@@ -77,7 +77,13 @@ import (
 // re-derives them — `deja friction` reads the records and sees the difference,
 // while `hook-tool-after` and the environment block read the manifest and stay
 // silent, which is the state this bump exists to end (#2444).
-const version = 31
+// 32: goose sessions are kept unless goose says it wrote them for itself. The
+// filter was an allow-list, so a way of reaching goose that it did not name
+// was dropped. A store built under the old rules is missing those sessions,
+// and the db path only re-reads what has been touched since its watermark, so
+// without the bump they stay missing until each is used again — the same shape
+// as 21, 22 and 23 (#2873).
+const version = 32
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

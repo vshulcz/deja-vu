@@ -47,21 +47,21 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Project: project,
 		Path:    path,
 	}
+	// The first line is the session header — id, timestamp, cwd — and an
+	// offset parse starts past it, so a resumed read fell back to the filename
+	// for the id and, where the header carries the cwd, to the directory name
+	// for the project. The filename is `<ISO>_<uuid>`, so appending one turn
+	// filed the tail under an id the whole read never produces (#2870).
+	if offset > 0 {
+		if head, herr := firstJSONLObject(path); herr == nil {
+			applyPiHeader(&s, head, useHeaderCwd)
+		}
+	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		switch typ {
 		case "session":
-			// First line: session header with id and timestamp.
-			if id, _ := m["id"].(string); id != "" {
-				s.ID = id
-			}
-			if useHeaderCwd {
-				if cwd, _ := m["cwd"].(string); cwd != "" {
-					s.Project = claudeProjectName(pathToProjectKey(cwd))
-				}
-			}
-			t := parseTimeAny(m["timestamp"])
-			s.Touch(t)
+			applyPiHeader(&s, m, useHeaderCwd)
 		case "message":
 			msg, ok := m["message"].(map[string]any)
 			if !ok {
@@ -94,6 +94,23 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// applyPiHeader reads identity out of the `session` header line, whether it
+// arrived in the scan or was fetched separately because the scan began past it.
+func applyPiHeader(s *model.Session, m map[string]any, useHeaderCwd bool) {
+	if typ, _ := m["type"].(string); typ != "session" {
+		return
+	}
+	if id, _ := m["id"].(string); id != "" {
+		s.ID = id
+	}
+	if useHeaderCwd {
+		if cwd, _ := m["cwd"].(string); cwd != "" {
+			s.Project = claudeProjectName(pathToProjectKey(cwd))
+		}
+	}
+	s.Touch(parseTimeAny(m["timestamp"]))
 }
 
 // piProjectName derives the project display name from the encoded directory

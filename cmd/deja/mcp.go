@@ -442,6 +442,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
 				commandListingLine(p.Command))
 		}
+		usage.RecordResult(dir, usage.KindFix, fb.Len(), len(pairs), false)
 		// Framed like `how` (#2844) and for a sharper reason: this hands an
 		// agent a command at the moment it has just hit an error, which is
 		// the moment it is most likely to run it without reading. The
@@ -501,6 +502,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// travel with the answer rather than to a terminal it never sees.
 			out += "\n\n" + note
 		}
+		usage.RecordResult(dir, usage.KindHow, len(out), len(entries), false)
 		// Framed like every other agent-facing recall: these are command lines
 		// lifted out of transcripts, which recall_frame.go names as data an
 		// attacker may have influenced — and they are the most directly
@@ -1478,7 +1480,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)
-	text := b.String()
+	text := b.String() + contextOthersNote(len(hits))
 	if hits[0].Tier != search.TierExact {
 		text = contextTierLead(hits[0].Tier, sessionNamesTheAsked(whole, q, result.TermIDF)) +
 			contextIgnoredWords(result) + text
@@ -1546,6 +1548,24 @@ func pluralHave(n int) string {
 		return "has"
 	}
 	return "have"
+}
+
+// contextOthersNote says how many other sessions matched the question this
+// digest answers.
+//
+// The tool returns one session on purpose. What it did not say is how many it
+// chose from, so a digest picked out of forty read exactly like the only thing
+// deja held — the misread #1308 fixed for the counted page, where "(5
+// match(es))" reads as five exist. blame already names what it left out.
+//
+// Silent on a single match: a sentence about others would be untrue, and an
+// agent told to go looking spends a call finding nothing.
+func contextOthersNote(hits int) string {
+	if hits < 2 {
+		return ""
+	}
+	return fmt.Sprintf("\n%d other session%s matched this question — call recall for the list if this one does not answer it.\n",
+		hits-1, pluralS(hits-1))
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in

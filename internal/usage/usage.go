@@ -43,6 +43,18 @@ const (
 	// KindDejaVu marks a per-prompt recall: the user asked something their
 	// own history already answers — the product's namesake moment.
 	KindDejaVu = "dejavu"
+	// KindHow and KindFix are the two MCP tools that hand an agent a command
+	// to run. They were the only answers missing from the journal, which is
+	// the record of what the agent was given — the same argument KindBlame and
+	// KindResource were added on (#682), and sharper: what these serve is the
+	// most directly actionable thing deja has (#2858).
+	//
+	// Recorded, and deliberately not in servedKind. That classifier decides
+	// the ratios `deja stats` publishes, and what it counts is the store's
+	// text handed over; a one-line command is not that. Keeping them out means
+	// every number published before and after this stays comparable.
+	KindHow = "how"
+	KindFix = "fix"
 	// KindTool is the PreToolUse hook injection — one line about a command or
 	// file the agent is acting on. It is deduped per session, so it counts a
 	// distinct fact served, not every action. Leaving it out made deja's most

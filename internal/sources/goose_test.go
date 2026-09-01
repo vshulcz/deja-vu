@@ -154,7 +154,9 @@ func TestGooseDataDirFollowsPathRoot(t *testing.T) {
 
 // Goose stores subagent turns and cron-recipe runs in the same table as real
 // sessions. Recall is about the user's own work, so those stay out; rows from
-// before the column existed have no type and stay in.
+// before the column existed have no type and stay in. The acp session type is
+// a user-visible Goose session and belongs in recall alongside plain user
+// sessions.
 func TestParseGooseDBSkipsNonUserSessions(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not installed")
@@ -163,13 +165,23 @@ func TestParseGooseDBSkipsNonUserSessions(t *testing.T) {
 	sql := `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text, session_type text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 insert into sessions values ('s_user','n','mine','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','user');
+insert into sessions values ('s_acp','n','acp','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','acp');
+insert into sessions values ('s_term','n','terminal','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','terminal');
+insert into sessions values ('s_gw','n','gateway','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','gateway');
 insert into sessions values ('s_sub','n','subagent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','subagent');
 insert into sessions values ('s_cron','n','cron','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','scheduled');
+insert into sessions values ('s_hidden','n','no-session','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','hidden');
+insert into sessions values ('s_new','n','a type goose adds later','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','somethingnew');
 insert into sessions values ('s_old','n','legacy','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z',null);
 insert into messages values (1,'s_user','user','[{"type":"text","text":"mine"}]',1784282401);
-insert into messages values (2,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
-insert into messages values (3,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
-insert into messages values (4,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);`
+insert into messages values (2,'s_acp','user','[{"type":"text","text":"acp sessions"}]',1784282401);
+insert into messages values (3,'s_term','user','[{"type":"text","text":"terminal session"}]',1784282401);
+insert into messages values (4,'s_gw','user','[{"type":"text","text":"gateway noise"}]',1784282401);
+insert into messages values (5,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
+insert into messages values (6,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
+insert into messages values (7,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);
+insert into messages values (8,'s_hidden','user','[{"type":"text","text":"a run that kept no session"}]',1784282401);
+insert into messages values (9,'s_new','user','[{"type":"text","text":"a type goose has not shipped yet"}]',1784282401);`
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
@@ -181,8 +193,14 @@ insert into messages values (4,'s_old','user','[{"type":"text","text":"legacy"}]
 	for _, s := range ss {
 		got[s.ID] = true
 	}
-	if !got["s_user"] || !got["s_old"] {
-		t.Fatalf("dropped sessions that belong in recall: %v", got)
+	// `hidden` is `goose run --no-session` and `gateway` is a person reaching
+	// goose from a chat app: both are somebody's work, so both are in. And a
+	// type goose has not shipped yet is in too — the allow-list dropped one
+	// silently, which is how #2873 happened.
+	for _, id := range []string{"s_user", "s_old", "s_acp", "s_term", "s_gw", "s_hidden", "s_new"} {
+		if !got[id] {
+			t.Errorf("%s belongs in recall and was dropped: %v", id, got)
+		}
 	}
 	if got["s_sub"] || got["s_cron"] {
 		t.Fatalf("subagent or scheduled runs leaked into recall: %v", got)

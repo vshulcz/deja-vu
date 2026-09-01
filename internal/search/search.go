@@ -17,6 +17,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -2199,7 +2200,7 @@ func proseForSnippet(s string) string {
 	var keep []string
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" || looksNumbered(line) || looksToolDump(line) {
+		if line == "" || looksNumbered(line) || looksToolDump(line) || digest.IsListingDump(line) {
 			continue
 		}
 		keep = append(keep, line)
