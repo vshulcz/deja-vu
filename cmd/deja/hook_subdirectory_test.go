@@ -67,3 +67,42 @@ func hookDigestAt(t *testing.T, cwd string) string {
 	withHookStdin(t, hookPayload(t, map[string]string{"source": "startup", "session_id": "s", "cwd": cwd}))
 	return captureStdout(t, func() { runHookContextPlain(t) })
 }
+
+// And only inside a checkout. Measured on a real store, standing in a home
+// directory admitted 697 of 768 sessions with touched files — every project on
+// the machine, under a line that says the sessions are from this project
+// (#2040, and #2343 for what that line promises).
+func TestAnUmbrellaDirectoryDoesNotRecallEverythingUnderIt(t *testing.T) {
+	tmp := hermeticEnv(t)
+	// No .git anywhere above: an ordinary directory holding two projects.
+	work := filepath.Join(tmp, "work")
+	other := filepath.Join(work, "someone-elses-project")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
+	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), encodedProjectDir(other))
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	lines := []string{
+		`{"type":"user","sessionId":"theirs","timestamp":"` + at + `","cwd":` + mustJSON(t, other) +
+			`,"message":{"role":"user","content":"the frobnicator keeps dropping its widgets"}}`,
+		`{"type":"assistant","sessionId":"theirs","timestamp":"` + at + `","cwd":` + mustJSON(t, other) +
+			`,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","id":"t1","input":{"file_path":` +
+			mustJSON(t, filepath.Join(other, "frob.go")) + `,"old_string":"a","new_string":"b"}}]}}`,
+	}
+	if err := os.WriteFile(filepath.Join(store, "theirs.jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if out := hookDigestAt(t, work); strings.Contains(out, "frobnicator") {
+		t.Errorf("a directory that is not a checkout recalled what is under it:\n%s", out)
+	}
+	// The project itself still recalls its own work.
+	if out := hookDigestAt(t, other); !strings.Contains(out, "frobnicator") {
+		t.Errorf("the project stopped recalling its own session:\n%s", out)
+	}
+}
