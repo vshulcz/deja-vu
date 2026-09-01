@@ -21,13 +21,25 @@ type Client struct {
 
 var probeURLs = []string{"http://localhost:11434/api/embed", "http://localhost:1234/v1/embeddings"}
 
+// Off reports whether embedding is switched off for this process. The probe
+// below reaches localhost, so without a way to say no, a machine running a
+// local model answers differently from one that is not — a test suite that
+// asserts "no endpoint" goes red on a developer's machine and stays green on
+// CI, which is the worst way round for a contributor to meet it.
+func Off() bool { return os.Getenv("DEJA_EMBED_OFF") == "1" }
+
 func New() (*Client, error) {
 	model := os.Getenv("DEJA_EMBED_MODEL")
 	if model == "" {
 		model = "nomic-embed-text"
 	}
+	// A configured endpoint wins over the switch: saying where to embed is
+	// asking for it, and the switch is about the probe below.
 	if endpoint := os.Getenv("DEJA_EMBED_URL"); endpoint != "" {
 		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
+	}
+	if Off() {
+		return nil, fmt.Errorf("embedding is off (DEJA_EMBED_OFF=1)")
 	}
 	for _, endpoint := range probeURLs {
 		c := &Client{URL: endpoint, Model: model, HTTP: &http.Client{Timeout: 30 * time.Second}}

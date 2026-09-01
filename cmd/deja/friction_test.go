@@ -76,6 +76,7 @@ func frictionEnv(t *testing.T) string {
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
+	t.Setenv("DEJA_EMBED_OFF", "1")
 	return root
 }
 
