@@ -154,7 +154,9 @@ func TestGooseDataDirFollowsPathRoot(t *testing.T) {
 
 // Goose stores subagent turns and cron-recipe runs in the same table as real
 // sessions. Recall is about the user's own work, so those stay out; rows from
-// before the column existed have no type and stay in.
+// before the column existed have no type and stay in. The acp session type is
+// a user-visible Goose session and belongs in recall alongside plain user
+// sessions.
 func TestParseGooseDBSkipsNonUserSessions(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not installed")
@@ -163,13 +165,15 @@ func TestParseGooseDBSkipsNonUserSessions(t *testing.T) {
 	sql := `create table sessions (id text primary key, name text, description text, working_dir text, created_at text, updated_at text, session_type text);
 create table messages (id integer primary key autoincrement, session_id text, role text, content_json text, created_timestamp integer);
 insert into sessions values ('s_user','n','mine','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','user');
+insert into sessions values ('s_acp','n','acp','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','acp');
 insert into sessions values ('s_sub','n','subagent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','subagent');
 insert into sessions values ('s_cron','n','cron','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','scheduled');
 insert into sessions values ('s_old','n','legacy','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z',null);
 insert into messages values (1,'s_user','user','[{"type":"text","text":"mine"}]',1784282401);
-insert into messages values (2,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
-insert into messages values (3,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
-insert into messages values (4,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);`
+insert into messages values (2,'s_acp','user','[{"type":"text","text":"acp sessions"}]',1784282401);
+insert into messages values (3,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
+insert into messages values (4,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
+insert into messages values (5,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);`
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
@@ -181,7 +185,7 @@ insert into messages values (4,'s_old','user','[{"type":"text","text":"legacy"}]
 	for _, s := range ss {
 		got[s.ID] = true
 	}
-	if !got["s_user"] || !got["s_old"] {
+	if !got["s_user"] || !got["s_old"] || !got["s_acp"] {
 		t.Fatalf("dropped sessions that belong in recall: %v", got)
 	}
 	if got["s_sub"] || got["s_cron"] {
