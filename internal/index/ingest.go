@@ -2876,7 +2876,12 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			}
 		}
 		switch harnessForPath(p) {
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok", "qwen", "goose-jsonl":
+		// omp, openclaw and prime read the same pi-shaped transcript pi does,
+		// through the same parser, and had offset entries in the registry that
+		// nothing ever reached — so a pass that saw one new turn re-read the
+		// file whole. They join the list now that a resumed read keeps the
+		// session header (#2870).
+		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok", "qwen", "goose-jsonl", "omp", "openclaw", "prime":
 		default:
 			return false
 		}
