@@ -1206,6 +1206,26 @@ func walkRecordsStable(dir string, walk func(m Manifest) error) error {
 	return errors.New("the index was rebuilt while this read was in flight — run it again")
 }
 
+// eachRecordOfRoles is EachRecordOfRole for more than one role at a time, in
+// the order the records were written. A caller that ties a command to what it
+// printed needs both roles in one pass: two passes would lose the order
+// between them.
+func eachRecordOfRoles(dir string, roles map[string]bool, fn func(SessionMeta, Record)) error {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	return walkRecordsStable(dir, func(m Manifest) error {
+		return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+			if !roles[r.Role] {
+				return
+			}
+			if meta, ok := m.Sessions[r.Key]; ok {
+				fn(meta, r)
+			}
+		})
+	})
+}
+
 // EachRecordOfRole streams every record of one role with the session it came
 // from. Ranked retrieval is the wrong instrument when the caller has an exact
 // key and needs every match rather than the best ones — restore is that case
