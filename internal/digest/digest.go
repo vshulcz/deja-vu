@@ -143,7 +143,7 @@ func MessageText(s string) string {
 }
 
 var (
-	shareLineNumRE = regexp.MustCompile(`^\s*\d{1,6}\s`)            // "1 diff --git", numbered dumps
+	shareLineNumRE = regexp.MustCompile(`^\s*\d{1,6}[ \t]`)         // "1\tdiff --git", numbered dumps
 	shareGrepRE    = regexp.MustCompile(`^\S+\.[a-z]{1,5}:\d+[:)]`) // path/file.go:18: grep output
 	shareShellRE   = regexp.MustCompile(`^\((eval|\w*sh)\):\d*:?`)  // zsh/bash error prefixes
 	shareDigitsRE  = regexp.MustCompile(`^[\d\s.,%-]+$`)            // bare number sequences
@@ -193,9 +193,62 @@ func looksLikeProse(line string) bool {
 }
 
 func noiseLine(line string) bool {
-	return shareLineNumRE.MatchString(line) || shareGrepRE.MatchString(line) ||
+	return numberedDumpLine(line) || shareGrepRE.MatchString(line) ||
 		shareShellRE.MatchString(line) || shareDigitsRE.MatchString(line) ||
 		looksLikeListingDump(line)
+}
+
+// numberedDumpLine reports whether a line that opens with a number is a line
+// out of a numbered listing rather than a sentence that starts with one.
+//
+// The rule used to be the number alone, which dropped every sentence opening
+// with a count — "12 зелёных. Жду ревьюера перед мержем.", "505 отказов записи
+// за 16 часов". Measured on a real store: of the lines it matched in assistant
+// text, 917 were sentences and none was a listing, because a numbered listing
+// arrives inside a code fence and MessageText returns those whole.
+//
+// What separates them, read off the same store rather than guessed: `cat -n`
+// and the file readers put a tab after the number, and the dumps that use a
+// space — `3 files changed, 9 insertions(+)`, `300 index.js` — are fragments
+// with no sentence in them. So a space-separated line survives only if it
+// reads as one.
+func numberedDumpLine(line string) bool {
+	if !shareLineNumRE.MatchString(line) {
+		return false
+	}
+	rest := strings.TrimLeft(line, " ")
+	i := 0
+	for i < len(rest) && rest[i] >= '0' && rest[i] <= '9' {
+		i++
+	}
+	if i < len(rest) && rest[i] == '\t' {
+		return true
+	}
+	body := strings.TrimSpace(rest[i:])
+	// A pipe opens a table row, which is what the numbered rows of a rendered
+	// listing look like.
+	if strings.HasPrefix(body, "|") {
+		return true
+	}
+	return !hasSentenceEnd(body)
+}
+
+// hasSentenceEnd reports whether the text closes a sentence anywhere, by the
+// same rule firstSentences counts them: a stop with a space after it, or one
+// of the CJK stops, which take no space.
+func hasSentenceEnd(s string) bool {
+	for i, r := range s {
+		switch {
+		case r == '.' || r == '!' || r == '?':
+			next := i + utf8.RuneLen(r)
+			if next >= len(s) || s[next] == ' ' {
+				return true
+			}
+		case isCJKSentenceEnd(r):
+			return true
+		}
+	}
+	return false
 }
 
 // shareStopwords: a line of 8+ tokens with none of these is a path listing or
