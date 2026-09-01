@@ -814,6 +814,25 @@ func hookDigestResult(dir string) (string, int, int64, []string, int, []string, 
 // project the call is about, rather than one reading it back out of the
 // environment, where a project deja itself had written stayed for every later
 // call in the process (#2182, #2185).
+
+// withProjectsOf adds the projects of sessions already chosen to a name list,
+// without disturbing its order: the names the caller guessed come first, and
+// what the store answered with follows.
+func withProjectsOf(names []string, ss []model.Session) []string {
+	have := make(map[string]bool, len(names))
+	for _, n := range names {
+		have[strings.ToLower(n)] = true
+	}
+	out := names
+	for _, s := range ss {
+		if p := strings.ToLower(s.Project); p != "" && !have[p] {
+			have[p] = true
+			out = append(out, s.Project)
+		}
+	}
+	return out
+}
+
 func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
 	withheld := 0
 	defer func() { _ = recover() }()
@@ -889,7 +908,10 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	if len(taskFiles) > 0 {
 		perName = 12
 	}
-	if got, err := index.RecentProjects(dir, lookupNames, perName); err == nil {
+	// The cwd as well as the names it can guess: a session started in a
+	// subdirectory keeps that directory's name, and no list of names reaches
+	// down to it (#2040).
+	if got, err := index.RecentProjectsUnder(dir, lookupNames, cwd, perName); err == nil {
 		for _, s := range got {
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				withheld++
@@ -939,7 +961,13 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// corrects unmarked (#761).
 	ss, rejectedWarning := orderForInjection(ss)
 	ss = leadWithUnseen(dir, names, ss)
-	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: mode, ProjectNames: names, TaskScores: scores})
+	// A session found by where its work happened carries the name of the
+	// directory it was started in, which is not one the cwd can guess — the
+	// safe-mode filter is a name list, so the evidence that admitted the
+	// session admits its name with it (#2040). The trust policy has already
+	// had its say on each of these, one session at a time, above.
+	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
+		Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores})
 	mark("build-digest")
 	if result.Sessions == 0 {
 		matched = nil

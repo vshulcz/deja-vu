@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func Search(dir string, o query.Options) ([]model.Session, error) {
@@ -1759,6 +1760,20 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 // RecentProjects is RecentProject for several project names at once: one
 // manifest read and one records pass instead of names × sessions scans.
 func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
+	return RecentProjectsUnder(dir, projects, "", perName)
+}
+
+// RecentProjectsUnder is RecentProjects plus the sessions whose work happened
+// inside root, whatever they are called.
+//
+// A project is a name derived from where a session was started, and a caller
+// can guess the names above it — a subdirectory finds its repository (#2039).
+// Downward it cannot: there is no list of the names a repository's
+// subdirectories might have produced, so standing at the root found nothing of
+// what happened inside it (#2040). The files a session touched are already in
+// the manifest and say where the work was, so the root asks that instead of
+// guessing.
+func RecentProjectsUnder(dir string, projects []string, root string, perName int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1799,7 +1814,89 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 			}
 		}
 	}
+	// And what happened under the caller's own checkout, however it was named.
+	// Ranked among themselves by recency and cut to the same per-name cap, so
+	// a repository with many subdirectories contributes as much as any one
+	// name does; from there they compete with the rest on the caller's own
+	// score and recency rule.
+	if under := metasWorkingUnder(m, root, seen); len(under) > 0 {
+		sort.Slice(under, func(i, j int) bool { return newestFirstMeta(under[i], under[j]) })
+		if perName > 0 && len(under) > perName {
+			under = under[:perName]
+		}
+		metas = append(metas, under...)
+	}
 	return sessionsForMetas(dir, metas)
+}
+
+// metasWorkingUnder is the sessions whose touched files sit under root and
+// which no name has already claimed. Nothing when root is empty, so a caller
+// that does not know where it stands is unaffected.
+//
+// A repository, not any directory: measured on a real store, standing in a
+// home directory admitted 697 of 768 sessions with touched files — every
+// project on the machine, injected under a line that says "from this project's
+// recent history" (#2343's shape). The checkout is the boundary a person means
+// by "this project", so anything that is not one answers with nothing.
+func metasWorkingUnder(m Manifest, root string, seen map[string]bool) []SessionMeta {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return nil
+	}
+	repo := sources.RepoRoot(root)
+	if repo == "" || sameDir(repo, homeDir()) {
+		// A checkout at the home directory — a dotfiles repo — is a repository
+		// whose "work" is the whole machine. Everything under it keeps its own
+		// name, as before.
+		return nil
+	}
+	prefix := filepath.ToSlash(filepath.Clean(root))
+	if prefix == "" || prefix == "/" || prefix == "." {
+		return nil
+	}
+	prefix += "/"
+	var out []SessionMeta
+	for _, meta := range m.Sessions {
+		k := meta.Harness + ":" + meta.ID
+		if seen[k] {
+			continue
+		}
+		for _, p := range meta.Touched {
+			if !underDir(p, prefix) {
+				continue
+			}
+			seen[k] = true
+			out = append(out, meta)
+			break
+		}
+	}
+	return metasNotIgnored(out)
+}
+
+// underDir reports whether p sits under a slash-terminated directory prefix,
+// without lowering either side into a new string: this runs over every touched
+// path of every session in the manifest, on the session-start hook, and the
+// lowering alone was 12 MB of garbage on a large store.
+func underDir(p, prefix string) bool {
+	p = filepath.ToSlash(p)
+	if len(p) <= len(prefix) {
+		return false
+	}
+	return strings.EqualFold(p[:len(prefix)], prefix)
+}
+
+// sameDir compares two directories the way the filesystem would for this
+// purpose: case-insensitively, since the callers are a cwd and a home.
+func sameDir(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
+}
+
+func homeDir() string {
+	h, _ := os.UserHomeDir()
+	return h
 }
 
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
