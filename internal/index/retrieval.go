@@ -3820,21 +3820,18 @@ func tokens(s string) []string {
 	return out
 }
 
+// indexKeys collects what textKeys emits, in order and with its repeats. The
+// build path streams the keys instead; this is what the tests read, so they
+// read the same emitter the build does.
+//
+// Bigram keys fold Traditional to Simplified so the same word written either
+// way lands on one key and a query in one script reaches content in the other.
+// Folding only the key keeps the stored text untouched. The emitter folds runs
+// in place and dedupes folded pairs — cheaper than folding each emitted
+// bigram, and every caller collapses repeated keys anyway (#492).
 func indexKeys(s string) []string {
 	var out []string
-	for _, tok := range tokens(s) {
-		out = append(out, "t"+tok)
-	}
-	for _, part := range identifierParts(s) {
-		out = append(out, "t"+part)
-	}
-	// Bigram keys fold Traditional to Simplified so the same word written
-	// either way lands on one key and a query in one script reaches content in
-	// the other. Folding only the key keeps the stored text untouched. The
-	// emitter folds runs in place and dedupes folded pairs — cheaper than
-	// folding each emitted bigram, and every caller collapses repeated keys
-	// anyway (#492).
-	cjkIndexKeys(s, func(tok string) {
+	textKeys(s, func(tok string) {
 		out = append(out, tok)
 	})
 	return out
