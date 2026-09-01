@@ -254,6 +254,33 @@ func LoadNotes() []model.Session {
 	return ss
 }
 
+// noteIDProject is the project name as a session id can carry it. An id is
+// what every other surface keys on, and a project of "../../etc" put a path
+// inside one.
+func noteIDProject(project string) string {
+	var b strings.Builder
+	for _, r := range project {
+		switch r {
+		case '/', '\\', ':':
+			b.WriteByte('-')
+		case '.':
+			// A dot is ordinary inside a name ("api.v2") and a way out of the
+			// tree in a run of them.
+			if strings.HasSuffix(b.String(), ".") {
+				continue
+			}
+			b.WriteRune(r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	out := strings.Trim(b.String(), "-.")
+	if out == "" {
+		return "notes"
+	}
+	return out
+}
+
 func ParseNotesFile(path string) ([]model.Session, error) {
 	return ParseNotesFileFromOffset(path, 0)
 }
@@ -281,6 +308,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		if project == "" {
 			project = "notes"
 		}
+		idProject := noteIDProject(project)
 		if kind, _ := m["kind"].(string); kind == "promoted" {
 			// One session per promoted source session; corrections append as
 			// further messages and the title tracks the latest state.
@@ -341,7 +369,7 @@ func ParseNotesFileFromOffset(path string, offset int64) ([]model.Session, error
 		key := project + "\x00" + day
 		s := byDay[key]
 		if s == nil {
-			s = &model.Session{ID: "deja-" + day + "-" + project, Harness: "deja", Project: project, Path: path}
+			s = &model.Session{ID: "deja-" + day + "-" + idProject, Harness: "deja", Project: project, Path: path}
 			byDay[key] = s
 		}
 		s.Touch(t)
