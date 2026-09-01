@@ -957,7 +957,7 @@ func Conclusions(s model.Session, budget int, max int) []string {
 	var out []string
 	spent := 0
 	for i := len(picked) - 1; i >= 0 && len(out) < max; i-- {
-		line := firstSentences(MessageText(picked[i].Text), 2)
+		line := decisionLead(MessageText(picked[i].Text))
 		if line == "" {
 			continue
 		}
@@ -989,6 +989,62 @@ func Conclusions(s model.Session, budget int, max int) []string {
 		if spent >= budget {
 			break
 		}
+	}
+	return out
+}
+
+// decisionLead is the part of a picked message the block quotes: its opening
+// two sentences, unless the words that make it a conclusion are further in.
+//
+// A reply is diagnosis-first, so the opening is the right default and #1336's
+// whole-sentences rule is built on it. But the head is not always where the
+// conclusion lives, and when it is not, the block quoted the diagnosis and
+// dropped the outcome — measured on a real store, 211 of 490 sessions that
+// settled something handed over a block that no longer read as one (#2243).
+//
+// One sentence, not the head plus it: the budget is the reason the conclusion
+// fell off in the first place.
+func decisionLead(text string) string {
+	head := firstSentences(text, 2)
+	if head == "" || CarriesDecision(head) {
+		return head
+	}
+	for _, sent := range sentencesOf(text) {
+		if CarriesDecision(sent) {
+			return sent
+		}
+	}
+	return head
+}
+
+// sentencesOf splits on the same stops firstSentences counts, so the two agree
+// on what a sentence is — including the space-after rule that keeps "v1.2"
+// whole and the CJK stops that have no space after them.
+func sentencesOf(s string) []string {
+	s = strings.TrimSpace(strings.ReplaceAll(s, "\n", " "))
+	if s == "" {
+		return nil
+	}
+	var out []string
+	start := 0
+	for i, r := range s {
+		switch {
+		case r == '.' || r == '!' || r == '?':
+			if i+1 < len(s) && s[i+1] != ' ' {
+				continue
+			}
+		case isCJKSentenceEnd(r):
+		default:
+			continue
+		}
+		end := i + utf8.RuneLen(r)
+		if sent := strings.TrimSpace(s[start:end]); sent != "" {
+			out = append(out, sent)
+		}
+		start = end
+	}
+	if sent := strings.TrimSpace(s[start:]); sent != "" {
+		out = append(out, sent)
 	}
 	return out
 }
