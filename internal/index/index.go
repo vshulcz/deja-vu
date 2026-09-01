@@ -98,6 +98,12 @@ import (
 // cap and no query reached the words inside it; it now emits the overlapping
 // bigrams CJK has had since 21. A store built before this holds the sentences
 // and nothing re-derives the bigrams without the bump (#2897).
+//
+// The same bump carries one subtraction: a bigram of two function runes — 的了,
+// 在哪, 什么 — is grammar, the query side has dropped it from the term list
+// since it was written, and the index was storing the most frequent pairs in
+// the language for nothing. Measured on a 42 MB Chinese corpus, buckets 75.5
+// MB to 70.7 MB (#492).
 const version = 34
 const maxIndexedText = 64 * 1024
 

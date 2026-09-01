@@ -3955,7 +3955,10 @@ func queryKeys(s string) []string {
 	// query is all stop words, keep them (odd results beat none).
 	content := make([]string, 0, len(toks))
 	for _, tok := range toks {
-		if !query.IsStopWord(tok) {
+		// A bigram of two function runes is grammar, and the index no longer
+		// stores one: asking for it would AND the query against a key that
+		// cannot exist (#492).
+		if !query.IsStopWord(tok) && !query.CJKFunctionBigram(tok) {
 			content = append(content, tok)
 		}
 	}
