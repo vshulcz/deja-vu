@@ -623,14 +623,14 @@ var decisionMarkers = []string{
 	// live questions turns into a pointer.
 	"теперь ", "стало ", "становится", "лежит в", "работает через",
 	"по умолчанию", "переехал", "now lives", "now goes", "by default",
-	// A decision is as often reported as the state something ended up in as by
-	// the act of deciding. Measured over 4000 assistant lines from a real
-	// store, the list above marks 4% of them, and lines like "прод-пины теперь
-	// ложатся на deploy/prod" or "бывшая ведущая становится ведомой" — plainly
-	// the outcome of a decision — were read as passing mentions. With these the
-	// share is 9%, the benchmark does not move, and one off-topic block of 58
-	// live questions turns into a pointer.
-
+	// The English half was missing the shapes English actually uses to close
+	// something. Counted over 41,084 real messages, the Russian markers fired
+	// 149 times on "решили" and 47 on "в итоге" while their English mirrors —
+	// "we settled on", "in the end we", "Decision:" at the start of a line —
+	// fired once or twice each: the store is Russian-dominant, so the gap read
+	// as rare rather than as a hole (#2340). It is a hole for a reader working
+	// in English, and these are the same shapes as the entries above them.
+	"settled on", "went with", "ended up", "in the end", "opted for",
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather
