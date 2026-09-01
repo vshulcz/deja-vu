@@ -869,6 +869,7 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	return entries, f, nil
 }
 
+// encodePostings encodes a posting block with per-block offset and session deltas.
 func encodePostings(posts []posting) []byte {
 	if len(posts) == 0 {
 		return nil
@@ -876,24 +877,41 @@ func encodePostings(posts []posting) []byte {
 	s := sortedUniquePostings(posts)
 	b := make([]byte, 0, len(s)*6)
 	var prev int64
+	var prevSid uint32
 	for _, p := range s {
 		b = binary.AppendUvarint(b, uint64(p.Off-prev))
-		// The tool bit rides in the low bit of the session field: a separate
-		// varint would cost a byte on every posting in the store, and the shift
-		// costs nothing until a corpus passes two billion sessions.
-		v := uint64(p.Sid) << 1
+		// A block is sorted by offset and records.bin is written in session
+		// order, so the session ids in one block are nearly sorted: 99.66% of
+		// postings on a real store carry an id no smaller than the one before
+		// them, and writing the difference instead of the id took 16% off the
+		// buckets (#492). Zigzag because "nearly" is not "always" — the ids
+		// that step backwards must survive too.
+		//
+		// The subtraction is deliberately modulo 2^32, which is what int32 of
+		// a uint32 difference gives: it round-trips the whole id space rather
+		// than the half an int32 could hold.
+		d := int32(p.Sid - prevSid)
+		z := uint32((d << 1) ^ (d >> 31))
+		// The tool bit rides in the low bit, where it has always ridden: a
+		// separate varint would cost a byte on every posting in the store.
+		v := uint64(z) << 1
 		if p.Tool {
 			v |= 1
 		}
 		b = binary.AppendUvarint(b, v)
 		prev = p.Off
+		prevSid = p.Sid
 	}
 	return b
 }
 
+// decodePostings mirrors encodePostings. A truncated varint ends the walk and
+// yields what was whole: a bucket cut short by a crash is a cache miss, not a
+// panic, and two callers already depend on the prefix coming back.
 func decodePostings(b []byte) []posting {
 	out := make([]posting, 0)
 	var prev int64
+	var prevSid uint32
 	for len(b) > 0 {
 		d, n := binary.Uvarint(b)
 		if n <= 0 {
@@ -901,11 +919,15 @@ func decodePostings(b []byte) []posting {
 		}
 		prev += int64(d)
 		b = b[n:]
-		sid, n := binary.Uvarint(b)
+		v, n := binary.Uvarint(b)
 		if n <= 0 {
 			return out
 		}
-		out = append(out, posting{Off: prev, Sid: uint32(sid >> 1), Tool: sid&1 == 1})
+		z := uint32(v >> 1)
+		sidDelta := int32(z>>1) ^ -int32(z&1)
+		sid := prevSid + uint32(sidDelta)
+		out = append(out, posting{Off: prev, Sid: sid, Tool: v&1 == 1})
+		prevSid = sid
 		b = b[n:]
 	}
 	return out

@@ -104,6 +104,17 @@ import (
 // since it was written, and the index was storing the most frequent pairs in
 // the language for nothing. Measured on a 42 MB Chinese corpus, buckets 75.5
 // MB to 70.7 MB (#492).
+//
+// And one more subtraction on the same rebuild, because it is the same
+// rebuild: a posting's session id is written as a delta against the previous
+// posting in its block rather than in full. A block is sorted by offset and
+// records.bin is written in session order, so on a real store 99.66% of
+// postings already hold a session id no smaller than the one before them.
+// Measured by two contributors on two real stores, buckets fall 16.11% and
+// 11.95%; the bucket magic moves with it so a reader that skips the version
+// check — an index directory that cannot be locked is served without one —
+// gets errCorruptIndex rather than session ids that are wrong without saying
+// so (#492).
 const version = 34
 const maxIndexedText = 64 * 1024
 
@@ -112,7 +123,15 @@ const maxIndexedText = 64 * 1024
 // a corrupt length prefix — reject it rather than allocate up to 4 GiB.
 const maxRecordSize = 8 << 20
 
-var bucketMagic = []byte("DJB1")
+// bucketMagic moves whenever the meaning of the bytes behind it moves. The
+// version bump above rebuilds the index on the next Ensure, but a directory
+// that cannot be locked is served as it stands, with no version check at all
+// (EnsureForSearch, EnsureForSearchNoWait) — the read-only container this
+// repo deliberately supports. Reading old posting bytes under a new rule
+// there would hand back session ids that are wrong rather than absent, and
+// nothing would say so; failing the magic check instead makes it a corrupt
+// index, which callers already treat as a cache miss (#492).
+var bucketMagic = []byte("DJB2")
 
 // errCorruptIndex marks unreadable index structures (e.g. a bucket file cut
 // short by a crash). Callers treat it as a cache miss and rebuild.
