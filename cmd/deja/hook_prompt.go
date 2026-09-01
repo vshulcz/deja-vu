@@ -260,89 +260,109 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		leadTerms = ordered[:min(len(ordered), leadTermsKept)]
 	}
 	pol := policy.Load()
-	for i, s := range ranked {
-		// Every other injection path asks the policy first; this one is a
-		// per-prompt injection like any other, and imported projects reach
-		// it (a local project name is a substring of "imported:<name>").
-		if !pol.Allows(policy.ActivationAuto, s.Project) {
-			continue
-		}
-		// matched counts informative terms; strong counts the rare ones — a
-		// term that identifies something on its own rather than merely beating
-		// the corpus average. Two informative terms earn the announcement. A
-		// single term is a weak claim, so it only injects when that term is
-		// strong: "pgbouncer" answers a question, "problem" does not, and this
-		// hook pays its cost on every message the user sends. Measured on
-		// cross-paired prompts whose answer is absent, the old bar injected on
-		// 94% of them; half of those rested on one ordinary word.
-		if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
-			continue
-		}
-		// A word rare enough to identify something is a real match on its own —
-		// the bar just above says so in as many words, and lets such a question
-		// through. The payload rule did not: it asked only for two informative
-		// terms, so whether the reader got the memory or a pointer to it turned
-		// on whether some ordinary word of the question happened to also appear
-		// in that session.
-		//
-		// Measured on a real store over sixty subjects the project holds:
-		// "напомни, что мы решали про X" returned content 63% of the time and
-		// "what did we decide about X" returned it never — the same question,
-		// the same answer sitting in the same session.
-		if matched[i] >= 2 {
-			confident = true
-		}
-		if matched[i] >= 2 || strong[i] >= 1 {
-			worthDigest = true
-		}
-		// The session being written right now is never worth recalling to
-		// itself. Work merely fresh is a different case: "what did we just
-		// change" is a question about the last ten minutes, so age alone no
-		// longer withholds an answer — it only withholds the unprompted
-		// déjà vu line below.
-		//
-		// Asked before the narrowing below, not after: narrowing scans every
-		// message, the session being written is usually the longest one on the
-		// store, and it was scanned in full only to be dropped on the next
-		// line. Measured on a 1149-session store, moving these two checks up
-		// takes the hook's median from 181 ms to 136 ms.
-		if s.ID == input.SessionID {
-			continue
-		}
-		if !search.SpeechCarriesAnyTerm(s, leadTerms) {
-			// The subject matched, but only where a tool printed it: a
-			// failing job line, a bumped dependency, a pinned action
-			// version. Nobody in that session said anything about it, and a
-			// block built from those lines answers a different question
-			// than the one asked.
-			continue
-		}
-
-		// A marathon session that touched everything matches everything, so
-		// it used to be skipped whole. But the sessions people ask about are
-		// exactly the long ones — measured here, only 2% of sessions cross
-		// the line and they are the current work. The haystack argument is
-		// about the session as a whole and not about the part that matched,
-		// so narrow it to that part instead of dropping the answer.
-		if len(s.Messages) > dejaVuMaxMessages {
-			s = focusSession(s, terms)
-			if len(s.Messages) == 0 {
+	// How many candidates were dropped for saying what one already chosen
+	// says. A store repeats itself — the same complaint filed against forty
+	// shards — and those copies take the ranking's window with them, so the
+	// answer to the question can sit outside it (#1556).
+	crowdedOut := 0
+	pick := func(ranked []model.Session, matched, strong []int) {
+		for i, s := range ranked {
+			// Every other injection path asks the policy first; this one is a
+			// per-prompt injection like any other, and imported projects reach
+			// it (a local project name is a substring of "imported:<name>").
+			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				continue
 			}
+			// matched counts informative terms; strong counts the rare ones — a
+			// term that identifies something on its own rather than merely beating
+			// the corpus average. Two informative terms earn the announcement. A
+			// single term is a weak claim, so it only injects when that term is
+			// strong: "pgbouncer" answers a question, "problem" does not, and this
+			// hook pays its cost on every message the user sends. Measured on
+			// cross-paired prompts whose answer is absent, the old bar injected on
+			// 94% of them; half of those rested on one ordinary word.
+			if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
+				continue
+			}
+			// A word rare enough to identify something is a real match on its own —
+			// the bar just above says so in as many words, and lets such a question
+			// through. The payload rule did not: it asked only for two informative
+			// terms, so whether the reader got the memory or a pointer to it turned
+			// on whether some ordinary word of the question happened to also appear
+			// in that session.
+			//
+			// Measured on a real store over sixty subjects the project holds:
+			// "напомни, что мы решали про X" returned content 63% of the time and
+			// "what did we decide about X" returned it never — the same question,
+			// the same answer sitting in the same session.
+			if matched[i] >= 2 {
+				confident = true
+			}
+			if matched[i] >= 2 || strong[i] >= 1 {
+				worthDigest = true
+			}
+			// The session being written right now is never worth recalling to
+			// itself. Work merely fresh is a different case: "what did we just
+			// change" is a question about the last ten minutes, so age alone no
+			// longer withholds an answer — it only withholds the unprompted
+			// déjà vu line below.
+			//
+			// Asked before the narrowing below, not after: narrowing scans every
+			// message, the session being written is usually the longest one on the
+			// store, and it was scanned in full only to be dropped on the next
+			// line. Measured on a 1149-session store, moving these two checks up
+			// takes the hook's median from 181 ms to 136 ms.
+			if s.ID == input.SessionID {
+				continue
+			}
+			if !search.SpeechCarriesAnyTerm(s, leadTerms) {
+				// The subject matched, but only where a tool printed it: a
+				// failing job line, a bumped dependency, a pinned action
+				// version. Nobody in that session said anything about it, and a
+				// block built from those lines answers a different question
+				// than the one asked.
+				continue
+			}
+
+			// A marathon session that touched everything matches everything, so
+			// it used to be skipped whole. But the sessions people ask about are
+			// exactly the long ones — measured here, only 2% of sessions cross
+			// the line and they are the current work. The haystack argument is
+			// about the session as a whole and not about the part that matched,
+			// so narrow it to that part instead of dropping the answer.
+			if len(s.Messages) > dejaVuMaxMessages {
+				s = focusSession(s, terms)
+				if len(s.Messages) == 0 {
+					continue
+				}
+			}
+			// Two slots, two answers. The same content reaches the block from
+			// several sessions all the time — a marathon that was split, a
+			// resumed session, a workflow run again — and spending both slots on
+			// it costs the reader the second answer entirely. Measured on a
+			// seeded store where the question drifted from the wording of the
+			// session that settled it, both slots went to two copies of one
+			// neighbour on every framing but the near-verbatim one.
+			if sameAnswerAs(ss, s, terms) {
+				crowdedOut++
+				continue
+			}
+			ss = append(ss, s)
+			if len(ss) == 2 {
+				return
+			}
 		}
-		// Two slots, two answers. The same content reaches the block from
-		// several sessions all the time — a marathon that was split, a
-		// resumed session, a workflow run again — and spending both slots on
-		// it costs the reader the second answer entirely. Measured on a
-		// seeded store where the question drifted from the wording of the
-		// session that settled it, both slots went to two copies of one
-		// neighbour on every framing but the near-verbatim one.
-		if sameAnswerAs(ss, s, terms) {
-			continue
-		}
-		ss = append(ss, s)
-		if len(ss) == 2 {
-			break
+	}
+	pick(ranked, matched, strong)
+	// One slot left and duplicates took the window: ask for a wider one. The
+	// second pass costs a ranking read and happens only when the store said
+	// the same thing several times, which is exactly when the answer is
+	// further down than the window reached.
+	if len(ss) < 2 && crowdedOut > 0 {
+		wider, wmatched, wstrong, _, werr := index.ProjectRelevantSkipping(
+			dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates*widerWindow, skip)
+		if werr == nil {
+			pick(wider, wmatched, wstrong)
 		}
 	}
 	if len(ss) == 0 {
@@ -467,48 +487,74 @@ func askedBeforeWhen(s model.Session) string {
 // whole transcript: two sessions of the same workflow differ everywhere else
 // and agree exactly where it matters.
 func sameAnswerAs(chosen []model.Session, s model.Session, terms []string) bool {
-	next := matchedFingerprint(s, terms)
-	if next == "" {
+	next := matchedWords(s, terms)
+	if len(next) == 0 {
 		return false
 	}
 	for _, c := range chosen {
-		if matchedFingerprint(c, terms) == next {
+		if sameWords(matchedWords(c, terms), next) {
 			return true
 		}
 	}
 	return false
 }
 
-// matchedFingerprint is the session's matching lines, normalised, hashed. Empty
-// when nothing matched, which is not a duplicate of anything.
-func matchedFingerprint(s model.Session, terms []string) string {
+// sameWords reports whether two sessions said the same thing about the
+// question. An exact hash of the matching lines missed the case it exists for:
+// the same complaint filed twice differs by a shard number, a pid, a run id,
+// and hashing put the two copies in the block side by side while the session
+// that answered the question never appeared (#1556). The threshold matches the
+// one the session-start digest already uses on its own candidates.
+func sameWords(a, b map[string]bool) bool {
+	if len(a) == 0 || len(b) == 0 {
+		return false
+	}
+	shared := 0
+	for w := range b {
+		if a[w] {
+			shared++
+		}
+	}
+	union := len(a) + len(b) - shared
+	return union > 0 && float64(shared)/float64(union) >= sameAnswerOverlap
+}
+
+// sameAnswerOverlap is how much of what two sessions said about the question
+// has to be the same word before the second one is not worth a slot.
+const sameAnswerOverlap = 0.8
+
+// matchedWords is the words of the session's matching lines. Empty when
+// nothing matched, which is not a duplicate of anything.
+func matchedWords(s model.Session, terms []string) map[string]bool {
 	// Lines that carry the question, not lines that brush it. A session says
 	// the thing once and talks around it for the rest, and the talk differs
 	// session to session — so hashing every line that held any query word gave
 	// two sessions that settled the same thing two fingerprints, and the block
 	// spent both its slots saying it twice. A line holding one ordinary word of
 	// the question is that talk.
-	var b strings.Builder
+	words := map[string]bool{}
 	for _, m := range s.Messages {
-		line := strings.Join(strings.Fields(strings.ToLower(m.Text)), " ")
-		if search.TermHitsLowered(line, terms) < fingerprintTermsPerLine {
+		fields := strings.Fields(strings.ToLower(m.Text))
+		if search.TermHitsLowered(strings.Join(fields, " "), terms) < fingerprintTermsPerLine {
 			continue
 		}
 		if !search.SpeechCarriesAnyTerm(model.Session{Messages: []model.Message{m}}, terms) {
 			continue
 		}
-		b.WriteString(line)
-		b.WriteByte('\n')
+		for _, w := range fields {
+			words[w] = true
+		}
 	}
-	if b.Len() == 0 {
-		return ""
-	}
-	return blockFingerprint(b.String())
+	return words
 }
 
 // fingerprintTermsPerLine is how much of the question a line has to carry
 // before it counts toward what a session is saying.
 const fingerprintTermsPerLine = 2
+
+// widerWindow is how much further down the ranking the second pass looks when
+// near-duplicates filled the first one.
+const widerWindow = 4
 
 // leadTermsKept is how many of the question's identifying words a session may
 // be judged on. Three rather than one: the gate exists to reject a session
