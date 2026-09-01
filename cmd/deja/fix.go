@@ -122,6 +122,17 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			when = " · " + p.When.Local().Format("2006-01-02")
 		}
 		fmt.Fprintf(stdout, "%s%s\n", search.SafeLine(p.Error), when)
+		if p.Edit != "" {
+			// An edit is not something to run, so it is not offered as one:
+			// what fixes a failing test is a change to a file, and the useful
+			// half of that is which file (#2163).
+			changed := "changed next"
+			if p.Candidate {
+				changed = "changed next, unconfirmed"
+			}
+			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafeLine(p.Edit))
+			continue
+		}
 		ran := "ran next"
 		if p.Candidate {
 			// One session doing something after an error is half the evidence,
