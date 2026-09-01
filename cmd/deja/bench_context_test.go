@@ -40,10 +40,22 @@ func TestContextJSONAndIsolation(t *testing.T) {
 	if report.Chains != bench.ContextChainCount || report.Negatives != bench.ContextNegativeCount || len(report.CorpusHash) != 64 {
 		t.Fatalf("unexpected context report: %#v", report)
 	}
-	for _, arm := range []string{"deja-recall", "full-history", "naive-grep", "cold"} {
+	for _, arm := range []string{"deja-recall", "deja-digest", "deja-block", "full-history", "naive-grep", "cold"} {
 		if _, ok := report.Arms[arm]; !ok {
 			t.Fatalf("missing arm %q", arm)
 		}
+	}
+	// The two halves of what deja injects are scored apart, and each has to
+	// carry its own text: scored only as a union the coverage column could not
+	// move — deleting either surface left it at 1.00 because the other one
+	// still held the chain's facts (#2931).
+	digest, block := report.Arms["deja-digest"], report.Arms["deja-block"]
+	if digest.MedianTokens == 0 || block.MedianTokens == 0 {
+		t.Errorf("a half of the injection is scored empty: digest %.0f tokens, block %.0f", digest.MedianTokens, block.MedianTokens)
+	}
+	if union := report.Arms["deja-recall"]; union.MedianTokens < digest.MedianTokens || union.MedianTokens < block.MedianTokens {
+		t.Errorf("the union is smaller than one of its halves: %.0f against %.0f and %.0f",
+			union.MedianTokens, digest.MedianTokens, block.MedianTokens)
 	}
 	entries, err := os.ReadDir(outside)
 	if err != nil {

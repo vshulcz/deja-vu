@@ -104,18 +104,29 @@ func measureContext(seed int64) (contextReport, error) {
 	if err := index.EnsureForSearch(indexDir, search.Options{Query: "", All: true}, true, io.Discard); err != nil {
 		return contextReport{}, fmt.Errorf("build context benchmark index: %w", err)
 	}
-	measurements := map[string][]contextMeasurement{"deja-recall": nil, "full-history": nil, "naive-grep": nil, "cold": nil}
+	measurements := map[string][]contextMeasurement{
+		"deja-recall": nil, "deja-digest": nil, "deja-block": nil,
+		"full-history": nil, "naive-grep": nil, "cold": nil,
+	}
 	for _, chain := range corpus.Chains {
-		deja, err := contextDeja(indexDir, chain)
+		digest, block, err := contextDejaParts(indexDir, chain)
 		if err != nil {
 			return contextReport{}, err
 		}
+		deja := digest + block
 		full := contextFullHistory(chain)
 		naive, err := contextNaiveGrep(claudeRoot, chain)
 		if err != nil {
 			return contextReport{}, err
 		}
-		for name, text := range map[string]string{"deja-recall": deja, "full-history": full, "naive-grep": naive, "cold": ""} {
+		// The two halves are scored on their own as well as together. Scored
+		// only as a union, the column could not move: each surface carries the
+		// chain's facts by itself, so deleting either one left coverage at
+		// 1.00 and only deleting both showed anything (#2931).
+		for name, text := range map[string]string{
+			"deja-recall": deja, "deja-digest": digest, "deja-block": block,
+			"full-history": full, "naive-grep": naive, "cold": "",
+		} {
 			measurements[name] = append(measurements[name], contextMeasurement{tokens: len(text) / 4, coverage: contextCoverage(text, chain.Facts), negative: chain.Negative})
 		}
 	}
@@ -126,14 +137,18 @@ func measureContext(seed int64) (contextReport, error) {
 	return report, nil
 }
 
-func contextDeja(dir string, chain bench.ContextChain) (string, error) {
+// contextDejaParts returns the two surfaces deja puts in front of an agent
+// separately: the per-hit context digest, and the session-start block. Their
+// concatenation is what an agent sees; scoring them apart is what makes a
+// regression in either attributable (#2931).
+func contextDejaParts(dir string, chain bench.ContextChain) (digest, block string, err error) {
 	result, err := index.SearchWithRecoveryDetailed(dir, search.Options{Query: strings.Join(chain.Terms, " "), All: true}, io.Discard)
 	if err != nil {
-		return "", fmt.Errorf("context query %q: %w", chain.Task, err)
+		return "", "", fmt.Errorf("context query %q: %w", chain.Task, err)
 	}
 	hits, err := search.Run(result.Sessions, search.Options{Query: strings.Join(chain.Terms, " "), All: true})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	var b bytes.Buffer
 	ss := make([]model.Session, 0, len(hits))
@@ -144,9 +159,8 @@ func contextDeja(dir string, chain bench.ContextChain) (string, error) {
 		ss = append(ss, hit.Session)
 		search.PrintContext(&b, hit.Session, strings.Join(chain.Terms, " "))
 	}
-	// This is the same digest builder used by the SessionStart hook.
-	b.WriteString(search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: search.RecallAggressive}).Text)
-	return b.String(), nil
+	// The second is the same digest builder the SessionStart hook uses.
+	return b.String(), search.BuildAutoRecall(ss, search.AutoRecallOptions{Mode: search.RecallAggressive}).Text, nil
 }
 
 func contextFullHistory(chain bench.ContextChain) string {
@@ -249,7 +263,7 @@ func percentileFloat(values []float64, p int) float64 {
 func printContextReport(w io.Writer, report contextReport) {
 	fmt.Fprintf(w, "deja bench context\nchains: %d, negative controls: %d\n", report.Chains, report.Negatives)
 	fmt.Fprintln(w, "arm           median tokens  p10-p90       median coverage  negative median")
-	for _, name := range []string{"deja-recall", "full-history", "naive-grep", "cold"} {
+	for _, name := range []string{"deja-recall", "deja-digest", "deja-block", "full-history", "naive-grep", "cold"} {
 		r := report.Arms[name]
 		span := fmt.Sprintf("%.0f-%.0f", r.P10Tokens, r.P90Tokens)
 		fmt.Fprintf(w, "%-13s %-14.0f %-13s %-16.2f %.0f\n", name, r.MedianTokens, span, r.MedianCoverage, r.NegativeMedian)
