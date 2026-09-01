@@ -165,9 +165,16 @@ func gooseTypeFilter(db string) string {
 }
 
 // gooseMachineTypes are the session types goose writes for its own work rather
-// than the reader's: a subagent it spawned (spelled both ways across versions),
-// a recipe it ran on a schedule, and the sessions it hides from its own list.
-var gooseMachineTypes = []string{"subagent", "sub_agent", "scheduled", "recipe", "hidden"}
+// than the reader's: a subagent it spawned (spelled both ways across versions)
+// and a run its scheduler started.
+//
+// Read off goose's own enum rather than guessed — user, scheduled, sub_agent,
+// hidden, terminal, gateway, acp. `hidden` is not on this list although the
+// name suggests it: goose writes it for `goose run --no-session`, which is the
+// reader working without keeping a session, and for two wizards that store no
+// conversation at all and fall out of the role join anyway. `gateway` is a
+// person reaching goose from a chat app. Both are history someone made.
+var gooseMachineTypes = []string{"subagent", "sub_agent", "scheduled"}
 
 func ParseGooseDB(db string) ([]model.Session, error) {
 	return parseGooseDBWhere(db, "", 0)

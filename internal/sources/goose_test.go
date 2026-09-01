@@ -171,6 +171,8 @@ insert into sessions values ('s_acp','n','acp','/w','2026-07-24T11:00:00Z','2026
 insert into sessions values ('s_term','n','terminal','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','terminal');
 insert into sessions values ('s_sub2','n','sub_agent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','sub_agent');
 insert into sessions values ('s_hidden','n','hidden','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','hidden');
+insert into sessions values ('s_empty','n','empty','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','');
+insert into sessions values ('s_gateway','n','gateway','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','gateway');
 insert into messages values (1,'s_user','user','[{"type":"text","text":"mine"}]',1784282401);
 insert into messages values (2,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
 insert into messages values (3,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
@@ -178,7 +180,9 @@ insert into messages values (4,'s_old','user','[{"type":"text","text":"legacy"}]
 insert into messages values (5,'s_acp','user','[{"type":"text","text":"through the editor"}]',1784282401);
 insert into messages values (6,'s_term','user','[{"type":"text","text":"through the terminal"}]',1784282401);
 insert into messages values (7,'s_sub2','user','[{"type":"text","text":"subagent noise"}]',1784282401);
-insert into messages values (8,'s_hidden','user','[{"type":"text","text":"hidden noise"}]',1784282401);`
+insert into messages values (8,'s_hidden','user','[{"type":"text","text":"a run kept no session"}]',1784282401);
+insert into messages values (9,'s_empty','user','[{"type":"text","text":"no type at all"}]',1784282401);
+insert into messages values (10,'s_gateway','user','[{"type":"text","text":"through a chat app"}]',1784282401);`
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
@@ -195,12 +199,15 @@ insert into messages values (8,'s_hidden','user','[{"type":"text","text":"hidden
 	// Named the other way round — an allow-list of "user" — a type goose added
 	// later was dropped, and a reader's ACP sessions were missing from recall
 	// with nothing saying why (#2873).
-	for _, id := range []string{"s_user", "s_old", "s_acp", "s_term"} {
+	// The empty string and a type this build has never heard of are in the
+	// keep list on purpose: what the filter must never do again is drop work
+	// for carrying a name it was not told about.
+	for _, id := range []string{"s_user", "s_old", "s_acp", "s_term", "s_empty", "s_gateway", "s_hidden"} {
 		if !got[id] {
 			t.Errorf("%s belongs in recall and is not there: %v", id, got)
 		}
 	}
-	for _, id := range []string{"s_sub", "s_sub2", "s_cron", "s_hidden"} {
+	for _, id := range []string{"s_sub", "s_sub2", "s_cron"} {
 		if got[id] {
 			t.Errorf("%s is goose talking to itself and leaked into recall: %v", id, got)
 		}
