@@ -1,12 +1,13 @@
 package index
 
 import (
-	"github.com/vshulcz/deja-vu/internal/model"
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
 )
 
@@ -148,4 +149,78 @@ func ids(ss []model.Session) []string {
 		out = append(out, s.ID)
 	}
 	return out
+}
+
+// RecentProjectsUnder adds the sessions whose work happened inside the
+// caller's checkout, whatever project name they were recorded under, and only
+// when the caller stands in a checkout: an ordinary directory that happens to
+// hold other people's projects speaks for none of them (#2040).
+func TestRecentProjectsUnderNeedsACheckout(t *testing.T) {
+	home := t.TempDir()
+	setHome(t, home)
+	t.Setenv("USERPROFILE", home)
+	claude := filepath.Join(home, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", claude)
+	dir := filepath.Join(home, "idx")
+
+	repo := filepath.Join(home, "src", "app")
+	sub := filepath.Join(repo, "cmd", "tool")
+	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	touched := filepath.Join(sub, "pool.go")
+	writeLines(t, filepath.Join(claude, "tool", "t1.jsonl"),
+		claudeLineAt("t1", "2026-03-01T00:01:00Z", "the pool ran dry", sub),
+		claudeEditAt("t1", "2026-03-01T00:02:00Z", touched, sub))
+	if err := Ensure(dir, "", true, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	// The name the session was recorded under does not reach the root.
+	if got, err := RecentProjects(dir, []string{"app"}, 5); err != nil || len(got) != 0 {
+		t.Fatalf("RecentProjects(app) = %v, %v; want nothing", ids(got), err)
+	}
+	// Standing in the checkout, the work under it comes back.
+	got, err := RecentProjectsUnder(dir, []string{"app"}, repo, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "t1" {
+		t.Fatalf("got %v, want the subdirectory session", ids(got))
+	}
+	// A directory that is not a checkout speaks for nothing under it, and
+	// neither does the home directory itself.
+	for _, root := range []string{filepath.Join(home, "src"), home, "/", ".", "", "  "} {
+		got, err := RecentProjectsUnder(dir, []string{"app"}, root, 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 0 {
+			t.Fatalf("root %q recalled %v; want nothing", root, ids(got))
+		}
+	}
+}
+
+// claudeLineAt and claudeEditAt are claudeLine with a working directory and a
+// file edit: what a session touched is what RecentProjectsUnder reads.
+func claudeLineAt(sid, ts, text, cwd string) string {
+	return `{"type":"user","sessionId":"` + sid + `","timestamp":"` + ts + `","cwd":` + jsonStr(cwd) +
+		`,"message":{"role":"user","content":"` + text + `"}}` + "\n"
+}
+
+func claudeEditAt(sid, ts, path, cwd string) string {
+	return `{"type":"assistant","sessionId":"` + sid + `","timestamp":"` + ts + `","cwd":` + jsonStr(cwd) +
+		`,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","id":"e1","input":{"file_path":` +
+		jsonStr(path) + `,"old_string":"a","new_string":"b"}}]}}` + "\n"
+}
+
+func jsonStr(s string) string {
+	b, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
 }
