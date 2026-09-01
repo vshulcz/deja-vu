@@ -49,6 +49,13 @@ func TestContextJSONAndIsolation(t *testing.T) {
 	// carry its own text: scored only as a union the coverage column could not
 	// move — deleting either surface left it at 1.00 because the other one
 	// still held the chain's facts (#2931).
+	// The coverage column has to be able to move. Every prior session names
+	// the chain and only the first three settle anything, so the block's
+	// budget has to choose — at three prior sessions per chain every arm
+	// scored 1.00 whatever the digest did (#2931, #2933).
+	if c := report.Arms["deja-block"].MedianCoverage; c <= 0 || c >= 1 {
+		t.Errorf("the block's coverage is %.2f — saturated again, so a regression in it cannot show", c)
+	}
 	digest, block := report.Arms["deja-digest"], report.Arms["deja-block"]
 	if digest.MedianTokens == 0 || block.MedianTokens == 0 {
 		t.Errorf("a half of the injection is scored empty: digest %.0f tokens, block %.0f", digest.MedianTokens, block.MedianTokens)
