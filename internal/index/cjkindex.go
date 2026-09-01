@@ -147,7 +147,7 @@ func cjkIndexKeys(s string, emit func(tok string)) {
 	}
 
 	for _, r := range s {
-		if !cjkfold.IsCJK(r) {
+		if !cjkfold.Unspaced(r) {
 			flush()
 			continue
 		}

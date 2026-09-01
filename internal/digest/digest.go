@@ -171,7 +171,7 @@ func looksLikeProse(line string) bool {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
 			letters++
 		}
-		if cjkfold.IsCJK(r) {
+		if cjkfold.Unspaced(r) {
 			spaceless++
 		}
 	}

@@ -1083,7 +1083,7 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 			size = n
 			isWord = unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
 			if isWord {
-				if cjkfold.IsCJK(r) {
+				if cjkfold.Unspaced(r) {
 					cjk++
 				} else {
 					other++

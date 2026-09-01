@@ -93,7 +93,12 @@ import (
 // re-derives them without the bump (#1941). A variation selector is category
 // Mn but says how to draw the rune in front of it, so it is not one of those
 // marks and does not join the word (#2896).
-const version = 33
+// 34: Thai is indexed the way the other unspaced scripts are. Thai writes
+// without spaces between words, so a sentence was one token cut at the byte
+// cap and no query reached the words inside it; it now emits the overlapping
+// bigrams CJK has had since 21. A store built before this holds the sentences
+// and nothing re-derives the bigrams without the bump (#2897).
+const version = 34
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

@@ -200,3 +200,33 @@ func TestAShortAsciiQueryDoesNotReadTheCatalog(t *testing.T) {
 		t.Error("a marked word's plain form never consulted the catalog")
 	}
 }
+
+// Thai writes without spaces, so a sentence is one run of letters: the
+// tokenizer keys the sentence and the reader searching for a word in it got
+// nothing. Bigrams are what makes an unspaced script searchable, and Thai now
+// gets the ones CJK has had (#2897).
+func TestAThaiWordIsFoundInsideASentence(t *testing.T) {
+	const sentence = "\u0e09\u0e31\u0e19\u0e0a\u0e2d\u0e1a\u0e01\u0e34\u0e19\u0e02\u0e49\u0e32\u0e27\u0e40\u0e0a\u0e49\u0e32\u0e17\u0e38\u0e01\u0e27\u0e31\u0e19"
+	dir := seedOneWord(t, sentence)
+	for _, word := range []string{
+		"\u0e02\u0e49\u0e32\u0e27",             // rice
+		"\u0e40\u0e0a\u0e49\u0e32",             // morning
+		"\u0e17\u0e38\u0e01\u0e27\u0e31\u0e19", // every day
+	} {
+		res, err := SearchDetailed(dir, query.Options{Query: word, All: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Sessions) != 1 {
+			t.Errorf("%q: %d hits, want the sentence that contains it", word, len(res.Sessions))
+		}
+	}
+	// A Thai word the sentence does not contain is still not in it.
+	res, err := SearchDetailed(dir, query.Options{Query: "\u0e2a\u0e38\u0e19\u0e31\u0e02", All: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Sessions) != 0 {
+		t.Errorf("an absent word matched the sentence: %d hits", len(res.Sessions))
+	}
+}
