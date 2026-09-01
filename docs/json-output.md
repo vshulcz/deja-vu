@@ -526,6 +526,53 @@ The prose path distinguishes "held but unconfirmed", "nothing recorded for that
 line" and "no session ran a command after that error" in three different
 sentences; the JSON says only that there is nothing to act on.
 
+## `deja how <what> --json`
+
+The real command this machine runs for a given tool:
+
+```json
+{
+  "schema_version": 2,
+  "found": 13,
+  "truncated": true,
+  "withheld": 0,
+  "ignored": 0,
+  "commands": [
+    {
+      "command": "go test ./... -race",
+      "runs": 41,
+      "sessions": 12,
+      "last": "2026-08-30T11:20:03Z",
+      "failed_every_time": false,
+      "outcomes": 3,
+      "failures": 0
+    }
+  ]
+}
+```
+
+`found` and `truncated` are here because the cap note goes to **stderr**: a caller
+reading stdout alone could not otherwise tell eight ways to run the tests from
+thirteen.
+
+`failed_every_time` is the prose's failure note as a field. `how` offering a
+command that never once worked, in the shape of one that always has, is the
+sharpest miss this surface can make, so a machine reader has to be able to see
+it too. `outcomes` and `failures` are beside it so a consumer can weigh that
+flag rather than trust it blind — only about one run record in a hundred carries
+an exit status at all, and `failed_every_time` is false whenever deja knows the
+outcome of no run. `exit_code` is present only when every recorded failure
+agreed on one.
+
+`withheld` and `ignored` are what the trust policy and the ignore rule took out
+before any of this was counted. Without them an empty `commands` means both
+"nothing matched" and "everything that matched was hidden" — which is the reason
+the count travels with the entries in the first place, and what the prose path
+says in a sentence.
+
+`last` is omitted rather than zero-valued when a command carries no recorded
+time. An empty result keeps the envelope and returns `commands: []`.
+
 ## `deja stats --impact --json`
 
 What deja has actually served on this machine, measured from the usage log:

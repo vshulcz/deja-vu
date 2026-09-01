@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"unicode"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
@@ -88,9 +90,12 @@ func (e howEntry) failureNote() string {
 func runHow(dir string, args []string, stdout io.Writer) error {
 	limit := 8
 	project := ""
+	asJSON := false
 	var terms []string
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--json":
+			asJSON = true
 		case "--limit":
 			// What was typed has to do something: a flag with nothing after it,
 			// an unknown flag and an empty argument all used to pass through in
@@ -124,7 +129,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja how <what> [--project name] [--limit n]")
+		return fmt.Errorf("usage: deja how <what> [--project name] [--limit n] [--json]")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
@@ -135,6 +140,9 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	}
 	if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
 		fmt.Fprint(os.Stderr, note)
+	}
+	if asJSON {
+		return writeHowJSON(stdout, entries, limit, hidden, ignored)
 	}
 	if len(entries) == 0 {
 		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
@@ -353,4 +361,86 @@ func commandMentions(low, term string) bool {
 
 func isCommandWordRune(r rune) bool {
 	return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+}
+
+// howJSON is the `deja how --json` envelope. See docs/json-output.md.
+//
+// `how` answers "how do I run this here", and its answer is the single output most
+// worth piping somewhere else — yet it was the one command in this family without
+// `--json` (#1931).
+//
+// Carries `found` and `truncated` for the reason the version 2 search envelope does:
+// the cap note lives on stderr, so a caller reading stdout alone cannot otherwise tell
+// eight ways to run the tests from thirteen.
+type howJSON struct {
+	SchemaVersion int  `json:"schema_version"`
+	Found         int  `json:"found"`
+	Truncated     bool `json:"truncated"`
+	// Withheld and Ignored are what the two rules took out before any of this
+	// was counted. howEntries carries them for a stated reason — filtering on
+	// its own turns a leak into a confident "no command mentions that" over
+	// records a rule hid — and the prose path says so in a sentence. Without
+	// them here the envelope reintroduces exactly what the counts exist to
+	// prevent: `commands: []` reads as "nothing matched" when it can mean
+	// "everything that matched was withheld".
+	Withheld int          `json:"withheld"`
+	Ignored  int          `json:"ignored"`
+	Commands []howRowJSON `json:"commands"`
+}
+
+type howRowJSON struct {
+	Command  string `json:"command"`
+	Runs     int    `json:"runs"`
+	Sessions int    `json:"sessions"`
+	// Last is omitted rather than zero-valued: a command with no recorded time is a
+	// real state, and "0001-01-01" is not a date.
+	Last string `json:"last,omitempty"`
+	// FailedEveryTime is the prose's failure note as a field. `how` offering a command
+	// that never once worked, in the shape of one that always has, is the sharpest miss
+	// this surface can make — so a machine reader must be able to see it too.
+	FailedEveryTime bool `json:"failed_every_time"`
+	// Outcomes is how many runs recorded an exit status at all (about one in a hundred
+	// on a real store), so a consumer can weigh `failed_every_time` rather than trust it
+	// blind. ExitCode is omitted when the failures disagreed about it.
+	Outcomes int  `json:"outcomes"`
+	Failures int  `json:"failures"`
+	ExitCode *int `json:"exit_code,omitempty"`
+}
+
+func writeHowJSON(stdout io.Writer, entries []howEntry, limit, withheld, ignored int) error {
+	found := len(entries)
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+	rows := make([]howRowJSON, 0, len(entries))
+	for _, e := range entries {
+		row := howRowJSON{
+			// The same sanitiser the prose path uses: a recorded command is untrusted
+			// text, and a JSON consumer pasting it into a shell is no safer than a human.
+			Command:         search.SafeCommand(e.Command),
+			Runs:            e.Runs,
+			Sessions:        len(e.Sessions),
+			FailedEveryTime: e.failedEveryTime(),
+			Outcomes:        e.Outcomes,
+			Failures:        e.Failures,
+		}
+		if !e.Last.IsZero() {
+			row.Last = e.Last.UTC().Format(time.RFC3339)
+		}
+		if e.failedEveryTime() && !e.MixedExit {
+			code := e.ExitCode
+			row.ExitCode = &code
+		}
+		rows = append(rows, row)
+	}
+	enc := json.NewEncoder(stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(howJSON{
+		SchemaVersion: jsonout.Version,
+		Found:         found,
+		Truncated:     found > len(rows),
+		Withheld:      withheld,
+		Ignored:       ignored,
+		Commands:      rows,
+	})
 }
