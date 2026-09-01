@@ -260,10 +260,10 @@ func LoadNotes() []model.Session {
 func noteIDProject(project string) string {
 	var b strings.Builder
 	for _, r := range project {
-		switch {
-		case r == '/' || r == '\\' || r == ':':
+		switch r {
+		case '/', '\\', ':':
 			b.WriteByte('-')
-		case r == '.':
+		case '.':
 			// A dot is ordinary inside a name ("api.v2") and a way out of the
 			// tree in a run of them.
 			if strings.HasSuffix(b.String(), ".") {
