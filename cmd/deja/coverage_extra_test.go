@@ -46,6 +46,10 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	t.Setenv("DEJA_WARMUP_SENTINEL", filepath.Join(tmp, "warmup-guard"))
+	// The embedding client probes localhost when no endpoint is set, so a
+	// developer running Ollama or LM Studio got a different answer out of
+	// doctor than CI did — "reachable" where the test says nothing is wired.
+	t.Setenv("DEJA_EMBED_URL", "off")
 	t.Setenv("DEJA_AIDER_ROOTS", filepath.Join(tmp, "aider"))
 	t.Setenv("DEJA_GEMINI_ROOT", filepath.Join(tmp, "gemini"))
 	t.Setenv("DEJA_CURSOR_ROOT", filepath.Join(tmp, "cursor"))

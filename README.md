@@ -307,6 +307,10 @@ export DEJA_EMBED_MODEL='text-embedding-3-small'
 deja embed
 ```
 
+Set `DEJA_EMBED_URL=off` to keep deja from looking for a local runtime at all —
+without an endpoint it probes `localhost:11434` and `localhost:1234`, which finds
+whatever else you happen to be running.
+
 For another authenticated OpenAI-compatible endpoint, set `DEJA_EMBED_KEY` explicitly:
 
 ```sh
