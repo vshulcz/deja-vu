@@ -85,8 +85,11 @@ func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(string(b), "deja-vu recalled"); n < 2 {
-		t.Fatalf("MCP tool descriptions carry narration %d times, want >=2 (recall + recall_context)", n)
+	// Once, not twice: the six tools became one with modes, so the sentence
+	// that tells the agent to say what it reused is written once and covers
+	// every mode.
+	if n := strings.Count(string(b), "deja-vu recalled"); n < 1 {
+		t.Fatalf("MCP tool descriptions carry the narration %d times, want at least once", n)
 	}
 	if !strings.Contains(string(b), "Say nothing about recalls that did not help") {
 		t.Fatal("MCP narration missing the no-spam guard")
