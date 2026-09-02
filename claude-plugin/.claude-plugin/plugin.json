@@ -11,12 +11,13 @@
   "license": "MIT",
   "keywords": [
     "memory",
-    "session history",
+    "session-history",
     "recall",
     "context",
-    "claude code",
+    "claude-code",
     "codex",
-    "cursor"
+    "cursor",
+    "copilot-cli"
   ],
   "skills": "./skills/",
   "hooks": {

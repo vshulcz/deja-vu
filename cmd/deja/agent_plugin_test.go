@@ -15,9 +15,43 @@ import (
 //
 // https://open-plugins.com/plugin-authors/manifest
 func TestAgentPluginManifestIsPortable(t *testing.T) {
+	for _, path := range []string{"plugin.json", "claude-plugin/plugin.json"} {
+		t.Run(path, func(t *testing.T) { checkAgentPluginManifest(t, path) })
+	}
+}
+
+// The Claude Code plugin carries its manifest twice: .claude-plugin/plugin.json
+// for Claude Code and plugin.json at the plugin root for directories that read
+// the Agent Plugins layout (awesome-copilot's intake rejected the plugin for
+// its absence, and then for the version being behind the tag). One version.
+func TestClaudePluginManifestsAgree(t *testing.T) {
+	var a, b map[string]any
+	if err := json.Unmarshal(repoFile(t, "claude-plugin/.claude-plugin/plugin.json"), &a); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(repoFile(t, "claude-plugin/plugin.json"), &b); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"name", "version", "description", "license"} {
+		if a[k] != b[k] {
+			t.Errorf("%s: .claude-plugin has %v, plugin.json has %v", k, a[k], b[k])
+		}
+	}
+	for _, m := range []map[string]any{a, b} {
+		kws, _ := m["keywords"].([]any)
+		for _, kw := range kws {
+			if s, _ := kw.(string); !regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(s) {
+				t.Errorf("keyword %q: directories accept lowercase letters, digits and hyphens only", s)
+			}
+		}
+	}
+}
+
+func checkAgentPluginManifest(t *testing.T, path string) {
+	t.Helper()
 	var manifest map[string]any
-	if err := json.Unmarshal(repoFile(t, "plugin.json"), &manifest); err != nil {
-		t.Fatalf("plugin.json: %v", err)
+	if err := json.Unmarshal(repoFile(t, path), &manifest); err != nil {
+		t.Fatalf("%s: %v", path, err)
 	}
 
 	allowed := map[string]bool{

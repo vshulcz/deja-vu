@@ -1,0 +1,23 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "deja-vu",
+  "version": "0.19.2",
+  "description": "Memory for AI coding agents: your own past sessions, recalled before you ask.",
+  "author": {
+    "name": "vshulcz",
+    "url": "https://github.com/vshulcz"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu",
+  "repository": "https://github.com/vshulcz/deja-vu",
+  "license": "MIT",
+  "keywords": [
+    "memory",
+    "session-history",
+    "recall",
+    "context",
+    "claude-code",
+    "codex",
+    "cursor",
+    "copilot-cli"
+  ]
+}

@@ -43,6 +43,9 @@ const (
 	// the default branch. It had no version field at all until the directory's
 	// own scanner asked for one.
 	claudePlugin = "claude-plugin/.claude-plugin/plugin.json"
+	// The same plugin in the Agent Plugins v1 layout, which directories such as
+	// awesome-copilot read: plugin.json at the plugin root.
+	claudeAgentPlugin = "claude-plugin/plugin.json"
 	// The Gemini gallery crawls the manifest at the repository root and shows
 	// its version, and `gemini extensions install` reads the same file.
 	geminiExtension = "gemini-extension.json"
@@ -136,17 +139,18 @@ func parse(version, checksums string) (pins, error) {
 
 func write(root string, p pins) error {
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:       renderScoop,
-		versionPath:     renderVersion,
-		localePath:      renderLocale,
-		installer:       renderInstaller,
-		codexPlugin:     renderPluginVersion(codexPlugin),
-		claudePlugin:    renderPluginVersion(claudePlugin),
-		geminiExtension: renderPluginVersion(geminiExtension),
-		kimiPlugin:      renderPluginVersion(kimiPlugin),
-		kimiPacked:      renderPluginVersion(kimiPacked),
-		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
-		agentPlugin:     renderPluginVersion(agentPlugin),
+		scoopPath:         renderScoop,
+		versionPath:       renderVersion,
+		localePath:        renderLocale,
+		installer:         renderInstaller,
+		codexPlugin:       renderPluginVersion(codexPlugin),
+		claudePlugin:      renderPluginVersion(claudePlugin),
+		claudeAgentPlugin: renderPluginVersion(claudeAgentPlugin),
+		geminiExtension:   renderPluginVersion(geminiExtension),
+		kimiPlugin:        renderPluginVersion(kimiPlugin),
+		kimiPacked:        renderPluginVersion(kimiPacked),
+		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
+		agentPlugin:       renderPluginVersion(agentPlugin),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -328,17 +332,18 @@ func runCheck(root string) error {
 		return err
 	}
 	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:       renderScoop,
-		versionPath:     renderVersion,
-		localePath:      renderLocale,
-		installer:       renderInstaller,
-		codexPlugin:     renderPluginVersion(codexPlugin),
-		claudePlugin:    renderPluginVersion(claudePlugin),
-		geminiExtension: renderPluginVersion(geminiExtension),
-		kimiPlugin:      renderPluginVersion(kimiPlugin),
-		kimiPacked:      renderPluginVersion(kimiPacked),
-		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
-		agentPlugin:     renderPluginVersion(agentPlugin),
+		scoopPath:         renderScoop,
+		versionPath:       renderVersion,
+		localePath:        renderLocale,
+		installer:         renderInstaller,
+		codexPlugin:       renderPluginVersion(codexPlugin),
+		claudePlugin:      renderPluginVersion(claudePlugin),
+		claudeAgentPlugin: renderPluginVersion(claudeAgentPlugin),
+		geminiExtension:   renderPluginVersion(geminiExtension),
+		kimiPlugin:        renderPluginVersion(kimiPlugin),
+		kimiPacked:        renderPluginVersion(kimiPacked),
+		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
+		agentPlugin:       renderPluginVersion(agentPlugin),
 	} {
 		want, err := render(p)
 		if err != nil {
