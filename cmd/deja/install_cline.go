@@ -158,7 +158,13 @@ export default {
         if (!query) return "Usage: /deja <what you are looking for>";
         // A command the user just typed can wait: the first search may have
         // to build the index, which a hook never gets to do.
-        const found = run(["search", query], "", 120000);
+        //
+        // "--" when the query names one of deja's own flags: searching for
+        // "--json" or "--all-matches" otherwise dies in flag parsing and comes
+        // back as an empty history. Sent only when it is needed, so a deja too
+        // old to know the terminator still answers every ordinary query.
+        const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
+        const found = run(args, "", 120000);
         return found || `+"`No past session matches ${query}.`"+`;
       },
     });

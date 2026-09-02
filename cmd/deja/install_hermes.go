@@ -112,7 +112,12 @@ def search(raw_args):
         return "Usage: /deja <what you are looking for>"
     # A hook must not stall a turn, but a command the user just typed can
     # wait: a first search may rebuild the index, which took 18s here.
-    found = _deja(["search", query], timeout=120)
+    #
+    # "--" when the query names one of deja's own flags: searching for
+    # "--json" or "--all-matches" otherwise dies in flag parsing and comes back
+    # as an empty history.
+    args = ["search", "--", query] if query.startswith("-") else ["search", query]
+    found = _deja(args, timeout=120)
     return found or f"Nothing in your history matches {query!r}."
 
 
