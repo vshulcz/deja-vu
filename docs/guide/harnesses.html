@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Code, Codex, Cursor and 18 more agents — deja-vu</title>
-<meta name="description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<title>Claude Code, Codex, Cursor and 19 more agents — deja-vu</title>
+<meta name="description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Claude Code, Codex, Cursor and 18 more agents — deja-vu">
-<meta property="og:description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta property="og:title" content="Claude Code, Codex, Cursor and 19 more agents — deja-vu">
+<meta property="og:description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,14 +25,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Claude Code, Codex, Cursor and 18 more agents — deja-vu">
-<meta name="twitter:description" content="The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta name="twitter:title" content="Claude Code, Codex, Cursor and 19 more agents — deja-vu">
+<meta name="twitter:description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty-one coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Harnesses","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"}]}</script>
 </head>
 <body>
@@ -88,12 +88,13 @@
 <article>
 
 <h1>Harnesses</h1>
-<p class="pagelede">the twenty-one it reads, and what each one supports<span class="mins" data-mins></span></p>
-<p>deja indexes twenty-one coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
+<p class="pagelede">the twenty-two it reads, and what each one supports<span class="mins" data-mins></span></p>
+<p>deja indexes twenty-two coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
 <!-- matrix:start -->
 <table>
 <tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Skill</th><th>Command</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>
 <tr><td><a href="../registry/aider.html">aider</a></td><td><code>~/.aider.chat.history.md</code><br><code>${AIDER_CHAT_HISTORY_FILE}</code><br><code>${DEJA_AIDER_ROOTS}/**/.aider.chat.history.md</code></td><td>⚠</td><td>✅</td><td>✕</td><td>⚠</td><td>✕</td><td>✅</td><td>deja aider</td></tr>
+<tr><td><a href="../registry/amp.html">Amp</a></td><td><code>~/.local/share/amp/threads/*.json</code><br><code>${XDG_DATA_HOME}/amp/threads/*.json</code><br><code>${DEJA_AMP_ROOT}/*.json</code></td><td>—</td><td>—</td><td>—</td><td>—</td><td>?</td><td>paste</td><td>—</td></tr>
 <tr><td><a href="../registry/antigravity.html">Antigravity</a></td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code><br><code>${DEJA_ANTIGRAVITY_ROOT}/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code><br><code>${DEJA_CLAUDE_ROOT}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code><br><code><vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json</code><br><code>${DEJA_CLINE_ROOT}/*/*.messages.json</code><br><code>${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>

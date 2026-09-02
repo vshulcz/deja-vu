@@ -2951,6 +2951,7 @@ func printSources(dir string) {
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
 		{"omp", sources.OmpRoot(), []string{sources.OmpRoot()}, sources.OmpSessionFiles, sources.LoadOmp},
 		{"prime", sources.PrimeRoot(), []string{sources.PrimeRoot()}, sources.PrimeSessionFiles, sources.LoadPrime},
+		{"amp", sources.AmpRoot(), []string{sources.AmpRoot()}, sources.AmpThreadFiles, sources.LoadAmp},
 		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawSessionFiles, sources.LoadOpenClaw},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},

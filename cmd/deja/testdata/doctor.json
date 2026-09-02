@@ -140,6 +140,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "amp",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/amp/threads"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "openclaw",
       "state": "missing",
       "paths": [

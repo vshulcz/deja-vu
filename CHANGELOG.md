@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Amp (Sourcegraph) threads are indexed, from `~/.local/share/amp/threads` or `$XDG_DATA_HOME`; `DEJA_AMP_ROOT` overrides. (#1714, #2986)
 - A transcript the client deleted stays in the index. Claude Code removes
   transcripts older than `cleanupPeriodDays` (30 by default), and the next
   incremental pass used to drop the session with the file. A file that is gone

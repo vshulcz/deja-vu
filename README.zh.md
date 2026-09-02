@@ -69,7 +69,7 @@ dsh plugin --profile web add dsh-deja
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 二十一个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 二十二个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |

@@ -769,6 +769,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("omp", ompRoot, doctorExists(ompRoot), sources.OmpSessionFiles())
 	primeRoot := sources.PrimeRoot()
 	printFiles("prime", primeRoot, doctorExists(primeRoot), sources.PrimeSessionFiles())
+	ampRoot := sources.AmpRoot()
+	printFiles("amp", ampRoot, doctorExists(ampRoot), sources.AmpThreadFiles())
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()
