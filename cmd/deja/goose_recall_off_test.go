@@ -38,7 +38,7 @@ func TestTheGooseRecallHonoursTheKillSwitch(t *testing.T) {
 func TestTheKillSwitchLeavesTheReadersLines(t *testing.T) {
 	gooseHomeForTest(t)
 	path := gooseHintsPath()
-	if err := os.MkdirAll(strings.TrimSuffix(path, "/AGENTS.md"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, []byte("# mine\n\nalways use pgx\n"), 0o644); err != nil {
