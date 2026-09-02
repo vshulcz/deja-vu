@@ -486,6 +486,12 @@ func IndexCommands() bool { return os.Getenv("DEJA_INDEX_COMMANDS") != "0" }
 // for the same reason go mod tidy is: "start the thing that is not running" is
 // the answer to a refused connection, and it was the one remedy the list did
 // not carry while `brew install`, two words away, was carried (#2373).
+// The task runners — just, task, mise — are the same kind of entry as make,
+// and they gate more than the command table: the point-of-action hook only
+// speaks about a command the ingest kept, so on a repository driven by a
+// justfile every deploy and every migration was invisible to it while the same
+// work behind a Makefile was not. They are anchored to the start of a segment
+// because each is an ordinary English word: `git grep task` names no runner.
 var meaningfulCommand = regexp.MustCompile(`\b(go (test|build|vet|run|mod|get|install|generate|work|clean)|brew (install|upgrade|uninstall|reinstall|tap|services)|systemctl|launchctl|service [a-z0-9_.-]+ (start|stop|restart|reload|status)|golangci-lint|gofmt|pytest|python3? -m|uv (run|pip)|pip install|ruff|mypy|npm|npx|pnpm|yarn|bun |cargo |make\b|cmake|ctest|ninja|meson|bazel|buck2|gh (pr|run|release|issue|workflow|api)|git [a-z-]+|docker|kubectl|helm|terraform|psql|mysql|latexmk|mvn|gradle|dotnet|swift (build|test)|bundle exec|rails|rake|rspec|phpunit|composer (install|update|require)|tox|nox|jest|vitest|playwright|cypress|deno|tsc|sbt|stack (build|test|run|exec)|cabal|ghc|dune|zig|nix|rustc|clang\+\+|clang|g\+\+|gcc|pdm run|poetry run|deja )`)
 
 var trivialCommand = regexp.MustCompile(`^\s*(ls|cd|pwd|cat|head|tail|echo|grep|rg|find|which|wc|sed|awk|sleep|mkdir|rm|cp|mv|chmod|export|source|touch|open|printf)\b`)
@@ -518,8 +524,27 @@ func worthIndexing(cmd string) bool {
 			return true
 		}
 	}
+	// The task runners are judged on statement boundaries rather than on every
+	// pipe. Their names are ordinary words, and splitting on a bare `|` cuts
+	// inside a quoted alternation too: `grep "worktree names\|task signal" f`
+	// yields a fragment beginning "task signal" and nothing else about that
+	// line says a runner ran. Nobody pipes into one, so `&&`, `||` and `;` are
+	// the only places a run can begin.
+	for _, seg := range statementChain.Split(cmd, -1) {
+		if taskRunner.MatchString(seg) && !trivialCommand.MatchString(seg) {
+			return true
+		}
+	}
 	return false
 }
+
+// statementChain splits on the operators that start a new command, leaving a
+// pipe inside a quoted argument alone.
+var statementChain = regexp.MustCompile(`&&|\|\||;`)
+
+// taskRunner is just, task and mise at the head of a statement — the same kind
+// of entry as make, kept apart because each name is also an ordinary word.
+var taskRunner = regexp.MustCompile(`^\s*(just|task|mise)\s`)
 
 // commandChain splits a shell line on the operators that separate commands, so
 // each side is judged on its own. Quoted operators are rare in real command
