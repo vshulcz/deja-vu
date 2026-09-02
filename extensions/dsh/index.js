@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { contributions } from "./lib.js";
+import { argv, contributions } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -89,6 +89,7 @@ function answer(text) {
   return MISSING;
 }
 
+
 function tools(ctx) {
   if (!defineTool) return;
 
@@ -122,7 +123,7 @@ function tools(ctx) {
       // spend the model's context on a tail nobody reads.
       const asked = Number.isFinite(args.limit) ? Math.trunc(args.limit) : 5;
       const limit = String(Math.min(20, Math.max(1, asked)));
-      return Promise.resolve(answer(run(["search", "--json", "--limit", limit, String(args.query)])));
+      return Promise.resolve(answer(run(argv("search", ["--json", "--limit", limit], args.query))));
     },
   }));
 
@@ -139,7 +140,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(["ctx", String(args.query)])));
+      return Promise.resolve(answer(run(argv("ctx", [], args.query))));
     },
   }));
 
@@ -156,7 +157,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(["blame", String(args.path), "--json"])));
+      return Promise.resolve(answer(run(argv("blame", ["--json"], args.path))));
     },
   }));
 
@@ -173,7 +174,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(["fix", String(args.error)])));
+      return Promise.resolve(answer(run(argv("fix", [], args.error))));
     },
   }));
 
@@ -190,7 +191,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(["how", String(args.what)])));
+      return Promise.resolve(answer(run(argv("how", [], args.what))));
     },
   }));
 
@@ -207,7 +208,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      const written = run(["remember", String(args.text)]);
+      const written = run(argv("remember", [], args.text));
       if (!INSTALLED) return Promise.resolve(MISSING);
       return Promise.resolve(written || "deja did not record that.");
     },
@@ -224,7 +225,11 @@ function command(ctx) {
       if (!query) {
         return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
       }
-      const out = run([query]);
+      // Named, not handed over as deja's first word: the bare-query path
+      // dispatches a word that happens to be a command, so `/deja version`
+      // printed a version number and `/deja index` rebuilt the index, and one
+      // of the words people most want history about is `install`.
+      const out = run(argv("search", [], query));
       return { kind: INSTALLED ? "success" : "error", text: answer(out) };
     },
   });

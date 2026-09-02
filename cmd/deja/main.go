@@ -869,9 +869,17 @@ func cmdCtx(dir string, rest []string) error {
 	// neighbouring commands — so reaching for one here is the obvious mistake.
 	// Folding it into the query answered "no session matches", which is a
 	// false statement about the store (#721).
-	for _, a := range rest {
-		if strings.HasPrefix(a, "--") {
-			return fmt.Errorf("ctx takes no flags, only a query or id-prefix — got %q", a)
+	// Except behind a leading `--`, which is how search, fix and how already
+	// spell "the rest is the query". Without it no caller can ask about a
+	// query that starts with a dash, and the refusal reads to a plugin exactly
+	// like an empty store.
+	if len(rest) > 0 && rest[0] == "--" {
+		rest = rest[1:]
+	} else {
+		for _, a := range rest {
+			if strings.HasPrefix(a, "--") {
+				return fmt.Errorf("ctx takes no flags, only a query or id-prefix — got %q", a)
+			}
 		}
 	}
 	q := strings.Join(rest, " ")
@@ -2540,6 +2548,18 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
+		case "--":
+			// The rest is the path, dash or not — the spelling search, fix and
+			// how already take. A file really named `-report.md` was otherwise
+			// unreachable, and the refusal reads to a caller like a file
+			// nobody has ever touched.
+			if i+1 < len(args) {
+				if path != "" {
+					return "", o, false, fmt.Errorf("blame accepts one path")
+				}
+				path = args[i+1]
+			}
+			i++
 		case "--json":
 			jsonOutput = true
 		case "--all":

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import apply from "../index.js";
-import { contributions } from "../lib.js";
+import { argv, contributions } from "../lib.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -22,6 +22,50 @@ test("the recall limit is bounded on both sides", () => {
   assert.equal(clamp(-3), 1);
   assert.equal(clamp(7), 7);
   assert.equal(clamp(9999), 20);
+});
+
+test("a query that is a command name is still searched", () => {
+  // deja's bare-query path dispatches the first word, so `/deja version`
+  // printed a version number instead of searching for the word.
+  assert.deepEqual(argv("search", [], "version"), ["search", "version"]);
+  assert.deepEqual(argv("search", ["--json"], "index"), ["search", "--json", "index"]);
+});
+
+test("a query that starts with a dash is not read as a flag", () => {
+  // Without the terminator deja exits on an unknown flag, which the caller
+  // cannot tell from an empty history.
+  assert.deepEqual(argv("search", [], "--no-verify"), ["search", "--", "--no-verify"]);
+  assert.deepEqual(argv("fix", [], "-race detected"), ["fix", "--", "-race detected"]);
+  // Flags the plugin sends itself stay ahead of the terminator, or deja reads
+  // them as part of the query.
+  assert.deepEqual(argv("search", ["--json", "--limit", "5"], "--all-matches"), [
+    "search",
+    "--json",
+    "--limit",
+    "5",
+    "--",
+    "--all-matches",
+  ]);
+});
+
+test("the terminator is sent only when the query needs it", () => {
+  // A deja too old to know `--` on this subcommand would otherwise fail on
+  // every ordinary query, not just the ones that start with a dash.
+  assert.deepEqual(argv("how", [], "run the tests"), ["how", "run the tests"]);
+  assert.deepEqual(argv("ctx", [], "the checkout worker"), ["ctx", "the checkout worker"]);
+});
+
+test("every query the plugin sends goes through argv", () => {
+  // The rules above are worth nothing if a call site passes its text straight
+  // through, which is how both bugs got in.
+  // A literal list is deja's own vocabulary — `run(["version"])` and the hook.
+  // Anything else in that position is somebody's text, and it belongs in
+  // argv(), which names the command and ends the flags.
+  const calls = source.match(/run\(\[[^\]]*\]/g) || [];
+  for (const call of calls) {
+    assert.match(call, /^run\(\["/, `${call} builds a call out of something other than deja's own words`);
+    assert.doesNotMatch(call, /String\(args\./, `${call} passes a query to deja without argv()`);
+  }
 });
 
 test("tool output declares a plain JSON schema", () => {

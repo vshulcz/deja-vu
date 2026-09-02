@@ -57,8 +57,15 @@ function apply(ctx) {
       if (!query) {
         return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
       }
+      // "search" is named rather than handed over as deja's first word: the
+      // bare-query path dispatches a word that happens to be a command, so
+      // /deja version printed a version number and /deja index rebuilt the
+      // index. "--" then keeps a query that starts with a dash from being read
+      // as a flag, which came back as an error the caller cannot tell from an
+      // empty history.
+      const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
       try {
-        const out = execFileSync(DEJA, [query], {
+        const out = execFileSync(DEJA, args, {
           encoding: "utf8",
           timeout: 20000,
           maxBuffer: 4 * 1024 * 1024,
