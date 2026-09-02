@@ -14,7 +14,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the twenty agents writes, and its format
 - [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
-- [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the six MCP tools, and what each harness supports
+- [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
 
 ## Problems it answers
 
