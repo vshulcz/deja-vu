@@ -495,6 +495,9 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	keep = append(keep, weak...)
 	ss, err := sessionsServable(dir, keep, o)
+	if err == nil && os.Getenv("DEJA_EXP_MSG_RERANK") != "" {
+		ss = rerankByBestMessage(ss, terms, rank.idf)
+	}
 	if err != nil {
 		return SearchResult{}, err
 	}
@@ -4288,4 +4291,75 @@ func consonantY(word string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSuffix(word, "y"), true
+}
+
+// rerankByBestMessage is an experiment (DEJA_EXP_MSG_RERANK): order the
+// relevance pool by the single message that covers the most query weight,
+// on the guess that a fact lives in one turn while a lookalike session spreads
+// the same words over many. Stable on ties, so the pool's own order survives
+// where messages cannot separate sessions.
+func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
+	forms := make([][]string, len(terms))
+	for i, t := range terms {
+		forms[i] = append([]string{t}, stemMatchForms(t)...)
+	}
+	best := make([]float64, len(ss))
+	for i, s := range ss {
+		for _, msg := range s.Messages {
+			toks := map[string]bool{}
+			for _, tk := range tokens(strings.ToLower(msg.Text)) {
+				toks[tk] = true
+			}
+			score := 0.0
+			for ti, t := range terms {
+				hit := false
+				for _, f := range forms[ti] {
+					if toks[f] {
+						hit = true
+						break
+					}
+				}
+				if hit {
+					w := idf[t]
+					if w <= 0 {
+						w = 1
+					}
+					score += w
+					if msg.Role == "user" {
+						score += 0.5 * w
+					}
+				}
+			}
+			if score > best[i] {
+				best[i] = score
+			}
+		}
+	}
+	// Fuse rather than replace: the pool's own order is session-level IDF
+	// overlap, which wins on a small haystack; the best-message score wins on
+	// a large pile. Reciprocal rank fusion keeps both votes.
+	byMsg := make([]int, len(ss))
+	for i := range byMsg {
+		byMsg[i] = i
+	}
+	sort.SliceStable(byMsg, func(a, b int) bool { return best[byMsg[a]] > best[byMsg[b]] })
+	msgRank := make([]int, len(ss))
+	for r, i := range byMsg {
+		msgRank[i] = r
+	}
+	const k = 5.0
+	fused := make([]float64, len(ss))
+	for i := range ss {
+		fused[i] = 1/(k+float64(i)) + 1/(k+float64(msgRank[i]))
+	}
+	idx := make([]int, len(ss))
+	for i := range idx {
+		idx[i] = i
+	}
+	sort.SliceStable(idx, func(a, b int) bool { return fused[idx[a]] > fused[idx[b]] })
+	out := make([]model.Session, len(ss))
+	for i, j := range idx {
+		out[i] = ss[j]
+	}
+	return out
 }
