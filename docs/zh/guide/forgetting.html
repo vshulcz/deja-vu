@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>为什么智能体在会话之间会忘事 — deja-vu</title>
+<meta name="description" content="会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/forgetting.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/forgetting.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="为什么智能体在会话之间会忘事">
+<meta property="og:description" content="会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="为什么智能体在会话之间会忘事">
+<meta name="twitter:description" content="会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "为什么智能体在会话之间会忘事", "description": "会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "为什么会忘事", "item": "https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "为什么智能体在会话之间会忘事？", "acceptedAnswer": {"@type": "Answer", "text": "会话的上下文窗口在会话结束时被丢弃。会话记录仍然写在磁盘上——Claude Code、Codex、Cursor 各写各的——但没有东西会把它读回来，所以下一个会话从空白开始。"}}, {"@type": "Question", "name": "压缩会保住会话早先的内容吗？", "acceptedAnswer": {"@type": "Answer", "text": "只保住一部分。对 43 次真实压缩的测量：摘要保留了 77% 的决策，以及 0.2% 实际执行过的命令。散文活下来了，具体的工作没有。"}}, {"@type": "Question", "name": "智能体能读到我装工具之前的会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以，前提是这个工具索引的是磁盘上已有的会话记录，而不是从安装那一刻开始往后记录。那些文件里有几个月的历史，早于任何记忆工具的存在。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html" aria-current="page">为什么会忘事</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>为什么你的智能体每次都从零开始</h1>
+<p class="pagelede">上下文窗口没了；会话记录还在<span class="mins" data-mins></span></p>
+
+<p>三月份你解决过一个问题。八月份，同一个智能体、同一个仓库，它提出的正是你当时试过又退掉的方案。没有什么坏掉了——装着答案的那个会话结束了，它的上下文窗口也跟着没了。</p>
+
+<h2>会话结束时到底发生了什么</h2>
+<p>会话期间，智能体的记忆就是上下文窗口；会话结束，窗口被丢弃。留下来的是一份会话记录，由工具自己写：Claude Code 写在 <code>~/.claude/projects</code> 下的 JSONL，Codex 在 <code>~/.codex</code>，opencode 用本地数据库，Cursor、Gemini CLI、Zed 等等各有各的格式。<a href="../../registry/README.html">格式登记表</a>写清了每一个写在哪里、记录长什么样。</p>
+<p>所以工作并没有丢，只是没人去读。默认配置里，没有任何东西会在你今天提问时打开昨天的记录。</p>
+
+<h2>压缩不是记忆</h2>
+<p>长会话会压缩：工具用一段摘要替换掉早先的轮次，好让窗口继续装得下。摘要是散文，而散文不是你需要拿回来的东西。</p>
+<p>对一台机器上 43 次真实压缩的测量：</p>
+<ul>
+<li>决策保留 <b>77%</b>。</li>
+<li>实际执行过的命令保留 <b>0.2%</b>。</li>
+</ul>
+<p>这个落差就是问题本身。推理进了摘要；那条带四个参数才跑通的命令、你贴进去的报错原文、某次编辑替换掉的那一段——恰恰是摘要最先丢掉的，也恰恰是你再次撞墙时最需要的。</p>
+
+<h2>人们试过的三条路</h2>
+<h3>规则文件</h3>
+<p><code>CLAUDE.md</code>、<code>AGENTS.md</code> 每个会话都会被读，所以它们是放长期约定的好地方——代码风格、构建命令、别动哪里。放历史就不合适：每条事实都得手写，而还没踩到第二次的坑，没有人会去写。</p>
+<h3>记忆服务</h3>
+<p>记忆平台从安装那一刻开始往后记录，通常在写入时用模型抽取一遍事实。它们能用，但一开始是空的：安装之前的几个月不在里面，抽取步骤认为「不算事实」的东西也不在。</p>
+<h3>读你已经有的会话记录</h3>
+<p>第三条路把日志本身当成记忆。不需要提前记录，因为记录已经发生了——包括工具装上之前的一切。<a href="https://github.com/vshulcz/deja-vu">deja</a> 就是这么做的：在本地给这些文件建索引，谁来问就交给谁。</p>
+
+<h2>为什么不直接 grep 日志</h2>
+<p>因为代价。在三十条任务链的评测语料上，靠 grep 原始记录拿到同样的工作上下文，中位数花了 <b>57,489</b> tokens；重放完整历史花 <b>16,919</b>；召回在同样的事实覆盖率下花 <b>286</b>，而在历史里本来就没有答案的链上一个 token 都不花。这些数字、语料生成器和相关性标注都在仓库里——在相信任何一个数字之前，包括我们的，先去看「相关」是怎么定义的。</p>
+
+<h2>它不做什么</h2>
+<p>它不写记忆，所以编不出记忆。它不往外发东西：索引和检索都在本地，凭据在建索引时就被脱敏。它不会让智能体更聪明；它只是让它不再从空白开始。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="does-my-agent-remember.html">智能体记得之前的对话吗</a> · <a href="https://github.com/vshulcz/deja-vu">源码</a></p>
+
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

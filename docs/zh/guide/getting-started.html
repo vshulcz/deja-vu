@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>deja 快速开始：让编程智能体能搜自己的会话历史 — deja-vu</title>
+<meta name="description" content="安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。全部在本地，不需要账号。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="deja 快速开始：让编程智能体能搜自己的会话历史">
+<meta property="og:description" content="安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。全部在本地，不需要账号。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="deja 快速开始：让编程智能体能搜自己的会话历史">
+<meta name="twitter:description" content="安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。全部在本地，不需要账号。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "deja 快速开始：让编程智能体能搜自己的会话历史", "description": "安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。全部在本地，不需要账号。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "快速开始", "item": "https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么安装 deja？", "acceptedAnswer": {"@type": "Answer", "text": "一条 curl 安装脚本，然后 deja install --auto。也可以用 Homebrew 安装，或从 GitHub releases 下载二进制。安装约十秒，首次建索引约十秒。"}}, {"@type": "Question", "name": "deja 需要联网或者 API key 吗？", "acceptedAnswer": {"@type": "Answer", "text": "不需要。索引和检索都在本地，默认没有账号、没有网络调用，也不需要模型。"}}, {"@type": "Question", "name": "deja 能搜到安装之前的会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。它索引的是各个工具本来就写在磁盘上的会话记录，所以第一次建完索引，安装之前的历史就已经可以搜到了。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html" aria-current="page">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>快速开始</h1>
+<p class="pagelede">装十秒，建索引十秒，然后智能体就能查自己的历史了<span class="mins" data-mins></span></p>
+
+<h2>安装</h2>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>第二条命令做三件事：把 MCP 召回接到它在这台机器上找到的每一个智能体，在支持的地方打开会话启动时的自动召回，并建好第一份索引。也可以用 Homebrew（<code>brew install deja-vu</code>）或从 <a href="https://github.com/vshulcz/deja-vu/releases">releases</a> 直接下二进制。</p>
+<p>建索引读的是你磁盘上<b>已经有</b>的会话记录，所以第一次跑完，你几个月前的工作就已经能搜到了——不需要提前记录任何东西。</p>
+
+<h2>先确认它看到了什么</h2>
+<pre>deja sources
+deja stats</pre>
+<p><code>sources</code> 列出它在每个工具下找到的路径和会话数；<code>stats</code> 给出索引里有多少会话、来自哪些项目、活跃度如何。如果某个工具没被认出来，<a href="../../guide/harnesses.html">支持矩阵</a>里有它期望的路径和对应的环境变量。</p>
+
+<h2>自己搜一下</h2>
+<pre>$ deja "connection pool exhausted"
+[claude] api   · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web   · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow</pre>
+<p>几条常用的：</p>
+<ul>
+<li><code>deja "报错原文"</code> —— 跨所有工具搜历史。</li>
+<li><code>deja fix "报错原文"</code> —— 上次这个报错之后，真正跑通的是哪条命令。</li>
+<li><code>deja how "docker build"</code> —— 你在这台机器上实际用过的调用方式。</li>
+<li><code>deja show &lt;id&gt;</code> —— 打开某一个会话；<code>deja last</code> 列出最近的。</li>
+<li><code>deja blame &lt;文件&gt;</code> —— 哪些会话动过这个文件、当时在做什么。</li>
+</ul>
+
+<h2>让智能体自己去查</h2>
+<p><code>deja install --auto</code> 已经把这条路接好了。之后是智能体自己发起召回，不用你开口：会话开始时、提问命中过去的工作时、改文件或执行命令之前、命令失败之后。哪个工具支持哪一个时机，见<a href="../../guide/agents.html">agents 指南</a>。</p>
+<p>只想手动用也完全可以：不接自动召回，deja 就只是一个命令行搜索工具。</p>
+
+<h2>关于隐私</h2>
+<p>索引和检索都在本地，默认不需要网络、账号或 API key。建索引时凭据会被脱敏。除非你显式配置了远程 embedding 端点，否则没有任何内容离开这台机器——细节见<a href="../../guide/privacy.html">隐私说明</a>。</p>
+
+<h2>不想要了</h2>
+<pre>deja uninstall --all
+rm -rf ~/.cache/deja</pre>
+<p>会话记录本来就是各个工具自己写的，deja 不动它们。</p>
+
+<p><a href="does-my-agent-remember.html">智能体记得之前的对话吗</a> · <a href="forgetting.html">为什么会忘事</a> · <a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a></p>
+
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

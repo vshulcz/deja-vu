@@ -30,6 +30,12 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
 - [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): the measured token cost of recall
 
+## 中文
+
+- [快速开始](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)：安装、接上智能体、第一次查询
+- [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
+- [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
+
 ## Per-harness setup
 
 - [Claude Code, Codex and the rest](https://vshulcz.github.io/deja-vu/guide/harnesses.html): the full support matrix

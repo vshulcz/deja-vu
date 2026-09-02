@@ -69,7 +69,7 @@ dsh plugin --profile web add dsh-deja
 
 ## 能得到什么
 
-**在 Codex 里解决，Claude 记得。** 二十个编程智能体把每一次对话都写进本地文件，
+**在 Codex 里解决，Claude 记得。** 二十一个编程智能体把每一次对话都写进本地文件，
 deja 把这些文件变成一层它们都能读的记忆。
 
 | | |
@@ -245,6 +245,9 @@ rm -rf ~/.cache/deja
 
 按场景写的，不是按功能：
 
+- [快速开始（中文）](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)——安装、接上智能体、第一次查询
+- [编程智能体记得之前的对话吗（中文）](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)——各个工具跨会话留下了什么
+- [为什么智能体会忘事（中文）](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)——会话结束时消失的是什么
 - [编码智能体记得之前的对话吗？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html)——每个智能体在会话之间留下了什么，又丢掉了什么
 - [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)——`~/.claude/projects` 会长到多大，删掉要付出什么代价
 - [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html)——崩溃之后、清空之后，或者会话回来时空空如也
