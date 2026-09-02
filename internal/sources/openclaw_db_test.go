@@ -116,7 +116,7 @@ func TestOpenClawSQLiteSinceReturnsWholeSessions(t *testing.T) {
 	}
 }
 
-func TestOpenClawEmptyOrForeignStoreIsQuiet(t *testing.T) {
+func TestOpenClawEmptyStoreIsQuietAndAForeignOneSaysSo(t *testing.T) {
 	if !SQLite3Available() {
 		t.Skip("sqlite3 not installed")
 	}
@@ -132,7 +132,10 @@ func TestOpenClawEmptyOrForeignStoreIsQuiet(t *testing.T) {
 	if out, err := exec.Command("sqlite3", other, "create table t(x)").CombinedOutput(); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
-	if got, err := ParseOpenClawDB(other); err != nil || len(got) != 0 {
-		t.Errorf("a store without transcript_events must read as nothing, not an error: %v %v", got, err)
+	// A database that exists but has no transcript_events is a schema deja
+	// does not know — the hermes rule: say so, rather than report an empty
+	// store that doctor would call healthy.
+	if got, err := ParseOpenClawDB(other); err == nil || len(got) != 0 {
+		t.Errorf("a store without transcript_events must surface an error, got %v %v", got, err)
 	}
 }

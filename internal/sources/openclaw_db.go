@@ -3,6 +3,7 @@ package sources
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -71,35 +72,54 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	q := `select e.session_id, e.event_json from transcript_events e` + where +
 		` order by e.session_id, e.seq`
 	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		if _, ok := err.(*exec.ExitError); ok || len(out) == 0 {
-			// The store may be mid-migration or the schema older than this
-			// reader; a missing table is not a broken index.
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	// Rows stream through the decoder rather than landing in one buffer: a
+	// store of a few gigabytes is normal for a daily-reset agent, and
+	// holding every event_json in memory before the first session is built
+	// is what the hermes reader was written to avoid.
+	dec := json.NewDecoder(stdout)
+	tok, err := dec.Token()
+	if err != nil {
+		waitErr := cmd.Wait()
+		if err == io.EOF {
+			// No stdout is a query that matched nothing or one sqlite3 refused
+			// to run; the second must not read as an empty store, or a whole
+			// harness vanishes from recall while doctor calls it healthy.
+			if waitErr != nil {
+				return nil, fmt.Errorf("openclaw: query failed, the store schema may have changed: %w", waitErr)
+			}
 			return nil, nil
 		}
 		return nil, err
 	}
-	if len(out) == 0 {
-		return nil, nil
-	}
-	var rows []struct {
-		SessionID string `json:"session_id"`
-		Event     string `json:"event_json"`
-	}
-	if err := json.Unmarshal(out, &rows); err != nil {
+	if d, ok := tok.(json.Delim); !ok || d != '[' {
+		_ = cmd.Wait()
 		return nil, fmt.Errorf("bad sqlite json")
 	}
 	project := "openclaw-" + openclawDBAgent(db)
-	var out2 []model.Session
+	var out []model.Session
 	var s *model.Session
 	flush := func() {
 		if s != nil && len(s.Messages) > 0 {
-			out2 = append(out2, *s)
+			out = append(out, *s)
 		}
 		s = nil
 	}
-	for _, r := range rows {
+	for dec.More() {
+		var r struct {
+			SessionID string `json:"session_id"`
+			Event     string `json:"event_json"`
+		}
+		if err := dec.Decode(&r); err != nil {
+			_ = cmd.Wait()
+			return nil, fmt.Errorf("bad sqlite json")
+		}
 		if s == nil || s.ID != r.SessionID {
 			flush()
 			s = &model.Session{Harness: "openclaw", ID: r.SessionID, Project: project, Path: db}
@@ -111,5 +131,12 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		piShapedLine(s, m, true)
 	}
 	flush()
-	return out2, nil
+	if _, err := dec.Token(); err != nil { // the closing ']'
+		_ = cmd.Wait()
+		return nil, err
+	}
+	if err := cmd.Wait(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
