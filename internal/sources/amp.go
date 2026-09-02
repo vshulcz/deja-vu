@@ -22,7 +22,7 @@ func AmpRoot() string {
 			dataHome = filepath.Join(p, "amp")
 		}
 	}
-	return EnvPath("DEJA_AMP_ROOT", filepath.Join(dataHome, "threads"))
+	return filepath.Clean(EnvPath("DEJA_AMP_ROOT", filepath.Join(dataHome, "threads")))
 }
 
 // AmpThreadFiles lists Amp's one-thread-per-JSON files.
