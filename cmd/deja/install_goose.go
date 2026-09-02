@@ -389,10 +389,17 @@ func cmdGooseHook(_ string, _ []string) error {
 // session opens. Overwriting the hints file mid-session would therefore
 // replace the recall that is already in front of the model with nothing the
 // model will ever see, so without MOIM this leaves the session as it is.
+// refreshGooseForPrompt rewrites the recall for what was just typed, so the
+// block follows the conversation instead of staying on whatever the session
+// opened with.
+//
+// It used to return here unless MOIM was set, because the file it wrote was
+// read once when the session started and refreshing it mid-session reached
+// nobody. That is no longer true of where the recall lives: measured against
+// goose 1.48 with a stub endpoint, a change to `AGENTS.md` between two turns of
+// one session arrives on the second — the file is re-read every turn. So the
+// guard was the only thing keeping per-turn recall to the wrapper.
 func refreshGooseForPrompt(dir string, payload []byte) error {
-	if os.Getenv("GOOSE_MOIM_MESSAGE_FILE") == "" {
-		return nil
-	}
 	var input struct {
 		// Goose calls it message; matcher_context carries the same text.
 		Message string `json:"message"`
@@ -424,6 +431,14 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 	if strings.TrimSpace(out.String()) == "" {
 		return nil
 	}
+	return writeGooseRecall(out.String())
+}
+
+// writeGooseRecall puts the recall where goose will read it. The MOIM file is
+// deja's own and holds nothing else; AGENTS.md is the reader's, so only the
+// block between deja's markers is ours to rewrite — the prompt path wrote it
+// raw and erased everything else in the file.
+func writeGooseRecall(body string) error {
 	path := gooseRecallPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
@@ -432,8 +447,14 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 	if err != nil {
 		return err
 	}
-	_, err = writeIfChanged(path, old, []byte(out.String()))
-	return err
+	next := []byte(body)
+	if path == gooseHintsPath() {
+		next = []byte(gooseRecallBlock(string(old), body))
+	}
+	if _, err := writeIfChanged(path, old, next); err != nil {
+		return err
+	}
+	return dropRetiredGooseHints()
 }
 
 // gooseRecallPath is the hints file, or the MOIM file when the wrapper set
@@ -465,20 +486,7 @@ func refreshGooseHintsFor(cwd string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	old, err := readConfig(path)
-	if err != nil {
-		return err
-	}
-	// The MOIM file is deja's own and holds nothing else; AGENTS.md is the
-	// reader's, so only the block between the markers is ours to rewrite.
-	next := []byte(body)
-	if path == gooseHintsPath() {
-		next = []byte(gooseRecallBlock(string(old), body))
-	}
-	if _, err := writeIfChanged(path, old, next); err != nil {
-		return err
-	}
-	return dropRetiredGooseHints()
+	return writeGooseRecall(body)
 }
 
 // dropGooseRecallBlock takes deja's block out of the file and removes the file
