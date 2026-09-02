@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions } from "./lib.js";
+import { argv, contributions, guarded } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -102,7 +102,7 @@ function tools(ctx) {
     render: (_args, value) => [{ type: "text", text: String(value) }],
   };
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_recall",
     description:
       "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing anything that may already exist. Match on the most specific token available: an exact error string, function name, file path or flag.",
@@ -125,9 +125,9 @@ function tools(ctx) {
       const limit = String(Math.min(20, Math.max(1, asked)));
       return Promise.resolve(answer(run(argv("search", ["--json", "--limit", limit], args.query))));
     },
-  }));
+  })));
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_session",
     description:
       "A full digest of the single best-matching past session — what was tried, what was decided, what it cost. Use after deja_recall when the reasoning behind an earlier decision matters, not just that it happened.",
@@ -142,9 +142,9 @@ function tools(ctx) {
     execute(args) {
       return Promise.resolve(answer(run(argv("ctx", [], args.query))));
     },
-  }));
+  })));
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_blame",
     description:
       "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
@@ -159,9 +159,9 @@ function tools(ctx) {
     execute(args) {
       return Promise.resolve(answer(run(argv("blame", ["--json"], args.path))));
     },
-  }));
+  })));
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_fix",
     description:
       "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase — the match is on the error's own words.",
@@ -176,9 +176,9 @@ function tools(ctx) {
     execute(args) {
       return Promise.resolve(answer(run(argv("fix", [], args.error))));
     },
-  }));
+  })));
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_how",
     description:
       "The real invocation this machine uses for a build, test, deploy or script, with the flags it actually ran, ordered by how many sessions ran it. A guessed command is plausible and fails on this setup.",
@@ -193,9 +193,9 @@ function tools(ctx) {
     execute(args) {
       return Promise.resolve(answer(run(argv("how", [], args.what))));
     },
-  }));
+  })));
 
-  ctx.tools.register(defineTool({
+  guarded(() => ctx.tools.register(defineTool({
     name: "deja_remember",
     description:
       "Store one durable decision once it is settled, as a single self-contained fact that will make sense months later. Not transcripts, not a summary of the conversation, and not anything already obvious from the code.",
@@ -212,11 +212,11 @@ function tools(ctx) {
       if (!INSTALLED) return Promise.resolve(MISSING);
       return Promise.resolve(written || "deja did not record that.");
     },
-  }));
+  })));
 }
 
 function command(ctx) {
-  ctx.commands.register({
+  guarded(() => ctx.commands.register({
     name: "deja",
     description: "Search this machine's past AI coding sessions",
     input: { hint: "what to look for" },
@@ -232,7 +232,7 @@ function command(ctx) {
       const out = run(argv("search", [], query));
       return { kind: INSTALLED ? "success" : "error", text: answer(out) };
     },
-  });
+  }));
 }
 
 function userText(message) {
@@ -250,26 +250,36 @@ function userText(message) {
 // alternative — splicing a message into the "agent/pre-step" waterfall — looks
 // like it works and does not: a later listener rebuilds its answer from the
 // payload, and the added message is dropped with nothing reported.
+//
+// The registration is guarded because the host throws "prompt context
+// deja:recall is already registered" on a second copy in the same profile, and
+// that failure is not local: the whole profile fails to load, so a duplicate
+// memory plugin costs the user their agent. One registration is all recall
+// needs. installedByCLI() below is the first line of defence; this is the one
+// that holds when the installer wrote to a different DSH_HOME than the profile
+// boots from.
 function autoRecall(ctx) {
   let asked = "";
   let recalled = "";
 
-  ctx.systemPrompt.context({
-    name: "deja:recall",
-    order: 120,
-    text: (assembly) => {
-      const agent = assembly && assembly.agent;
-      if (!agent) return "";
-      const prompt = lastHumanText(agent);
-      if (!prompt) return "";
-      if (prompt !== asked) {
-        asked = prompt;
-        recalled = run(["hook-prompt", "--plain"], JSON.stringify({ prompt, cwd: process.cwd() }));
-      }
-      // Silence is the common case: this speaks only when the history answers.
-      return recalled;
-    },
-  });
+  guarded(() =>
+    ctx.systemPrompt.context({
+      name: "deja:recall",
+      order: 120,
+      text: (assembly) => {
+        const agent = assembly && assembly.agent;
+        if (!agent) return "";
+        const prompt = lastHumanText(agent);
+        if (!prompt) return "";
+        if (prompt !== asked) {
+          asked = prompt;
+          recalled = run(["hook-prompt", "--plain"], JSON.stringify({ prompt, cwd: process.cwd() }));
+        }
+        // Silence is the common case: this speaks only when the history answers.
+        return recalled;
+      },
+    }),
+  );
 }
 
 // lastHumanText is the newest thing the person actually typed. At assembly

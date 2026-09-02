@@ -21,6 +21,24 @@ export function argv(cmd, flags, text) {
   return arg.startsWith("-") ? [cmd, ...flags, "--", arg] : [cmd, ...flags, arg];
 }
 
+// guarded runs one registration, and swallows the host's refusal of a name it
+// already holds.
+//
+// dsh answers a duplicate with "prompt context deja:recall is already
+// registered" or "command deja is already registered", and that failure is not
+// local: the whole plugin tree fails to load, so a second copy of this plugin —
+// the npm package next to the installer's files, a --patch overlay naming it
+// twice — costs the user their agent over an optional memory plugin. One
+// registration is all any of these need, so the loser stands down.
+export function guarded(register) {
+  try {
+    register();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // contributions says what this package adds, given what `deja install` already
 // wrote into DSH_HOME and what the profile turned off. The rule is the same
 // everywhere: fill the gaps, never repeat the installer.

@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import apply from "../index.js";
-import { argv, contributions } from "../lib.js";
+import { argv, contributions, guarded } from "../lib.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -82,6 +82,61 @@ test("automatic recall does not use the pre-step waterfall", () => {
   // registration rather than on the words.
   assert.doesNotMatch(source, /ctx\.on\("agent\/pre-step"/);
   assert.match(source, /ctx\.systemPrompt\.context\(/);
+});
+
+// dsh refuses a name one of its registries already holds — "prompt context
+// deja:recall is already registered", "command deja is already registered" —
+// and the failure is not local: the whole profile fails to load, so a second
+// copy of this plugin costs the user their agent.
+test("a refused registration is reported, not thrown", () => {
+  assert.equal(guarded(() => {}), true);
+  assert.equal(
+    guarded(() => {
+      throw new Error('command "deja" is already registered');
+    }),
+    false,
+  );
+});
+
+test("every registration the plugin makes goes through the guard", () => {
+  // The tools cannot be reached from the case below — registering them needs
+  // the dsh-tools peer the host provides — so the rule is pinned here.
+  // Whitespace-free, so a call broken across lines reads the same as one that
+  // is not.
+  const compact = source.replace(/\s+/g, "");
+  const calls = /ctx\.(?:tools\.register|commands\.register|systemPrompt\.context)\(/g;
+  let total = 0;
+  for (const m of compact.matchAll(calls)) {
+    total++;
+    assert.ok(
+      compact.slice(0, m.index).endsWith("guarded(()=>"),
+      `${m[0]} is not wrapped in guarded()`,
+    );
+  }
+  assert.equal(total, 8, "six tools, the command and the recall");
+});
+
+test("a name the host already holds does not take the profile down", () => {
+  const taken = new Set();
+  const refusing = {
+    tools: { register: () => { throw new Error("tool is already registered"); } },
+    commands: {
+      register: (c) => {
+        if (taken.has(c.name)) throw new Error(`command "${c.name}" is already registered`);
+        taken.add(c.name);
+      },
+    },
+    systemPrompt: {
+      context: (c) => {
+        if (taken.has(c.name)) throw new Error(`prompt context "${c.name}" is already registered`);
+        taken.add(c.name);
+      },
+    },
+  };
+  withDSHHome([], () => {
+    assert.doesNotThrow(() => apply(refusing, {}), "first load");
+    assert.doesNotThrow(() => apply(refusing, {}), "second load, every name taken");
+  });
 });
 
 test("the patch names the package the host has to load", () => {

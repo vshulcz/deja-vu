@@ -82,6 +82,36 @@ func TestDSHCommandSearchesRatherThanDispatching(t *testing.T) {
 	}
 }
 
+// dsh refuses a name one of its registries already holds, and the failure is
+// not local: "prompt context deja:recall is already registered" fails the whole
+// plugin tree, so the profile boots with no agent at all. Two copies of these
+// files in one profile — the npm package next to the installer's, a --patch
+// overlay naming them twice — must cost at most the duplicate.
+func TestDSHPluginsStandDownOnADuplicateName(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		js   string
+		call string
+	}{
+		{"command", dshCommandJS("/bin/deja"), "ctx.commands.register("},
+		{"auto", dshAutoJS("/bin/deja"), "ctx.systemPrompt.context("},
+	} {
+		if !strings.Contains(tc.js, tc.call) {
+			t.Fatalf("%s: %s is gone, so this test guards nothing", tc.name, tc.call)
+		}
+		// Whitespace-free, so the check does not depend on how the generated
+		// file happens to be indented.
+		compact := strings.Join(strings.Fields(tc.js), "")
+		want := "try{" + strings.ReplaceAll(tc.call, " ", "")
+		if !strings.Contains(compact, want) {
+			t.Errorf("%s registers %s without standing down on a refusal", tc.name, tc.call)
+		}
+		if !strings.Contains(compact, "}catch{}") {
+			t.Errorf("%s does not catch the refusal", tc.name)
+		}
+	}
+}
+
 func TestBlameTakesAPathBehindTheTerminator(t *testing.T) {
 	path, o, jsonOut, err := parseBlame([]string{"--json", "--", "-report.md"})
 	if err != nil {
