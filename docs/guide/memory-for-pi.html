@@ -66,6 +66,7 @@
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html" aria-current="page">Memory for pi and omp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>
@@ -98,7 +99,7 @@
 <h2>Adding recall</h2>
 <pre>deja install pi-auto
 deja install omp-auto</pre>
-<p>Each writes the MCP server, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code>, and one extension:</p>
+<p>Each writes the MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision — and one extension:</p>
 <ul>
 <li><b>pi</b> — <code>~/.pi/agent/extensions/deja.ts</code>, answering <code>before_agent_start</code>. It fires after you submit a prompt, carries the prompt text, and can return a message that is stored in the session and sent to the model — both halves of what Claude Code splits across SessionStart and UserPromptSubmit, in one event. pi also has a real channel to you, <code>ctx.ui.notify</code>, so the recall line and the "index still building" note go there rather than into the prompt.</li>
 <li><b>omp</b> — a module under the active agent's <code>extensions/</code>, registering a handler on the <code>context</code> event. A handler returning <code>{ messages }</code> replaces what goes to the provider, which is the only seam that reaches the model before it answers. Which event, and that a returned list is honoured at all, came from running a probe against omp 17.4.1: <code>input</code> never fires in print mode, <code>before_agent_start</code> carries the prompt but not the context, and a marker prepended in <code>context</code> came back out of the model.</li>

@@ -66,6 +66,7 @@
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>
@@ -99,7 +100,7 @@
 <pre>deja install openclaw-auto</pre>
 <p>Three things are written, and all three are reversible with <code>deja uninstall openclaw</code>:</p>
 <ul>
-<li><b>The MCP server</b>, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code> itself.</li>
+<li><b>The MCP server</b>, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</li>
 <li><b>A hook pack</b> under <code>~/.openclaw/hooks</code> — a directory with <code>HOOK.md</code> and <code>handler.js</code>, which is OpenClaw's own format, so no <code>openclaw plugins install</code> step. It answers the <code>agent:bootstrap</code> event by appending a digest of this machine's relevant history to the Project Context set, without writing anything into the workspace.</li>
 <li><b>A plugin</b> under <code>extensions/</code>, with the <code>package.json</code> and <code>openclaw.plugin.json</code> pair OpenClaw validates. It answers <code>before_prompt_build</code> with the history the prompt you just typed is about, and it fires under <code>openclaw agent --local</code> too, where the bootstrap event never does.</li>
 </ul>

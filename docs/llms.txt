@@ -51,6 +51,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html)
 - [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html)
 - [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html)
+- [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## Evidence
 

@@ -66,6 +66,7 @@
 <a href="memory-for-goose.html" aria-current="page">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>
@@ -97,7 +98,7 @@
 
 <h2>Adding recall</h2>
 <pre>deja install goose-auto</pre>
-<p>That adds deja to the <code>extensions</code> block of <code>config.yaml</code> as an MCP server, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code>, and a SessionStart hook that refreshes <code>.goosehints</code> with this machine's relevant history before Goose reads it — the same session sees the new content. <code>config.yaml</code> is edited textually rather than round-tripped through a YAML library: it holds provider settings you wrote by hand, and re-serialising would drop your comments and ordering.</p>
+<p>That adds deja to the <code>extensions</code> block of <code>config.yaml</code> as an MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision, and a SessionStart hook that refreshes <code>.goosehints</code> with this machine's relevant history before Goose reads it — the same session sees the new content. <code>config.yaml</code> is edited textually rather than round-tripped through a YAML library: it holds provider settings you wrote by hand, and re-serialising would drop your comments and ordering.</p>
 <p>For recall on every turn, start Goose through the wrapper:</p>
 <pre>deja goose</pre>
 <p>It sets the MOIM file and launches Goose; each turn the block says whether this machine's history answers the prompt, and after compaction the block is still there. Without the wrapper you keep the session-start half and the tools.</p>

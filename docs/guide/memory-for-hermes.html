@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for Hermes: what its own memory does not cover — deja-vu</title>
+<meta name="description" content="Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other twenty agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Hermes">
+<meta property="og:description" content="Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other twenty agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Hermes">
+<meta name="twitter:description" content="Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other twenty agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Hermes", "description": "Hermes already searches its own sessions and keeps MEMORY.md. deja adds the other twenty agents on the machine: a plugin on pre_llm_call, the MCP tools, and a skill you can install straight from GitHub.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Hermes", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Hermes remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Yes — its own. Hermes keeps sessions in a SQLite store per profile, searches them with FTS5 and summarises them for cross-session recall, and keeps MEMORY.md and USER.md. What it does not see is what you did in Claude Code, Codex, Cursor or any of the other agents on the same machine."}}, {"@type": "Question", "name": "How do I add deja to Hermes?", "acceptedAnswer": {"@type": "Answer", "text": "deja install hermes-auto writes the MCP server and a plugin under ~/.hermes/plugins/deja that answers pre_llm_call, appending matching history to the user message so the system prompt stays byte-identical and provider caching survives; it also enables the plugin and adds a /deja command. Or install only the skill: hermes skills install vshulcz/deja-vu/skills/deja-search."}}, {"@type": "Question", "name": "Can Hermes see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "With deja, yes: the index covers the transcripts of twenty-one agents on the machine, Hermes included, and history from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="memory-for-hermes.html" aria-current="page">Memory for Hermes</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Hermes</h1>
+<p class="pagelede">Hermes remembers Hermes; this is about the other twenty<span class="mins" data-mins></span></p>
+
+<p>Hermes is one of the few agents that already has memory of its own: sessions live in a SQLite store per profile, an FTS5 index searches them and an LLM summarises them for cross-session recall, and <code>MEMORY.md</code> and <code>USER.md</code> carry what it has learned about the project and about you. This page is not about replacing any of that. It is about the question Hermes cannot answer: what you did in Claude Code, Codex, Cursor or opencode on the same machine, last week or last spring.</p>
+
+<h2>What Hermes already has</h2>
+<p>Its own sessions, searchable; its own notes, persistent; a skills system compatible with the <a href="https://agentskills.io">agentskills.io</a> standard. All of it is scoped to Hermes. The twenty other agents on the machine each keep their own log in their own format, and none of them are in Hermes's index.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install hermes-auto</pre>
+<p>That writes the MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision, and a plugin under <code>~/.hermes/plugins/deja</code> — a <code>plugin.yaml</code> manifest and an <code>__init__.py</code> exporting <code>register(ctx)</code>, which is Hermes's own plugin shape. Of Hermes's hooks only <code>pre_llm_call</code> can inject, and what it returns under <code>context</code> is appended to the user message. That is also where Hermes wants it: the system prompt stays byte-identical, so provider caching survives. The installer also lists the plugin in <code>plugins.enabled</code>, since a discovered plugin is shown as "not enabled" and never loaded until it is there, and adds a <code>/deja</code> command for asking directly.</p>
+<p>Reading Hermes's store needs the <code>sqlite3</code> CLI on the machine; <code>deja doctor</code> names it if it is missing.</p>
+
+<h2>Or only the skill</h2>
+<p>Hermes installs skills straight from a GitHub repository, so the CLI contract can be added without the plugin:</p>
+<pre>hermes skills install vshulcz/deja-vu/skills/deja-search</pre>
+<p>That teaches the agent to reach for <code>deja search --json</code>, <code>deja ctx</code>, <code>deja blame</code> and <code>deja fix</code> on its own when a question sounds like earlier work. It needs the <code>deja</code> binary on <code>PATH</code> (<code>brew install deja-vu</code> or the <a href="getting-started.html">install script</a>) and nothing else.</p>
+
+<h2>What arrives</h2>
+<p>On each prompt, when this machine's history in any agent answers it, the plugin appends the matching session to the message; silence is the common case. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about Hermes</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in Hermes, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/hermes.html">The Hermes session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

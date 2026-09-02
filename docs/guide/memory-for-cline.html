@@ -66,6 +66,7 @@
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html" aria-current="page">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>
@@ -97,7 +98,7 @@
 
 <h2>Adding recall</h2>
 <pre>deja install cline-auto</pre>
-<p>That registers a plugin with three parts, plus the MCP server so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code> itself:</p>
+<p>That registers a plugin with three parts, plus the MCP server so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision:</p>
 <ul>
 <li><b>A rule</b> whose content is a function, resolved when the session builds its instructions — session-start recall by another name. A rule is handed nothing, so it recalls against the session rather than the question.</li>
 <li><b>A message builder</b>, the prompt-aware half: its build is called with the messages on their way to the model, and the new array it returns is what gets sent. That is where the history the prompt is actually about goes in.</li>
