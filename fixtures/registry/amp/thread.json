@@ -1,0 +1,1 @@
+{"id":"registry-amp","title":"Registry Amp thread","created":1767337445000,"env":{"initial":{"trees":[{"uri":"file:///workspace/amp-demo"}]}},"messages":[{"role":"user","content":[{"type":"text","text":"synthetic Amp question"}]},{"role":"assistant","content":[{"type":"text","text":"synthetic Amp answer"}]}]}

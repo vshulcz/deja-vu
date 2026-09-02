@@ -120,6 +120,16 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "amp", Load: LoadAmp, Files: AmpThreadFiles,
+			Kinds: []FileKind{{
+				Name: "amp",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".json") && strings.HasPrefix(p, AmpRoot()+string(filepath.Separator))
+				},
+				Parse: fullParse(ParseAmpFile),
+			}},
+		},
+		{
 			Name: "gemini", Load: LoadGemini, Files: GeminiChatFiles,
 			Kinds: []FileKind{{
 				Name: "gemini",

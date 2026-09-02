@@ -34,7 +34,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	for _, key := range []string{
 		"AIDER_CHAT_HISTORY_FILE", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
-		"CURSOR_CONFIG_DIR", "DEJA_AIDER_ROOTS", "DEJA_ANTIGRAVITY_ROOT",
+		"CURSOR_CONFIG_DIR", "DEJA_AIDER_ROOTS", "DEJA_AMP_ROOT", "AMP_DATA_HOME", "DEJA_ANTIGRAVITY_ROOT",
 		"DEJA_CLAUDE_ROOT", "DEJA_CODEX_ROOT", "DEJA_CURSOR_CLI_ROOT",
 		"DEJA_CURSOR_ROOT", "DEJA_GEMINI_ROOT", "DEJA_GROK_ROOT", "DEJA_GOOSE_ROOT", "DEJA_GOOSE_DB",
 		"DEJA_PI_ROOT", "DEJA_OMP_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
@@ -158,6 +158,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseOpencodeDB(db)
 	case "aider":
 		sessions, err = ParseAiderFile(path)
+	case "amp":
+		sessions, err = ParseAmpFile(path)
 	case "gemini":
 		sessions, err = ParseGeminiFile(path)
 	case "cursor":

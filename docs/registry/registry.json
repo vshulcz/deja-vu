@@ -48,6 +48,31 @@
       }
     },
     {
+      "id": "amp",
+      "store_paths": [
+        "~/.local/share/amp/threads/*.json",
+        "${XDG_DATA_HOME}/amp/threads/*.json",
+        "${AMP_DATA_HOME}/threads/*.json",
+        "${DEJA_AMP_ROOT}/*.json"
+      ],
+      "format_kind": "json-thread",
+      "fixture_paths": [
+        "fixtures/registry/amp/thread.json"
+      ],
+      "parser_source": "internal/sources/amp.go",
+      "last_verified": "2026-09-02",
+      "display_name": "Amp",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "none",
+        "prereq": ""
+      }
+    },
+    {
       "id": "antigravity",
       "store_paths": [
         "~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl",
