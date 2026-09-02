@@ -190,7 +190,7 @@ type scoopAutoupdate struct {
 func renderScoop(p pins) ([]byte, error) {
 	m := scoopManifest{
 		Version:     p.version,
-		Description: "Persistent memory for coding agents",
+		Description: "Search Claude Code, Codex and Cursor session history locally",
 		Homepage:    "https://github.com/vshulcz/deja-vu",
 		License:     "MIT",
 		Architecture: map[string]scoopArch{

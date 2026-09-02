@@ -1,6 +1,6 @@
 {
     "version": "0.19.2",
-    "description": "Persistent memory for coding agents",
+    "description": "Search Claude Code, Codex and Cursor session history locally",
     "homepage": "https://github.com/vshulcz/deja-vu",
     "license": "MIT",
     "architecture": {
