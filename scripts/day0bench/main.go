@@ -36,6 +36,7 @@ import (
 	"path/filepath"
 	"runtime/pprof"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -178,6 +179,7 @@ func main() {
 	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
 	ranks := flag.Bool("ranks", false, "print where each answer landed, for triage of ranking rather than retrieval")
 	corpus := flag.Int("corpus", 0, "lay down history from this many questions while scoring -limit of them; holds the questions fixed so only the pile grows")
+	skipAbs := flag.Bool("skip-abs", true, "skip abstention (_abs) questions, as the cleaned-dataset longmemeval runs do; their session is a decoy for a fact the user never stated")
 	keep := flag.String("keep", "", "also lay the corpus down under DIR/home as ~/.claude/projects and ~/.codex/sessions, with DIR/questions.json, so another tool can be run over the same history and scored by the same rule")
 	flag.Parse()
 	if *data == "" {
@@ -214,6 +216,17 @@ func main() {
 			os.Exit(1)
 		}
 		defer pprof.StopCPUProfile()
+	}
+	if *skipAbs {
+		// A fresh slice: filtering in place would also shrink `all`, and the
+		// corpus every tool is scored against must not depend on this flag.
+		kept := make([]question, 0, len(qs))
+		for _, q := range qs {
+			if !strings.Contains(q.ID, "_abs") {
+				kept = append(kept, q)
+			}
+		}
+		qs = kept
 	}
 	if *limit > 0 && len(qs) > *limit {
 		qs = qs[:*limit]
