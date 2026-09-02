@@ -36,6 +36,18 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 		}
 	}
 
+	// The home page says it in a figure of its own — "Works with 18" — sitting
+	// above a grid that listed twenty. The digit test looks for "N harnesses"
+	// or "N agents" and a bare number in a span is neither, so it stayed at
+	// eighteen through three harnesses landing.
+	home, err := os.ReadFile(filepath.Join(root, "docs", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := fmt.Sprintf(`Works with <span class="fig">%d</span>`, n); !strings.Contains(string(home), want) {
+		t.Errorf("docs/index.html does not say %q — the registry has %d harnesses", want, n)
+	}
+
 	// The registry pages close with "deja reads this format and N others". The
 	// word was typed into the generator's template, so all twenty pages kept
 	// saying seventeen for three harnesses running.
