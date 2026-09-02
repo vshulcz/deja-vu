@@ -3,6 +3,7 @@ package sources
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -12,24 +13,16 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// AmpDataHome is Amp's native data directory. AMP_DATA_HOME is the upstream
-// relocation variable; it is useful for custom installs and hermetic tests.
-func AmpDataHome() string {
-	if p := os.Getenv("AMP_DATA_HOME"); p != "" {
-		return p
-	}
-	if runtime.GOOS == "linux" {
-		if p := os.Getenv("XDG_DATA_HOME"); p != "" {
-			return filepath.Join(p, "amp")
-		}
-	}
-	return filepath.Join(Home(), ".local", "share", "amp")
-}
-
 // AmpRoot returns Amp's thread store root, overridable by deja without
 // changing Amp's own environment.
 func AmpRoot() string {
-	return EnvPath("DEJA_AMP_ROOT", filepath.Join(AmpDataHome(), "threads"))
+	dataHome := filepath.Join(Home(), ".local", "share", "amp")
+	if runtime.GOOS == "linux" {
+		if p := os.Getenv("XDG_DATA_HOME"); p != "" {
+			dataHome = filepath.Join(p, "amp")
+		}
+	}
+	return EnvPath("DEJA_AMP_ROOT", filepath.Join(dataHome, "threads"))
 }
 
 // AmpThreadFiles lists Amp's one-thread-per-JSON files.
@@ -76,6 +69,13 @@ func ParseAmpFile(path string) ([]model.Session, error) {
 	dec.UseNumber()
 	if err := dec.Decode(&thread); err != nil {
 		return nil, fmt.Errorf("decode Amp thread %s: %w", path, err)
+	}
+	var trailing json.RawMessage
+	if err := dec.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return nil, fmt.Errorf("decode Amp thread %s: trailing data", path)
+		}
+		return nil, fmt.Errorf("decode Amp thread %s: trailing data: %w", path, err)
 	}
 	if thread.ID == "" {
 		return nil, fmt.Errorf("decode Amp thread %s: missing id", path)

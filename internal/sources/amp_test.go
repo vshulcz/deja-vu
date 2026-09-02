@@ -96,6 +96,32 @@ func TestParseAmpRejectsMalformedOrTruncatedJSON(t *testing.T) {
 	}
 }
 
+func TestParseAmpRejectsTrailingData(t *testing.T) {
+	for _, trailing := range []string{`{"id":"second"}`, "junk"} {
+		t.Run(trailing, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "trailing.json")
+			body := `{"id":"first","title":"First","created":1767337445000,"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}]}` + trailing
+			if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ParseAmpFile(path); err == nil {
+				t.Fatalf("parsed valid JSON followed by %q", trailing)
+			}
+		})
+	}
+}
+
+func TestParseAmpAllowsTrailingWhitespace(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "whitespace.json")
+	body := `{"id":"whitespace","title":"Whitespace","created":1767337445000,"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}]}` + " \n\t"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseAmpFile(path); err != nil {
+		t.Fatalf("rejected trailing JSON whitespace: %v", err)
+	}
+}
+
 func TestLoadAmpSkipsMalformedThread(t *testing.T) {
 	root := t.TempDir()
 	home := filepath.Join(root, "home")
@@ -123,18 +149,11 @@ func TestAmpDiscoveryAndRegistry(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(root, "xdg"))
-	t.Setenv("AMP_DATA_HOME", "")
 	t.Setenv("DEJA_AMP_ROOT", "")
 	wantDefault := filepath.Join(root, "xdg", "amp", "threads")
 	if got := AmpRoot(); got != wantDefault {
 		t.Fatalf("default AmpRoot = %q, want %q", got, wantDefault)
 	}
-	native := filepath.Join(root, "native-amp")
-	t.Setenv("AMP_DATA_HOME", native)
-	if got := AmpRoot(); got != filepath.Join(native, "threads") {
-		t.Fatalf("AMP_DATA_HOME AmpRoot = %q", got)
-	}
-	t.Setenv("AMP_DATA_HOME", "")
 
 	override := filepath.Join(root, "custom-amp")
 	t.Setenv("DEJA_AMP_ROOT", override)

@@ -52,7 +52,6 @@
       "store_paths": [
         "~/.local/share/amp/threads/*.json",
         "${XDG_DATA_HOME}/amp/threads/*.json",
-        "${AMP_DATA_HOME}/threads/*.json",
         "${DEJA_AMP_ROOT}/*.json"
       ],
       "format_kind": "json-thread",
