@@ -111,3 +111,19 @@ two files the Gemini install uses.
   source and obvious the moment the real host executed it — a peer dependency
   the host does not install, a hook that accepts input and drops it, a 60-second
   timeout on `initialize`.
+
+## OpenClaw
+
+The runtime integration — MCP server, hook pack, plugin — is written by
+`deja install openclaw-auto`; nothing here is needed for it. What lives here is
+the skill pack for [ClawHub](https://clawhub.ai), OpenClaw's public skill
+registry, which the awesome-openclaw-skills list and clawskills.sh read from:
+
+```sh
+clawhub skill publish extensions/openclaw/skill/deja-history
+```
+
+The frontmatter declares the `deja` binary as a requirement and how to install
+it (brew formula `deja-vu`, npm `@vshulcz/deja-vu`), which is what ClawHub's
+security analysis checks against. `scripts/pinmanifests` keeps its `version:`
+in step with the release.

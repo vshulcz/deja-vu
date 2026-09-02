@@ -26,6 +26,9 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html
 https://vshulcz.github.io/deja-vu/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/guide/context-window-full.html
 https://vshulcz.github.io/deja-vu/guide/resume-a-session.html

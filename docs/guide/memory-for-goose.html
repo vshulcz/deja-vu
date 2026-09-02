@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for Goose: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="Goose keeps sessions in a local database and reads .goosehints at start; nothing brings earlier sessions back. deja adds MCP recall, a session-start hook and a per-turn channel through the deja goose wrapper.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Goose">
+<meta property="og:description" content="Goose keeps sessions in a local database and reads .goosehints at start; nothing brings earlier sessions back. deja adds MCP recall, a session-start hook and a per-turn channel through the deja goose wrapper.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Goose">
+<meta name="twitter:description" content="Goose keeps sessions in a local database and reads .goosehints at start; nothing brings earlier sessions back. deja adds MCP recall, a session-start hook and a per-turn channel through the deja goose wrapper.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Goose", "description": "Goose keeps sessions in a local database and reads .goosehints at start; nothing brings earlier sessions back. deja adds MCP recall, a session-start hook and a per-turn channel through the deja goose wrapper.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Goose", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Goose remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps them in a local SQLite store under its data directory and can resume one, but a new session does not read the others. .goosehints is read once at start and holds only what you wrote by hand."}}, {"@type": "Question", "name": "How do I add memory to Goose?", "acceptedAnswer": {"@type": "Answer", "text": "deja install goose-auto adds deja as an MCP extension in config.yaml and a SessionStart hook that refreshes .goosehints with this machine's relevant history. Running Goose as `deja goose` also turns on the per-turn MOIM channel, which is env-only and survives compaction."}}, {"@type": "Question", "name": "Can Goose see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-one agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html" aria-current="page">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Goose</h1>
+<p class="pagelede">.goosehints is what you wrote; the sessions are what happened<span class="mins" data-mins></span></p>
+
+<p>Goose keeps every session in a local database under its data directory and can reopen one. What it reads at the start of a new session is <code>.goosehints</code> — a file you maintain by hand — and nothing else: not last week's session, and not the one in Claude Code or Codex where the same problem was already solved on this machine. This page is about adding that.</p>
+
+<h2>What Goose already has</h2>
+<p>Two ways to put text in front of the model, and deja uses both. <code>.goosehints</code> is read into the system prompt when a session starts. <b>MOIM</b> — with <code>GOOSE_MOIM_MESSAGE_FILE</code> set — is a file re-read on every turn and injected as a <code>&lt;turn-context&gt;</code> block, which also survives compaction. MOIM is environment-only; <code>config.yaml</code> is not consulted, so only a wrapper can turn it on.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install goose-auto</pre>
+<p>That adds deja to the <code>extensions</code> block of <code>config.yaml</code> as an MCP server, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code>, and a SessionStart hook that refreshes <code>.goosehints</code> with this machine's relevant history before Goose reads it — the same session sees the new content. <code>config.yaml</code> is edited textually rather than round-tripped through a YAML library: it holds provider settings you wrote by hand, and re-serialising would drop your comments and ordering.</p>
+<p>For recall on every turn, start Goose through the wrapper:</p>
+<pre>deja goose</pre>
+<p>It sets the MOIM file and launches Goose; each turn the block says whether this machine's history answers the prompt, and after compaction the block is still there. Without the wrapper you keep the session-start half and the tools.</p>
+
+<h2>What arrives</h2>
+<p>At session start, a digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred. On each turn under the wrapper, the history the prompt is actually about, when there is any; silence is the common case. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about Goose</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in Goose, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/goose.html">The Goose session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

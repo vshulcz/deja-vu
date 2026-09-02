@@ -48,6 +48,9 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
 - [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html)
+- [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html)
+- [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html)
+- [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html)
 
 ## Evidence
 

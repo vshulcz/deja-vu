@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for pi and omp: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="pi and omp have no hooks; they have extension APIs. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to pi and omp">
+<meta property="og:description" content="pi and omp have no hooks; they have extension APIs. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to pi and omp">
+<meta name="twitter:description" content="pi and omp have no hooks; they have extension APIs. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to pi and omp", "description": "pi and omp have no hooks; they have extension APIs. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for pi and omp", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does pi remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps a JSONL log per session under ~/.pi/agent/sessions and can resume one; a new session does not read the others. omp is the same lineage and keeps the same shape under ~/.omp."}}, {"@type": "Question", "name": "How do I add memory to pi or omp?", "acceptedAnswer": {"@type": "Answer", "text": "deja install pi-auto or deja install omp-auto writes one extension file into the agent's extensions directory, which is auto-discovered — no settings edit. On pi it answers before_agent_start with the prompt in hand; on omp it answers the context event, the one seam that reaches the model."}}, {"@type": "Question", "name": "Can pi see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-one agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html" aria-current="page">Memory for pi and omp</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to pi and omp</h1>
+<p class="pagelede">no hooks, an extension API — and one file is the whole install<span class="mins" data-mins></span></p>
+
+<p>pi writes a JSONL log per session under <code>~/.pi/agent/sessions</code> and can resume one; omp (Oh My Pi) is the same lineage and keeps the same shape under <code>~/.omp</code>. A new session in either reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
+
+<h2>What they already have</h2>
+<p>Neither has hooks. Both have an extension API, and extensions under the agent's <code>extensions/</code> directory are auto-discovered — so installing is one file and no settings edit, and removing it is deleting the file.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install pi-auto
+deja install omp-auto</pre>
+<p>Each writes the MCP server, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code>, and one extension:</p>
+<ul>
+<li><b>pi</b> — <code>~/.pi/agent/extensions/deja.ts</code>, answering <code>before_agent_start</code>. It fires after you submit a prompt, carries the prompt text, and can return a message that is stored in the session and sent to the model — both halves of what Claude Code splits across SessionStart and UserPromptSubmit, in one event. pi also has a real channel to you, <code>ctx.ui.notify</code>, so the recall line and the "index still building" note go there rather than into the prompt.</li>
+<li><b>omp</b> — a module under the active agent's <code>extensions/</code>, registering a handler on the <code>context</code> event. A handler returning <code>{ messages }</code> replaces what goes to the provider, which is the only seam that reaches the model before it answers. Which event, and that a returned list is honoured at all, came from running a probe against omp 17.4.1: <code>input</code> never fires in print mode, <code>before_agent_start</code> carries the prompt but not the context, and a marker prepended in <code>context</code> came back out of the model.</li>
+</ul>
+
+<h2>What arrives</h2>
+<p>On each prompt, the history it is actually about, when there is any; silence is the common case. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about pi</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in pi, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/pi.html">The pi session format</a> · <a href="../registry/omp.html">omp</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

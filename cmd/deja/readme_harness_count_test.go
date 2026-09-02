@@ -63,6 +63,9 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		"server.json",
 		"packaging/mcpb/manifest.json",
 		"docs/guide/harnesses.html",
+		// The ClawHub skill pack, which the OpenClaw registry renders as the
+		// skill's own page.
+		"extensions/openclaw/skill/deja-history/SKILL.md",
 	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {
@@ -240,4 +243,33 @@ func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]s
 		t.Fatalf("the count is %d and this test has no word for it; add one", n)
 	}
 	return want, words
+}
+
+// The per-harness pages say it a third way — "twenty of them today" — and ten
+// of them were a harness behind, because the phrase is not a title, not a
+// digit, and not the bare word the README test looks for.
+func TestGuidePagesCountTheHarnessesTheyList(t *testing.T) {
+	root := filepath.Join("..", "..")
+	want, words := harnessCountWords(t, root, 0)
+	phrase := regexp.MustCompile(`([a-z]+(?:-[a-z]+)?) of them today`)
+	pages, err := filepath.Glob(filepath.Join(root, "docs", "guide", "*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range pages {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range phrase.FindAllStringSubmatch(string(b), -1) {
+			if m[1] == want {
+				continue
+			}
+			for _, w := range words {
+				if m[1] == w {
+					t.Errorf("%s says %q of them; the registry has %s", filepath.Base(p), m[1], want)
+				}
+			}
+		}
+	}
 }

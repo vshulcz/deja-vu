@@ -63,6 +63,9 @@
 <a href="memory-for-cursor.html">Memory for Cursor</a>
 <a href="memory-for-copilot.html">Memory for Copilot CLI</a>
 <a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>
@@ -105,7 +108,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>There is a community CLI that shares the name <code>grok</code> and the <code>~/.grok</code> directory, and it is a different product. deja reads xAI's Grok Build store, and <code>deja resume</code> prints a <code>grok --resume</code> for its sessions and refuses for the community CLI's, which has no terminal resume. Where something still could not be checked against a running Grok Build, the <a href="../registry/grok.html">registry page</a> says so and names what was tried instead of guessing.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — twenty of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>The index covers every agent's transcripts on the machine — twenty-one of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
 <p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="../registry/grok.html">How Grok's store is read</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/grok">The plugin source</a></p>
