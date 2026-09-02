@@ -1,14 +1,14 @@
 # dsh-deja
 
-English | [中文](docs/zh.md)
+English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md)
 
 DeepSeek Harness can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
 did in the *other* agents on this machine.
 
-deja indexes the session files that Claude Code, Codex, Cursor, opencode,
-Antigravity, Grok Build, Kimi, Cline, Zed and ten more agents already write to
-disk. Nothing has to have been recorded ahead of time: the history is already
+deja indexes the session files that twenty other coding agents — Claude Code,
+Codex, Cursor, opencode, Antigravity, Grok Build, Kimi, Cline and Zed among
+them — already write to disk. Nothing has to have been recorded ahead of time: the history is already
 there, including the months before deja was installed. If you moved to dsh last
 week, everything you did before last week is still reachable from inside it.
 

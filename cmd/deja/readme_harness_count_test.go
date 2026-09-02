@@ -191,3 +191,53 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		}
 	}
 }
+
+// The two npm pages count what a plugin brings its host: every harness except
+// the host itself. Between them they are installed a couple of thousand times a
+// week — more people than the site sees — and both were describing nineteen
+// agents months after there were twenty, because the count was written relative
+// to whatever the sentence had just listed ("and ten more") and nothing could
+// check that against anything.
+func TestPluginPagesCountTheOtherHarnesses(t *testing.T) {
+	root := filepath.Join("..", "..")
+	want, words := harnessCountWords(t, root, -1)
+
+	for _, name := range []string{
+		"extensions/dsh/package.json",
+		"extensions/dsh/README.md",
+		"extensions/opencode/package.json",
+		"extensions/opencode/README.md",
+	} {
+		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		text := strings.ToLower(string(b))
+		rest := strings.ReplaceAll(text, want, "")
+		for _, stale := range words {
+			if stale != want && strings.Contains(rest, stale) {
+				t.Errorf("%s still counts %q other agents; there are %s", name, stale, want)
+			}
+		}
+		if !strings.Contains(text, want) {
+			t.Errorf("%s never says %q, which is how many other agents deja reads", name, want)
+		}
+	}
+}
+
+// harnessCountWords is the registry count plus an offset, as a word, together
+// with the words this test knows — a page that counts the harnesses says the
+// first, and a page that counts the other ones says it with offset -1.
+func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]string) {
+	t.Helper()
+	n := registryHarnessCount(t, root) + offset
+	words := map[int]string{
+		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
+		19: "nineteen", 20: "twenty", 21: "twenty-one",
+	}
+	want, ok := words[n]
+	if !ok {
+		t.Fatalf("the count is %d and this test has no word for it; add one", n)
+	}
+	return want, words
+}
