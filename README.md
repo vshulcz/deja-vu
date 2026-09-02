@@ -429,6 +429,17 @@ record-forward tools and worth your time if that model fits you; it still starts
 knows only what an agent chose to save. The
 [full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers eleven of them.
 
+**Where is Claude Code session history stored, and can I search it?** Under
+`~/.claude/projects`, one JSONL file per session; Codex keeps `~/.codex/sessions`, Cursor a
+SQLite `state.vscdb`. `deja search` reads them all in place, `deja last` lists the recent
+sessions of every agent, and `deja view` opens the whole history as one local page. Paths
+for each agent: [where sessions are stored](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
+
+**My Claude Code session history disappeared. Is it gone?** Claude Code deletes transcripts
+older than 30 days (`cleanupPeriodDays` in `~/.claude/settings.json`), and `/resume` lists
+only what is left. A session deja indexed before the cleanup stays searchable after the
+file is gone. Details: [session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
+
 **What about Windows?** Builds exist and CI runs the suite there. macOS and Linux are the
 battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/deja-vu/issues/9).
 
