@@ -21,10 +21,15 @@ for q in qs:
     dt = time.time() - t1; lat.append(dt)
     if first is None: first = dt
     want = set(q['answer_session_ids'])
+    # MemPalace splits a file into drawers named <id>_<n>.jsonl; an id may
+    # itself carry underscores (ultrachat_440010), so match by prefix rather
+    # than by stripping a suffix.
     order = []
     for m in src.finditer(r.stdout):
-        sid = re.sub(r'(_\d+)?\.jsonl$', '', os.path.basename(m.group(1)))
-        if sid not in order: order.append(sid)
+        base = os.path.basename(m.group(1))
+        sid = next((w for w in want if base == w + '.jsonl' or re.match(re.escape(w) + r'_\d+\.jsonl$', base)), None)
+        key = sid or re.sub(r'\.jsonl$', '', base)
+        if key not in order: order.append(key)
     rank = next((k for k, sid in enumerate(order) if sid in want), None)
     if rank is not None:
         found += 1
