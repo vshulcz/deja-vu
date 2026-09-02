@@ -218,8 +218,56 @@ func gooseConfigDir() string {
 	return filepath.Join(homeDir(), ".config", "goose")
 }
 
+// gooseHintsPath is where the session-start recall goes: AGENTS.md in goose's
+// own config directory.
+//
+// It used to be `.goosehints` beside it, and that never reached the model on
+// goose 1.48 — measured by pointing goose at a stub endpoint and reading the
+// request it sent. Of the places a global file can live, only this one arrives:
+//
+//	<project>/.goosehints          reaches the model
+//	<project>/AGENTS.md            reaches the model
+//	~/.config/goose/AGENTS.md      reaches the model
+//	~/.config/goose/.goosehints    does not
+//	~/.goosehints                  does not
+//	an ancestor directory's .goosehints  does not
+//
+// The file belongs to the reader, so deja edits its own marked block inside it
+// and leaves every other line alone — the same discipline guidance already uses
+// for an AGENTS.md.
 func gooseHintsPath() string {
+	return filepath.Join(gooseConfigDir(), "AGENTS.md")
+}
+
+// retiredGooseHintsPath is the file deja used to write. Install clears its
+// block, because a stale copy of somebody's history sitting in a file nothing
+// reads is the worst of both: invisible and wrong.
+func retiredGooseHintsPath() string {
 	return filepath.Join(gooseConfigDir(), ".goosehints")
+}
+
+const (
+	gooseRecallStart = "<!-- deja recall:start -->"
+	gooseRecallEnd   = "<!-- deja recall:end -->"
+)
+
+// gooseRecallBlock puts the body inside deja's markers, replacing an earlier
+// block and leaving the rest of the file as it was.
+func gooseRecallBlock(doc, body string) string {
+	block := gooseRecallStart + "\n" + strings.TrimRight(body, "\n") + "\n" + gooseRecallEnd + "\n"
+	start := strings.Index(doc, gooseRecallStart)
+	if start < 0 {
+		if strings.TrimSpace(doc) == "" {
+			return block
+		}
+		return strings.TrimRight(doc, "\n") + "\n\n" + block
+	}
+	end := strings.Index(doc[start:], gooseRecallEnd)
+	if end < 0 {
+		return doc[:start] + block
+	}
+	tail := doc[start+end+len(gooseRecallEnd):]
+	return doc[:start] + block + strings.TrimLeft(tail, "\n")
 }
 
 // installGooseAuto adds the session-start half: a plugin hook that refreshes
@@ -235,18 +283,36 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 		// The hook lives in its own plugin directory; leaving it behind means
 		// Goose keeps running a command that no longer exists.
 		_ = os.RemoveAll(filepath.Dir(filepath.Dir(gooseHookPath())))
-		if _, serr := os.Stat(path); serr == nil {
-			if rerr := os.Remove(path); rerr != nil {
-				return installResult{}, rerr
-			}
+		// The recall now lives in the reader's own AGENTS.md, so uninstall
+		// takes deja's block out and leaves the file. Removing it was right
+		// while the target was a `.goosehints` deja owned outright; against
+		// AGENTS.md it would delete whatever the reader had written there.
+		if rerr := dropGooseRecallBlock(path); rerr != nil {
+			return installResult{}, rerr
+		}
+		if rerr := dropRetiredGooseHints(); rerr != nil {
+			return installResult{}, rerr
 		}
 		return res, nil
 	}
 	if err := refreshGooseHints(); err != nil {
 		return installResult{}, err
 	}
-	if err := writeGooseHook(); err != nil {
+	// The hook is the whole of what -auto adds over the plain target, and it
+	// was written without a word: run `deja install goose` and then
+	// `goose-auto` and every line said "unchanged" while the session-start
+	// recall was being switched on. Report the file, the way omp-auto reports
+	// its extension.
+	action, err := writeGooseHook(exe)
+	if err != nil {
 		return installResult{}, err
+	}
+	// Whichever half moved. Reporting the hook alone hid a rewritten config,
+	// and reporting the config alone hid the hook — which is the only thing
+	// -auto adds, so `deja install goose` followed by `goose-auto` said
+	// "unchanged" three times while switching session-start recall on.
+	if action != "unchanged" {
+		return installResult{Path: gooseHookPath(), Action: action}, nil
 	}
 	return res, nil
 }
@@ -258,11 +324,7 @@ func gooseHookPath() string {
 	return filepath.Join(homeDir(), ".agents", "plugins", "deja", "hooks", "hooks.json")
 }
 
-func writeGooseHook() error {
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
+func writeGooseHook(exe string) (string, error) {
 	body, err := json.MarshalIndent(map[string]any{
 		"hooks": map[string]any{
 			"SessionStart": []any{map[string]any{
@@ -288,19 +350,18 @@ func writeGooseHook() error {
 		},
 	}, "", "  ")
 	if err != nil {
-		return err
+		return "", err
 	}
 	body = append(body, '\n')
 	path := gooseHookPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return "", err
 	}
 	old, err := readConfig(path)
 	if err != nil {
-		return err
+		return "", err
 	}
-	_, werr := writeIfChanged(path, old, body)
-	return werr
+	return writeIfChanged(path, old, body)
 }
 
 // cmdGooseHook is what the SessionStart hook runs. Under the wrapper it
@@ -408,8 +469,50 @@ func refreshGooseHintsFor(cwd string) error {
 	if err != nil {
 		return err
 	}
-	_, err = writeIfChanged(path, old, []byte(body))
+	// The MOIM file is deja's own and holds nothing else; AGENTS.md is the
+	// reader's, so only the block between the markers is ours to rewrite.
+	next := []byte(body)
+	if path == gooseHintsPath() {
+		next = []byte(gooseRecallBlock(string(old), body))
+	}
+	if _, err := writeIfChanged(path, old, next); err != nil {
+		return err
+	}
+	return dropRetiredGooseHints()
+}
+
+// dropGooseRecallBlock takes deja's block out of the file and removes the file
+// only when nothing else was in it.
+func dropGooseRecallBlock(path string) error {
+	old, err := readConfig(path)
+	if err != nil || len(old) == 0 {
+		return nil
+	}
+	start := strings.Index(string(old), gooseRecallStart)
+	if start < 0 {
+		return nil
+	}
+	rest := string(old)[start:]
+	end := strings.Index(rest, gooseRecallEnd)
+	next := string(old)[:start]
+	if end >= 0 {
+		next += rest[end+len(gooseRecallEnd):]
+	}
+	if strings.TrimSpace(next) == "" {
+		return os.Remove(path)
+	}
+	_, err = writeIfChanged(path, old, []byte(strings.TrimLeft(next, "\n")))
 	return err
+}
+
+// dropRetiredGooseHints removes the file deja used to write, once it holds
+// nothing but what deja put there.
+func dropRetiredGooseHints() error {
+	path := retiredGooseHintsPath()
+	if _, err := os.Stat(path); err != nil {
+		return nil
+	}
+	return os.Remove(path)
 }
 
 const gooseLead = "The sessions below are from this project's recent history. " +
