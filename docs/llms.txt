@@ -47,6 +47,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html)
 - [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
+- [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html)
 
 ## Evidence
 

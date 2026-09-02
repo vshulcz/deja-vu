@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for OpenClaw: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="OpenClaw keeps a session log per agent and can resume one; nothing reads earlier sessions back. deja indexes them with every other agent on the machine and puts recall in front of the model.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to OpenClaw">
+<meta property="og:description" content="OpenClaw keeps a session log per agent and can resume one; nothing reads earlier sessions back. deja indexes them with every other agent on the machine and puts recall in front of the model.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to OpenClaw">
+<meta name="twitter:description" content="OpenClaw keeps a session log per agent and can resume one; nothing reads earlier sessions back. deja indexes them with every other agent on the machine and puts recall in front of the model.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to OpenClaw", "description": "OpenClaw keeps a session log per agent and can resume one; nothing reads earlier sessions back. deja indexes them with every other agent on the machine and puts recall in front of the model.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for OpenClaw", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does OpenClaw remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps a JSONL log per agent under ~/.openclaw/agents/*/sessions and can resume one session by key, but a new session does not read earlier ones. deja indexes those logs together with every other agent's on the machine and puts matching history in front of the model."}}, {"@type": "Question", "name": "How do I add memory to OpenClaw?", "acceptedAnswer": {"@type": "Answer", "text": "deja install openclaw-auto writes the MCP server, a hook pack under ~/.openclaw/hooks that adds recall to the Project Context at agent bootstrap, and a plugin that answers before_prompt_build on each prompt, including under openclaw agent --local. Internal hooks need hooks.internal.enabled set."}}, {"@type": "Question", "name": "Can OpenClaw see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-one agents on the same machine, including sessions from before deja was installed, so a fix found in Claude Code answers a question asked in OpenClaw."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-openclaw.html" aria-current="page">Memory for OpenClaw</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to OpenClaw</h1>
+<p class="pagelede">it keeps a log and can resume one session; nothing reads the others back<span class="mins" data-mins></span></p>
+
+<p>OpenClaw writes every session to disk — one JSONL file per session under <code>~/.openclaw/agents/&lt;agent&gt;/sessions/</code> — and <code>openclaw chat --session &lt;key&gt;</code> reopens one. That is resumption, not memory: a new session knows nothing about the last one, and nothing about what you did in Claude Code, Codex or Cursor on the same machine the week before. This page is about adding that.</p>
+
+<h2>What OpenClaw already has</h2>
+<p>The session log, per agent, and a session key to resume by. Its default backend is <code>claude-cli</code>, so a Claude Code hook already reaches it there; the other providers get nothing between sessions unless a plugin puts it in front of the model.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install openclaw-auto</pre>
+<p>Three things are written, and all three are reversible with <code>deja uninstall openclaw</code>:</p>
+<ul>
+<li><b>The MCP server</b>, so the model can call <code>recall</code>, <code>recall_context</code>, <code>blame</code>, <code>fix</code> and <code>how</code> itself.</li>
+<li><b>A hook pack</b> under <code>~/.openclaw/hooks</code> — a directory with <code>HOOK.md</code> and <code>handler.js</code>, which is OpenClaw's own format, so no <code>openclaw plugins install</code> step. It answers the <code>agent:bootstrap</code> event by appending a digest of this machine's relevant history to the Project Context set, without writing anything into the workspace.</li>
+<li><b>A plugin</b> under <code>extensions/</code>, with the <code>package.json</code> and <code>openclaw.plugin.json</code> pair OpenClaw validates. It answers <code>before_prompt_build</code> with the history the prompt you just typed is about, and it fires under <code>openclaw agent --local</code> too, where the bootstrap event never does.</li>
+</ul>
+<p>Two things learned by running it against OpenClaw 2026.7.1, which the installer prints but are worth knowing before you test:</p>
+<ul>
+<li>Internal hooks are off wholesale until <code>hooks.internal.enabled</code> is set. A pack listed as "ready" still never runs until then.</li>
+<li>The bootstrap event fires in gateway mode, and only when the agent workspace is first bootstrapped — not once per session. Tested under <code>openclaw agent --local</code>, the pack looks dead; that is what the plugin half is for.</li>
+</ul>
+<p><code>plugins.allow</code> is left alone: it is advisory, leaving it costs one warning at startup, and writing to it would be deja deciding what you trust.</p>
+
+<h2>What arrives</h2>
+<p>At bootstrap, a short digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred — as one more entry in the Project Context. On each prompt, when your history already answers it, the plugin says so in front of the model; silence is the common case, and an injection is capped at about 1.5 KB per prompt and 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about OpenClaw</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in OpenClaw, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/openclaw.html">The OpenClaw session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
