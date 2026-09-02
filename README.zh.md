@@ -234,6 +234,10 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 
 [完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十一个。
 
+**Claude Code 的会话历史存在哪里，能搜索吗？** 在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地读取它们，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+
+**Claude Code 的会话历史不见了，是丢了吗？** Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `cleanupPeriodDays`），`claude --resume` 只列出还剩下的。deja 在清理前索引过的会话，文件没了之后仍然可以搜索。详见[磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
+
 **怎么全部清除？**
 
 ```sh

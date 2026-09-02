@@ -432,6 +432,11 @@ func withStatsStores(t *testing.T) {
 	t.Setenv("DEJA_CODEX_ROOT", codexRoot)
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	// The notes file falls back to %AppData% on Windows, which moving HOME
+	// does not move — so every test that left it unpinned shared one real
+	// file, and a note another test promoted turned up in this fixture's
+	// install proof and its totals (#2978).
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
 	t.Setenv("NO_COLOR", "1")
 
 	writeClaudeFixture(t, filepath.Join(claudeRoot, "-tmp-alpha", "c1.jsonl"), "c1", []string{

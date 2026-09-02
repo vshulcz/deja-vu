@@ -49,6 +49,20 @@ func runRemember(dir string, args []string) error {
 			i++
 			continue
 		}
+		// `--` says the next word is the note however it starts, the spelling
+		// search, fix and how already take. A decision whose own words begin
+		// with a dash was otherwise refused as a flag.
+		if args[i] == "--" {
+			if i+1 >= len(args) {
+				return fmt.Errorf("remember: text required")
+			}
+			if text != "" {
+				return fmt.Errorf("remember: expected one text argument")
+			}
+			text = args[i+1]
+			i++
+			continue
+		}
 		if strings.HasPrefix(args[i], "-") {
 			return fmt.Errorf("remember: unknown flag %q", args[i])
 		}

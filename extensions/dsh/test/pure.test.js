@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import apply from "../index.js";
-import { contributions } from "../lib.js";
+import { argv, contributions, guarded } from "../lib.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -22,6 +22,50 @@ test("the recall limit is bounded on both sides", () => {
   assert.equal(clamp(-3), 1);
   assert.equal(clamp(7), 7);
   assert.equal(clamp(9999), 20);
+});
+
+test("a query that is a command name is still searched", () => {
+  // deja's bare-query path dispatches the first word, so `/deja version`
+  // printed a version number instead of searching for the word.
+  assert.deepEqual(argv("search", [], "version"), ["search", "version"]);
+  assert.deepEqual(argv("search", ["--json"], "index"), ["search", "--json", "index"]);
+});
+
+test("a query that starts with a dash is not read as a flag", () => {
+  // Without the terminator deja exits on an unknown flag, which the caller
+  // cannot tell from an empty history.
+  assert.deepEqual(argv("search", [], "--no-verify"), ["search", "--", "--no-verify"]);
+  assert.deepEqual(argv("fix", [], "-race detected"), ["fix", "--", "-race detected"]);
+  // Flags the plugin sends itself stay ahead of the terminator, or deja reads
+  // them as part of the query.
+  assert.deepEqual(argv("search", ["--json", "--limit", "5"], "--all-matches"), [
+    "search",
+    "--json",
+    "--limit",
+    "5",
+    "--",
+    "--all-matches",
+  ]);
+});
+
+test("the terminator is sent only when the query needs it", () => {
+  // A deja too old to know `--` on this subcommand would otherwise fail on
+  // every ordinary query, not just the ones that start with a dash.
+  assert.deepEqual(argv("how", [], "run the tests"), ["how", "run the tests"]);
+  assert.deepEqual(argv("ctx", [], "the checkout worker"), ["ctx", "the checkout worker"]);
+});
+
+test("every query the plugin sends goes through argv", () => {
+  // The rules above are worth nothing if a call site passes its text straight
+  // through, which is how both bugs got in.
+  // A literal list is deja's own vocabulary — `run(["version"])` and the hook.
+  // Anything else in that position is somebody's text, and it belongs in
+  // argv(), which names the command and ends the flags.
+  const calls = source.match(/run\(\[[^\]]*\]/g) || [];
+  for (const call of calls) {
+    assert.match(call, /^run\(\["/, `${call} builds a call out of something other than deja's own words`);
+    assert.doesNotMatch(call, /String\(args\./, `${call} passes a query to deja without argv()`);
+  }
 });
 
 test("tool output declares a plain JSON schema", () => {
@@ -38,6 +82,61 @@ test("automatic recall does not use the pre-step waterfall", () => {
   // registration rather than on the words.
   assert.doesNotMatch(source, /ctx\.on\("agent\/pre-step"/);
   assert.match(source, /ctx\.systemPrompt\.context\(/);
+});
+
+// dsh refuses a name one of its registries already holds — "prompt context
+// deja:recall is already registered", "command deja is already registered" —
+// and the failure is not local: the whole profile fails to load, so a second
+// copy of this plugin costs the user their agent.
+test("a refused registration is reported, not thrown", () => {
+  assert.equal(guarded(() => {}), true);
+  assert.equal(
+    guarded(() => {
+      throw new Error('command "deja" is already registered');
+    }),
+    false,
+  );
+});
+
+test("every registration the plugin makes goes through the guard", () => {
+  // The tools cannot be reached from the case below — registering them needs
+  // the dsh-tools peer the host provides — so the rule is pinned here.
+  // Whitespace-free, so a call broken across lines reads the same as one that
+  // is not.
+  const compact = source.replace(/\s+/g, "");
+  const calls = /ctx\.(?:tools\.register|commands\.register|systemPrompt\.context)\(/g;
+  let total = 0;
+  for (const m of compact.matchAll(calls)) {
+    total++;
+    assert.ok(
+      compact.slice(0, m.index).endsWith("guarded(()=>"),
+      `${m[0]} is not wrapped in guarded()`,
+    );
+  }
+  assert.equal(total, 8, "six tools, the command and the recall");
+});
+
+test("a name the host already holds does not take the profile down", () => {
+  const taken = new Set();
+  const refusing = {
+    tools: { register: () => { throw new Error("tool is already registered"); } },
+    commands: {
+      register: (c) => {
+        if (taken.has(c.name)) throw new Error(`command "${c.name}" is already registered`);
+        taken.add(c.name);
+      },
+    },
+    systemPrompt: {
+      context: (c) => {
+        if (taken.has(c.name)) throw new Error(`prompt context "${c.name}" is already registered`);
+        taken.add(c.name);
+      },
+    },
+  };
+  withDSHHome([], () => {
+    assert.doesNotThrow(() => apply(refusing, {}), "first load");
+    assert.doesNotThrow(() => apply(refusing, {}), "second load, every name taken");
+  });
 });
 
 test("the patch names the package the host has to load", () => {

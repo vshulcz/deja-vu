@@ -48,6 +48,10 @@ import { execFileSync } from "node:child_process";
 const DEJA = %q;
 
 function apply(ctx) {
+  // Loaded twice in one profile the host throws "command deja is already
+  // registered" and the whole profile fails to load, which costs the user
+  // their agent over a duplicate search command. One /deja is enough.
+  try {
   ctx.commands.register({
     name: "deja",
     description: "Search this machine's past AI coding sessions",
@@ -57,8 +61,15 @@ function apply(ctx) {
       if (!query) {
         return { kind: "error", text: "Say what to look for: /deja <error, file, or decision>" };
       }
+      // "search" is named rather than handed over as deja's first word: the
+      // bare-query path dispatches a word that happens to be a command, so
+      // /deja version printed a version number and /deja index rebuilt the
+      // index. "--" then keeps a query that starts with a dash from being read
+      // as a flag, which came back as an error the caller cannot tell from an
+      // empty history.
+      const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
       try {
-        const out = execFileSync(DEJA, [query], {
+        const out = execFileSync(DEJA, args, {
           encoding: "utf8",
           timeout: 20000,
           maxBuffer: 4 * 1024 * 1024,
@@ -70,6 +81,7 @@ function apply(ctx) {
       }
     },
   });
+  } catch {}
 }
 
 apply.inject = ["commands"];
@@ -156,22 +168,29 @@ function apply(ctx) {
   let asked = "";
   let recalled = "";
 
-  ctx.systemPrompt.context({
-    name: "deja:recall",
-    order: 120,
-    text: (assembly) => {
-      const agent = assembly && assembly.agent;
-      if (!agent) return "";
-      const prompt = lastHumanText(agent);
-      if (!prompt) return "";
-      if (prompt !== asked) {
-        asked = prompt;
-        recalled = recall(prompt);
-      }
-      // Silence is the common case: this speaks only when the history answers.
-      return recalled;
-    },
-  });
+  // A second copy of this file in the same profile — the npm package next to
+  // the installer's, a --patch overlay naming it again — makes the host throw
+  // "prompt context deja:recall is already registered", and that takes the
+  // whole profile down: no agent at all, over an optional memory plugin.
+  // One registration is all recall needs, so the loser stands down quietly.
+  try {
+    ctx.systemPrompt.context({
+      name: "deja:recall",
+      order: 120,
+      text: (assembly) => {
+        const agent = assembly && assembly.agent;
+        if (!agent) return "";
+        const prompt = lastHumanText(agent);
+        if (!prompt) return "";
+        if (prompt !== asked) {
+          asked = prompt;
+          recalled = recall(prompt);
+        }
+        // Silence is the common case: this speaks only when the history answers.
+        return recalled;
+      },
+    });
+  } catch {}
 }
 
 apply.inject = ["systemPrompt"];
