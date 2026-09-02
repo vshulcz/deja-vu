@@ -110,9 +110,14 @@ func TestInstallGooseAutoWritesHints(t *testing.T) {
 	if _, err := installGooseAuto("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}
-	hints := filepath.Join(cfg, "goose", ".goosehints")
-	if _, err := os.Stat(hints); err != nil {
+	hints := filepath.Join(cfg, "goose", "AGENTS.md")
+	b, err := os.ReadFile(hints)
+	if err != nil {
 		t.Fatalf("hints not written: %v", err)
+	}
+	// Inside deja's markers, because the file is the reader's.
+	if !strings.Contains(string(b), gooseRecallStart) || !strings.Contains(string(b), gooseRecallEnd) {
+		t.Errorf("the recall is not in a marked block:\n%s", b)
 	}
 	if _, err := installGooseAuto("/bin/deja", true); err != nil {
 		t.Fatalf("uninstall: %v", err)
@@ -178,7 +183,9 @@ func TestGooseRecallPathFollowsMOIM(t *testing.T) {
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
 	t.Setenv("GOOSE_MOIM_MESSAGE_FILE", "")
-	if got := gooseRecallPath(); !strings.HasSuffix(got, ".goosehints") {
+	// AGENTS.md in goose's config directory: the `.goosehints` beside it never
+	// reached the model on goose 1.48.
+	if got := gooseRecallPath(); !strings.HasSuffix(got, filepath.Join("goose", "AGENTS.md")) {
 		t.Fatalf("without MOIM the target is %q", got)
 	}
 	moim := filepath.Join(home, "recall.md")

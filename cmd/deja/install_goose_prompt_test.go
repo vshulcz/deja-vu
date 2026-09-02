@@ -13,8 +13,14 @@ func TestGooseHookCoversTheUserPrompt(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	if err := writeGooseHook(); err != nil {
+	action, err := writeGooseHook("/usr/local/bin/deja")
+	if err != nil {
 		t.Fatalf("write: %v", err)
+	}
+	// -auto adds the hook and nothing else; a caller that cannot tell it what
+	// happened reports "unchanged" over a file it just created (#2953).
+	if action == "" || action == "unchanged" {
+		t.Errorf("writing the hook reported %q", action)
 	}
 	b, err := os.ReadFile(gooseHookPath())
 	if err != nil {
