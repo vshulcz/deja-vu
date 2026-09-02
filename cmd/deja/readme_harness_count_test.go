@@ -40,7 +40,7 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 
 	words := map[int]string{
 		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-		19: "nineteen", 20: "twenty", 21: "twenty-one",
+		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
 	}
 	want, ok := words[n]
 	if !ok {
@@ -233,7 +233,7 @@ func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]s
 	n := registryHarnessCount(t, root) + offset
 	words := map[int]string{
 		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-		19: "nineteen", 20: "twenty", 21: "twenty-one",
+		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
 	}
 	want, ok := words[n]
 	if !ok {

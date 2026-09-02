@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-the twenty-one the loader registers; `docs/registry/` describes each store's
+the twenty-two the loader registers; `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
 
@@ -15,6 +15,7 @@ against the loader list.
 | Codex CLI | `codex.go` | rollout JSONL files plus `history.jsonl` under `~/.codex` |
 | opencode | `opencode.go` | SQLite database at `~/.local/share/opencode/opencode.db` |
 | aider | `aider.go` | `.aider.chat.history.md` files under configured project roots |
+| Amp | `amp.go` | one JSON thread object per `~/.local/share/amp/threads/*.json` |
 | Gemini CLI | `gemini.go` | JSON and JSONL chats under `~/.gemini/tmp` |
 | Cursor | `cursor.go` | SQLite state stores plus CLI agent transcripts |
 | Antigravity | `antigravity.go` | JSONL transcripts under `~/.gemini/antigravity*` |

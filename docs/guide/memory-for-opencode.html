@@ -121,7 +121,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <p>An injection is capped: 1,536 bytes per prompt, about 4 KB for a tool call. <a href="token-cost.html">What memory costs</a> has the measured numbers against replaying or grepping instead.</p>
 
 <h2>The part that is not opencode-specific</h2>
-<p>The index covers every agent's transcripts on the machine, not opencode's alone — twenty-one of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
+<p>The index covers every agent's transcripts on the machine, not opencode's alone — twenty-two of them today, <a href="where-sessions-are-stored.html">each in its own format</a>. So a fix you found in Claude Code in March answers a question you ask in opencode in August, and the reverse. That is the whole reason to index rather than to capture: the history is already written, including the months before any of this was installed.</p>
 
 <h2>Turning parts off</h2>
 <pre>{"plugin": [["opencode-deja", {"autoRecall": false, "tools": true}]]}</pre>

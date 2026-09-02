@@ -243,7 +243,7 @@ type pageData struct {
 func countWord(n int) string {
 	words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven",
 		"eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-		"sixteen", "seventeen", "eighteen", "nineteen", "twenty", "twenty-one",
+		"sixteen", "seventeen", "eighteen", "nineteen", "twenty", "twenty-one", "twenty-two",
 		"twenty-two", "twenty-three", "twenty-four", "twenty-five"}
 	if n < 0 || n >= len(words) {
 		return fmt.Sprint(n)

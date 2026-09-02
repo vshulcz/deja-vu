@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Amp stores its history — session format</title>
+<meta name="description" content="Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/amp.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Amp stores its history — session format">
+<meta property="og:description" content="Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/amp.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Amp stores its history — session format">
+<meta name="twitter:description" content="Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Amp","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/amp.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/amp.html","name":"Amp","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html" aria-current="page">Amp</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Amp</h1>
+<p>Amp (Sourcegraph) stores one JSON object per thread under its local data</p>
+<p>directory:</p>
+<ul>
+<li>Linux: <code>${XDG_DATA_HOME}/amp/threads/</code>, or <code>~/.local/share/amp/threads/</code></li>
+</ul>
+<p>when <code>XDG_DATA_HOME</code> is unset.</p>
+<ul>
+<li>macOS and Windows: <code>~/.local/share/amp/threads/</code>.</li>
+<li><code>DEJA_AMP_ROOT</code> replaces the thread directory directly. When set, it is the</li>
+</ul>
+<p>only root deja reads.</p>
+<p>Each <code>*.json</code> file is one thread. The parser uses <code>id</code> as the stable session ID,</p>
+<p><code>title</code> as the session title, and the first <code>env.initial.trees[0].uri</code> when it</p>
+<p>is a <code>file://</code> URI to derive the project name from its final path component.</p>
+<p>If that working-directory URI is absent or not a file URI, the project falls</p>
+<p>back to the title.</p>
+<p>A thread&#39;s <code>messages</code> are retained only for <code>user</code> and <code>assistant</code> roles. Within</p>
+<p>each message, blocks with <code>type: &#34;text&#34;</code> are joined in order; other block types</p>
+<p>are ignored. Amp does not write per-message timestamps, so every retained</p>
+<p>message uses the thread&#39;s <code>created</code> Unix-millisecond timestamp. This is an</p>
+<p>intentional approximation for ordering and recency, not an inferred message</p>
+<p>time.</p>
+<p>A malformed or truncated JSON file is reported as a per-file ingestion error</p>
+<p>and skipped by discovery/load and index rebuilds; it does not prevent other</p>
+<p>thread files from being indexed. Amp thread files are not append-only, so deja</p>
+<p>uses the normal full-file parse path when a file changes.</p>
+<h2 id="synthetic-fixture">Synthetic fixture</h2>
+<p><a href="../../fixtures/registry/amp/thread.json"><code>fixtures/registry/amp/thread.json</code></a></p>
+<p>is a minimal conformance sample with deterministic IDs, paths, and timestamps.</p>
+<p>It contains no personal data or credentials.</p>
+<p><strong>Last verified:</strong> 2026-09-02</p>
+
+<hr>
+<p>deja reads this format and twenty-one others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+</body>
+</html>

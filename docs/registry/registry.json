@@ -48,6 +48,52 @@
       }
     },
     {
+      "id": "amp",
+      "store_paths": [
+        "~/.local/share/amp/threads/*.json",
+        "${XDG_DATA_HOME}/amp/threads/*.json",
+        "${DEJA_AMP_ROOT}/*.json"
+      ],
+      "format_kind": "json-thread",
+      "fixture_paths": [
+        "fixtures/registry/amp/thread.json"
+      ],
+      "parser_source": "internal/sources/amp.go",
+      "last_verified": "2026-09-02",
+      "display_name": "Amp",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": ""
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Amp reads MCP servers from amp.mcpServers in its settings file, so recall can reach it the same way it reaches Cursor; deja has no install target for it yet, so nothing is wired.",
+          "source": "https://ampcode.com/manual#mcp"
+        },
+        "auto": {
+          "state": "todo",
+          "why": "Amp has no hook surface deja has checked against a real install yet; until a session-start or pre-tool hook is verified, auto-recall is not wired.",
+          "source": "https://ampcode.com/manual"
+        },
+        "skill": {
+          "state": "todo",
+          "why": "Amp loads skills from .agents/skills; the deja-search skill has not been verified in an Amp session yet.",
+          "source": "https://ampcode.com/manual#skills"
+        },
+        "command": {
+          "state": "todo",
+          "why": "No /deja command is written for Amp; deja install has no amp target yet.",
+          "source": "https://ampcode.com/manual"
+        }
+      }
+    },
+    {
       "id": "antigravity",
       "store_paths": [
         "~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl",

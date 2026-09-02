@@ -80,8 +80,12 @@ snapshot:
   version_template: "{{ incpatch .Version }}-next"
 
 changelog:
+  # Read through the GitHub API rather than git so the author's login is
+  # known. Outside contributors get their name on the line, which is also
+  # the notification that their change shipped; my own lines stay bare.
+  use: github
   sort: asc
-  format: "{{ .Message }}"
+  format: '{{ .Message }}{{ if and .AuthorUsername (ne .AuthorUsername "vshulcz") }} (@{{ .AuthorUsername }}){{ end }}'
   groups:
     - title: Features
       regexp: '^feat(\(.+\))?:'
