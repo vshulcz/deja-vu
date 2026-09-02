@@ -9,6 +9,15 @@
   "homepage": "https://github.com/vshulcz/deja-vu",
   "repository": "https://github.com/vshulcz/deja-vu",
   "license": "MIT",
+  "keywords": [
+    "memory",
+    "session history",
+    "recall",
+    "context",
+    "claude code",
+    "codex",
+    "cursor"
+  ],
   "skills": "./skills/",
   "hooks": {
     "SessionStart": [
@@ -18,7 +27,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-context",
             "timeout": 10,
-            "statusMessage": "Recalling past sessions\u2026"
+            "statusMessage": "Recalling past sessions…"
           }
         ]
       }
@@ -30,7 +39,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-prompt",
             "timeout": 10,
-            "statusMessage": "Searching past sessions\u2026"
+            "statusMessage": "Searching past sessions…"
           }
         ]
       }
@@ -43,7 +52,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-precompact",
             "timeout": 10,
-            "statusMessage": "Saving this session to memory\u2026"
+            "statusMessage": "Saving this session to memory…"
           }
         ]
       }
@@ -56,7 +65,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-tool",
             "timeout": 10,
-            "statusMessage": "Checking what this touches\u2026"
+            "statusMessage": "Checking what this touches…"
           }
         ]
       }
@@ -69,7 +78,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-tool-after",
             "timeout": 10,
-            "statusMessage": "Checking what fixed this before\u2026"
+            "statusMessage": "Checking what fixed this before…"
           }
         ]
       }
