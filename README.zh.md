@@ -88,7 +88,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 
 ### 把你自己的工作画出来
 
-`deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。
+`deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。要发到别处，就把它[转成 PNG](https://vshulcz.github.io/deja-vu/card/)——那个页面在你自己的浏览器里完成转换。
 
 <p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
 

@@ -29,6 +29,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
 - [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
 - [What memory costs](https://vshulcz.github.io/deja-vu/guide/token-cost.html): the measured token cost of recall
+- [Stats card to PNG](https://vshulcz.github.io/deja-vu/card/): turn the card `deja stats --card` writes into a PNG, in the browser
 
 ## 中文
 

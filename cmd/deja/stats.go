@@ -191,7 +191,11 @@ func runStats(dir string, args []string) error {
 			return err
 		}
 		base := filepath.Base(path)
-		fmt.Fprintf(os.Stdout, "saved %s\n\nshare it — paste into a README or post:\n  ![deja](%s)\n", search.SafePath(path), search.SafePath(base))
+		// Two destinations, and only one of them takes an SVG. A README
+		// renders it; X, Threads, Reddit and every chat app refuse it, which
+		// the reader found out after writing the post. The page converts it
+		// locally, in their own browser.
+		fmt.Fprintf(os.Stdout, "saved %s\n\nin a README:\n  ![deja](%s)\n\nin a post, as a PNG:\n  https://vshulcz.github.io/deja-vu/card/\n", search.SafePath(path), search.SafePath(base))
 		return nil
 	}
 	if htmlPath != "" {
