@@ -1,6 +1,6 @@
 {
   "name": "dsh-deja",
-  "version": "0.20.4",
+  "version": "0.20.5",
   "description": "Brings the session history of twenty-one other coding agents into DeepSeek Harness: recall, session digest and per-file history tools over a local index, plus optional automatic recall before each step.",
   "type": "module",
   "main": "index.js",
@@ -44,7 +44,7 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.18.0"
+    "@vshulcz/deja-vu": "^0.19.2"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
