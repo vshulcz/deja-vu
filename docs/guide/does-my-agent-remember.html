@@ -100,7 +100,7 @@
 <tr><td>Rules file (<code>CLAUDE.md</code>, <code>AGENTS.md</code>)</td><td>Yes</td><td>Only what you typed into it by hand</td></tr>
 <tr><td>Session transcript on disk</td><td>Yes, but nothing reads it</td><td>Every turn, command and error, verbatim</td></tr>
 </table>
-<p>So the honest answer to "does it remember?" is: your agent wrote down everything that happened, and then never opened the file again.</p>
+<p>So the honest answer to "does it remember?" is: your agent wrote down everything that happened, and then never opened the file again. And Claude Code deletes that file after <b>30 days</b> by default (<code>cleanupPeriodDays</code>) — see <a href="session-files-on-disk.html">session files on disk</a> for how to keep it.</p>
 
 <h2>Per agent</h2>
 <p>Every agent below writes a transcript you can read. "Resume" means the harness can re-open one specific past session and continue it; none of them search across sessions on their own.</p>
