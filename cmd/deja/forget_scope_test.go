@@ -17,7 +17,7 @@ func TestForgetScopeRefusal(t *testing.T) {
 		t.Fatal("a prefix of twelve sessions was not refused")
 	}
 	got := err.Error()
-	for _, want := range []string{"prefix of 12 sessions", "--dry-run", "--all-matches"} {
+	for _, want := range []string{"matches 12 sessions", "--dry-run", "--all-matches"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("refusal does not mention %q: %q", want, got)
 		}

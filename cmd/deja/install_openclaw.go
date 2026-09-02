@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -80,6 +81,11 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			return "unchanged", nil
 		}
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// A comment is not a broken file, and this writer shares openclaw.json
+		// with the MCP one — so refusing here left a target that wrote half its
+		// wiring, or could not take its own hook back out (#2811).
+		return setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return "", configParseError(path, err)
 	}
@@ -91,10 +97,19 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			return "unchanged", nil
 		}
 		delete(entries, openclawHookName)
-		// Leave the user's other hooks — and the master switch — alone.
+		// Leave the user's other hooks alone — and the switch, unless deja is
+		// what turned it on. It records that at install time, the way it
+		// records a block it created, so an uninstall gives back a setting the
+		// reader had rather than deleting one deja only overwrote (#2830, the
+		// rule the text writer got in #2811).
 		if len(entries) == 0 {
 			delete(internal, "entries")
-			delete(internal, "enabled")
+			if was := hookSwitchWas(path); was == nil {
+				delete(internal, "enabled")
+			} else {
+				internal["enabled"] = was
+			}
+			forgetHookSwitch(path)
 		}
 		if len(internal) == 0 {
 			delete(hooks, "internal")
@@ -115,6 +130,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 			entries = map[string]any{}
 			internal["entries"] = entries
 		}
+		noteHookSwitch(path, internal["enabled"])
 		internal["enabled"] = true
 		entries[openclawHookName] = map[string]any{"enabled": true}
 	}
@@ -124,6 +140,210 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 	}
 	next = append(next, '\n')
 	return writeIfChanged(path, old, next)
+}
+
+// hookSwitchKeys name what deja found under the switch, in the wiring state
+// beside the blocks it records there. Three states rather than two: the reader
+// had it on, the reader had it off, or there was nothing there and it is
+// deja's to remove.
+func hookSwitchKeys() (deja, on, off string) {
+	keys := strings.Split(openclawHookEntries, ".")
+	base := flagRecordKey(keys, openclawHookSwitch)
+	// The bare key is the one the text writer uses for "deja put this here",
+	// so a config that gains or loses a comment between install and uninstall
+	// still reads the same record (#2830).
+	return base, base + "=true", base + "=false"
+}
+
+// noteHookSwitch records what was under the switch before deja wrote to it.
+func noteHookSwitch(path string, was any) {
+	deja, on, off := hookSwitchKeys()
+	// Once. A second install reads the switch deja itself set on the first, so
+	// recording again would say the reader had it on and hand it back that way
+	// — which is #2830 again, by way of an upgrade.
+	for _, k := range []string{deja, on, off} {
+		if blockWasAdded(path, k) {
+			return
+		}
+	}
+	switch v, ok := was.(bool); {
+	case !ok:
+		// Absent, or something that is not a boolean: deja overwrites it and
+		// takes it away again, since it cannot know what a `null` or a `0`
+		// there was meant to say.
+		noteBlockAdded(path, deja)
+	case v:
+		noteBlockAdded(path, on)
+	default:
+		noteBlockAdded(path, off)
+	}
+}
+
+// hookSwitchWas is what to put back, or nil where the switch is deja's own.
+func hookSwitchWas(path string) any {
+	_, on, off := hookSwitchKeys()
+	switch {
+	case blockWasAdded(path, on):
+		return true
+	case blockWasAdded(path, off):
+		return false
+	}
+	return nil
+}
+
+func forgetHookSwitch(path string) {
+	deja, on, off := hookSwitchKeys()
+	forgetBlockAdded(path, deja)
+	forgetBlockAdded(path, on)
+	forgetBlockAdded(path, off)
+}
+
+const (
+	// openclawHookEntries and openclawHookSwitch are where the bootstrap hook
+	// lives and the switch that runs it, named once so the two writers agree.
+	openclawHookEntries = "hooks.internal.entries"
+	openclawHookSwitch  = "enabled"
+)
+
+// flagRecordKey names the switch in the wiring state, beside the blocks deja
+// records there. A key of its own rather than the block's, so "deja created
+// this block" and "deja turned this switch on" cannot be confused.
+func flagRecordKey(keys []string, flagKey string) string {
+	return strings.Join(keys[:len(keys)-1], ".") + "." + flagKey
+}
+
+// setOpenClawEntryJSONC writes one of openclaw's entries — the bootstrap hook,
+// or the plugin — into a config carrying comments, as text, so the reader's own
+// lines stay where they are.
+//
+// flagKey is the switch beside the entries block, "" where there is none. For
+// the hook it matters as much as the entry does: without it the pack is
+// discovered, listed as ready, and never invoked, so the two are written
+// together and taken back out together (#2811).
+func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string, on bool) (string, error) {
+	text := string(old)
+	var root map[string]any
+	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
+		return "", configParseError(path, err)
+	}
+	keys := strings.Split(blockKey, ".")
+	// A key holding something other than an object is a config deja does not
+	// understand, and the text writer would insert a second key of the same
+	// name beside it — where the reader's value wins the decode and deja is
+	// silently unwired (#2399, and #2811 for this writer).
+	holder := root
+	for i, key := range keys {
+		v, present := holder[key]
+		if !present {
+			break
+		}
+		next, isObject := v.(map[string]any)
+		if !isObject {
+			if !on {
+				return "unchanged", nil
+			}
+			return "", fmt.Errorf("%s: %q is not an object deja can edit — left as it was",
+				path, strings.Join(keys[:i+1], "."))
+		}
+		holder = next
+	}
+	holders := chainHolders(root, keys)
+	held := holders[len(keys)-1]
+	have, _ := mapAt(held, keys[len(keys)-1])
+	if !on {
+		if have[id] == nil {
+			return "unchanged", nil
+		}
+		delete(have, id)
+		dropFrom := len(keys)
+		// The switch comes out only where deja is what turned it on. A reader
+		// who had set it themselves keeps it: deleting it left their own hook
+		// wired and switched off (#2811).
+		dropFlag := flagKey != "" && blockWasAdded(path, flagRecordKey(keys, flagKey))
+		if len(have) == 0 && blockWasAdded(path, blockKey) {
+			dropFrom = len(keys) - 1
+			forgetBlockAdded(path, blockKey)
+			// The switch goes with the entries it was for, and so does each
+			// level above that deja created and that holds nothing else.
+			if dropFlag {
+				delete(held, flagKey)
+			}
+			for i := len(keys) - 2; i >= 0; i-- {
+				prefix := strings.Join(keys[:i+1], ".")
+				if len(holders[i+1]) != 1 || !blockWasAdded(path, prefix) {
+					break
+				}
+				dropFrom = i
+				forgetBlockAdded(path, prefix)
+			}
+		}
+		next, err := jsoncSetEntry(text, blockKey, id, "", true, dropFrom)
+		if err != nil {
+			return "", configParseError(path, err)
+		}
+		// Only where the entries block deja created has emptied — the same
+		// condition the parsed path uses. Taken on the ordinary
+		// entry-comes-out case it deleted a switch the reader had set
+		// themselves, leaving their own hook wired and turned off (#2811).
+		if dropFlag {
+			forgetBlockAdded(path, flagRecordKey(keys, flagKey))
+		}
+		// A switch deja turned on over the reader's own "off" goes back to off
+		// rather than staying on: an uninstall that leaves internal hooks
+		// running for someone who had switched them off is a setting deja
+		// changed and did not give back.
+		if !dropFlag && flagKey != "" && blockWasAdded(path, flagRecordKey(keys, flagKey)+"=false") {
+			forgetBlockAdded(path, flagRecordKey(keys, flagKey)+"=false")
+			next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, false)
+			if err != nil {
+				return "", configParseError(path, err)
+			}
+		}
+		if dropFlag && dropFrom >= len(keys)-1 {
+			// The chain stayed, so the switch is still in it and comes out on
+			// its own.
+			flagBlock := strings.Join(keys[:len(keys)-1], ".")
+			next, err = jsoncRemoveKey(next, flagBlock, flagKey, len(keys)-1)
+			if err != nil {
+				return "", configParseError(path, err)
+			}
+		}
+		return writeIfChanged(path, old, []byte(next))
+	}
+	if have == nil {
+		for i := range keys {
+			if _, ok := holders[i][keys[i]].(map[string]any); !ok {
+				noteBlockAdded(path, strings.Join(keys[:i+1], "."))
+			}
+		}
+	}
+	entry, err := jsoncEntryText(map[string]any{"enabled": true})
+	if err != nil {
+		return "", err
+	}
+	next, err := jsoncSetEntry(text, blockKey, id, entry, false, len(keys))
+	if err != nil {
+		return "", configParseError(path, err)
+	}
+	if flagKey != "" {
+		// Recorded the way a block deja created is, so an uninstall can tell a
+		// switch deja turned on from one the reader set.
+		switch was, present := held[flagKey]; {
+		case !present:
+			noteBlockAdded(path, flagRecordKey(keys, flagKey))
+		case was == false:
+			// Theirs, and off: deja needs it on while it is installed, so what
+			// it changed is written down to be put back. The boolean only —
+			// deja cannot know what a `null` or a `0` there was meant to say,
+			// and writing a guess back is worse than leaving the switch on.
+			noteBlockAdded(path, flagRecordKey(keys, flagKey)+"=false")
+		}
+		next, err = jsoncSetFlag(next, strings.Join(keys[:len(keys)-1], "."), flagKey, true)
+		if err != nil {
+			return "", configParseError(path, err)
+		}
+	}
+	return writeIfChanged(path, old, []byte(next))
 }
 
 func mapAt(parent map[string]any, key string) (map[string]any, bool) {

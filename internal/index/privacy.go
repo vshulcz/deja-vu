@@ -317,14 +317,30 @@ func SelectorMatches(meta SessionMeta, sel string) bool { return selectorMatches
 // beside it, and in promote's receipts — which `show` refused and
 // `forget --session` accepted while matching nothing (#921).
 func selectorMatches(meta SessionMeta, sel string) bool {
-	if strings.HasPrefix(meta.ID, sel) || idMatchesElided(meta.ID, sel) {
+	if selectorMatchesID(meta.ID, sel) || selectorMatchesOrigID(meta, sel) {
 		return true
 	}
 	harness, id := splitSelector(sel)
 	if harness == "" || !strings.EqualFold(meta.Harness, harness) {
 		return false
 	}
-	return strings.HasPrefix(meta.ID, id) || idMatchesElided(meta.ID, id)
+	return selectorMatchesID(meta.ID, id) || selectorMatchesOrigID(meta, id)
+}
+
+func selectorMatchesID(have, sel string) bool {
+	return strings.HasPrefix(have, sel) || idMatchesElided(have, sel)
+}
+
+// selectorMatchesOrigID takes the id a session had where it was recorded. A
+// sync rewrites the id, so the one the reader knows — the one the other machine
+// prints, the one a note promoted from it carries — named nothing here, and the
+// session could only be forgotten by an id nobody chose (#2843).
+//
+// The whole id, not a prefix of it: the local id is what a reader resolves
+// against, and a prefix of the original is a guess about a session this machine
+// never named that way.
+func selectorMatchesOrigID(meta SessionMeta, sel string) bool {
+	return meta.OrigID != "" && meta.OrigID == sel
 }
 
 // splitSelector takes the `harness:` off a pasted selector. The whole string is
@@ -568,8 +584,15 @@ func tombstoneMatches(key, prefix string) bool {
 		id = key[i+1:]
 	}
 	// Same widening as the forget selector: the id a reader copies off a
-	// result line carries the elision (#855).
-	return key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix)
+	// result line carries the elision (#855), and a session that arrived by
+	// sync answers to the id it came with — which forget now takes, so undo
+	// has to take it too or the reader can drop a session and not put it back
+	// without reading `forget --list` for an id they never chose (#2843).
+	if key == prefix || strings.HasPrefix(id, prefix) || idMatchesElided(id, prefix) {
+		return true
+	}
+	harness, _, ok := strings.Cut(key, ":")
+	return ok && id == ImportedSessionID(harness, prefix)
 }
 
 // Unforget lifts tombstones and reports how many it lifted. The count is not

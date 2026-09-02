@@ -154,9 +154,8 @@ func TestGooseDataDirFollowsPathRoot(t *testing.T) {
 
 // Goose stores subagent turns and cron-recipe runs in the same table as real
 // sessions. Recall is about the user's own work, so those stay out; rows from
-// before the column existed have no type and stay in. The acp session type is
-// a user-visible Goose session and belongs in recall alongside plain user
-// sessions.
+// before the column existed have no type and stay in, and so does every way a
+// person reaches goose (#2873).
 func TestParseGooseDBSkipsNonUserSessions(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 not installed")
@@ -168,20 +167,24 @@ insert into sessions values ('s_user','n','mine','/w','2026-07-24T11:00:00Z','20
 insert into sessions values ('s_acp','n','acp','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','acp');
 insert into sessions values ('s_term','n','terminal','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','terminal');
 insert into sessions values ('s_gw','n','gateway','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','gateway');
-insert into sessions values ('s_sub','n','subagent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','subagent');
-insert into sessions values ('s_cron','n','cron','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','scheduled');
 insert into sessions values ('s_hidden','n','no-session','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','hidden');
+insert into sessions values ('s_empty','n','no type at all','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','');
 insert into sessions values ('s_new','n','a type goose adds later','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','somethingnew');
 insert into sessions values ('s_old','n','legacy','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z',null);
+insert into sessions values ('s_sub','n','subagent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','subagent');
+insert into sessions values ('s_sub2','n','sub_agent','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','sub_agent');
+insert into sessions values ('s_cron','n','cron','/w','2026-07-24T11:00:00Z','2026-07-24T11:00:02Z','scheduled');
 insert into messages values (1,'s_user','user','[{"type":"text","text":"mine"}]',1784282401);
-insert into messages values (2,'s_acp','user','[{"type":"text","text":"acp sessions"}]',1784282401);
-insert into messages values (3,'s_term','user','[{"type":"text","text":"terminal session"}]',1784282401);
-insert into messages values (4,'s_gw','user','[{"type":"text","text":"gateway noise"}]',1784282401);
-insert into messages values (5,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
-insert into messages values (6,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);
-insert into messages values (7,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);
-insert into messages values (8,'s_hidden','user','[{"type":"text","text":"a run that kept no session"}]',1784282401);
-insert into messages values (9,'s_new','user','[{"type":"text","text":"a type goose has not shipped yet"}]',1784282401);`
+insert into messages values (2,'s_acp','user','[{"type":"text","text":"through the editor"}]',1784282401);
+insert into messages values (3,'s_term','user','[{"type":"text","text":"through the terminal"}]',1784282401);
+insert into messages values (4,'s_gw','user','[{"type":"text","text":"through a chat app"}]',1784282401);
+insert into messages values (5,'s_hidden','user','[{"type":"text","text":"a run that kept no session"}]',1784282401);
+insert into messages values (6,'s_empty','user','[{"type":"text","text":"no type at all"}]',1784282401);
+insert into messages values (7,'s_new','user','[{"type":"text","text":"a type goose has not shipped yet"}]',1784282401);
+insert into messages values (8,'s_old','user','[{"type":"text","text":"legacy"}]',1784282401);
+insert into messages values (9,'s_sub','user','[{"type":"text","text":"subagent noise"}]',1784282401);
+insert into messages values (10,'s_sub2','user','[{"type":"text","text":"subagent noise"}]',1784282401);
+insert into messages values (11,'s_cron','user','[{"type":"text","text":"cron noise"}]',1784282401);`
 	if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
 		t.Fatalf("create db: %v: %s", err, out)
 	}
@@ -193,16 +196,22 @@ insert into messages values (9,'s_new','user','[{"type":"text","text":"a type go
 	for _, s := range ss {
 		got[s.ID] = true
 	}
-	// `hidden` is `goose run --no-session` and `gateway` is a person reaching
-	// goose from a chat app: both are somebody's work, so both are in. And a
-	// type goose has not shipped yet is in too — the allow-list dropped one
-	// silently, which is how #2873 happened.
-	for _, id := range []string{"s_user", "s_old", "s_acp", "s_term", "s_gw", "s_hidden", "s_new"} {
+	// Everything a person did, whichever way they reached goose: the CLI, the
+	// desktop app, and an editor speaking ACP are all the reader's own work.
+	// `hidden` is `goose run --no-session`, which is somebody working too.
+	// Named the other way round — an allow-list of "user" — a type goose added
+	// later was dropped, and a reader's ACP sessions were missing from recall
+	// with nothing saying why (#2873). The empty string and a type this build
+	// has never heard of are in the keep list on purpose: what the filter must
+	// never do again is drop work for carrying a name it was not told about.
+	for _, id := range []string{"s_user", "s_old", "s_acp", "s_term", "s_gw", "s_hidden", "s_empty", "s_new"} {
 		if !got[id] {
-			t.Errorf("%s belongs in recall and was dropped: %v", id, got)
+			t.Errorf("%s belongs in recall and is not there: %v", id, got)
 		}
 	}
-	if got["s_sub"] || got["s_cron"] {
-		t.Fatalf("subagent or scheduled runs leaked into recall: %v", got)
+	for _, id := range []string{"s_sub", "s_sub2", "s_cron"} {
+		if got[id] {
+			t.Errorf("%s is goose talking to itself and leaked into recall: %v", id, got)
+		}
 	}
 }

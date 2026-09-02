@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/query"
 )
 
 // hexBuckets fixes every shard name in a lookup table. bucket relies on these
@@ -115,6 +116,14 @@ func cjkIndexKeys(s string, emit func(tok string)) {
 
 	seen := map[uint64]struct{}{}
 	emitFolded := func(r1, r2 rune) {
+		// Grammar earns no posting. A pair of function runes — 的了, 在哪,
+		// 什么 — is the CJK counterpart of a stop word: the query side has
+		// dropped it from the term list since it was written, so the postings
+		// were carrying the most frequent pairs in the language for nothing
+		// (#492). queryKeys drops them from the AND for the same reason.
+		if r1 != 0 && query.CJKFunctionRune(r1) && query.CJKFunctionRune(r2) {
+			return
+		}
 		key := (uint64(r1) << 21) | uint64(r2)
 		if _, ok := seen[key]; ok {
 			return
@@ -147,7 +156,7 @@ func cjkIndexKeys(s string, emit func(tok string)) {
 	}
 
 	for _, r := range s {
-		if !cjkfold.IsCJK(r) {
+		if !cjkfold.Unspaced(r) {
 			flush()
 			continue
 		}

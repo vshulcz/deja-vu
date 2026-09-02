@@ -35,7 +35,10 @@ type BlameHit struct {
 	Count    int           `json:"count"`
 	Snippets []string      `json:"snippets"`
 	Score    float64       `json:"score"`
-	Tier     string        `json:"tier"`
+	// Specificity is how fully the session named the file — a path against a
+	// bare name — and is what orders the answer before the score does (#2840).
+	Specificity float64 `json:"specificity"`
+	Tier        string  `json:"tier"`
 	// Lifecycle carries a decision that did not hold. blame answers "who
 	// decided this", and it was answering with the accepted line of a decision
 	// that had been taken back (#1017).
@@ -184,9 +187,22 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			score *= 1.35
 		}
 		hit.Score = score * freshnessDecay(session.Updated, now)
+		hit.Specificity = specificity
 		hits = append(hits, hit)
 	}
 	sort.Slice(hits, func(i, j int) bool {
+		// Whether the session named a path at all, before anything else: the
+		// description this answers to promises the most specific mention
+		// first, and recency alone put a bare mention above the sessions that
+		// spelled the path out (#2840).
+		//
+		// Whether, not how deeply — ordering on the depth itself put one
+		// mention of an unrelated file above a session that had worked on this
+		// one for a thousand lines, which is the opposite of what blame
+		// answers.
+		if namedAPath(hits[i]) != namedAPath(hits[j]) {
+			return namedAPath(hits[i])
+		}
 		if hits[i].Score != hits[j].Score {
 			return hits[i].Score > hits[j].Score
 		}
@@ -195,8 +211,24 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		}
 		return hits[i].Session.ID < hits[j].Session.ID
 	})
+	// And the rule promote promises, which the score cannot express here: a
+	// note mentions the file once where the transcript it distils mentions it
+	// many times, so scoring alone put the transcript above its own note on
+	// every blame (#2829).
+	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
 	return hits
 }
+
+// namedAPath reports whether the session wrote the file as a path rather than
+// as a bare name, and said enough for that to be evidence. It is the coarse
+// half of specificity — the half that orders the answer; the rest is left to
+// the score, where the number of mentions is.
+//
+// Said something, because naming the path and saying nothing else is not
+// working on a file: measured on a real store, a pasted absolute path and a
+// `git diff --stat` row each took the top of the answer from the session that
+// had debugged it (#2854).
+func namedAPath(h BlameHit) bool { return h.Specificity > 1.0 }
 
 // BlameCap is how many hits the default listing shows. The rest are behind
 // --all, so a caller that cuts the list here owes the reader the count it cut
@@ -230,7 +262,22 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 	low := strings.ToLower(filepath.ToSlash(text))
 	count := 0
 	level := 1.0
+	// A path with nothing said around it is not a session working on the file:
+	// a `git diff --stat` row and a pasted absolute path each name it once and
+	// took the top of the answer from the session that had debugged it
+	// (#2854). What counts is the path plus something about it, on the line it
+	// is on — asked of the whole message, a diffstat qualifies on its own
+	// summary line ("2 files changed, 6 insertions(+)") and the rule catches
+	// only messages shorter than three words.
+	explained := aLineSaysMoreThanThePath(low, base)
 	for _, form := range forms {
+		// The bare basename is one of the forms, and it matches inside a path
+		// as well as on its own — so every mention was already "specific" and
+		// the rule below could never fire. A name is what the caller asked
+		// with; a path is what says which file the session meant (#2840).
+		if !strings.Contains(strings.Trim(form, "/"), "/") || !explained {
+			continue
+		}
 		if pathFormCount(low, form) > 0 {
 			candidate := 1.0 + float64(len(strings.Split(form, "/")))/4
 			if candidate > level {
@@ -238,6 +285,13 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 			}
 		}
 	}
+	// Only the target's own directories count, which is what the forms above
+	// are. Crediting any directory a session wrote instead — measured on a
+	// real store — handed `blame Makefile` to three other projects' Makefiles
+	// and dropped this repo's own from rank 2 to rank 24, because "wrote a
+	// deep path" is a proxy for working in a deep tree rather than for meaning
+	// this file. A target with no directory of its own leaves every mention at
+	// 1.0, and the rule sits out (#2840).
 	for pos := 0; ; {
 		i := strings.Index(low[pos:], base)
 		if i < 0 {
@@ -250,6 +304,59 @@ func mentionScore(text, base string, forms []string) (int, float64) {
 		pos = i + len(base)
 	}
 	return count, level
+}
+
+// aLineSaysMoreThanThePath reports whether some line naming the file carries
+// words of its own beside the paths on it. Three, so a diffstat row
+// (`cmd/deja/mcp.go | 4 +-`) and a bare pasted path do not read as a session
+// discussing the file, while a line that says what was done to it does.
+//
+// Per line rather than per message, because a diffstat's own summary line
+// would otherwise vouch for every path above it.
+func aLineSaysMoreThanThePath(low, base string) bool {
+	for _, line := range strings.Split(low, "\n") {
+		if strings.Contains(line, base) && saysMoreThanThePath(line) {
+			return true
+		}
+	}
+	return false
+}
+
+// saysMoreThanThePath counts the words on a line that are not part of a path.
+// Letters by Unicode rather than by ASCII: a session that says what it did in
+// Russian or Chinese is saying it (#2854).
+func saysMoreThanThePath(low string) bool {
+	words, unspaced := 0, 0
+	for _, field := range strings.Fields(low) {
+		if strings.ContainsAny(field, "/\\") {
+			continue
+		}
+		letters, script := 0, 0
+		for _, r := range field {
+			if !unicode.IsLetter(r) {
+				continue
+			}
+			letters++
+			// Chinese, Japanese and Korean put no spaces between words, so a
+			// whole sentence arrives as one field and counting fields counts
+			// it as one word. Their letters are counted instead, which is the
+			// same question asked in the units that script uses (#2854).
+			if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
+				script++
+			}
+		}
+		unspaced += script
+		if unspaced >= 4 {
+			return true
+		}
+		if letters >= 2 && utf8.RuneCountInString(field) >= 2 {
+			words++
+			if words >= 3 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func pathFormCount(s, form string) int {

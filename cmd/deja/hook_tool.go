@@ -208,6 +208,26 @@ func applyPatchFiles(patch string) []string {
 //     the command.
 //
 // So the count stands alone on purpose (#2587).
+// commandFailureLine is what this command shape ended in before, or "" when
+// nothing confirmed is on file.
+//
+// It states what happened and recommends nothing — which is why it is keyed on
+// the command's shape rather than on the whole line the way CommandHistory is.
+// That rule exists so deja cannot endorse a command it half recognises; a
+// warning cannot endorse anything, and its cost when wrong is a line the
+// reader ignores.
+func commandFailureLine(dir, cmd string) string {
+	pol := policy.Load()
+	fail, ok := index.CommandFailedBefore(dir, cmd, func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project)
+	})
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("Last time this machine ran %s it ended with: %s (in %s)",
+		search.SafeCommand(fail.Head), search.SafeLine(fail.Line), toolSessionCount(fail.Sessions))
+}
+
 func commandHookLine(dir, cwd, cmd string) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
@@ -216,6 +236,16 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// a test, a deploy — a command that does something.
 	if index.InspectionCommand(cmd) {
 		return ""
+	}
+	// What this command did to this machine last time, before what it is.
+	// Measured on a real store, the "you have run this" line answers 2 of 120
+	// commands an agent actually runs — everything else is a compound unique
+	// in its arguments — while a failure is keyed on the shape of the command
+	// and reaches the ones that matter (#2924). It is also the more useful of
+	// the two: knowing a command has been run says nothing about whether to
+	// run it now.
+	if line := commandFailureLine(dir, cmd); line != "" {
+		return line
 	}
 	use, ok := index.CommandHistory(dir, cmd)
 	if !ok {

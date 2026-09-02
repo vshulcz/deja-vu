@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -28,15 +29,14 @@ func TestTheSessionStartBlockCarriesAllThreePieces(t *testing.T) {
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	oldwd, err := os.Getwd()
+	t.Chdir(work)
+	// The cwd as JSON writes it: a Windows path carries backslashes, and the
+	// fixture would not parse with them raw (#2808).
+	workJSON, err := json.Marshal(work)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(oldwd) })
-	store := filepath.Join(root, strings.ReplaceAll(work, string(filepath.Separator), "-"))
+	store := filepath.Join(root, encodedProjectDir(work))
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -52,11 +52,11 @@ func TestTheSessionStartBlockCarriesAllThreePieces(t *testing.T) {
 	for k := 0; k < 4; k++ {
 		sid := fmt.Sprintf("w%d", k)
 		lines = []string{
-			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":"`+work+`","message":{"role":"user","content":"the migration runner keeps stalling on the pool"}}`, sid, at(300-10*k)),
-			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"cwd":"`+work+`","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"psql -h db.internal -c 'select 1'"}}]}}`, sid, at(299-10*k)),
-			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":"`+work+`","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":%q}]}}`, sid, at(298-10*k), wall),
-			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"cwd":"`+work+`","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"brew services start postgresql@16"}}]}}`, sid, at(297-10*k)),
-			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":"`+work+`","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"==> Successfully started postgresql@16"}]}}`, sid, at(296-10*k)),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"user","content":"the migration runner keeps stalling on the pool"}}`, sid, at(300-10*k)),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"psql -h db.internal -c 'select 1'"}}]}}`, sid, at(299-10*k)),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":%q}]}}`, sid, at(298-10*k), wall),
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"brew services start postgresql@16"}}]}}`, sid, at(297-10*k)),
+			fmt.Sprintf(`{"type":"user","sessionId":%q,"timestamp":%q,"cwd":`+string(workJSON)+`,"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","content":"==> Successfully started postgresql@16"}]}}`, sid, at(296-10*k)),
 		}
 		if err := os.WriteFile(filepath.Join(store, sid+".jsonl"), []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
 			t.Fatal(err)

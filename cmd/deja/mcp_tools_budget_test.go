@@ -18,7 +18,11 @@ import (
 // fails, the question to ask is whether the new capability has to be a tool at
 // all — `instructions` is read once, resources/list costs nothing here, and a
 // hook already fires at the point of action.
-const mcpToolsListCharBudget = 7200
+// One tool with modes, so the six envelopes and their six repetitions of
+// query/harness/project/limit are gone: 7,145 chars became 3,112. The budget
+// is set just above what that costs, because the point of it is to notice
+// growth rather than to leave room for it (#1298).
+const mcpToolsListCharBudget = 3400
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)

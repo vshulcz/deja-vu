@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -41,6 +42,18 @@ func writeClaudeMCP(t *testing.T, home string, entry map[string]any) string {
 	return path
 }
 
+// entryArgs reads back the args of a decoded entry, which JSON hands over as
+// []any.
+func entryArgs(entry map[string]any) []string {
+	raw, _ := entry["args"].([]any)
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		s, _ := v.(string)
+		out = append(out, s)
+	}
+	return out
+}
+
 // deja owns the command, the args and the type on its own entry. An env the
 // reader added, or a disabled flag they set, is theirs — replacing the whole
 // entry threw both away, and the note reported a replacement of the command by
@@ -59,8 +72,14 @@ func TestInstallKeepsWhatTheReaderPutOnDejasEntry(t *testing.T) {
 		t.Fatal(err)
 	}
 	entry := dejaMCPEntry(t, path)
-	if entry["command"] != "/new/bin/deja" {
+	wantCommand, wantArgs := mcpCommandArgs("/new/bin/deja")
+	if entry["command"] != wantCommand {
 		t.Errorf("the command was not repointed: %v", entry["command"])
+	}
+	// Where the harness needs a shell in front of it, the exe is in the args
+	// — asserting the exe as the command is asserting a Unix spelling.
+	if got := entryArgs(entry); !slices.Equal(got, wantArgs) {
+		t.Errorf("the args are not deja's own: %v, want %v", got, wantArgs)
 	}
 	env, _ := entry["env"].(map[string]any)
 	if env["DEJA_INDEX_DIR"] != "/data/index.db" {
@@ -78,7 +97,8 @@ func TestInstallKeepsWhatTheReaderPutOnDejasEntry(t *testing.T) {
 // the same either way, so there is nothing to report.
 func TestInstallIsQuietWhenTheCommandDidNotChange(t *testing.T) {
 	home := filepath.Join(hermeticEnv(t), "home")
-	writeClaudeMCP(t, home, map[string]any{"command": "/bin/deja", "args": []string{"mcp"}})
+	command, args := mcpCommandArgs("/bin/deja")
+	writeClaudeMCP(t, home, map[string]any{"command": command, "args": args})
 
 	res, err := installClaude("/bin/deja", false)
 	if err != nil {
@@ -103,7 +123,7 @@ func TestInstallDoesNotMergeIntoAnEntryThatIsNotDejas(t *testing.T) {
 	if _, ok := entry["url"]; ok {
 		t.Errorf("the remote shape survived beside deja's own wiring: %v", entry)
 	}
-	if entry["command"] != "/bin/deja" {
+	if want, _ := mcpCommandArgs("/bin/deja"); entry["command"] != want {
 		t.Errorf("deja is not wired: %v", entry)
 	}
 }

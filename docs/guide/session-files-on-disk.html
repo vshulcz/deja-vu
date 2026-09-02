@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Can you delete Claude Code session files in ~/.claude/projects? — deja-vu</title>
+<meta name="description" content="What Claude Code writes to ~/.claude/projects, how large those JSONL files get in practice, what you lose by deleting them, and how to reclaim space without losing your history.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code session files: how big they get and whether to delete them">
+<meta property="og:description" content="What is inside ~/.claude/projects, how much space it really uses, and what deleting it costs you.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Claude Code session files: how big they get and whether to delete them">
+<meta name="twitter:description" content="What is inside ~/.claude/projects, how much space it really uses, and what deleting it costs you.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code session files: how big they get and whether to delete them", "description": "What Claude Code writes to ~/.claude/projects, how large those JSONL files get in practice, what you lose by deleting them, and how to reclaim space without losing your history.", "url": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Session files on disk", "item": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Can I delete Claude Code session files?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, nothing in the agent breaks. You lose the ability to resume those sessions, any future search over that history, and your record of what the agent ran. Deleting the largest few files usually frees the space without losing much history."}}, {"@type": "Question", "name": "Where does Claude Code store session files?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.claude/projects, one directory per project and one JSONL file per session, unless CLAUDE_CONFIG_DIR points elsewhere. Codex uses ~/.codex/sessions and Cursor uses a SQLite state.vscdb."}}, {"@type": "Question", "name": "How much disk space do Claude Code sessions use?", "acceptedAnswer": {"@type": "Answer", "text": "On one machine with thirteen projects and two months of heavy daily use: 875 files totalling 1.6 GB, median 304 KB per session, with a single runaway session accounting for 586 MB."}}, {"@type": "Question", "name": "What is inside a Claude Code .jsonl session file?", "acceptedAnswer": {"@type": "Answer", "text": "JSON Lines: one object per line, appended as the session runs, each carrying a role, timestamp, session id and payload — your prompt, the assistant reply, or a tool call and its output, verbatim."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html" aria-current="page">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Claude Code session files: what they hold, how big they get, whether to delete them</h1>
+<p class="pagelede">875 files and 1.6 GB on one laptop — and one of them was 586 MB<span class="mins" data-mins></span></p>
+
+<p>Every session your agent runs is written to disk as it happens. Claude Code puts JSONL under <code>~/.claude/projects</code>, one directory per project and one file per session; Codex writes <code>~/.codex/sessions/**/rollout-*.jsonl</code>; Cursor uses a SQLite database. <a href="where-sessions-are-stored.html">Where each agent writes</a> has the rest.</p>
+<p>Nobody tells you these files exist until they are large.</p>
+
+<h2>How big they actually get</h2>
+<p>One developer's <code>~/.claude/projects</code>: thirteen projects, two months of heavy daily use.</p>
+<table>
+<tr><th>Measure</th><th>Value</th></tr>
+<tr><td>Session files</td><td>875</td></tr>
+<tr><td>Total size</td><td>1.6 GB</td></tr>
+<tr><td>Median file</td><td>304 KB</td></tr>
+<tr><td>90th percentile</td><td>644 KB</td></tr>
+<tr><td>Largest single file</td><td>586 MB</td></tr>
+</table>
+<p>The distribution is the interesting part: a typical session costs a third of a megabyte, and a handful of runaway sessions carry most of the gigabytes. Growth is driven by tool output, not by how much you typed — a session that catted large files or ran a chatty build is orders of magnitude bigger than one where you talked through a design.</p>
+<p>To find yours:</p>
+<pre>du -sh ~/.claude/projects
+find ~/.claude/projects -name '*.jsonl' -size +50M</pre>
+
+<h2>What is inside one</h2>
+<p>A Claude Code session file is JSON Lines: one JSON object per line, appended as the session runs. Each record carries a role, a timestamp, a session id and the payload — your prompt, the assistant's reply, or a tool call with its result. Codex, Copilot CLI and Antigravity use the same line-per-record shape with different field names; Cursor, Zed, Goose and Hermes use SQLite instead. The <a href="../registry/README.html">format registry</a> documents each one field by field.</p>
+<p>Two consequences worth knowing. It is plain text, so <code>grep</code> works and so does any tool you write. And it is verbatim: whatever scrolled past in your terminal is in there, including anything a command printed. Treat the directory as you would your shell history.</p>
+
+<h2>Can you delete them?</h2>
+<p>Yes — nothing in the agent breaks. What you lose:</p>
+<ul>
+<li><b>Resume.</b> <code>claude --resume</code> lists sessions by reading these files. Delete one and it disappears from the list.</li>
+<li><b>Any history search, forever.</b> Anything that answers "have I hit this before?" reads these files. Deleted transcripts are not recoverable and cannot be re-derived — the agent will not reconstruct them.</li>
+<li><b>Your own audit trail.</b> It is the only record of what an agent actually ran in your repository. See <a href="auditing-agents.html">auditing an agent</a>.</li>
+</ul>
+<p>If you need the space back, delete narrowly rather than emptying the directory:</p>
+<pre># the few outliers, which is usually all the space you need
+find ~/.claude/projects -name '*.jsonl' -size +100M -ls
+
+# a project you will never open again
+rm -rf ~/.claude/projects/-Users-you-old-project</pre>
+<p>Deleting by age is the tempting one and the one to avoid: old sessions are exactly the ones you no longer remember, so they are worth the most per byte.</p>
+
+<h2>Backing them up</h2>
+<p>They are ordinary files, so any backup tool works. If you want them readable somewhere else — a different machine, a different agent, or as Markdown — see <a href="export-conversations.html">exporting sessions</a> and <a href="sync-across-machines.html">across machines</a>.</p>
+
+<h2>Making them useful instead of just large</h2>
+<p>The files are already a complete record of every problem you have solved. What they lack is a way in: opening the right 300 KB file out of 875 is not a thing anyone does by hand.</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> builds a local index over those transcripts — every agent on the machine, including the sessions from before it was installed — and answers from them in milliseconds. Indexing a few gigabytes takes about ten seconds. Nothing is uploaded and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). On the machine measured above the index is 204 MB against 1.6 GB of transcripts; <a href="token-cost.html">what memory costs</a> has the token side of it.</p>
+
+<p><a href="does-my-agent-remember.html">Does your agent remember previous conversations?</a> · <a href="find-a-session.html">Finding a session</a> · <a href="getting-started.html">Getting started</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

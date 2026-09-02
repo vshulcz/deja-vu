@@ -32,6 +32,8 @@ func TestBenchRecallJSONAndIsolation(t *testing.T) {
 		Sessions   int    `json:"sessions"`
 		Queries    int    `json:"queries"`
 		Lexical    struct {
+			RecallAt1  float64 `json:"recall_at_1"`
+			MRR        float64 `json:"mrr"`
 			RecallAt5  float64 `json:"recall_at_5"`
 			RecallAt10 float64 `json:"recall_at_10"`
 			MedianMS   float64 `json:"median_latency_ms"`
@@ -43,6 +45,18 @@ func TestBenchRecallJSONAndIsolation(t *testing.T) {
 	}
 	if len(report.CorpusHash) != 64 || report.Sessions != 500 || report.Queries != 50 || report.Lexical.RecallAt5 < 0.85 || report.Lexical.RecallAt10 < report.Lexical.RecallAt5 || report.Lexical.MedianMS < 0 || report.HybridStatus == "" {
 		t.Fatalf("unexpected benchmark report: %#v", report)
+	}
+	// The columns that can see the order. Every query on this corpus returns
+	// exactly five hits, so recall@5 answers "did it come back" and recall@10
+	// cannot differ from it — a ranking that put every answer last scored the
+	// same 1.00 (#2933). recall@1 and MRR are what move: they must be reported,
+	// and they must be below the saturated column, or the bench is measuring
+	// presence again under new names.
+	if report.Lexical.MRR <= 0 || report.Lexical.MRR >= report.Lexical.RecallAt5 {
+		t.Errorf("MRR %.3f says nothing recall@5 %.2f does not", report.Lexical.MRR, report.Lexical.RecallAt5)
+	}
+	if report.Lexical.RecallAt1 <= 0 || report.Lexical.RecallAt1 >= report.Lexical.RecallAt5 {
+		t.Errorf("recall@1 %.2f says nothing recall@5 %.2f does not", report.Lexical.RecallAt1, report.Lexical.RecallAt5)
 	}
 	entries, err := os.ReadDir(outside)
 	if err != nil {

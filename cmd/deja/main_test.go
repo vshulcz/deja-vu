@@ -748,7 +748,10 @@ func TestMCPHandshakeListRecallRoundTrip(t *testing.T) {
 	if res["protocolVersion"] != mcpProtocolVersion {
 		t.Fatalf("bad init: %#v", initResp)
 	}
-	if !strings.Contains(lines[1], "recall_context") || !strings.Contains(lines[1], "blame") || !strings.Contains(lines[2], "frobnicator bug") {
+	// The list is one tool with the capabilities as modes, and the modes are
+	// what a reader of this test wants named.
+	if !strings.Contains(lines[1], "\"name\":\"deja\"") || !strings.Contains(lines[1], "blame") ||
+		!strings.Contains(lines[1], "context") || !strings.Contains(lines[2], "frobnicator bug") {
 		t.Fatalf("bad mcp output:\n%s", out.String())
 	}
 }

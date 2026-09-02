@@ -99,7 +99,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
 		// still worth reading: pull the output back out of the cut JSON rather
 		// than throwing away a megabyte that begins with the error.
-		out = clampOutput(salvageToolOutput(after(string(raw), `"tool_response"`)))
+		out = salvageFromPayload(string(raw))
 	}
 	if out == "" {
 		return nil
@@ -166,27 +166,46 @@ func toolResponseText(raw json.RawMessage) string {
 	return clampOutput(b.String())
 }
 
-// after returns what follows key where the key is used as a key — the next
-// non-space character is a colon — or "" when it is not there at all. Scoping
-// the salvage this way keeps it from mining the command in tool_input, which
-// can hold any of the keys below.
+// after returns what follows key where it is used as one, or "" when the key is
+// not there. Scoping the salvage this way keeps it from mining the command in
+// tool_input, which can hold any of the keys below.
 //
-// The colon is the whole point. This took the first occurrence anywhere, and
-// on this path the payload is one the decoder could not read — a command
-// spliced in without escaping is how a payload gets that way — so a command
-// running `grep -n "tool_response" hook.go` moved the scope inside itself, and
-// the salvage returned what that same command echoed (#2051).
-func after(s, key string) string {
+// Where it is used as one, because the first occurrence is inside the command
+// whenever the command mentions it — and this path exists for payloads the
+// decoder could not read, which is where an unescaped `"tool_response"` in a
+// command shows up. A key is followed by a colon; a mention is not (#2051).
+func after(s, key string) string { return afterKey(s, key, false) }
+
+// salvageFromPayload is the whole salvage: scope to the tool's response, pull a
+// value out of it, and bound what comes back.
+func salvageFromPayload(raw string) string {
+	return clampOutput(salvageToolOutput(afterLast(raw, `"tool_response"`)))
+}
+
+// afterLast is after, from the last place the key is used as one. A tool's
+// response is written after the input that produced it, so where a command
+// quotes a whole payload of its own — a shape this path sees, since a command
+// with unescaped quotes in it is why the decoder failed — the real key is the
+// later one (#2051).
+func afterLast(s, key string) string { return afterKey(s, key, true) }
+
+// afterKey is both: what follows the first or the last place key is used as
+// one. A key is followed by a colon; a mention of it in a command is not.
+func afterKey(s, key string, last bool) string {
+	out := ""
 	for i := 0; ; {
 		j := strings.Index(s[i:], key)
 		if j < 0 {
-			return ""
+			return out
 		}
 		at := i + j + len(key)
 		if rest := strings.TrimLeft(s[at:], " \t\r\n"); strings.HasPrefix(rest, ":") {
-			return s[at:]
+			out = s[at:]
+			if !last {
+				return out
+			}
 		}
-		i = i + j + 1
+		i = at
 	}
 }
 
@@ -201,12 +220,19 @@ func salvageToolOutput(raw string) string {
 	// the mention, the scan gave up on stderr and answered with stdout, the
 	// half of the payload without the error in it (#2051).
 	for _, key := range []string{`"stderr"`, `"error"`, `"output"`, `"stdout"`, `"content"`, `"result"`} {
-		at := after(raw, key)
-		if at == "" {
-			continue
-		}
-		if v, ok := jsonStringAfter(at); ok && strings.TrimSpace(v) != "" {
-			return v
+		// Every occurrence, not the first: a mention of the key that is not a
+		// key — `grep "stderr" build.log` — made this give up on the key
+		// entirely and skip the real one further along (#2051).
+		for i := 0; ; {
+			j := strings.Index(raw[i:], key)
+			if j < 0 {
+				break
+			}
+			at := i + j + len(key)
+			if v, ok := jsonStringAfter(raw[at:]); ok && strings.TrimSpace(v) != "" {
+				return v
+			}
+			i = at
 		}
 	}
 	return ""
@@ -370,11 +396,6 @@ func fixLine(p index.FixPair, sessions int) string {
 	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 
-// exitMarker is the shape a source appends when it knows what a command
-// returned: two spaces, the marker, the digits, end of string
-// (internal/sources/codex.go:259, internal/sources/opencode.go:202).
-const exitMarker = "  → exit "
-
 // withoutFailedExit drops the recorded exit status from a command, and reports
 // false when that status says the command failed.
 //
@@ -383,18 +404,9 @@ const exitMarker = "  → exit "
 // it read was `0"` — a command that mentions deja's own marker is still just a
 // command (#2048).
 func withoutFailedExit(cmd string) (string, bool) {
-	i := strings.LastIndex(cmd, exitMarker)
-	if i < 0 {
+	rest, code, recorded := index.CommandExitOutcome(cmd)
+	if !recorded {
 		return cmd, true
 	}
-	code := cmd[i+len(exitMarker):]
-	if code == "" {
-		return cmd, true
-	}
-	for _, r := range code {
-		if r < '0' || r > '9' {
-			return cmd, true
-		}
-	}
-	return strings.TrimSpace(cmd[:i]), code == "0"
+	return rest, code == 0
 }

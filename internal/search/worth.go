@@ -89,6 +89,23 @@ func HasIdentifierTermKnown(terms []string, known map[string]float64) bool {
 	return HasIdentifierTerm(kept)
 }
 
+// IdentifyingTerms is the question's words that are rare enough in this store
+// to say what a session is about. The caller that has the ranking's own idf
+// gets that verdict; without it there is nothing to judge by and the whole
+// question stands.
+func IdentifyingTerms(terms []string, known map[string]float64) []string {
+	if known == nil {
+		return terms
+	}
+	kept := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if v, ok := known[t]; ok && v >= identifierIDFFloor {
+			kept = append(kept, t)
+		}
+	}
+	return kept
+}
+
 // HasIdentifierTerm reports whether the question contains a word specific
 // enough to carry a match on its own. In a small corpus even "file" clears the
 // informativeness bar, so a single hit is only trusted when the question named

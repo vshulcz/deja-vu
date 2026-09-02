@@ -86,6 +86,14 @@ deja 把这些文件变成一层它们都能读的记忆。
 `deja handoff --to codex` 把当前上下文打包，好在另一个智能体里接着做；
 密钥、令牌、JWT 和私钥块在建索引时就被剥掉。
 
+### 把你自己的工作画出来
+
+`deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。
+
+<p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
+
+完整的功能参考在[文档站](https://vshulcz.github.io/deja-vu/)。
+
 ## 隐私
 
 建索引和搜索都在本地。只有 `deja update`、`deja sync ssh` 和 `deja doctor` 里的版本检查会用到网络。
@@ -138,6 +146,26 @@ Copilot CLI · Roo Code · DeepSeek Harness · Zed。
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
 [英文 README 的能力矩阵](README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`
 变量指定，各家自己的迁移变量也会被尊重。
+
+### 自带插件包的智能体
+
+`deja install --auto` 会像接其他工具一样把下面这几个接好，那始终是最短的一条路。
+它们同时在各自的生态里有一个包，方便习惯从那边装扩展的人：
+
+| 智能体 | 包 | 安装 |
+| --- | --- | --- |
+| opencode | npm `opencode-deja` | `opencode plugin opencode-deja` |
+| DeepSeek Harness | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
+| Zed | `deja-context-server` | Zed → Extensions → deja |
+| Kimi Code | 插件 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
+| Codex CLI | 插件 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`，然后 `codex plugin add deja-vu@deja-vu` |
+| Grok Build | 插件 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`，然后 `grok plugin install deja` |
+
+两条路各自都够用，两条都走也不会出问题：opencode、dsh、Kimi、Grok 和 Codex 的包会读
+`deja install` 写下的配置，只补上缺的那部分；在 Zed 里两边用的是同一个 server id，
+所以无论先装哪个都不会重复。
+
+它们用的都是你已经装好的 deja，包里自带的那份只是兜底。
 
 ## 可选的语义召回
 
@@ -212,6 +240,32 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+## 指南
+
+按场景写的，不是按功能：
+
+- [编码智能体记得之前的对话吗？](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html)——每个智能体在会话之间留下了什么，又丢掉了什么
+- [磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)——`~/.claude/projects` 会长到多大，删掉要付出什么代价
+- [智能体把你刚才的上下文弄丢了](https://vshulcz.github.io/deja-vu/guide/lost-context.html)——崩溃之后、清空之后，或者会话回来时空空如也
+- [上下文窗口满了](https://vshulcz.github.io/deja-vu/guide/context-window-full.html)——压缩到底保住了什么，实测数据，以及可以换成什么做法
+- [接着昨天的会话做](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html)——跨所有智能体找到它，再回到它原来所属的那一个里打开
+- [智能体又犯了你已经修过的错](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html)
+- [找到当初解决它的那次会话](https://vshulcz.github.io/deja-vu/guide/find-a-session.html)
+- [为什么智能体在会话之间会忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
+- [压缩会丢掉什么](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
+
+按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html) · [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
+
+## 在你自己的历史上试一次
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+装好十秒，建索引十来秒。下一次智能体打开会话，它就已经知道你在这个项目里解决过什么——
+包括你装 deja 之前的那些。
 
 ## 参与开发
 

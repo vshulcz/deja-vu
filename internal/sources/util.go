@@ -260,6 +260,46 @@ func scanJSONL(path string, fn func(map[string]any)) error {
 	return scanJSONLFromOffset(path, 0, fn)
 }
 
+// scanJSONLWithHeaderFromOffset is scanJSONLFromOffset for a format whose
+// first line is metadata rather than a turn: the session's id, its title, the
+// directory it ran in. Resuming past that line left the parser with none of
+// it, so an appended turn arrived under a key made from the filename and the
+// session it belonged to never grew — measured on omp and prime, where the
+// append made a second session, and on goose and openclaw, where it renamed
+// the project (#2870).
+//
+// The header is handed over again on every resume. That is safe because it is
+// metadata: the parsers read it into fields they set rather than append to.
+func scanJSONLWithHeaderFromOffset(path string, offset int64, fn func(map[string]any)) error {
+	if offset > 0 {
+		if header, err := firstJSONLRecord(path); err == nil && header != nil {
+			fn(header)
+		}
+	}
+	return scanJSONLFromOffset(path, offset, fn)
+}
+
+// firstJSONLRecord decodes the first line of a JSONL file, or nil when there
+// is none to read.
+func firstJSONLRecord(path string) (map[string]any, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	line, err := bufio.NewReaderSize(f, 1024*1024).ReadBytes('\n')
+	if line = trimJSONSpace(line); len(line) == 0 {
+		return nil, err
+	}
+	var m map[string]any
+	d := json.NewDecoder(strings.NewReader(string(line)))
+	d.UseNumber()
+	if d.Decode(&m) != nil {
+		return nil, nil
+	}
+	return m, nil
+}
+
 func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) error {
 	f, err := os.Open(path)
 	if err != nil {

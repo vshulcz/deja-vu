@@ -160,7 +160,7 @@ func zedHasKey(text string, from int, key string) bool {
 			if end < 0 {
 				return false
 			}
-			if depth == 0 && text[i:end] == want {
+			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
 				return true
 			}
 			i = end - 1
@@ -256,7 +256,11 @@ func zedFindKey(text string, from int, key string) *zedSpan {
 			if end < 0 {
 				return nil
 			}
-			if depth == 0 && text[i:end] == want {
+			// A string *value* equal to the key's name is not the key: without
+			// this a `"note": "internal"` beside the real `"internal"` block
+			// read as the block itself, and the writer put a second one in
+			// beside it — where the reader's value wins the decode (#2811).
+			if depth == 0 && text[i:end] == want && jsoncIsKey(text, end) {
 				open := zedValueOpen(text, end)
 				if open < 0 {
 					return nil

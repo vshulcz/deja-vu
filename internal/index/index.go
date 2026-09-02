@@ -78,12 +78,47 @@ import (
 // while `hook-tool-after` and the environment block read the manifest and stay
 // silent, which is the state this bump exists to end (#2444).
 // 32: goose sessions are kept unless goose says it wrote them for itself. The
-// filter was an allow-list, so a way of reaching goose that it did not name
-// was dropped. A store built under the old rules is missing those sessions,
-// and the db path only re-reads what has been touched since its watermark, so
-// without the bump they stay missing until each is used again — the same shape
-// as 21, 22 and 23 (#2873).
-const version = 32
+// filter was an allow-list of `session_type = 'user'`, so the ways people
+// actually reach goose — an editor over ACP, the CLI, a chat gateway, a run
+// that kept no session — were dropped. A store built under the old rules is
+// missing those sessions, and the db path only re-reads what has been touched
+// since its watermark, so without the bump they stay missing until each is
+// used again — the same shape as 21, 22 and 23 (#2873).
+// 33: a combining mark continues the word it sits on. Latin NFD was composed
+// away already, but Arabic harakat, Hebrew niqqud, Thai vowel signs and the
+// Indic matras have no precomposed form, so the mark ended the token: كَتَبَ was
+// indexed as three one-letter tokens and हिन्दी as two, and the words
+// themselves were never in the index for any query to reach. A store built
+// under the old rules holds the letters rather than the words, and nothing
+// re-derives them without the bump (#1941). A variation selector is category
+// Mn but says how to draw the rune in front of it, so it is not one of those
+// marks and does not join the word (#2896).
+// 34: Thai is indexed the way the other unspaced scripts are. Thai writes
+// without spaces between words, so a sentence was one token cut at the byte
+// cap and no query reached the words inside it; it now emits the overlapping
+// bigrams CJK has had since 21. A store built before this holds the sentences
+// and nothing re-derives the bigrams without the bump (#2897).
+//
+// The same bump carries one subtraction: a bigram of two function runes — 的了,
+// 在哪, 什么 — is grammar, the query side has dropped it from the term list
+// since it was written, and the index was storing the most frequent pairs in
+// the language for nothing. Measured on a 42 MB Chinese corpus, buckets 75.5
+// MB to 70.7 MB (#492).
+//
+// And one more subtraction on the same rebuild, because it is the same
+// rebuild: a posting's session id is written as a delta against the previous
+// posting in its block rather than in full. A block is sorted by offset and
+// records.bin is written in session order, so on a real store 99.66% of
+// postings already hold a session id no smaller than the one before them.
+// Measured here at 5.91% of buckets on a mixed store, and by two contributors
+// at 16.11% and 11.95% on theirs — none of those three is reproducible from
+// this repository, which is why the first number is the one taken on the
+// machine that merged it. The bucket magic moves with it so a reader that
+// skips the version
+// check — an index directory that cannot be locked is served without one —
+// gets errCorruptIndex rather than session ids that are wrong without saying
+// so (#492).
+const version = 34
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -91,7 +126,23 @@ const maxIndexedText = 64 * 1024
 // a corrupt length prefix — reject it rather than allocate up to 4 GiB.
 const maxRecordSize = 8 << 20
 
-var bucketMagic = []byte("DJB1")
+// bucketMagic moves whenever the meaning of the bytes behind it moves. The
+// version bump above rebuilds the index on the next Ensure, but a directory
+// that cannot be locked is served as it stands, with no version check at all
+// (EnsureForSearch, EnsureForSearchNoWait) — the read-only container this
+// repo deliberately supports. Reading old posting bytes under a new rule
+// there would hand back session ids that are wrong rather than absent, and
+// nothing would say so; failing the magic check instead makes it a corrupt
+// index (#492).
+//
+// What that costs, stated because the first version of this comment said the
+// opposite: on a writable index it is a cache miss — the recovery path
+// rebuilds and the reader sees an answer. On a read-only directory it is not.
+// The rebuild cannot run, so `deja search` exits non-zero with no results
+// until the index is replaced by hand. That is the right trade against wrong
+// session ids served silently, and it is a break for anyone shipping a
+// pre-34 index inside a read-only image.
+var bucketMagic = []byte("DJB2")
 
 // errCorruptIndex marks unreadable index structures (e.g. a bucket file cut
 // short by a crash). Callers treat it as a cache miss and rebuild.

@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func Search(dir string, o query.Options) ([]model.Session, error) {
@@ -194,7 +195,15 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 			} else if len(result.Sessions) > 0 {
 				return result, nil
 			}
-			return relevanceSearch(dir, m, o)
+			ranked, rerr := relevanceSearch(dir, m, o)
+			if rerr != nil || len(ranked.Sessions) > 0 {
+				return ranked, rerr
+			}
+			// Nothing anywhere. The neighbour map holds the one link left to
+			// try — the project's own word for what the reader asked about —
+			// and asking it over the question's identifying words is what
+			// makes it readable by a sentence (#2331).
+			return cooccurNarrowedSearch(dir, m, o)
 		}
 		ss, err := scanRecords(dir, m, o, nil)
 		return SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants}, err
@@ -1396,7 +1405,7 @@ func SearchWithRecoveryDetailed(dir string, o query.Options, progress io.Writer)
 		return r, err
 	}
 	if progress != nil {
-		fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+		fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
 	}
 	if rerr := EnsureForSearch(dir, o, true, progress); rerr != nil {
 		return SearchResult{}, rerr
@@ -1759,6 +1768,20 @@ func sessionsForMetas(dir string, metas []SessionMeta) ([]model.Session, error) 
 // RecentProjects is RecentProject for several project names at once: one
 // manifest read and one records pass instead of names × sessions scans.
 func RecentProjects(dir string, projects []string, perName int) ([]model.Session, error) {
+	return RecentProjectsUnder(dir, projects, "", perName)
+}
+
+// RecentProjectsUnder is RecentProjects plus the sessions whose work happened
+// inside root, whatever they are called.
+//
+// A project is a name derived from where a session was started, and a caller
+// can guess the names above it — a subdirectory finds its repository (#2039).
+// Downward it cannot: there is no list of the names a repository's
+// subdirectories might have produced, so standing at the root found nothing of
+// what happened inside it (#2040). The files a session touched are already in
+// the manifest and say where the work was, so the root asks that instead of
+// guessing.
+func RecentProjectsUnder(dir string, projects []string, root string, perName int) ([]model.Session, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -1799,7 +1822,89 @@ func RecentProjects(dir string, projects []string, perName int) ([]model.Session
 			}
 		}
 	}
+	// And what happened under the caller's own checkout, however it was named.
+	// Ranked among themselves by recency and cut to the same per-name cap, so
+	// a repository with many subdirectories contributes as much as any one
+	// name does; from there they compete with the rest on the caller's own
+	// score and recency rule.
+	if under := metasWorkingUnder(m, root, seen); len(under) > 0 {
+		sort.Slice(under, func(i, j int) bool { return newestFirstMeta(under[i], under[j]) })
+		if perName > 0 && len(under) > perName {
+			under = under[:perName]
+		}
+		metas = append(metas, under...)
+	}
 	return sessionsForMetas(dir, metas)
+}
+
+// metasWorkingUnder is the sessions whose touched files sit under root and
+// which no name has already claimed. Nothing when root is empty, so a caller
+// that does not know where it stands is unaffected.
+//
+// A repository, not any directory: measured on a real store, standing in a
+// home directory admitted 697 of 768 sessions with touched files — every
+// project on the machine, injected under a line that says "from this project's
+// recent history" (#2343's shape). The checkout is the boundary a person means
+// by "this project", so anything that is not one answers with nothing.
+func metasWorkingUnder(m Manifest, root string, seen map[string]bool) []SessionMeta {
+	root = strings.TrimSpace(root)
+	if root == "" {
+		return nil
+	}
+	repo := sources.RepoRoot(root)
+	if repo == "" || sameDir(repo, homeDir()) {
+		// A checkout at the home directory — a dotfiles repo — is a repository
+		// whose "work" is the whole machine. Everything under it keeps its own
+		// name, as before.
+		return nil
+	}
+	prefix := filepath.ToSlash(filepath.Clean(root))
+	if prefix == "" || prefix == "/" || prefix == "." {
+		return nil
+	}
+	prefix += "/"
+	var out []SessionMeta
+	for _, meta := range m.Sessions {
+		k := meta.Harness + ":" + meta.ID
+		if seen[k] {
+			continue
+		}
+		for _, p := range meta.Touched {
+			if !underDir(p, prefix) {
+				continue
+			}
+			seen[k] = true
+			out = append(out, meta)
+			break
+		}
+	}
+	return metasNotIgnored(out)
+}
+
+// underDir reports whether p sits under a slash-terminated directory prefix,
+// without lowering either side into a new string: this runs over every touched
+// path of every session in the manifest, on the session-start hook, and the
+// lowering alone was 12 MB of garbage on a large store.
+func underDir(p, prefix string) bool {
+	p = filepath.ToSlash(p)
+	if len(p) <= len(prefix) {
+		return false
+	}
+	return strings.EqualFold(p[:len(prefix)], prefix)
+}
+
+// sameDir compares two directories the way the filesystem would for this
+// purpose: case-insensitively, since the callers are a cwd and a home.
+func sameDir(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
+}
+
+func homeDir() string {
+	h, _ := os.UserHomeDir()
+	return h
 }
 
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
@@ -2882,12 +2987,29 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 const commonTokenPostings = 200
 
 func fuzzyPostings(dir string, terms, phrases []string) ([]posting, map[string][]string, error) {
-	if !hasFuzzyToken(terms) {
-		return nil, nil, nil
+	var idx *tokenIndex
+	if !hasFuzzyToken(terms, nil) {
+		// Every term is below the length floor. One of them may still be a
+		// word whose marked form is in the index, which only the catalog can
+		// say — but a mark strips to a non-ASCII base, so an ASCII term has
+		// none and the catalog stays unread. That keeps the answer this path
+		// gave before it asked, and keeps it free (#2898).
+		if !anyNonASCII(terms) {
+			return nil, nil, nil
+		}
+		cat, err := tokenIndexCached(dir)
+		// A catalog that will not read means no, as it did before.
+		if err != nil || !hasFuzzyToken(terms, cat) {
+			return nil, nil, nil
+		}
+		idx = cat
 	}
-	idx, err := tokenIndexCached(dir)
-	if err != nil {
-		return nil, nil, err
+	if idx == nil {
+		cat, err := tokenIndexCached(dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		idx = cat
 	}
 	perToken := make([]map[int64]posting, len(terms))
 	variants := map[string][]string{}
@@ -3435,11 +3557,31 @@ func oneSuffixStep(word string) []string {
 	return out
 }
 
-func hasFuzzyToken(terms []string) bool {
+// anyNonASCII reports whether any term could carry or shed a combining mark.
+func anyNonASCII(terms []string) bool {
+	for _, term := range terms {
+		if !isASCIIString(term) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasFuzzyToken(terms []string, idx *tokenIndex) bool {
 	for _, term := range terms {
 		// The 4-rune floor also keeps CJK bigrams (always 2 runes) out of
 		// fuzzy variant generation entirely — no variant-space blowup (#338).
 		if len([]rune(term)) >= 4 {
+			return true
+		}
+		// A shorter word is let in only to reach its own marked form: Arabic
+		// writes its vowels as combining marks, so كتب is three runes and the
+		// written-out كَتَبَ is six — the word a reader types is below the floor
+		// while the word in the index is above it (#1941). The question is
+		// asked of the term itself, not of the corpus: one Arabic word in one
+		// session must not open the tier for every three-letter word a reader
+		// types.
+		if idx != nil && len(idx.markedFormsOf(term)) > 0 {
 			return true
 		}
 	}
@@ -3482,15 +3624,43 @@ func closeTokens(query string, idx *tokenIndex) []string {
 	if qr >= 8 {
 		limit = 2
 	}
+	seen := make(map[string]bool)
+	consider := func(token string, d int) {
+		if seen[token] || d > limit {
+			return
+		}
+		seen[token] = true
+		matches = append(matches, match{token: token, distance: d})
+	}
 	// An edit changes the length by at most one and a transposition not at
 	// all, so only tokens within the limit of the query's length can match.
 	// Walking those buckets replaces a Damerau-Levenshtein run against every
 	// token in the corpus — ~200k of them — with a few short slices.
 	idx.candidates(qr, limit, func(token string) {
-		if d := damerauDistance(query, token, limit); d <= limit {
-			matches = append(matches, match{token: token, distance: d})
+		if seen[token] {
+			return
 		}
+		consider(token, damerauDistance(query, token, limit))
 	})
+	// And the same word written with its marks, or without them. Arabic is
+	// normally typed without harakat and each mark is a rune of its own, so
+	// كتب sat three edits from كَتَبَ while café sat one from cafe: one rule,
+	// two outcomes, and the reader who got nothing was the one whose script
+	// writes its vowels as marks (#1941).
+	//
+	// A lookup, not a walk: the marked forms of a word are the tokens that
+	// strip to it, which is a map, and a walk over every marked token cost 36
+	// ms a term on a corpus where most tokens carry marks. It also keeps the
+	// rule honest — a mark is free, and nothing else is, so ข้าว is reachable
+	// from ขาว but neither is reachable from a third word.
+	//
+	// Scored as one edit rather than none, because in Thai and Hebrew the mark
+	// is what tells two words apart: a real typo correction must not sort
+	// behind a word that merely lost its vowels, and the eight-variant cap
+	// below must not fill with them.
+	for _, token := range idx.markedFormsOf(query) {
+		consider(token, 1)
+	}
 	sort.Slice(matches, func(i, j int) bool {
 		if matches[i].distance == matches[j].distance {
 			return matches[i].token < matches[j].token
@@ -3544,10 +3714,13 @@ func damerauDistance(a, b string, max int) int {
 }
 
 func damerauDistanceRunes(a, b string, max int) int {
-	ar, br := []rune(a), []rune(b)
-	if abs(len(ar)-len(br)) > max {
+	// Before the conversion: an edit changes the length by one, so a pair too
+	// far apart in runes cannot match however it is spelled, and counting
+	// costs no allocation.
+	if abs(utf8.RuneCountInString(a)-utf8.RuneCountInString(b)) > max {
 		return max + 1
 	}
+	ar, br := []rune(a), []rune(b)
 	prev := make([]int, len(br)+1)
 	for j := range prev {
 		prev[j] = j
@@ -3569,6 +3742,56 @@ func damerauDistanceRunes(a, b string, max int) int {
 		prevPrev, prev = prev, cur
 	}
 	return prev[len(br)]
+}
+
+// isMark reports whether r is a combining mark: Mn covers Arabic harakat,
+// Hebrew niqqud, Thai vowel signs and the Greek and Vietnamese tone marks in
+// their decomposed form, and Mc the spacing matras of the Indic scripts, which
+// are as much part of their word as any of those. The range test in front
+// keeps ordinary text to one comparison per rune — every mark sits above
+// U+0300.
+func isMark(r rune) bool {
+	if r < 0x0300 || isVariationSelector(r) {
+		return false
+	}
+	return unicode.Is(unicode.Mn, r) || unicode.Is(unicode.Mc, r)
+}
+
+// isVariationSelector reports whether r only says how to draw the rune in
+// front of it. They are category Mn, but gluing one to a word made "widget️"
+// — the word plus an emoji presentation selector — a different token from
+// "widget", which demoted an ordinary query off the exact tier.
+func isVariationSelector(r rune) bool {
+	return (r >= 0xFE00 && r <= 0xFE0F) || (r >= 0xE0100 && r <= 0xE01EF)
+}
+
+// hasMark reports whether s carries a combining mark, without building the
+// stripped form: the index builder asks this of every non-ASCII token it sees
+// and only strips the ones that answer yes.
+func hasMark(s string) bool {
+	for _, r := range s {
+		if isMark(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// unmarked strips combining marks from s, reporting whether any were there. A
+// string without one is returned untouched, so ordinary text pays one scan and
+// no allocation.
+func unmarked(s string) (string, bool) {
+	if !hasMark(s) {
+		return s, false
+	}
+	out := make([]rune, 0, len(s))
+	for _, r := range s {
+		if isMark(r) {
+			continue
+		}
+		out = append(out, r)
+	}
+	return string(out), true
 }
 
 func abs(n int) int {
@@ -3620,7 +3843,15 @@ func tokens(s string) []string {
 		b.Reset()
 	}
 	for _, r := range strings.ToLower(s) {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+		// A combining mark continues the word it sits on. Latin NFD is already
+		// composed away above, but Arabic harakat, Hebrew niqqud, Thai vowel
+		// signs and the Indic matras have no precomposed form, so the mark
+		// ended the token: كَتَبَ was indexed as three one-letter tokens and
+		// हिन्दी as two, and the words themselves were not in the index at all
+		// (#1941). A mark cannot start a token, so a stray one still
+		// separates.
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
+			(b.Len() > 0 && isMark(r)) {
 			b.WriteRune(r)
 			if b.Len() > 64 {
 				flush()
@@ -3634,21 +3865,18 @@ func tokens(s string) []string {
 	return out
 }
 
+// indexKeys collects what textKeys emits, in order and with its repeats. The
+// build path streams the keys instead; this is what the tests read, so they
+// read the same emitter the build does.
+//
+// Bigram keys fold Traditional to Simplified so the same word written either
+// way lands on one key and a query in one script reaches content in the other.
+// Folding only the key keeps the stored text untouched. The emitter folds runs
+// in place and dedupes folded pairs — cheaper than folding each emitted
+// bigram, and every caller collapses repeated keys anyway (#492).
 func indexKeys(s string) []string {
 	var out []string
-	for _, tok := range tokens(s) {
-		out = append(out, "t"+tok)
-	}
-	for _, part := range identifierParts(s) {
-		out = append(out, "t"+part)
-	}
-	// Bigram keys fold Traditional to Simplified so the same word written
-	// either way lands on one key and a query in one script reaches content in
-	// the other. Folding only the key keeps the stored text untouched. The
-	// emitter folds runs in place and dedupes folded pairs — cheaper than
-	// folding each emitted bigram, and every caller collapses repeated keys
-	// anyway (#492).
-	cjkIndexKeys(s, func(tok string) {
+	textKeys(s, func(tok string) {
 		out = append(out, tok)
 	})
 	return out
@@ -3735,7 +3963,10 @@ func queryKeys(s string) []string {
 	// query is all stop words, keep them (odd results beat none).
 	content := make([]string, 0, len(toks))
 	for _, tok := range toks {
-		if !query.IsStopWord(tok) {
+		// A bigram of two function runes is grammar, and the index no longer
+		// stores one: asking for it would AND the query against a key that
+		// cannot exist (#492).
+		if !query.IsStopWord(tok) && !query.CJKFunctionBigram(tok) {
 			content = append(content, tok)
 		}
 	}

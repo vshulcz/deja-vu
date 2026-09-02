@@ -5,8 +5,10 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 )
@@ -78,6 +80,18 @@ var catalogCache struct {
 type tokenIndex struct {
 	set   map[string]bool
 	byLen [][]string
+	// The tokens that carry a combining mark. The close tier treats a mark as
+	// free, and a marked token is as many runes longer than its unmarked form
+	// as it has marks, so the ordinary length window never reaches it
+	// (#1941). Collected here on the way past and keyed by their unmarked
+	// form on first use: a lookup rather than a walk, because on a corpus
+	// where most tokens are marked — the Arabic and Thai stores this exists
+	// for — walking them cost 36 ms per term, and the only thing that walk
+	// could find is what the lookup returns. Built lazily because a query
+	// that has no unmarked form to ask about never pays for it.
+	marked     []string
+	byUnmarked map[string][]string
+	markedOnce sync.Once
 }
 
 const maxIndexedTokenLen = 64
@@ -86,15 +100,47 @@ func newTokenIndex(set map[string]bool) *tokenIndex {
 	idx := &tokenIndex{set: set, byLen: make([][]string, maxIndexedTokenLen+2)}
 	for tok := range set {
 		n := len(tok)
-		if !isASCIIString(tok) {
+		ascii := isASCIIString(tok)
+		if !ascii {
 			n = utf8.RuneCountInString(tok)
 		}
-		if n > maxIndexedTokenLen {
-			n = maxIndexedTokenLen + 1 // one overflow bucket, always scanned
+		idx.byLen[bucketFor(n)] = append(idx.byLen[bucketFor(n)], tok)
+		if ascii {
+			continue // no ASCII byte is a combining mark
 		}
-		idx.byLen[n] = append(idx.byLen[n], tok)
+		if hasMark(tok) {
+			idx.marked = append(idx.marked, tok)
+		}
 	}
 	return idx
+}
+
+// markedForms keys the marked tokens by their unmarked form, once.
+func (t *tokenIndex) markedForms() map[string][]string {
+	t.markedOnce.Do(func() {
+		if len(t.marked) == 0 {
+			return
+		}
+		t.byUnmarked = make(map[string][]string, len(t.marked))
+		for _, tok := range t.marked {
+			if bare, _ := unmarked(tok); bare != "" {
+				t.byUnmarked[bare] = append(t.byUnmarked[bare], tok)
+			}
+		}
+		for _, forms := range t.byUnmarked {
+			sort.Strings(forms) // one order, whatever the map hands back
+		}
+	})
+	return t.byUnmarked
+}
+
+// bucketFor clamps a rune length to the bucket that holds it; anything longer
+// than maxIndexedTokenLen shares one overflow bucket, which is always scanned.
+func bucketFor(n int) int {
+	if n > maxIndexedTokenLen {
+		return maxIndexedTokenLen + 1
+	}
+	return n
 }
 
 // candidates visits the tokens whose rune length is within limit of n, plus
@@ -115,6 +161,33 @@ func (t *tokenIndex) candidates(n, limit int, fn func(string)) {
 	for _, tok := range t.byLen[maxIndexedTokenLen+1] {
 		fn(tok)
 	}
+}
+
+// markedFormsOf is the tokens that are word with combining marks on it, or —
+// when word itself carries marks — the tokens that carry different ones, plus
+// the bare form if the corpus holds it. Nothing else: a mark is free on the
+// close tier, and nothing else is.
+func (t *tokenIndex) markedFormsOf(word string) []string {
+	bare, marked := unmarked(word)
+	if bare == "" {
+		return nil
+	}
+	forms := t.markedForms()[bare]
+	if !marked {
+		return forms
+	}
+	// A marked query reaches the bare word as well as its other spellings,
+	// and never itself.
+	out := make([]string, 0, len(forms)+1)
+	if t.set[bare] {
+		out = append(out, bare)
+	}
+	for _, f := range forms {
+		if f != word {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // bucketsSignature changes whenever any bucket file is added, removed, resized
@@ -144,7 +217,13 @@ func tokenCatalogCached(dir string) (map[string]bool, error) {
 	return idx.set, nil
 }
 
+// catalogReads counts how often the token catalog was consulted, for the test
+// that pins the fuzzy tier's early exit (#2898). Reading it is the only way to
+// tell "answered no without looking" from "looked, then answered no".
+var catalogReads atomic.Int64
+
 func tokenIndexCached(dir string) (*tokenIndex, error) {
+	catalogReads.Add(1)
 	sig, err := bucketsSignature(dir)
 	if err != nil {
 		c, cerr := tokenCatalog(dir)

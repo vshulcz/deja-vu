@@ -32,10 +32,12 @@ deja-stats.svg
 # this was two blocks that had drifted apart: seven names duplicated between
 # them, seven packages with no line at all, and three lines for packages that no
 # longer existed — while the comment above it said one line per package.
+/blockcarry
 /corpusprobe
 /day0bench
 /decisionbench
 /demo
+/filehookreach
 /genlogo
 /genmatrix
 /genregistry
@@ -55,6 +57,8 @@ deja-stats.svg
 /relnotes
 /reusebench
 /searchbench
+/semanticgap
+/staleoverlap
 
 # Where story.py drops the film's frames when it is run without --out. Three
 # hundred and twenty PNGs, one run.

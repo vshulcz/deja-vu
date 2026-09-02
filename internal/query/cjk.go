@@ -25,7 +25,7 @@ func ExpandCJKTokens(toks []string) []string {
 		hasCJK := false
 		allCJK := true
 		for _, r := range runes {
-			if cjkfold.IsCJK(r) {
+			if cjkfold.Unspaced(r) {
 				hasCJK = true
 			} else {
 				allCJK = false
@@ -42,12 +42,12 @@ func ExpandCJKTokens(toks []string) []string {
 		}
 		i := 0
 		for i < len(runes) {
-			if !cjkfold.IsCJK(runes[i]) {
+			if !cjkfold.Unspaced(runes[i]) {
 				i++
 				continue
 			}
 			j := i
-			for j < len(runes) && cjkfold.IsCJK(runes[j]) {
+			for j < len(runes) && cjkfold.Unspaced(runes[j]) {
 				j++
 			}
 			out = append(out, cjkfold.Bigrams(string(runes[i:j]))...)
@@ -65,9 +65,14 @@ func ExpandCJKTokens(toks []string) []string {
 //
 // The test is deliberately "both runes", not "either": 中 and 个 are function
 // runes on their own but carry meaning in 中国 and 个人, and dropping every
-// bigram that merely contains one would delete real words. This filter runs
-// at query time only — the index keeps every bigram, so nothing about
-// ingestion changes.
+// bigram that merely contains one would delete real words.
+//
+// Both sides apply it. It began as a query-time filter with the index keeping
+// every bigram, which meant the postings carried the most frequent pairs in
+// the language for nothing: 的了是在 and their neighbours are what a Chinese
+// text is mostly made of, and #492 measured bigram postings at +68% of the
+// bucket bytes. The index drops them too now, and queryKeys drops them from
+// the AND, so the two sides ask for the same thing.
 //
 // The list covers three scripts of the same closed class. Simplified Mandarin
 // alone is not enough: a Traditional writer's 哪個 and a Cantonese writer's
@@ -98,6 +103,11 @@ var cjkFunctionRunes = map[rune]bool{
 	'點': true, '哋': true, '嗰': true, '啲': true, '樣': true, '冇': true,
 	'嚟': true, '咪': true, '囉': true, '喎': true, '啦': true, '咁': true,
 }
+
+// CJKFunctionRune reports whether r belongs to the closed class above: a
+// particle, pronoun or question word that carries no topic on its own. The
+// index asks this pair by pair, to keep grammar out of the postings.
+func CJKFunctionRune(r rune) bool { return cjkFunctionRunes[r] }
 
 // CJKFunctionBigram reports whether every rune of a CJK token is a function
 // rune, i.e. the token is pure grammar.

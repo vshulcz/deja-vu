@@ -30,7 +30,6 @@ func TestAnUnreadablePayloadIsRecordedAsOne(t *testing.T) {
 		{"null", "null", ""},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			skipWindowsEmptySessionID(t)
 			withStatsStores(t)
 			claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 			old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
@@ -81,7 +80,6 @@ func TestAnUnreadablePayloadIsRecordedAsOne(t *testing.T) {
 // names its session and mistypes something else keeps its receiver — the flag
 // is about the payload, not about the id.
 func TestAPayloadThatNamesItsSessionKeepsTheReceiver(t *testing.T) {
-	skipWindowsEmptySessionID(t)
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
@@ -125,7 +123,6 @@ func TestAPayloadThatNamesItsSessionKeepsTheReceiver(t *testing.T) {
 // --last carries the same answer as the list: the header is where #2301 put
 // the receiver, so it is where its absence has to be explained too.
 func TestTheLastHeaderSaysTheReceiverIsUnknown(t *testing.T) {
-	skipWindowsEmptySessionID(t)
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)
