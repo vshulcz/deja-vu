@@ -270,8 +270,20 @@ impl zed::Extension for DejaExtension {
                     .to_string()
             })?;
 
+        // `search` is named rather than handed over as deja's first word: the
+        // bare-query path dispatches a first word that happens to be a
+        // command, so `/deja version` printed a version number and `/deja
+        // index` rebuilt the index. `--` then keeps a query that names one of
+        // deja's own flags out of its flag parsing, where it would exit and
+        // come back to the reader as an empty history.
+        let mut args = vec!["search".to_string()];
+        if query.starts_with('-') {
+            args.push("--".to_string());
+        }
+        args.push(query.clone());
+
         let output = zed::process::Command::new(binary)
-            .arg(query.clone())
+            .args(args)
             .envs(worktree.map(|worktree| worktree.shell_env()).unwrap_or_default())
             .output()?;
 

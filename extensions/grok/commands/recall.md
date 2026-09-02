@@ -14,7 +14,7 @@ recall_context using a term from it.
 If the deja MCP tools are unavailable, fall back to the CLI:
 
 ```bash
-deja "$ARGUMENTS"
+deja search -- "$ARGUMENTS"
 ```
 
 Answer with what actually happened in those sessions — when it was, which

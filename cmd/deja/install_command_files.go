@@ -42,7 +42,7 @@ result looks right but is too short to act on, follow up with recall_context.
 
 If the deja MCP tools are unavailable, run the CLI instead:
 
-` + "```bash\n" + shellQuoteIfNeeded(exe) + ` "` + argsToken + `"
+` + "```bash\n" + shellQuoteIfNeeded(exe) + ` search -- "` + argsToken + `"
 ` + "```" + `
 
 Answer with what actually happened in those sessions — when it was, which

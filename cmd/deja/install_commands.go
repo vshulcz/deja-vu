@@ -53,7 +53,7 @@ recall_context using a term from it.
 
 If the deja MCP tools are unavailable, fall back to the CLI:
 
-` + "```bash\n" + exe + ` "$ARGUMENTS"
+` + "```bash\n" + exe + ` search -- "$ARGUMENTS"
 ` + "```" + `
 
 Answer with what actually happened in those sessions — when it was, which
