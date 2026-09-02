@@ -18,6 +18,13 @@ week, everything you did before last week is still reachable from inside it.
 dsh plugin --profile web add dsh-deja
 ```
 
+From the repository instead of npm — the root manifest re-exports this
+directory, so either form works:
+
+```sh
+dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
+```
+
 The plugin runs the `deja` binary. It is pulled in as a dependency, so npm
 installs it with the plugin; a `deja` already on `PATH` is used as-is, and
 `DEJA_BIN` overrides both.
