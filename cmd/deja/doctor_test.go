@@ -486,13 +486,28 @@ func TestDoctorDeepCleanAndDrift(t *testing.T) {
 		t.Fatalf("missing clean deep section:\n%s", got)
 	}
 
+	// One transcript gone, its directory still there: the client's cleanup,
+	// which the index keeps on purpose — not drift, and not a reason to
+	// rebuild, since a rebuild is what would lose it (#2970).
 	if err := os.Remove(src); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := runDoctor(&out, []string{"--deep", "--offline"}, nil, dir); err != nil {
+		t.Fatalf("a transcript the client cleaned up must not fail deep doctor: %v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "kept") || strings.Contains(out.String(), "orphan-file") {
+		t.Fatalf("a kept transcript is reported as drift, or not at all:\n%s", out.String())
+	}
+
+	// The whole store gone is drift.
+	if err := os.RemoveAll(filepath.Dir(src)); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
 	err := runDoctor(&out, []string{"--deep", "--offline"}, nil, dir)
 	if err == nil || !strings.Contains(err.Error(), "index drift") {
-		t.Fatalf("deleted source must fail deep doctor, err=%v", err)
+		t.Fatalf("a vanished store must fail deep doctor, err=%v", err)
 	}
 	if !strings.Contains(out.String(), "orphan-file") || !strings.Contains(out.String(), "deja index --rebuild") {
 		t.Fatalf("drift output missing finding or fix hint:\n%s", out.String())

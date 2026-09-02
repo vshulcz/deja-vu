@@ -42,24 +42,34 @@ func buildWithFiles(t *testing.T, ids ...string) (proj, dir string) {
 func TestTheEvictedCounterBelongsToTheLastBuild(t *testing.T) {
 	proj, dir := buildWithFiles(t, "a", "b", "c")
 
-	for _, id := range []string{"a", "b"} {
-		if err := os.Remove(filepath.Join(proj, id+".jsonl")); err != nil {
-			t.Fatal(err)
-		}
+	// Whole stores, not single files: a file that goes while its directory
+	// stays is kept on purpose now (#2970), and an eviction is a store that
+	// went away. First a second store with one file, then the first with
+	// three; the second count must be its own three, not four.
+	other := filepath.Join(filepath.Dir(proj), "other")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeLines(t, filepath.Join(other, "d.jsonl"), claudeLine("d", "2026-01-04T00:00:00Z", "delta text"))
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(other); err != nil {
+		t.Fatal(err)
 	}
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
 	// Deliberately not read: the leftover is what the next build must not
 	// inherit.
-	if err := os.Remove(filepath.Join(proj, "c.jsonl")); err != nil {
+	if err := os.RemoveAll(proj); err != nil {
 		t.Fatal(err)
 	}
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if n := ReportEvictedFiles(); n != 1 {
-		t.Errorf("the second eviction reported %d files, want its own 1", n)
+	if n := ReportEvictedFiles(); n != 3 {
+		t.Errorf("the second eviction reported %d files, want its own 3", n)
 	}
 }
 

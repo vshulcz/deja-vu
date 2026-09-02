@@ -177,6 +177,42 @@ func HarnessSharedCounts(dir string) map[string]int {
 	return out
 }
 
+// HarnessKeptCounts is how many indexed sessions per harness came from a
+// transcript that is no longer on disk while its directory still is — the
+// client's own cleanup, kept on purpose (#2970). doctor prints it beside the
+// session count, since "1 file, 2 indexed sessions" reads as a miscount
+// otherwise.
+func HarnessKeptCounts(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	gone := map[string]bool{}
+	out := map[string]int{}
+	for _, meta := range m.Sessions {
+		if meta.Path == "" {
+			continue
+		}
+		g, seen := gone[meta.Path]
+		if !seen {
+			_, err := os.Stat(meta.Path)
+			g = os.IsNotExist(err)
+			if g {
+				_, derr := os.Stat(filepath.Dir(meta.Path))
+				g = derr == nil
+			}
+			gone[meta.Path] = g
+		}
+		if g {
+			out[meta.Harness]++
+		}
+	}
+	return out
+}
+
 func Redactions(dir string) (RedactionStats, error) {
 	if dir == "" {
 		dir = DefaultDir()

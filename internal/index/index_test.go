@@ -576,10 +576,12 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if err := Ensure(idx, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log.String(), "removed_files=1") {
-		t.Fatalf("want removed file log, got %q", log.String())
+	// The file is gone and its directory is not: that is the client's
+	// cleanup, and the session is kept on purpose (#2970).
+	if !strings.Contains(log.String(), "still searchable") {
+		t.Fatalf("want the kept-transcript line, got %q", log.String())
 	}
-	if got, err := Recent(idx, 10); err != nil || len(got) != 0 {
+	if got, err := Recent(idx, 10); err != nil || len(got) != 1 {
 		t.Fatalf("recent after remove=%#v err=%v", got, err)
 	}
 }

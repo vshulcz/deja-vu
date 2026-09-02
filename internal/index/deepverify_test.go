@@ -103,6 +103,10 @@ func TestDeepVerifyFlagsShrunkSource(t *testing.T) {
 	}
 }
 
+// A transcript deleted while its directory stays is the client's cleanup, and
+// the index keeps it on purpose (#2970): listed under Kept, not a finding,
+// because the finding's remedy — a rebuild — is what would lose it. A tree
+// that is gone whole is still drift.
 func TestDeepVerifyFlagsDeletedSource(t *testing.T) {
 	dir, src := deepFixture(t)
 	if err := os.Remove(src); err != nil {
@@ -112,8 +116,21 @@ func TestDeepVerifyFlagsDeletedSource(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if findingKinds(r)["orphan-file"] {
+		t.Fatalf("a transcript the client cleaned up was reported as drift: %#v", r.Findings)
+	}
+	if len(r.Kept) != 1 || r.Kept[0] != src {
+		t.Fatalf("kept = %v, want the deleted transcript", r.Kept)
+	}
+	if err := os.RemoveAll(filepath.Dir(src)); err != nil {
+		t.Fatal(err)
+	}
+	r, err = DeepVerify(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !findingKinds(r)["orphan-file"] {
-		t.Fatalf("want orphan-file for deleted source, got %#v", r.Findings)
+		t.Fatalf("want orphan-file once the whole tree is gone, got %#v", r.Findings)
 	}
 }
 

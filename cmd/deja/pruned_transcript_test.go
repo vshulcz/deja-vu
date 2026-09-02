@@ -8,16 +8,17 @@ import (
 	"time"
 )
 
-// A harness that prunes an old transcript is the ordinary case, and deja's
-// answer to it is eviction: the index mirrors the stores, and what is kept back
-// is only the file on a volume that is not mounted (#900) or a tree that was
-// renamed. The tests beside this one cover those two; nothing covered the plain
-// one — one file deleted from a store that is otherwise still there — which is
-// the case a person meets when a harness rotates its history or they tidy up.
+// A harness that prunes an old transcript is the ordinary case — Claude Code
+// does it to everything older than cleanupPeriodDays, 30 by default — and
+// deja's answer to it is to keep what it indexed: the file is gone, the
+// session is not, and `deja forget` is the way to drop one on purpose. Only a
+// store that goes away whole leaves the index; a file on a volume that is not
+// mounted (#900) or a tree that was renamed were already kept.
 //
-// Pinned rather than argued: a change of mind here is a decision about what
-// deja is for, and it should be made on purpose rather than drift in.
-func TestAPrunedTranscriptLeavesTheIndexAndItsNeighbourStays(t *testing.T) {
+// Pinned rather than argued: this is a decision about what deja is for, made
+// on purpose on 2026-09-02 (#2970) after the index had followed the file out
+// the door since the first release.
+func TestAPrunedTranscriptStaysInTheIndexAndItsNeighbourToo(t *testing.T) {
 	tmp := hermeticEnv(t)
 	root := filepath.Join(tmp, "claude", "projects", "-tmp-app")
 	if err := os.MkdirAll(root, 0o755); err != nil {
@@ -48,21 +49,21 @@ func TestAPrunedTranscriptLeavesTheIndexAndItsNeighbourStays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The pass says one file went, and does not claim the store is gone: this
-	// is a prune, not an unplugged disk.
-	if !strings.Contains(said, "removed_files=1") {
-		t.Errorf("the pass does not report the file that went:\n%s", said)
+	// The pass says the file went and the session did not, and does not
+	// claim the store is gone: this is a prune, not an unplugged disk.
+	if !strings.Contains(said, "no longer on disk") || !strings.Contains(said, "still searchable") {
+		t.Errorf("the pass does not say what it kept:\n%s", said)
 	}
 	if strings.Contains(said, "is gone, and") {
 		t.Errorf("a pruned file was reported as a store that went away whole:\n%s", said)
 	}
 
 	out, _ := captureRun(t, "search", "migration")
-	if strings.Contains(out, "s1") {
-		t.Errorf("the pruned session is still answered from the index:\n%s", out)
+	if !strings.Contains(out, "s1") {
+		t.Errorf("the pruned session left the index with its file:\n%s", out)
 	}
 	if !strings.Contains(out, "s2") {
-		t.Errorf("the session whose transcript is still there went with it:\n%s", out)
+		t.Errorf("the session whose transcript is still there went too:\n%s", out)
 	}
 
 	// And nothing keeps naming the file: doctor counts what is there.
@@ -74,7 +75,7 @@ func TestAPrunedTranscriptLeavesTheIndexAndItsNeighbourStays(t *testing.T) {
 	}
 	// The store's own row, whole, so the count cannot be read out of a larger
 	// number somewhere else on the screen.
-	if !strings.Contains(doc, "(1 file, 1 indexed session)") {
-		t.Errorf("doctor does not count the one file and session that are left:\n%s", doc)
+	if !strings.Contains(doc, "(1 file, 2 indexed sessions, 1 from a transcript no longer on disk)") {
+		t.Errorf("doctor does not say that one of the two sessions has no file any more:\n%s", doc)
 	}
 }

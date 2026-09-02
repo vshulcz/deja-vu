@@ -401,6 +401,10 @@ permission walk was cut short or blocked carries `partial` or `unchecked`.
 stores, and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
 
+Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
+their directory is — the client's own cleanup, kept on purpose. It is not a
+finding: nothing about the index is wrong, and a rebuild would lose them.
+
 Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `--offline`), or `unknown`. `policy.state` is `default`, `active` or
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and

@@ -111,6 +111,7 @@ find ~/.claude/projects -name '*.jsonl' -size +50M</pre>
 <h2>Claude Code deletes them for you</h2>
 <p>By default Claude Code keeps a transcript for <b>30 days</b> and then removes it — the setting is <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code>, documented under <a href="https://code.claude.com/docs/en/data-usage#data-retention">data retention</a>. Nothing announces it; people notice when <code>--resume</code> no longer lists a session they had in June. If you want the files to stay, raise the number before the month is up:</p>
 <pre>{ "cleanupPeriodDays": 3650 }</pre>
+<p>deja keeps what it indexed: a transcript the sweep removes stays searchable, because the index does not follow a single file out the door — only <code>deja forget</code> drops a session on purpose. The files themselves, though, are gone, and so is <code>--resume</code> for them.</p>
 <p>The sweep is Claude Code's own, not a cron job, and it pauses whenever the client cannot safely determine the retention period — which is why the machine measured above, on the default setting, still holds 69 files older than 31 days. Do not read that as safety. The documented behaviour is deletion after 30 days, and the day the sweep runs is the day the June session goes.</p>
 
 <h2>Can you delete them yourself?</h2>

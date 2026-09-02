@@ -64,7 +64,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"failed_files": true, "last_error": true,
 		// index.DeepReport / index.DeepFinding
 		"files_checked": true, "sessions_indexed": true, "sampled_files": true,
-		"sampled_postings": true, "stale": true, "findings": true,
+		"sampled_postings": true, "stale": true, "findings": true, "kept": true,
 		"kind": true, "detail": true,
 	}
 	emitted := map[string]bool{}

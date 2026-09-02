@@ -33,6 +33,10 @@ type DeepReport struct {
 	// Findings mean the index disagrees with what it already claimed to hold.
 	Stale    []string      `json:"stale,omitempty"`
 	Findings []DeepFinding `json:"findings,omitempty"`
+	// Kept lists files the manifest holds that are no longer on disk while
+	// their store is: transcripts the client cleaned up, kept in the index on
+	// purpose. Not a finding — nothing is wrong with the index (#2970).
+	Kept []string `json:"kept,omitempty"`
 }
 
 func (r DeepReport) Clean() bool { return len(r.Findings) == 0 }
@@ -79,10 +83,21 @@ func DeepVerify(dir string) (DeepReport, error) {
 		}
 	}
 	for p := range m.Files {
-		if _, ok := current[p]; !ok {
-			report.Findings = append(report.Findings, DeepFinding{Kind: "orphan-file", Detail: p + " is in the manifest but no longer on disk"})
+		if _, ok := current[p]; ok {
+			continue
 		}
+		// A file that is gone while its directory is still there is the
+		// client's cleanup or a deletion by hand, and the index keeps those
+		// on purpose (#2970) — so it is not drift, and the fix the finding
+		// prescribes, a rebuild, is exactly what would lose them. A tree that
+		// is gone whole is still reported.
+		if _, err := os.Stat(filepath.Dir(p)); err == nil {
+			report.Kept = append(report.Kept, p)
+			continue
+		}
+		report.Findings = append(report.Findings, DeepFinding{Kind: "orphan-file", Detail: p + " is in the manifest but no longer on disk"})
 	}
+	sort.Strings(report.Kept)
 	sort.Strings(report.Stale)
 
 	// 2. Parse drift: deterministically sample in-sync source files (stale

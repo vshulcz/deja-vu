@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- A transcript the client deleted stays in the index. Claude Code removes
+  transcripts older than `cleanupPeriodDays` (30 by default), and the next
+  incremental pass used to drop the session with the file. A file that is gone
+  while its store is still there is now kept and stays searchable; `deja
+  forget` remains the way to drop one on purpose. A store that vanishes whole
+  is dropped as before, and a full `deja index --rebuild` still reads only what
+  is on disk. (#2970)
 - The proof after `deja install --auto` opens with the error this machine keeps
   hitting — "this machine has hit `command not found: timeout` in 18 sessions"
   — above the recent-sessions list. The same rule and threshold as `friction`;

@@ -122,8 +122,11 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 {
-		t.Fatalf("export n=%d, want 1 native record only", n)
+	// Two native records: local2, and local1, whose file was removed while
+	// its directory stayed and which the index therefore kept (#2970). What
+	// must not be here is the imported one.
+	if n != 2 {
+		t.Fatalf("export n=%d, want the 2 native records only", n)
 	}
 	matches, err := filepath.Glob(filepath.Join(outDir, "*.jsonl"))
 	if err != nil {
@@ -146,8 +149,8 @@ func TestImportedRecordsSurviveRebuildAndUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 {
-		t.Fatalf("full export n=%d, want 1 native record", n)
+	if n != 2 {
+		t.Fatalf("full export n=%d, want the 2 native records", n)
 	}
 	matches, err = filepath.Glob(filepath.Join(fullDir, "*.jsonl"))
 	if err != nil {

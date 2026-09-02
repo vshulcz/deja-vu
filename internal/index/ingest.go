@@ -2637,8 +2637,36 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			}
 		}
 	}
-	// Counted after the keep-back above: records that came off an unmounted
-	// volume are still in the index, so they did not go away.
+	// A file that is gone while the directory around it is still there is
+	// not a store that went away: it is Claude Code's own cleanup, which
+	// deletes a transcript once it is older than cleanupPeriodDays (30 by
+	// default), or a deletion by hand. Either way the index keeps what it
+	// read — outlasting the client's housekeeping is the one thing a memory
+	// over transcripts can offer against a 30-day default, and `deja forget`
+	// is the deliberate path for a session that must go (#2970). A tree that
+	// is gone whole is an uninstall or a move, and is dropped as before.
+	kept := map[string]bool{}
+	for p := range removed {
+		if _, err := os.Stat(filepath.Dir(p)); err != nil {
+			continue
+		}
+		if of, ok := old.Files[p]; ok {
+			files[p] = of
+			delete(removed, p)
+			kept[p] = true
+		}
+	}
+	// Said once per pass, and only once the rename filter below has had its
+	// say — except when nothing else changed, in which case there is no
+	// rename to filter and the pass returns early.
+	sayKept := func() {
+		if len(kept) > 0 && progress != nil {
+			fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja forget <id>` drops one for good\n", len(kept), pluralS(len(kept)))
+		}
+	}
+	// Counted after the keep-backs above: records that came off an unmounted
+	// volume, or out of a file the client cleaned up, are still in the index,
+	// so they did not go away.
 	evicted.Add(int64(len(removed)))
 	if progress != nil {
 		for _, g := range gone {
@@ -2660,6 +2688,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 	}
 	if len(changed) == 0 && len(removed) == 0 {
+		sayKept()
 		lastIngestFiles = 0
 		return nil
 	}
@@ -2674,6 +2703,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if err != nil {
 			return fmt.Errorf("append: %w", err)
 		}
+		sayKept()
 		if progress != nil {
 			line := fmt.Sprintf("deja: updated %d file%s (%d new message%s)", filesTouched, pluralS(filesTouched), messages, pluralS(messages))
 			// After the first build every run a person sees is this one, so a
@@ -2732,6 +2762,25 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true
 	}
+	// A kept file whose session arrived again from another path is a rename,
+	// not a cleanup: the client moved the transcript, and keeping the old copy
+	// would make the session its own second copy (#1086). Those go back to
+	// being removed, so the records under the old path are dropped below.
+	// Only when the arrival sits in the same directory: two projects can
+	// share a filename-derived id (#699), and that is a collision, not the
+	// kept session moving.
+	arrivedIn := map[string]string{}
+	for _, r := range replacements {
+		arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+	}
+	for key, meta := range old.Sessions {
+		if kept[meta.Path] && replaceKeys[key] && arrivedIn[key] == filepath.Dir(meta.Path) {
+			removed[meta.Path] = true
+			delete(files, meta.Path)
+			delete(kept, meta.Path)
+		}
+	}
+	sayKept()
 	if progress != nil {
 		fmt.Fprintf(progress, "deja: incremental index changed_files=%d removed_files=%d sessions=%d\n", len(changed), len(removed), len(replacements))
 	}

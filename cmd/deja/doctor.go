@@ -147,6 +147,7 @@ func doctorDeep(w io.Writer, r index.DeepReport) {
 	if len(r.Stale) > 0 {
 		fmt.Fprintf(w, "  stale    %s changed since last pass — `deja index` will absorb them\n", doctorCount(len(r.Stale), "source"))
 	}
+	doctorKept(w, &r)
 	if r.Clean() {
 		// What this pass compares is message counts per session, plus the
 		// structure around them: sizes, magic numbers, postings that resolve.
@@ -174,6 +175,16 @@ func doctorDeep(w io.Writer, r index.DeepReport) {
 		fmt.Fprintf(w, "  drift    [%s] %s\n", f.Kind, f.Detail)
 	}
 	fmt.Fprintf(w, "  status   %s — run `deja index --rebuild`\n", doctorCount(len(r.Findings), "finding"))
+}
+
+// doctorKept says which indexed transcripts are no longer on disk and are kept
+// on purpose — the client's cleanup, not drift (#2970). Printed before the
+// verdict so a reader sees it is not what any finding is about.
+func doctorKept(w io.Writer, r *index.DeepReport) {
+	if r == nil || len(r.Kept) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "  kept     %d transcript%s no longer on disk, still searchable — `deja forget <id>` drops one for good\n", len(r.Kept), pluralS(len(r.Kept)))
 }
 
 func deepDriftErr(r *index.DeepReport) error {
@@ -574,6 +585,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	indexed := index.HarnessSessionCounts(dir)
 	fromElsewhere := index.ImportedSessionCounts(dir)
 	sharedRows := index.HarnessSharedCounts(dir)
+	keptRows := index.HarnessKeptCounts(dir)
 
 	// The same inspection the JSON form reports, so one command does not give
 	// two answers about one store: `found` here and `unreadable` there (#999).
@@ -649,6 +661,13 @@ func doctorHarnesses(w io.Writer, dir string) {
 				// sharing an id. The manifest knows which (#1101).
 				if sh := sharedRows[name]; sh > 0 {
 					detail += fmt.Sprintf(", %d of them shared by two transcripts", sh)
+				}
+				// And the other way the numbers disagree: a session whose
+				// transcript the client cleaned up, kept on purpose (#2970).
+				if k := keptRows[name]; k == 1 {
+					detail += ", 1 from a transcript no longer on disk"
+				} else if k > 1 {
+					detail += fmt.Sprintf(", %d from transcripts no longer on disk", k)
 				}
 			case n:
 				detail += doctorCount(n, "indexed session") + " from elsewhere"
