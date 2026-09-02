@@ -100,3 +100,34 @@ func TestGuidePagesShareTheirNavigation(t *testing.T) {
 		}
 	}
 }
+
+// sitemap.txt is the same list as sitemap.xml, one URL per line. Search Console
+// reported the XML as "could not be processed" with zero URLs found, twice,
+// while the file validated against the sitemaps.org schema and Googlebot's own
+// user agent fetched it whole. A text sitemap has nothing to parse, so it is
+// the second way in — and it goes stale the moment someone adds a page to only
+// one of the two.
+func TestTextSitemapMatchesTheXMLOne(t *testing.T) {
+	root := filepath.Join("..", "..")
+	xml, err := os.ReadFile(filepath.Join(root, "docs", "sitemap.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	txt, err := os.ReadFile(filepath.Join(root, "docs", "sitemap.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []string
+	for _, m := range regexp.MustCompile(`<loc>([^<]+)</loc>`).FindAllStringSubmatch(string(xml), -1) {
+		want = append(want, m[1])
+	}
+	got := strings.Split(strings.TrimSpace(string(txt)), "\n")
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("docs/sitemap.txt lists %d URLs and docs/sitemap.xml %d, or in a different order — regenerate the text one from the XML", len(got), len(want))
+	}
+	for _, u := range got {
+		if !strings.HasPrefix(u, "https://vshulcz.github.io/deja-vu/") || strings.ContainsAny(u, " \t") {
+			t.Errorf("docs/sitemap.txt has a line that is not one of our URLs: %q", u)
+		}
+	}
+}

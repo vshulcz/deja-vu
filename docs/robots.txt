@@ -2,7 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://vshulcz.github.io/deja-vu/sitemap.xml
-
-# For agents rather than crawlers: a map of this site in one file.
-# https://llmstxt.org
-# https://vshulcz.github.io/deja-vu/llms.txt
+Sitemap: https://vshulcz.github.io/deja-vu/sitemap.txt
