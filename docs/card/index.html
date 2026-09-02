@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Turn your deja stats card into a PNG — deja-vu</title>
+<meta name="description" content="deja stats --card writes an SVG. Drop it here to get a PNG you can post. The conversion happens in your browser; the file is never uploaded.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/card/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Turn your deja stats card into a PNG">
+<meta property="og:description" content="Drop the SVG, get a PNG. Runs in your browser — the file is never uploaded.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/card/">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0f10">
+<meta name="color-scheme" content="dark light">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<style>
+.cardpage{max-width:860px;margin:0 auto;padding:8vh 24px 10vh}
+.cardpage h1{margin:0 0 6px}
+.cardpage .lede{opacity:.75;margin:0 0 28px}
+#drop{border:1px dashed #2b3540;border-radius:14px;padding:38px 24px;text-align:center;
+  font-family:var(--mono);cursor:pointer;transition:border-color .15s,background .15s}
+#drop:hover,#drop.over{border-color:#8787af;background:rgba(135,135,175,.06)}
+#drop input{display:none}
+#out{margin-top:26px;display:none}
+#out img{max-width:100%;border-radius:12px;display:block}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:16px}
+.btn{font-family:var(--mono);font-size:14px;padding:9px 16px;border-radius:9px;
+  border:1px solid #2b3540;background:transparent;color:inherit;cursor:pointer}
+.btn.primary{border-color:#8787af}
+.btn:disabled{opacity:.45;cursor:default}
+#err{color:#e06c75;font-family:var(--mono);font-size:14px;margin-top:14px;display:none}
+.note{opacity:.6;font-size:14px;margin-top:26px}
+.cardpage pre{margin:10px 0 0}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+
+<div class="cardpage">
+<h1>Your stats card, as a PNG</h1>
+<p class="lede">The card <code>deja</code> draws is an SVG, which a README renders and every social site refuses. This turns it into a PNG. The conversion runs in this page — the file never leaves your machine.</p>
+
+<pre>deja stats --card deja-stats.svg</pre>
+
+<div id="drop" tabindex="0" role="button" aria-label="Choose or drop your card SVG">
+  drop <b>deja-stats.svg</b> here, or click to choose
+  <input id="file" type="file" accept=".svg,image/svg+xml">
+</div>
+<div id="err"></div>
+
+<div id="out">
+  <div class="row">
+    <button id="save" class="btn primary">download PNG</button>
+    <button id="copy" class="btn">copy to clipboard</button>
+    <span id="dims" style="opacity:.6;font-family:var(--mono);font-size:13px"></span>
+  </div>
+  <div class="row"><img id="preview" alt="your stats card"></div>
+</div>
+
+<p class="note">Rendered at 2× so it stays sharp on a phone. Nothing is uploaded: the SVG is read with <code>FileReader</code> and drawn to a canvas locally. If you would rather not trust that, the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/card/index.html">script on this page</a> is short enough to read.</p>
+<p class="note">No card yet? <a href="../guide/getting-started.html">Install deja</a>, then run the command above — it reads the sessions your agents already wrote to disk.</p>
+</div>
+
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+
+<script>
+(function () {
+  var drop = document.getElementById('drop'), file = document.getElementById('file');
+  var out = document.getElementById('out'), preview = document.getElementById('preview');
+  var save = document.getElementById('save'), copy = document.getElementById('copy');
+  var dims = document.getElementById('dims'), err = document.getElementById('err');
+  var blob = null, name = 'deja-stats.png';
+
+  function fail(msg) { err.textContent = msg; err.style.display = 'block'; out.style.display = 'none'; }
+
+  // The card's own dimensions, read out of the document. width and height are
+  // what deja writes; viewBox is the fallback for a card drawn by something
+  // else. Nothing is guessed: a wrong guess is a stretched PNG that looks like
+  // the tool drew it that way.
+  function cardSize(text) {
+    var w = /<svg[^>]*\swidth="(\d+(?:\.\d+)?)"/.exec(text);
+    var h = /<svg[^>]*\sheight="(\d+(?:\.\d+)?)"/.exec(text);
+    if (w && h) { return { w: +w[1], h: +h[1] }; }
+    var vb = /<svg[^>]*\sviewBox="\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)/.exec(text);
+    if (vb) { return { w: +vb[1], h: +vb[2] }; }
+    return null;
+  }
+
+  function render(f) {
+    err.style.display = 'none';
+    if (!f) return;
+    if (!/svg/.test(f.type) && !/\.svg$/i.test(f.name)) { return fail('that is not an SVG — deja stats --card writes one'); }
+    name = f.name.replace(/\.svg$/i, '') + '.png';
+    var reader = new FileReader();
+    reader.onerror = function () { fail('could not read the file'); };
+    reader.onload = function () {
+      var url = URL.createObjectURL(new Blob([reader.result], { type: 'image/svg+xml' }));
+      var size = cardSize(reader.result);
+      if (!size) { URL.revokeObjectURL(url); return fail('that SVG says no size — the card deja writes carries width and height'); }
+      var img = new Image();
+      img.onload = function () {
+        // The SVG's own size, not the decoded image's: a browser that cannot
+        // work one out hands back 0, or its own default, and the card comes
+        // out stretched.
+        var scale = 2, w = size.w, h = size.h;
+        var canvas = document.createElement('canvas');
+        canvas.width = w * scale; canvas.height = h * scale;
+        var ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#0b0f10';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (b) {
+          // An SVG that pulls in anything from outside itself taints the
+          // canvas, and then this returns null rather than raising. The card
+          // deja writes references nothing, so say what a null means here.
+          if (!b) { return fail('the browser would not encode this one — an SVG that loads an external image or font cannot be exported'); }
+          blob = b;
+          preview.src = URL.createObjectURL(b);
+          dims.textContent = canvas.width + '×' + canvas.height;
+          out.style.display = 'block';
+        }, 'image/png');
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); fail('that SVG did not render — is it the card deja wrote?'); };
+      img.src = url;
+    };
+    reader.readAsText(f);
+  }
+
+  drop.addEventListener('click', function () { file.click(); });
+  drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } });
+  file.addEventListener('change', function () { render(file.files[0]); });
+  ['dragenter', 'dragover'].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); });
+  });
+  ['dragleave', 'drop'].forEach(function (t) {
+    drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('over'); });
+  });
+  drop.addEventListener('drop', function (e) { render(e.dataTransfer.files[0]); });
+
+  save.addEventListener('click', function () {
+    if (!blob) return;
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+  copy.addEventListener('click', function () {
+    if (!blob || !navigator.clipboard || !window.ClipboardItem) { copy.textContent = 'not supported here'; return; }
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(function () {
+      copy.textContent = 'copied';
+      setTimeout(function () { copy.textContent = 'copy to clipboard'; }, 1600);
+    }, function () { copy.textContent = 'clipboard refused'; });
+  });
+})();
+</script>
+</body>
+</html>

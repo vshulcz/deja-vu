@@ -135,7 +135,9 @@ to local files, and deja turns those files into one memory layer all of them rea
 ### Your own work, wrapped
 
 `deja stats --card` draws it in the terminal; give it a filename and it writes an
-SVG for a profile README.
+SVG for a profile README. To post it anywhere else, [turn it into a
+PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
+browser.
 
 <p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
