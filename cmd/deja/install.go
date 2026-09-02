@@ -399,11 +399,6 @@ func printInstallProof(dir string) {
 	printMemoryProofOf(dir, "deja already knows this machine:", nil, recurringErrorLine(dir))
 }
 
-// printMemoryProof is that same proof under a caller's heading. `sync import`
-// ends the move to a new machine and said only "imported 59000 records" —
-// deja's own unit, and nothing a person can check (#929).
-func printMemoryProof(dir, heading string) { printMemoryProofOf(dir, heading, nil, "") }
-
 // printMemoryProofOf is the proof narrowed to the rows a caller can honestly
 // claim. `sync import` says "from the machine you came from" and was handed
 // the recent list, so on a batch that added nothing visible it offered this
