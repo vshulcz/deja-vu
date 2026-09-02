@@ -59,8 +59,26 @@ func cliSkillPath() string {
 	return filepath.Join(homeDir(), ".agents", "skills", cliSkillName, "SKILL.md")
 }
 
+// cliSkillMeta is what a skill registry reads to know what the skill needs:
+// ClawHub serves this file as vshulcz/deja-search and checks the declared
+// binary and install specs against what the skill does. The agentskills.io
+// shape, so other readers ignore it.
+const cliSkillMeta = `metadata:
+  openclaw:
+    homepage: https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html
+    requires:
+      bins:
+        - deja
+    install:
+      - kind: brew
+        formula: deja-vu
+        bins: [deja]
+      - kind: node
+        package: "@vshulcz/deja-vu"
+        bins: [deja]`
+
 func cliSkillFile() string {
-	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n---\n\n" + cliSkillBody + "\n"
+	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n" + cliSkillMeta + "\n---\n\n" + cliSkillBody + "\n"
 }
 
 // writeCLISkill puts the skill in place. Called by warmup, which is the only

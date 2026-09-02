@@ -50,9 +50,7 @@ const (
 	// straight from the default branch, so its version is the one a
 	// listing shows.
 	agentPlugin = "plugin.json"
-	// The root skill, which is what ClawHub serves as vshulcz/deja-search:
-	// YAML frontmatter, so it has its own renderer.
-	clawSkill = "skills/deja-search/SKILL.md"
+
 	// The Kimi Code plugin is packed into the release archive, so the version
 	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
 	// day it was added — the same way the Codex plugin did, and for the same
@@ -149,7 +147,6 @@ func write(root string, p pins) error {
 		kimiPacked:      renderPluginVersion(kimiPacked),
 		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:     renderPluginVersion(agentPlugin),
-		clawSkill:       renderYAMLVersion(clawSkill),
 	} {
 		body, err := render(p)
 		if err != nil {
@@ -271,23 +268,7 @@ func renderPluginVersion(path string) func(pins) ([]byte, error) {
 	}
 }
 
-// renderYAMLVersion pins a `version:` line in YAML frontmatter — the ClawHub
-// skill pack's SKILL.md.
-func renderYAMLVersion(path string) func(pins) ([]byte, error) {
-	return func(p pins) ([]byte, error) {
-		b, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		if !yamlVersion.MatchString(string(b)) {
-			return nil, fmt.Errorf("%s has no version line to pin", path)
-		}
-		return []byte(yamlVersion.ReplaceAllString(string(b), "version: "+p.version)), nil
-	}
-}
-
 var (
-	yamlVersion = regexp.MustCompile(`(?m)^version: .*$`)
 	versionLine = regexp.MustCompile(`(?m)^PackageVersion: .*$`)
 	// (?m) because a tag reference is often the last thing on its line: the
 	// ReleaseNotesUrl in the winget locale sat at v0.16.1 through three
@@ -358,7 +339,6 @@ func runCheck(root string) error {
 		kimiPacked:      renderPluginVersion(kimiPacked),
 		kimiConst:       renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:     renderPluginVersion(agentPlugin),
-		clawSkill:       renderYAMLVersion(clawSkill),
 	} {
 		want, err := render(p)
 		if err != nil {

@@ -1,7 +1,6 @@
 ---
 name: deja-search
 description: Search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.
-version: 0.19.2
 metadata:
   openclaw:
     homepage: https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html

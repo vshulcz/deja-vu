@@ -124,5 +124,6 @@ clawhub skill publish skills/deja-search
 ```
 
 Its frontmatter declares the `deja` binary and how to install it, which is what
-ClawHub's security analysis checks; `scripts/pinmanifests` keeps its `version:`
-in step with the release, so a publish after a release ships the current one.
+ClawHub's security analysis checks. The version is given at publish time; the
+file is the same one `deja warmup` writes to `~/.agents/skills`, and a test
+keeps the two identical.
