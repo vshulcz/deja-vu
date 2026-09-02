@@ -10,7 +10,9 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 
 - [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire an agent, and the first query
 - [Why agents forget](https://vshulcz.github.io/deja-vu/guide/forgetting.html): what ends with a session and what survives on disk
+- [Does my agent remember previous conversations](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html): what Claude Code, Codex and Cursor keep between sessions, and what they do not
 - [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the twenty agents writes, and its format
+- [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the six MCP tools, and what each harness supports
 
