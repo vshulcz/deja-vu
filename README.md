@@ -436,7 +436,7 @@ sessions of every agent, and `deja view` opens the whole history as one local pa
 for each agent: [where sessions are stored](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 
 **My Claude Code session history disappeared. Is it gone?** Claude Code deletes transcripts
-older than 30 days (`cleanupPeriodDays` in `~/.claude/settings.json`), and `/resume` lists
+older than 30 days (`cleanupPeriodDays` in `~/.claude/settings.json`), and `claude --resume` lists
 only what is left. A session deja indexed before the cleanup stays searchable after the
 file is gone. Details: [session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
 
