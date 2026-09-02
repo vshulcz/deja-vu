@@ -57,6 +57,16 @@ dsh plugin --profile web add dsh-deja
 `deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
 [`extensions/`](extensions)。
 
+同一套搜索也是一个 skill，任何会读 `SKILL.md` 的智能体都能装：
+
+```sh
+npx skills add https://github.com/vshulcz/deja-vu --skill deja-search   # skills CLI：Claude Code、Cursor、Goose、Copilot…
+openclaw skills install @vshulcz/deja-search                            # ClawHub
+hermes skills install vshulcz/deja-vu/skills/deja-search                # Hermes
+```
+
+skill 调用的是上面装好的 `deja` 二进制，自己不带。
+
 其他安装方式：`brew install deja-vu`、
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
 `npx @vshulcz/deja-vu "查询词"` 先试试而不装任何东西。Windows 上安装脚本会退出并提示

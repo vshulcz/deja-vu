@@ -283,7 +283,7 @@ keeping those descriptions checked against the parsers.
 
 ### Harnesses with a package of their own
 
-`deja install --auto` wires all five of these like every other harness, and
+`deja install --auto` wires all six of these like every other harness, and
 that stays the shortest path. They also have a package in their own ecosystem,
 for people who install extensions there rather than from a CLI:
 
@@ -302,6 +302,16 @@ contribute only what is missing, and in Zed both halves use one server id, so
 there is nothing to have twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.
+
+The same search is also a skill, for any agent that loads a `SKILL.md`:
+
+```sh
+npx skills add https://github.com/vshulcz/deja-vu --skill deja-search   # skills CLI: Claude Code, Cursor, Goose, Copilot…
+openclaw skills install @vshulcz/deja-search                            # ClawHub
+hermes skills install vshulcz/deja-vu/skills/deja-search                # Hermes
+```
+
+The skill drives the `deja` binary from the install step above; it does not bundle one.
 
 ## Semantic recall (optional)
 
