@@ -695,7 +695,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 		detail := doctorCount(len(seen), "file")
 		unread, byRule := unplacedFiles(path, seen, skipped)
 		if byRule > 0 {
-			detail += fmt.Sprintf(", %d subagent transcripts skipped (DEJA_INCLUDE_SUBAGENTS=1)", byRule)
+			// The variable named the way it was read as the cause of the
+			// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
+			// wanted those transcripts indexed set the thing the line said
+			// was already set. It is the remedy, and it reads as one now.
+			detail += fmt.Sprintf(", %d subagent transcripts skipped — set DEJA_INCLUDE_SUBAGENTS=1 to index them", byRule)
 		}
 		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
