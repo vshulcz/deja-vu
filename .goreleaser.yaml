@@ -137,7 +137,11 @@ brews:
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/vshulcz/deja-vu
-    description: Persistent memory for your coding agents
+    # What people type into `brew search`, which matches names and
+    # descriptions: the old line said neither the agents nor the thing it
+    # searches, so `brew search claude` and `brew search session history`
+    # both missed us.
+    description: Search Claude Code, Codex and Cursor session history locally
     license: MIT
 
 # nfpms intentionally omitted for now; add .deb/.rpm packaging when distro packages are needed.
