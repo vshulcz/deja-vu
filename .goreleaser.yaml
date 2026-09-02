@@ -72,9 +72,16 @@ signs:
 
 # The nightly publishes a rolling `nightly` tag. Left visible, it becomes the
 # most recent tag and every version template downstream fails on it.
+#
+# The harness plugins are tagged in this repository too, and their names are not
+# semver: `copilot-plugin-0.19.2` became the newest tag and `goreleaser check`
+# failed on every pull request with "invalid semantic version". The glob covers
+# the ones added since as well, which is the point — a release tag here is
+# `vX.Y.Z` and anything else belongs to something that ships on its own.
 git:
   ignore_tags:
     - nightly
+    - "*-plugin-*"
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
