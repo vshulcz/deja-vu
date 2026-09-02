@@ -118,6 +118,22 @@ export function contributions(wiring, config = {}) {
   }
 }
 
+// argv builds the call for a query somebody typed, rather than handing the text
+// to deja as it stands.
+//
+// A query that starts with a dash is read as a flag: `deja search --no-verify`
+// exits on an unknown flag, run() turns a failed call into "", and the model is
+// told the history holds nothing about --no-verify while the sessions that
+// discuss it sit right there. A wrong answer, where an error would at least be
+// visible. `--` ends the flags.
+//
+// Sent only when the query needs it, so a deja too old to know the terminator
+// on this subcommand still answers every ordinary query.
+export function argv(cmd, flags, text) {
+  const arg = String(text)
+  return arg.startsWith("-") ? [cmd, ...flags, "--", arg] : [cmd, ...flags, arg]
+}
+
 // clampLimit keeps a model that asks for a hundred sessions from spending the
 // window on a tail nobody reads.
 export function clampLimit(value, fallback = 5) {

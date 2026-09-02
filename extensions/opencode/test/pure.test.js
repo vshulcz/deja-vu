@@ -1,11 +1,12 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
+  argv,
   clampLimit,
   cliPluginPath,
   contextText,
@@ -149,4 +150,47 @@ test("contributions fills the gaps and never repeats the installer", () => {
   assert.deepEqual(contributions({}, { tools: false }), { tools: false, recall: true })
   assert.deepEqual(contributions({}, { autoRecall: false }), { tools: true, recall: false })
   assert.deepEqual(contributions(undefined, {}), { tools: true, recall: true })
+})
+
+// deja's flag parser reads a query that starts with a dash as a flag, exits,
+// and the plugin turns the failed call into "" — which the model receives as
+// "nothing in this machine's history", while the sessions that discuss the flag
+// sit right there.
+test("a query that starts with a dash is not read as a flag", () => {
+  assert.deepEqual(argv("search", [], "--no-verify"), ["search", "--", "--no-verify"])
+  assert.deepEqual(argv("fix", [], "-race detected"), ["fix", "--", "-race detected"])
+  // The plugin's own flags stay ahead of the terminator, or deja reads them as
+  // part of the query.
+  assert.deepEqual(argv("search", ["--json", "--limit", "5"], "--all-matches"), [
+    "search",
+    "--json",
+    "--limit",
+    "5",
+    "--",
+    "--all-matches",
+  ])
+})
+
+test("the terminator is sent only when the query needs it", () => {
+  // A deja too old to know `--` on this subcommand would otherwise fail on
+  // every ordinary query, not just the ones that start with a dash.
+  assert.deepEqual(argv("search", ["--json"], "the checkout worker"), [
+    "search",
+    "--json",
+    "the checkout worker",
+  ])
+  assert.deepEqual(argv("blame", ["--json"], "internal/index/sync.go"), [
+    "blame",
+    "--json",
+    "internal/index/sync.go",
+  ])
+})
+
+test("every query the plugin sends goes through argv", () => {
+  // The rule is worth nothing if one call site passes its text straight
+  // through, which is how this got in.
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  for (const call of source.match(/ask\(\[[^\]]*\]/g) || []) {
+    assert.doesNotMatch(call, /String\(args\./, `${call} passes a query to deja without argv()`)
+  }
 })

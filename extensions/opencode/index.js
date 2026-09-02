@@ -14,6 +14,7 @@ import { join } from "node:path"
 import { accessSync, constants, existsSync, readFileSync } from "node:fs"
 
 import {
+  argv,
   clampLimit,
   cliPluginPath,
   configPaths,
@@ -166,7 +167,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         },
         async execute(args) {
           const limit = String(clampLimit(args.limit))
-          return answer(await ask(["search", "--json", "--limit", limit, String(args.query)]))
+          return answer(await ask(argv("search", ["--json", "--limit", limit], args.query)))
         },
       }),
       deja_session: tool({
@@ -176,7 +177,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           query: schema.string().describe("A query, or a session id prefix returned by deja_recall."),
         },
         async execute(args) {
-          return answer(await ask(["ctx", String(args.query)]))
+          return answer(await ask(argv("ctx", [], args.query)))
         },
       }),
       deja_blame: tool({
@@ -186,7 +187,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           path: schema.string().describe("Path to the file, absolute or relative to the project."),
         },
         async execute(args) {
-          return answer(await ask(["blame", String(args.path), "--json"]))
+          return answer(await ask(argv("blame", ["--json"], args.path)))
         },
       }),
       deja_fix: tool({
@@ -196,7 +197,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           error: schema.string().describe("The failing output, copied as it was printed."),
         },
         async execute(args) {
-          return answer(await ask(["fix", String(args.error)]))
+          return answer(await ask(argv("fix", [], args.error)))
         },
       }),
       deja_how: tool({
@@ -206,7 +207,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           what: schema.string().describe("The thing to run: a tool, a task, a script name."),
         },
         async execute(args) {
-          return answer(await ask(["how", String(args.what)]))
+          return answer(await ask(argv("how", [], args.what)))
         },
       }),
       deja_remember: tool({
@@ -216,7 +217,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
           text: schema.string().describe("The decision, in one or two sentences, with the reason it was taken."),
         },
         async execute(args) {
-          const written = await ask(["remember", String(args.text)])
+          const written = await ask(argv("remember", [], args.text))
           if (!installed) return MISSING
           return written || "deja did not record that."
         },
