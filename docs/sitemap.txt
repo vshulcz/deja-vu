@@ -40,6 +40,7 @@ https://vshulcz.github.io/deja-vu/guide/harnesses.html
 https://vshulcz.github.io/deja-vu/guide/privacy.html
 https://vshulcz.github.io/deja-vu/guide/benchmarks.html
 https://vshulcz.github.io/deja-vu/guide/compare.html
+https://vshulcz.github.io/deja-vu/guide/day-zero.html
 https://vshulcz.github.io/deja-vu/registry/README.html
 https://vshulcz.github.io/deja-vu/registry/aider.html
 https://vshulcz.github.io/deja-vu/registry/antigravity.html

@@ -110,6 +110,7 @@
 <a href="privacy.html">Privacy</a>
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html" aria-current="page">Compare</a>
+<a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
@@ -129,11 +130,11 @@
 <tr><td>Stored as</td><td class="us">verbatim, redacted</td><td>LLM facts</td><td>memory blocks</td><td>markdown</td><td>SQL rows</td><td>LLM summaries</td><td>events + vectors</td></tr>
 <tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>model or API</td></tr>
 <tr><td>Background process</td><td class="us y">none</td><td>server / cloud</td><td>server + Postgres</td><td>server / cloud</td><td class="y">none</td><td>worker</td><td>daemon, ports</td></tr>
-<tr><td>Coding agents</td><td class="us">17 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>frameworks</td><td>Claude Code, opencode, Antigravity, OpenClaw</td><td>via hooks</td></tr>
+<tr><td>Coding agents</td><td class="us">22 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>frameworks</td><td>Claude Code, opencode, Antigravity, OpenClaw</td><td>via hooks</td></tr>
 <tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>your DB</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
-<tr><td>Benchmark, harness in repo</td><td class="us">85.3% hit@1 LME-S · <a href="benchmarks.html">measured</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Benchmark, harness in repo</td><td class="us">85.3% hit@1 LME-S · <a href="benchmarks.html">measured</a> · <a href="day-zero.html">day zero vs four tools</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Install</td><td class="us">one binary</td><td>pip + keys</td><td>docker</td><td>pip / server</td><td>pip</td><td>npm + Claude</td><td>installer + deps</td></tr>
 <tr><td>License</td><td class="us">MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
 </table>
