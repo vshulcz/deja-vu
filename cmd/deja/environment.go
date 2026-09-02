@@ -189,7 +189,11 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 			"it is what this machine ran after that error before; check the rest or use an alternative " +
 			"before running into them again.")
 	} else {
-		b.WriteString("These are environment facts, not history: the tool or module is still missing. " +
+		// Not "the tool or module is still missing": friction is any error
+		// three projects keep hitting, and the block that reached this machine
+		// listed a compile error and an ssh timeout under that sentence. What
+		// is true of all of them is that nothing in the history cleared them.
+		b.WriteString("These are environment facts, not history: nothing here has cleared them yet. " +
 			"Check or use an alternative before running into them again.")
 	}
 	return b.String(), projects

@@ -1,12 +1,37 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
+
+// injectedBytes is the size of what the hook actually put in front of the
+// model. In plain mode that is the framed block on stdout; in the JSON shape it
+// is the additionalContext the reply carries.
+func injectedBytes(t *testing.T, hookOutput string) int {
+	t.Helper()
+	text := strings.TrimSpace(hookOutput)
+	if strings.HasPrefix(text, "{") {
+		var reply struct {
+			HookSpecificOutput struct {
+				AdditionalContext string `json:"additionalContext"`
+			} `json:"hookSpecificOutput"`
+		}
+		if err := json.Unmarshal([]byte(text), &reply); err != nil {
+			t.Fatalf("hook reply is not the shape the statusline counts: %v\n%s", err, hookOutput)
+		}
+		text = reply.HookSpecificOutput.AdditionalContext
+	}
+	if text == "" {
+		t.Fatal("the hook produced nothing, so there is nothing to count")
+	}
+	return len(text)
+}
 
 // A machine whose project has no history of its own still gets the environment
 // block at every session start, and on such a day that block is the whole of
@@ -32,8 +57,12 @@ func TestTheStatuslineCountsTheBlockItInjected(t *testing.T) {
 	// Asserted positively: runStatusline returns early on a warmup, a policy
 	// rule or a quiet week, and every one of those lines would satisfy "does
 	// not say 0 B injected" while saying nothing about the block at all.
+	// The size is measured from what went out, not written down here: a byte
+	// count in the source pins the block's wording, so changing a sentence in
+	// it failed this test for a reason that has nothing to do with counting.
 	got := strings.TrimSpace(line.String())
-	if want := "deja · no agent recalls today · 501 B injected"; got != want {
+	want := fmt.Sprintf("deja · no agent recalls today · %d B injected", injectedBytes(t, out))
+	if got != want {
 		t.Errorf("statusline = %q,\n                 want %q", got, want)
 	}
 }
