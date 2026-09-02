@@ -150,7 +150,13 @@ func runStats(dir string, args []string) error {
 	// other machine's project, in an artifact meant to be shown to someone
 	// (#966). Browsing your own store is the search activation, as in `last`
 	// (#937).
-	ss, policyHidden := policyFilterSessionsCounted(policy.ActivationSearch, ss)
+	// Counted over what the screen would have shown: the note says a rule hides
+	// *matching* sessions, and taken over the whole store `deja stats --project
+	// alpha` reported the ones hidden in beta (#2816, the class #2795 and #2814
+	// closed for how and friction).
+	kept, withheld := policyFilterSessionsSplit(policy.ActivationSearch, ss)
+	policyHidden := len(stats.Filter(withheld, options))
+	ss = kept
 	if note := policyHiddenNote(policy.ActivationSearch, policyHidden); note != "" {
 		fmt.Fprintln(os.Stderr, note)
 	}

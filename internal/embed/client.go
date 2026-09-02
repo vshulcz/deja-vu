@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -33,9 +34,15 @@ func New() (*Client, error) {
 	if model == "" {
 		model = "nomic-embed-text"
 	}
-	// A configured endpoint wins over the switch: saying where to embed is
-	// asking for it, and the switch is about the probe below.
-	if endpoint := os.Getenv("DEJA_EMBED_URL"); endpoint != "" {
+	// "off" is how a caller says there is no endpoint and none is to be looked
+	// for, the same thing DEJA_EMBED_OFF=1 says. Without it the probe below
+	// reaches whatever is listening on this machine, so a developer running
+	// Ollama got a different answer out of `deja doctor` — and out of the
+	// tests — than a machine with nothing wired. Any other configured endpoint
+	// wins over the switch: saying where to embed is asking for it.
+	if endpoint := os.Getenv("DEJA_EMBED_URL"); strings.EqualFold(strings.TrimSpace(endpoint), "off") {
+		return nil, errNoEmbedEndpoint
+	} else if endpoint != "" {
 		return &Client{URL: endpoint, Model: model, apiKey: embedAPIKey(endpoint), HTTP: &http.Client{Timeout: 30 * time.Second}}, nil
 	}
 	if Off() {
@@ -47,8 +54,12 @@ func New() (*Client, error) {
 			return c, nil
 		}
 	}
-	return nil, fmt.Errorf("embedding endpoint unavailable (set DEJA_EMBED_URL)")
+	return nil, errNoEmbedEndpoint
 }
+
+// errNoEmbedEndpoint is what every "nothing to embed with" path returns, so a
+// caller can tell it from a transport failure.
+var errNoEmbedEndpoint = errors.New("embedding endpoint unavailable (set DEJA_EMBED_URL)")
 
 func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {

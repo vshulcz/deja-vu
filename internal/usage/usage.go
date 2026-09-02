@@ -48,11 +48,6 @@ const (
 	// the record of what the agent was given — the same argument KindBlame and
 	// KindResource were added on (#682), and sharper: what these serve is the
 	// most directly actionable thing deja has (#2858).
-	//
-	// Recorded, and deliberately not in servedKind. That classifier decides
-	// the ratios `deja stats` publishes, and what it counts is the store's
-	// text handed over; a one-line command is not that. Keeping them out means
-	// every number published before and after this stays comparable.
 	KindHow = "how"
 	KindFix = "fix"
 	// KindTool is the PreToolUse hook injection — one line about a command or
@@ -64,8 +59,13 @@ const (
 
 // servedKinds are the events that hand an agent memory it asked for: the two
 // recall tools, a blame — "the largest thing the server hands over", which is
-// why #682 gave it a kind of its own — and a read of deja://session/…, which
-// hands over a whole session in the same frame recall_context uses.
+// why #682 gave it a kind of its own — a read of deja://session/…, which hands
+// over a whole session in the same frame recall_context uses. A kind counted on
+// one screen and not another is the drift below, so a kind added to the log
+// belongs here or nowhere — with one deliberate exception: `how` and `fix` are
+// journalled but not counted here, because what this classifier measures is
+// the store's text handed over and a one-line command is not that. Keeping
+// them out keeps every ratio published before and after #2858 comparable.
 //
 // Named once because the counters drifted: #1569 aligned five of them and left
 // Impact behind, so a blame was a recall on `deja stats` and nothing on

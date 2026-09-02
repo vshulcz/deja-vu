@@ -48,7 +48,7 @@ func TestAWorktreeSharesTheProjectsHistory(t *testing.T) {
 	git(main, "worktree", "add", "-q", feature, "-b", "feature")
 
 	// One session, recorded in the main checkout only.
-	dirName := strings.ReplaceAll(main, string(filepath.Separator), "-")
+	dirName := encodedProjectDir(main)
 	store := filepath.Join(root, dirName)
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
@@ -74,4 +74,13 @@ func TestAWorktreeSharesTheProjectsHistory(t *testing.T) {
 	if !strings.Contains(fromWorktree, "retry budget on main") {
 		t.Errorf("a linked worktree does not see the repo's history:\n%s", fromWorktree)
 	}
+}
+
+// encodedProjectDir is the directory name a harness gives a project, the way
+// sources.resolveEncodedPath reads one back: separators become dashes, and on
+// Windows the drive's colon goes with them — a colon is not a filename
+// character there, so the old spelling could not be created at all (#2808).
+func encodedProjectDir(path string) string {
+	name := strings.ReplaceAll(path, string(filepath.Separator), "-")
+	return strings.Replace(name, ":", "-", 1)
 }

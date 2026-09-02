@@ -643,8 +643,8 @@ A top-level array, so no `schema_version`, on the same terms as `blame`. It is
 `[]` and never `null` when there is nothing to report: this is the output a
 script polls, and `null` raises where an empty list iterates zero times.
 
-`t` is when it happened and `kind` is what deja did — `recall`, `recall_context`
-and `blame` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
+`t` is when it happened and `kind` is what deja did — `recall`, `recall_context`,
+`blame`, `how` and `fix` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
 memory offered unasked; `resource` is a read of `deja://session/…`; `remember`
 writes rather than serves; `search` and `handoff` are the reader's own commands.
 A kind this list does not name may still appear: another version of deja may
@@ -700,10 +700,17 @@ Returns a JSON array of blame hits (same stability rules as exact search):
     "count": 3,
     "snippets": ["… parser.go …"],
     "score": 1.5,
+    "specificity": 1.75,
     "tier": "exact"
   }
 ]
 ```
+
+`specificity` says whether the session wrote the file as a path or as a bare
+name. It orders the list ahead of `score`, so a session that spelled the path
+out comes before one that only mentioned the filename. It is deliberately
+coarse: ordering on how deep the path was put a same-named file from another
+project above the sessions that had worked on this one.
 
 A hit for a session whose decision was promoted also carries `lifecycle`,
 `lifecycle_note` and `lifecycle_at`. Every state appears there, `accepted`

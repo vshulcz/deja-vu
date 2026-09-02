@@ -21,6 +21,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -160,44 +161,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			"instructions":    mcpInstructions(dir),
 		}, 0, ""
 	case "tools/list":
-		return map[string]any{"tools": []map[string]any{
-			{
-				"name":        "recall",
-				"description": "Search the user's own past coding sessions across every AI tool they've used (Claude Code, Codex, Cursor, opencode, aider, gemini, and others) and return the best matches as dense text under ~4KB. Call this the moment the user implies work already happened — 'didn't we fix this before?', 'what was that error again', 'we already set this up', 'how did we solve X last time', 'what did we decide about Y' — and always before debugging an error or re-implementing something that might already exist. Query with an exact error string, function name, file path or flag when you have one — that is the strongest key there is. Otherwise ask in your own words, as a phrase or a question: the search falls back to ranking when nothing matches exactly, and a sentence is not rejected. Do NOT use this for general knowledge or library/API docs — only this user's prior sessions. A bracketed marker on a result is the user's own later judgement on that session; act on what it says. Follow up with recall_context when one session looks right and you need its full story. When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
-				"annotations": map[string]any{"title": "Search past sessions", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "An exact token — error string, function name, flag — matches strongest. Failing that, the question in your own words; several words are tried together first and then ranked, so a phrase still finds things."}, "harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."}, "limit": map[string]any{"type": "number", "description": "Max sessions to return (default 5)."}, "offset": map[string]any{"type": "number", "description": "Skip this many ranked matches — page through results without re-ranking."}}, "required": []string{"query"}},
-			},
-			{
-				"name":        "recall_context",
-				"description": "Return a full markdown digest (~8KB) of the single best-matching prior session — problem, decisions, outcome — when a bare recall hit is not enough and you need the reasoning behind it. Use after recall, or directly when the user asks 'remind me how we handled X' or 'what was the whole story with Y'. Query terms are matched against transcript text, so a token likely to appear verbatim — an error string, function name, or flag — finds it fastest; the question in your own words works too. Not for browsing many sessions — use recall for that; this returns one deep digest. When it genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
-				"annotations": map[string]any{"title": "Digest one past session", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"query": map[string]any{"type": "string", "description": "Search terms identifying the session to digest."}, "harness": map[string]any{"type": "string", "description": "Optional harness filter."}}, "required": []string{"query"}},
-			},
-			{
-				"name":        "blame",
-				"description": "Before editing, refactoring, or deleting a file, find the prior sessions that discussed it so you know why it is shaped the way it is. Call whenever you are about to change a file, or when the user asks 'why is this like this', 'what was this for', 'is it safe to remove this'. Most specific mentions come first. This is session history across AI tools, not git blame — it explains intent and past decisions, not commit authorship. Give an absolute path, relative path, or bare filename.",
-				"annotations": map[string]any{"title": "Why is this file like this", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"path": map[string]any{"type": "string", "description": "Absolute, relative, or bare filename."}, "harness": map[string]any{"type": "string"}, "project": map[string]any{"type": "string"}, "since": map[string]any{"type": "string", "description": "Age such as 30d or 24h."}, "limit": map[string]any{"type": "number"}, "all": map[string]any{"type": "boolean"}}, "required": []string{"path"}},
-			},
-			{
-				"name":        "fix",
-				"description": "You just hit an error — before diagnosing it, ask what this machine ran the last time that same error appeared. Pass the failing output verbatim (a whole stack trace is fine; every line is checked). Returns the commands that followed that error in past sessions without it coming back. Evidence from the user's own history, not a guaranteed fix: read the command, decide whether it applies, and say so if you reuse it. An empty result means this machine has no record of that error being followed by a command.",
-				"annotations": map[string]any{"title": "What was run after this error before", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"error": map[string]any{"type": "string", "description": "The failing output, verbatim. Multi-line pastes are fine."}, "limit": map[string]any{"type": "number", "description": "Max pairs to return (default 3)."}}, "required": []string{"error"}},
-			},
-			{
-				"name":        "how",
-				"description": "How this user actually runs a thing on this machine — the real command with the real flags, taken from commands their agents ran, ordered by how many separate sessions ran it. Call before inventing a build, test, deploy or debug invocation: a guessed command is plausible and fails on this setup. Query with the tool or target ('go test', 'docker compose', 'terraform apply', a script name). Optionally scope to a project. Command records are kept out of ordinary search, so this is the only way to reach them.",
-				"annotations": map[string]any{"title": "How this is run here", "readOnlyHint": true, "openWorldHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"what": map[string]any{"type": "string", "description": "Tool or target, e.g. 'go test', 'docker compose', a script name. Every word must appear in the command."}, "project": map[string]any{"type": "string", "description": "Optional project substring filter."}, "limit": map[string]any{"type": "number", "description": "Max commands to return (default 8)."}}, "required": []string{"what"}},
-			},
-			{
-				"name":        "remember",
-				"description": "Store one durable decision or conclusion so a future session can recall it. Call right after a decision is settled, a tricky bug is resolved, or the user says 'remember this', 'note that for next time', 'don't forget we chose X'. Write a single self-contained fact (e.g. 'We use Postgres advisory locks for the job queue because Redis lost messages under load'). Do NOT store transcripts, routine conversation, or anything already obvious from the code. text is required; project defaults to notes.",
-				"annotations": map[string]any{"title": "Remember a decision", "readOnlyHint": false},
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string", "description": "A durable fact, decision, or conclusion to remember."}, "project": map[string]any{"type": "string", "description": "Optional project name; defaults to notes."}, "tags": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Optional navigation tags, searchable as #tag."}}, "required": []string{"text"}},
-			},
-		}}, 0, ""
+		return map[string]any{"tools": []map[string]any{dejaTool()}}, 0, ""
 	case "ping":
 		// Part of the spec at the version we claim, and both sides must
 		// answer it with an empty result. A host that pings for keepalive
@@ -283,7 +247,83 @@ func jsonTypeName(k reflect.Kind) string {
 	}
 }
 
+// dejaTool is the whole surface as one tool with a mode.
+//
+// Six tools were six envelopes: the same query, harness, project and limit
+// declared six times, and six descriptions each arguing they were the entry
+// point — which is how `how` lost to `recall` on a question about a command
+// (#1298). One envelope costs less and asks the model an easier question:
+// which capability, not which tool.
+//
+// The old names still answer for a client that has them wired; they are not
+// listed, so they cost nothing per session.
+func dejaTool() map[string]any {
+	return map[string]any{
+		"name": "deja",
+		"description": "This user's own past coding sessions, across every AI tool they use (Claude Code, Codex, Cursor, opencode, aider, gemini and others). " +
+			"Not general knowledge and not library docs — only what happened on this machine. Pick a mode:\n" +
+			"- recall: search past sessions. The moment the user implies work already happened (\"didn't we fix this?\", \"what was that error\", \"what did we decide about X\"), and always before debugging an error or re-implementing something. An exact error string, function name or path is the strongest query; a question in your own words works too.\n" +
+			"- context: the full story of the single best-matching session — problem, decisions, outcome — when a recall hit is not enough.\n" +
+			"- blame: why a file is the way it is, before you edit, refactor or delete it. Session history, not git authorship.\n" +
+			"- fix: you just hit an error. What this machine ran, or changed, after that same error before. Pass the failing output verbatim.\n" +
+			"- how: the real command with the real flags this user runs for a thing — build, test, deploy — instead of a guessed one.\n" +
+			"- remember: store one durable decision so a later session can recall it. Only after something is settled.\n" +
+			"A bracketed marker on a result is the user's own later judgement on that session; act on what it says. " +
+			"When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
+		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
+		"inputSchema": map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}, "description": "Which capability to use."},
+				"query":   map[string]any{"type": "string", "description": "recall and context: an exact token — error string, function name, flag — or the question in your own words."},
+				"path":    map[string]any{"type": "string", "description": "blame: absolute, relative, or bare filename."},
+				"error":   map[string]any{"type": "string", "description": "fix: the failing output, verbatim. Multi-line pastes are fine."},
+				"what":    map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
+				"text":    map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
+				"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
+				"harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."},
+				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
+				"since":   map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
+				"limit":   map[string]any{"type": "number", "description": "Max results."},
+				"offset":  map[string]any{"type": "number", "description": "recall: skip this many ranked matches, to page without re-ranking."},
+				"all":     map[string]any{"type": "boolean", "description": "blame: every project, not just this one."},
+			},
+			"required": []string{"mode"},
+		},
+	}
+}
+
+// dispatcherModes maps a mode onto the call that implements it. The old tool
+// names are the same strings, which is why a client with them wired keeps
+// working.
+var dispatcherModes = map[string]string{
+	"recall":   "recall",
+	"search":   "recall",
+	"context":  "recall_context",
+	"digest":   "recall_context",
+	"blame":    "blame",
+	"fix":      "fix",
+	"how":      "how",
+	"remember": "remember",
+}
+
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
+	if name == "deja" {
+		var a struct {
+			Mode string `json:"mode"`
+		}
+		if err := decodeToolArgs(name, raw, &a); err != nil {
+			return "", err
+		}
+		mode := strings.ToLower(strings.TrimSpace(a.Mode))
+		target, ok := dispatcherModes[mode]
+		if !ok {
+			// Named, not guessed at: a model that invents a mode gets the list
+			// rather than an empty answer it will read as "no history".
+			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
+		}
+		return callMCPTool(dir, target, raw)
+	}
 	switch name {
 	case "recall":
 		var a struct {
@@ -394,121 +434,12 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		return text, err
 	case "fix":
-		var a struct {
-			Error string    `json:"error"`
-			Limit mcpNumber `json:"limit"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(a.Error) == "" {
-			return "", fmt.Errorf("error text required")
-		}
-		// Before the read, not after: the rebuild used to happen first and the
-		// guard ran when there was nothing left to report (#1306, #1309).
-		if line := buildingNowForAgent(dir); line != "" {
-			return line, nil
-		}
-		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
-			return "", err
-		}
-		pol := policy.Load()
-		pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
-			return pol.Allows(policy.ActivationMCP, project)
-		})
-		if len(pairs) == 0 {
-			if !index.LooksLikeError(a.Error) {
-				return "That text does not read like an error line - pass the failing output itself.", nil
-			}
-			// Held-but-unconfirmed is not never-seen, and the agent asking is
-			// the one that would otherwise re-derive the remedy (#2282).
-			if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
-				return pol.Allows(policy.ActivationMCP, project)
-			}) {
-				return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", nil
-			}
-			return "No session on this machine ran a command after that error." + emptyStoreNote(dir), nil
-		}
-		var fb strings.Builder
-		for _, p := range pairs {
-			when := ""
-			if !p.When.IsZero() {
-				when = " (" + p.When.Local().Format("2006-01-02") + ")"
-			}
-			ran := "ran next"
-			if p.Candidate {
-				ran = "ran next, unconfirmed"
-			}
-			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
-				commandListingLine(p.Command))
-		}
-		usage.RecordResult(dir, usage.KindFix, fb.Len(), len(pairs), false)
-		// Framed like `how` (#2844) and for a sharper reason: this hands an
-		// agent a command at the moment it has just hit an error, which is
-		// the moment it is most likely to run it without reading. The
-		// command came out of a transcript, which recall_frame.go names as
-		// data an attacker may have influenced.
-		return frameRecall(strings.TrimRight(fb.String(), "\n")), nil
+		// Recorded like blame and the resource reader: `deja log` is what deja
+		// put in front of an agent, and this is the surface that hands one a
+		// command to run (#2858).
+		return recordedMCPAnswer(dir, usage.KindFix, func() (string, int, error) { return mcpFix(dir, name, raw) })
 	case "how":
-		var a struct {
-			What    string    `json:"what"`
-			Project string    `json:"project"`
-			Limit   mcpNumber `json:"limit"`
-		}
-		if err := decodeToolArgs(name, raw, &a); err != nil {
-			return "", err
-		}
-		if strings.TrimSpace(a.What) == "" {
-			return "", fmt.Errorf("what required")
-		}
-		if line := buildingNowForAgent(dir); line != "" {
-			return line, nil
-		}
-		if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
-			return "", err
-		}
-		entries, hidden, ignored, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
-		if err != nil {
-			return "", err
-		}
-		if len(entries) == 0 {
-			// The same reasoning one line down, for the other rule: an agent
-			// told nothing exists invents one, and the ignore rule is exactly
-			// the case where something does exist (#2630).
-			if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
-				return strings.TrimSpace(note), nil
-			}
-			// Not a flat negative when the policy is what emptied the answer:
-			// an agent told nothing exists invents one, and here something does
-			// exist. The CLI has said so since the note was written; this
-			// surface was returning the negative regardless.
-			if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
-				return strings.TrimSpace(note), nil
-			}
-			return fmt.Sprintf("No command on this machine mentions %q.", a.What) + emptyStoreNote(dir), nil
-		}
-		limit := int(a.Limit)
-		if limit <= 0 {
-			limit = 8
-		}
-		var hb strings.Builder
-		// The same lines the CLI prints, from the same writer: this tool used
-		// to keep its own copy of the loop, so a note the CLI learned never
-		// reached the agent (#1634).
-		writeHowEntries(&hb, entries, limit, ", last ")
-		out := strings.TrimRight(hb.String(), "\n")
-		if note := howCapNote(len(entries), limit, "call again with a higher limit for the rest"); note != "" {
-			// The agent cannot ask a follow-up of its own, so the cut has to
-			// travel with the answer rather than to a terminal it never sees.
-			out += "\n\n" + note
-		}
-		usage.RecordResult(dir, usage.KindHow, len(out), len(entries), false)
-		// Framed like every other agent-facing recall: these are command lines
-		// lifted out of transcripts, which recall_frame.go names as data an
-		// attacker may have influenced — and they are the most directly
-		// actionable thing deja serves, since an agent may run them. This was
-		// the one MCP answer with neither frame nor note (#2827's sweep).
-		return frameRecall(out), nil
+		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpHow(dir, name, raw) })
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
@@ -681,6 +612,139 @@ func keepsQuery(shorter, longer, query string) bool {
 // 8335 (#1797).
 const contextMCPBudget = 8192
 
+// recordedMCPAnswer journals what a tool handed the agent, whatever it was:
+// "no session ran a command after that error" is an answer the agent acts on
+// as much as a remedy is, and a log that held only the successful calls
+// understated what deja said (#2858).
+func recordedMCPAnswer(dir, kind string, answer func() (string, int, error)) (string, error) {
+	text, found, err := answer()
+	if err == nil {
+		// The count, not a zero: a row recorded with none is marked as having
+		// found nothing, so the log said "(empty result)" over an answer that
+		// served a command from two sessions — the opposite of what happened,
+		// on the surface this recording exists to make honest (#2858).
+		usage.RecordServedSnapshot(dir, kind, text, found, 0, nil, policy.Load().Describe(policy.ActivationMCP))
+	}
+	return text, err
+}
+
+func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
+	var a struct {
+		Error string    `json:"error"`
+		Limit mcpNumber `json:"limit"`
+	}
+	if err := decodeToolArgs(name, raw, &a); err != nil {
+		return "", 0, err
+	}
+	if strings.TrimSpace(a.Error) == "" {
+		return "", 0, fmt.Errorf("error text required")
+	}
+	// Before the read, not after: the rebuild used to happen first and the
+	// guard ran when there was nothing left to report (#1306, #1309).
+	if line := buildingNowForAgent(dir); line != "" {
+		return line, 0, nil
+	}
+	if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
+		return "", 0, err
+	}
+	pol := policy.Load()
+	pairs := index.FixesFor(dir, a.Error, int(a.Limit), func(project string) bool {
+		return pol.Allows(policy.ActivationMCP, project)
+	})
+	if len(pairs) == 0 {
+		if !index.LooksLikeError(a.Error) {
+			return "That text does not read like an error line - pass the failing output itself.", 0, nil
+		}
+		// Held-but-unconfirmed is not never-seen, and the agent asking is
+		// the one that would otherwise re-derive the remedy (#2282).
+		if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
+			return pol.Allows(policy.ActivationMCP, project)
+		}) {
+			return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", 0, nil
+		}
+		return "No session on this machine ran a command after that error." + emptyStoreNote(dir), 0, nil
+	}
+	var fb strings.Builder
+	for _, p := range pairs {
+		when := ""
+		if !p.When.IsZero() {
+			when = " (" + p.When.Local().Format("2006-01-02") + ")"
+		}
+		ran := "ran next"
+		if p.Candidate {
+			ran = "ran next, unconfirmed"
+		}
+		fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
+			commandListingLine(p.Command))
+	}
+	// Framed like `how` (#2844) and for a sharper reason: this hands an agent a
+	// command at the moment it has just hit an error, which is the moment it is
+	// most likely to run it without reading. The command came out of a
+	// transcript, which recall_frame.go names as data an attacker may have
+	// influenced.
+	return frameRecall(strings.TrimRight(fb.String(), "\n")), len(pairs), nil
+}
+
+func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
+	var a struct {
+		What    string    `json:"what"`
+		Project string    `json:"project"`
+		Limit   mcpNumber `json:"limit"`
+	}
+	if err := decodeToolArgs(name, raw, &a); err != nil {
+		return "", 0, err
+	}
+	if strings.TrimSpace(a.What) == "" {
+		return "", 0, fmt.Errorf("what required")
+	}
+	if line := buildingNowForAgent(dir); line != "" {
+		return line, 0, nil
+	}
+	if _, err := index.EnsureForSearchStale(dir, search.Options{}, mcpProgress()); err != nil {
+		return "", 0, err
+	}
+	entries, hidden, ignored, err := howEntries(dir, strings.Fields(a.What), a.Project, policy.ActivationMCP)
+	if err != nil {
+		return "", 0, err
+	}
+	if len(entries) == 0 {
+		// The same reasoning one line down, for the other rule: an agent
+		// told nothing exists invents one, and the ignore rule is exactly
+		// the case where something does exist (#2630).
+		if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
+			return strings.TrimSpace(note), 0, nil
+		}
+		// Not a flat negative when the policy is what emptied the answer:
+		// an agent told nothing exists invents one, and here something does
+		// exist. The CLI has said so since the note was written; this
+		// surface was returning the negative regardless.
+		if note := policyHiddenNote(policy.ActivationMCP, hidden); note != "" {
+			return strings.TrimSpace(note), 0, nil
+		}
+		return fmt.Sprintf("No command on this machine mentions %q.", a.What) + emptyStoreNote(dir), 0, nil
+	}
+	limit := int(a.Limit)
+	if limit <= 0 {
+		limit = 8
+	}
+	var hb strings.Builder
+	// The same lines the CLI prints, from the same writer: this tool used
+	// to keep its own copy of the loop, so a note the CLI learned never
+	// reached the agent (#1634).
+	writeHowEntries(&hb, entries, limit, ", last ")
+	out := strings.TrimRight(hb.String(), "\n")
+	if note := howCapNote(len(entries), limit, "call again with a higher limit for the rest"); note != "" {
+		// The agent cannot ask a follow-up of its own, so the cut has to
+		// travel with the answer rather than to a terminal it never sees.
+		out += "\n\n" + note
+	}
+	// Framed like every other agent-facing recall: these are command lines
+	// lifted out of transcripts, which recall_frame.go names as data an
+	// attacker may have influenced — and they are the most directly actionable
+	// thing deja serves, since an agent may run them (#2827's sweep).
+	return frameRecall(out), len(entries), nil
+}
+
 // blameMCPBudget bounds one blame answer. Higher than recall's ~4 KB because a
 // hit is a whole session rather than a snippet, and well under what an agent
 // can absorb from one tool call.
@@ -689,12 +753,15 @@ const blameMCPBudget = 8192
 // blameHitJSON is what the MCP blame tool returns: the same shape as the CLI's
 // --json minus the session's message list.
 type blameHitJSON struct {
-	Session  blameSessionJSON `json:"session"`
-	Title    string           `json:"title,omitempty"`
-	Count    int              `json:"count"`
-	Score    float64          `json:"score"`
-	Tier     string           `json:"tier,omitempty"`
-	Snippets []string         `json:"snippets,omitempty"`
+	Session blameSessionJSON `json:"session"`
+	Title   string           `json:"title,omitempty"`
+	Count   int              `json:"count"`
+	Score   float64          `json:"score"`
+	// Specificity is what orders the list, ahead of the score, so an agent
+	// reading these rows can see why one came first (#2840).
+	Specificity float64  `json:"specificity"`
+	Tier        string   `json:"tier,omitempty"`
+	Snippets    []string `json:"snippets,omitempty"`
 }
 
 type blameSessionJSON struct {
@@ -763,7 +830,8 @@ func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []by
 				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
 			},
 			Title: search.SafeNoteTitle(h.Session.Title), Count: h.Count, Score: h.Score,
-			Tier: h.Tier, Snippets: h.Snippets,
+			Specificity: h.Specificity,
+			Tier:        h.Tier, Snippets: h.Snippets,
 		})
 	}
 	if omitted > 0 {
@@ -1109,6 +1177,11 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	if stale {
 		fmt.Fprintln(&b, "(index refresh running in the background — the very newest sessions may not appear yet)")
 	}
+	// Whether the question named something the store does not hold. The word
+	// forms line already says which word was dropped; what it did not say is
+	// that dropping the subject leaves an answer about the rest of the
+	// sentence, which is the shape #657 measured on twenty invented subjects.
+	absent := namedSomethingAbsent(result.Variants)
 	if result.Stemmed {
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
@@ -1129,6 +1202,27 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// questions about subjects this machine has never held — eight of
 		// eight came back with sessions rather than nothing, and the tool
 		// description promises an empty result means no record (#2074).
+		//
+		// But only where it is true. The tier is reached whenever the exact
+		// AND misses, which a real question does all the time: measured on
+		// this store, four of five questions about work done that same day
+		// were headed "No session is about this" while the session below was
+		// exactly about it (#657). A session that speaks one of the question's
+		// identifying words is about it as far as deja can tell, and saying
+		// otherwise teaches the reader to ignore the line that matters.
+		// The query's own words, not the stem forms the ranking also tries:
+		// the idf map is keyed by what the reader typed.
+		asked, _ := query.QueryParts(q)
+		if !absent && relevanceHitsAreAboutIt(hits, asked, result.TermIDF) {
+			fmt.Fprintln(&b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
+		} else {
+			fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+		}
+	}
+	if absent && result.Tier != search.TierRelevance {
+		// The tier below relevance already says which word it dropped; this
+		// says what dropping it means, in the words the relevance tier uses
+		// for the same situation.
 		fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
 	}
 	if note := demotedNote(hits, demoted); note != "" {
@@ -1566,6 +1660,69 @@ func contextOthersNote(hits int) string {
 	}
 	return fmt.Sprintf("\n%d other session%s matched this question — call recall for the list if this one does not answer it.\n",
 		hits-1, pluralS(hits-1))
+}
+
+// relevanceHitsAreAboutIt reports whether some session being served is about
+// the question, or whether the page is only the nearest wording to it.
+//
+// The test is whether one session holds the whole question. The tier is
+// reached whenever the exact AND misses, which happens both when the store has
+// never held the subject and when it holds it and the reader phrased it
+// differently — and the strong warning was printed over both: measured on this
+// store, four of five questions about that same day's work were headed "No
+// session is about this" while the session below was exactly about it (#657).
+//
+// A session that speaks every word of the question the store knows is about it
+// as far as deja can tell. A page where the words are spread across different
+// sessions — one holds half, another the other half — is not, and keeps the
+// warning it earned in #2074.
+func relevanceHitsAreAboutIt(hits []search.Hit, terms []string, idf map[string]float64) bool {
+	if len(hits) == 0 || len(terms) == 0 || idf == nil {
+		return false
+	}
+	known := make([]string, 0, len(terms))
+	for _, t := range terms {
+		if _, ok := idf[t]; ok {
+			known = append(known, t)
+		}
+	}
+	// A word the store does not hold at all is the #657 case and is decided by
+	// the caller before this; here it only means the question is not fully
+	// known, so nothing can hold all of it.
+	if len(known) == 0 || len(known) != len(terms) {
+		return false
+	}
+	for _, h := range hits {
+		if sessionSpeaksEvery(h.Session, known) {
+			return true
+		}
+	}
+	return false
+}
+
+// sessionSpeaksEvery reports whether one session says every one of these words
+// somewhere in what a person or the agent said.
+func sessionSpeaksEvery(s model.Session, terms []string) bool {
+	for _, t := range terms {
+		if !search.SpeechCarriesAnyTerm(s, []string{t}) {
+			return false
+		}
+	}
+	return true
+}
+
+// namedSomethingAbsent reports whether a word of the question was dropped for
+// having nothing in the store: the recovery tiers record such a term with an
+// empty variant, which is how the "ignored" note is written.
+func namedSomethingAbsent(variants map[string][]string) bool {
+	for _, values := range variants {
+		for _, v := range values {
+			if v == "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // nothingIsAboutThis is the half both surfaces share. The wording was tuned in

@@ -15,7 +15,11 @@ import (
 const (
 	ContextChainCount    = 30
 	ContextNegativeCount = 5
-	ContextPriorCount    = 3
+	// Seven, not three: with one fact per session and the rest naming the
+	// chain without settling anything, the block has to choose what to quote.
+	// At three every arm scored 1.00 whatever the digest did, which is what
+	// made the coverage column unable to move (#2931, #2933).
+	ContextPriorCount = 7
 )
 
 type ContextChain struct {
@@ -61,8 +65,20 @@ func GenerateContext(seed int64) ContextCorpus {
 		// comparison is meaningless, so each prior session carries a
 		// realistic filler load around its one durable fact.
 		for j := 0; j < ContextPriorCount; j++ {
-			text := "routine update with no prior fact"
-			if !chain.Negative {
+			// One fact per session, and the sessions past them carry none:
+			// the number of prior sessions is what makes the facts hard to
+			// reach, and indexing Facts by j made the constant unchangeable —
+			// raising it panicked (#2933).
+			// One fact per session, and the sessions past them carry none —
+			// while still naming the chain, so the ranking has to choose which
+			// of them to quote. Indexing Facts by j made the constant
+			// unchangeable (it panicked above three), and filler that did not
+			// name the chain was never retrieved, so raising it changed
+			// nothing either (#2933).
+			text := fmt.Sprintf("%s routine update, nothing settled here", id)
+			if chain.Negative {
+				text = "routine update with no prior fact"
+			} else if j < len(chain.Facts) {
 				text = chain.Facts[j]
 			}
 			t := base.Add(time.Duration(i*10+j) * time.Minute)

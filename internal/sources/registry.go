@@ -47,8 +47,8 @@ func offsetParse(f func(string, int64) ([]model.Session, error)) func(string, in
 	return func(p string, off, _ int64) ([]model.Session, error) { return f(p, off) }
 }
 
-// dbParse/dbParseFrom handle the two db-backed kinds (opencode, cursor) that
-// filter by time rather than byte offset.
+// dbParse/dbParseFrom handle the db-backed kinds — opencode, cursor, goose,
+// grok, hermes and zed — which filter by time rather than byte offset.
 func dbParse(full func(string) ([]model.Session, error), since func(string, time.Time) ([]model.Session, error)) func(string, int64) ([]model.Session, error) {
 	return func(p string, nano int64) ([]model.Session, error) {
 		if nano > 0 {
@@ -428,6 +428,21 @@ func KindForPath(p string) string {
 		}
 	}
 	return ""
+}
+
+// KindsWithOffsetParsers names every kind that can resume a parse where the
+// last pass stopped. The index gates its append path on this rather than on a
+// list of harness names it has to remember to grow (#2870).
+func KindsWithOffsetParsers() []string {
+	var out []string
+	for _, h := range Registry() {
+		for _, k := range h.Kinds {
+			if k.ParseFrom != nil {
+				out = append(out, k.Name)
+			}
+		}
+	}
+	return out
 }
 
 // KindForPathKind returns the full FileKind whose Match accepts p, for

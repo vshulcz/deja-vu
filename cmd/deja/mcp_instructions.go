@@ -12,7 +12,7 @@ import (
 func mcpInstructions(dir string) string {
 	var b strings.Builder
 	b.WriteString("deja indexes this user's past sessions across every AI coding tool they use. ")
-	b.WriteString("Call the recall tool before debugging an error or re-implementing anything that might already exist, ")
+	b.WriteString("Call the deja tool with mode recall before debugging an error or re-implementing anything that might already exist, ")
 	b.WriteString("and whenever the user implies the work happened before (\"didn't we fix this?\", \"what was that error\").")
 	if s := readWarmupStatus(dir); s != nil {
 		b.WriteString(" The index is still building (")

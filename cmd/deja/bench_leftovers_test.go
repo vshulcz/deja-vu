@@ -12,15 +12,12 @@ import (
 // touches the parent. So a ^C leaves megabytes there that nothing ever looks at
 // again, and a clean run still leaves an empty directory behind (#2560).
 func TestBenchSweepsWhatEarlierRunsLeft(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	// t.Chdir rather than a cleanup of our own: cleanups run last-registered
+	// first, so a chdir registered before the temp directory is restored
+	// after it is removed — and on Windows a process's working directory
+	// cannot be removed while it stands there (#2808).
 	work := t.TempDir()
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(work)
 	parent := filepath.Join(work, ".deja-bench")
 	stale := filepath.Join(parent, "run-interrupted")
 	if err := os.MkdirAll(stale, 0o700); err != nil {
@@ -65,15 +62,12 @@ func TestBenchSweepsWhatEarlierRunsLeft(t *testing.T) {
 
 // A parent still holding another run's tree stays where it is.
 func TestBenchKeepsTheParentWhileAnotherRunIsInIt(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(cwd) })
+	// t.Chdir rather than a cleanup of our own: cleanups run last-registered
+	// first, so a chdir registered before the temp directory is restored
+	// after it is removed — and on Windows a process's working directory
+	// cannot be removed while it stands there (#2808).
 	work := t.TempDir()
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
+	t.Chdir(work)
 	dir, err := benchmarkTempDir()
 	if err != nil {
 		t.Fatal(err)

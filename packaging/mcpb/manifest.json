@@ -38,28 +38,8 @@
   },
   "tools": [
     {
-      "name": "recall",
-      "description": "Search the user's own past coding sessions across every AI tool they have used and return the best matches as dense text."
-    },
-    {
-      "name": "recall_context",
-      "description": "Return a full markdown digest of the single best-matching prior session — problem, decisions, outcome."
-    },
-    {
-      "name": "blame",
-      "description": "Before editing or deleting a file, find the prior sessions that discussed it and why it is shaped the way it is."
-    },
-    {
-      "name": "fix",
-      "description": "You just hit an error — ask what this machine ran the last time that same error appeared, before diagnosing it again."
-    },
-    {
-      "name": "how",
-      "description": "How this user actually runs a thing on this machine: the real command with the real flags, from what their agents ran."
-    },
-    {
-      "name": "remember",
-      "description": "Store one durable decision or conclusion so a future session can recall it."
+      "name": "deja",
+      "description": "This user's own past coding sessions across every AI tool they use, in modes: recall (search), context (one session in full), blame (why a file is like this), fix (what was run or changed after this error), how (the real command for a thing here), remember (store a decision)."
     }
   ],
   "compatibility": {

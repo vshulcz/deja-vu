@@ -460,6 +460,11 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
 	ss = filterTombstonedSet(ss, dead)
+	// Nothing to search until the whole corpus is written, and on a first
+	// install that is the fourteen seconds a user decides in (#505). Publish
+	// the newest slice first: it is a valid index of a few hundred sessions,
+	// it lands in about a second, and the full one replaces it moments later.
+	publishNewestFirst(dir, ss, progress)
 	// A full build passes every session through the exclusion patterns, so
 	// this is the one place the current set can be claimed as applied. An
 	// incremental build carries the old stamp forward: it keeps records it
@@ -560,13 +565,14 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	buildCooccur(tmp, ss)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
 	buildCommands(tmp, ss)
+	buildCommandFails(tmp, ss)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -888,6 +894,57 @@ func ReportEmptySessions() int {
 	return int(emptied.Swap(0))
 }
 
+// publishNewestFirst writes an index of the newest sessions and swaps it in,
+// so a first build answers before it finishes. Best effort in every sense: any
+// failure leaves the build to write the whole thing as it always did.
+//
+// Only on a first build, and only a big one — replacing an index that already
+// answers with a smaller one would be a regression, and on a small corpus the
+// full build is already fast enough that the extra pass is the slower path.
+//
+// The file states are deliberately not carried into it. They are the record of
+// what has been parsed, and claiming the whole corpus for an index holding a
+// slice of it would let the next incremental run skip files whose sessions
+// were never written.
+func publishNewestFirst(dir string, ss []model.Session, progress io.Writer) {
+	if HasManifest(dir) || len(ss) < partialPublishFrom {
+		return
+	}
+	newest := append([]model.Session(nil), ss...)
+	sort.Slice(newest, func(i, j int) bool { return newest[i].Updated.After(newest[j].Updated) })
+	newest = newest[:partialPublishSessions]
+	tmp := dir + ".part"
+	_ = os.RemoveAll(tmp)
+	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
+		return
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	// The counters this pass moves belong to the build that follows it, so
+	// they are put back where it left them: writeSessions zeroes and fills
+	// them, and a line saying "3 empty transcripts" must count the whole
+	// corpus rather than this slice of it.
+	wasEmptied, wasCollisions, wasMerged := emptied.Load(), collisions.Load(), merged.Load()
+	err := writeSessions(tmp, dir, newest, nil, "")
+	emptied.Store(wasEmptied)
+	collisions.Store(wasCollisions)
+	merged.Store(wasMerged)
+	if err != nil {
+		return
+	}
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: searchable now with the %d most recent sessions while the rest is indexed\n", len(newest))
+	}
+}
+
+// partialPublishFrom is the corpus size at which the wait is worth a second
+// pass, and partialPublishSessions how much of it lands first. A few hundred
+// sessions is what a person has touched recently enough to ask about, and it
+// writes in about a second where the whole corpus takes fourteen.
+const (
+	partialPublishFrom     = 400
+	partialPublishSessions = 200
+)
+
 func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{})
 }
@@ -1016,13 +1073,14 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	buildCooccur(tmp, ss)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
 	buildCommands(tmp, ss)
+	buildCommandFails(tmp, ss)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
 	}
 	// Before the swap: whatever is left in tmp ships inside the index.
 	sp.cleanup()
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -1223,11 +1281,44 @@ func signalLine(l string) bool {
 // eachIndexKey calls fn once per distinct token a message earns. Both the
 // in-memory incremental path and the spilling full build go through it, so
 // neither can drift from the other on what a message indexes to.
+// eachIndexKey calls fn once per distinct key a record contributes. The keys
+// are streamed rather than collected: a CJK message produces a bigram per rune
+// pair, and building the slice only to walk it once cost a third of the keying
+// time on a Han corpus (#492).
 func eachIndexKey(text string, when time.Time, fn func(tok string)) {
-	seen := map[string]bool{}
-	for _, tok := range append(indexKeys(text), dateTokens(when)...) {
+	emit := dedupe(fn)
+	textKeys(text, emit)
+	for _, tok := range dateTokens(when) {
+		emit(tok)
+	}
+}
+
+// eachTextKey is eachIndexKey without the date keys, for the caller that keys
+// text alone.
+func eachTextKey(text string, fn func(tok string)) {
+	textKeys(text, dedupe(fn))
+}
+
+// textKeys emits every key the text contributes, repeats included; the callers
+// above put one dedupe in front of it rather than one per source.
+func textKeys(text string, emit func(tok string)) {
+	for _, tok := range tokens(text) {
+		emit("t" + tok)
+	}
+	for _, part := range identifierParts(text) {
+		emit("t" + part)
+	}
+	cjkIndexKeys(text, emit)
+}
+
+// dedupe wraps fn so it sees each key once. The three key sources overlap —
+// a word is a token and can be an identifier part as well — and a posting list
+// must not hold the same offset twice.
+func dedupe(fn func(tok string)) func(tok string) {
+	seen := make(map[string]bool, 64)
+	return func(tok string) {
 		if seen[tok] {
-			continue
+			return
 		}
 		seen[tok] = true
 		fn(tok)
@@ -2271,23 +2362,10 @@ func fromDatabase(r Record) bool {
 	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
 		return true
 	}
-	// grok's database, by path rather than by kind: both grok kinds are
-	// registered under one name, so the kind cannot tell the store from the
-	// session files beside it. Without this the changed-file rule dropped every
-	// session the incremental pass did not ask about, which is what stamping
-	// the store turned on (#2075).
-	if r.SourcePath == sources.GrokDB() {
-		return true
-	}
-	switch h := harnessForPath(r.SourcePath); h {
-	case "cursor-db", "goose-db", "hermes", "zed":
-		return true
-	default:
-		// A path that names a per-file kind settles it: two transcripts in
-		// different projects can share a filename-derived id, and judging those
-		// by key erased the sibling that was never re-read (#699).
-		return false
-	}
+	// A path that names a per-file kind settles it: two transcripts in
+	// different projects can share a filename-derived id, and judging those by
+	// key erased the sibling that was never re-read (#699).
+	return storeHarness(r.SourcePath) != ""
 }
 
 // readWholeThisPass reports whether the pass re-read this record's store in
@@ -2303,8 +2381,7 @@ func readWholeThisPass(r Record) bool {
 	if len(passWholeStores) == 0 {
 		return false
 	}
-	switch harnessForPath(r.SourcePath) {
-	case "cursor-db", "goose-db":
+	if storeHarness(r.SourcePath) != "" {
 		return passWholeStores[r.SourcePath]
 	}
 	harness, _, ok := strings.Cut(r.Key, ":")
@@ -2319,28 +2396,18 @@ var passWholeStores map[string]bool
 // wholeStoresThisPass records them, under both the store path and the harness:
 // a record names the first where it can and the second otherwise.
 //
-// Only the stamped stores belong here (setStoreLastUpdated). Everything else is
-// read whole on every pass and judged by its path, which is why it needs none of
-// this — a watermark added to another database later has to join fromDatabase
-// and this function in the same change, and grok did (#2075).
+// Every store setDatabaseStoreWatermarks stamps belongs here, and storeHarness
+// is the one list of them: a stamped store is parsed from its watermark, so its
+// records must survive a pass that did not hand them back, and only a pass that
+// read the store whole may drop one because its key came back.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
+	// Rebuilt here rather than kept: a store that appeared since the last pass
+	// is one the walk has to see.
+	passStores = resolveStorePaths()
 	for p := range changed {
-		harness := ""
-		switch harnessForPath(p) {
-		case "opencode":
-			harness = "opencode"
-		case "cursor-db":
-			harness = "cursor"
-		case "goose-db":
-			harness = "goose"
-		case "zed":
-			// A thread is a session and comes back whole, so the record it
-			// replaces has to be droppable — without this the earlier turns of
-			// a continued thread were added a second time (#2075). One store
-			// and one kind, so naming the harness is naming the store.
-			harness = "zed"
-		default:
+		harness := storeHarness(p)
+		if harness == "" {
 			continue
 		}
 		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
@@ -2358,18 +2425,77 @@ func wholeStoresThisPass(changed, old map[string]FileState) {
 // this one store, rather than a number that only climbs. Narrowing the clause
 // instead costs the session its earlier turns (#2033), so the re-reading stays.
 func rereadsWholeSessions(p string) bool {
-	switch harnessForPath(p) {
-	case "goose-db":
+	if harnessForPath(p) == "goose-db" {
 		return true
-	case "zed":
-		// zed's cursor selects threads, and a thread is a session: a continued
-		// one comes back whole, so its earlier turns were added a second time
-		// — measured, the first turn of a thread that gained a second was held
-		// twice (#2075). The SQL still asks only for the touched threads, so
-		// what this gives up is the record bookkeeping, not the read.
+	}
+	switch storeHarness(p) {
+	case "grok", "zed", "hermes":
+		// The same shape: each asks for the sessions touched since the stamp
+		// and hands them back whole, so what comes back replaces what the
+		// index holds for that key rather than adding to it (#2075). The
+		// clauses are session-scoped for exactly this reason — a message-scoped
+		// one returns the newest turn alone, and replacing a session with it
+		// loses the rest.
 		return true
 	}
 	return false
+}
+
+// storeHarness names the harness whose shared store lives at p, and "" for
+// anything else.
+//
+// harnessForPath answers with a kind, and three of the six stores share their
+// kind name with the harness's own transcripts — grok and hermes both have
+// files as well as a database, and a kind name cannot tell them apart. The
+// store paths can, and a record that names one belongs to a store read from a
+// watermark: it must not be dropped because the database changed, and it may be
+// replaced when its key comes back.
+func storeHarness(p string) string {
+	if p == "" {
+		return ""
+	}
+	if h, ok := passStorePaths()[p]; ok {
+		return h
+	}
+	if sources.IsHermesPGStore(p) {
+		return "hermes"
+	}
+	switch harnessForPath(p) {
+	case "opencode":
+		return "opencode"
+	case "cursor-db":
+		return "cursor"
+	case "goose-db":
+		return "goose"
+	}
+	return ""
+}
+
+// passStorePaths is the store-path half of storeHarness, resolved once.
+//
+// fromDatabase asks per record, and the answer needs the store paths, two of
+// which are found by walking a directory. Measured at ~11 µs a record with the
+// walk on the hot path, which is a second per hundred thousand records on every
+// pass. A pass holds the directory lock, so the map lives beside
+// passWholeStores and is built where that one is.
+func passStorePaths() map[string]string {
+	// wholeStoresThisPass builds it at the top of a pass, before anything asks.
+	// The fallback is for a caller outside a pass — a search recovering a
+	// damaged index reads records without one.
+	if passStores == nil {
+		passStores = resolveStorePaths()
+	}
+	return passStores
+}
+
+var passStores map[string]string
+
+func resolveStorePaths() map[string]string {
+	out := map[string]string{sources.GrokDB(): "grok", sources.ZedDB(): "zed"}
+	for _, db := range sources.HermesDBs() {
+		out[db] = "hermes"
+	}
+	return out
 }
 
 // fullyReadFiles drops the files a pass reads only part of. LastUpdated is
@@ -2541,7 +2667,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if IsCorrupt(err) {
 			if progress != nil {
-				fmt.Fprintf(progress, "deja: index damaged (%v), rebuilding ...\n", err)
+				fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
 			}
 			return rebuild(dir, harness, scope, files, progress)
 		}
@@ -2587,6 +2713,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
 		files[p] = f
 	}
+	// First, so everything below reads the same list of stores.
+	wholeStoresThisPass(changed, old.Files)
 	// After the loop, because a file whose parse failed is dropped from
 	// `changed` there and keeps what it already held — starting it over would
 	// throw the counts away on the one pass that could not read it.
@@ -2597,7 +2725,6 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// append path's — a db's counts can only grow until a full rebuild.
 	reread := fullyReadFiles(changed, old.Files)
 	parsedThisPass(reread)
-	wholeStoresThisPass(changed, old.Files)
 	// A file the pass read is a file that opens, whether or not it read all of
 	// it, so an error recorded when it did not has to go.
 	readThisPass(changed)
@@ -2679,18 +2806,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if err != nil {
 			return err
 		}
-		seen := map[string]bool{}
-		for _, tok := range append(indexKeys(r.Text), dateTokens(r.Time)...) {
-			if seen[tok] {
-				continue
-			}
-			seen[tok] = true
+		eachIndexKey(r.Text, r.Time, func(tok string) {
 			b := bucket(tok)
 			if buckets[b] == nil {
 				buckets[b] = map[string][]posting{}
 			}
 			buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: meta.Ord})
-		}
+		})
 		if _, exists := m.Sessions[r.Key]; exists {
 			return nil
 		}
@@ -2804,7 +2926,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err := writeBucketsConcurrent(filepath.Join(tmp, "buckets"), buckets); err != nil {
 		return err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	if err := writeManifest(tmp, m); err != nil {
 		return err
@@ -2814,6 +2936,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// have something to say, and the carried file is what a quiet update leaves.
 	mergeFixes(dir, tmp, replacements, replaceKeys)
 	buildCommandsFromIndex(tmp)
+	buildCommandFailsFromIndex(tmp)
 	return swapIndexDir(dir, tmp)
 }
 
@@ -2840,6 +2963,29 @@ func carrySidecars(dir, tmp string) {
 		_ = os.WriteFile(filepath.Join(tmp, name), b, 0o600)
 	}
 }
+
+// appendableKind reports whether a kind can be read from where the last pass
+// stopped. Named by kind rather than by path so the guard and the test that
+// keeps it honest ask the same question.
+func appendableKind(kind string) bool {
+	if kind == "" {
+		return false
+	}
+	resumableKindsOnce.Do(func() {
+		resumableKinds = map[string]bool{}
+		for _, k := range sources.KindsWithOffsetParsers() {
+			resumableKinds[k] = true
+		}
+	})
+	return resumableKinds[kind]
+}
+
+// The registry is fixed for the life of the process, and this is asked once
+// per changed file: walking it each time cost 4.3 KB of garbage a file.
+var (
+	resumableKinds     map[string]bool
+	resumableKindsOnce sync.Once
+)
 
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
 	if len(changed) == 0 {
@@ -2875,14 +3021,11 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 				return false
 			}
 		}
-		switch harnessForPath(p) {
-		// omp, openclaw and prime read the same pi-shaped transcript pi does,
-		// through the same parser, and had offset entries in the registry that
-		// nothing ever reached — so a pass that saw one new turn re-read the
-		// file whole. They join the list now that a resumed read keeps the
-		// session header (#2870).
-		case "claude", "codex", "codex-history", "opencode", "cursor-db", "goose-db", "deja", "pi", "copilot", "grok", "qwen", "goose-jsonl", "omp", "openclaw", "prime":
-		default:
+		// Whether the kind can resume a parse, not whether its name is on a
+		// list: the list grew one harness at a time and six kinds that declare
+		// an offset parser were never added, so their files were re-read whole
+		// on every pass (#2870).
+		if !appendableKind(harnessForPath(p)) {
 			return false
 		}
 	}
@@ -3029,17 +3172,20 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					return filesTouched, messages, 0, err
 				}
 				messages++
-				seen := map[string]bool{}
-				for _, tok := range indexKeys(text) {
-					if seen[tok] {
-						continue
+				var keyErr error
+				eachTextKey(text, func(tok string) {
+					if keyErr != nil {
+						return
 					}
-					seen[tok] = true
 					data, err := loadBucket(tok)
 					if err != nil {
-						return filesTouched, messages, 0, err
+						keyErr = err
+						return
 					}
 					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
+				})
+				if keyErr != nil {
+					return filesTouched, messages, 0, keyErr
 				}
 			}
 		}
@@ -3050,7 +3196,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := writeBucketsConcurrent(filepath.Join(dir, "buckets"), buckets); err != nil {
 		return filesTouched, messages, 0, err
 	}
-	setOpencodeLastUpdated(m.Files, m.Sessions)
+	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
 	// Read before writeManifest: the fold in there drains the counters, and the
 	// caller prints its line after this returns (#2007).
@@ -3125,7 +3271,13 @@ func harnessForPath(p string) string {
 	return ""
 }
 
-func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]SessionMeta) {
+// setDatabaseStoreWatermarks stamps every store deja reads through SQLite.
+//
+// Each of the six has a since-the-watermark parser, and dbParse only calls it
+// once the store carries a watermark — so the three that were never stamped
+// (grok, hermes, zed) read their store whole on every pass, for the life of
+// the index (#2075).
+func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]SessionMeta) {
 	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
 	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
 	// grok's database had a since-the-watermark parser in the registry and
@@ -3152,6 +3304,9 @@ func setOpencodeLastUpdated(files map[string]FileState, sessions map[string]Sess
 	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
+	}
+	for _, db := range sources.HermesDBs() {
+		setStoreLastUpdated(files, sessions, "hermes", db)
 	}
 }
 

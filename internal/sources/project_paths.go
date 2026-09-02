@@ -87,6 +87,12 @@ func agentScratch(p string) bool {
 
 var repoRootCache sync.Map
 
+// RepoRoot is the checkout dir sits in, or "" when it is not in one. Exported
+// for the index, which needs to know whether a caller's directory is a
+// repository before treating everything under it as one project's work
+// (#2040).
+func RepoRoot(dir string) string { return repoRoot(dir) }
+
 // repoRoot walks up until it finds a .git, which is what makes a directory a
 // project rather than a folder. Cached because one session touches the same few
 // directories hundreds of times.

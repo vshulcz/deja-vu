@@ -16,7 +16,6 @@ import (
 // search.Hit, so the rule could not reach it and the block led with the
 // transcript while its own note waited behind (#2803).
 func TestTheHookLiftsANoteAboveItsSource(t *testing.T) {
-	skipWindowsEmptySessionID(t)
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
 	old := time.Now().Add(-72 * time.Hour).UTC().Format(time.RFC3339)

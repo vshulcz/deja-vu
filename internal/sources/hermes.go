@@ -103,7 +103,14 @@ func ParseHermesDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return parseHermesDBWhere(db, "")
 	}
-	return parseHermesDBWhere(db, fmt.Sprintf(" and timestamp > %d", t.Add(-time.Second).Unix()))
+	// By session, so the session comes back whole: what a store parsed from its
+	// watermark hands back replaces what the index holds for that key, and a
+	// return of the newest turn alone takes the earlier ones with it (#2075).
+	// The whole-second floor is then harmless — it can only re-offer a message
+	// the pass was going to replace anyway.
+	return parseHermesDBWhere(db, fmt.Sprintf(
+		" and session_id in (select session_id from messages where timestamp > %d)",
+		t.Add(-time.Second).Unix()))
 }
 
 func parseHermesDBWhere(db, where string) ([]model.Session, error) {

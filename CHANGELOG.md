@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The index format moved: this release rebuilds the index once on first run.
+  Arabic, Hebrew, Thai and the Indic scripts are tokenized as words rather than
+  as single letters, Thai gets the bigrams the other unspaced scripts have,
+  grammar-only CJK bigrams are no longer stored, and a posting's session id is
+  written as a delta — measured at 5.9% to 16.1% smaller `buckets/` across four
+  stores.
+
+  **A read-only index directory needs its index replaced by hand.** deja serves
+  a directory it cannot lock without a version check, by design, so it cannot
+  rebuild one in place: a pre-0.20 index inside a read-only image will make
+  `deja search` exit with `index written by another version of deja` until the
+  directory is rebuilt somewhere writable and copied in. The alternative was
+  reading old posting bytes under the new rule, which returns session ids that
+  are wrong without saying so.
+
 
 ## [0.19.2] - 2026-09-01
 

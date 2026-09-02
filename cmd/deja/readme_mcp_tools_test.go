@@ -80,6 +80,12 @@ func TestReadmeListsEveryMCPToolTheServerRegisters(t *testing.T) {
 
 // tableRow returns the README table row for a tool, or "" when there is none.
 func tableRow(readme, tool string) string {
+	// From the MCP section onwards. The CLI command table has a `deja` row of
+	// its own, and the tool is now called `deja` too — reading the first row
+	// with that name asked the CLI table for a tool's arguments.
+	if at := strings.Index(readme, "### MCP tools"); at >= 0 {
+		readme = readme[at:]
+	}
 	head := "| `" + tool + "` |"
 	i := strings.Index(readme, head)
 	if i < 0 {

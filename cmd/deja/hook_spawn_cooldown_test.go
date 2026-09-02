@@ -107,7 +107,14 @@ func TestAnOrdinaryPromptStillSitsOutTheCooldown(t *testing.T) {
 			t.Fatal(err)
 		}
 		var out bytes.Buffer
-		payload := `{"prompt":` + string(b) + `,"session_id":"` + sid + `","cwd":"` + cwd + `"}`
+		// The cwd goes in as JSON writes it: a Windows path carries
+		// backslashes, and pasting them raw leaves a payload the hook cannot
+		// read — which reads as a hook that answered nothing (#2808).
+		where, err := json.Marshal(cwd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload := `{"prompt":` + string(b) + `,"session_id":"` + sid + `","cwd":` + string(where) + `}`
 		if err := runHookPrompt(index.DefaultDir(), strings.NewReader(payload), &out); err != nil {
 			t.Fatal(err)
 		}

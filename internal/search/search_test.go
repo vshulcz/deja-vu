@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -96,8 +97,11 @@ func TestBM25HelperSignals(t *testing.T) {
 	if got := freshnessDecay(now.Add(time.Hour), now); got != 1 {
 		t.Fatalf("future decay=%v", got)
 	}
-	if got := freshnessDecay(now.Add(-24*time.Hour), now); got != 0.5 {
+	if got := freshnessDecay(now.Add(-24*time.Hour), now); math.Abs(got-0.75) > 1e-9 {
 		t.Fatalf("one-day decay=%v", got)
+	}
+	if got := freshnessDecay(now.Add(-3650*24*time.Hour), now); got < freshnessFloor {
+		t.Fatalf("decay fell through its floor: %v", got)
 	}
 	counts := make([]int, 2)
 	userCounts := make([]int, 2)
@@ -756,5 +760,44 @@ func TestProjectMatchesHandlesImportedPrefix(t *testing.T) {
 		if got := projectMatches(c.project, names); got != c.want {
 			t.Errorf("projectMatches(%q, %v) = %v, want %v", c.project, names, got, c.want)
 		}
+	}
+}
+
+// The exact tier states that it weighs freshness. With a hyperbolic decay it
+// ordered by date instead: a month-old session keeps 3% of its score, which is
+// more than BM25 spans, so topicality only broke ties (#1269).
+func TestASharpOldMatchOutranksAVagueNewOne(t *testing.T) {
+	now := time.Now()
+	at := now.Add(-30 * 24 * time.Hour)
+	old := model.Session{ID: "old", Harness: "claude", Project: "p", Updated: at,
+		Messages: []model.Message{{Role: "user", Time: at,
+			Text: "the pgbouncer pool ran out of connections; pgbouncer pool_mode transaction fixed the connections, pgbouncer pool connections settled"}}}
+	fresh := model.Session{ID: "fresh", Harness: "claude", Project: "p", Updated: now,
+		Messages: []model.Message{{Role: "user", Time: now,
+			Text: "notes on the reporting worker " + strings.Repeat("queues dashboards retries batches ", 20) + " the pgbouncer pool connections were fine here"}}}
+	hits, err := Run([]model.Session{fresh, old}, Options{Query: "pgbouncer pool connections"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "old" {
+		t.Fatalf("the sharper match lost to the newer one: %#v", hits)
+	}
+}
+
+// And age still counts: between two sessions that say the same thing, the
+// recent one leads.
+func TestBetweenEqualMatchesTheRecentOneLeads(t *testing.T) {
+	now := time.Now()
+	text := "the pgbouncer pool ran out of connections"
+	old := model.Session{ID: "old", Harness: "claude", Project: "p", Updated: now.Add(-30 * 24 * time.Hour),
+		Messages: []model.Message{{Role: "user", Text: text, Time: now.Add(-30 * 24 * time.Hour)}}}
+	fresh := model.Session{ID: "fresh", Harness: "claude", Project: "p", Updated: now,
+		Messages: []model.Message{{Role: "user", Text: text, Time: now}}}
+	hits, err := Run([]model.Session{old, fresh}, Options{Query: "pgbouncer pool connections"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "fresh" {
+		t.Fatalf("age stopped counting: %#v", hits)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -94,13 +95,21 @@ func TestAMissingOrForeignFileIsLeftAlone(t *testing.T) {
 // A store under a directory with a space or a question mark still reaches
 // sqlite3 whole: the URI form escapes per segment.
 func TestAPathWithAwkwardCharactersSurvivesTheURI(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "My Store?v2")
+	// A name Windows accepts: `?` is not a filename character there, so the
+	// old fixture could not be created at all and the test failed before it
+	// measured anything. `#` needs the same per-segment escaping a `?` does,
+	// and the `?` case is kept where it can exist (#2808).
+	name := "My Store#v2"
+	if runtime.GOOS != "windows" {
+		name += "?raw"
+	}
+	dir := filepath.Join(t.TempDir(), name)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	db := walDB(t, dir, "store.db")
 	target := sqliteTarget(db)
-	if strings.Contains(target, " ") || strings.Contains(target, "?v2") {
+	if strings.Contains(target, " ") || strings.Contains(target, "#v2") {
 		t.Fatalf("the path went out unescaped: %q", target)
 	}
 	out, err := exec.Command("sqlite3", "-readonly", target, "select x from t").CombinedOutput()

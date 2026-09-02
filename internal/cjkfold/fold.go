@@ -66,8 +66,24 @@ func String(s string) string {
 	return string(runes)
 }
 
+// Unspaced reports whether r belongs to a script that writes without spaces
+// between words. Everything IsCJK covers, plus Thai: a Thai sentence is one
+// run of letters, so a tokenizer that splits on spaces keys the sentence and
+// never the word (#2897). The bigram path is what makes such a script
+// searchable, and it asks this rather than IsCJK.
+func Unspaced(r rune) bool {
+	return IsCJK(r) || IsThai(r)
+}
+
+// IsThai reports whether r is a Thai letter, digit or sign. The block is
+// contiguous and holds nothing else, so the range is the test.
+func IsThai(r rune) bool {
+	return r >= 0x0E00 && r <= 0x0E7F
+}
+
 // IsCJK reports whether r is a Han, Hiragana, Katakana or Hangul rune — the
-// scripts this package folds, and the ones written without spaces between words.
+// scripts this package folds. Use Unspaced for the wider question of whether a
+// script writes its words apart.
 func IsCJK(r rune) bool {
 	return unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) ||
 		unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) ||
@@ -192,7 +208,7 @@ func Bigrams(s string) []string {
 		run = run[:0]
 	}
 	for _, r := range s {
-		if IsCJK(r) {
+		if Unspaced(r) {
 			run = append(run, r)
 			continue
 		}

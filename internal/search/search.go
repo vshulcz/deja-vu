@@ -656,16 +656,87 @@ func LiftNotesAboveTheirSource(hits []Hit) {
 // is dated by its evidence rather than by the day it was filed (V4) the two are
 // equally fresh, so the transcript won its own distillation.
 func liftNotesAboveTheirSource(hits []Hit) {
-	order := liftedNoteOrder(len(hits),
-		func(i int) string { return hits[i].Session.Harness },
-		func(i int) string { return hits[i].Session.ID },
-		func(i int) string { return hits[i].Session.OrigID })
-	if order == nil {
+	liftNotesBy(hits, func(h Hit) model.Session { return h.Session })
+}
+
+// indexNotes is where each promoted note sits, by the id it names, in rank
+// order. Every hit holding an id rather than one of them: two machines can
+// promote the same session, and keeping only the last put the peer's copy
+// above this machine's own note.
+func indexNotes[T any](hits []T, of func(T) model.Session) map[string][]int {
+	notes := make(map[string][]int, len(hits))
+	for i, h := range hits {
+		if id := noteID(of(h)); id != "" {
+			notes[id] = append(notes[id], i)
+		}
+	}
+	return notes
+}
+
+// noteID is the id a promoted note has on the machine that made it, and "" for
+// a session that is not one. Mirrors cmd/deja's promotedNoteID: after a sync
+// the local id is `imported-…` and the real one rides in OrigID (#975, #2833).
+func noteID(s model.Session) string {
+	if s.Harness != notesHarness {
+		return ""
+	}
+	if strings.HasPrefix(s.ID, "deja-note-") {
+		return s.ID
+	}
+	if strings.HasPrefix(s.OrigID, "deja-note-") {
+		return s.OrigID
+	}
+	return ""
+}
+
+// sessionOrigID is the id a session had where it was recorded.
+func sessionOrigID(s model.Session) string {
+	if s.OrigID != "" {
+		return s.OrigID
+	}
+	return s.ID
+}
+
+// liftNotesBy is the rule itself, over anything that names a session: blame
+// ranks its own hit type and had the same omission (#2829).
+func liftNotesBy[T any](hits []T, of func(T) model.Session) {
+	notes := indexNotes(hits, of)
+	if len(notes) == 0 {
 		return
 	}
-	out := make([]Hit, len(hits))
-	for at, from := range order {
-		out[at] = hits[from]
+	// One pass, emitting each source's notes just before it. Reordering in
+	// place meant reindexing after every rotation, which is a map rebuild per
+	// pair over the whole matched set — measured at 622ms and a gigabyte on a
+	// store where every transcript outranked its own note (#2833).
+	done := make([]bool, len(hits))
+	out := make([]T, 0, len(hits))
+	for i := range hits {
+		src := of(hits[i])
+		if src.Harness != notesHarness {
+			// Both ids. The note names the session as it was on the machine
+			// that made it — the local id where this machine promoted it, the
+			// original where the note travelled — and after a sync a session
+			// carries `imported-…` locally with the original in OrigID (#2833).
+			//
+			// Every copy that has not been placed yet, in rank order, so two
+			// machines' notes about one session both land above it and this
+			// machine's own comes first.
+			for _, id := range []string{
+				"deja-note-" + src.Harness + "-" + src.ID,
+				"deja-note-" + src.Harness + "-" + sessionOrigID(src),
+			} {
+				for _, j := range notes[id] {
+					if j > i && !done[j] {
+						done[j] = true
+						out = append(out, hits[j])
+					}
+				}
+			}
+		}
+		if !done[i] {
+			done[i] = true
+			out = append(out, hits[i])
+		}
 	}
 	copy(hits, out)
 }
@@ -675,81 +746,7 @@ func liftNotesAboveTheirSource(hits []Hit) {
 // note-over-source rule at all, so the transcript a note was distilled from
 // went into the block ahead of the note (#2803).
 func LiftNoteSessionsAboveTheirSource(ss []model.Session) {
-	order := liftedNoteOrder(len(ss),
-		func(i int) string { return ss[i].Harness },
-		func(i int) string { return ss[i].ID },
-		func(i int) string { return ss[i].OrigID })
-	if order == nil {
-		return
-	}
-	out := make([]model.Session, len(ss))
-	for at, from := range order {
-		out[at] = ss[from]
-	}
-	copy(ss, out)
-}
-
-// liftedNoteOrder answers where each element goes so that a promoted note sits
-// in front of the transcript it was distilled from, and nothing else moves. It
-// returns nil when there is nothing to lift, so a caller can skip the copy.
-func liftedNoteOrder(n int, harnessAt, idAt, origAt func(int) string) []int {
-	// A session that arrived by sync has its local id rewritten to imported-…
-	// and keeps the real one in OrigID. Both sides of the pair need reading
-	// that way — the note's own id, and the source's key a note is built from
-	// — or an imported note is never recognised and the transcript it distils
-	// outranks it everywhere this rule reaches (#2833). lifecycle.go and
-	// hook_tool.go already consult OrigID for the same reason (#975).
-	noteID := func(i int) string {
-		if id := idAt(i); strings.HasPrefix(id, "deja-note-") {
-			return id
-		}
-		if orig := origAt(i); strings.HasPrefix(orig, "deja-note-") {
-			return orig
-		}
-		return ""
-	}
-	notes := make(map[string]int, n)
-	for i := 0; i < n; i++ {
-		if harnessAt(i) == notesHarness && noteID(i) != "" {
-			notes[noteID(i)] = i
-		}
-	}
-	if len(notes) == 0 {
-		return nil
-	}
-	order := make([]int, 0, n)
-	taken := make(map[int]bool, len(notes))
-	moved := false
-	for i := 0; i < n; i++ {
-		if taken[i] {
-			continue
-		}
-		if harnessAt(i) != notesHarness {
-			// Mirrors sources.PromotedNoteID: building the id rather than
-			// parsing one keeps a harness name with a dash in it from
-			// splitting wrong. Built from the source's own id and from the one
-			// it had before it was imported, since either may be what the note
-			// was made against.
-			for _, key := range []string{idAt(i), origAt(i)} {
-				if key == "" {
-					continue
-				}
-				j, ok := notes["deja-note-"+harnessAt(i)+"-"+key]
-				if !ok || j <= i || taken[j] {
-					continue
-				}
-				order = append(order, j)
-				taken[j] = true
-				moved = true
-				break
-			}
-		}
-		order = append(order, i)
-	}
-	if !moved {
-		return nil
-	}
-	return order
+	liftNotesBy(ss, func(s model.Session) model.Session { return s })
 }
 
 // sortHits orders a ranked result set.
@@ -778,6 +775,16 @@ func isLocalProject(project string) bool {
 	return !strings.HasPrefix(project, "imported:")
 }
 
+// freshnessFloor bounds how much a session's age can cost it. The decay used
+// to be 1/(1+age), which keeps 3% of a score after a month and 0.3% after a
+// year; BM25 does not span three orders of magnitude, so the exact tier
+// ordered by date and let topicality break the ties, the opposite of what it
+// says it does (#1269). At a floor of 0.5 age can halve a score, not erase it:
+// recency still leads between answers that say the same thing, and a session
+// that answers the question outranks a newer one that only mentions it.
+const freshnessFloor = 0.5
+
+// freshnessDecay weighs a session's age between freshnessFloor and 1.
 func freshnessDecay(updated, now time.Time) float64 {
 	if updated.IsZero() {
 		return 0
@@ -786,7 +793,7 @@ func freshnessDecay(updated, now time.Time) float64 {
 	if age <= 0 {
 		return 1
 	}
-	return 1 / (1 + age)
+	return freshnessFloor + (1-freshnessFloor)/(1+age)
 }
 
 // windowScanLimit bounds how many places of one token are enumerated when
@@ -1099,7 +1106,7 @@ func countDocumentWords(s string, terms []string, variants map[string][]string, 
 			size = n
 			isWord = unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-'
 			if isWord {
-				if cjkfold.IsCJK(r) {
+				if cjkfold.Unspaced(r) {
 					cjk++
 				} else {
 					other++

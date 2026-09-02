@@ -172,7 +172,7 @@ func looksLikeProse(line string) bool {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r >= 0x80 {
 			letters++
 		}
-		if cjkfold.IsCJK(r) {
+		if cjkfold.Unspaced(r) {
 			spaceless++
 		}
 	}
@@ -686,7 +686,10 @@ func Handoff(s model.Session, budget int) string {
 		}
 	}
 	quoted := neutralizeHandoffMarkers(body)
-	if tail := tailSection(s, budget-b.Len()); tail != "" {
+	// The body is in `quoted` rather than in `b`, so the tail's budget has to
+	// count both — measured, it was handed the whole body's worth of extra
+	// room and a 2000-byte package came back at 3159 (#2866).
+	if tail := tailSection(s, budget-b.Len()-len(quoted)); tail != "" {
 		quoted += "\n\n## Where it stopped\n\n" + neutralizeHandoffMarkers(tail)
 	}
 	// The quote closes before deja speaks again, so its own last paragraph is
@@ -833,6 +836,14 @@ var decisionMarkers = []string{
 	// live questions turns into a pointer.
 	"теперь ", "стало ", "становится", "лежит в", "работает через",
 	"по умолчанию", "переехал", "now lives", "now goes", "by default",
+	// The English half was missing the shapes English actually uses to close
+	// something. Counted over 41,084 real messages, the Russian markers fired
+	// 149 times on "решили" and 47 on "в итоге" while their English mirrors —
+	// "we settled on", "in the end we", "Decision:" at the start of a line —
+	// fired once or twice each: the store is Russian-dominant, so the gap read
+	// as rare rather than as a hole (#2340). It is a hole for a reader working
+	// in English, and these are the same shapes as the entries above them.
+	"settled on", "went with", "ended up", "in the end", "opted for",
 }
 
 // CarriesDecision reports whether a line reads as something concluded rather

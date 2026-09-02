@@ -212,18 +212,24 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 
 ### MCP tools
 
-The server exposes `recall`, `recall_context`, `blame`, `fix`, `how` and `remember`.
-`deja install` wires them in, so this is only needed to configure an agent by hand.
+The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, so
+this is only needed to configure an agent by hand. The six older tool names
+(`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
+anything already wired to them.
 
 <details>
 <summary>Arguments and return shapes</summary>
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
+| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?` | Depends on the mode, below. |
+
+| Mode | Arguments it reads | Returns |
+| --- | --- | --- |
 | `recall` | `query`, `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
-| `recall_context` | `query`, `harness?` | Markdown digest of the best-matching session. |
+| `context` | `query`, `harness?` | Markdown digest of the best-matching session. |
 | `blame` | `path`, `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
-| `fix` | `error`, `project?`, `limit?` | What this machine ran after that same error before. |
+| `fix` | `error`, `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | `what`, `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `remember` | `text`, `project?`, `tags?` | Stores a durable decision for later recall. |
 
@@ -309,7 +315,8 @@ deja embed
 
 With no `DEJA_EMBED_URL` set, deja probes `localhost:11434` and `localhost:1234`,
 so a machine already running Ollama or LM Studio is picked up without being asked.
-`DEJA_EMBED_OFF=1` turns that probe off — a configured `DEJA_EMBED_URL` still wins.
+`DEJA_EMBED_OFF=1`, or `DEJA_EMBED_URL=off`, turns that probe off — any other
+configured `DEJA_EMBED_URL` still wins.
 
 For another authenticated OpenAI-compatible endpoint, set `DEJA_EMBED_KEY` explicitly:
 
@@ -434,6 +441,8 @@ rm -rf ~/.cache/deja
 
 Written for the situation rather than the feature:
 
+- [Does your agent remember previous conversations?](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html) — what each agent keeps between sessions, and what it drops
+- [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) — how big `~/.claude/projects` gets, and what deleting it costs
 - [The agent lost the context you had](https://vshulcz.github.io/deja-vu/guide/lost-context.html) — after a crash, a clear, or a session that came back empty
 - [The context window is full](https://vshulcz.github.io/deja-vu/guide/context-window-full.html) — what compaction keeps, measured, and what to do instead
 - [Resuming yesterday's session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html) — find it across every agent, reopen it in the one that owns it

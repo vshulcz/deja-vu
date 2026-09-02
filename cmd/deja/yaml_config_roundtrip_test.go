@@ -13,19 +13,25 @@ import (
 // block it added in a config the reader owned, and goose returns the file
 // without the trailing newline it came with (#2606).
 func TestAYamlConfigComesBackAsItWas(t *testing.T) {
+	// The path each writer actually uses, asked rather than restated: goose is
+	// one of the few that does not keep its config under ~/.config on Windows,
+	// so a hard-coded relative path was a config deja never reads (#2808).
 	for _, tc := range []struct {
 		name    string
 		target  string
-		rel     []string
+		path    func() string
 		content string
 	}{
-		{"hermes", "hermes", []string{".hermes", "config.yaml"}, "profile: default\n"},
-		{"goose", "goose", []string{".config", "goose", "config.yaml"}, "GOOSE_MODEL: gpt-5\n"},
+		{"hermes", "hermes", func() string {
+			return filepath.Join(os.Getenv("HOME"), ".hermes", "config.yaml")
+		}, "profile: default\n"},
+		{"goose", "goose", func() string {
+			return filepath.Join(gooseConfigDir(), "config.yaml")
+		}, "GOOSE_MODEL: gpt-5\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			hermeticEnv(t)
-			home := os.Getenv("HOME")
-			path := filepath.Join(append([]string{home}, tc.rel...)...)
+			path := tc.path()
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				t.Fatal(err)
 			}

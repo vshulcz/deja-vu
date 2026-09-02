@@ -81,6 +81,10 @@ func setOpenClawPluginEnabled(on bool) (string, error) {
 			return "unchanged", nil
 		}
 		root = map[string]any{}
+	} else if configIsJSONC(old) {
+		// The same file the hook and the MCP entry are written into, and the
+		// same reason not to refuse it over a comment (#2811).
+		return setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", on)
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return "", configParseError(path, err)
 	}

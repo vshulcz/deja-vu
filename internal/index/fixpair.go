@@ -67,6 +67,13 @@ type FixPair struct {
 	// Empty on a pair mined before this field existed; the version bump that
 	// ships it forces the rebuild that fills it.
 	Project string
+	// Edit is the file a session changed after the error, for the failures a
+	// command cannot answer. What fixes a failing test is an edit, and the
+	// miner only ever looked for the next command — so the most common failure
+	// an agent sees had no remedy it could record (#2163). Set instead of
+	// Command, never beside it: an edit is evidence of what was changed, not
+	// something a reader can run.
+	Edit string `json:",omitempty"`
 	// Candidate marks a sighting that is not a pair yet: the remedy named
 	// nothing the error named, and no other session has done the same thing
 	// after the same error. Evidence of the second kind accumulates across
@@ -156,7 +163,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 // fixKey identifies one remedy for one error, so the same pair arriving from
 // two sessions can be counted as a repeat.
 func fixKey(p FixPair) string {
-	return strconv.FormatUint(p.Sig, 16) + "|" + strings.ToLower(p.Command)
+	return strconv.FormatUint(p.Sig, 16) + "|" + strings.ToLower(p.Command) + "|" + strings.ToLower(p.Edit)
 }
 
 // fixTermRE matches the words worth comparing: identifiers, paths, flags.
@@ -284,16 +291,8 @@ func outputReadsAsFailure(text string) bool {
 // commandFailed reads the exit status the record carries, for the harnesses
 // that store one (codex and opencode append it; Claude does not).
 func commandFailed(text string) bool {
-	i := strings.LastIndex(text, "→ exit ")
-	if i < 0 {
-		return false
-	}
-	code := strings.TrimSpace(text[i+len("→ exit "):])
-	if j := strings.IndexAny(code, " \n"); j >= 0 {
-		code = code[:j]
-	}
-	n, err := strconv.Atoi(code)
-	return err == nil && n != 0
+	_, code, recorded := CommandExitOutcome(text)
+	return recorded && code != 0
 }
 
 // outputFailed reports whether what came back from the command is itself an
@@ -325,15 +324,30 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		if !ok {
 			continue
 		}
+		// The first file the session changed after the error, kept in case the
+		// window holds no command that answers it.
+		edited := ""
+		paired := false
 		for j := i + 1; j < len(ms) && j <= i+fixLookAhead; j++ {
+			if ms[j].Role == roleEdit {
+				if edited == "" {
+					edited = strings.TrimSpace(firstLineOf(ms[j].Text))
+				}
+				continue
+			}
 			if ms[j].Role != roleCommand {
 				continue
 			}
 			cmd := strings.TrimSpace(firstLineOf(ms[j].Text))
-			if cmd == "" || len(cmd) > fixCommandMax {
+			if cmd == "" || len(cmd) > fixCommandMax || opensMoreInput(cmd) {
 				// A heredoc or pasted script right after the error is not the
 				// remedy; keep scanning the window for the real one-liner two
 				// records on, instead of abandoning the error entirely.
+				//
+				// The length bound is what caught most of those, and it caught
+				// them by luck: a short first line — `python - <<'EOF'` — was
+				// stored whole and handed to an agent as the command to run,
+				// where it waits on input that is not coming (#2051).
 				continue
 			}
 			if lastSeen[sig] > j {
@@ -367,7 +381,14 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				continue
 			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
+			paired = true
 			break
+		}
+		// No command answered it, and the session changed a file: that is the
+		// remedy for a failing test, which is what the command window can
+		// never hold.
+		if !paired && edited != "" && looksLikeEditedPath(edited) {
+			out = append(out, FixPair{Sig: sig, Error: line, Edit: edited, Key: key, When: m.Time, Project: project})
 		}
 	}
 	return out
@@ -384,6 +405,40 @@ var ephemeralPathRE = regexp.MustCompile(`(^|[\s"'=(])(/tmp/|/var/folders/|/priv
 // gone by the time deja would serve it.
 func namesAnEphemeralPath(cmd string) bool {
 	return ephemeralPathRE.MatchString(cmd)
+}
+
+// looksLikeEditedPath keeps the first line of an edit record to what a path can
+// be. The record is "<path>\n<span>", but a span whose file was not recorded
+// would otherwise put a line of source in the table.
+func looksLikeEditedPath(p string) bool {
+	// A path carries no whitespace and none of the punctuation source is
+	// written in. "Makefile" is a path and "\tif err != nil {" is not;
+	// requiring a dot or a slash would have refused the first, which is a real
+	// file at the top of a repository.
+	if p == "" || len(p) > 200 {
+		return false
+	}
+	return !strings.ContainsAny(p, " \t\"'`$(){}[]=;:,*")
+}
+
+// opensMoreInput reports whether a command's first line is only the start of
+// one. A pair stores that line and a reader runs it, so a heredoc opener is not
+// a remedy but a hang.
+func opensMoreInput(cmd string) bool {
+	// A herestring is a whole command — `psql <<< "$sql"` reads from the line
+	// it is on — so it is not one of these.
+	for i := 0; ; {
+		j := strings.Index(cmd[i:], "<<")
+		if j < 0 {
+			break
+		}
+		at := i + j
+		if !strings.HasPrefix(cmd[at+2:], "<") {
+			return true
+		}
+		i = at + 3
+	}
+	return strings.HasSuffix(cmd, "\\")
 }
 
 // firstFrictionLine returns the first line of a record that names something
@@ -414,6 +469,72 @@ func LooksLikeError(text string) bool {
 		}
 	}
 	return false
+}
+
+// mergeFixPairs folds newly mined pairs into the table on file: a remedy that
+// names what the error named is a pair at once, anything else waits for a
+// second session to do the same thing.
+func mergeFixPairs(kept, fresh []FixPair) []FixPair {
+	seen := map[string]int{}
+	for _, p := range kept {
+		seen[fixKey(p)]++
+	}
+	repeats := map[string]int{}
+	for _, p := range fresh {
+		repeats[fixKey(p)]++
+	}
+	// A candidate already on file is the evidence a later session needs, so it
+	// counts towards the second sighting — and once something is promoted, the
+	// candidate copy of it goes. Not redundant with the deduplication below:
+	// two sessions carrying the same timestamp sort either way, and when the
+	// candidate copy sorts first it is the one that survives, so the pair the
+	// second sighting just earned is never served.
+	promoted := map[string]bool{}
+	for _, p := range fresh {
+		k := fixKey(p)
+		// An edit is never self-evident the way a command that names what the
+		// error named is: the error names a test, the remedy names a file, and
+		// nothing ties them but a second session doing the same thing.
+		selfEvident := p.Edit == "" && sharesTerm(p.Error, p.Command)
+		if selfEvident || repeats[k]+seen[k] >= 2 {
+			p.Candidate = false
+			kept = append(kept, p)
+			promoted[k] = true
+			continue
+		}
+		p.Candidate = true
+		kept = append(kept, p)
+	}
+	for i := range kept {
+		if promoted[fixKey(kept[i])] {
+			kept[i].Candidate = false
+		}
+	}
+	sort.SliceStable(kept, func(i, j int) bool { return kept[i].When.After(kept[j].When) })
+	written := map[string]bool{}
+	out := kept[:0]
+	candidates := 0
+	for _, p := range kept {
+		k := fixKey(p)
+		if written[k] {
+			continue
+		}
+		// Candidates are bounded on their own. They serve nobody until a second
+		// session confirms them, so letting them share the pair budget would
+		// push real answers out of a table that is read whole.
+		if p.Candidate {
+			if candidates >= fixesCandidateMax {
+				continue
+			}
+			candidates++
+		}
+		written[k] = true
+		out = append(out, p)
+		if len(out) >= fixesMax+fixesCandidateMax {
+			break
+		}
+	}
+	return out
 }
 
 // mergeFixes updates the carried pairs with what the sessions in this
@@ -461,61 +582,7 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 	if len(fresh) == 0 && len(kept) == len(carried) && !dirty {
 		return
 	}
-	seen := map[string]int{}
-	for _, p := range kept {
-		seen[fixKey(p)]++
-	}
-	repeats := map[string]int{}
-	for _, p := range fresh {
-		repeats[fixKey(p)]++
-	}
-	// A candidate already on file is the evidence a later session needs, so it
-	// counts towards the second sighting — and once something is promoted, the
-	// candidate copy of it goes. Not redundant with the deduplication below:
-	// two sessions carrying the same timestamp sort either way, and when the
-	// candidate copy sorts first it is the one that survives, so the pair the
-	// second sighting just earned is never served.
-	promoted := map[string]bool{}
-	for _, p := range fresh {
-		k := fixKey(p)
-		if sharesTerm(p.Error, p.Command) || repeats[k]+seen[k] >= 2 {
-			p.Candidate = false
-			kept = append(kept, p)
-			promoted[k] = true
-			continue
-		}
-		p.Candidate = true
-		kept = append(kept, p)
-	}
-	for i := range kept {
-		if promoted[fixKey(kept[i])] {
-			kept[i].Candidate = false
-		}
-	}
-	sort.SliceStable(kept, func(i, j int) bool { return kept[i].When.After(kept[j].When) })
-	written := map[string]bool{}
-	out := kept[:0]
-	candidates := 0
-	for _, p := range kept {
-		k := fixKey(p)
-		if written[k] {
-			continue
-		}
-		// Candidates are bounded on their own. They serve nobody until a second
-		// session confirms them, so letting them share the pair budget would
-		// push real answers out of a table that is read whole.
-		if p.Candidate {
-			if candidates >= fixesCandidateMax {
-				continue
-			}
-			candidates++
-		}
-		written[k] = true
-		out = append(out, p)
-		if len(out) >= fixesMax+fixesCandidateMax {
-			break
-		}
-	}
+	out := mergeFixPairs(kept, fresh)
 	// Atomic, unlike buildFixes above: that one writes into a directory made
 	// moments earlier, where the file cannot exist. This one runs after
 	// carrySidecars has copied the live table into the build directory, and the

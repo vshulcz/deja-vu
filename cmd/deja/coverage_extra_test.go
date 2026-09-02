@@ -793,7 +793,15 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 	idx := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", idx)
 	claudeRoot := filepath.Join(tmp, "claude")
-	projDir := filepath.Join(claudeRoot, "-tmp-many")
+	// The project the hook will stand in, and the directory name a harness
+	// gives it: spelled out rather than written by hand, since the encoding
+	// differs by platform and a fixture under the wrong name is memory the
+	// hook never finds (#2808).
+	work := filepath.Join("/tmp", "many")
+	if runtime.GOOS == "windows" {
+		work = filepath.Join(tmp, "many")
+	}
+	projDir := filepath.Join(claudeRoot, encodedProjectDir(work))
 	for i := 0; i < 4; i++ {
 		id := string(rune('a'+i)) + "many"
 		writeClaudeFixture(t, filepath.Join(projDir, id+".jsonl"), id, []string{`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"many project memory ` + id + `"}}`})
@@ -801,18 +809,10 @@ func TestHookDigestPlainAndLimitBranches(t *testing.T) {
 	if err := index.EnsureForSearch(idx, search.Options{Query: "many", All: true}, false, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	oldwd, _ := os.Getwd()
-	work := filepath.Join("/tmp", "many")
-	if runtime.GOOS == "windows" {
-		work = filepath.Join(tmp, "many")
-	}
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Chdir(work); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chdir(oldwd) })
+	t.Chdir(work)
 	var out bytes.Buffer
 	old := os.Stdout
 	r, w, err := os.Pipe()

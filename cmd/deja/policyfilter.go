@@ -78,6 +78,21 @@ func policyFilterSessionsCounted(activation string, ss []model.Session) ([]model
 	return kept, before - len(kept)
 }
 
+// policyFilterSessionsSplit is policyFilterSessionsCounted with the withheld
+// sessions kept rather than counted, for a caller whose note is about the ones
+// its own filters would have shown (#2816).
+func policyFilterSessionsSplit(activation string, ss []model.Session) (keep, withheld []model.Session) {
+	p := policy.Load()
+	for _, s := range ss {
+		if p.Allows(activation, s.Project) {
+			keep = append(keep, s)
+			continue
+		}
+		withheld = append(withheld, s)
+	}
+	return keep, withheld
+}
+
 // policyHiddenProjects names the projects a rule is withholding right now. The
 // view page needs them by name rather than by session: a stored digest carries
 // no project field, so the only way to keep withheld content off a shareable

@@ -47,17 +47,7 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Project: project,
 		Path:    path,
 	}
-	// The first line is the session header — id, timestamp, cwd — and an
-	// offset parse starts past it, so a resumed read fell back to the filename
-	// for the id and, where the header carries the cwd, to the directory name
-	// for the project. The filename is `<ISO>_<uuid>`, so appending one turn
-	// filed the tail under an id the whole read never produces (#2870).
-	if offset > 0 {
-		if head, herr := firstJSONLObject(path); herr == nil {
-			applyPiHeader(&s, head, useHeaderCwd)
-		}
-	}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		switch typ {
 		case "session":

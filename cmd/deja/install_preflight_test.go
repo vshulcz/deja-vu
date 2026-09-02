@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -163,6 +164,12 @@ func TestThePreflightRefusesJSONThatIsNotAnObject(t *testing.T) {
 
 // A file that is there but cannot be read is not a file that is absent.
 func TestThePreflightPassesOnAReadErrorRatherThanSkippingIt(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The mode bits are the whole fixture, and Windows does not read them
+		// — a 0o000 file opens there, so the test would be asserting that a
+		// readable file is unreadable (#2808).
+		t.Skip("a file mode is not what decides this on Windows")
+	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "unreadable.json")
 	if err := os.WriteFile(path, []byte(`{"a":1}`), 0o000); err != nil {

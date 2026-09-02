@@ -9,14 +9,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -536,24 +539,127 @@ func consumeField(b []byte) (string, []byte, bool) {
 func swapIndexDir(dir, tmp string) error {
 	old := dir + ".old"
 	_ = os.RemoveAll(old)
-	if err := os.Rename(dir, old); err != nil && !os.IsNotExist(err) {
-		// The parking spot survived the removal above — a leftover from an
-		// interrupted swap whose permissions stop deja from clearing it. The
-		// bare `rename …: file exists` names two paths nobody chose and gives
-		// nothing to do about either (#1009).
-		if _, statErr := os.Stat(old); statErr == nil {
-			return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
-		}
+	// The parking spot survived the removal above — a leftover from an
+	// interrupted swap whose permissions stop deja from clearing it. The bare
+	// `rename …: file exists` names two paths nobody chose and gives nothing to
+	// do about either (#1009). Decided before the wait: no amount of waiting
+	// clears it, and the reader has to act on the message either way.
+	if _, statErr := os.Stat(old); statErr == nil {
+		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
+	}
+	// The parking step can afford to wait: the index is still where readers
+	// look until it succeeds, so nobody is waiting on it, and this is the
+	// rename a pass that spent seconds building tmp would otherwise give up on
+	// for the sake of a search that held a handle for a quarter of a second.
+	if err := renameWaiting(dir, old, parkRenameWait); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	if err := os.Rename(tmp, dir); err != nil {
-		// Put the previous index back rather than leaving nothing.
-		_ = os.Rename(old, dir)
+	// From here the index is not where readers look, so this rename and the
+	// restore that may follow it share one deadline: the window a reader waits
+	// out, spent once between them rather than twice.
+	deadline := time.Now().Add(swapRenameWait)
+	if err := renameWaitingUntil(tmp, dir, deadline); err != nil {
+		// Put the previous index back rather than leaving nothing, with
+		// whatever is left of that window — this runs exactly when renames on
+		// this directory are being refused.
+		floor := time.Now().Add(restoreRenameFloor)
+		if floor.After(deadline) {
+			// A little past the window rather than none of it: the restore is
+			// the one rename that must not fail, and a second rename that
+			// spent the whole budget would otherwise leave it none.
+			deadline = floor
+		}
+		_ = renameWaitingUntil(old, dir, deadline)
 		return err
 	}
 	_ = os.RemoveAll(old)
 	return nil
 }
+
+// renameWaiting is os.Rename with a short wait for a rename another pass is
+// holding the directory open against.
+//
+// Windows refuses to rename a directory while any handle inside it is open, so
+// two ordinary passes at once — a hook's warmup and a `deja index` from a shell
+// — left the loser unable to swap, and the store a session short until
+// something rebuilt it. On Unix the loser renames over the winner and both end
+// up consistent, which is why this went unmeasured (#2228). The reader holding
+// those handles is finishing a read, not doing work, so the wait is short and
+// bounded; a rename still refused at the end is reported rather than retried
+// forever, and the caller puts the previous index back.
+func renameWaiting(from, to string, wait time.Duration) error {
+	return renameWaitingUntil(from, to, time.Now().Add(wait))
+}
+
+// renameWaitingUntil is renameWaiting against a deadline the caller keeps, so a
+// swap and the restore that follows it share one window rather than each
+// getting a fresh one — two full budgets in a row is the index away for twice
+// as long as a reader will wait (#2228).
+func renameWaitingUntil(from, to string, deadline time.Time) error {
+	err := renameFile(from, to)
+	for err != nil && renameHeldOpen(err) && time.Now().Before(deadline) {
+		time.Sleep(swapRenameStep)
+		err = renameFile(from, to)
+	}
+	return err
+}
+
+// renameHeldOpen reports whether a refusal is the kind that clears on its own.
+// A handle in the directory is; a read-only filesystem, a path that is a file,
+// a parking spot deja cannot replace (#1009) are not, and waiting two seconds
+// to say so delays a message the reader has to act on either way.
+//
+// By errno rather than by fs.ErrPermission, which does not discriminate here:
+// Windows reports both a sharing refusal and a real ACL denial as
+// ERROR_ACCESS_DENIED.
+func renameHeldOpen(err error) bool {
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	switch uintptr(errno) {
+	case 5, 32, 33: // ACCESS_DENIED, SHARING_VIOLATION, LOCK_VIOLATION
+		// Those numbers mean something else on Unix, where the rename does not
+		// fail this way at all, so the wait is Windows' alone. A variable
+		// rather than runtime.GOOS so a test can stand where Windows is.
+		return renameOS == "windows"
+	}
+	return false
+}
+
+// renameOS is runtime.GOOS, indirected for the tests that inject a refusal.
+var renameOS = runtime.GOOS
+
+const (
+	// swapRenameWait is how long a swap waits out a reader, and it is bounded
+	// by what a reader will wait for it: swapWindowTries × swapWindowWait is
+	// 200ms, after which a reader stops looking and gets the bare ENOENT that
+	// swapInFlight exists to absorb. Waiting longer than that turns one pass
+	// losing its swap into every reader losing (#2228).
+	//
+	// The same refusal atomicfile.publish waits out, measured on windows CI at
+	// 20 × 5ms; this is the same order, in the steps the reader side uses.
+	swapRenameWait = swapWindowTries * swapWindowWait
+	swapRenameStep = swapWindowWait
+	// parkRenameWait is the other side of that: the parking step and the
+	// crash-recovery restore happen while the index is still (or already)
+	// where readers look, so nothing is waiting on them and the only cost of
+	// waiting is the pass's own. Long enough to outlast a search holding a
+	// handle, short enough that a directory nobody will ever release still
+	// reports inside a scheduled run.
+	parkRenameWait = 2 * time.Second
+	// restoreRenameFloor is what the restore gets when the rename before it
+	// spent the shared window. Three attempts, which is what the refusal this
+	// waits out clears in.
+	restoreRenameFloor = 3 * swapRenameStep
+)
+
+// renameFile is os.Rename, indirected so a test can refuse a rename the way
+// Windows does without needing Windows.
+var renameFile = os.Rename
 
 // recoverIndexDir finishes an interrupted swapIndexDir: if the index dir is
 // missing but its .old sibling survives, restore it.
@@ -566,7 +672,9 @@ func recoverIndexDir(dir string) {
 		return
 	}
 	if _, err := os.Stat(dir + ".old"); err == nil {
-		_ = os.Rename(dir+".old", dir)
+		// The same wait: this is the crash-recovery path, and a refusal here
+		// leaves the index missing for the whole run.
+		_ = renameWaiting(dir+".old", dir, parkRenameWait)
 	}
 }
 
@@ -696,7 +804,11 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	}
 	if string(magic) != string(bucketMagic) {
 		f.Close()
-		return nil, nil, fmt.Errorf("%w: bad bucket magic", errCorruptIndex)
+		// Named for what it is. The magic moves when the posting format
+		// changes, and every reader of an index written by another version
+		// lands here — telling them the index is damaged sends them looking
+		// for a disk fault they do not have (#492).
+		return nil, nil, fmt.Errorf("%w: %s", errCorruptIndex, wrongBucketFormat(magic))
 	}
 	count, err := binary.ReadUvarint(r)
 	if err != nil {
@@ -761,6 +873,52 @@ func openBucketDir(p string) ([]bucketEntry, *os.File, error) {
 	return entries, f, nil
 }
 
+// damagedOrOutdated names the two reasons an index cannot be read. A format
+// this build does not write is not damage, and saying so sent a reader looking
+// for a disk fault (#492).
+func damagedOrOutdated(err error) string {
+	if err != nil && strings.Contains(err.Error(), "bucket format") {
+		return "index written by another version of deja"
+	}
+	return "index damaged"
+}
+
+// wrongBucketFormat says which of the two shapes a bucket file is in, so the
+// message a reader gets names the version rather than a fault.
+func wrongBucketFormat(magic []byte) string {
+	// Only a magic deja itself has written means another version. Anything
+	// else is a header that is not one, which is damage — and calling that a
+	// version difference would send a reader to the release notes for a disk
+	// fault.
+	for _, known := range formerBucketMagics {
+		if string(magic) == known {
+			return fmt.Sprintf("postings written by an older deja (bucket format %s, this build reads %s)",
+				known, string(bucketMagic))
+		}
+	}
+	return fmt.Sprintf("bad bucket magic %q", printableMagic(magic))
+}
+
+// formerBucketMagics are the bucket headers earlier releases wrote. A reader
+// that meets one is behind or ahead of a format change rather than looking at
+// a damaged file.
+var formerBucketMagics = []string{"DJB1"}
+
+// printableMagic keeps a corrupt header out of the terminal as raw bytes.
+func printableMagic(magic []byte) string {
+	out := make([]rune, 0, len(magic))
+	for _, b := range magic {
+		if b < 0x20 || b > 0x7e {
+			out = append(out, '?')
+			continue
+		}
+		out = append(out, rune(b))
+	}
+	return string(out)
+}
+
+// encodePostings encodes a posting block with per-block offset and session
+// deltas.
 func encodePostings(posts []posting) []byte {
 	if len(posts) == 0 {
 		return nil
@@ -768,24 +926,46 @@ func encodePostings(posts []posting) []byte {
 	s := sortedUniquePostings(posts)
 	b := make([]byte, 0, len(s)*6)
 	var prev int64
+	var prevSid uint32
 	for _, p := range s {
 		b = binary.AppendUvarint(b, uint64(p.Off-prev))
-		// The tool bit rides in the low bit of the session field: a separate
-		// varint would cost a byte on every posting in the store, and the shift
-		// costs nothing until a corpus passes two billion sessions.
-		v := uint64(p.Sid) << 1
+		// A block is sorted by offset and records.bin is written in session
+		// order, so the session ids in one block are nearly sorted: 99.66% of
+		// postings on a real store carry an id no smaller than the one before
+		// them, and writing the difference instead of the id took 16% off the
+		// buckets (#492). Zigzag because "nearly" is not "always" — the ids
+		// that step backwards must survive too.
+		//
+		// The subtraction is deliberately modulo 2^32, which is what int32 of
+		// a uint32 difference gives: it round-trips the whole id space rather
+		// than the half an int32 could hold.
+		d := int32(p.Sid - prevSid)
+		z := uint32((d << 1) ^ (d >> 31))
+		// The tool bit rides in the low bit, where it has always ridden: a
+		// separate varint would cost a byte on every posting in the store.
+		v := uint64(z) << 1
 		if p.Tool {
 			v |= 1
 		}
 		b = binary.AppendUvarint(b, v)
 		prev = p.Off
+		prevSid = p.Sid
 	}
 	return b
 }
 
+// decodePostings mirrors encodePostings. A truncated varint ends the walk and
+// yields what was whole rather than panicking.
+//
+// Defensive only: every caller sizes its buffer from the directory entry and
+// gets io.EOF from ReadAt before a short block reaches here, and openBucketDir
+// bounds each block against the file size. Nothing in the product depends on
+// the prefix coming back — an earlier version of this comment claimed two
+// callers did, and none does.
 func decodePostings(b []byte) []posting {
 	out := make([]posting, 0)
 	var prev int64
+	var prevSid uint32
 	for len(b) > 0 {
 		d, n := binary.Uvarint(b)
 		if n <= 0 {
@@ -793,11 +973,15 @@ func decodePostings(b []byte) []posting {
 		}
 		prev += int64(d)
 		b = b[n:]
-		sid, n := binary.Uvarint(b)
+		v, n := binary.Uvarint(b)
 		if n <= 0 {
 			return out
 		}
-		out = append(out, posting{Off: prev, Sid: uint32(sid >> 1), Tool: sid&1 == 1})
+		z := uint32(v >> 1)
+		sidDelta := int32(z>>1) ^ -int32(z&1)
+		sid := prevSid + uint32(sidDelta)
+		out = append(out, posting{Off: prev, Sid: sid, Tool: v&1 == 1})
+		prevSid = sid
 		b = b[n:]
 	}
 	return out
@@ -1096,6 +1280,26 @@ func walkRecordsStable(dir string, walk func(m Manifest) error) error {
 		return nil
 	}
 	return errors.New("the index was rebuilt while this read was in flight — run it again")
+}
+
+// eachRecordOfRoles is EachRecordOfRole for more than one role at a time, in
+// the order the records were written. A caller that ties a command to what it
+// printed needs both roles in one pass: two passes would lose the order
+// between them.
+func eachRecordOfRoles(dir string, roles map[string]bool, fn func(SessionMeta, Record)) error {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	return walkRecordsStable(dir, func(m Manifest) error {
+		return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+			if !roles[r.Role] {
+				return
+			}
+			if meta, ok := m.Sessions[r.Key]; ok {
+				fn(meta, r)
+			}
+		})
+	})
 }
 
 // EachRecordOfRole streams every record of one role with the session it came

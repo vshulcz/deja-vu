@@ -6,24 +6,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// A note that arrived by sync has its local id rewritten to imported-… and
-// keeps the real one in OrigID. The lift recognised a note by its id alone, so
-// an imported note was never recognised and the transcript it distils outranked
-// it everywhere the rule reaches (#2833).
-func TestAnImportedNoteIsLiftedAboveItsSource(t *testing.T) {
-	hits := []Hit{
-		{Session: model.Session{ID: "other", Harness: "claude"}},
-		{Session: model.Session{ID: "sess1", Harness: "claude"}},
-		{Session: model.Session{ID: "imported-abc", OrigID: "deja-note-claude-sess1", Harness: "deja"}},
-	}
-	liftNotesAboveTheirSource(hits)
-	if got := liftIDs(hits); got[1] != "imported-abc" {
-		t.Errorf("an imported note was not lifted in front of its source: %v", got)
-	}
-}
-
-// And the other side of the pair: an imported *source* is keyed by its
-// original id too, so a note about it has to be matched on that.
 func TestANoteIsLiftedAboveAnImportedSource(t *testing.T) {
 	hits := []Hit{
 		{Session: model.Session{ID: "other", Harness: "claude"}},
