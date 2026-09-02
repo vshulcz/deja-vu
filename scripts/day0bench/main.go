@@ -178,6 +178,7 @@ func main() {
 	misses := flag.Bool("misses", false, "print the questions whose answer session never came back, for triage")
 	ranks := flag.Bool("ranks", false, "print where each answer landed, for triage of ranking rather than retrieval")
 	corpus := flag.Int("corpus", 0, "lay down history from this many questions while scoring -limit of them; holds the questions fixed so only the pile grows")
+	keep := flag.String("keep", "", "also lay the corpus down under DIR/home as ~/.claude/projects and ~/.codex/sessions, with DIR/questions.json, so another tool can be run over the same history and scored by the same rule")
 	flag.Parse()
 	if *data == "" {
 		fmt.Fprintln(os.Stderr, "day0bench: -data is required")
@@ -216,6 +217,13 @@ func main() {
 	}
 	if *limit > 0 && len(qs) > *limit {
 		qs = qs[:*limit]
+	}
+	if *keep != "" {
+		if err := keepCorpus(*keep, all, qs); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("kept: %s/home (claude + codex layout), %s/questions.json\n", *keep, *keep)
 	}
 	if *corpus <= 0 {
 		all = qs
@@ -404,4 +412,49 @@ func parseDate(s string) time.Time {
 		}
 	}
 	return time.Now().AddDate(0, -3, 0)
+}
+
+// keepCorpus writes the history in the real on-disk layouts under dir/home —
+// ~/.claude/projects and ~/.codex/sessions — plus the scored questions with
+// their answer session ids, so a second tool can be pointed at HOME=dir/home
+// and judged by the same rule: does the session the answer lives in come back.
+func keepCorpus(dir string, all, qs []question) error {
+	home := filepath.Join(dir, "home")
+	roots := map[string]string{
+		"claude": filepath.Join(home, ".claude", "projects"),
+		"codex":  filepath.Join(home, ".codex"),
+	}
+	for _, w := range writers() {
+		root := roots[w.harness]
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			return err
+		}
+		seen := map[string]bool{}
+		for _, q := range all {
+			for i, turns := range q.Sessions {
+				id := q.SessionIDs[i]
+				if seen[id] {
+					continue
+				}
+				seen[id] = true
+				if err := w.write(root, id, parseDate(q.Dates[i]), turns); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	type kept struct {
+		ID       string   `json:"question_id"`
+		Question string   `json:"question"`
+		Answer   []string `json:"answer_session_ids"`
+	}
+	out := make([]kept, 0, len(qs))
+	for _, q := range qs {
+		out = append(out, kept{q.ID, q.Question, q.AnswerSession})
+	}
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "questions.json"), b, 0o644)
 }
