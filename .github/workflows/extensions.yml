@@ -228,6 +228,20 @@ jobs:
       - name: The release script's version rules
         run: node --test scripts/release_npm_test.mjs
 
+      - name: The drift guard's own rules
+        run: node --test scripts/extension_drift_test.mjs
+
+      # A package npm holds ahead of the release line is skipped by every
+      # release, silently, until the project's version passes it — dsh-deja sat
+      # that way from 25 August. Reporting rather than failing while that is
+      # still true of dsh-deja: drop continue-on-error once the release line has
+      # caught up, and this becomes the guard that stops it happening again.
+      - name: No harness package is stranded ahead of the release line
+        continue-on-error: true
+        run: |
+          git fetch --tags --quiet || true
+          node scripts/extension-drift.mjs
+
       # Published metadata is what a user follows back to the source. When a
       # package moves, npm keeps serving the old repository field until someone
       # notices; this notices.
