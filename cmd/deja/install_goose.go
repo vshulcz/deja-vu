@@ -434,6 +434,20 @@ func refreshGooseForPrompt(dir string, payload []byte) error {
 	return writeGooseRecall(out.String())
 }
 
+// clearGooseRecall takes deja's block out of wherever the recall lives, so a
+// switch thrown mid-session stops the injection instead of freezing it.
+func clearGooseRecall() error {
+	path := gooseRecallPath()
+	if path != gooseHintsPath() {
+		// The MOIM file is deja's own; emptying it is the whole of it.
+		if _, err := os.Stat(path); err != nil {
+			return nil
+		}
+		return os.Remove(path)
+	}
+	return dropGooseRecallBlock(path)
+}
+
 // writeGooseRecall puts the recall where goose will read it. The MOIM file is
 // deja's own and holds nothing else; AGENTS.md is the reader's, so only the
 // block between deja's markers is ours to rewrite — the prompt path wrote it
@@ -474,6 +488,14 @@ func refreshGooseHints() error {
 // project the call is about; "" leaves the chain to answer, which is what the
 // wrapper and the installer want (#2187).
 func refreshGooseHintsFor(cwd string) error {
+	// The documented kill switch. Every other hook reads it; this one did not,
+	// so `DEJA_RECALL=off` left deja writing a block into the reader's
+	// AGENTS.md — and that file is re-read every turn, so it kept reaching the
+	// model. Off has to mean nothing of deja's arrives, which means taking out
+	// what an earlier run put there rather than only declining to write.
+	if recallIsOff() {
+		return clearGooseRecall()
+	}
 	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
 	body := digest
 	if sessions > 0 {
