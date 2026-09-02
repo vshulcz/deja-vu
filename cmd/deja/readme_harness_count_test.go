@@ -63,9 +63,6 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		"server.json",
 		"packaging/mcpb/manifest.json",
 		"docs/guide/harnesses.html",
-		// The ClawHub skill pack, which the OpenClaw registry renders as the
-		// skill's own page.
-		"extensions/openclaw/skill/deja-history/SKILL.md",
 	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {

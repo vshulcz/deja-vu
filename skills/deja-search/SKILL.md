@@ -1,6 +1,20 @@
 ---
 name: deja-search
 description: Search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.
+version: 0.19.2
+metadata:
+  openclaw:
+    homepage: https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html
+    requires:
+      bins:
+        - deja
+    install:
+      - kind: brew
+        formula: deja-vu
+        bins: [deja]
+      - kind: node
+        package: "@vshulcz/deja-vu"
+        bins: [deja]
 ---
 
 Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.

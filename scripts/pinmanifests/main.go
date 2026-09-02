@@ -50,8 +50,9 @@ const (
 	// straight from the default branch, so its version is the one a
 	// listing shows.
 	agentPlugin = "plugin.json"
-	// The ClawHub skill pack: YAML frontmatter, so it has its own renderer.
-	clawSkill = "extensions/openclaw/skill/deja-history/SKILL.md"
+	// The root skill, which is what ClawHub serves as vshulcz/deja-search:
+	// YAML frontmatter, so it has its own renderer.
+	clawSkill = "skills/deja-search/SKILL.md"
 	// The Kimi Code plugin is packed into the release archive, so the version
 	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
 	// day it was added — the same way the Codex plugin did, and for the same
