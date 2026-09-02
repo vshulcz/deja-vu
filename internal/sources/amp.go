@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -17,10 +16,8 @@ import (
 // changing Amp's own environment.
 func AmpRoot() string {
 	dataHome := filepath.Join(Home(), ".local", "share", "amp")
-	if runtime.GOOS == "linux" {
-		if p := os.Getenv("XDG_DATA_HOME"); p != "" {
-			dataHome = filepath.Join(p, "amp")
-		}
+	if p := os.Getenv("XDG_DATA_HOME"); p != "" {
+		dataHome = filepath.Join(p, "amp")
 	}
 	return filepath.Clean(EnvPath("DEJA_AMP_ROOT", filepath.Join(dataHome, "threads")))
 }
