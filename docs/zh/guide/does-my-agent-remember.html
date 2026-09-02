@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code 记得之前的对话吗？ — deja-vu</title>
+<meta name="description" content="Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Claude Code 记得之前的对话吗？">
+<meta property="og:description" content="Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Claude Code 记得之前的对话吗？">
+<meta name="twitter:description" content="Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code 记得之前的对话吗？", "description": "Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "智能体记得之前的对话吗", "item": "https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Claude Code 记得之前的对话吗？", "acceptedAnswer": {"@type": "Answer", "text": "不记得。智能体的记忆就是上下文窗口，会话结束窗口就被丢弃。会话记录仍然写在 ~/.claude/projects 下，但没有任何东西会去读它，所以新会话从空白开始。"}}, {"@type": "Question", "name": "Codex、Cursor、Gemini CLI 会记得过去的会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。它们都会把会话写到磁盘上，其中几个可以重新打开过去的某一个会话并接着做，但没有一个会主动检索你更早的会话。"}}, {"@type": "Question", "name": "压缩算不算记忆？", "acceptedAnswer": {"@type": "Answer", "text": "只在同一个会话里算，而且只是散文。对 43 次真实压缩的测量：摘要保留了 77% 的决策，以及 0.2% 实际执行过的命令。"}}, {"@type": "Question", "name": "怎么让编程智能体记住之前的会话？", "acceptedAnswer": {"@type": "Answer", "text": "三种办法：手写进 CLAUDE.md 这类规则文件；装一个从安装时开始往后记录的记忆服务；或者给磁盘上已有的会话记录建索引，这样连你安装之前的历史也能搜到。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html" aria-current="page">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>编程智能体记得之前的对话吗？</h1>
+<p class="pagelede">简短的回答：不记得。但那些对话都还在你的磁盘上<span class="mins" data-mins></span></p>
+
+<p>Claude Code、Codex CLI、Cursor、Gemini CLI 在这件事上是一样的：同一个会话里它记得你说过的每一句话；开一个新会话，它对上一个一无所知——昨天一起修好的 bug、试过又放弃的方案、最后真正跑通的那条命令，全都不在。</p>
+<p>这不是 bug，也不是你漏开了什么开关。智能体在会话中的记忆<b>就是</b>上下文窗口，会话结束，窗口就被丢掉了。</p>
+
+<h2>三样东西都叫「记忆」</h2>
+<table>
+<tr><th>机制</th><th>跨会话保留</th><th>里面有什么</th></tr>
+<tr><td>上下文窗口</td><td>否</td><td>当前会话的全部内容，直到装不下为止</td></tr>
+<tr><td>规则文件（<code>CLAUDE.md</code>、<code>AGENTS.md</code>）</td><td>是</td><td>只有你亲手写进去的那些</td></tr>
+<tr><td>磁盘上的会话记录</td><td>是，但没有人去读</td><td>每一轮对话、每条命令、每个报错，原样保存</td></tr>
+</table>
+<p>所以老实的回答是：你的智能体把发生过的一切都写下来了，然后再也没打开过那个文件。</p>
+
+<h2>各家的情况</h2>
+<p>下面每一个都会把会话写到磁盘上。「能恢复会话」指这个工具可以重新打开过去的某一个会话并接着做，但没有一个会主动去检索你更早的会话。</p>
+<table>
+<tr><th>工具</th><th>跨会话记忆</th><th>能恢复单个会话</th><th>记录位置</th></tr>
+<tr><td>Claude Code</td><td>否</td><td>是（<code>--resume</code>）</td><td><code>~/.claude/projects/**/*.jsonl</code></td></tr>
+<tr><td>Codex CLI</td><td>否</td><td>是</td><td><code>~/.codex/sessions/**/rollout-*.jsonl</code></td></tr>
+<tr><td>Cursor</td><td>否</td><td>是</td><td><code>state.vscdb</code>（SQLite）与 <code>~/.cursor</code></td></tr>
+<tr><td>Gemini CLI</td><td>否</td><td>是</td><td><code>~/.gemini/tmp/*/chats/</code></td></tr>
+<tr><td>Copilot CLI</td><td>否</td><td>是</td><td><code>~/.copilot/session-state/*/events.jsonl</code></td></tr>
+<tr><td>DeepSeek Harness（dsh）</td><td>否</td><td>否</td><td><code>~/.dsh/sessions/*/session-*/session.jsonl.zstd</code></td></tr>
+<tr><td>Kimi Code</td><td>否</td><td>是</td><td><code>~/.kimi-code/sessions/*/*/agents/main/wire.jsonl</code></td></tr>
+<tr><td>Qwen Code</td><td>否</td><td>是</td><td><code>~/.qwen/projects/*/chats/*.jsonl</code></td></tr>
+</table>
+<p><a href="../../registry/README.html">格式登记表</a>里有全部二十一个工具：各自的路径通配符，以及一条记录长什么样。</p>
+
+<h2>「它不是给会话做了总结吗？」</h2>
+<p>压缩（compaction）是会话变长、窗口装不下时发生的事：早先的轮次被一段摘要替换掉，剩下的才放得进去。这段摘要只活在那个会话里，而且它是散文。</p>
+<p>在一台机器上对 43 次真实压缩做的测量（方法和语料见<a href="../../guide/benchmarks.html">评测</a>）：</p>
+<ul>
+<li>决策保留了 <b>77%</b>。</li>
+<li>实际跑过的命令保留了 <b>0.2%</b>。</li>
+</ul>
+<p>这和使用时的感受是一致的：它还记得你们选了 Postgres，但完全不知道当时的迁移命令是什么。</p>
+
+<h2>怎么让它记住</h2>
+<h3>1. 自己写下来</h3>
+<p>规则文件每次会话开始都会被读一遍，写进去的东西就永远记得。它适合放约定、构建命令、不要碰的地方；不适合放历史——你得提前预判什么以后会用到，而没有人会去记录一个还没踩到第二次的坑。</p>
+<h3>2. 记忆服务</h3>
+<p>这类平台从你装上它的那一刻开始往后记录，通常还要靠一个抽取模型。它们从空的开始——你之前几个月的工作不在里面——并且给本来不需要联网的流程加进了一次网络调用。</p>
+<h3>3. 直接读已经存在的会话记录</h3>
+<p>不需要提前记录，因为记录早就发生了。在这些文件上建一个索引，就能回答「这个我是不是遇到过」——包括你装任何工具之前的每一个会话。<a href="https://github.com/vshulcz/deja-vu">deja</a> 做的就是这件事：</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<pre>$ deja "connection pool exhausted"
+[claude] api   · Jul 8 · 8f31c0a9 — 2 matches
+  login started failing after refresh token rotation; jwt kid mismatch in tests
+  fixed by reloading jwks cache after rotateKey and adding a clock-skew test
+[codex]  web   · Jul 1 · b77d91e2 — 1 match
+  refresh token cookie needed SameSite=Lax in local callback flow</pre>
+<p>接上自动召回之后，这次查询是智能体自己发起的：会话开始时、提问命中过去的工作时、动手改文件或执行命令之前、命令失败之后。全部在本地：不需要账号，不上传，也不调用模型。</p>
+
+<p>就算你不装任何东西，这些历史也是你自己的，而且是纯文本。<a href="getting-started.html">快速开始</a> · <a href="forgetting.html">为什么会忘事</a> · <a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a></p>
+
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>
