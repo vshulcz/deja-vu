@@ -25,8 +25,16 @@ func gooseRecipe(exe string) string {
 	return `version: 1.0.0
 title: deja
 description: Search this machine's past AI coding sessions (deja-vu)
+prompt: |
+  {{ query }}
 instructions: |
-` + indentLines(commandBody(exe, "the user's request"), "  ")
+` + indentLines(commandBody(exe, "the user's request"), "  ") + `parameters:
+  - key: query
+    input_type: string
+    requirement: optional
+    default: ""
+    description: what to look for; omit to search from what was already said
+`
 }
 
 func indentLines(s, pad string) string {
