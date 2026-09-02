@@ -134,8 +134,8 @@ $ deja "jwt refresh token"
 
 ### MCP 工具
 
-服务端提供 `recall`、`recall_context`、`blame`、`fix`、`how` 和 `remember`。
-`deja install` 会自动接好，只有手工配置智能体时才需要关心它们。
+服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`remember`。
+`deja install` 会自动接好，只有手工配置智能体时才需要关心它。原来的六个工具名对已经接好的客户端仍然有效。
 
 ## 支持的工具
 

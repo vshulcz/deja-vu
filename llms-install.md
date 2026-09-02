@@ -43,10 +43,10 @@ deja warmup           # builds the local index (~10s for a few GB of history)
 deja "test query"     # CLI search works
 ```
 
-The MCP tools:
+One MCP tool, `deja`, with a `mode` argument (the six names below still work as tools of their own for clients wired earlier):
 
 - `recall` — dense results under ~4KB for a query.
-- `recall_context` — markdown digest of the best-matching session.
+- `context` — markdown digest of the best-matching session (was `recall_context`).
 - `blame` — which sessions discussed a file, and what was decided.
 - `fix` — what this machine ran after the same error last time.
 - `how` — the real invocation for a tool here, with its real flags.
