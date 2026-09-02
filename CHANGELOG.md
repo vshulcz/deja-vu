@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The proof after `deja install --auto` opens with the error this machine keeps
+  hitting — "this machine has hit `command not found: timeout` in 18 sessions"
+  — above the recent-sessions list. The same rule and threshold as `friction`;
+  nothing is claimed when nothing recurs. (#2966)
+
 ### Changed
 - The index format moved: this release rebuilds the index once on first run.
   Arabic, Hebrew, Thai and the Indic scripts are tokenized as words rather than

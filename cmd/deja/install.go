@@ -395,18 +395,24 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 // printInstallProof shows the "starts full" moment right in the install: a
 // few real sessions deja already indexed from this machine's history, so the
 // value is visible before the first agent session ever runs.
-func printInstallProof(dir string) { printMemoryProof(dir, "deja already knows this machine:") }
+func printInstallProof(dir string) {
+	printMemoryProofOf(dir, "deja already knows this machine:", nil, recurringErrorLine(dir))
+}
 
 // printMemoryProof is that same proof under a caller's heading. `sync import`
 // ends the move to a new machine and said only "imported 59000 records" —
 // deja's own unit, and nothing a person can check (#929).
-func printMemoryProof(dir, heading string) { printMemoryProofOf(dir, heading, nil) }
+func printMemoryProof(dir, heading string) { printMemoryProofOf(dir, heading, nil, "") }
 
 // printMemoryProofOf is the proof narrowed to the rows a caller can honestly
 // claim. `sync import` says "from the machine you came from" and was handed
 // the recent list, so on a batch that added nothing visible it offered this
 // machine's own sessions as the evidence a transfer had landed (#988).
-func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
+// lead is one line printed under the heading before the listing, or "". Only
+// the install passes one: `sync import` shows sessions from another machine
+// under a heading that says so, and the error *this* machine keeps hitting
+// would be a lie there (#2966).
+func printMemoryProofOf(dir, heading string, keep func(model.Session) bool, lead string) {
 	if !index.HasManifest(dir) {
 		return
 	}
@@ -482,10 +488,33 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool) {
 		return
 	}
 	fmt.Fprintln(os.Stderr, "\n"+heading)
+	// The one thing here the reader does not already know. The titles below
+	// are their own words from last week; the error their agents hit in a
+	// dozen sessions is what nobody kept score of, and it is the reason to
+	// keep reading (#2966).
+	if lead != "" {
+		fmt.Fprintln(os.Stderr, "  "+lead)
+	}
 	for _, l := range lines {
 		fmt.Fprintln(os.Stderr, l)
 	}
 	fmt.Fprintln(os.Stderr, "ask your agent about any of these — it will remember.")
+}
+
+// recurringErrorLine is the top row of `deja friction`, as one sentence, or ""
+// when nothing clears the threshold — a pattern claimed over a single sighting
+// would be the tool inventing one.
+func recurringErrorLine(dir string) string {
+	scan, err := scanFriction(dir, policy.Load())
+	if err != nil || len(scan.rows) == 0 {
+		return ""
+	}
+	r := scan.rows[0]
+	if r.n < index.FrictionMinSessions {
+		return ""
+	}
+	return fmt.Sprintf("this machine has hit `%s` in %d sessions (%s) — your agent will be told before it runs into it again",
+		trimFriction(r.line), r.n, strings.Join(r.harnesses, ", "))
 }
 
 // shortHome contracts the home directory to ~ for display.

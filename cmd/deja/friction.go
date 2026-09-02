@@ -73,6 +73,120 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
+	pol := policy.Load()
+	scan, err := scanFriction(dir, pol)
+	if err != nil {
+		return err
+	}
+	rows, sessions := scan.rows, scan.sessions
+	withheldOutput, ignoredOutput := scan.withheldOutput, scan.ignoredOutput
+	if note := policyHiddenNote(policy.ActivationSearch, scan.withheldSessions); note != "" {
+		fmt.Fprintln(os.Stderr, note)
+	}
+	if note := ignoredHiddenNoteFor("answer", scan.ignoredSessions); note != "" {
+		fmt.Fprint(os.Stderr, note)
+	}
+	if asJSON {
+		return writeFrictionJSON(stdout, rows, sessions, limit)
+	}
+	if len(rows) == 0 {
+		// The count is sessions-with-tool-output, and it reads as
+		// sessions-indexed: a store with six conversations reported zero,
+		// which is the sentence #637 was about — a reader told the index holds
+		// nothing concludes the tool is broken (#705).
+		// Two counts, because they answer two questions. What is on disk
+		// decides whether this machine has any history at all, and what the
+		// rules leave decides how much friction had to read: naming the store
+		// for the second put "none of the 4 indexed sessions" over a note
+		// saying two of them are withheld (#2709, the shape #2707 fixed on the
+		// empty search). Reading the store count for the first is what keeps a
+		// machine whose history is entirely behind a rule from being told it
+		// has none.
+		stored, err := index.SessionCount(dir)
+		total := stored
+		if reach, _, _, ok := reachableSessionCount(dir); ok {
+			total = reach
+		}
+		switch {
+		case err != nil || stored == 0:
+			// "no sessions are indexed yet" is a claim about the machine, and
+			// a store deja is not allowed to open produces the same zero —
+			// the failure #1020 closed on last and search. friction is where
+			// someone lands when recall feels thin, so it is the worst place
+			// to say the history is not there (#1044).
+			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
+		case sessions == 0 && withheldOutput > 0:
+			// The sessions that recorded tool output are exactly the ones a
+			// rule took away, and saying the machine never had them is a claim
+			// about the store rather than about the rule — the misread #637
+			// and #1044 closed elsewhere. The stderr note above says the same
+			// thing, and stdout is what a redirect keeps (#2319).
+			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
+				withheldOutput, pluralS(withheldOutput))
+		case sessions == 0 && ignoredOutput > 0:
+			// The same claim about the store rather than about the rule, for
+			// the other rule: the sessions with the tool output are there and
+			// the ignore rule is what keeps them out (#2630).
+			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
+				ignoredOutput, pluralS(ignoredOutput))
+		case sessions == 0 && total == 0:
+			// Every session on this machine is behind a rule, and none of them
+			// recorded tool output — so neither arm above fired and the count
+			// is zero. "none of the 0 indexed sessions" is arithmetic; what
+			// the reader needs is which rule leaves friction nothing to read.
+			fmt.Fprintf(stdout, "nothing recurring — %s keeps every one of the %d indexed session%s out of recall, and friction reads errors from what it may open\n",
+				emptiedBy(pol), stored, pluralS(stored))
+		case sessions == 0:
+			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
+				total, pluralS(total))
+		case sessions == total:
+			// The parenthetical is there to say how much was not read. When
+			// the rules leave exactly the sessions that recorded tool output,
+			// it repeats the number beside it.
+			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output — no error hit %d separate sessions\n",
+				sessions, pluralS(sessions), index.FrictionMinSessions)
+		default:
+			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output (of %d indexed) — no error hit %d separate sessions\n",
+				sessions, pluralS(sessions), total, index.FrictionMinSessions)
+		}
+		return nil
+	}
+	total := len(rows)
+	if len(rows) > limit {
+		rows = rows[:limit]
+	}
+	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", sessions, pluralS(sessions))
+	for _, r := range rows {
+		where := strings.Join(r.harnesses, ", ")
+		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, trimFriction(r.line))
+		fmt.Fprintf(stdout, "               %s", where)
+		if !r.when.IsZero() {
+			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
+		}
+		fmt.Fprintln(stdout)
+	}
+	// The header claims to say what this machine keeps tripping over, so a cut
+	// list with nothing after it reads as all of it — the sentence `how` and
+	// `files` print for the same flag (#2311).
+	if total > len(rows) {
+		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), total)
+	}
+	return nil
+}
+
+// frictionScan is one pass over the record log: the recurring errors, ranked,
+// and the counts the sentences around them need. The install proof reads it
+// too, so the loop lives here rather than inside runFriction (#2966).
+type frictionScan struct {
+	rows     []frictionRow
+	sessions int // sessions that recorded tool output and were read
+	// Sessions a rule kept out — those with a friction line in them, and those
+	// that recorded tool output at all; two sentences, two counts (#2794).
+	withheldSessions, ignoredSessions int
+	withheldOutput, ignoredOutput     int
+}
+
+func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 	type seen struct {
 		sessions map[string]bool
 		harness  map[string]bool
@@ -90,7 +204,6 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	// hosts, its infra IPs — surfaced here even when the trust policy withheld
 	// imported content from every other browsing surface. Browsing is the search
 	// activation, as in `last` and `stats` (#937, and its friction gap #1120).
-	pol := policy.Load()
 	// Sessions, not records: the note says "hides N matching sessions", and
 	// counting the callback's firings reported one hidden session with ten
 	// error lines as ten (#1639).
@@ -159,15 +272,8 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 			}
 		}
 	}); err != nil {
-		return fmt.Errorf("friction: %w", err)
+		return nil, fmt.Errorf("friction: %w", err)
 	}
-	if note := policyHiddenNote(policy.ActivationSearch, len(withheldSessions)); note != "" {
-		fmt.Fprintln(os.Stderr, note)
-	}
-	if note := ignoredHiddenNoteFor("answer", len(ignoredSessions)); note != "" {
-		fmt.Fprint(os.Stderr, note)
-	}
-
 	var rows []frictionRow
 	for _, s := range found {
 		line := s.text
@@ -187,92 +293,11 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		}
 		return rows[i].line < rows[j].line
 	})
-	if asJSON {
-		return writeFrictionJSON(stdout, rows, len(sessions), limit)
-	}
-	if len(rows) == 0 {
-		// The count is sessions-with-tool-output, and it reads as
-		// sessions-indexed: a store with six conversations reported zero,
-		// which is the sentence #637 was about — a reader told the index holds
-		// nothing concludes the tool is broken (#705).
-		// Two counts, because they answer two questions. What is on disk
-		// decides whether this machine has any history at all, and what the
-		// rules leave decides how much friction had to read: naming the store
-		// for the second put "none of the 4 indexed sessions" over a note
-		// saying two of them are withheld (#2709, the shape #2707 fixed on the
-		// empty search). Reading the store count for the first is what keeps a
-		// machine whose history is entirely behind a rule from being told it
-		// has none.
-		stored, err := index.SessionCount(dir)
-		total := stored
-		if reach, _, _, ok := reachableSessionCount(dir); ok {
-			total = reach
-		}
-		switch {
-		case err != nil || stored == 0:
-			// "no sessions are indexed yet" is a claim about the machine, and
-			// a store deja is not allowed to open produces the same zero —
-			// the failure #1020 closed on last and search. friction is where
-			// someone lands when recall feels thin, so it is the worst place
-			// to say the history is not there (#1044).
-			fmt.Fprintln(stdout, strings.TrimPrefix(emptyIndexHint("nothing recurring"), "deja: "))
-		case len(sessions) == 0 && len(withheldOutput) > 0:
-			// The sessions that recorded tool output are exactly the ones a
-			// rule took away, and saying the machine never had them is a claim
-			// about the store rather than about the rule — the misread #637
-			// and #1044 closed elsewhere. The stderr note above says the same
-			// thing, and stdout is what a redirect keeps (#2319).
-			fmt.Fprintf(stdout, "nothing recurring — the trust policy withheld the %d session%s that recorded tool output, which is what friction reads errors from\n",
-				len(withheldOutput), pluralS(len(withheldOutput)))
-		case len(sessions) == 0 && len(ignoredOutput) > 0:
-			// The same claim about the store rather than about the rule, for
-			// the other rule: the sessions with the tool output are there and
-			// the ignore rule is what keeps them out (#2630).
-			fmt.Fprintf(stdout, "nothing recurring — the ignore rule keeps the %d session%s that recorded tool output out of recall, which is what friction reads errors from\n",
-				len(ignoredOutput), pluralS(len(ignoredOutput)))
-		case len(sessions) == 0 && total == 0:
-			// Every session on this machine is behind a rule, and none of them
-			// recorded tool output — so neither arm above fired and the count
-			// is zero. "none of the 0 indexed sessions" is arithmetic; what
-			// the reader needs is which rule leaves friction nothing to read.
-			fmt.Fprintf(stdout, "nothing recurring — %s keeps every one of the %d indexed session%s out of recall, and friction reads errors from what it may open\n",
-				emptiedBy(pol), stored, pluralS(stored))
-		case len(sessions) == 0:
-			fmt.Fprintf(stdout, "nothing recurring — none of the %d indexed session%s recorded tool output, which is what friction reads errors from\n",
-				total, pluralS(total))
-		case len(sessions) == total:
-			// The parenthetical is there to say how much was not read. When
-			// the rules leave exactly the sessions that recorded tool output,
-			// it repeats the number beside it.
-			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output — no error hit %d separate sessions\n",
-				len(sessions), pluralS(len(sessions)), index.FrictionMinSessions)
-		default:
-			fmt.Fprintf(stdout, "nothing recurring in the %d session%s that recorded tool output (of %d indexed) — no error hit %d separate sessions\n",
-				len(sessions), pluralS(len(sessions)), total, index.FrictionMinSessions)
-		}
-		return nil
-	}
-	total := len(rows)
-	if len(rows) > limit {
-		rows = rows[:limit]
-	}
-	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", len(sessions), pluralS(len(sessions)))
-	for _, r := range rows {
-		where := strings.Join(r.harnesses, ", ")
-		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, trimFriction(r.line))
-		fmt.Fprintf(stdout, "               %s", where)
-		if !r.when.IsZero() {
-			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
-		}
-		fmt.Fprintln(stdout)
-	}
-	// The header claims to say what this machine keeps tripping over, so a cut
-	// list with nothing after it reads as all of it — the sentence `how` and
-	// `files` print for the same flag (#2311).
-	if total > len(rows) {
-		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), total)
-	}
-	return nil
+	return &frictionScan{
+		rows: rows, sessions: len(sessions),
+		withheldSessions: len(withheldSessions), ignoredSessions: len(ignoredSessions),
+		withheldOutput: len(withheldOutput), ignoredOutput: len(ignoredOutput),
+	}, nil
 }
 
 func trimFriction(l string) string {

@@ -188,6 +188,12 @@ func TestImportProofShowsOnlyWhatArrived(t *testing.T) {
 	if strings.Contains(proof, "local work on the ticker window") {
 		t.Errorf("a session that was here before the transfer is offered as proof of it:\n%s", proof)
 	}
+	// And not the error *this* machine keeps hitting, which the install proof
+	// leads with: under a heading about the machine you came from it would be
+	// a claim about the wrong machine (#2966).
+	if strings.Contains(proof, "this machine has hit") {
+		t.Errorf("the import proof names a local recurring error under a heading about another machine:\n%s", proof)
+	}
 
 	// With every arrived row hidden by a rule, the reader gets the rule — not
 	// this machine's own sessions under someone else's heading.
