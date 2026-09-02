@@ -759,6 +759,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
 	openclawRoot := sources.OpenClawRoot()
 	printRow("openclaw", openclawRoot, doctorExists(openclawRoot), doctorCount(len(sources.OpenClawSessionFiles()), "file"))
+	for _, db := range sources.OpenClawAgentDBs() {
+		printRow("openclaw", db, doctorFilePresent(db), doctorSQLiteDetail(db, sqlite))
+	}
 	copilotRoot := sources.CopilotRoot()
 	printFiles("copilot", copilotRoot, doctorExists(copilotRoot), sources.CopilotSessionFiles())
 	// omp, deepseek and zed are read by the indexer and were named by nothing

@@ -2429,7 +2429,7 @@ func rereadsWholeSessions(p string) bool {
 		return true
 	}
 	switch storeHarness(p) {
-	case "grok", "zed", "hermes":
+	case "grok", "zed", "hermes", "openclaw":
 		// The same shape: each asks for the sessions touched since the stamp
 		// and hands them back whole, so what comes back replaces what the
 		// index holds for that key rather than adding to it (#2075). The
@@ -2467,6 +2467,8 @@ func storeHarness(p string) string {
 		return "cursor"
 	case "goose-db":
 		return "goose"
+	case "openclaw-db":
+		return "openclaw"
 	}
 	return ""
 }
@@ -3356,6 +3358,9 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	}
 	for _, db := range sources.HermesDBs() {
 		setStoreLastUpdated(files, sessions, "hermes", db)
+	}
+	for _, db := range sources.OpenClawAgentDBs() {
+		setStoreLastUpdated(files, sessions, "openclaw", db)
 	}
 }
 

@@ -325,12 +325,21 @@ func Registry() []Harness {
 			}},
 		},
 		{
-			Name: "openclaw", Load: LoadOpenClaw, Files: OpenClawSessionFiles,
+			Name: "openclaw", Load: LoadOpenClaw, Files: OpenClawStoreFiles,
 			Kinds: []FileKind{{
 				Name:      "openclaw",
 				Match:     func(p string) bool { return openclawTranscript(OpenClawRoot(), p) },
 				Parse:     fullParse(ParseOpenClawFile),
 				ParseFrom: offsetParse(ParseOpenClawFileFromOffset),
+			}, {
+				// The per-agent SQLite store the 2026.8 flip made canonical;
+				// the JSONL kind above is what older installs and archives hold.
+				Name: "openclaw-db",
+				Match: func(p string) bool {
+					return hasBase(p, "openclaw-agent.sqlite") && strings.HasPrefix(p, OpenClawRoot()+string(filepath.Separator))
+				},
+				Parse:     dbParse(ParseOpenClawDB, ParseOpenClawDBSince),
+				ParseFrom: dbParseFrom(ParseOpenClawDB, ParseOpenClawDBSince),
 			}},
 		},
 		{

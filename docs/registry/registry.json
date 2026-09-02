@@ -387,15 +387,18 @@
     {
       "id": "openclaw",
       "store_paths": [
+        "${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/agent/openclaw-agent.sqlite",
         "${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl",
+        "${DEJA_OPENCLAW_ROOT}/*/agent/openclaw-agent.sqlite",
         "${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "sqlite-or-jsonl",
       "fixture_paths": [
+        "fixtures/registry/openclaw/agent/openclaw-agent.sql",
         "fixtures/registry/openclaw/agents/main/sessions/a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d.jsonl"
       ],
       "parser_source": "internal/sources/openclaw.go",
-      "last_verified": "2026-07-23",
+      "last_verified": "2026-09-02",
       "display_name": "OpenClaw",
       "capabilities": {
         "mcp": true,

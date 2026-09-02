@@ -183,6 +183,30 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		} else {
 			sessions, err = ParseGooseFile(path)
 		}
+	case "openclaw":
+		if strings.HasSuffix(path, ".sql") {
+			if !SQLite3Available() {
+				t.Skip("sqlite3 not installed")
+			}
+			sql, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			// agents/<agent>/agent/openclaw-agent.sqlite: the agent id is read
+			// off the path, so the fixture goes in at the same depth.
+			db := filepath.Join(t.TempDir(), "main", "agent", "openclaw-agent.sqlite")
+			if mkErr := os.MkdirAll(filepath.Dir(db), 0o755); mkErr != nil {
+				t.Fatal(mkErr)
+			}
+			cmd := exec.Command("sqlite3", db)
+			cmd.Stdin = strings.NewReader(string(sql))
+			if out, runErr := cmd.CombinedOutput(); runErr != nil {
+				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+			}
+			sessions, err = ParseOpenClawDB(db)
+		} else {
+			sessions, err = ParseOpenClawFile(path)
+		}
 	case "hermes":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")
@@ -225,8 +249,6 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseOmpFile(path)
 	case "prime":
 		sessions, err = ParsePrimeFile(path)
-	case "openclaw":
-		sessions, err = ParseOpenClawFile(path)
 	case "copilot":
 		sessions, err = ParseCopilotFile(path)
 	case "deepseek":

@@ -53,7 +53,14 @@ func OpenClawSessionFiles() []string {
 }
 
 // LoadOpenClaw loads all OpenClaw sessions.
-func LoadOpenClaw() []model.Session { return parseFiles(OpenClawSessionFiles(), ParseOpenClawFile) }
+func LoadOpenClaw() []model.Session {
+	ss := parseFiles(OpenClawSessionFiles(), ParseOpenClawFile)
+	for _, db := range OpenClawAgentDBs() {
+		got, _ := ParseOpenClawDB(db)
+		ss = append(ss, got...)
+	}
+	return ss
+}
 
 // ParseOpenClawFile parses a single OpenClaw transcript.
 func ParseOpenClawFile(path string) ([]model.Session, error) {

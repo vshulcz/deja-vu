@@ -264,7 +264,7 @@ aider &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CL
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| prime-agent (PrimeIntellect) | — | — | — | — | ? | paste | — |
+| prime-agent (PrimeIntellect) | — | — | — | — | — | paste | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | — |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |

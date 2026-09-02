@@ -39,21 +39,30 @@
 <h1>OpenClaw</h1>
 <ul>
 <li><strong>ID</strong>: <code>openclaw</code></li>
-<li><strong>Store</strong>: <code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.jsonl</code> — one append-only pi-format transcript per session, per agent</li>
+<li><strong>Store</strong>: <code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/&lt;agentId&gt;/agent/openclaw-agent.sqlite</code> since OpenClaw 2026.8 — session rows and transcript events in one per-agent SQLite database; before that, <code>agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.jsonl</code>, one append-only pi-format transcript per session, which the upgrade migrates into the database and leaves behind as an archive</li>
 <li><strong>Read override</strong>: <code>DEJA_OPENCLAW_ROOT</code> (agents root), <code>OPENCLAW_STATE_DIR</code> (OpenClaw&#39;s own state override, also honored)</li>
-<li><strong>Format</strong>: JSONL, append-cheap incremental parse from offset</li>
+<li><strong>Format</strong>: SQLite (<code>transcript_events.event_json</code>, one pi-format line per row, <code>session_windows</code> marking reset and rollover boundaries) or JSONL, append-cheap incremental parse from offset</li>
 </ul>
 <p>OpenClaw&#39;s agent runtime is pi-lineage, so transcripts share pi&#39;s line shape:</p>
 <p>a <code>{&#34;type&#34;:&#34;session&#34;}</code> header (id, timestamp, optional cwd) followed by</p>
 <p><code>{&#34;type&#34;:&#34;message&#34;}</code> entries whose <code>message.content</code> is a block array. The</p>
 <p>shared pi parser handles both; when the header carries a <code>cwd</code>, it becomes</p>
 <p>the project key, otherwise sessions attribute to <code>openclaw-&lt;agentId&gt;</code>.</p>
+<p>The SQLite flip (openclaw/openclaw#98236, in 2026.8.x) moved the runtime</p>
+<p>store into <code>agent/openclaw-agent.sqlite</code>: <code>transcript_events</code> holds the same</p>
+<p>lines the JSONL held, keyed by session id and sequence, and <code>session_windows</code></p>
+<p>records every reset or rollover, whose earlier session stays in the store</p>
+<p>instead of being renamed away. deja reads the rows in sequence through the</p>
+<p>same line reader; a session that gained an event since the last pass comes</p>
+<p>back whole. Explicit deletes keep a compressed archive in</p>
+<p><code>session_transcript_archives</code>, which is not read. The fixture database is the</p>
+<p>output of <code>openclaw doctor --session-sqlite import</code> over the JSONL fixture.</p>
 <p>Skipped in the sessions directory: <code>sessions.json</code> (store metadata),</p>
-<p>compaction checkpoints (<code>&lt;id&gt;.checkpoint.&lt;uuid&gt;.jsonl</code>), and archived</p>
-<p>transcripts (<code>.deleted</code>/<code>.reset</code>/<code>.bak</code> suffixes). Newer OpenClaw builds can</p>
-<p>keep session *metadata* in SQLite; transcripts stay JSONL files, which is all</p>
-<p>deja reads. Format verified against openclaw source</p>
-<p>(<code>src/config/sessions/paths.ts</code>, <code>artifacts.ts</code>, <code>src/transcripts/store.ts</code>).</p>
+<p>compaction checkpoints (<code>&lt;id&gt;.checkpoint.&lt;uuid&gt;.jsonl</code>), archived</p>
+<p>transcripts (<code>.deleted</code>/<code>.reset</code>/<code>.bak</code> suffixes) and the</p>
+<p><code>session-sqlite-import-archive/</code> copies the migration leaves. Format verified</p>
+<p>against a 2026.8.2 store and openclaw source</p>
+<p>(<code>src/config/sessions/session-accessor.sqlite-*.ts</code>, <code>paths.ts</code>).</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install openclaw</code> wires deja into <code>openclaw.json</code> under</li>
 </ul>
@@ -71,7 +80,7 @@
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-23</p>
+<p><strong>Last verified:</strong> 2026-09-02</p>
 
 <hr>
 <p>deja reads this format and twenty others, and turns what it finds into memory your

@@ -47,43 +47,48 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Project: project,
 		Path:    path,
 	}
-	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
-		typ, _ := m["type"].(string)
-		switch typ {
-		case "session":
-			applyPiHeader(&s, m, useHeaderCwd)
-		case "message":
-			msg, ok := m["message"].(map[string]any)
-			if !ok {
-				return
-			}
-			role, _ := msg["role"].(string)
-			outRole := role
-			switch role {
-			case "user", "assistant":
-				// speech, kept under its own role
-			case "toolResult":
-				// Command output and errors carry the same recall value every
-				// other harness with structured tool output indexes: roleToolOutput
-				// powers friction and `--role tool`. pi kept it in the transcript
-				// but the parser dropped everything but speech, so pi users alone
-				// had no friction and could not search a command's output.
-				outRole = RoleToolOutput
-			default:
-				return
-			}
-			t := parseTimeAny(m["timestamp"])
-			s.Touch(t)
-			txt := textFromContent(msg["content"])
-			if txt != "" {
-				s.Messages = append(s.Messages, model.Message{Role: outRole, Text: txt, Time: t})
-			}
-		}
-	})
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) { piShapedLine(&s, m, useHeaderCwd) })
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// piShapedLine folds one transcript line into s: the session header and the
+// user/assistant/toolResult messages. Shared by the JSONL transcripts and
+// OpenClaw's SQLite store, whose event_json rows are the same lines.
+func piShapedLine(s *model.Session, m map[string]any, useHeaderCwd bool) {
+	typ, _ := m["type"].(string)
+	switch typ {
+	case "session":
+		applyPiHeader(s, m, useHeaderCwd)
+	case "message":
+		msg, ok := m["message"].(map[string]any)
+		if !ok {
+			return
+		}
+		role, _ := msg["role"].(string)
+		outRole := role
+		switch role {
+		case "user", "assistant":
+			// speech, kept under its own role
+		case "toolResult":
+			// Command output and errors carry the same recall value every
+			// other harness with structured tool output indexes: roleToolOutput
+			// powers friction and `--role tool`. pi kept it in the transcript
+			// but the parser dropped everything but speech, so pi users alone
+			// had no friction and could not search a command's output.
+			outRole = RoleToolOutput
+		default:
+			return
+		}
+		t := parseTimeAny(m["timestamp"])
+		s.Touch(t)
+		txt := textFromContent(msg["content"])
+		if txt != "" {
+			s.Messages = append(s.Messages, model.Message{Role: outRole, Text: txt, Time: t})
+		}
+	}
 }
 
 // applyPiHeader reads identity out of the `session` header line, whether it

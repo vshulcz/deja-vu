@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- OpenClaw 2026.8 keeps sessions in `agents/<agent>/agent/openclaw-agent.sqlite`; deja read only the JSONL files it left behind, so nothing written since the upgrade reached the index. The store is read now, including the sessions an earlier reset window kept. (#2994)
+
 ### Added
 - A transcript the client deleted stays in the index. Claude Code removes
   transcripts older than `cleanupPeriodDays` (30 by default), and the next
