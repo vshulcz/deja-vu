@@ -120,8 +120,10 @@ func TestOpencodePluginAnnouncesTheBuildInTheTUI(t *testing.T) {
 	if strings.Contains(js, "output.system.push(status") {
 		t.Error("the build note leaks into the model's context")
 	}
-	// The plugin needs the client to reach the TUI at all.
-	if !strings.Contains(js, "{ $, client }") {
+	// The plugin needs the client to reach the TUI at all. Named rather than
+	// matched against the whole parameter list, which also carries the
+	// session's directory.
+	if !strings.Contains(js, "client") || !strings.Contains(js, "client.tui.showToast") {
 		t.Error("the plugin does not receive the client it needs for a toast")
 	}
 }
