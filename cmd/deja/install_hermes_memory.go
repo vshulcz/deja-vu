@@ -207,15 +207,17 @@ class DejaMemoryProvider(MemoryProvider):
         # are the same text deja's own hooks inject in Claude Code and Codex.
         # Silence is the normal answer — a memory that talks every turn is
         # wallpaper.
+        # Both calls are milliseconds against a built index and never build
+        # one; the timeouts are the ceiling for a machine that is swapping.
         parts = []
         if self._first_turn:
             self._first_turn = False
-            digest = _deja(["hook-context", "--plain"])
+            digest = _deja(["hook-context", "--plain"], timeout=8)
             if digest:
                 parts.append(digest)
         if query:
             payload = json.dumps({"prompt": query, "session_id": session_id or ""})
-            hit = _deja(["hook-prompt", "--plain"], payload)
+            hit = _deja(["hook-prompt", "--plain"], payload, timeout=5)
             if hit:
                 parts.append(hit)
         text = "\n\n".join(parts)
@@ -236,7 +238,9 @@ class DejaMemoryProvider(MemoryProvider):
         return None
 
     def on_session_switch(self, new_session_id: str, *, parent_session_id: str = "", reset: bool = False, rewound: bool = False, **kwargs) -> None:
-        if reset:
+        # A new conversation, or one whose transcript was cut back, has lost
+        # the digest; hand it over again on the next turn.
+        if reset or rewound:
             self._first_turn = True
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:

@@ -58,8 +58,10 @@ func TestInstallHermesWritesAMemoryProviderBesideTheHookPlugin(t *testing.T) {
 	}
 	// With the provider active, the hook stays silent: the provider injects
 	// the same recall before each turn.
-	if !strings.Contains(string(hook), `"memory", "provider") == "deja-memory"`) {
-		t.Fatalf("hook plugin does not step aside for the provider:\n%s", hook)
+	for _, want := range []string{`"memory", "provider") != "deja-memory"`, `"deja-memory", "__init__.py"`} {
+		if !strings.Contains(string(hook), want) {
+			t.Fatalf("hook plugin does not step aside for a provider that exists (%q):\n%s", want, hook)
+		}
 	}
 	if _, err := installHermesAuto("/bin/deja", true); err != nil {
 		t.Fatalf("uninstall: %v", err)
