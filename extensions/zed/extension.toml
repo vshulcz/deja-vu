@@ -1,6 +1,6 @@
 id = "deja-context-server"
 name = "deja"
-description = "Search the sessions your other coding agents already wrote to disk, from inside Zed"
+description = "deja-vu memory for Zed: search and recall the sessions your other coding agents already wrote, from inside Zed"
 version = "0.1.0"
 schema_version = 1
 authors = ["vshulcz <vshulcz@gmail.com>"]
@@ -10,5 +10,5 @@ repository = "https://github.com/vshulcz/deja-vu"
 name = "deja"
 
 [slash_commands.deja]
-description = "Search the sessions your other coding agents already wrote"
+description = "deja-vu memory for Zed: search and recall the sessions your other coding agents already wrote, from inside Zed"
 requires_argument = true

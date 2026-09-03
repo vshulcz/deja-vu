@@ -13,7 +13,7 @@ import (
 // other; the same index answers both.
 const (
 	cliSkillName = "deja-search"
-	cliSkillDesc = "Search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved."
+	cliSkillDesc = "deja-vu memory — search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved."
 )
 
 const cliSkillBody = `Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.

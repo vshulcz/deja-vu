@@ -1,8 +1,14 @@
 {
   "name": "deja",
   "version": "0.19.2",
-  "description": "Recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and sixteen more, including work from before deja was installed.",
-  "keywords": ["memory", "recall", "sessions", "search", "history"],
+  "description": "deja-vu memory for Kimi Code: recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and eighteen more, including work from before it was installed.",
+  "keywords": [
+    "memory",
+    "recall",
+    "sessions",
+    "search",
+    "history"
+  ],
   "author": "vshulcz",
   "homepage": "https://github.com/vshulcz/deja-vu",
   "license": "MIT",
@@ -21,7 +27,9 @@
   "mcpServers": {
     "deja": {
       "command": "node",
-      "args": ["./bin/deja-mcp.mjs"]
+      "args": [
+        "./bin/deja-mcp.mjs"
+      ]
     }
   },
   "hooks": [

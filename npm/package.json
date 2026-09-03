@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/deja-vu",
   "version": "0.0.0",
-  "description": "Search the sessions your coding agents already wrote to disk — Claude Code, Codex, Cursor and the rest — locally, from the CLI or over MCP.",
+  "description": "deja-vu: memory for coding agents from the sessions they already wrote to disk — Claude Code, Codex, Cursor and the rest — local, from the CLI or over MCP.",
   "license": "MIT",
   "repository": {
     "type": "git",
