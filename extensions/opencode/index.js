@@ -288,11 +288,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // Per-prompt recall, the relevance pass Claude Code gets on
   // UserPromptSubmit: the digest above is ranked by the project, this is ranked
   // by what the user just asked. Silent when nothing matches.
-  hooks["experimental.chat.messages.transform"] = async (_input, output) => {
+  hooks["experimental.chat.messages.transform"] = async (input, output) => {
     try {
-      const { parts, prompt } = lastUserText(output?.messages)
+      const { parts, prompt, sessionID } = lastUserText(output?.messages)
       if (!prompt) return
-      const raw = await ask(["hook-prompt"], JSON.stringify({ prompt, cwd }))
+      // The session id lets recall skip what it already showed this session.
+      // Without it every message re-injects the same block — measured on a real
+      // store, half of all injections were a word-for-word repeat.
+      const key = input?.sessionID || sessionID || ""
+      const raw = await ask(["hook-prompt"], JSON.stringify({ prompt, session_id: key, cwd }))
       if (!raw) return
       const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
       if (!extra) return
@@ -309,6 +313,57 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       await ask(["hook-precompact"], undefined, 60000)
     } catch {
       // memory is optional: never break a compaction over it
+    }
+  }
+
+  // A spawned agent gets none of the above: the system prompt was built for the
+  // session that spawned it, and the per-prompt pass fires on what the user
+  // typed, which a subagent never does. Its instructions are the one thing that
+  // reaches it, so recall goes in there.
+  hooks["tool.execute.before"] = async (input, output) => {
+    try {
+      if (input?.tool !== "task") return
+      const args = output?.args
+      if (!args?.prompt) return
+      const payload = {
+        hook_event_name: "PreToolUse",
+        tool_name: "Task",
+        tool_input: { prompt: args.prompt },
+        session_id: input.sessionID || "",
+        cwd,
+      }
+      const raw = await ask(["hook-tool"], JSON.stringify(payload))
+      if (!raw) return
+      const next = JSON.parse(raw)?.hookSpecificOutput?.updatedInput?.prompt
+      if (next) args.prompt = next
+    } catch {
+      // memory is optional: never break a spawn over it
+    }
+  }
+
+  // The moment a command fails is the one an agent never thinks to ask about,
+  // and tool.execute.after is the only seam opencode gives for it. The hook
+  // returns nothing to inject, so the line is folded into the tool output,
+  // which the next request carries as the tool result.
+  hooks["tool.execute.after"] = async (input, output) => {
+    try {
+      if (input?.tool !== "bash") return
+      const text = output?.output
+      if (!text) return
+      const payload = {
+        hook_event_name: "PostToolUse",
+        tool_name: "bash",
+        tool_input: { command: input?.args?.command || "" },
+        tool_response: { output: text },
+        session_id: input.sessionID || "",
+        cwd,
+      }
+      const raw = await ask(["hook-tool-after"], JSON.stringify(payload))
+      if (!raw) return
+      const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
+      if (extra) output.output = text + "\n\n" + extra
+    } catch {
+      // memory is optional: never break a tool call over it
     }
   }
 

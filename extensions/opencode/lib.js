@@ -29,11 +29,12 @@ export function lastUserText(messages) {
   const list = Array.isArray(messages) ? messages : []
   for (let i = list.length - 1; i >= 0; i--) {
     if (list[i]?.info?.role !== "user") continue
+    const sessionID = list[i].info?.sessionID || ""
     const parts = (list[i].parts || []).filter((p) => p?.type === "text" && p.text)
-    if (!parts.length) return { parts: [], prompt: "" }
-    return { parts, prompt: parts.map((p) => p.text).join("\n").trim() }
+    if (!parts.length) return { parts: [], prompt: "", sessionID }
+    return { parts, prompt: parts.map((p) => p.text).join("\n").trim(), sessionID }
   }
-  return { parts: [], prompt: "" }
+  return { parts: [], prompt: "", sessionID: "" }
 }
 
 // cliPluginPath is where `deja install opencode-auto` writes its own plugin.

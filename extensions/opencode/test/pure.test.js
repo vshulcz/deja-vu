@@ -105,6 +105,51 @@ test("without it the recall hooks are installed", async () => {
   })
 })
 
+// The package lagged the plugin `deja install` writes by two whole channels: a
+// spawned agent got no memory, and a failed command never surfaced the repair.
+test("every channel the generated plugin has, the package has", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deja-oc-"))
+  await withConfigHome(dir, async () => {
+    const hooks = await DejaPlugin({ client: quietClient(), directory: dir })
+    for (const name of [
+      "experimental.chat.system.transform",
+      "experimental.chat.messages.transform",
+      "experimental.session.compacting",
+      "tool.execute.before",
+      "tool.execute.after",
+    ]) {
+      assert.equal(typeof hooks[name], "function", `${name} is not wired`)
+    }
+  })
+})
+
+test("the spawn hook rewrites a subagent's prompt, and only a subagent's", () => {
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const at = source.indexOf('"tool.execute.before"')
+  const body = source.slice(at, source.indexOf('"tool.execute.after"'))
+  assert.ok(body.includes('input?.tool !== "task"'), "not scoped to the spawn tool")
+  assert.ok(body.includes("hook-tool"), "does not call the pre-tool hook")
+  assert.ok(body.includes("updatedInput?.prompt"), "does not read the rewritten prompt")
+  assert.ok(body.includes("args.prompt = next"), "does not put the recall in the child's prompt")
+})
+
+test("the after-tool hook folds the fix line into a failed command's output", () => {
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const at = source.indexOf('"tool.execute.after"')
+  const body = source.slice(at)
+  assert.ok(body.includes('input?.tool !== "bash"'), "not scoped to bash")
+  assert.ok(body.includes("hook-tool-after"), "does not call the failure hook")
+  assert.ok(body.includes("tool_response: { output: text }"), "does not pass the command output")
+  assert.ok(body.includes("output.output = text +"), "does not fold the line into the output")
+})
+
+test("the per-prompt hook carries the session id, so it does not repeat itself", () => {
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const at = source.indexOf('"experimental.chat.messages.transform"')
+  const body = source.slice(at, source.indexOf('"experimental.session.compacting"'))
+  assert.ok(body.includes("session_id: key"), "the per-prompt payload carries no session id")
+})
+
 test("mcpWired reads the entry the installer writes, comments and all", () => {
   const config = `{
   // deja was wired by \`deja install opencode\`
