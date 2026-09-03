@@ -10,7 +10,7 @@ as REAL epoch seconds. Rows with `role` of `tool` carry no prose and are skipped
 are rows with a null `content`. There is no working directory in the schema, so the
 profile name stands in for the project.
 
-- **MCP**: `mcp_servers` in `~/.hermes/config.yaml`; `deja install hermes-auto` also drops a plugin whose `pre_llm_call` hook injects recall and registers `/deja`.
+- **MCP**: `mcp_servers` in `~/.hermes/config.yaml`; `deja install hermes-auto` also drops a plugin whose `pre_llm_call` hook injects recall and registers `/deja`, and a memory provider (`deja-memory`) that `hermes memory setup` lists next to mem0 and supermemory — the same recall in the `memory.provider` slot, with `deja_recall`, `deja_fix` and `deja_blame` as its tools.
 - **Resume**: Hermes has its own session commands; nothing documented that starts a session from a prompt.
 - **Handoff**: paste.
 

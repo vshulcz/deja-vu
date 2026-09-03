@@ -102,6 +102,9 @@
 <h2>Adding recall</h2>
 <pre>deja install hermes-auto</pre>
 <p>That writes the MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision, and a plugin under <code>~/.hermes/plugins/deja</code> — a <code>plugin.yaml</code> manifest and an <code>__init__.py</code> exporting <code>register(ctx)</code>, which is Hermes's own plugin shape. Of Hermes's hooks only <code>pre_llm_call</code> can inject, and what it returns under <code>context</code> is appended to the user message. That is also where Hermes wants it: the system prompt stays byte-identical, so provider caching survives. The installer also lists the plugin in <code>plugins.enabled</code>, since a discovered plugin is shown as "not enabled" and never loaded until it is there, and adds a <code>/deja</code> command for asking directly.</p>
+<p>It also writes a memory provider. Hermes fills its <code>memory.provider</code> slot once, at <code>hermes memory setup</code>, from a list that otherwise holds mem0, supermemory, honcho and their keys and servers; deja appears there as <code>deja-memory</code>, needs none of that, and starts full, because what it answers from is the session history already on the disk. Pick it there, or set it directly:</p>
+<pre>hermes config set memory.provider deja-memory</pre>
+<p>With the provider active the model gets the same recall before each turn and three tools — <code>deja_recall</code>, <code>deja_fix</code>, <code>deja_blame</code> — and the <code>pre_llm_call</code> plugin steps aside so nothing arrives twice.</p>
 <p>Reading Hermes's store needs the <code>sqlite3</code> CLI on the machine; <code>deja doctor</code> names it if it is missing.</p>
 
 <h2>Or only the skill</h2>

@@ -48,7 +48,7 @@
 <p>are rows with a null <code>content</code>. There is no working directory in the schema, so the</p>
 <p>profile name stands in for the project.</p>
 <ul>
-<li><strong>MCP</strong>: <code>mcp_servers</code> in <code>~/.hermes/config.yaml</code>; <code>deja install hermes-auto</code> also drops a plugin whose <code>pre_llm_call</code> hook injects recall and registers <code>/deja</code>.</li>
+<li><strong>MCP</strong>: <code>mcp_servers</code> in <code>~/.hermes/config.yaml</code>; <code>deja install hermes-auto</code> also drops a plugin whose <code>pre_llm_call</code> hook injects recall and registers <code>/deja</code>, and a memory provider (<code>deja-memory</code>) that <code>hermes memory setup</code> lists next to mem0 and supermemory — the same recall in the <code>memory.provider</code> slot, with <code>deja_recall</code>, <code>deja_fix</code> and <code>deja_blame</code> as its tools.</li>
 <li><strong>Resume</strong>: Hermes has its own session commands; nothing documented that starts a session from a prompt.</li>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

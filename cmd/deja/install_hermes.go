@@ -90,10 +90,23 @@ def _deja(args, payload="", timeout=10):
         return ""
 
 
+def _provider_active():
+    """True when deja is the configured memory provider (memory.provider in
+    config.yaml): the provider then injects the same recall before each turn,
+    and a hook that repeats it would hand the model everything twice."""
+    try:
+        from hermes_cli.config import cfg_get, load_config
+        return cfg_get(load_config(), "memory", "provider") == "deja-memory"
+    except Exception:
+        return False
+
+
 def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     # First turn gets the session digest, ranked by the project; every turn
     # after gets the relevance pass over what was just asked. Silence is the
     # normal answer — a hook that talks every turn is wallpaper.
+    if _provider_active():
+        return None
     if is_first_turn:
         digest = _deja(["hook-context", "--plain"])
         if digest:

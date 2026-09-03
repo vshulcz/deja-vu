@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenClaw 2026.8 keeps sessions in `agents/<agent>/agent/openclaw-agent.sqlite`; deja read only the JSONL files it left behind, so nothing written since the upgrade reached the index. The store is read now, including the sessions an earlier reset window kept. (#2994)
 
 ### Added
+- `deja install hermes-auto` writes a Hermes memory provider (`deja-memory`): `hermes memory setup` lists it beside mem0 and supermemory, and with `memory.provider: deja-memory` the model gets deja's recall before each turn plus `deja_recall`, `deja_fix` and `deja_blame` as tools. (#3035)
 - Amp (Sourcegraph) threads are indexed, from `~/.local/share/amp/threads` or `$XDG_DATA_HOME`; `DEJA_AMP_ROOT` overrides. (#1714, #2986)
 - A transcript the client deleted stays in the index. Claude Code removes
   transcripts older than `cleanupPeriodDays` (30 by default), and the next

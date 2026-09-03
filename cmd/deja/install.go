@@ -838,7 +838,11 @@ func installHermesAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return wroteAll(mcp, plugin), nil
+	provider, err := installHermesMemoryProvider(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin, provider), nil
 }
 
 func installPiAuto(exe string, uninstall bool) (installResult, error) {
