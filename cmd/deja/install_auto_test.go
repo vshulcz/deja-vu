@@ -96,6 +96,44 @@ func TestInstallCodexWiresThePromptItself(t *testing.T) {
 	}
 }
 
+// Codex compacts on its own and fires PreCompact with trigger "auto" first.
+// Unwired, the session keeps its record of what it was shown while losing the
+// blocks themselves, so recall stays quiet about exactly what was just dropped.
+func TestInstallCodexWiresCompaction(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".codex", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	entries := root.Hooks["PreCompact"]
+	if len(entries) != 1 {
+		t.Fatalf("PreCompact entries = %d, want 1: %s", len(entries), b)
+	}
+	if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, "deja hook-precompact") {
+		t.Fatalf("command = %q, want deja hook-precompact", got)
+	}
+	// Codex sends "auto" when it compacts by itself, which is how it compacts.
+	if m := entries[0].Matcher; !strings.Contains(m, "auto") {
+		t.Fatalf("matcher = %q, want it to cover codex's own compaction", m)
+	}
+}
+
 func TestInstallCodexHooksErrorsAndMissingUninstall(t *testing.T) {
 	t.Run("malformed json", func(t *testing.T) {
 		home := t.TempDir()
