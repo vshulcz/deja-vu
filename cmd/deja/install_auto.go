@@ -305,9 +305,36 @@ export const DejaRecall = async ({ $, client, directory }) => {
         // memory is optional: never break a spawn over it
       }
     },
+    // The moment a command fails is the one an agent never thinks to ask
+    // about, and this is the only seam opencode has for it. The hook returns
+    // void, so the line cannot be handed to the model directly — it is
+    // appended to the tool's own output, which the next request carries as the
+    // tool result. Verified against a real run: a string written here arrives
+    // in the tool message of the following request.
+    "tool.execute.after": async (input, output) => {
+      try {
+        if (input?.tool !== "bash") return
+        const text = output?.output
+        if (!text) return
+        const payload = {
+          hook_event_name: "PostToolUse",
+          tool_name: "bash",
+          tool_input: { command: input?.args?.command || "" },
+          tool_response: { output: text },
+          session_id: input.sessionID || "",
+          cwd,
+        }
+        const raw = await $%secho ${JSON.stringify(payload)} | %s%q hook-tool-after%s.text()
+        if (!raw.trim()) return
+        const extra = JSON.parse(raw)?.hookSpecificOutput?.additionalContext
+        if (extra) output.output = text + "\n\n" + extra
+      } catch {
+        // memory is optional: never break a tool call over it
+      }
+    },
   }
 }
-`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is
