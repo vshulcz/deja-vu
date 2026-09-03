@@ -194,3 +194,22 @@ test("every query the plugin sends goes through argv", () => {
     assert.doesNotMatch(call, /String\(args\./, `${call} passes a query to deja without argv()`)
   }
 })
+
+// An empty answer is cached so the plugin does not shell out every turn. Its
+// reasons are not alike: no history is permanent, a locked index or a call that
+// did not get through is over by the next turn. Cached alike, one bad moment
+// cost the session all of its memory — driven against the installed plugin, a
+// single failed first call left turns two and three silent too.
+test("an empty answer is not cached for the life of the session", () => {
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const compact = source.replace(/\s+/g, "")
+  assert.match(compact, /constemptyRetries=\d/, "no bound on how often it asks again")
+  assert.match(
+    compact,
+    /if\(asks<emptyRetries\)digests\.delete\(key\)/,
+    "the cached emptiness is never dropped, so the session cannot recover",
+  )
+  // And the counter has to be per session, or one session's bad moment spends
+  // another's retries.
+  assert.match(compact, /empties\.set\(key,asks\)/, "the count is not kept per session")
+})

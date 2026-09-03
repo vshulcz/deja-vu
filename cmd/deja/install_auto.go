@@ -174,6 +174,15 @@ func opencodePluginJS(exe string) string {
 export const DejaRecall = async ({ $, client }) => {
   const cache = new Map()
   const told = new Set()
+  // How many times this session was answered with nothing. The empty answer
+  // is cached so the plugin does not shell out every turn, but its reasons
+  // are not alike: no history is permanent, while a locked index, a call that
+  // did not get through, or an upgrade replacing the binary are over by the
+  // next turn. Cached alike, one bad moment cost the session all of its
+  // memory. Counted, so a store that really is empty is still asked only a
+  // few times.
+  const empties = new Map()
+  const emptyRetries = 3
   return {
     "experimental.chat.system.transform": async (input, output) => {
       try {
@@ -207,8 +216,12 @@ export const DejaRecall = async ({ $, client }) => {
           else output.system.push(ctx)
           return
         }
-        // Nothing to recall: either there is no history yet, or the first
-        // index is still being built. Only the second is worth saying.
+        // Nothing to recall: there is no history yet, the first index is still
+        // being built, or the call did not get through. Only the build is worth
+        // saying out loud; the rest is worth asking again.
+        const asks = (empties.get(key) || 0) + 1
+        empties.set(key, asks)
+        if (asks < emptyRetries) cache.delete(key)
         if (told.has(key)) return
         const status = (await $%s%q %s%s.text()).trim()
         if (!status) return

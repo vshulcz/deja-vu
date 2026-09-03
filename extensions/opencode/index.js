@@ -31,6 +31,11 @@ const WINDOWS = process.platform === "win32"
 const PLATFORM = WINDOWS ? "windows" : process.platform
 const ARCH = process.arch === "x64" ? "amd64" : process.arch
 const EXE = WINDOWS ? "deja.exe" : "deja"
+// How many turns of a session will ask again after being answered with
+// nothing. Three covers the moments that pass — a locked index, a call that
+// timed out, an upgrade replacing the binary — without turning a store that
+// genuinely holds nothing into a shell-out on every turn.
+const emptyRetries = 3
 
 // The tool helper is a peer of the host, not of us: it is identity plus a zod
 // re-export. Without it the hooks still run and only the model-facing tools are
@@ -144,6 +149,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
 
   const digests = new Map()
   const told = new Set()
+  // How many times this session has been answered with nothing. An empty
+  // answer is cached so the plugin does not shell out every turn, but the
+  // reasons for it are not alike: no history is permanent, while a locked
+  // index, a timed-out call or a binary being replaced mid-`deja update` are
+  // over by the next turn. Cached alike, one bad moment cost the session all
+  // of its memory — every later turn read the emptiness rather than asking
+  // again. Counted, so a store that really is empty is still only asked a few
+  // times.
+  const empties = new Map()
 
   const hooks = {}
 
@@ -251,9 +265,13 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         output.system.push(context)
         return
       }
-      // Nothing recalled: either this machine has no history yet, or the first
-      // index is still building. Only the second is worth saying, and saying it
-      // drops the empty answer so the next turn asks again.
+      // Nothing recalled: this machine has no history yet, the first index is
+      // still building, or the call did not get through. The build is the only
+      // one worth saying out loud, and saying it drops the empty answer so the
+      // next turn asks again.
+      const asks = (empties.get(key) || 0) + 1
+      empties.set(key, asks)
+      if (asks < emptyRetries) digests.delete(key)
       if (told.has(key)) return
       const status = await ask(["warmup-status"], undefined, 5000)
       if (!status) return
