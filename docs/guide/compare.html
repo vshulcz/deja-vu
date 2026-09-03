@@ -42,9 +42,11 @@
 
    Removing the article's max-width alone was not enough — the grid still held
    the middle column, so four of the seven columns stayed off-screen. */
+@media(min-width:861px){
 .doc{grid-template-columns:224px minmax(0,1fr)}
 .doc .toc{display:none}
 .doc article{max-width:none}
+}
 .cmpwrap{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:10px}
 .cmpwrap table{table-layout:fixed;border-collapse:collapse;margin:0;
   font:12.5px var(--mono);min-width:1040px;width:100%}
@@ -79,6 +81,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold"><summary>Per-agent guides <span class="n">16</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -95,6 +98,7 @@
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
 <a href="resume-a-session.html">Resuming a session</a>

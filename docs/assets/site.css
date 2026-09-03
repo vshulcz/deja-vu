@@ -119,6 +119,14 @@ footer a:hover{color:var(--ph-hi)}
   .doc{grid-template-columns:1fr;gap:24px}
   .doc aside{position:static}
   .doc article{max-width:none}
+  /* A table of paths on a phone: let the paths wrap inside their cell rather
+     than push the table three screens wide, and take the padding down so a
+     row is a row and not a card. */
+  .doc article table{font-size:12.5px}
+  .doc article th,.doc article td{padding:7px 9px}
+  .doc article td code{white-space:normal;overflow-wrap:anywhere}
+  .doc article pre{font-size:12.5px;padding:12px 14px}
+  h1{font-size:clamp(26px,7.5vw,32px)}
 }
 
 /* ── ergonomics ───────────────────────────────────────────────────────── */
@@ -258,3 +266,17 @@ h2:hover .hlink{opacity:1}
   .sidefold > a:last-of-type{margin-bottom:10px}
   .doc aside a.sidecat{margin-top:14px}
 }
+
+/* ── the per-agent pages fold into one row of the sidebar ───────────── */
+/* Sixteen "Memory for X" links in a flat list were half the sidebar; a reader
+   on the Codex page does not need the other fifteen open. The group opens
+   itself on those pages and stays one line elsewhere. */
+.doc aside details.grpfold{margin:6px 0 2px}
+.doc aside details.grpfold summary{list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:8px;
+  color:var(--faint);padding:5px 10px;border-radius:6px;border-left:2px solid transparent}
+.doc aside details.grpfold summary::-webkit-details-marker{display:none}
+.doc aside details.grpfold summary::after{content:"▸";margin-left:auto;color:var(--ph-dim);font-size:11px}
+.doc aside details.grpfold[open] summary::after{content:"▾"}
+.doc aside details.grpfold summary:hover{color:var(--ink);background:var(--panel)}
+.doc aside details.grpfold summary .n{color:var(--ph-dim);font-size:11px}
+.doc aside details.grpfold > a{margin-left:12px}
