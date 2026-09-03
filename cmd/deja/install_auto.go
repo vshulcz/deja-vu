@@ -279,12 +279,16 @@ export const DejaRecall = async ({ $, client }) => {
         if (input?.tool !== "task") return
         const args = output?.args
         if (!args?.prompt) return
-        const payload = JSON.stringify({
+        // One encoding, not two. Stringified again on the way into the shell,
+        // deja received a JSON string where it expects an object, read nothing
+        // out of it and answered with silence — so a spawned agent in opencode
+        // has been starting with no memory at all.
+        const payload = {
           hook_event_name: "PreToolUse",
           tool_name: "Task",
           tool_input: { prompt: args.prompt },
           session_id: input.sessionID || "",
-        })
+        }
         const raw = await $%secho ${JSON.stringify(payload)} | %s%q hook-tool%s.text()
         if (!raw.trim()) return
         const next = JSON.parse(raw)?.hookSpecificOutput?.updatedInput?.prompt
