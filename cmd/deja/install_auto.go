@@ -35,6 +35,11 @@ var codexHookWiring = []struct{ Event, Sub, Matcher string }{
 	// And the fix pair when a command fails, which is the moment an agent never
 	// thinks to ask for it.
 	{"PostToolUse", "hook-tool-after", "Bash"},
+	// Compaction throws away the blocks this session was shown while the list
+	// that stops them repeating outlives them, so without this the memory codex
+	// just lost is the memory recall refuses to send again. Codex fires it with
+	// trigger "auto", the same shape Claude sends.
+	{"PreCompact", "hook-precompact", "manual|auto"},
 }
 
 func installCodexHooks(exe string, uninstall bool) (installResult, error) {
