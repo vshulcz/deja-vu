@@ -11,6 +11,7 @@
 ignore_paths = [
   "internal/redact/*_test.go",
   "internal/index/*_test.go",
+  "internal/embed/*_test.go",
   "cmd/deja/*_test.go",
   # Drives a real agent against a throwaway config and prints the placeholder
   # key it wired, so the run is reproducible.
