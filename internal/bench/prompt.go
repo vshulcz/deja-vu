@@ -388,8 +388,8 @@ func GeneratePrompt(seed int64) PromptCorpus {
 	// The bucket case. An agent started from a parent directory — a home
 	// directory, a workspace root — gets a project scope that holds everything
 	// ever launched from there, and not the repository actually being worked
-	// on. Measured on a real machine 2026-08-19: from /Users/shulcz the scope
-	// was [shulcz, Users/shulcz], the answer lay in another project entirely,
+	// on. Measured on a real machine 2026-08-19: from the home directory the
+	// scope was [<user>, Users/<user>], the answer lay in another project entirely,
 	// and the hook injected an unrelated session from the bucket instead.
 	//
 	// The right answer is silence. A neighbour from the bucket is worse than

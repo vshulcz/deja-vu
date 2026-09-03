@@ -12,7 +12,7 @@ deja-stats.svg
 # Harness artefacts: running an agent inside this checkout to test an
 # integration leaves its own history and config here. None of it belongs in
 # the repository — three of these were committed by a careless `git add -A`.
-.aider.chat.history.md
+/.aider.chat.history.md
 .aider.input.history
 .aider.tags.cache.v*/
 .grok/
@@ -77,3 +77,5 @@ extensions/zed/Cargo.lock
 extensions/*/node_modules/
 extensions/*/*.tgz
 extensions/*/package-lock.json
+# a test run that starts deja from cmd/deja writes its state dir there
+/cmd/deja/deja/
