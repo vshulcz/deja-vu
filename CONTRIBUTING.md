@@ -81,6 +81,12 @@ input, and incremental behavior where the format is append-only. Add an index
 integration test and install/doctor coverage when those commands recognize the
 harness.
 
+Wiring a harness is not the same as finishing one. What "finished" means here —
+the memory reaching the model rather than the hook merely running, what it is
+allowed to cost, and the traps that have wasted time before — is written down in
+[`.claude/commands/harness.md`](.claude/commands/harness.md), which is also a
+slash command if you work in this repository with Claude Code.
+
 If an upstream format changed, use the
 [format drift report](https://github.com/vshulcz/deja-vu/issues/new?template=format-drift.yml).
 For a new harness, use the
