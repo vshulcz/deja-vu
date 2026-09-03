@@ -18,12 +18,16 @@ import (
 // everything else in the file alone.
 // codexHookWiring is every event deja installs into Codex, in one place because
 // install writes from it and doctor reads it. A hooks.json written by an older
-// deja — SessionStart alone, where there are now three — was reported as wired
-// on the strength of the trust entry, and the two events added since reached
+// deja — SessionStart alone, where there are now four — was reported as wired
+// on the strength of the trust entry, and the events added since reached
 // nobody.
 var codexHookWiring = []struct{ Event, Sub, Matcher string }{
 	// SessionStart carries the project digest.
 	{"SessionStart", "hook-context", "startup|resume"},
+	// UserPromptSubmit answers the prompt itself. Codex sends the same payload
+	// Claude does — prompt, session_id, cwd — so hook-prompt reads it unchanged;
+	// measured on codex 0.149.0, the event fires on every `codex exec` turn.
+	{"UserPromptSubmit", "hook-prompt", ""},
 	// PreToolUse carries the prior decision for the file or command about to
 	// change, scoped to the tools that run a command or change a file (codex
 	// edits via apply_patch) so the hook does not spawn on every read.
@@ -99,7 +103,13 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 		if msg := hookStatusMessage(event); msg != "" {
 			h["statusMessage"] = msg
 		}
-		kept = append(kept, map[string]any{"matcher": matcher, "hooks": []any{h}})
+		entry := map[string]any{"hooks": []any{h}}
+		// An event that applies to every turn has no matcher, and codex's own
+		// examples leave the key out rather than carrying an empty pattern.
+		if matcher != "" {
+			entry["matcher"] = matcher
+		}
+		kept = append(kept, entry)
 	}
 	if len(kept) == 0 {
 		delete(hooks, event)

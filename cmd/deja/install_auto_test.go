@@ -56,6 +56,46 @@ func TestInstallCodexHooksMergeAndUninstall(t *testing.T) {
 	}
 }
 
+// Codex sends the same UserPromptSubmit payload Claude does, and it is the only
+// event that carries the user's own words. Without it a codex session recalls
+// nothing between the session digest and a command it is about to run: measured
+// on codex 0.149.0, the event fires on every `codex exec` turn.
+func TestInstallCodexWiresThePromptItself(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".codex", "hooks.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Matcher *string `json:"matcher"`
+			Hooks   []struct {
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	entries := root.Hooks["UserPromptSubmit"]
+	if len(entries) != 1 {
+		t.Fatalf("UserPromptSubmit entries = %d, want 1: %s", len(entries), b)
+	}
+	if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, "deja hook-prompt") {
+		t.Fatalf("command = %q, want deja hook-prompt", got)
+	}
+	// Codex's own examples carry no matcher on an every-turn event, and an
+	// empty pattern is not the same thing as an absent one.
+	if entries[0].Matcher != nil {
+		t.Fatalf("matcher = %q, want the key left out", *entries[0].Matcher)
+	}
+}
+
 func TestInstallCodexHooksErrorsAndMissingUninstall(t *testing.T) {
 	t.Run("malformed json", func(t *testing.T) {
 		home := t.TempDir()
