@@ -12,7 +12,7 @@ import (
 // only offers an update for a plugin it installed from its own marketplace, so
 // for a repository or zip install nothing tells the user their copy is behind.
 // deja knows both numbers, and doctor is where someone looks.
-const kimiPluginVersion = "0.19.2"
+const kimiPluginVersion = "0.19.3"
 
 // kimiPluginInstalledVersion returns the version of the installed copy, or ""
 // when the plugin is not there.

@@ -7,12 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- OpenClaw 2026.8 keeps sessions in `agents/<agent>/agent/openclaw-agent.sqlite`; deja read only the JSONL files it left behind, so nothing written since the upgrade reached the index. The store is read now, including the sessions an earlier reset window kept. (#2994)
+## [0.19.3] - 2026-09-04
+
+A release about the moment memory is worth most: the turn a command fails, the
+turn after a compaction, the first prompt of a session. Four harnesses were
+wired for less than they can take, and the measurements that found it are in
+each line.
 
 ### Added
-- `deja install hermes-auto` writes a Hermes memory provider (`deja-memory`): `hermes memory setup` lists it beside mem0 and supermemory, and with `memory.provider: deja-memory` the model gets deja's recall before each turn plus `deja_recall`, `deja_fix` and `deja_blame` as tools. (#3035)
-- Amp (Sourcegraph) threads are indexed, from `~/.local/share/amp/threads` or `$XDG_DATA_HOME`; `DEJA_AMP_ROOT` overrides. (#1714, #2986)
+- Codex takes recall on the prompt itself, not only at session start.
+  `UserPromptSubmit` carries the same payload Claude sends, so `hook-prompt`
+  reads it unchanged; measured on codex 0.149.0, the answer reached the model in
+  every request with the event wired and in none without it. (#3041)
+- Codex clears what a compaction threw away, so recall can serve it again
+  instead of treating it as already shown. (#3044)
+- Gemini gets the fix pair where a command fails: what an `AfterTool` hook
+  returns is appended to the tool result, which is exactly where the repair
+  belongs. Its shell tool is `run_shell_command` and its output arrives as
+  `llmContent` inside a frame whose `Output:` marker stopped a build failure
+  reading as an error — all three are handled. `BeforeTool` is deliberately not
+  wired: it fires, and what it returns never reaches the model. (#3049)
+- Qwen takes the session digest again and the fix pair for the first time. On
+  qwen-code 0.20.0 `SessionStart` is consumed, where an older build ignored it,
+  and `PostToolUse` is too: measured against a stub endpoint, 0 of 2 requests
+  carried a deja block before and 2 of 2 after. (#3050)
+- Cursor gets recall at the moment of the action. It maps Claude's event names
+  onto its own and reads `~/.claude/settings.json`, so it has been running
+  deja's pre-tool, post-tool and pre-compact hooks for anyone who also has
+  Claude Code and none of them for anyone who does not; its own `hooks.json`
+  now carries the same three. (#3052)
+- A slash command for harnesses deja ships no command file into. Gemini and
+  qwen both ask an MCP server for `prompts/list` on startup and put what comes
+  back behind a slash; deja answered `-32601`. It now offers one command that
+  runs the recall and hands back the result. (#3051)
+- opencode recalls the repair when a command fails, carries recall into a
+  spawned agent, and its npm package ships the same channels the installed
+  plugin has. (#3033, #3027, #3036)
+- `deja sync export --include-imported` hands over what arrived from other
+  machines, under the names it had where the work happened, so a machine in the
+  middle of a chain is no longer a dead end and a migration off it carries
+  everything. Off by default; an export that holds work back now says so
+  instead of reporting nothing changed. (#2962, #3053)
+- `deja install hermes-auto` writes a Hermes memory provider (`deja-memory`):
+  `hermes memory setup` lists it beside mem0 and supermemory, and with
+  `memory.provider: deja-memory` the model gets deja's recall before each turn
+  plus `deja_recall`, `deja_fix` and `deja_blame` as tools. (#3035)
+- Amp (Sourcegraph) threads are indexed, from `~/.local/share/amp/threads` or
+  `$XDG_DATA_HOME`; `DEJA_AMP_ROOT` overrides. (#1714, #2986)
 - A transcript the client deleted stays in the index. Claude Code removes
   transcripts older than `cleanupPeriodDays` (30 by default), and the next
   incremental pass used to drop the session with the file. A file that is gone
@@ -24,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hitting — "this machine has hit `command not found: timeout` in 18 sessions"
   — above the recent-sessions list. The same rule and threshold as `friction`;
   nothing is claimed when nothing recurs. (#2966)
+- `DEJA_TRACE=1` names where a slow search spent its time — the lock, the store
+  walk, the ingest — on the path every CLI search takes, not only in the
+  session-start hook. (#3021, #3054)
+- On a large store, a session is ranked by the turn that holds the fact rather
+  than by the whole transcript. (#3017)
+- `deja stats` gives the card a way onto a social post. (#2959)
+- The DeepSeek Harness plugin carries a root manifest, so the catalogs see it
+  inside the monorepo. (#2981)
+- The Claude plugin carries a `plugin.json` at the root the layout directories
+  read, and the keywords the directory search needs. (#3011, #3005)
 
 ### Changed
 - The index format moved: this release rebuilds the index once on first run.
@@ -35,12 +86,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **A read-only index directory needs its index replaced by hand.** deja serves
   a directory it cannot lock without a version check, by design, so it cannot
-  rebuild one in place: a pre-0.20 index inside a read-only image will make
-  `deja search` exit with `index written by another version of deja` until the
-  directory is rebuilt somewhere writable and copied in. The alternative was
-  reading old posting bytes under the new rule, which returns session ids that
-  are wrong without saying so.
+  rebuild one in place: an index written by an earlier deja inside a read-only
+  image will make `deja search` exit with `index written by another version of
+  deja` until the directory is rebuilt somewhere writable and copied in. The
+  alternative was reading old posting bytes under the new rule, which returns
+  session ids that are wrong without saying so.
 
+### Fixed
+- A session start stops repeating the last one. Without changed files to match
+  against, the candidate pool was three deep and a digest serves three, so
+  every candidate had just been served and the novelty ordering had nothing to
+  promote — and the builder sorted by recency again on the way past. Measured on
+  a seeded store of 300 sessions, five consecutive starts named 3 distinct
+  sessions before and 12 after, at 1 ms of a 22 ms session start. (#3048)
+- Codex fires `SessionStart` again with source `compact` after every
+  compaction, which the matcher `startup|resume` never matched — one `codex
+  exec` run compacted 12 times and the agent came out of each with nothing.
+  2 of 13 requests carried a recall block before, 13 of 13 after. Install now
+  rewrites the matcher on an entry it owns, so the fix reaches machines that
+  already have one. (#3046)
+- Cursor's payload is read as cursor sends it: the shell tool is called `Shell`,
+  the output arrives under `tool_output` as a JSON document inside a JSON
+  string, and `cwd` is empty with the project named in `workspace_roots`. deja
+  read none of the three, so the fix pair had no error to match and recall
+  answered for whatever directory the hook was spawned in. (#3052)
+- opencode asks from the project rather than from wherever opencode was
+  started, one failed call no longer costs the session its memory, and a query
+  naming one of deja's own flags reaches the store. (#3028, #3024, #3014)
+- Every `/deja` runs a search instead of deja's first word, across the harnesses
+  that ship the command. (#3020, #2988, #2958)
+- goose honours the recall kill switch, refreshes recall on every prompt rather
+  than only under the wrapper, puts the session-start recall where goose reads
+  it, and indexes the command it ran with what the command printed. (#2980,
+  #2963, #2954, #2951)
+- OpenClaw 2026.8 keeps sessions in
+  `agents/<agent>/agent/openclaw-agent.sqlite`; deja read only the JSONL files
+  it left behind, so nothing written since the upgrade reached the index. The
+  store is read now, including the sessions an earlier reset window kept.
+  (#2994)
+- `just`, `task` and `mise` are recorded, so the pre-tool hook can speak about
+  the commands a repo actually runs. (#2999)
+- The environment block stops blaming a missing tool for every wall it names.
+  (#3012)
+- A duplicate DeepSeek Harness registration stands down instead of failing the
+  whole profile. (#2990)
+- `deja install` ends the flags before the query for cline, pi and hermes too.
+  (#3015)
+- doctor's subagent row names the variable as the remedy rather than as the
+  cause. (#3008)
+- The release no longer takes plugin tags into goreleaser's version templates.
+  (#3013)
 
 ## [0.19.2] - 2026-09-01
 
@@ -987,7 +1082,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.3...HEAD
+[0.19.3]: https://github.com/vshulcz/deja-vu/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...v0.19.0
