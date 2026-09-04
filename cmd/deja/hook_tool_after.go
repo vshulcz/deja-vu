@@ -51,8 +51,12 @@ type toolAfterInput struct {
 	// whether the exit code is reported at all, so every shape is read and the
 	// decision rests on the text rather than on a status field.
 	ToolResponse json.RawMessage `json:"tool_response"`
-	SessionID    string          `json:"session_id"`
-	CWD          string          `json:"cwd"`
+	// Cursor calls it tool_output, and sends a JSON document inside a JSON
+	// string: {"output":"…","exitCode":0} (measured on cursor-agent
+	// 2026.09.02). Reading only tool_response left the fix pair with nothing.
+	ToolOutput json.RawMessage `json:"tool_output"`
+	SessionID  string          `json:"session_id"`
+	CWD        string          `json:"cwd"`
 }
 
 func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
@@ -90,7 +94,11 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	if !isCommandTool(name) {
 		return nil
 	}
-	out := toolResponseText(input.ToolResponse)
+	response := input.ToolResponse
+	if len(bytes.TrimSpace(response)) == 0 {
+		response = input.ToolOutput
+	}
+	out := toolResponseText(response)
 	if out == "" {
 		// readHookPayload stops at 1 MiB, so a verbose build cuts the JSON
 		// mid-string and the decode yields nothing at all — not a truncated
@@ -131,7 +139,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 // speaks for them.
 func isCommandTool(name string) bool {
 	switch name {
-	case "Bash", "bash", "shell", "run_command", "execute_command", "terminal", "run_shell_command":
+	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal", "run_shell_command":
 		return true
 	}
 	return false
@@ -146,6 +154,14 @@ func toolResponseText(raw json.RawMessage) string {
 	}
 	var s string
 	if json.Unmarshal(raw, &s) == nil {
+		// A harness that puts a JSON document inside the string — cursor sends
+		// {"output":"…","exitCode":0} that way — would otherwise hand the
+		// signature scan a line of escaped JSON rather than the error.
+		if inner := strings.TrimSpace(s); strings.HasPrefix(inner, "{") {
+			if text := toolResponseText(json.RawMessage(inner)); text != "" {
+				return text
+			}
+		}
 		return clampOutput(s)
 	}
 	var obj map[string]any

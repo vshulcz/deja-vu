@@ -51,6 +51,8 @@ type promptHookInput struct {
 	// environment meant a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR recalled nothing (#759).
 	CWD string `json:"cwd"`
+	// Cursor leaves cwd empty and names the project here instead.
+	WorkspaceRoots []string `json:"workspace_roots"`
 }
 
 // hookPromptText reads a prompt that arrives either as a string (Claude Code,
@@ -172,7 +174,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The payload first, then the export, then where the process stands: the
 	// export is set once per process and will not change, so reading it alone
 	// answered a second payload with the first one's project (#2182).
-	cwd := hookCWD(input.CWD)
+	cwd := hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	// Rank THIS project's sessions by how well they match the prompt terms
 	// (IDF-weighted), rather than reconstructing an AND query — natural
 	// prompts are full of filler that poisons an AND.

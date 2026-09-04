@@ -291,6 +291,8 @@ func runHookContext(dir string, plain bool) error {
 		Source    string `json:"source"`
 		SessionID string `json:"session_id"`
 		CWD       string `json:"cwd"`
+		// Cursor leaves cwd empty and names the project here instead.
+		WorkspaceRoots []string `json:"workspace_roots"`
 	}
 	// Best effort, as every hook is — but not silent about it. A payload deja
 	// cannot decode carries the session this injection went to, and losing it
@@ -302,7 +304,7 @@ func runHookContext(dir string, plain bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, input.CWD)
+	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots))
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -381,7 +383,7 @@ func runHookContext(dir string, plain bool) error {
 		// most needs is its own evidence: measured on this corpus, a summary
 		// keeps ~77% of the decisions and 0.2% of the commands that produced
 		// them (#543).
-		if ev := compactEvidence(dir, input.SessionID, hookCWD(input.CWD)); ev != "" {
+		if ev := compactEvidence(dir, input.SessionID, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots))); ev != "" {
 			lead += "\n" + ev + "\n"
 		}
 	}
@@ -403,7 +405,7 @@ func runHookContext(dir string, plain bool) error {
 	// per-prompt path bans a session it already showed *this* agent session,
 	// and unprefixed rows made a session-start block count as that — the first
 	// prompt about what the start just mentioned got nothing back.
-	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+input.SessionID, hookProjectKey(input.CWD), servedIDs)
+	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+input.SessionID, hookProjectKey(hookProjectPath(input.CWD, input.WorkspaceRoots)), servedIDs)
 	if plain {
 		fmt.Fprintln(os.Stdout, digest)
 		return nil
@@ -667,6 +669,22 @@ func notesStamp() string {
 		return "none"
 	}
 	return strconv.FormatInt(fi.Size(), 10) + "@" + strconv.FormatInt(fi.ModTime().UnixNano(), 10)
+}
+
+// hookProjectPath is the directory a payload is about. Cursor leaves cwd empty
+// and names the project in workspace_roots instead (measured on cursor-agent
+// 2026.09.02), so a hook reading cwd alone fell back to whatever directory the
+// harness happened to spawn it in — which is not the project on every host.
+func hookProjectPath(cwd string, roots []string) string {
+	if strings.TrimSpace(cwd) != "" {
+		return cwd
+	}
+	for _, r := range roots {
+		if strings.TrimSpace(r) != "" {
+			return r
+		}
+	}
+	return ""
 }
 
 // hookCWD is where the hook is standing: what the payload says, else the

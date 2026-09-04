@@ -68,6 +68,8 @@ type toolHookInput struct {
 	} `json:"tool_input"`
 	SessionID string `json:"session_id"`
 	CWD       string `json:"cwd"`
+	// Cursor leaves cwd empty and names the project here instead.
+	WorkspaceRoots []string `json:"workspace_roots"`
 }
 
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
@@ -112,7 +114,7 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 		requestWarmup(dir)
 		return nil
 	}
-	line := toolHookLine(dir, hookCWD(input.CWD), input)
+	line := toolHookLine(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), input)
 	if line == "" {
 		return nil
 	}
