@@ -61,7 +61,7 @@ type promptHookInput struct {
 // under the session that asked for it.
 func (i *promptHookInput) adopt() {
 	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
-	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.grokEnvelope.WorkspaceRoot)
+	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
 }
 
 // hookPromptText reads a prompt that arrives either as a string (Claude Code,

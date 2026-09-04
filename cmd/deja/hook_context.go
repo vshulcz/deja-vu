@@ -313,7 +313,7 @@ func runHookContext(dir string, plain bool) error {
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
-	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.grokEnvelope.WorkspaceRoot)
+	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)
 	// The harness tells us which project this is; deja read only the
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having

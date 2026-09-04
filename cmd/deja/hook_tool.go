@@ -79,7 +79,7 @@ type toolHookInput struct {
 // the action up by.
 func (i *toolHookInput) adopt() {
 	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
-	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.grokEnvelope.WorkspaceRoot)
+	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
 	i.ToolName = adoptGrok(i.ToolName, i.grokEnvelope.ToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
