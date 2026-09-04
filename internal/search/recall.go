@@ -27,6 +27,13 @@ type AutoRecallOptions struct {
 	// right now (harness:ID → matched-file count). Sessions the task points
 	// at outrank plain recency; zero or a nil map falls back to recency.
 	TaskScores map[string]int
+	// Unseen are the sessions this project has not been served recently, by
+	// id. They win ties over recency, which is what stops a session start
+	// repeating itself: the caller's novelty ordering used to be undone here,
+	// because the sort below re-ordered by recency whatever came in, and three
+	// separate sessions in one project were handed the same three sessions.
+	// Nil leaves the order to task score and recency alone.
+	Unseen map[string]bool
 }
 
 type AutoRecallResult struct {
@@ -110,6 +117,12 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		tj := o.TaskScores[candidates[j].Harness+":"+candidates[j].ID]
 		if ti != tj {
 			return ti > tj
+		}
+		if len(o.Unseen) > 0 {
+			iNew, jNew := o.Unseen[candidates[i].ID], o.Unseen[candidates[j].ID]
+			if iNew != jNew {
+				return iNew
+			}
 		}
 		iRecent := !candidates[i].Updated.Before(o.Now.AddDate(0, 0, -90))
 		jRecent := !candidates[j].Updated.Before(o.Now.AddDate(0, 0, -90))

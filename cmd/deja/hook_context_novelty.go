@@ -56,9 +56,12 @@ const sessionStartWindow = 40
 // Nothing is dropped. A start with no memory is worse than a repeat, and a
 // project whose whole recent tail has been served still deserves its best
 // candidate — it simply goes behind anything newer to say.
-func leadWithUnseen(dir string, projects []string, ss []model.Session) []model.Session {
+// It also returns the ids it treated as new, because the digest builder sorts
+// again on the way past and would otherwise put recency back on top — the
+// reordering happened and was thrown away one call later.
+func leadWithUnseen(dir string, projects []string, ss []model.Session) ([]model.Session, map[string]bool) {
 	if len(ss) < 2 {
-		return ss
+		return ss, nil
 	}
 	seen := map[string]bool{}
 	for _, p := range projects {
@@ -67,7 +70,7 @@ func leadWithUnseen(dir string, projects []string, ss []model.Session) []model.S
 		}
 	}
 	if len(seen) == 0 {
-		return ss
+		return ss, nil
 	}
 	worn := usage.WornSessions(dir)
 	unseen := make([]model.Session, 0, len(ss))
@@ -80,12 +83,16 @@ func leadWithUnseen(dir string, projects []string, ss []model.Session) []model.S
 		unseen = append(unseen, s)
 	}
 	if len(unseen) == 0 || len(repeats) == 0 {
-		return ss
+		return ss, nil
+	}
+	fresh := make(map[string]bool, len(unseen))
+	for _, s := range unseen {
+		fresh[s.ID] = true
 	}
 	// Stable by demand so the repeat that does get through is the one agents
 	// keep coming back to, rather than whichever happened to be newest.
 	stableSortByDemand(repeats, worn)
-	return append(unseen, repeats...)
+	return append(unseen, repeats...), fresh
 }
 
 // stableSortByDemand orders sessions by how many agent-initiated recalls asked

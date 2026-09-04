@@ -20,7 +20,7 @@ func TestUnseenSessionsLeadWhenThereAreEnoughOfThem(t *testing.T) {
 	}
 	rememberInjectedIDsFor(dir, "agent-one", sessionStartKeyPrefix+project, []string{"told-1", "told-2", "told-3"})
 
-	got := leadWithUnseen(dir, []string{project}, ss)
+	got, _ := leadWithUnseen(dir, []string{project}, ss)
 	if len(got) != len(ss) {
 		t.Fatalf("the ordering dropped candidates: %d in, %d out", len(ss), len(got))
 	}
@@ -48,7 +48,7 @@ func TestNothingNewLeavesTheOrderAlone(t *testing.T) {
 	ss := []model.Session{{ID: "a"}, {ID: "b"}, {ID: "c"}}
 	rememberInjectedIDsFor(dir, "agent-one", sessionStartKeyPrefix+project, []string{"a", "b", "c"})
 
-	got := leadWithUnseen(dir, []string{project}, ss)
+	got, _ := leadWithUnseen(dir, []string{project}, ss)
 	for i := range ss {
 		if got[i].ID != ss[i].ID {
 			t.Fatalf("the order changed with nothing new to promote: %v", got)

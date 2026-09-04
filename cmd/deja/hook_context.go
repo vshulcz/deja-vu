@@ -899,15 +899,16 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 			}
 		}
 	}
-	// The task signal decides how wide the candidate pool is: with changed
-	// files to match against, older sessions are worth considering; without
-	// it, recency alone decides and a small pool is enough.
 	taskFiles := <-taskCh
 	mark("git-taskfiles")
-	perName := 3
-	if len(taskFiles) > 0 {
-		perName = 12
-	}
+	// Four times what a safe-mode digest serves, so the novelty ordering below
+	// has something to choose from. Without changed files this used to be three
+	// — exactly what the digest serves — so every candidate had just been shown,
+	// unseen was always empty, and each session start in a project repeated the
+	// last one word for word. That is what #2038 measured as 87.5% repeats and
+	// read as a ranking problem. Measured on a seeded store of 300 sessions, the
+	// wider pool costs 1 ms of a 22 ms session start.
+	const perName = 12
 	// The cwd as well as the names it can guess: a session started in a
 	// subdirectory keeps that directory's name, and no list of names reaches
 	// down to it (#2040).
@@ -960,14 +961,14 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// block listed the correction as a separate item and left the session it
 	// corrects unmarked (#761).
 	ss, rejectedWarning := orderForInjection(ss)
-	ss = leadWithUnseen(dir, names, ss)
+	ss, unseen := leadWithUnseen(dir, names, ss)
 	// A session found by where its work happened carries the name of the
 	// directory it was started in, which is not one the cwd can guess — the
 	// safe-mode filter is a name list, so the evidence that admitted the
 	// session admits its name with it (#2040). The trust policy has already
 	// had its say on each of these, one session at a time, above.
 	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
-		Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores})
+		Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores, Unseen: unseen})
 	mark("build-digest")
 	if result.Sessions == 0 {
 		matched = nil
