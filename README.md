@@ -416,7 +416,11 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 [data flows](docs/SECURITY-MODEL.md#data-flows).
 
 **What about secrets already in my logs?** They stay in the original harness files, which
-are your agent's data. They do not enter deja's index, digests, shares or sync exports.
+are your agent's data. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
+tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
+the index is built, so they do not reach digests, shares or sync exports. Pattern matching
+is not secret detection: a shape it does not know can pass through. See the
+[security model](docs/SECURITY-MODEL.md#redaction).
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
 ~0.4 ms median, and nothing waits on a model. A hook adds the process start and a
