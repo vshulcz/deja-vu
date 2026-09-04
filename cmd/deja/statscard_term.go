@@ -209,10 +209,13 @@ func wrapTo(s string, width int) [2]string {
 // same job.
 func heroStat(r stats.Report) (string, string) {
 	switch {
-	case r.WeekRecalls > 0:
-		return formatStatNumber(r.WeekRecalls), "recalls handed to your agents this week"
+	// The repeat count first: it comes from the corpus, so a machine that
+	// installed deja an hour ago has it, and it is the one figure on the card
+	// that is about the person's own history rather than about deja.
 	case r.RepeatQuestions > 0:
 		return formatStatNumber(r.RepeatQuestions), "questions you asked more than once"
+	case r.WeekRecalls > 0:
+		return formatStatNumber(r.WeekRecalls), "recalls handed to your agents this week"
 	case r.Recall.Recalls+r.Recall.Injections > 0:
 		handed := r.Recall.Recalls + r.Recall.Injections
 		return formatStatNumber(handed), "recalls handed to your agents"

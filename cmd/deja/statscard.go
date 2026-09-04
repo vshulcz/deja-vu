@@ -74,14 +74,23 @@ func renderStatsCard(r stats.Report) string {
 
 	renderAgents(&b, r, 470, 120)
 
-	// Counts only, no content: see longestLine in statscard_term.go and #1180.
+	// The supporting row sits above the footer with the gap the other rows
+	// keep; it shared the footer's line before (#3060). Counts only, no
+	// content: see longestLine in statscard_term.go and #1180.
+	const rowY = 448
 	if r.Longest.Messages > 0 {
-		cardText(&b, pad, 472, 11, "700", "THE LONGEST SESSION", "#55626a", "letter-spacing=\"1.5\"")
-		cardText(&b, pad+170, 472, 12, "400",
+		cardText(&b, pad, rowY, 11, "700", "THE LONGEST SESSION", "#55626a", "letter-spacing=\"1.5\"")
+		cardText(&b, pad+170, rowY, 12, "400",
 			formatStatNumber(r.Longest.Messages)+" messages", "#8b989a")
 	}
-	if n := r.RepeatQuestions; n > 0 {
-		cardText(&b, w-pad, 472, 12, "400",
+	// Whatever the hero did not take: the week's recalls when the repeat count
+	// leads, the repeat count otherwise.
+	if n := r.WeekRecalls; n > 0 && r.RepeatQuestions > 0 {
+		cardText(&b, w-pad, rowY, 12, "400",
+			formatStatNumber(n)+" recalls handed to your agents this week", "#8b989a",
+			"text-anchor=\"end\"")
+	} else if n := r.RepeatQuestions; n > 0 {
+		cardText(&b, w-pad, rowY, 12, "400",
 			formatStatNumber(n)+" questions asked more than once", "#8b989a",
 			"text-anchor=\"end\"")
 	}
@@ -91,7 +100,9 @@ func renderStatsCard(r stats.Report) string {
 		foot += " · v" + version
 	}
 	cardText(&b, pad, h-18, 11, "400", foot, "#55626a")
-	cardText(&b, w-pad, h-18, 12, "700", "vshulcz.github.io/deja-vu", "#8787af", "text-anchor=\"end\"")
+	// The repository, not the site: a card gets posted, and the reader of a
+	// post goes to the code. The site stays on the --share path.
+	cardText(&b, w-pad, h-18, 12, "700", "github.com/vshulcz/deja-vu", "#8787af", "text-anchor=\"end\"")
 	b.WriteString("</g>\n")
 	fmt.Fprintf(&b, `<rect width="%d" height="%d" fill="url(#scan)"/>`+"\n", w, h)
 	b.WriteString("</svg>\n")
