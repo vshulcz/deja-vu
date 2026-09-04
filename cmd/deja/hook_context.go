@@ -333,6 +333,9 @@ func runHookContext(dir string, plain bool) error {
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
 			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
+			// Last, after anything that needs acting on: once a week, what
+			// the week looked like (#3065).
+			resp.SystemMessage = joinNotes(resp.SystemMessage, weekNote(dir))
 			if b, err := json.Marshal(resp); err == nil {
 				fmt.Fprintln(os.Stdout, string(b))
 			}
