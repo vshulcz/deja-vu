@@ -333,9 +333,10 @@ func runHookContext(dir string, plain bool) error {
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
 			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
-			// Last, after anything that needs acting on: once a week, what
-			// the week looked like (#3065).
-			resp.SystemMessage = joinNotes(resp.SystemMessage, weekNote(dir))
+			// Last, after anything that needs acting on: what the build
+			// found, once (#3073), then once a week what the week looked
+			// like (#3065).
+			resp.SystemMessage = joinNotes(resp.SystemMessage, joinNotes(builtNote(dir), weekNote(dir)))
 			if b, err := json.Marshal(resp); err == nil {
 				fmt.Fprintln(os.Stdout, string(b))
 			}
@@ -496,6 +497,9 @@ func runHookContext(dir string, plain bool) error {
 	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
 		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
 	}
+	// What the build found, once (#3073), then once a week what the week
+	// looked like (#3065) — after everything that needs acting on.
+	resp.SystemMessage = joinNotes(resp.SystemMessage, joinNotes(builtNote(dir), weekNote(dir)))
 	// An index that is behind and cannot be written stays behind. "the agent
 	// starts already knowing them" was printed over a picture missing today's
 	// work, and this path said nothing — search names the same state (#1005).
