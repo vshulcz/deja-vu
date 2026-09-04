@@ -68,8 +68,15 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// continued one — so the conversation's own ledger decides, and the
 	// counter only says which call inside the turn we are on.
 	if input.InvocationNum > 0 || digestAlreadyInjected(dir, input.ConversationID) {
-		block := antigravityPromptBlock(dir, latestUserRequest(input.TranscriptPath),
+		// A command that just failed is the more urgent memory, and it is only
+		// reachable from here: PostToolUse is handed the error and its contract
+		// allows no answer at all.
+		block := antigravityFixPair(dir, latestToolFailure(input.TranscriptPath),
 			input.ConversationID, workspace)
+		if block == "" {
+			block = antigravityPromptBlock(dir, latestUserRequest(input.TranscriptPath),
+				input.ConversationID, workspace)
+		}
 		if block == "" {
 			fmt.Fprintln(stdout, "{}")
 			return nil
