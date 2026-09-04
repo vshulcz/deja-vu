@@ -17,7 +17,7 @@
     "url": "git+https://github.com/vshulcz/deja-vu.git",
     "directory": "extensions/openclaw"
   },
-  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/openclaw",
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html",
   "bugs": {
     "url": "https://github.com/vshulcz/deja-vu/issues"
   },

@@ -20,7 +20,7 @@
     "url": "git+https://github.com/vshulcz/deja-vu.git",
     "directory": "extensions/opencode"
   },
-  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/opencode",
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html",
   "bugs": {
     "url": "https://github.com/vshulcz/deja-vu/issues"
   },

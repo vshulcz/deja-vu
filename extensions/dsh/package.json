@@ -22,7 +22,7 @@
     "url": "git+https://github.com/vshulcz/deja-vu.git",
     "directory": "extensions/dsh"
   },
-  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/dsh",
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html",
   "bugs": {
     "url": "https://github.com/vshulcz/deja-vu/issues"
   },
