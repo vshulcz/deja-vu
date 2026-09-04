@@ -396,7 +396,7 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 // few real sessions deja already indexed from this machine's history, so the
 // value is visible before the first agent session ever runs.
 func printInstallProof(dir string) {
-	printMemoryProofOf(dir, "deja already knows this machine:", nil, recurringErrorLine(dir))
+	printMemoryProofOf(dir, "deja already knows this machine:", nil, installLead(dir))
 }
 
 // printMemoryProofOf is the proof narrowed to the rows a caller can honestly

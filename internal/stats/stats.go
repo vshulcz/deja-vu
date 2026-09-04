@@ -423,10 +423,20 @@ const askedMaxRunes = 240
 
 // RepeatQuestions is a corpus proxy because the usage sidecar does not store query text.
 func RepeatQuestions(ss []model.Session) int {
+	_, n := RepeatQuestionExample(ss)
+	return n
+}
+
+// RepeatQuestionExample is the count of questions asked in more than one
+// session, and the one asked most often, as the person typed it the last
+// time — the line the install opens with (#3064). "" and 0 when nothing
+// repeats.
+func RepeatQuestionExample(ss []model.Session) (example string, repeated int) {
 	// Exact stem match only: questionStemFor already folds case and
 	// punctuation, and a pairwise similarity pass is quadratic in corpora
 	// with tens of thousands of user messages.
 	counts := map[string]int{}
+	texts := map[string]string{}
 	for _, s := range ss {
 		seen := map[string]bool{}
 		for _, m := range s.Messages {
@@ -448,15 +458,24 @@ func RepeatQuestions(ss []model.Session) int {
 			}
 			seen[stem] = true
 			counts[stem]++
+			texts[stem] = strings.TrimSpace(m.Text)
 		}
 	}
-	count := 0
-	for _, n := range counts {
+	best := ""
+	for stem, n := range counts {
 		if n > 1 {
-			count++
+			repeated++
+		}
+		// Ties go to the stem that sorts first, so the example is stable
+		// across runs on the same store.
+		if n > 1 && (best == "" || n > counts[best] || (n == counts[best] && stem < best)) {
+			best = stem
 		}
 	}
-	return count
+	if best == "" {
+		return "", repeated
+	}
+	return TrimRunes(texts[best], 72), repeated
 }
 
 func questionStemFor(text string) string {
