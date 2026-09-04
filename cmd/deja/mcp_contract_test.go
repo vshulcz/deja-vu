@@ -401,22 +401,23 @@ func TestMCPPingAndResourceTemplates(t *testing.T) {
 	}
 }
 
-// TestMCPUndeclaredMethodStillErrors is the control for the case above: the
-// fix must add exactly the two spec methods, not turn the default branch
-// into a catch-all that answers anything.
+// TestMCPUndeclaredMethodStillErrors is the control for the case above: each
+// fix must add exactly the spec methods deja declares a capability for, not
+// turn the default branch into a catch-all that answers anything.
 func TestMCPUndeclaredMethodStillErrors(t *testing.T) {
 	hermeticEnv(t)
 
-	resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"prompts/list","params":{}}`)
+	// A method deja declares no capability for.
+	resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"logging/setLevel","params":{"level":"debug"}}`)
 	if len(resp) != 1 {
 		t.Fatalf("got %d responses, want 1", len(resp))
 	}
 	e, ok := resp[0]["error"].(map[string]any)
 	if !ok {
-		t.Fatalf("prompts/list did not error: %#v", resp[0])
+		t.Fatalf("logging/setLevel did not error: %#v", resp[0])
 	}
 	if code, _ := e["code"].(float64); code != -32601 {
-		t.Errorf("prompts/list error code = %v, want -32601", e["code"])
+		t.Errorf("logging/setLevel error code = %v, want -32601", e["code"])
 	}
 }
 

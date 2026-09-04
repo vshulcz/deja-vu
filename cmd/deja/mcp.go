@@ -156,7 +156,7 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 	case "initialize":
 		return map[string]any{
 			"protocolVersion": mcpProtocolVersion,
-			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}},
+			"capabilities":    map[string]any{"tools": map[string]any{}, "resources": map[string]any{}, "prompts": map[string]any{}},
 			"serverInfo":      map[string]any{"name": "deja", "version": version},
 			"instructions":    mcpInstructions(dir),
 		}, 0, ""
@@ -174,6 +174,10 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 		// templates, and the empty list is the shape that says so —
 		// an error here reads as a broken capability.
 		return map[string]any{"resourceTemplates": []map[string]any{}}, 0, ""
+	case "prompts/list":
+		return map[string]any{"prompts": []map[string]any{dejaPrompt()}}, 0, ""
+	case "prompts/get":
+		return mcpPromptGet(dir, req.Params)
 	case "resources/list":
 		return mcpResourcesList(dir)
 	case "resources/read":
