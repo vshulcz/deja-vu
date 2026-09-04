@@ -40,6 +40,15 @@ func installCursorHooks(exe string, uninstall bool) (installResult, error) {
 	// interactive TUI — headless `-p` skips it — but costs nothing there.
 	setCursorHook(hooks, "sessionStart", exe+" hook-context", uninstall)
 	setCursorHook(hooks, "beforeSubmitPrompt", exe+" hook-prompt", uninstall)
+	// And the same three cursor already runs for anyone who also has Claude
+	// Code: it reads ~/.claude/settings.json and maps the names onto its own —
+	// PreToolUse→preToolUse, PostToolUse→postToolUse, PreCompact→preCompact
+	// (the table is in its own bundle, 2026.07.23). A cursor-only user got none
+	// of them. The dedupe is by exact command string, so a user with both still
+	// gets one hook, not two.
+	setCursorHook(hooks, "preToolUse", exe+" hook-tool", uninstall)
+	setCursorHook(hooks, "postToolUse", exe+" hook-tool-after", uninstall)
+	setCursorHook(hooks, "preCompact", exe+" hook-precompact", uninstall)
 	if len(hooks) == 0 {
 		delete(root, "hooks")
 		delete(root, "version")
