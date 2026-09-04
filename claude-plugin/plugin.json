@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "deja-vu",
-  "version": "0.19.3",
+  "version": "0.19.2",
   "description": "deja-vu memory for Claude Code: your own past sessions, from every coding agent on the machine, recalled before you ask.",
   "author": {
     "name": "vshulcz",
