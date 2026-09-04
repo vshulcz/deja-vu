@@ -131,7 +131,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 // speaks for them.
 func isCommandTool(name string) bool {
 	switch name {
-	case "Bash", "bash", "shell", "run_command", "execute_command", "terminal":
+	case "Bash", "bash", "shell", "run_command", "execute_command", "terminal", "run_shell_command":
 		return true
 	}
 	return false
@@ -155,15 +155,46 @@ func toolResponseText(raw json.RawMessage) string {
 	var b strings.Builder
 	// stderr first: the signature is far more often there, and the scan is
 	// capped, so a long stdout must not push it out of reach.
-	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result"} {
-		if v, ok := obj[key].(string); ok && strings.TrimSpace(v) != "" {
-			if b.Len() > 0 {
-				b.WriteByte('\n')
-			}
-			b.WriteString(v)
+	// llmContent is gemini's: the text it puts in front of the model, which for
+	// a shell tool is the command's own output inside a wrapper of its own.
+	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent"} {
+		v, ok := obj[key].(string)
+		if !ok || strings.TrimSpace(v) == "" {
+			continue
 		}
+		if key == "llmContent" {
+			v = unwrapGeminiShellOutput(v)
+		}
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(v)
 	}
 	return clampOutput(b.String())
+}
+
+// unwrapGeminiShellOutput strips the frame gemini puts around a command's
+// output before handing it to the model: an <untrusted_context> fence, an
+// "Output:" marker on the first line and a trailing process-group note. The
+// marker is the one that matters — with it in front, the first line of a build
+// failure stops looking like an error, and the fix pair went silent on a
+// failure it answers the moment the marker is gone (gemini-cli 0.55.1).
+func unwrapGeminiShellOutput(s string) string {
+	if !strings.Contains(s, "<untrusted_context>") {
+		return s
+	}
+	var kept []string
+	for _, line := range strings.Split(s, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "<untrusted_context>" || t == "</untrusted_context>" || strings.HasPrefix(t, "Process Group PGID:") {
+			continue
+		}
+		kept = append(kept, strings.TrimPrefix(line, "Output: "))
+	}
+	return strings.Join(kept, "\n")
 }
 
 // after returns what follows key where it is used as one, or "" when the key is

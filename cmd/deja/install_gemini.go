@@ -82,6 +82,22 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 					"timeout": 10000,
 				}},
 			}},
+			// The fix pair, arriving where a failing command is read: what this
+			// hook returns is appended to the tool result as <hook_context>.
+			// Checked on gemini-cli 0.55.1, and BeforeTool is not the pair to
+			// it — that one fires, but what it returns decides whether the tool
+			// runs and never reaches the model, so wiring it would cost a
+			// process per command and inject nothing.
+			//
+			// Matched on the tool that runs a command; gemini honours the
+			// matcher, so this never spawns on a read or a glob.
+			"AfterTool": []any{map[string]any{
+				"matcher": "run_shell_command",
+				"hooks": []any{map[string]any{
+					"type": "command", "command": exe + " hook-tool-after",
+					"timeout": 10000,
+				}},
+			}},
 		},
 	}, "", "  ")
 	if err != nil {
