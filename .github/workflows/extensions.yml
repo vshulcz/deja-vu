@@ -139,6 +139,9 @@ jobs:
         working-directory: extensions/zed
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The guard below reads history, not just the tree.
+          fetch-depth: 0
 
       - name: Install the target Zed compiles extensions to
         run: rustup target add wasm32-wasip1
@@ -153,6 +156,26 @@ jobs:
             echo "extension.toml id is '$id'; zed-industries/extensions lists it as deja-context-server"
             exit 1
           }
+
+      - name: A change to the extension must move its version
+        run: |
+          # Zed installs whatever version the registry lists, so a fix that
+          # lands here without a bump reaches nobody. `/deja` was fixed in
+          # #3020 and sat unpublished behind 0.1.0 until this check existed.
+          version_commit=$(git log -1 --format=%H -G'^version = ' -- extension.toml)
+          source_commit=$(git log -1 --format=%H -- src Cargo.toml)
+          if [ -z "$version_commit" ] || [ -z "$source_commit" ]; then
+            echo "cannot read the history of extensions/zed; not failing on that"
+            exit 0
+          fi
+          if git merge-base --is-ancestor "$source_commit" "$version_commit"; then
+            exit 0
+          fi
+          echo "extensions/zed changed after its version last moved:"
+          echo "  source  $(git log -1 --format='%h %s' "$source_commit")"
+          echo "  version $(git log -1 --format='%h %s' "$version_commit")"
+          echo "Bump version in extension.toml, or Zed users keep the build they already have."
+          exit 1
 
   kimi:
     name: kimi-deja
