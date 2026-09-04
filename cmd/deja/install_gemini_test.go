@@ -114,8 +114,10 @@ func TestKimiInstallsNoHooks(t *testing.T) {
 
 // Qwen was written off as having no hooks twice over: its timeout is in
 // milliseconds, so the 10 deja used to write killed the hook instantly, and
-// only UserPromptSubmit consumes additionalContext — a SessionStart-shaped
-// reply is dropped because the event name does not match.
+// SessionStart was thought to consume nothing. On qwen-code 0.20.0 it does —
+// measured against a stub endpoint, a session with only UserPromptSubmit wired
+// put a deja block in 0 of 2 requests and one with SessionStart added put it in
+// 2 of 2.
 func TestQwenHooksUserPromptSubmitInMilliseconds(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -139,8 +141,12 @@ func TestQwenHooksUserPromptSubmitInMilliseconds(t *testing.T) {
 	if err := json.Unmarshal(b, &root); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := root.Hooks["SessionStart"]; ok {
-		t.Fatal("SessionStart fires but never takes the context: wrong event")
+	start := root.Hooks["SessionStart"]
+	if len(start) == 0 || len(start[0].Hooks) == 0 {
+		t.Fatalf("no SessionStart hook, so a qwen session opens with no digest: %s", b)
+	}
+	if !strings.HasSuffix(start[0].Hooks[0].Command, "hook-context") {
+		t.Fatalf("SessionStart runs %q, want the digest", start[0].Hooks[0].Command)
 	}
 	groups := root.Hooks["UserPromptSubmit"]
 	if len(groups) == 0 || len(groups[0].Hooks) == 0 {

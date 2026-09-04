@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -25,8 +26,8 @@ func TestWiringRefreshesAfterUpgrade(t *testing.T) {
 	}
 	recordWiring([]string{"qwen-auto"}, false)
 
-	// Rewind: the wiring an older deja wrote, under an event qwen never
-	// consumes, with a timeout it reads as ten milliseconds.
+	// Rewind: the wiring an older deja wrote — the old binary path, and a
+	// timeout qwen reads as ten milliseconds.
 	settings := filepath.Join(home, ".qwen", "settings.json")
 	stale := map[string]any{"hooks": map[string]any{
 		"SessionStart": []any{map[string]any{"hooks": []any{map[string]any{
@@ -55,11 +56,23 @@ func TestWiringRefreshesAfterUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	hooks, _ := got["hooks"].(map[string]any)
-	if _, dead := hooks["SessionStart"]; dead {
-		t.Fatalf("the abandoned event survived: %s", raw)
-	}
 	if _, live := hooks["UserPromptSubmit"]; !live {
 		t.Fatalf("the working hook was not restored: %s", raw)
+	}
+	// The stale entry is taken over rather than left as it was: same event,
+	// this binary, and a timeout in the units qwen actually reads.
+	start, _ := hooks["SessionStart"].([]any)
+	if len(start) != 1 {
+		t.Fatalf("SessionStart entries = %d, want the stale one adopted: %s", len(start), raw)
+	}
+	entry, _ := start[0].(map[string]any)
+	inner, _ := entry["hooks"].([]any)
+	h, _ := inner[0].(map[string]any)
+	if cmd, _ := h["command"].(string); strings.HasPrefix(cmd, "/old/deja") {
+		t.Fatalf("the old binary path survived the upgrade: %s", raw)
+	}
+	if to, _ := h["timeout"].(float64); to < 1000 {
+		t.Fatalf("timeout = %v, still the value qwen reads as ten milliseconds: %s", to, raw)
 	}
 	// And the record now says this binary owns it, so the repair does not
 	// repeat on every session start.

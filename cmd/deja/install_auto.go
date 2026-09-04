@@ -137,6 +137,19 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 	}
 }
 
+// adoptHookTimeout sets the timeout on the hook deja owns inside an entry,
+// leaving any line a reader wrote around it alone.
+func adoptHookTimeout(entry map[string]any, cmd string, timeout int) {
+	hs, _ := entry["hooks"].([]any)
+	for _, hAny := range hs {
+		h, _ := hAny.(map[string]any)
+		if h == nil || h["type"] != "command" || hookCommandKindOf(h["command"], cmd) != hookDejas {
+			continue
+		}
+		h["timeout"] = timeout
+	}
+}
+
 // adoptCodexHookEntry rewrites the command and status message of an entry deja
 // already owns.
 func adoptCodexHookEntry(entry map[string]any, cmd, event string) {
@@ -389,21 +402,39 @@ func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
 	return installGeminiExtension(exe, uninstall)
 }
 
-// Qwen took two wrong readings to get right. Its `timeout` is MILLISECONDS,
-// like Gemini's — the 10 deja used to write killed the hook ten milliseconds
-// in, which is indistinguishable from a harness that has no hooks. And while
-// SessionStart does fire, only UserPromptSubmit consumes additionalContext
-// (appendUserPromptExpansionAdditionalContext), and Qwen checks that the
-// hookEventName in the reply matches the event — so the SessionStart-shaped
-// output of `hook-context` was dropped without a word.
+// Qwen's `timeout` is MILLISECONDS, like Gemini's — the 10 deja used to write
+// killed the hook ten milliseconds in, which is indistinguishable from a
+// harness that has no hooks.
+//
+// SessionStart used to be dropped here: qwen ran it and consumed nothing, so
+// deja retired the entry rather than leave a hook answering into the void. That
+// is no longer true — on qwen-code 0.20.0 the digest reaches the model, and so
+// does what a PostToolUse hook returns. PreToolUse fires and its output does
+// not, so it stays unwired.
+var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
+	{"SessionStart", "hook-context", ""},
+	{"UserPromptSubmit", "hook-prompt", ""},
+	// The fix pair, at the failure. Matched on the tool that runs a command so
+	// it never spawns on a read.
+	{"PostToolUse", "hook-tool-after", "run_shell_command"},
+}
+
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
-	// Older deja wrote SessionStart here, which qwen never consumed. Naming
-	// it as retired means an upgrade removes the dead entry instead of
-	// leaving qwen to run a hook that answers into the void.
-	return installSettingsHookRetiring(
-		filepath.Join(sources.QwenConfigDir(), "settings.json"),
-		"UserPromptSubmit", "", 60000, exe+" hook-prompt", uninstall,
-		map[string]bool{"SessionStart": true})
+	path := filepath.Join(sources.QwenConfigDir(), "settings.json")
+	var res installResult
+	for i, h := range qwenHookWiring {
+		r, err := installSettingsHookCmd(path, h.Event, h.Matcher, 60000, exe+" "+h.Sub, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// What the target reports is the first change made, the way the other
+		// multi-write targets do: "unchanged" from a later event must not
+		// overwrite the first one's "updated".
+		if i == 0 || (res.Action == "unchanged" && r.Action != "unchanged") {
+			res = r
+		}
+	}
+	return res, nil
 }
 
 // installSettingsHook merges one hook entry into a settings.json that the
@@ -492,6 +523,12 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
+			// The timeout too. Qwen and gemini read it in milliseconds, and the
+			// 10 an older deja wrote kills the hook ten milliseconds in — which
+			// looks exactly like a harness with no hooks. Adopting the entry
+			// without this left everyone who installed before the fix with a
+			// hook that could never answer.
+			adoptHookTimeout(entry, cmd, timeout)
 		}
 		kept = append(kept, entryAny)
 	}

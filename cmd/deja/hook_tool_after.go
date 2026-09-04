@@ -176,25 +176,48 @@ func toolResponseText(raw json.RawMessage) string {
 	return clampOutput(b.String())
 }
 
-// unwrapGeminiShellOutput strips the frame gemini puts around a command's
-// output before handing it to the model: an <untrusted_context> fence, an
-// "Output:" marker on the first line and a trailing process-group note. The
-// marker is the one that matters — with it in front, the first line of a build
-// failure stops looking like an error, and the fix pair went silent on a
-// failure it answers the moment the marker is gone (gemini-cli 0.55.1).
+// unwrapGeminiShellOutput strips the frame gemini and qwen put around a
+// command's output before handing it to the model. Gemini fences it in
+// <untrusted_context> with an "Output:" marker; qwen writes a labelled report —
+// Command, Directory, Output, Error, Exit Code, Signal, PGID. The marker is
+// what matters: with it in front, the first line of a build failure stops
+// looking like an error, and the fix pair went silent on a failure it answers
+// the moment the marker is gone (gemini-cli 0.55.1, qwen-code 0.20.0).
 func unwrapGeminiShellOutput(s string) string {
-	if !strings.Contains(s, "<untrusted_context>") {
+	if !strings.Contains(s, "Output:") {
 		return s
 	}
 	var kept []string
 	for _, line := range strings.Split(s, "\n") {
 		t := strings.TrimSpace(line)
-		if t == "<untrusted_context>" || t == "</untrusted_context>" || strings.HasPrefix(t, "Process Group PGID:") {
+		if t == "<untrusted_context>" || t == "</untrusted_context>" || framingLabel(t) {
 			continue
 		}
-		kept = append(kept, strings.TrimPrefix(line, "Output: "))
+		// The label introduces the payload on its first line only; what follows
+		// is the command's own output, untouched.
+		for _, label := range []string{"Output: ", "Error: "} {
+			if strings.HasPrefix(line, label) {
+				line = line[len(label):]
+				break
+			}
+		}
+		if strings.TrimSpace(line) == "(none)" {
+			continue
+		}
+		kept = append(kept, line)
 	}
 	return strings.Join(kept, "\n")
+}
+
+// framingLabel reports whether a line is part of the shell report rather than
+// the command's output.
+func framingLabel(t string) bool {
+	for _, label := range []string{"Command: ", "Directory: ", "Exit Code: ", "Signal: ", "Process Group PGID:"} {
+		if strings.HasPrefix(t, label) {
+			return true
+		}
+	}
+	return false
 }
 
 // after returns what follows key where it is used as one, or "" when the key is
