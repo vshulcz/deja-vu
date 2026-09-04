@@ -70,12 +70,26 @@ type toolHookInput struct {
 	CWD       string `json:"cwd"`
 	// Cursor leaves cwd empty and names the project here instead.
 	WorkspaceRoots []string `json:"workspace_roots"`
+	// Grok spells all of this in camelCase. See hook_grok.go.
+	grokEnvelope
+}
+
+// adopt fills in what grok spells differently. Without the tool name and its
+// command this hook cannot tell a spawn from an edit, and has nothing to look
+// the action up by.
+func (i *toolHookInput) adopt() {
+	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.grokEnvelope.WorkspaceRoot)
+	i.ToolName = adoptGrok(i.ToolName, i.grokEnvelope.ToolName)
+	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
+	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
 }
 
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
+	input.adopt()
 	// The kill switch, before anything is read. It reached the session-start
 	// hook and nothing else, so a machine with recall off still had text drawn
 	// from its own indexed sessions injected here (#2701).
@@ -149,12 +163,20 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // changed — Read, Glob and NotebookRead carry a file_path too, and a hook wired
 // with a wide matcher would otherwise fire on every one of them.
 func toolHookLine(dir, cwd string, input toolHookInput) string {
-	switch input.ToolName {
-	case "Bash":
+	// The names are each harness's own. A harness that calls its shell
+	// run_terminal_command rather than Bash was matched by the wiring — grok
+	// maps the Claude names onto its own — and then dropped here, so the hook
+	// fired on every action it took and had nothing to say about any of them.
+	if isCommandTool(input.ToolName) {
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
 			return commandHookLine(dir, cwd, cmd)
 		}
-	case "Edit", "Write", "MultiEdit", "NotebookEdit":
+		return ""
+	}
+	switch input.ToolName {
+	case "Edit", "Write", "MultiEdit", "NotebookEdit",
+		// Grok's editor and its file writer.
+		"search_replace", "write":
 		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
 			return fileHookLine(dir, cwd, path)
 		}

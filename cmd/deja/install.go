@@ -1626,6 +1626,7 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 				if msg := hookStatusMessage(event); msg != "" {
 					h["statusMessage"] = msg
 				}
+				adoptMatcher(entry, hs, matcher)
 			}
 			kept = append(kept, hAny)
 		}
@@ -1660,6 +1661,26 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		delete(root, "hooks")
 	}
 	return root
+}
+
+// adoptMatcher brings an entry deja already owns up to the matcher this build
+// wires. Without it a matcher is written once and never again: grok's session
+// hook carried `startup|resume` copied from Claude Code, grok names its sources
+// `new` and `load`, and the corrected matcher would have reached only machines
+// installing deja for the first time.
+//
+// It moves only when deja's hook is alone in the entry. A matcher covers every
+// hook beside it, so rewriting a shared one would silently change when someone
+// else's hook runs.
+func adoptMatcher(entry map[string]any, hooks []any, matcher string) {
+	if len(hooks) != 1 {
+		return
+	}
+	if matcher == "" {
+		delete(entry, "matcher")
+		return
+	}
+	entry["matcher"] = matcher
 }
 
 // combinedStatusline builds a command that runs the existing statusline and

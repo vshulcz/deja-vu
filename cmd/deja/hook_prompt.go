@@ -53,6 +53,15 @@ type promptHookInput struct {
 	CWD string `json:"cwd"`
 	// Cursor leaves cwd empty and names the project here instead.
 	WorkspaceRoots []string `json:"workspace_roots"`
+	// Grok spells all of this in camelCase. See hook_grok.go.
+	grokEnvelope
+}
+
+// adopt fills in what grok spells differently, so this prompt's recall is filed
+// under the session that asked for it.
+func (i *promptHookInput) adopt() {
+	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.grokEnvelope.WorkspaceRoot)
 }
 
 // hookPromptText reads a prompt that arrives either as a string (Claude Code,
@@ -145,6 +154,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// could not read (#2773). The prompt is what this hook recalls from, so a
 	// payload it cannot read at all injects nothing and this never fires.
 	unreadable := json.NewDecoder(bytes.NewReader(payload)).Decode(&input) != nil
+	input.adopt()
 	// The kill switch. It reached the session-start hook and nothing else, so
 	// this hook — every user message, and the wiring for seven harnesses —
 	// kept injecting on a machine with recall off (#2701).

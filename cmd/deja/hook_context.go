@@ -44,6 +44,15 @@ type precompactHookInput struct {
 	CWD            string `json:"cwd"`
 	HookEventName  string `json:"hook_event_name"`
 	Trigger        string `json:"trigger"`
+	// Grok spells all of this in camelCase. See hook_grok.go.
+	grokEnvelope
+}
+
+// adopt fills in what grok spells differently, so the session this compaction
+// belongs to is the one deja forgets.
+func (i *precompactHookInput) adopt() {
+	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.TranscriptPath = adoptGrok(i.TranscriptPath, i.grokEnvelope.TranscriptPath)
 }
 
 // hookStdinWait bounds how long any hook waits for its payload.
@@ -122,6 +131,7 @@ func endsAValue(b []byte) bool {
 func runHookPrecompact(dir string) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookStdin(), &input)
+	input.adopt()
 	// Compaction throws away the blocks this session was shown, and the list
 	// that stops them repeating outlives them — so the memory the agent just
 	// lost is exactly the memory recall refuses to send again. Forget what this
@@ -293,6 +303,8 @@ func runHookContext(dir string, plain bool) error {
 		CWD       string `json:"cwd"`
 		// Cursor leaves cwd empty and names the project here instead.
 		WorkspaceRoots []string `json:"workspace_roots"`
+		// Grok spells all of this in camelCase. See hook_grok.go.
+		grokEnvelope
 	}
 	// Best effort, as every hook is — but not silent about it. A payload deja
 	// cannot decode carries the session this injection went to, and losing it
@@ -300,6 +312,8 @@ func runHookContext(dir string, plain bool) error {
 	// that sent nothing at all (#2161).
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
+	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
+	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.grokEnvelope.WorkspaceRoot)
 	// The harness tells us which project this is; deja read only the
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having

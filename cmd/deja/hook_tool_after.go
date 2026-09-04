@@ -139,7 +139,8 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 // speaks for them.
 func isCommandTool(name string) bool {
 	switch name {
-	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal", "run_shell_command":
+	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal",
+		"run_shell_command", "run_terminal_command":
 		return true
 	}
 	return false

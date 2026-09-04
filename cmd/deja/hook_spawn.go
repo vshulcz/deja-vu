@@ -33,7 +33,7 @@ var spawnPromptFields = []string{"prompt", "instructions", "task"}
 // hook with its own matcher may spell it differently.
 func isSpawnTool(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "task", "agent", "subagent":
+	case "task", "agent", "subagent", "spawn_subagent":
 		return true
 	}
 	return false
@@ -47,8 +47,18 @@ func isSpawnTool(name string) bool {
 func runHookSpawn(dir string, input toolHookInput, raw []byte, stdout io.Writer) error {
 	var payload struct {
 		ToolInput map[string]json.RawMessage `json:"tool_input"`
+		// Grok spells it camelCase. See hook_grok.go — and a rewritten tool
+		// input is the one hook reply grok acts on, so reading its spelling is
+		// the whole of what makes memory reach a subagent there.
+		ToolInputCamel map[string]json.RawMessage `json:"toolInput"`
 	}
-	if err := json.Unmarshal(raw, &payload); err != nil || len(payload.ToolInput) == 0 {
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil
+	}
+	if len(payload.ToolInput) == 0 {
+		payload.ToolInput = payload.ToolInputCamel
+	}
+	if len(payload.ToolInput) == 0 {
 		return nil
 	}
 	field, text := spawnPrompt(payload.ToolInput)
