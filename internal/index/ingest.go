@@ -377,6 +377,11 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	// The wait before an answer is made of three things — taking the lock,
+	// walking the stores to see what changed, and ingesting whatever did — and
+	// from the outside they are one number. A reader who sees seconds here can
+	// say which one it was rather than guessing (#3021).
+	mark := searchTrace()
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
 		return false, err
@@ -386,11 +391,14 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		return true, nil
 	}
 	defer unlock()
+	mark("lock")
 	// Read first, walk second: this is the path every search takes, and
 	// re-deriving state for unchanged transcripts was costing 700 ms of the
 	// second it takes to answer a query.
 	m, err := readManifest(dir)
+	mark("manifest")
 	want := currentFilesReusing("", priorFiles(m, err))
+	mark("walk stores")
 	if err != nil || m.Version != version || m.Scope != "" || !recordsIntact(dir, m) {
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
@@ -420,10 +428,28 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		}
 	}
 	if !removedAny && canAppendIncremental(changed, m.Files) {
-		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+		mark("decide append")
+		err := updateIndex(dir, o.Harness, "", want, false, progress)
+		mark("append")
+		return false, err
 	}
 	// Caller detaches the rebuild (it owns the executable path).
+	mark("hand to warmup")
 	return true, nil
+}
+
+// searchTrace returns a stage marker that prints when DEJA_TRACE=1, and costs a
+// comparison otherwise. Same shape and same variable as the session-start hook,
+// so one instruction covers both paths.
+func searchTrace() func(string) {
+	if os.Getenv("DEJA_TRACE") != "1" {
+		return func(string) {}
+	}
+	last := time.Now()
+	return func(stage string) {
+		fmt.Fprintf(os.Stderr, "trace %-16s %6.1fms\n", stage, float64(time.Since(last).Microseconds())/1000)
+		last = time.Now()
+	}
 }
 
 func rebuild(dir string, harness string, scope string, files map[string]FileState, progress io.Writer) error {
