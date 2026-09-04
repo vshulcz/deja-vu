@@ -156,6 +156,24 @@ func ipv4At(l string, i int) (int, bool) {
 	return pos, true
 }
 
+// filePosition is a compiler's way of saying where: a path, a line, and often a
+// column, before the error itself. `./main.go:12:2: undefined: helper` and
+// `tsc: src/app.ts:88:5: error TS2304` are the shape.
+var filePosition = regexp.MustCompile(`(^|\s)([^\s:]*[./][^\s:]*):([0-9]{1,6})(:([0-9]{1,6}))?:`)
+
+// maskFilePosition replaces the line and column a compiler prints with a
+// placeholder. Adding an import moves every error in the file down a line, and
+// without this the same undefined symbol at line 4 and at line 9 are two walls
+// — each below the second sighting a fix pair needs and the three sessions
+// `deja friction` needs, so the repair for a wall this machine has hit ten
+// times is never offered. The path stays: which file it was is the useful half,
+// and the reader is shown the line as it was printed either way, because this
+// runs on the signature and not on the text (#2369 draws the same line for
+// ports and pids).
+func maskFilePosition(l string) string {
+	return filePosition.ReplaceAllString(l, "${1}${2}:<n>:")
+}
+
 // maskVolatileNumbers replaces long digit runs with a placeholder, so one
 // failure is one wall across the numbers a machine hands out: a port, a pid, an
 // epoch, a goroutine id. Without it `dial tcp 10.0.0.7:5432: connect:
@@ -169,6 +187,7 @@ func ipv4At(l string, i int) (int, bool) {
 // epochs and ids are longer than that; 404 and 500 are not.
 func maskVolatileNumbers(l string) string {
 	l = maskIPv4(l)
+	l = maskFilePosition(l)
 	var b strings.Builder
 	b.Grow(len(l))
 	for i := 0; i < len(l); {
