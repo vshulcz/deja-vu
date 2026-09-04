@@ -62,8 +62,10 @@ func TestHookAntigravityBoundsStdinWithoutInjectingOnEveryTurn(t *testing.T) {
 	}{
 		{"unreadable payload", "not json at all", false},
 		{"empty payload", "", false},
-		{"seventh turn", `{"invocationNum":7}`, false},
-		{"first turn", `{"invocationNum":1}`, true},
+		{"seventh call", `{"invocationNum":7}`, false},
+		// Zero is the first call, not one: the harness counts from there and
+		// restarts every turn (measured on antigravity-cli 1.1.13).
+		{"first call", `{"invocationNum":0}`, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer

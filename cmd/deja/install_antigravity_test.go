@@ -80,7 +80,7 @@ func TestHookAntigravityInjectsOnlyOnFirstInvocation(t *testing.T) {
 	}
 	// No index: still valid JSON, never a bare error the host would choke on.
 	out.Reset()
-	if err := runHookAntigravity(dir, strings.NewReader(`{"invocationNum":1}`), &out); err != nil {
+	if err := runHookAntigravity(dir, strings.NewReader(`{"invocationNum":0}`), &out); err != nil {
 		t.Fatalf("hook: %v", err)
 	}
 	var resp antigravityHookResponse
@@ -126,7 +126,7 @@ func TestHookAntigravityScopesToWorkspacePath(t *testing.T) {
 	// Marshalled rather than pasted: a Windows path is full of backslashes,
 	// and hand-built JSON turns them into escape sequences the decoder refuses
 	// — the payload then names no workspace and the recall comes back empty.
-	payload, err := json.Marshal(map[string]any{"invocationNum": 1, "workspacePaths": []string{beta}})
+	payload, err := json.Marshal(map[string]any{"invocationNum": 0, "workspacePaths": []string{beta}})
 	if err != nil {
 		t.Fatal(err)
 	}

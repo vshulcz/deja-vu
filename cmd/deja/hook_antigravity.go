@@ -10,12 +10,18 @@ import (
 )
 
 // Antigravity's PreInvocation hook runs before every model call and injects
-// whatever steps the hook prints. That is one call per turn, not per session,
-// so the digest goes in on the first invocation only — invocationNum tells us
-// which one we are on.
+// whatever steps the hook prints. It is the only place a hook can speak here:
+// PreToolUse fires but its reason never reaches the model, and PostToolUse must
+// answer with an empty object (checked on antigravity-cli 1.1.13). So this one
+// event carries both channels — the digest on the first invocation, and the
+// question's own answer on the ones after it.
 type antigravityHookInput struct {
 	InvocationNum  int      `json:"invocationNum"`
 	WorkspacePaths []string `json:"workspacePaths"`
+	// The transcript is where the question lives: antigravity has no
+	// per-prompt event, so the newest user turn is read from here.
+	TranscriptPath string `json:"transcriptPath"`
+	ConversationID string `json:"conversationId"`
 }
 
 type antigravityInjectStep struct {
@@ -32,12 +38,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// close the pipe, which cost 20 s per turn on a host that holds it (#846).
 	payload := readHookPayload(stdin, hookStdinWait)
 	decoded := json.Unmarshal(payload, &input) == nil && len(payload) > 0
-	// invocationNum is 1-based; anything past the first turn already has the
-	// digest in its transcript. A payload deja could not read leaves it at 0,
-	// which reads as the first turn — so bounding the read without this would
-	// turn "blocks once per turn" into "injects the whole digest before every
-	// model call" (#846).
-	if !decoded || input.InvocationNum > 1 {
+	// A payload deja could not read leaves invocationNum at 0, which reads as
+	// the first call — so bounding the read without this would turn "once per
+	// turn" into "before every model call" (#846).
+	if !decoded {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
@@ -48,6 +52,35 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if len(input.WorkspacePaths) > 0 {
 		workspace = input.WorkspacePaths[0]
 	}
+	// Past the first invocation the digest is already in the transcript, and
+	// the harness has no per-prompt event of its own — so this is where the
+	// question gets answered. Silence is the usual result, and the prompt
+	// path's dedupe keeps an answer to one per question rather than one per
+	// model call.
+	//
+	// The count starts at zero and restarts on every turn (measured on
+	// antigravity-cli 1.1.13: one two-turn conversation ran 0..21 and then 0
+	// again). Reading it as 1-based put the digest in twice per turn, and
+	// reading it as per-conversation put it in again on every turn of a
+	// continued one — so the conversation's own ledger decides, and the
+	// counter only says which call inside the turn we are on.
+	if input.InvocationNum > 0 || digestAlreadyInjected(dir, input.ConversationID) {
+		block := antigravityPromptBlock(dir, latestUserRequest(input.TranscriptPath),
+			input.ConversationID, workspace)
+		if block == "" {
+			fmt.Fprintln(stdout, "{}")
+			return nil
+		}
+		b, err := json.Marshal(antigravityHookResponse{
+			InjectSteps: []antigravityInjectStep{{EphemeralMessage: block}},
+		})
+		if err != nil {
+			fmt.Fprintln(stdout, "{}")
+			return nil
+		}
+		fmt.Fprintln(stdout, string(b))
+		return nil
+	}
 	// The payload, and nothing written back into the environment: deja used to
 	// export the workspace here, which carried this call's project into the
 	// next one in the same process and decided nothing else (#2185).
@@ -57,6 +90,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 		return nil
 	}
 	digest = frameRecall(startLead(antigravityLead) + digest)
+	rememberDigestInjected(dir, input.ConversationID)
 	usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, "", sessions, raw,
 		policy.Load().Describe(policy.ActivationAuto), ids, projects)
 	b, err := json.Marshal(antigravityHookResponse{
