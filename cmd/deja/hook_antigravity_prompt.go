@@ -30,8 +30,9 @@ const (
 
 // transcriptStep is as much of an antigravity step as this hook reads.
 type transcriptStep struct {
-	Type    string `json:"type"`
-	Content string `json:"content"`
+	Type      string `json:"type"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"created_at"`
 }
 
 // transcriptTailSteps decodes the end of a transcript, newest step first. A
@@ -261,4 +262,43 @@ func antigravityFixPair(dir, output, conversationID, workspace string) string {
 		return ""
 	}
 	return resp.HookSpecificOutput.AdditionalContext
+}
+
+// newestCheckpoint is when this conversation was last compacted, or "" if it
+// has not been. Antigravity has no compaction event — the five it offers are
+// PreToolUse, PostToolUse, PreInvocation, PostInvocation and Stop — but it
+// truncates the conversation and writes a CHECKPOINT step saying so, and the
+// hook is handed the transcript on every call.
+func newestCheckpoint(path string) string {
+	for _, step := range transcriptTailSteps(path) {
+		if step.Type == checkpointStepType {
+			return step.CreatedAt
+		}
+	}
+	return ""
+}
+
+const checkpointStepType = "CHECKPOINT"
+
+// forgetOnCheckpoint clears what this conversation was shown once it has been
+// compacted, so the memory it just lost can be served again. Without it the
+// blocks are gone from the context while the record of having sent them
+// outlives them, which is the one state where recall is silent about exactly
+// what the agent no longer has.
+//
+// The marker is kept under a key of its own, so forgetting the conversation's
+// rows does not forget that this compaction was handled.
+func forgetOnCheckpoint(dir, conversationID, marker string) bool {
+	if strings.TrimSpace(conversationID) == "" || strings.TrimSpace(marker) == "" {
+		return false
+	}
+	key := "agy-compact:" + conversationID
+	token := "checkpoint:" + shortHash(marker)
+	if alreadyInjected(dir, key)[token] {
+		return false
+	}
+	rememberInjectedIDs(dir, key, token)
+	forgetInjected(dir, conversationID)
+	forgetInjected(dir, antigravityDigestKey(conversationID))
+	return true
 }

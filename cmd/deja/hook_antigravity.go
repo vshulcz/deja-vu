@@ -55,6 +55,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if workspace == "" {
 		workspace = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
 	}
+	// A compaction throws away the blocks this conversation was shown while the
+	// record of having sent them outlives them, so the memory it just lost is
+	// the memory recall refuses to send again.
+	forgetOnCheckpoint(dir, input.ConversationID, newestCheckpoint(input.TranscriptPath))
 	// Past the first invocation the digest is already in the transcript, and
 	// the harness has no per-prompt event of its own — so this is where the
 	// question gets answered. Silence is the usual result, and the prompt
