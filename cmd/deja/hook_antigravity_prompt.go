@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -139,3 +140,44 @@ func antigravityDigestKey(conversationID string) string {
 // antigravityDigestToken is what the ledger row says: this conversation has
 // been handed the digest.
 const antigravityDigestToken = "agy-digest"
+
+// workspaceFromConversation is where this conversation was started. The CLI
+// leaves workspacePaths empty unless it was given --add-dir (measured on
+// antigravity-cli 1.1.13: an ordinary `agy -p` inside a project sends []), and
+// the hook's own working directory is the plugin folder — so without this the
+// digest is scoped to a directory nobody works in and recalls the wrong
+// project's history, or none.
+//
+// Antigravity keeps the answer beside the transcript: a cache mapping each
+// directory to the conversation it last opened there. The payload names the
+// conversation, so the map is read backwards.
+func workspaceFromConversation(transcriptPath, conversationID string) string {
+	if strings.TrimSpace(transcriptPath) == "" || strings.TrimSpace(conversationID) == "" {
+		return ""
+	}
+	// <product root>/brain/<conversation>/.system_generated/logs/transcript.jsonl
+	root := transcriptPath
+	for range 5 {
+		root = filepath.Dir(root)
+	}
+	b, err := os.ReadFile(filepath.Join(root, "cache", "last_conversations.json"))
+	if err != nil {
+		return ""
+	}
+	var byDir map[string]string
+	if json.Unmarshal(b, &byDir) != nil {
+		return ""
+	}
+	// The longest match, so a conversation opened in a subdirectory is filed
+	// under that subdirectory rather than under its parent.
+	best := ""
+	for dir, conv := range byDir {
+		if conv != conversationID {
+			continue
+		}
+		if len(dir) > len(best) {
+			best = dir
+		}
+	}
+	return best
+}

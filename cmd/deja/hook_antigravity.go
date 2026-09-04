@@ -52,6 +52,9 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	if len(input.WorkspacePaths) > 0 {
 		workspace = input.WorkspacePaths[0]
 	}
+	if workspace == "" {
+		workspace = workspaceFromConversation(input.TranscriptPath, input.ConversationID)
+	}
 	// Past the first invocation the digest is already in the transcript, and
 	// the harness has no per-prompt event of its own — so this is where the
 	// question gets answered. Silence is the usual result, and the prompt
