@@ -140,6 +140,30 @@ func runHookPrecompact(dir string) {
 	requestWarmup(dir)
 }
 
+// sessionHadDigest reports whether this session has already had its one
+// session-start attempt, for a host that fires that event every turn. Antigravity
+// keeps the same record under a key of its own; this one is for hosts that come
+// in through the ordinary session-start hook.
+func sessionHadDigest(dir, sessionID string) bool {
+	if strings.TrimSpace(sessionID) == "" {
+		return false
+	}
+	return alreadyInjected(dir, onceDigestKey(sessionID))[onceDigestToken]
+}
+
+func rememberSessionDigest(dir, sessionID string) {
+	if strings.TrimSpace(sessionID) == "" {
+		return
+	}
+	rememberInjectedIDs(dir, onceDigestKey(sessionID), onceDigestToken)
+}
+
+func onceDigestKey(sessionID string) string { return "once:" + sessionID }
+
+// onceDigestToken is what the ledger row says: this session has had its
+// session-start attempt.
+const onceDigestToken = "once-digest"
+
 // joinNotes puts a maintenance line ahead of the memory line without letting
 // an empty one leave a stray separator.
 func joinNotes(a, b string) string {
@@ -305,6 +329,14 @@ func runHookContext(dir string, plain bool) error {
 		WorkspaceRoots []string `json:"workspace_roots"`
 		// Grok spells all of this in camelCase. See hook_grok.go.
 		grokEnvelope
+		// Once is set by a host whose session-start event is really a per-turn
+		// one. OpenClaw's before_agent_start fires on every agent run, so
+		// without this the project digest would go in front of the model on
+		// every message rather than at the start of the session. The session
+		// gets one attempt: the digest describes the project rather than the
+		// question, so a first turn with nothing to say has nothing new to say
+		// on the second either.
+		Once bool `json:"deja_once"`
 	}
 	// Best effort, as every hook is — but not silent about it. A payload deja
 	// cannot decode carries the session this injection went to, and losing it
@@ -313,6 +345,12 @@ func runHookContext(dir string, plain bool) error {
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
+	if input.Once {
+		if sessionHadDigest(dir, input.SessionID) {
+			return nil
+		}
+		rememberSessionDigest(dir, input.SessionID)
+	}
 	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)
 	// The harness tells us which project this is; deja read only the
 	// environment, so a host that sends the payload without exporting

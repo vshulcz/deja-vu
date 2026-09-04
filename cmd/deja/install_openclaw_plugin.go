@@ -155,10 +155,46 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
+// Memory is optional: a hook that throws must never take the turn down with it.
+function ask(args, payload) {
+  try {
+    return execFileSync(DEJA, args, {
+      input: JSON.stringify(payload),
+      encoding: "utf8",
+      timeout: 10000,
+      maxBuffer: 4 * 1024 * 1024,
+      stdio: ["pipe", "pipe", "ignore"],
+    }).trim();
+  } catch {
+    return "";
+  }
+}
+
 export default {
   id: %q,
   name: "deja recall",
   register(api) {
+    // What this project settled, at the start of the session. The bootstrap
+    // hook does this in gateway mode and does not run under the local agent,
+    // where a session had no memory of the project at all until it happened to
+    // ask a question the store answered.
+    //
+    // before_agent_start fires once per agent run rather than once per session,
+    // so deja_once is what keeps the digest to the first of them.
+    api.on(
+      "before_agent_start",
+      async (_event, ctx) => {
+        const digest = ask(["hook-context", "--plain"], {
+          session_id: ctx?.sessionKey || ctx?.sessionId || "",
+          cwd: process.cwd(),
+          source: "startup",
+          deja_once: true,
+        });
+        if (!digest) return;
+        return { prependContext: digest };
+      },
+      { timeoutMs: 15000 },
+    );
     api.on(
       "before_prompt_build",
       async (event) => {
@@ -168,19 +204,11 @@ export default {
         // session id. A payload without one turns that off: measured on a real
         // store, half of all injections were then a word-for-word repeat.
         const sessionID = event?.sessionId || event?.session_id || event?.session?.id || "";
-        let recall = "";
-        try {
-          recall = execFileSync(DEJA, ["hook-prompt", "--plain"], {
-            input: JSON.stringify({ prompt, session_id: sessionID, cwd: process.cwd() }),
-            encoding: "utf8",
-            timeout: 10000,
-            maxBuffer: 4 * 1024 * 1024,
-            stdio: ["pipe", "pipe", "ignore"],
-          }).trim();
-        } catch {
-          // Memory is optional: never take the turn down with it.
-          return;
-        }
+        const recall = ask(["hook-prompt", "--plain"], {
+          prompt,
+          session_id: sessionID,
+          cwd: process.cwd(),
+        });
         // Silence is the common case — the hook speaks only when the user's
         // own history answers what they just asked.
         if (!recall) return;
