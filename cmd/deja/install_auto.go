@@ -22,8 +22,12 @@ import (
 // on the strength of the trust entry, and the events added since reached
 // nobody.
 var codexHookWiring = []struct{ Event, Sub, Matcher string }{
-	// SessionStart carries the project digest.
-	{"SessionStart", "hook-context", "startup|resume"},
+	// SessionStart carries the project digest. No matcher, as in Claude: codex
+	// fires this again with source "compact" after each compaction, and that is
+	// the moment the digest is worth most — measured on codex 0.149.0, one
+	// `codex exec` run compacted six times and "startup|resume" caught none of
+	// them, so the agent came out of every compaction with nothing.
+	{"SessionStart", "hook-context", ""},
 	// UserPromptSubmit answers the prompt itself. Codex sends the same payload
 	// Claude does — prompt, session_id, cwd — so hook-prompt reads it unchanged;
 	// measured on codex 0.149.0, the event fires on every `codex exec` turn.
@@ -99,6 +103,16 @@ func updateCodexHook(root map[string]any, event, cmd, matcher string, uninstall 
 			}
 			found = true
 			adoptCodexHookEntry(entry, cmd, event)
+			// The matcher is part of the wiring, not a user setting, so an
+			// upgrade has to rewrite it: the SessionStart entry written when
+			// this meant "startup|resume" went on missing every compaction
+			// through any number of installs, because adopting it left the
+			// pattern alone.
+			if matcher == "" {
+				delete(entry, "matcher")
+			} else {
+				entry["matcher"] = matcher
+			}
 		}
 		kept = append(kept, entryAny)
 	}

@@ -99,6 +99,45 @@ func TestInstallCodexWiresThePromptItself(t *testing.T) {
 // Codex compacts on its own and fires PreCompact with trigger "auto" first.
 // Unwired, the session keeps its record of what it was shown while losing the
 // blocks themselves, so recall stays quiet about exactly what was just dropped.
+// Codex fires SessionStart again with source "compact" after it compacts, which
+// is when the digest is worth most — and an install that predates this carries
+// the old pattern, so the upgrade has to rewrite it rather than adopt it.
+func TestInstallCodexSessionStartSurvivesCompaction(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	path := filepath.Join(home, ".codex", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	old := `{"hooks":{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"/usr/local/bin/deja hook-context"}]}]}}`
+	if err := os.WriteFile(path, []byte(old), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root struct {
+		Hooks map[string][]struct {
+			Matcher *string `json:"matcher"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatal(err)
+	}
+	entries := root.Hooks["SessionStart"]
+	if len(entries) != 1 {
+		t.Fatalf("SessionStart entries = %d, want the old one adopted: %s", len(entries), b)
+	}
+	if entries[0].Matcher != nil {
+		t.Fatalf("matcher = %q, want it widened to every source", *entries[0].Matcher)
+	}
+}
+
 func TestInstallCodexWiresCompaction(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
