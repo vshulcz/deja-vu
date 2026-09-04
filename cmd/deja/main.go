@@ -2495,29 +2495,30 @@ func parseSearch(args []string) (search.Options, error) {
 // that are real deja flags somewhere but not here. Only exact matches: a query
 // may legitimately start with a dash, and `--` still ends option parsing.
 var flagsOfOtherCommands = map[string]string{
-	"--offset":      "show",
-	"--span":        "restore",
-	"--out":         "restore",
-	"--force":       "restore",
-	"--tag":         "remember",
-	"--deep":        "doctor",
-	"--offline":     "doctor",
-	"--dry-run":     "forget",
-	"--all-matches": "forget",
-	"--list":        "forget",
-	"--unforget":    "forget",
-	"--before":      "forget",
-	"--to":          "handoff",
-	"--exec":        "resume",
-	"--plain":       "hook-prompt",
-	"--no-open":     "view",
-	"--full":        "sync export",
-	"--peer":        "sync export",
-	"--pull":        "sync ssh",
-	"--both":        "sync ssh",
-	"--from":        "last",
-	"--last":        "log",
-	"--seed":        "bench",
+	"--offset":           "show",
+	"--span":             "restore",
+	"--out":              "restore",
+	"--force":            "restore",
+	"--tag":              "remember",
+	"--deep":             "doctor",
+	"--offline":          "doctor",
+	"--dry-run":          "forget",
+	"--all-matches":      "forget",
+	"--list":             "forget",
+	"--unforget":         "forget",
+	"--before":           "forget",
+	"--to":               "handoff",
+	"--exec":             "resume",
+	"--plain":            "hook-prompt",
+	"--no-open":          "view",
+	"--full":             "sync export",
+	"--include-imported": "sync export",
+	"--peer":             "sync export",
+	"--pull":             "sync ssh",
+	"--both":             "sync ssh",
+	"--from":             "last",
+	"--last":             "log",
+	"--seed":             "bench",
 }
 
 // searchFlags is every flag the bare search form accepts, for the typo check.
@@ -3606,7 +3607,7 @@ Usage:
   deja friction [--limit n] [--json]
   deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
   deja how <what> [--project name] [--limit n] [--json]  (commands this machine actually ran)
-  deja sync export <dir> [--full] [--peer name]
+  deja sync export <dir> [--full] [--include-imported] [--peer name]
   deja sync import <dir>
   deja sync                       (exchange with every machine deja knows, both ways)
   deja sync ssh <host> [--pull] [--both] [--full]

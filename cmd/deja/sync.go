@@ -70,12 +70,23 @@ func runSync(dir string, args []string) error {
 		return nil
 	case "export":
 		full := false
+		relay := false
 		rest := args[1:]
 		out := ""
 		peer := ""
 		for i := 0; i < len(rest); i++ {
 			a := rest[i]
 			if a == "--full" {
+				full = true
+				continue
+			}
+			// What arrived from other machines stays put by default: passing
+			// it on spreads it past whoever agreed to the first hop (#2450).
+			// This is how someone says otherwise about machines that are all
+			// theirs — a chain where this one sits in the middle, or a
+			// migration off it (#2962).
+			if a == "--include-imported" {
+				relay = true
 				full = true
 				continue
 			}
@@ -96,7 +107,7 @@ func runSync(dir string, args []string) error {
 			// records into an empty directory while the reader believed they
 			// had carried their whole memory to another machine (#745).
 			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("sync export: unknown flag %q — only --full and --peer are accepted", a)
+				return fmt.Errorf("sync export: unknown flag %q — only --full, --include-imported and --peer are accepted", a)
 			}
 			out = a
 		}
@@ -112,9 +123,12 @@ func runSync(dir string, args []string) error {
 		}
 		var n int
 		var err error
-		if full {
+		switch {
+		case relay:
+			n, err = index.ExportRelay(dir, out, peers.Identity(peer))
+		case full:
 			n, err = index.ExportFull(dir, out)
-		} else {
+		default:
 			// Folded, so one machine settles under one watermark whichever way
 			// the name was spelled — a pull runs this on the remote with that
 			// machine's hostname, capitalised on macOS, while the alias someone
@@ -161,6 +175,16 @@ func runSync(dir string, args []string) error {
 		// the recovery sentence in #1820 and the tombstone id in #1794.
 		if n == 0 && !full && !hasSyncBatches(out) {
 			fmt.Fprintf(os.Stdout, "deja: nothing has changed since the last export, and this folder holds no batch from this machine — `deja sync export %s --full` sends everything\n", pasteSafe(out))
+		}
+		// An export that holds nothing but other machines' work says so.
+		// Without this the reader was told "exported 0 records" by a machine
+		// whose `stats` showed hundreds, and had to guess whether the data was
+		// lost (#2962).
+		if !relay {
+			if held := importedSessionTotal(dir); held > 0 && n == 0 {
+				fmt.Fprintf(os.Stdout, "deja: %d session%s here arrived from other machines and are not passed on — `deja sync export %s --include-imported` sends those too\n",
+					held, pluralS(held), pasteSafe(out))
+			}
 		}
 		// Only when something was written: on a watermarked sync most runs
 		// send nothing, and the line asked the reader to review a file that

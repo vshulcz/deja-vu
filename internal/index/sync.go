@@ -44,6 +44,10 @@ type SyncRecord struct {
 // behind it is not.
 type syncName string
 
+// importedProjectPrefix marks a project that arrived by sync. Relaying strips
+// it so the next machine files the work under its real name.
+const importedProjectPrefix = "imported:"
+
 func (n *syncName) UnmarshalJSON(b []byte) error {
 	var s string
 	if json.Unmarshal(b, &s) == nil {
@@ -57,18 +61,28 @@ func (n *syncName) UnmarshalJSON(b []byte) error {
 // machine can receive the whole history even after earlier batch dirs are
 // gone; import-side dedupe makes it safe.
 func Export(dir, outDir string) (int, error) {
-	return exportRecords(dir, outDir, "", false)
+	return exportRecords(dir, outDir, "", false, false)
 }
 
 func ExportFull(dir, outDir string) (int, error) {
-	return exportRecords(dir, outDir, "", true)
+	return exportRecords(dir, outDir, "", true, false)
+}
+
+// ExportRelay is ExportFull and the work that arrived from other machines with
+// it, each record under the names it had where it happened rather than this
+// machine's. Opt-in, because passing a peer's work on spreads it past whoever
+// agreed to the first hop (#2450) — but a machine in the middle of a chain, or
+// one being migrated off, has to be able to hand over everything it holds
+// (#2962). It never sends a record back to the machine it came from.
+func ExportRelay(dir, outDir, peer string) (int, error) {
+	return exportRecords(dir, outDir, peer, true, true)
 }
 
 // ExportTo is Export for a named peer: the watermark it advances is that
 // peer's alone. An empty name keeps the shared one, which is what a hand-taken
 // backup uses.
 func ExportTo(dir, outDir, peer string) (int, error) {
-	return exportRecords(dir, outDir, peer, false)
+	return exportRecords(dir, outDir, peer, false, false)
 }
 
 // ExportDeferred writes batches like Export but does not advance the
@@ -109,8 +123,8 @@ func recordIdentity(r Record) uint64 {
 	return h.Sum64()
 }
 
-func exportRecords(dir, outDir, peer string, full bool) (int, error) {
-	n, commit, err := exportRecordsDeferred(dir, outDir, peer, full)
+func exportRecords(dir, outDir, peer string, full, relay bool) (int, error) {
+	n, commit, err := exportRecordsWith(dir, outDir, peer, full, relay)
 	if err != nil {
 		return n, err
 	}
@@ -118,6 +132,10 @@ func exportRecords(dir, outDir, peer string, full bool) (int, error) {
 }
 
 func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() error, error) {
+	return exportRecordsWith(dir, outDir, peer, full, false)
+}
+
+func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() error, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -182,8 +200,28 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 	// beyond it. Held records are not sent, and they are not settled either.
 	heldFrom := map[string]int64{}
 	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		if r.SourcePath == syncImportPath {
+		// What arrived by sync travels on rather than stopping here. A machine
+		// that pulled from a container and is then pulled from itself used to
+		// export nothing at all — `--full` included — so a middle machine in a
+		// chain was a dead end, and a migration off it lost everything it had
+		// gathered (#2962). It relays under the original machine's name, not
+		// its own: a relay must not sign someone else's work.
+		relayed := r.SourcePath == syncImportPath
+		if relayed && !relay {
+			// The standing rule: what arrived from elsewhere is not this
+			// machine's to pass on, because a second hop spreads it past
+			// whoever agreed to the first (#2450). Opt in to relay it — a
+			// migration off this machine, or a chain where it sits in the
+			// middle — with `sync export --include-imported` (#2962).
 			return
+		}
+		if relayed && peer != "" {
+			// Not back where it came from. A pull tells the far side who is
+			// asking (`sync export --peer <us>`), and sending a machine its own
+			// work is pure traffic: the receiver recognises it and drops it.
+			if meta, ok := m.Sessions[r.Key]; ok && meta.From != "" && strings.EqualFold(meta.From, peer) {
+				return
+			}
 		}
 		source := r.SourcePath
 		if source == "" {
@@ -206,7 +244,23 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 		if !ok {
 			return
 		}
-		if (!ex.Empty() && ex.Match(meta.Project)) || pol.Ignored(meta.Path, meta.Project) {
+		// A relayed session is filed here under "imported:<project>" and a
+		// local id. It goes back out under the names it had where the work
+		// happened, so the next machine dedupes it against a batch pulled
+		// straight from that machine rather than growing a second copy — and
+		// so the privacy rules below, which are written against real project
+		// names, match it at all.
+		project, sessionID, origin := meta.Project, meta.ID, syncName(self)
+		if relayed {
+			project = strings.TrimPrefix(meta.Project, importedProjectPrefix)
+			if meta.OrigID != "" {
+				sessionID = meta.OrigID
+			}
+			if meta.From != "" {
+				origin = syncName(meta.From)
+			}
+		}
+		if (!ex.Empty() && ex.Match(project)) || pol.Ignored(meta.Path, project) {
 			// Held, not settled, for both: a watermark that ran past a
 			// withheld record would settle it forever, so lifting the rule
 			// later would never send that work.
@@ -218,12 +272,7 @@ func exportRecordsDeferred(dir, outDir, peer string, full bool) (int, func() err
 			return
 		}
 		text, _ := redact.Text(r.Text)
-		// Always this machine: an export never forwards what arrived by sync
-		// (the syncImportPath check above), so nothing here was worked on
-		// anywhere else. If records ever do transit, this becomes meta.From
-		// with a fallback — a machine that relays must not sign someone else's
-		// work as its own.
-		rec := SyncRecord{Harness: meta.Harness, SessionID: meta.ID, Project: meta.Project, Role: r.Role, Text: text, Time: r.Time, Origin: syncName(self)}
+		rec := SyncRecord{Harness: meta.Harness, SessionID: sessionID, Project: project, Role: r.Role, Text: text, Time: r.Time, Origin: origin}
 		bySource[source] = append(bySource[source], rec)
 		touched[wk] = true
 		tn := r.Time.UnixNano()
@@ -613,7 +662,7 @@ func Import(dir, inDir string) (int, error) {
 			recsByKey[key] = append(recsByKey[key], Record{Key: key, Role: sr.Role, Text: text, Time: sr.Time, SourcePath: syncImportPath})
 			meta := metas[key]
 			if meta.ID == "" {
-				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: "imported:" + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
+				meta = SessionMeta{ID: importID, Harness: sr.Harness, Project: importedProjectPrefix + sr.Project, Path: syncImportPath, OrigID: origID, From: string(sr.Origin)}
 			}
 			if meta.Started.IsZero() || (!sr.Time.IsZero() && sr.Time.Before(meta.Started)) {
 				meta.Started = sr.Time
