@@ -100,6 +100,9 @@
 <p>The session log, per agent, and a session key to resume by. Its default backend is <code>claude-cli</code>, so a Claude Code hook already reaches it there; the other providers get nothing between sessions unless a plugin puts it in front of the model.</p>
 
 <h2>Adding recall</h2>
+<p>From ClawHub, without the deja CLI on hand:</p>
+<pre>openclaw plugins install clawhub:@vshulcz/openclaw-deja</pre>
+<p>The package brings the binary along, recalls before each turn and registers <code>deja_recall</code>, <code>deja_fix</code> and <code>deja_blame</code>. Or, with the CLI installed:</p>
 <pre>deja install openclaw-auto</pre>
 <p>Three things are written, and all three are reversible with <code>deja uninstall openclaw</code>:</p>
 <ul>

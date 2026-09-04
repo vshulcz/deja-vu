@@ -1,0 +1,51 @@
+{
+  "name": "@vshulcz/openclaw-deja",
+  "version": "0.19.3",
+  "description": "deja-vu memory for OpenClaw: the coding sessions already on this machine — OpenClaw, Claude Code, Codex, Cursor and 18 more — recalled before each turn and searchable as tools. A local index, no LLM.",
+  "type": "module",
+  "main": "index.mjs",
+  "files": [
+    "index.mjs",
+    "lib.mjs",
+    "openclaw.plugin.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/openclaw"
+  },
+  "homepage": "https://github.com/vshulcz/deja-vu/tree/main/extensions/openclaw",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "keywords": [
+    "openclaw",
+    "openclaw-plugin",
+    "memory",
+    "recall",
+    "session-history",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vshulcz/deja-vu": "^0.19.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.7.1"
+  },
+  "openclaw": {
+    "extensions": ["./index.mjs"],
+    "compat": {
+      "pluginApi": ">=2026.7.1",
+      "minGatewayVersion": "2026.7.1"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

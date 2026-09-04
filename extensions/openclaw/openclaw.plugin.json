@@ -1,0 +1,29 @@
+{
+  "id": "deja-vu",
+  "name": "deja-vu",
+  "description": "Memory from the coding sessions already on this machine — recalled before each turn, searchable as tools",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": ["deja_recall", "deja_fix", "deja_blame"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "bin": {
+        "type": "string",
+        "description": "Path to the deja binary. Default: the deja on PATH, then the copy bundled with this package."
+      },
+      "autoRecall": {
+        "type": "boolean",
+        "description": "Put relevant history in front of the model before each turn. Default true."
+      },
+      "tools": {
+        "type": "boolean",
+        "description": "Register deja_recall, deja_fix and deja_blame. Default true."
+      }
+    }
+  }
+}

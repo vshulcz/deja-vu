@@ -38,7 +38,7 @@ test("the extension packages are published from the release version", () => {
   // plugin that ships the wrong binary as its fallback.
   assert.match(source, /outPkg\.version = version/);
   assert.match(source, /outPkg\.dependencies\["@vshulcz\/deja-vu"\] = `\^\$\{version\}`/);
-  assert.match(source, /const extensions = \["opencode", "dsh"\]/);
+  assert.match(source, /const extensions = \["opencode", "dsh", "openclaw"\]/);
 });
 
 test("a release behind npm skips instead of moving latest backwards", () => {

@@ -8,6 +8,7 @@ import { PACKAGES, compareVersions, stranded } from "./extension-drift.mjs";
 const names = {
   "extensions/opencode": { name: "opencode-deja" },
   "extensions/dsh": { name: "dsh-deja" },
+  "extensions/openclaw": { name: "@vshulcz/openclaw-deja" },
 };
 const readPkg = (dir) => names[dir];
 
@@ -34,9 +35,9 @@ test("what cannot be answered is not drift", () => {
   assert.deepEqual(stranded(PACKAGES, readPkg, () => "0.99.0", ""), []);
 });
 
-test("both packages are reported when both are stranded", () => {
+test("every package is reported when all are stranded", () => {
   const bad = stranded(PACKAGES, readPkg, () => "0.21.0", "0.19.2");
-  assert.deepEqual(bad.map((p) => p.name).sort(), ["dsh-deja", "opencode-deja"]);
+  assert.deepEqual(bad.map((p) => p.name).sort(), ["@vshulcz/openclaw-deja", "dsh-deja", "opencode-deja"]);
 });
 
 test("versions order by number", () => {

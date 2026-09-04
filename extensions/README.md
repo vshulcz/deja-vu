@@ -9,6 +9,7 @@ same local index.
 |---|---|---|
 | [`opencode/`](opencode) | npm `opencode-deja` | `opencode plugin opencode-deja` |
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
+| [`openclaw/`](openclaw) | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
@@ -36,6 +37,7 @@ Publishing by hand is still possible when a fix should not wait for a release:
 ```
 cd extensions/opencode && npm publish --access public
 cd extensions/dsh      && npm publish --access public
+cd extensions/openclaw && npm publish --access public && clawhub package publish .
 ```
 
 The Grok plugin is published by a catalog entry, not by us: the entry in

@@ -73,7 +73,7 @@ run("npm publish --access public", mainDir);
 // independently before this, so a release whose version is behind what npm
 // already has would move the `latest` tag backwards: skip those and say so,
 // and the lines converge on their own as soon as deja passes them.
-const extensions = ["opencode", "dsh"];
+const extensions = ["opencode", "dsh", "openclaw"];
 const published = [];
 for (const name of extensions) {
   const dir = path.join("extensions", name);

@@ -61,6 +61,40 @@ jobs:
             console.log("hooks still declared: " + hooks.join(", "));
           '
 
+  openclaw:
+    name: openclaw-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/openclaw
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The plugin has to parse
+        run: node --check index.mjs && node --check lib.mjs
+
+      - name: The manifest declares every tool the runtime registers
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const manifest = JSON.parse(fs.readFileSync("openclaw.plugin.json", "utf8"));
+            const src = fs.readFileSync("index.mjs", "utf8");
+            const registered = [...src.matchAll(/name: "(deja_[a-z]+)"/g)].map((m) => m[1]);
+            const declared = manifest.contracts.tools;
+            const missing = registered.filter((t) => !declared.includes(t));
+            if (!registered.length || missing.length) {
+              console.error("contracts.tools is missing: " + missing.join(", "));
+              process.exit(1);
+            }
+            console.log("declared: " + declared.join(", "));
+          '
+
+      - run: npm test
+
   dsh:
     name: dsh-deja
     runs-on: ubuntu-latest
@@ -250,7 +284,7 @@ jobs:
           node -e '
             const fs = require("node:fs");
             let bad = 0;
-            for (const dir of ["extensions/opencode", "extensions/dsh"]) {
+            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw"]) {
               const pkg = JSON.parse(fs.readFileSync(dir + "/package.json", "utf8"));
               const repo = pkg.repository || {};
               if (!String(repo.url || "").includes("vshulcz/deja-vu")) {

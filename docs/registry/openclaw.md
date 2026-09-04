@@ -28,6 +28,7 @@ transcripts (`.deleted`/`.reset`/`.bak` suffixes) and the
 against a 2026.8.2 store and openclaw source
 (`src/config/sessions/session-accessor.sqlite-*.ts`, `paths.ts`).
 
+- **Plugin package**: `openclaw plugins install clawhub:@vshulcz/openclaw-deja` (also on npm) — `before_prompt_build` recall plus `deja_recall`, `deja_fix`, `deja_blame`; stands down on whatever `deja install openclaw-auto` already wired.
 - **MCP**: `deja install openclaw` wires deja into `openclaw.json` under
   `mcp.servers` (OpenClaw's own layout, not the common `mcpServers` root).
   Live-verified: `openclaw mcp probe deja` reports the tools and the agent
