@@ -219,6 +219,53 @@
       }
     },
     {
+      "id": "copilot-chat",
+      "store_paths": [
+        "<vscode-User>/workspaceStorage/*/chatSessions/*.{json,jsonl}",
+        "<vscode-User>/globalStorage/emptyWindowChatSessions/*.{json,jsonl}",
+        "<vscode-User>/workspaceStorage/no-workspace/chatSessions/*.json",
+        "${DEJA_COPILOT_CHAT_ROOTS}"
+      ],
+      "format_kind": "json-or-jsonl",
+      "fixture_paths": [
+        "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/chatSessions/3b7e1f1b-0000-4000-8000-000000000000.jsonl"
+      ],
+      "parser_source": "internal/sources/copilot_chat.go",
+      "last_verified": "2026-09-05",
+      "display_name": "VS Code Copilot Chat",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": ""
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "install could write the user mcp.json VS Code Copilot Chat already reads; that target is not built yet"
+        },
+        "auto": {
+          "state": "impossible",
+          "why": "VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install"
+        },
+        "skill": {
+          "state": "todo",
+          "why": "a skill file could be placed where Copilot Chat loads Agent Skills; not written yet"
+        },
+        "command": {
+          "state": "todo",
+          "why": "Copilot Chat has no user-level command file deja knows how to write yet"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "sessions reopen from Chat: Show Chats in the editor, not a command deja can print"
+        }
+      }
+    },
+    {
       "id": "cursor",
       "store_paths": [
         "~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",

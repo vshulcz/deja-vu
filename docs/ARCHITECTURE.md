@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-the twenty-two the loader registers; `docs/registry/` describes each store's
+the twenty-three the loader registers; `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
 
@@ -23,6 +23,7 @@ against the loader list.
 | Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
 | pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
 | Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
+| VS Code Copilot Chat | `copilot_chat.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions` |
 | Cline | `cline.go` | task JSON under the VS Code extension's storage, both store generations |
 | Roo Code | `roo.go` | task JSON under `rooveterinaryinc.roo-cline` in VS Code globalStorage |
 | Goose | `goose.go` | legacy JSONL sessions and the newer SQLite session store |

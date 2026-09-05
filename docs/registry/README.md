@@ -26,6 +26,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Kimi Code](kimi.md) | per-agent wire JSONL |
 | [OpenClaw](openclaw.md) | append-only pi-format JSONL |
 | [Copilot CLI](copilot.md) | session event JSONL |
+| [VS Code Copilot Chat](copilot-chat.md) | JSON/JSONL mutation log in VS Code workspaceStorage |
 | [Roo Code](roo.md) | task JSON in VS Code globalStorage |
 | [Hermes](hermes.md) | SQLite state store |
 | [DeepSeek Harness](deepseek.md) | append-only session log, zstd-framed JSONL |

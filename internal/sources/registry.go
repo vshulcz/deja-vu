@@ -362,6 +362,14 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "copilot-chat", Load: LoadCopilotChat, Files: CopilotChatSessionFiles,
+			Kinds: []FileKind{{
+				Name:  "copilot-chat",
+				Match: copilotChatMatch,
+				Parse: fullParse(ParseCopilotChatFile),
+			}},
+		},
+		{
 			// DeepSeek Harness writes one log per session, zstd-framed by
 			// default, so a machine without the zstd CLI sees the files and
 			// reads nothing out of them (SkipReason says so).

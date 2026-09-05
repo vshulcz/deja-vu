@@ -167,6 +167,13 @@
       "indexed_sessions": 0
     },
     {
+      "name": "copilot-chat",
+      "state": "missing",
+      "paths": null,
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "cline",
       "state": "missing",
       "paths": [

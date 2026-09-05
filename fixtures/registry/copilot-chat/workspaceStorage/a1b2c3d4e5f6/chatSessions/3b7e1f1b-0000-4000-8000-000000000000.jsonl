@@ -1,0 +1,3 @@
+{"kind":0,"v":{"version":3,"sessionId":"3b7e1f1b-0000-4000-8000-000000000000","creationDate":1763727100000,"customTitle":"fix the retry loop","requests":[],"inputState":{"selectedModel":{"metadata":{"auth":{"accountLabel":"someone"}}}},"workingDirectory":"file:///tmp/registry-demo"}}
+{"kind":2,"k":["requests"],"v":[{"requestId":"request_1","timestamp":1763727104742,"message":{"text":"the retry loop drops the last attempt"},"response":[{"value":"The loop compares with < where it needs <=."}]}]}
+{"kind":1,"k":["requests",0,"responseTimestamp"],"v":1763727400000}

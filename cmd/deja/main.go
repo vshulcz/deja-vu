@@ -2947,6 +2947,7 @@ func printSources(dir string) {
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles, sources.LoadGoose},
 		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.HermesSessionFiles, sources.LoadHermes},
 		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.CopilotSessionFiles, sources.LoadCopilot},
+		{"copilot-chat", strings.Join(sources.CopilotChatRoots(), string(os.PathListSeparator)), sources.CopilotChatRoots(), sources.CopilotChatSessionFiles, sources.LoadCopilotChat},
 		{"cline", sources.ClineSessionsDir(), append([]string{sources.ClineSessionsDir()}, sources.ClineLegacyRoots()...), sources.ClineSessionFiles, sources.LoadCline},
 		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.RooTaskFiles, sources.LoadRoo},
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},

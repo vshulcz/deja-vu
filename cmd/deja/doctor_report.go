@@ -439,6 +439,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"amp", []string{sources.AmpRoot()}, sources.AmpThreadFiles(), sources.ParseAmpFile},
 		{"openclaw", []string{sources.OpenClawRoot()}, sources.OpenClawStoreFiles(), parseDoctorOpenClaw},
 		{"copilot", []string{sources.CopilotRoot()}, sources.CopilotSessionFiles(), sources.ParseCopilotFile},
+		{"copilot-chat", sources.CopilotChatRoots(), sources.CopilotChatSessionFiles(), sources.ParseCopilotChatFile},
 		// Both were listed by the text rows and by nothing else: absent here,
 		// `doctor --json` never named them and "no agent history was found on
 		// this machine" was printed on a machine whose history is theirs

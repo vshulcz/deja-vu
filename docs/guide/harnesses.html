@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Claude Code, Codex, Cursor and 19 more agents — deja-vu</title>
-<meta name="description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<title>Claude Code, Codex, Cursor and 20 more agents — deja-vu</title>
+<meta name="description" content="The twenty-three coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Claude Code, Codex, Cursor and 19 more agents — deja-vu">
-<meta property="og:description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta property="og:title" content="Claude Code, Codex, Cursor and 20 more agents — deja-vu">
+<meta property="og:description" content="The twenty-three coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/harnesses.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,14 +25,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Claude Code, Codex, Cursor and 19 more agents — deja-vu">
-<meta name="twitter:description" content="The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.">
+<meta name="twitter:title" content="Claude Code, Codex, Cursor and 20 more agents — deja-vu">
+<meta name="twitter:description" content="The twenty-three coding agents deja indexes today, where each stores its history, and how to add a new one.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty-two coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Harnesses","description":"The twenty-three coding agents deja indexes today, where each stores its history, and how to add a new one.","url":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Harnesses","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html"}]}</script>
 </head>
 <body>
@@ -91,8 +91,8 @@
 <article>
 
 <h1>Harnesses</h1>
-<p class="pagelede">the twenty-two it reads, and what each one supports<span class="mins" data-mins></span></p>
-<p>deja indexes twenty-two coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
+<p class="pagelede">the twenty-three it reads, and what each one supports<span class="mins" data-mins></span></p>
+<p>deja indexes twenty-three coding-agent histories into one retroactive index. A fix found in one agent is recalled inside another.</p>
 <!-- matrix:start -->
 <table>
 <tr><th>Harness</th><th>Store</th><th>MCP recall</th><th>Auto-recall</th><th>Skill</th><th>Command</th><th>Resume</th><th>Handoff</th><th>Needs</th></tr>
@@ -103,6 +103,7 @@
 <tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code><br><code><vscode-globalStorage>/saoudrizwan.claude-dev/tasks/*/api_conversation_history.json</code><br><code>${DEJA_CLINE_ROOT}/*/*.messages.json</code><br><code>${DEJA_CLINE_ROOTS}/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code><br><code>${CODEX_HOME:-~/.codex}/history.jsonl</code><br><code>${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>✅</td><td>✕</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
+<tr><td><a href="../registry/copilot-chat.html">VS Code Copilot Chat</a></td><td><code><vscode-User>/workspaceStorage/*/chatSessions/*.{json,jsonl}</code><br><code><vscode-User>/globalStorage/emptyWindowChatSessions/*.{json,jsonl}</code><br><code><vscode-User>/workspaceStorage/no-workspace/chatSessions/*.json</code><br><code>${DEJA_COPILOT_CHAT_ROOTS}</code></td><td>—</td><td>✕</td><td>—</td><td>—</td><td>✕</td><td>paste</td><td>—</td></tr>
 <tr><td><a href="../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code><br><code>${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl</code><br><code>${DEJA_CURSOR_ROOT}</code><br><code>${DEJA_CURSOR_CLI_ROOT}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3 (IDE chats)</td></tr>
 <tr><td><a href="../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code><br><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl</code><br><code>${DEJA_DEEPSEEK_ROOT}/*/session-*/session.jsonl.zstd</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>zstd</td></tr>
 <tr><td><a href="../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code><br><code>${DEJA_GEMINI_ROOT}/tmp/*/chats/**/*.{json,jsonl}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
@@ -125,6 +126,7 @@
 <li>aider <code>skill</code> — aider loads instruction files, it does not load them by name on demand: --read (and a CONVENTIONS.md by habit) puts a file in every message, which is what deja already writes as aider&#39;s context file. There is no catalogue an agent picks from, so a skill would only be the same always-on text under another name (aider 0.86.2 --help: --read/--file/--config, no skills flag)</li>
 <li>aider <code>command</code> — the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today (https://github.com/Aider-AI/aider/issues/894)</li>
 <li>Copilot CLI <code>auto</code> — Copilot runs the hooks but drops their context, so recall there is MCP plus the skill</li>
+<li>VS Code Copilot Chat <code>auto</code> — VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install</li>
 <li>Roo Code <code>auto</code> — Roo&#39;s hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user&#39;s bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges (https://github.com/RooCodeInc/Roo-Code/pull/10785)</li>
 <li>Zed <code>auto</code> — Zed&#39;s agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one (no hook API in Zed 1.16.1 or extension API 0.7)</li>
 </ul><!-- matrix:end -->

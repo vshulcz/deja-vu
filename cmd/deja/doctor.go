@@ -768,6 +768,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	copilotRoot := sources.CopilotRoot()
 	printFiles("copilot", copilotRoot, doctorExists(copilotRoot), sources.CopilotSessionFiles())
+	chatFiles := len(sources.CopilotChatSessionFiles())
+	chatLoc := "VS Code Copilot Chat"
+	if roots := sources.CopilotChatRoots(); len(roots) > 0 {
+		chatLoc = strings.Join(roots, string(os.PathListSeparator))
+	}
+	printRow("copilot-chat", chatLoc, chatFiles > 0, doctorCount(chatFiles, "file"))
 	// omp, deepseek and zed are read by the indexer and were named by nothing
 	// here — a user of one of them had no row to check when their sessions did
 	// not come back (#1738). The registry decides what is indexed, and a test

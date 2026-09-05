@@ -187,6 +187,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "omp --resume " + s.ID, nil
 	case "copilot":
 		return "", "copilot --resume=" + s.ID, nil
+	case "copilot-chat":
+		return "", "", fmt.Errorf("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}

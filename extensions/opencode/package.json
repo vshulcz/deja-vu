@@ -1,7 +1,7 @@
 {
   "name": "opencode-deja",
   "version": "0.1.2",
-  "description": "deja-vu memory for opencode: the session history of twenty-one other coding agents, searchable and recalled on every request — a local index, no LLM.",
+  "description": "deja-vu memory for opencode: the session history of twenty-two other coding agents, searchable and recalled on every request — a local index, no LLM.",
   "type": "module",
   "main": "index.js",
   "exports": {

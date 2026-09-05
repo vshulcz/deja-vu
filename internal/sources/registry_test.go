@@ -40,6 +40,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_PI_ROOT", "DEJA_OMP_ROOT", "DEJA_QWEN_ROOT", "DEJA_KIMI_ROOT", "KIMI_CODE_HOME",
 		"DEJA_CLINE_ROOT", "DEJA_CLINE_ROOTS", "CLINE_DIR", "CLINE_DATA_DIR",
 		"CLINE_SESSION_DATA_DIR", "CLINE_MCP_SETTINGS_PATH", "DEJA_ROO_ROOTS",
+		"DEJA_COPILOT_CHAT_ROOTS",
 		"DEJA_OPENCLAW_ROOT", "OPENCLAW_STATE_DIR",
 		"DEJA_INCLUDE_SUBAGENTS", "DEJA_OPENCODE_DB", "GEMINI_CLI_HOME",
 		"GROK_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
@@ -253,6 +254,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParsePrimeFile(path)
 	case "copilot":
 		sessions, err = ParseCopilotFile(path)
+	case "copilot-chat":
+		sessions, err = ParseCopilotChatFile(path)
 	case "deepseek":
 		// The fixture is stored raw: the harness writes zstd frames by default,
 		// and a registry fixture that needs an external tool to read cannot be
