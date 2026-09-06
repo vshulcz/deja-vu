@@ -1,7 +1,7 @@
 # @vshulcz/openclaw-deja
 
 OpenClaw remembers its own sessions. This plugin answers the other question:
-what was done in the twenty-one other coding agents on this machine — Claude
+what was done in the twenty-two other coding agents on this machine — Claude
 Code, Codex, Cursor, Gemini and Zed among them — including the months before
 OpenClaw was installed.
 
