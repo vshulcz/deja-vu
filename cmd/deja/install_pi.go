@@ -63,6 +63,18 @@ function run(args: string[], input: string, timeout = 10000): string {
 export default function (pi: any) {
   let injected = false;
   let toldBuilding = false;
+  // The tool and compaction events carry no session id, and recall dedupes per
+  // session: without one it repeats itself and forgets nothing. pi keeps the id
+  // on the session manager, which every handler gets through ctx.
+  let session = "";
+  const remember = (ctx: any) => {
+    try {
+      const m = ctx && ctx.sessionManager;
+      const id = m && (m.getSessionId ? m.getSessionId() : m.sessionId);
+      if (id) session = String(id);
+    } catch {}
+  };
+  const sessionID = () => session;
 
   // pi keeps a footer status line: while the first index builds, that is
   // where the user can see it happening instead of wondering why recall is
@@ -79,6 +91,7 @@ export default function (pi: any) {
 
   pi.on("session_start", async (_event: any, ctx: any) => {
     try {
+      remember(ctx);
       showBuild(ctx);
     } catch {
       // memory is optional: never break the session over it
@@ -109,6 +122,7 @@ export default function (pi: any) {
 
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
+      remember(ctx);
       if (!injected) {
         const raw = run(["hook-context"], "");
         let digest = "";
@@ -140,10 +154,7 @@ export default function (pi: any) {
         }
         return;
       }
-      // The session id lets recall skip what it already showed this session;
-      // without one it repeats itself on every message.
-      const sessionID = event.sessionId || event.session_id || ctx?.session?.id || "";
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID }));
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: sessionID() }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");
@@ -153,6 +164,50 @@ export default function (pi: any) {
     } catch {
       // memory is optional: never break the session over it
     }
+  });
+
+  // The other half of the point of action: a command has just failed, and this
+  // machine has fixed that same error before. pi hands tool_result the content
+  // the model is about to read and uses what the handler returns, so the repair
+  // goes in beside the error in the same turn. tool_execution_start and
+  // tool_execution_end are observe-only — their return reaches nothing — which
+  // is why this is the one that carries it.
+  const repaired: Record<string, string> = {};
+  pi.on("tool_result", async (event: any) => {
+    try {
+      if (!event || !event.isError) return;
+      if (event.toolName !== "bash") return;
+      const parts = Array.isArray(event.content) ? event.content : [];
+      const output = parts
+        .filter((p: any) => p && p.type === "text" && typeof p.text === "string")
+        .map((p: any) => p.text)
+        .join("\n");
+      if (!output.trim()) return;
+      const id = String(event.toolCallId || "");
+      if (!(id in repaired)) {
+        repaired[id] = run(["hook-tool-after", "--plain"], JSON.stringify({
+          tool_name: "bash",
+          tool_response: output,
+          session_id: sessionID(),
+          cwd: process.cwd(),
+        }));
+      }
+      const line = repaired[id];
+      if (!line) return;
+      return { content: parts.concat([{ type: "text", text: line }]) };
+    } catch {
+      // never turn a failed command into a failed session
+    }
+  });
+
+  // Compaction throws away the blocks this session was shown, and the list that
+  // stops them repeating outlives them. session_compact fires once the summary
+  // has replaced the history, which is exactly when the session should be
+  // allowed to see those blocks again.
+  pi.on("session_compact", async (_event: any) => {
+    try {
+      run(["hook-precompact"], JSON.stringify({ session_id: sessionID() }));
+    } catch {}
   });
 }
 `, exe)

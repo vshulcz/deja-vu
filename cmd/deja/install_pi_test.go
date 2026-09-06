@@ -78,6 +78,49 @@ func TestPiCommandDoesNotRedeclareItsArgument(t *testing.T) {
 	}
 }
 
+// The fix pair only lands if it goes out on tool_result: measured on pi 0.73.1,
+// tool_execution_start and tool_execution_end are observe-only, and what their
+// handlers return reaches neither the transcript nor the model.
+func TestPiRepairsFailedCommandsOnToolResult(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	for _, want := range []string{
+		`pi.on("tool_result"`,
+		`"hook-tool-after", "--plain"`,
+		"event.isError",         // a command that succeeded needs no repair
+		"tool_response: output", // deja matches on what the command printed
+		"event.toolCallId",      // one lookup per call, not per re-render
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("no fix pair at the point of action, missing %q:\n%s", want, src)
+		}
+	}
+	// Observe-only events cannot carry it, so nothing may be wired there.
+	for _, wrong := range []string{
+		`pi.on("tool_execution_start"`,
+		`pi.on("tool_execution_end"`,
+	} {
+		if strings.Contains(src, wrong) {
+			t.Fatalf("the repair is wired to %s, whose return value pi drops:\n%s", wrong, src)
+		}
+	}
+}
+
+// pi names the event session_compact. "compaction" — the name the docs use for
+// the feature — registers a handler that never fires, so the session keeps its
+// list of shown blocks and stays quiet about a fix it could repeat.
+func TestPiForgetsOnTheCompactionEventPiActuallyEmits(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	if !strings.Contains(src, `pi.on("session_compact"`) {
+		t.Fatalf("nothing forgets after compaction:\n%s", src)
+	}
+	if !strings.Contains(src, "hook-precompact") {
+		t.Fatalf("session_compact is wired to something other than the forget hook:\n%s", src)
+	}
+	if strings.Contains(src, `pi.on("compaction"`) {
+		t.Fatalf("wired to an event pi does not emit:\n%s", src)
+	}
+}
+
 // A search the user typed may rebuild the index; a hook may not. One shared
 // timeout made /deja answer "nothing matches" for a query with real hits.
 func TestPiCommandOutlivesTheHookTimeout(t *testing.T) {

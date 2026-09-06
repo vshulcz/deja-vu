@@ -456,7 +456,7 @@
         "fixtures/registry/omp/session.jsonl"
       ],
       "parser_source": "internal/sources/omp.go",
-      "last_verified": "2026-08-21",
+      "last_verified": "2026-09-06",
       "display_name": "omp (Oh My Pi)",
       "capabilities": {
         "mcp": true,
@@ -530,7 +530,7 @@
         "fixtures/registry/pi/session.jsonl"
       ],
       "parser_source": "internal/sources/pi.go",
-      "last_verified": "2026-07-19",
+      "last_verified": "2026-09-06",
       "display_name": "pi",
       "capabilities": {
         "mcp": true,

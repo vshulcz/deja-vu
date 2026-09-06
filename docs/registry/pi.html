@@ -43,7 +43,7 @@
 <tr><td><strong>Default store path</strong></td><td><code>~/.pi/agent/sessions/&lt;encoded-project&gt;/&lt;timestamp&gt;_&lt;uuid&gt;.jsonl</code></td></tr>
 <tr><td><strong>Env override</strong></td><td><code>DEJA_PI_ROOT</code></td></tr>
 <tr><td><strong>deja parser</strong></td><td><code>internal/sources/pi.go</code></td></tr>
-<tr><td><strong>Last verified</strong></td><td>2026-07-19</td></tr>
+<tr><td><strong>Last verified</strong></td><td>2026-09-06</td></tr>
 </table></div>
 <h2 id="discovery">Discovery</h2>
 <p>pi stores session transcripts under <code>~/.pi/agent/sessions/</code>. Each project directory uses the same <code>--</code>-encoded path scheme as Claude Code, e.g. <code>--Users-max-code-deja-vu--</code> for <code>/Users/max/code/deja-vu</code>. Within each project directory, session files are named <code>&lt;ISO-timestamp&gt;_&lt;UUID&gt;.jsonl</code>.</p>
@@ -94,7 +94,7 @@
 <li>Version field observed: <code>3</code>. No version migration behavior is known.</li>
 <li>The <code>parentId</code> chain forms a tree, not a flat list; deja ignores the tree structure and processes messages in file order.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-19</p>
+<p><strong>Last verified:</strong> 2026-09-06</p>
 
 <hr>
 <p>deja reads this format and twenty-two others, and turns what it finds into memory your

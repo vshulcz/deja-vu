@@ -58,12 +58,12 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
-function recall(prompt, cwd) {
+function run(args, input, timeout = 10000) {
   try {
-    return execFileSync(DEJA, ["hook-prompt", "--plain"], {
-      input: JSON.stringify({ prompt, cwd }),
+    return execFileSync(DEJA, args, {
+      input,
       encoding: "utf8",
-      timeout: 10000,
+      timeout,
       maxBuffer: 4 * 1024 * 1024,
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
@@ -88,8 +88,79 @@ export default function extension(pi) {
   // provider request — so the answer is cached rather than asked again.
   let asked = "";
   let recalled = "";
+  // No event carries a session id; the session manager does, and every handler
+  // reaches it through ctx. Recall skips what it already showed a session, so
+  // without the id the same block goes out on every message.
+  let session = "";
+  const remember = (ctx) => {
+    try {
+      const m = ctx && ctx.sessionManager;
+      const id = m && (m.getSessionId ? m.getSessionId() : m.sessionId);
+      if (id) session = String(id);
+    } catch {}
+  };
+  const sessionID = () => session;
+
+  pi.on("session_start", async (_event, ctx) => {
+    try {
+      remember(ctx);
+      const status = run(["warmup-status"], "");
+      // omp keeps a footer line, so a first index that is still building is
+      // visible instead of looking like memory that does not work.
+      ctx.ui.setStatus("deja", status || run(["statusline"], ""));
+    } catch {}
+  });
+
+  // Registered commands show up in omp's prompt box, which is how someone who
+  // never read the docs finds this at all.
+  pi.registerCommand("deja", {
+    description: "Search your own past coding sessions",
+    handler: async (args, ctx) => {
+      const query = (args || "").trim();
+      if (!query) {
+        ctx.ui.notify("Usage: /deja <what you are looking for>", "info");
+        return;
+      }
+      // The user is waiting on this one, so it gets a longer budget than a
+      // hook: a first search can rebuild the index. "--" keeps a query that
+      // starts with a dash out of deja's own flag parsing.
+      const commandArgs = query.startsWith("-") ? ["search", "--", query] : ["search", query];
+      const found = run(commandArgs, "", 120000);
+      ctx.ui.notify(found || "Nothing in your history matches " + query, "info");
+    },
+  });
+
+  // Once per session, before the first answer: what this project's recent
+  // sessions were about. omp stores what a before_agent_start handler returns
+  // as a message of its own, so the digest is in the conversation rather than
+  // stapled onto the user's first prompt.
+  let injected = false;
+  pi.on("before_agent_start", async (_event, ctx) => {
+    try {
+      remember(ctx);
+      if (injected) return;
+      injected = true;
+      const raw = run(["hook-context"], "");
+      if (!raw) return;
+      let digest = raw;
+      let receipt = "";
+      try {
+        const parsed = JSON.parse(raw);
+        digest = (parsed && parsed.hookSpecificOutput && parsed.hookSpecificOutput.additionalContext) || "";
+        receipt = (parsed && parsed.systemMessage) || "";
+      } catch {}
+      if (!digest) return;
+      // Without the receipt the recall is invisible and reads as the model
+      // guessing; with it the user knows where the answer came from.
+      if (receipt) ctx.ui.notify(receipt, "info");
+      const stats = run(["statusline"], "");
+      if (stats) ctx.ui.setStatus("deja", stats);
+      return { message: { customType: "deja-recall", content: digest, display: false } };
+    } catch {}
+  });
 
   pi.on("context", async (event, ctx) => {
+    remember(ctx);
     const messages = Array.isArray(event && event.messages) ? event.messages : null;
     if (!messages || messages.length === 0) return;
     let at = -1;
@@ -104,7 +175,11 @@ export default function extension(pi) {
     if (!prompt) return;
     if (prompt !== asked) {
       asked = prompt;
-      recalled = recall(prompt, (ctx && ctx.cwd) || process.cwd());
+      recalled = run(["hook-prompt", "--plain"], JSON.stringify({
+        prompt,
+        session_id: sessionID(),
+        cwd: (ctx && ctx.cwd) || process.cwd(),
+      }));
     }
     // Silence is the common case: the hook speaks only when this machine's
     // history actually answers the question.
@@ -115,6 +190,52 @@ export default function extension(pi) {
       content: [{ type: "text", text: recalled }, ...messages[at].content],
     };
     return { messages: out };
+  });
+
+  // The point of action: a command just failed, and this machine has fixed that
+  // same error before. tool_result hands over the content the model is about to
+  // read and takes a replacement back, so the repair arrives beside the error in
+  // the same turn instead of a turn later.
+  const repaired = {};
+  pi.on("tool_result", async (event) => {
+    try {
+      if (!event || event.toolName !== "bash") return;
+      // omp's bash tool reports a non-zero exit in details.exitCode and leaves
+      // isError false — gating on isError alone stays silent on every failed
+      // build.
+      const failed = event.isError === true ||
+        (event.details && typeof event.details.exitCode === "number" && event.details.exitCode !== 0);
+      if (!failed) return;
+      const parts = Array.isArray(event.content) ? event.content : [];
+      const output = parts
+        .filter((p) => p && p.type === "text" && typeof p.text === "string")
+        .map((p) => p.text)
+        .join("\n");
+      if (!output.trim()) return;
+      const id = String(event.toolCallId || "");
+      if (!(id in repaired)) {
+        repaired[id] = run(["hook-tool-after", "--plain"], JSON.stringify({
+          tool_name: "bash",
+          tool_response: output,
+          session_id: sessionID(),
+          cwd: process.cwd(),
+        }));
+      }
+      const line = repaired[id];
+      if (!line) return;
+      return { content: parts.concat([{ type: "text", text: line }]) };
+    } catch {
+      // never turn a failed command into a failed session
+    }
+  });
+
+  // Compaction throws away the blocks this session was shown; the list that
+  // keeps them from repeating outlives it. Forgetting is a side effect, so the
+  // handler returns nothing.
+  pi.on("session_compact", async (_event) => {
+    try {
+      run(["hook-precompact"], JSON.stringify({ session_id: sessionID() }));
+    } catch {}
   });
 }
 `, exe)
