@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — with `before_prompt_build` recall and `deja_recall`, `deja_fix`, `deja_blame` as tools; it reads what `deja install openclaw-auto` wrote and adds only what is missing. (#3047)
 
+### Fixed
+- Search: offer `--limit` in bash, zsh, fish, and PowerShell completions. (#1929)
+
 ## [0.19.3] - 2026-09-04
 
 A release about the moment memory is worth most: the turn a command fails, the
