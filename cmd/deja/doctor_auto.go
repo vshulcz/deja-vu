@@ -40,7 +40,11 @@ func autoWirings() []autoWiring {
 			return filepath.Join(sources.GeminiHome(), "extensions", "deja", "hooks", "hooks.json")
 		}, "hook-context", ""},
 		{"qwen", func() string { return filepath.Join(sources.QwenConfigDir(), "settings.json") }, "hook-prompt", ""},
-		{"kimi", func() string { return filepath.Join(sources.KimiConfigDir(), "config.toml") }, "hook-prompt", ""},
+		// The digest hook, not the prompt one: a config written before kimi had
+		// all three blocks still carries hook-prompt, and reading that as wired
+		// hides a machine that is missing the session digest and the forget on
+		// compaction.
+		{"kimi", func() string { return filepath.Join(sources.KimiConfigDir(), "config.toml") }, "hook-context", ""},
 		{"antigravity", func() string {
 			return filepath.Join(antigravityConfigHome(), "plugins", "deja", "hooks.json")
 		}, "hook-antigravity", ""},

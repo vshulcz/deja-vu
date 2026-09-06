@@ -308,6 +308,13 @@ func indexNeedsRebuild(dir string) bool {
 // Code / Codex hook JSON envelope; plain=true prints the bare digest for
 // hosts that inject raw text (the opencode plugin).
 func runHookContext(dir string, plain bool) error {
+	return runHookContextMode(dir, plain, false)
+}
+
+// once forces the one-digest-per-session rule on from the command line, for a
+// harness that has no session-start channel and has to carry the digest on its
+// per-prompt hook.
+func runHookContextMode(dir string, plain, once bool) error {
 	// A session start is the one moment deja is guaranteed to run on every
 	// harness, which makes it the only reliable place to repair wiring left
 	// behind by an older binary. It costs one small file read when nothing
@@ -345,6 +352,9 @@ func runHookContext(dir string, plain bool) error {
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	input.SessionID = adoptGrok(input.SessionID, input.grokEnvelope.SessionID)
+	if once {
+		input.Once = true
+	}
 	if input.Once {
 		if sessionHadDigest(dir, input.SessionID) {
 			return nil
