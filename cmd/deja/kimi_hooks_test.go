@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -93,5 +95,45 @@ timeout = 30
 	const none = "model = \"kimi\"\n\n[[hooks]]\nevent = \"PreToolUse\"\ncommand = \"my-hook\"\n"
 	if got := removeKimiHookBlock(none); strings.TrimSpace(got) != strings.TrimSpace(none) {
 		t.Errorf("a config without deja was changed:\n%s", got)
+	}
+}
+
+// Kimi's channels, measured on 0.28.1 by reading the requests it sent: the
+// digest and the per-prompt block both ride UserPromptSubmit — several hooks on
+// that event all run and their output is joined — and PreCompact is wired for
+// its side effect, since nothing a hook prints there is read back.
+func TestKimiWiresTheThreeChannelsItHas(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installKimiAuto("/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := string(b)
+	for _, want := range []string{
+		`command = "/bin/deja hook-context --plain --once"`,
+		`command = "/bin/deja hook-prompt --plain"`,
+		`event = "PreCompact"`,
+		`command = "/bin/deja hook-precompact"`,
+	} {
+		if !strings.Contains(cfg, want) {
+			t.Fatalf("missing %s:\n%s", want, cfg)
+		}
+	}
+	// Every block deja writes carries the marker, or the ones without it are
+	// left behind on uninstall and keep firing.
+	if got, want := strings.Count(cfg, kimiHookMarker), strings.Count(cfg, "[[hooks]]"); got != want {
+		t.Fatalf("%d markers for %d hooks:\n%s", got, want, cfg)
+	}
+	if _, err := installKimiAuto("/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml"))
+	if strings.Contains(string(b), "deja") {
+		t.Fatalf("uninstall left deja behind:\n%s", b)
 	}
 }

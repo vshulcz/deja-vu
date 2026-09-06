@@ -550,8 +550,20 @@ func cmdIndex(dir string, rest []string) error {
 }
 
 func cmdHookContext(dir string, rest []string) error {
-	plain := len(rest) > 0 && rest[0] == "--plain"
-	_ = runHookContext(dir, plain)
+	plain := false
+	once := false
+	for _, a := range rest {
+		switch a {
+		case "--plain", "-plain":
+			plain = true
+		// --once is for a host with no usable session-start event, where the
+		// digest has to ride the per-prompt hook instead: it turns the payload
+		// flag on from the command line, so the same session gets it once.
+		case "--once", "-once":
+			once = true
+		}
+	}
+	_ = runHookContextMode(dir, plain, once)
 	return nil
 }
 
@@ -3597,6 +3609,7 @@ Usage:
   deja resume <id-prefix> [--exec]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
+  deja hook-context [--plain] [--once]  (session start: the project digest, once per session)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
   deja hook-tool     (PreToolUse Bash/Edit hook: one line on what this command or file already has)

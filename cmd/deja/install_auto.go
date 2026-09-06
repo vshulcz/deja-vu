@@ -583,13 +583,19 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 // entries are legal and only one of them is ours.
 const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`)"
 
-// Kimi Code runs SessionStart hooks, so auto-recall works there too. Its
-// config is TOML, not JSON, and the entry is a flat table rather than the
-// nested matcher/hooks shape Claude uses.
-// Kimi injects the hook's plain stdout, not a JSON field — its structured
-// output only carries permission decisions. And only UserPromptSubmit does it:
-// a SessionStart hook runs and its output goes nowhere, which is what made
-// this look like a harness that cannot take context at all.
+// Kimi Code's config is TOML, not JSON, and the entry is a flat table rather
+// than the nested matcher/hooks shape Claude uses.
+//
+// Measured on 0.28.1, by reading the requests it sent: UserPromptSubmit is the
+// only event whose output reaches the model, and it takes the hook's plain
+// stdout — structured output carries permission decisions and nothing else. A
+// SessionStart hook runs and its output goes nowhere; PreToolUse can block a
+// tool but not add to it; PostToolUse and PostToolUseFailure are fire and
+// forget. So the session digest rides the first prompt instead of a
+// session-start channel, and hook-context --once is what keeps it to one.
+//
+// Several UserPromptSubmit hooks are allowed: kimi runs them all and joins
+// their output, each in its own <hook_result> block.
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
 	old, err := readConfig(path)
@@ -598,8 +604,13 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	s := strings.TrimRight(removeKimiHookBlock(lfText(old)), "\n")
 	if !uninstall {
-		block := kimiHookMarker + "\n[[hooks]]\nevent = \"UserPromptSubmit\"\ncommand = " +
-			strconv.Quote(exe+" hook-prompt --plain") + "\ntimeout = 30\n"
+		block := kimiHookEntry("UserPromptSubmit", exe+" hook-context --plain --once") +
+			"\n" + kimiHookEntry("UserPromptSubmit", exe+" hook-prompt --plain") +
+			// Compaction throws away what the session was shown, and the list
+			// that stops those blocks repeating has to go with it. Nothing is
+			// read back from this hook: forgetting is a side effect, which is
+			// all a fire-and-forget event can carry.
+			"\n" + kimiHookEntry("PreCompact", exe+" hook-precompact")
 		if s != "" {
 			s += "\n\n"
 		}
@@ -609,6 +620,13 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	a, err := writeIfChanged(path, old, []byte(s))
 	return installResult{Path: path, Action: a}, err
+}
+
+// kimiHookEntry is one marked block. Every block carries the marker, so
+// removeKimiHookBlock takes them all and leaves a hand-written hook alone.
+func kimiHookEntry(event, command string) string {
+	return kimiHookMarker + "\n[[hooks]]\nevent = " + strconv.Quote(event) +
+		"\ncommand = " + strconv.Quote(command) + "\ntimeout = 30\n"
 }
 
 // removeKimiHookBlock drops our marked entry and nothing else: the next table

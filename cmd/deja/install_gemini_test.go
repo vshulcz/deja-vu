@@ -98,17 +98,29 @@ func TestInstallGeminiUninstallLeavesTheSwitchAlone(t *testing.T) {
 	}
 }
 
-func TestKimiInstallsNoHooks(t *testing.T) {
+// Kimi's SessionStart hook runs and its output goes nowhere, so the digest
+// there would be work nobody reads. It rides the per-prompt hook instead, held
+// to one by --once, and a SessionStart entry must never come back.
+func TestKimiPutsTheDigestOnThePromptHook(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	if _, err := installKimiAuto("/bin/deja", false); err != nil {
 		t.Fatalf("kimi: %v", err)
 	}
-	if b, err := os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml")); err == nil {
-		if strings.Contains(string(b), "hook-context") {
-			t.Fatalf("kimi config gained a hook whose output is discarded: %s", b)
-		}
+	b, err := os.ReadFile(filepath.Join(home, ".kimi-code", "config.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := string(b)
+	if strings.Contains(cfg, `event = "SessionStart"`) {
+		t.Fatalf("a hook whose output is discarded: %s", cfg)
+	}
+	if !strings.Contains(cfg, "hook-context --plain --once") {
+		t.Fatalf("no session digest on the prompt hook: %s", cfg)
+	}
+	if !strings.Contains(cfg, "hook-prompt --plain") {
+		t.Fatalf("no per-prompt recall: %s", cfg)
 	}
 }
 

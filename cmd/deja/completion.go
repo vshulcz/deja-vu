@@ -99,7 +99,7 @@ _deja_completion() {
             fi
             ;;
         hook-context)
-            COMPREPLY=( $(compgen -W "--plain" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--plain --once" -- "$cur") )
             ;;
         index)
             COMPREPLY=( $(compgen -W "--rebuild -rebuild" -- "$cur") )
@@ -239,7 +239,7 @@ _deja() {
       _arguments '--to=[target agent]:agent:(%HANDOFF_TARGETS%)' '--exec[launch the target agent]' '1:session ID prefix:'
       ;;
     hook-context)
-      _arguments '--plain[omit formatting]'
+      _arguments '--plain[omit formatting]' '--once[one digest per session]'
       ;;
     index)
       _arguments '--rebuild[force a full rebuild]' '-rebuild[force a full rebuild]'
@@ -326,6 +326,7 @@ complete -c deja -n '__fish_seen_subcommand_from forget' -l all-matches
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a '%HANDOFF_TARGETS%'
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
+complete -c deja -n '__fish_seen_subcommand_from hook-context' -l once
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
@@ -413,7 +414,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 if ($previous -eq '--to') { $handoffTargets }
                 else { @('--to', '--exec') }
             }
-            'hook-context' { @('--plain') }
+            'hook-context' { @('--plain', '--once') }
             'index' { @('--rebuild', '-rebuild') }
             { $_ -in @('install', 'uninstall') } { $installTargets + @('--no-guidance') }
             'last' {

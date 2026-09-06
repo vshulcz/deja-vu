@@ -57,4 +57,25 @@ func TestDejaOnceKeepsTheDigestToTheFirstTurn(t *testing.T) {
 		strings.TrimSpace(b) == "" {
 		t.Errorf("the ordinary session-start path went quiet: %q then %q", a, b)
 	}
+
+	// Kimi has no session-start channel at all — a SessionStart hook runs and
+	// its output goes nowhere — so the digest rides its per-prompt hook, and
+	// the payload comes from kimi rather than from deja. The flag is what
+	// turns the once rule on there; without it the same block would go in on
+	// every message of the session.
+	fromFlag := func(sid string) string {
+		t.Helper()
+		withHookStdin(t, `{"hook_event_name":"UserPromptSubmit","session_id":"`+sid+
+			`","cwd":"`+cwd+`","prompt":[{"type":"text","text":"anything"}]}`)
+		return captureStdout(t, func() { _ = runHookContextMode(index.DefaultDir(), true, true) })
+	}
+	if first := fromFlag("flag-1"); strings.TrimSpace(first) == "" {
+		t.Fatal("--once refused the first turn of a session")
+	}
+	if again := fromFlag("flag-1"); strings.TrimSpace(again) != "" {
+		t.Errorf("--once let the digest in twice in one session:\n%q", again)
+	}
+	if other := fromFlag("flag-2"); strings.TrimSpace(other) == "" {
+		t.Error("--once carried the first session's mark into a second one")
+	}
 }
