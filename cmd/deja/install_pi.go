@@ -101,8 +101,8 @@ export default function (pi: any) {
       // "--" when the query names one of deja's own flags: searching for
       // "--json" or "--all-matches" otherwise dies in flag parsing and comes
       // back as an empty history.
-      const args = query.startsWith("-") ? ["search", "--", query] : ["search", query];
-      const found = run(args, "", 120000);
+      const commandArgs = query.startsWith("-") ? ["search", "--", query] : ["search", query];
+      const found = run(commandArgs, "", 120000);
       ctx.ui.notify(found || "Nothing in your history matches " + query, "info");
     },
   });

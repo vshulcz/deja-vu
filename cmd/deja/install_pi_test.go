@@ -64,6 +64,20 @@ func TestPiExtensionQuotesExecutablePath(t *testing.T) {
 	}
 }
 
+// The command handler takes its argument as `args`, so the search array cannot
+// also be `const args`: pi parses the extension as TypeScript and refuses the
+// whole file with "Identifier 'args' has already been declared", which takes
+// deja's command — and the agent's startup — down with it (#3089).
+func TestPiCommandDoesNotRedeclareItsArgument(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	if !strings.Contains(src, "handler: async (args: string") {
+		t.Fatalf("the handler no longer takes args, so this guard is stale:\n%s", src)
+	}
+	if strings.Contains(src, "const args ") || strings.Contains(src, "const args=") {
+		t.Fatalf("the search array shadows the handler's `args` parameter, which pi rejects:\n%s", src)
+	}
+}
+
 // A search the user typed may rebuild the index; a hook may not. One shared
 // timeout made /deja answer "nothing matches" for a query with real hits.
 func TestPiCommandOutlivesTheHookTimeout(t *testing.T) {
