@@ -16,7 +16,28 @@ Four scenes, sixteen seconds:
   4. the line and the command
 
     python3 scripts/demo/story.py --out /tmp/frames
-    ffmpeg -framerate 20 -i /tmp/frames/%04d.png ... demo.gif
+
+    ffmpeg -y -framerate 20 -i /tmp/frames/%04d.png \
+      -vf "fps=12,scale=1000:-1:flags=lanczos,palettegen=max_colors=64:stats_mode=diff" \
+      /tmp/palette.png
+
+    ffmpeg -y -framerate 20 -i /tmp/frames/%04d.png -i /tmp/palette.png \
+      -lavfi "fps=12,scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=none:diff_mode=rectangle" \
+      -loop 0 assets/demo.gif
+
+The source frames are rendered at 20 fps, then reduced to 12 fps to keep the
+GIF small without making this slow animation look choppy. The six flat colours
+and glow fit comfortably in a 64-colour palette, so dithering only adds noise
+and bytes. A 1000 px output remains sharp at the README's 720 CSS px width
+without paying for a full 2x image.
+
+Nothing in CI rebuilds or checks this asset. After regenerating it, verify the
+shape of the result (tool versions can still cause small byte-size differences):
+
+    ffprobe -v error -show_entries stream=width,height,nb_frames \
+      -of default=noprint_wrappers=1 assets/demo.gif
+
+The expected result is 1000x467 with 192 frames.
 """
 
 import argparse
