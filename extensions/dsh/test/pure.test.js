@@ -84,6 +84,14 @@ test("automatic recall does not use the pre-step waterfall", () => {
   assert.match(source, /ctx\.systemPrompt\.context\(/);
 });
 
+test("the project digest opens the session once and asks deja for it", () => {
+  // agent/session-start is emit-only, so the digest rides the same assembly
+  // seam the recall does; deja_once is what keeps it to one turn per session.
+  assert.match(source, /name: "deja:project"/);
+  assert.match(source, /"hook-context", "--plain"/);
+  assert.match(source, /deja_once: true/);
+});
+
 // dsh refuses a name one of its registries already holds — "prompt context
 // deja:recall is already registered", "command deja is already registered" —
 // and the failure is not local: the whole profile fails to load, so a second
@@ -113,7 +121,7 @@ test("every registration the plugin makes goes through the guard", () => {
       `${m[0]} is not wrapped in guarded()`,
     );
   }
-  assert.equal(total, 8, "six tools, the command and the recall");
+  assert.equal(total, 9, "six tools, the command, the project digest and the recall");
 });
 
 test("a name the host already holds does not take the profile down", () => {
@@ -195,7 +203,7 @@ test("nothing installed by the CLI: the package contributes everything", () => {
   // The tool count is not asserted: registering them needs the dsh-tools peer,
   // which the host provides and this test does not have.
   assert.deepEqual(ctx.seen.commands, ["deja"]);
-  assert.deepEqual(ctx.seen.context, ["deja:recall"]);
+  assert.deepEqual(ctx.seen.context, ["deja:project", "deja:recall"]);
 });
 
 test("the CLI's install stands the command and the tools down", () => {
@@ -208,7 +216,7 @@ test("the CLI's install stands the command and the tools down", () => {
   });
   assert.equal(ctx.seen.tools, 0);
   assert.deepEqual(ctx.seen.commands, []);
-  assert.deepEqual(ctx.seen.context, ["deja:recall"], "recall was not installed by the CLI, so it stays here");
+  assert.deepEqual(ctx.seen.context, ["deja:project", "deja:recall"], "recall was not installed by the CLI, so it stays here");
 });
 
 test("the CLI's auto file stands the package's recall down", () => {

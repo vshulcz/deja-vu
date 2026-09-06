@@ -258,6 +258,39 @@ function userText(message) {
 // needs. installedByCLI() below is the first line of defence; this is the one
 // that holds when the installer wrote to a different DSH_HOME than the profile
 // boots from.
+// autoDigest puts what this project settled in front of the model once at the
+// start of the session — the question-independent counterpart to autoRecall.
+// dsh's own agent/session-start is emit-only, its return reaches nothing, so
+// the digest rides the same assembly seam the recall does. deja_once keys the
+// one-shot on the session id in deja's ledger, which survives a resume in a new
+// process; the Set is the in-process guard that keeps the long-lived web and
+// tui profiles from spawning deja on every assembly of a session already shown.
+function autoDigest(ctx) {
+  const seen = new Set();
+
+  guarded(() =>
+    ctx.systemPrompt.context({
+      name: "deja:project",
+      order: 110,
+      text: (assembly) => {
+        const agent = assembly && assembly.agent;
+        if (!agent) return "";
+        const sid = sessionId(agent);
+        if (sid && seen.has(sid)) return "";
+        if (sid) seen.add(sid);
+        return run(
+          ["hook-context", "--plain"],
+          JSON.stringify({ session_id: sid, cwd: process.cwd(), source: "startup", deja_once: true }),
+        );
+      },
+    }),
+  );
+}
+
+function sessionId(agent) {
+  return (agent && (agent.sessionId || (agent.session && agent.session.id))) || "";
+}
+
 function autoRecall(ctx) {
   let asked = "";
   let recalled = "";
@@ -339,7 +372,10 @@ function apply(ctx, config) {
   );
   if (adds.tools) tools(ctx);
   if (adds.command) command(ctx);
-  if (adds.recall) autoRecall(ctx);
+  if (adds.recall) {
+    autoDigest(ctx);
+    autoRecall(ctx);
+  }
 }
 
 apply.inject = ["tools", "commands", "systemPrompt"];

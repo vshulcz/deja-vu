@@ -117,19 +117,44 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
-function recall(prompt) {
+// Memory is optional: a plugin that throws in an assembly ends the turn, so
+// every call deja makes is swallowed to "".
+function ask(args, payload) {
   try {
-    return execFileSync(DEJA, ["hook-prompt", "--plain"], {
-      input: JSON.stringify({ prompt, cwd: process.cwd() }),
+    return execFileSync(DEJA, args, {
+      input: JSON.stringify(payload),
       encoding: "utf8",
       timeout: 10000,
       maxBuffer: 4 * 1024 * 1024,
       stdio: ["pipe", "pipe", "ignore"],
     }).trim();
   } catch {
-    // Memory is optional: a plugin that throws here ends the turn.
     return "";
   }
+}
+
+function recall(prompt) {
+  return ask(["hook-prompt", "--plain"], { prompt, cwd: process.cwd() });
+}
+
+function sessionId(agent) {
+  return (agent && (agent.sessionId || (agent.session && agent.session.id))) || "";
+}
+
+// The project digest, once at the start of the session. deja_once keys the
+// one-shot on the session id in deja's ledger, which survives a resume in a new
+// process; the Set is the in-process guard that keeps the long-lived web and
+// tui profiles from spawning deja on every assembly of a session already shown.
+function projectDigest(agent, seen) {
+  const sid = sessionId(agent);
+  if (sid && seen.has(sid)) return "";
+  if (sid) seen.add(sid);
+  return ask(["hook-context", "--plain"], {
+    session_id: sid,
+    cwd: process.cwd(),
+    source: "startup",
+    deja_once: true,
+  });
 }
 
 function userText(message) {
@@ -167,13 +192,30 @@ function lastHumanText(agent) {
 function apply(ctx) {
   let asked = "";
   let recalled = "";
+  const digestSeen = new Set();
 
   // A second copy of this file in the same profile — the npm package next to
   // the installer's, a --patch overlay naming it again — makes the host throw
   // "prompt context deja:recall is already registered", and that takes the
   // whole profile down: no agent at all, over an optional memory plugin.
   // One registration is all recall needs, so the loser stands down quietly.
+  //
+  // Two contexts are registered. deja:project is what this project settled,
+  // once at the start of the session, ordered ahead of the per-prompt recall so
+  // it reads as background rather than an answer to the question.
+  // agent/session-start is emit-only — its return reaches nothing — so the
+  // digest rides the same assembly seam the recall does, gated to one turn per
+  // session.
   try {
+    ctx.systemPrompt.context({
+      name: "deja:project",
+      order: 110,
+      text: (assembly) => {
+        const agent = assembly && assembly.agent;
+        if (!agent) return "";
+        return projectDigest(agent, digestSeen);
+      },
+    });
     ctx.systemPrompt.context({
       name: "deja:recall",
       order: 120,
