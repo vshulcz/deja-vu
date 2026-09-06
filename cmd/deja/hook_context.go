@@ -148,21 +148,21 @@ func sessionHadDigest(dir, sessionID string) bool {
 	if strings.TrimSpace(sessionID) == "" {
 		return false
 	}
-	return alreadyInjected(dir, onceDigestKey(sessionID))[onceDigestToken]
+	return alreadyInjected(dir, onceDigestKey(sessionID))[onceDigestMarker]
 }
 
 func rememberSessionDigest(dir, sessionID string) {
 	if strings.TrimSpace(sessionID) == "" {
 		return
 	}
-	rememberInjectedIDs(dir, onceDigestKey(sessionID), onceDigestToken)
+	rememberInjectedIDs(dir, onceDigestKey(sessionID), onceDigestMarker)
 }
 
 func onceDigestKey(sessionID string) string { return "once:" + sessionID }
 
-// onceDigestToken is what the ledger row says: this session has had its
+// onceDigestMarker is what the ledger row says: this session has had its
 // session-start attempt.
-const onceDigestToken = "once-digest"
+const onceDigestMarker = "once-digest"
 
 // joinNotes puts a maintenance line ahead of the memory line without letting
 // an empty one leave a stray separator.

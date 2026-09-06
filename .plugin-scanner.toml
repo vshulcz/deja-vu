@@ -13,6 +13,9 @@ ignore_paths = [
   "internal/index/*_test.go",
   "internal/embed/*_test.go",
   "cmd/deja/*_test.go",
+  # The extension test suites read their own source and assert on the hook
+  # names in it ("tool.execute.before"); nothing in them runs a shell.
+  "extensions/*/test/*",
   # Drives a real agent against a throwaway config and prints the placeholder
   # key it wired, so the run is reproducible.
   "scripts/agent-smoke.sh",

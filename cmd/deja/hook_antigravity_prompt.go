@@ -139,23 +139,23 @@ func digestAlreadyInjected(dir, conversationID string) bool {
 	if strings.TrimSpace(conversationID) == "" {
 		return false
 	}
-	return alreadyInjected(dir, antigravityDigestKey(conversationID))[antigravityDigestToken]
+	return alreadyInjected(dir, antigravityDigestKey(conversationID))[antigravityDigestMarker]
 }
 
 func rememberDigestInjected(dir, conversationID string) {
 	if strings.TrimSpace(conversationID) == "" {
 		return
 	}
-	rememberInjectedIDs(dir, antigravityDigestKey(conversationID), antigravityDigestToken)
+	rememberInjectedIDs(dir, antigravityDigestKey(conversationID), antigravityDigestMarker)
 }
 
 func antigravityDigestKey(conversationID string) string {
 	return "agy:" + conversationID
 }
 
-// antigravityDigestToken is what the ledger row says: this conversation has
+// antigravityDigestMarker is what the ledger row says: this conversation has
 // been handed the digest.
-const antigravityDigestToken = "agy-digest"
+const antigravityDigestMarker = "agy-digest"
 
 // workspaceFromConversation is where this conversation was started. The CLI
 // leaves workspacePaths empty unless it was given --add-dir (measured on
