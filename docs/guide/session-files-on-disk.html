@@ -4,8 +4,8 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Can you delete Claude Code session files in ~/.claude/projects? — deja-vu</title>
-<meta name="description" content="What Claude Code writes to ~/.claude/projects, how large those JSONL files get in practice, what you lose by deleting them, and how to reclaim space without losing your history.">
+<title>How to delete Claude Code sessions, and what you lose — deja-vu</title>
+<meta name="description" content="How to delete Claude Code sessions — one, a project, or all of ~/.claude/projects — what the JSONL files hold, how large they get in practice, and what you lose by deleting them.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Claude Code session files: how big they get and whether to delete them">
@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code session files: how big they get and whether to delete them", "description": "What Claude Code writes to ~/.claude/projects, how large those JSONL files get in practice, what you lose by deleting them, and how to reclaim space without losing your history.", "url": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Session files on disk", "item": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Claude Code delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Transcripts under ~/.claude/projects are kept for 30 days by default and then removed; the setting is cleanupPeriodDays in ~/.claude/settings.json. Raise it to keep them."}}, {"@type": "Question", "name": "Can I delete Claude Code session files?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, nothing in the agent breaks. You lose the ability to resume those sessions, any future search over that history, and your record of what the agent ran. Deleting the largest few files usually frees the space without losing much history."}}, {"@type": "Question", "name": "Where does Claude Code store session files?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.claude/projects, one directory per project and one JSONL file per session, unless CLAUDE_CONFIG_DIR points elsewhere. Codex uses ~/.codex/sessions and Cursor uses a SQLite state.vscdb."}}, {"@type": "Question", "name": "How much disk space do Claude Code sessions use?", "acceptedAnswer": {"@type": "Answer", "text": "On one machine with thirteen projects and two months of heavy daily use: 875 files totalling 1.6 GB, median 304 KB per session, with a single runaway session accounting for 586 MB."}}, {"@type": "Question", "name": "What is inside a Claude Code .jsonl session file?", "acceptedAnswer": {"@type": "Answer", "text": "JSON Lines: one object per line, appended as the session runs, each carrying a role, timestamp, session id and payload — your prompt, the assistant reply, or a tool call and its output, verbatim."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Claude Code delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Transcripts under ~/.claude/projects are kept for 30 days by default and then removed; the setting is cleanupPeriodDays in ~/.claude/settings.json. Raise it to keep them."}}, {"@type": "Question", "name": "How do I delete a Claude Code session?", "acceptedAnswer": {"@type": "Answer", "text": "Delete its file: rm ~/.claude/projects/<project-dir>/<session-id>.jsonl. Remove the project directory to drop every session of that project, or set cleanupPeriodDays in ~/.claude/settings.json to have Claude Code delete sessions older than N days on its own. The session leaves claude --resume immediately; prompt history in ~/.claude/history.jsonl is separate."}}, {"@type": "Question", "name": "Can I delete Claude Code session files?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, nothing in the agent breaks. You lose the ability to resume those sessions, any future search over that history, and your record of what the agent ran. Deleting the largest few files usually frees the space without losing much history."}}, {"@type": "Question", "name": "Where does Claude Code store session files?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.claude/projects, one directory per project and one JSONL file per session, unless CLAUDE_CONFIG_DIR points elsewhere. Codex uses ~/.codex/sessions and Cursor uses a SQLite state.vscdb."}}, {"@type": "Question", "name": "How much disk space do Claude Code sessions use?", "acceptedAnswer": {"@type": "Answer", "text": "On one machine with thirteen projects and two months of heavy daily use: 875 files totalling 1.6 GB, median 304 KB per session, with a single runaway session accounting for 586 MB."}}, {"@type": "Question", "name": "What is inside a Claude Code .jsonl session file?", "acceptedAnswer": {"@type": "Answer", "text": "JSON Lines: one object per line, appended as the session runs, each carrying a role, timestamp, session id and payload — your prompt, the assistant reply, or a tool call and its output, verbatim."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -97,6 +97,25 @@
 
 <p>Every session your agent runs is written to disk as it happens. Claude Code puts JSONL under <code>~/.claude/projects</code>, one directory per project and one file per session; Codex writes <code>~/.codex/sessions/**/rollout-*.jsonl</code>; Cursor uses a SQLite database. <a href="where-sessions-are-stored.html">Where each agent writes</a> has the rest.</p>
 <p>Nobody tells you these files exist until they are large.</p>
+
+<h2>How to delete Claude Code sessions</h2>
+<p>There is no command for it; the sessions are files, and deleting the file is the whole operation. The directory name is the project path with slashes turned into dashes, the file name is the session id.</p>
+<pre># see what is there, newest first
+ls -t ~/.claude/projects/-Users-you-project/*.jsonl
+
+# one session
+rm ~/.claude/projects/-Users-you-project/&lt;session-id&gt;.jsonl
+
+# every session of one project
+rm -rf ~/.claude/projects/-Users-you-project
+
+# everything, every project
+rm -rf ~/.claude/projects/*
+
+# or let Claude Code do it: sessions older than N days go on their own
+# ~/.claude/settings.json
+{ "cleanupPeriodDays": 7 }</pre>
+<p>Three things people expect and do not get. A session you delete disappears from <code>claude --resume</code> at once; that list is built from the files. Your prompt history is a separate file, <code>~/.claude/history.jsonl</code>, and stays until you delete it too. And there is no archive: a session that is no longer in <code>--resume</code> was swept by <code>cleanupPeriodDays</code>, and the file is gone, not archived. Before you delete by hand, the sections below say what the files cost you and what you lose.</p>
 
 <h2>How big they actually get</h2>
 <p>One developer's <code>~/.claude/projects</code>: thirteen projects, two months of heavy daily use.</p>
