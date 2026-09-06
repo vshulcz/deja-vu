@@ -86,6 +86,13 @@ func (i *toolHookInput) adopt() {
 }
 
 func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
+	return runHookToolMode(dir, stdin, stdout, false)
+}
+
+// plain writes the block on its own instead of Claude Code's hook envelope, for
+// the harnesses that take a string back from a handler rather than reading a
+// hook's stdout.
+func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
@@ -146,6 +153,10 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	// stats and the receipt. Deduped above, so this counts a distinct fact
 	// served, not every action.
 	usage.RecordResult(dir, usage.KindTool, len(out), 1, false)
+	if plain {
+		fmt.Fprint(stdout, out)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "PreToolUse"
 	resp.HookSpecificOutput.AdditionalContext = out
@@ -176,7 +187,14 @@ func toolHookLine(dir, cwd string, input toolHookInput) string {
 	switch input.ToolName {
 	case "Edit", "Write", "MultiEdit", "NotebookEdit",
 		// Grok's editor and its file writer.
-		"search_replace", "write":
+		"search_replace", "write",
+		// pi and omp have no pre-tool seam: the only handler whose return the
+		// model reads is the one holding a finished tool result. An edit there
+		// is already made, so the file's history goes out on their lowercase
+		// `read` instead — the step an agent takes before it edits. Claude Code
+		// sends "Read", which stays excluded: its hook fires before the action,
+		// so it has the edit itself to speak at.
+		"read":
 		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
 			return fileHookLine(dir, cwd, path)
 		}

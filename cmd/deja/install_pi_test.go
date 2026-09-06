@@ -105,6 +105,23 @@ func TestPiRepairsFailedCommandsOnToolResult(t *testing.T) {
 	}
 }
 
+// The file's history has to go out on the read, because pi has no seam that
+// runs before an edit: tool_call can only block a tool or rewrite its
+// arguments, and by tool_result the edit is already on disk. The read is the
+// step an agent takes first.
+func TestPiCarriesFileHistoryOnRead(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	for _, want := range []string{
+		`event.toolName === "read"`,
+		`"hook-tool", "--plain"`,
+		"event.input.path", // pi names it path, not file_path
+	} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("no file history at the read, missing %q:\n%s", want, src)
+		}
+	}
+}
+
 // pi names the event session_compact. "compaction" — the name the docs use for
 // the feature — registers a handler that never fires, so the session keeps its
 // list of shown blocks and stays quiet about a fix it could repeat.
