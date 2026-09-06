@@ -38,9 +38,12 @@ func TestHandoffCommandTable(t *testing.T) {
 		"aider":    {"aider", "--message", "P"},
 		"pi":       {"pi", "P"},
 		"omp":      {"omp", "P"},
-		"grok":     {"grok", "P"},
-		"cursor":   {"cursor-agent", "P"},
-		"copilot":  {"copilot", "-p", "P"},
+		// Amp's execute mode, from `amp --help` on 0.0.1788724845: -x takes the
+		// message and prints the last assistant reply.
+		"amp":     {"amp", "-x", "P"},
+		"grok":    {"grok", "P"},
+		"cursor":  {"cursor-agent", "P"},
+		"copilot": {"copilot", "-p", "P"},
 		// Verified against the running CLIs: cline answers a bare prompt
 		// argument, goose takes run -t, and kimi documents -p.
 		"cline": {"cline", "P"},

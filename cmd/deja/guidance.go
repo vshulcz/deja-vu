@@ -66,10 +66,12 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 // "Skill conflict detected" when the same skill exists in both its own
 // directory and the shared one, so having both is a visible fault rather than
 // harmless duplication.
+// Amp is measured too: `amp skill list` on 0.0.1788724845 lists a skill placed
+// only in ~/.agents/skills, and does not list one under a project's .amp/skills.
 var sharedSkillHarnesses = map[string]bool{
 	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
-	"omp": true, "deepseek": true, "zed": true,
+	"omp": true, "deepseek": true, "zed": true, "amp": true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately

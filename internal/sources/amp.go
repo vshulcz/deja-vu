@@ -12,6 +12,29 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
+// AmpConfigDir is where Amp keeps settings.json and its system plugins. Amp
+// uses the XDG path on every platform — `amp --help` names
+// ~/.config/amp/settings.json on macOS too — and honours AMP_SETTINGS_FILE for
+// the settings file itself.
+func AmpConfigDir() string {
+	base := filepath.Join(Home(), ".config")
+	if p := os.Getenv("XDG_CONFIG_HOME"); p != "" {
+		base = p
+	}
+	return filepath.Join(base, "amp")
+}
+
+// AmpSettingsFile is the file Amp reads its settings from, including the
+// amp.mcpServers block. AMP_SETTINGS_FILE moves it, and Amp itself respects
+// that variable, so an install has to follow it or write to a file nothing
+// reads.
+func AmpSettingsFile() string {
+	if p := os.Getenv("AMP_SETTINGS_FILE"); p != "" {
+		return filepath.Clean(p)
+	}
+	return filepath.Join(AmpConfigDir(), "settings.json")
+}
+
 // AmpRoot returns Amp's thread store root, overridable by deja without
 // changing Amp's own environment.
 func AmpRoot() string {

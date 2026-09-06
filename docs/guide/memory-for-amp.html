@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for Amp: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="Amp keeps every thread on the server and starts each one empty. A plugin file under ~/.config/amp/plugins puts this machine's own history in front of the model, and the MCP server lets it search the rest.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Amp">
+<meta property="og:description" content="Amp keeps every thread on the server and starts each one empty. A plugin file under ~/.config/amp/plugins puts this machine's own history in front of the model, and the MCP server lets it search the rest.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Amp">
+<meta name="twitter:description" content="Amp keeps every thread on the server and starts each one empty. A plugin file under ~/.config/amp/plugins puts this machine's own history in front of the model, and the MCP server lets it search the rest.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Amp", "description": "Amp keeps every thread on the server and starts each one empty. A plugin file under ~/.config/amp/plugins puts this machine's own history in front of the model, and the MCP server lets it search the rest.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Amp", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Amp remember previous threads?", "acceptedAnswer": {"@type": "Answer", "text": "Amp keeps threads and can continue one with `amp threads continue`, but a new thread starts empty and reads nothing from the others, or from any other agent on the machine."}}, {"@type": "Question", "name": "How do I add memory to Amp?", "acceptedAnswer": {"@type": "Answer", "text": "deja install amp-auto writes a plugin to ~/.config/amp/plugins/deja.ts and adds the deja MCP server under amp.mcpServers in Amp settings. The plugin answers agent.start, so the recall is part of the message the model reads, and tool.result, so a failed command gets the repair beside the error."}}, {"@type": "Question", "name": "Can Amp see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-three agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">17</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html" aria-current="page">Memory for Amp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Amp</h1>
+<p class="pagelede">a plugin API modelled on pi's, and one file is the whole install<span class="mins" data-mins></span></p>
+
+<p>Amp keeps its threads on the server and a copy under <code>~/.local/share/amp/threads</code>, and can continue one with <code>amp threads continue</code>. A new thread reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
+
+<h2>What it already has</h2>
+<p>No hooks, but a plugin API — acknowledged in Amp's own docs as inspired by pi's — and plugins under <code>~/.config/amp/plugins/*.ts</code> are auto-discovered, so installing is one file and no settings edit. Amp also takes MCP servers, under <code>amp.mcpServers</code> in its settings file.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install amp-auto</pre>
+<p>That writes both halves. The MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision. And the plugin, which does not wait to be asked:</p>
+<ul>
+<li><b>agent.start</b> — fires with the prompt in hand and its return value is appended to the user message, so the first turn of a thread carries a digest of what this project's recent sessions settled, and later turns carry recall for the question actually asked. This is both halves of what Claude Code splits across SessionStart and UserPromptSubmit.</li>
+<li><b>tool.result</b> — a command has just failed, and this machine has fixed that same error before. The handler is handed the output the model is about to read and hands back a replacement, so the repair arrives beside the error in the same turn rather than a turn later. The status stays an error: a repair that reported success would be a lie about the command.</li>
+<li><b>session.start</b> and the command palette — while a first index is still building, that is said once rather than looking like memory that does not work, and <code>deja: search past sessions</code> is there for searching by hand.</li>
+</ul>
+<p>Guidance goes to <code>~/.agents/skills/deja-history/SKILL.md</code>, the shared skills directory Amp reads — <code>amp skill list</code> shows it beside Amp's built-in skills.</p>
+<p><code>tool.call</code> runs before a command does, but its answer can only allow, reject, modify the arguments or synthesize a result — none of them add context — so the pre-tool line other harnesses get has nowhere to go in Amp. Amp also has no compaction event, so the list of blocks a thread has already been shown is not cleared when its context is.</p>
+
+<h2>What arrives</h2>
+<p>On each prompt, the history it is actually about, when there is any; silence is the common case. Measured on the stand: 43 ms and 556 bytes for the session digest, 21 ms and 286 bytes for the repair after a failed command, nothing when there is nothing to say — <a href="token-cost.html">what memory costs</a> has the wider comparison.</p>
+
+<h2>The part that is not about Amp</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-three of them, each in its own format — so a fix found in Claude Code answers a question asked in Amp, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/amp.html">The Amp thread format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
