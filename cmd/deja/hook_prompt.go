@@ -706,17 +706,22 @@ func matchedTitle(s model.Session, terms []string) string {
 // repeatLead is the lead for a question this machine has already asked. The
 // claim is stronger than "a session matches" — the agent does not have to
 // decide whether the history is relevant, only whether the answer still holds
-// — so the line it is asked to say names the earlier asking outright.
+// — so the line it is asked to say names the earlier asking outright, and it
+// is asked for unconditionally: that the question was asked and what was
+// settled then are facts either way. Making the line conditional on "if it
+// still holds" sent the agent off to verify first and the line never came —
+// measured on the demo corpus, 2 of 10 replies against 5 of 10 with the old
+// wording; unconditional, and the check asked for after it, it is said.
 func repeatLead(s model.Session, again string) string {
 	// The quoted question is pulled straight from a message into the one
 	// place the frame does not mark as untrusted, so it gets the same
 	// treatment as the digest body.
 	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
 	return "déjà vu — this was asked here before" + askedBeforeWhen(s) + ": \"" + again +
-		"\". What that session settled is below. If it still holds, open your reply with one short line, before the answer: " +
+		"\". What that session settled is below. Open your reply with one short line, before anything else: " +
 		"\"déjà vu: you asked this on " + strings.TrimPrefix(citationDate(s), ", ") + " in " + s.Harness +
-		"; it was settled <the answer, in a few words> (deja:" + shortID(s.ID) + ")\" — then continue from it. " +
-		"If it does not hold, say so instead of repeating it.\n"
+		"; it was settled <the answer, in a few words> (deja:" + shortID(s.ID) + ")\" — then check that it still holds " +
+		"before acting on it, and say so if it does not.\n"
 }
 
 // provenance is the part of the spoken line that makes it checkable: which
