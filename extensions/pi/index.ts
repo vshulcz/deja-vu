@@ -72,7 +72,7 @@ export default function (pi: any) {
   // it already does everything below, and two copies would inject the
   // recall twice and register /deja twice.
   try {
-    if (existsSync(installerExtensionPath(process.env, homedir()))) return;
+    if (existsSync(installerExtensionPath(homedir()))) return;
   } catch {}
 
   let injected = false;

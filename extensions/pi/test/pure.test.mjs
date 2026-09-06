@@ -3,8 +3,7 @@ import assert from "node:assert/strict"
 import { argv, contextText, installerExtensionPath, sessionKey } from "../lib.mjs"
 
 test("the installer's extension is looked for where the installer writes it", () => {
-  assert.equal(installerExtensionPath({}, "/home/u"), "/home/u/.pi/agent/extensions/deja.ts")
-  assert.equal(installerExtensionPath({ PI_HOME: "/srv/pi" }, "/home/u"), "/srv/pi/extensions/deja.ts")
+  assert.equal(installerExtensionPath("/home/u"), "/home/u/.pi/agent/extensions/deja.ts")
 })
 
 test("hook-context is read in both shapes deja prints", () => {

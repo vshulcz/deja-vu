@@ -7,10 +7,10 @@ import { join } from "node:path"
 // installerExtensionPath is where `deja install pi-auto` writes its own
 // extension. pi loads that file and this package side by side, and both
 // would inject recall and register /deja, so this package stands down when
-// the installer's copy is present. Mirrors PiConfigDir() in the installer.
-export function installerExtensionPath(env, home) {
-  const base = (env && env.PI_HOME) || join(home || "", ".pi", "agent")
-  return join(base, "extensions", "deja.ts")
+// the installer's copy is present. Mirrors PiConfigDir() in the installer,
+// which is ~/.pi/agent with no override — pi has none either.
+export function installerExtensionPath(home) {
+  return join(home || "", ".pi", "agent", "extensions", "deja.ts")
 }
 
 // contextText pulls the recall out of whatever hook-context printed. deja
@@ -41,11 +41,7 @@ export function argv(cmd, flags, text) {
 
 // sessionKey is what per-prompt recall dedups on: a hit shown once in a
 // session is not shown again. Without one it repeats itself every message.
+// Same order as the extension `deja install pi-auto` writes.
 export function sessionKey(event, ctx) {
-  return (
-    (event && (event.sessionId || event.session_id)) ||
-    (ctx && ctx.session && ctx.session.id) ||
-    (ctx && ctx.sessionId) ||
-    ""
-  )
+  return (event && (event.sessionId || event.session_id)) || (ctx && ctx.session && ctx.session.id) || ""
 }
