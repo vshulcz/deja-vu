@@ -19,7 +19,7 @@ func TestRepeatLeadStripsDisplayControls(t *testing.T) {
 		ID:      "8f2c19ab77d40e6b5c31",
 		Updated: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
-	got := repeatLead(s, "deploy ‮plan​ now\x1b[31m red\ttab\nline")
+	got := repeatLead(s, "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline")
 	// The lead ends with a newline of its own; every other rune must be
 	// plain text.
 	body := strings.TrimSuffix(got, "\n")
@@ -28,7 +28,7 @@ func TestRepeatLeadStripsDisplayControls(t *testing.T) {
 			t.Fatalf("lead carried a control rune %U: %q", r, got)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(got, bad) {
 			t.Fatalf("lead carried %U: %q", bad, got)
 		}
@@ -49,7 +49,7 @@ func TestOpenerLineStripsDisplayControls(t *testing.T) {
 		Harness: "claude",
 		ID:      "8f2c19ab77d40e6b5c31",
 		Updated: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
-		Title:   "deploy ‮plan​ now\x1b[31m red\ttab\nline \"quoted\"",
+		Title:   "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline \"quoted\"",
 	}
 	got := openerLine(s, nil)
 	for _, r := range got {
@@ -57,7 +57,7 @@ func TestOpenerLineStripsDisplayControls(t *testing.T) {
 			t.Fatalf("opener carried a control rune %U: %q", r, got)
 		}
 	}
-	for _, bad := range []rune{'‮', '​'} {
+	for _, bad := range []rune{'\u202e', '\u200b'} {
 		if strings.ContainsRune(got, bad) {
 			t.Fatalf("opener carried %U: %q", bad, got)
 		}
