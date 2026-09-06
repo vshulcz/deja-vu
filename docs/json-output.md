@@ -577,6 +577,57 @@ says in a sentence.
 `last` is omitted rather than zero-valued when a command carries no recorded
 time. An empty result keeps the envelope and returns `commands: []`.
 
+## `deja files <topic> --json`
+
+Which files a piece of work touched:
+
+```json
+{
+  "schema_version": 2,
+  "query": "singbox",
+  "sessions_scanned": 34,
+  "matched": 34,
+  "read_capped": false,
+  "truncated": true,
+  "filtered": 2,
+  "withheld": 0,
+  "ignored": 0,
+  "files": [
+    {
+      "path": "/srv/app/internal/singbox/render.go",
+      "near": 18,
+      "sessions": 6,
+      "total": 21
+    }
+  ]
+}
+```
+
+`near` is touches close to the topic, `sessions` how many separate sessions
+those came from, and `total` touches anywhere in the sessions read. The ranking
+is built from those three, so a caller can re-rank or threshold without
+re-deriving them — `total` is the denominator that makes a file specific to the
+topic rather than merely busy.
+
+Two different cuts, kept apart because a consumer that folded them together
+would report the wrong one:
+
+- `truncated` — the caller's `--limit` bit on the file list. The note naming it
+  goes to **stderr**, so stdout alone could not otherwise tell ten files from
+  ninety.
+- `read_capped` — the read budget bit on the sessions behind the list.
+  `sessions_scanned` is what deja got to and `matched` how many mentioned the
+  topic at all; on a store where 301 sessions matched, reporting only the first
+  would present 250 as though it were the number.
+
+`filtered` counts recorded paths dropped because they are not under a
+repository on this disk today — moved, archived, or an unmounted volume. It
+separates "recorded nothing" from "recorded files this build will not show".
+
+`withheld` and `ignored` are what the policy rules took out before any of this
+was counted, on the same terms as `how`: an empty `files` otherwise reads as
+"nothing matched" when it can mean every matching session was withheld.
+
 ## `deja stats --impact --json`
 
 What deja has actually served on this machine, measured from the usage log:

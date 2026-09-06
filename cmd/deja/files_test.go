@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -115,5 +118,106 @@ func TestLowerAllDropsShortWords(t *testing.T) {
 	got := lowerAll([]string{"Sing", "Box", "in", "GO"})
 	if len(got) != 2 || got[0] != "sing" || got[1] != "box" {
 		t.Fatalf("got %v", got)
+	}
+}
+
+// `deja files --json` (#1930). Every sibling command has one; this one printed
+// prose only, so a caller scripting against it had to parse a padded column.
+func TestFilesJSONEnvelope(t *testing.T) {
+	root, err := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
+
+	out, err := captureRun(t, "files", "--json", "parser")
+	if err != nil {
+		t.Fatalf("files --json err=%v out=%q", err, out)
+	}
+	var env struct {
+		SchemaVersion   int    `json:"schema_version"`
+		Query           string `json:"query"`
+		SessionsScanned int    `json:"sessions_scanned"`
+		Matched         int    `json:"matched"`
+		ReadCapped      bool   `json:"read_capped"`
+		Truncated       bool   `json:"truncated"`
+		Filtered        int    `json:"filtered"`
+		Withheld        int    `json:"withheld"`
+		Ignored         int    `json:"ignored"`
+		Files           []struct {
+			Path     string `json:"path"`
+			Near     int    `json:"near"`
+			Sessions int    `json:"sessions"`
+			Total    int    `json:"total"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("files --json is not valid JSON: %v\n%s", err, out)
+	}
+	if env.SchemaVersion != jsonout.Version {
+		t.Fatalf("schema_version=%d want %d", env.SchemaVersion, jsonout.Version)
+	}
+	if env.Query != "parser" {
+		t.Fatalf("query=%q want %q", env.Query, "parser")
+	}
+	// The list may legitimately be empty on this fixture; what must hold is
+	// that every row is well formed and that `total` is never smaller than
+	// `near`, since near-touches are a subset of the touches counted.
+	for _, f := range env.Files {
+		if f.Path == "" {
+			t.Fatalf("row with no path: %+v", f)
+		}
+		if f.Total < f.Near {
+			t.Fatalf("total %d < near %d for %s", f.Total, f.Near, f.Path)
+		}
+		if f.Sessions <= 0 {
+			t.Fatalf("row claims no sessions: %+v", f)
+		}
+	}
+}
+
+// A miss must still be an envelope, not prose on stdout: a consumer that got
+// one shape on a hit and a sentence on a miss would have to sniff the output
+// before parsing it.
+func TestFilesJSONOnAMissIsStillAnEnvelope(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(t.TempDir(), "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(t.TempDir(), "opencode.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(t.TempDir(), "index.db"))
+
+	out, err := captureRun(t, "files", "--json", "nothing-mentions-this-topic")
+	if err != nil {
+		t.Fatalf("files --json on a miss err=%v out=%q", err, out)
+	}
+	var env struct {
+		SchemaVersion int   `json:"schema_version"`
+		Files         []any `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(out), &env); err != nil {
+		t.Fatalf("miss is not valid JSON: %v\n%s", err, out)
+	}
+	if env.SchemaVersion != jsonout.Version {
+		t.Fatalf("schema_version=%d want %d", env.SchemaVersion, jsonout.Version)
+	}
+	if len(env.Files) != 0 {
+		t.Fatalf("miss returned %d files", len(env.Files))
+	}
+}
+
+// `files` refuses unknown flags by design (#1628); --json must not have opened
+// a hole in that.
+func TestFilesStillRefusesUnknownFlags(t *testing.T) {
+	if err := runFiles(t.TempDir(), []string{"--jsonn", "topic"}, io.Discard); err == nil {
+		t.Fatal("unknown flag accepted")
+	}
+	if err := runFiles(t.TempDir(), []string{"--json"}, io.Discard); err == nil {
+		t.Fatal("--json with no topic accepted")
 	}
 }
