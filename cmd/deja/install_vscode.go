@@ -58,6 +58,15 @@ func vsCodeUserDirs() []string {
 	return sources.CopilotChatRoots()
 }
 
+// vsCodeGuidanceDir is the User folder guidance is written into: the first host
+// present, or the stable one's default when VS Code has never run here.
+func vsCodeGuidanceDir() string {
+	if dirs := vsCodeUserDirs(); len(dirs) > 0 {
+		return dirs[0]
+	}
+	return vsCodeDefaultUserDir()
+}
+
 func installVSCodeMCP(exe string, uninstall bool) (installResult, error) {
 	dirs := vsCodeUserDirs()
 	if len(dirs) == 0 {

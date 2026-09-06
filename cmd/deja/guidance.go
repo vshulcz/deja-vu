@@ -110,6 +110,15 @@ func guidancePath(harness string) string {
 		// 1.0.5 lists those and not this. What reaches Grok Build is the shared
 		// skill written alongside it, which the same command lists.
 		return filepath.Join(sources.GrokHome(), "GROK.md")
+	case "vscode":
+		// VS Code's custom instructions, in the profile's prompts folder. This
+		// is the one place a block can sit in front of Copilot Chat before it
+		// reads the question — it has no session-start or per-prompt hook — and
+		// it tells the agent to call the MCP server `deja install vscode` wires.
+		//
+		// One file by contract, so the first User folder present gets it, while
+		// the MCP entry goes to every host on the machine.
+		return filepath.Join(vsCodeGuidanceDir(), "prompts", "deja.instructions.md")
 	case "opencode":
 		// opencode reads skills from its config directory, which is the cheaper
 		// channel: a block in AGENTS.md is in context for the whole session
@@ -132,6 +141,16 @@ func opencodeConfigHome() string {
 // loaded before the skill is used, so it carries the trigger phrases.
 func skillFile(body string) string {
 	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
+}
+
+// instructionsFile wraps the same body for VS Code, whose custom instructions
+// are markdown with an `applyTo` glob rather than a skill's name/description.
+// `**` is what makes it apply to every chat rather than to files that match a
+// pattern — measured on VS Code 1.134.0: with this file in the User folder's
+// prompts directory and nothing else, Copilot Chat called deja on a question
+// that had nothing to do with past work, because the file told it to.
+func instructionsFile(body string) string {
+	return "---\napplyTo: \"**\"\n---\n\n" + body + "\n"
 }
 
 func guidanceText(harness string) string {
@@ -158,6 +177,12 @@ Example: for "what did we decide about token refresh?", try recall first; if una
 When recalled history genuinely helps, say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
 		}
 
+		if harness == "vscode" {
+			// Copilot Chat has no hook, so this file is the only thing that is
+			// in front of the model before it reads the question. It says to
+			// call the tool; the tool is what carries the history.
+			return instructionsFile(body)
+		}
 		return skillFile(body)
 	}
 	return guidanceStart + "\n" + guidanceBody + "\n" + guidanceEnd + "\n"
@@ -624,7 +649,7 @@ func guidanceOwnsWholeFile(harness string) bool {
 		return true
 	}
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes", "vscode":
 		return true
 	}
 	return false
