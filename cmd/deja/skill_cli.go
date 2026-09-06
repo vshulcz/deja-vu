@@ -43,7 +43,7 @@ Useful flags on search: ` + "`--harness`" + `, ` + "`--project`" + `, ` + "`--si
 
 ## Saying what you used
 
-When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — tell the user in one short line what was recalled and how you used it: "deja-vu recalled: we hit this JWT skew in March — reusing that fix". Say nothing about recalls that did not help. This is provenance, not advertising; a note on every call would be noise.
+When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — tell the user in one short line at the start of your reply, naming the session: "déjà vu: we hit this JWT skew in March — reusing that fix (deja:a1b2c3d4-e5f)". Say nothing about recalls that did not help. This is provenance, not advertising; a note on every call would be noise.
 
 ## Limits worth respecting
 

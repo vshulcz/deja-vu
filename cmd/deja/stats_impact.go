@@ -109,9 +109,9 @@ func printImpact(w io.Writer, r usage.ImpactReport, credits int, jsonOut bool) e
 	served := r.Recalls + r.Injections + r.DejaVuMoments + r.ToolLines
 	switch {
 	case credits > 0:
-		fmt.Fprintf(w, "  credited aloud     %d of %d said \"deja-vu recalled\" — memory that was used, not just served\n", credits, served)
+		fmt.Fprintf(w, "  credited aloud     %d of %d said \"déjà vu\" — memory that was used, not just served\n", credits, served)
 	case served > 0:
-		fmt.Fprintf(w, "  credited aloud     none of %d yet — served, but no agent has said \"deja-vu recalled\"\n", served)
+		fmt.Fprintf(w, "  credited aloud     none of %d yet — served, but no agent has said \"déjà vu\"\n", served)
 	}
 	fmt.Fprintln(w, "\ncounted: served bytes = digests actually returned to agents; raw bytes =")
 	fmt.Fprintln(w, "the source transcripts those digests distilled. `deja log` shows every entry.")

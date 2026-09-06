@@ -35,7 +35,7 @@ func TestImpactReportsCreditsNotJustServed(t *testing.T) {
 	if err := runStatsImpact(&out, dir, false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `credited aloud     1 of 4 said "deja-vu recalled"`) {
+	if !strings.Contains(out.String(), `credited aloud     1 of 4 said "déjà vu"`) {
 		t.Errorf("impact panel does not report credits:\n%s", out.String())
 	}
 
@@ -88,7 +88,7 @@ func TestStatsCreditLineSingular(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, `"deja-vu recalled" 1 time (`) {
+	if !strings.Contains(out, `"déjà vu" 1 time (`) {
 		for _, line := range strings.Split(out, "\n") {
 			if strings.Contains(line, "Credited aloud") {
 				t.Fatalf("credit line: %q", line)

@@ -273,7 +273,7 @@ func dejaTool() map[string]any {
 			"- how: the real command with the real flags this user runs for a thing — build, test, deploy — instead of a guessed one.\n" +
 			"- remember: store one durable decision so a later session can recall it. Only after something is settled.\n" +
 			"A bracketed marker on a result is the user's own later judgement on that session; act on what it says. " +
-			"When a result genuinely helps, tell the user in one short line: \"deja-vu recalled: <what> — <how you used it>\". Say nothing about recalls that did not help.",
+			"When a result genuinely helps, tell the user in one short line at the start of your reply: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
 		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
 		"inputSchema": map[string]any{
 			"type": "object",

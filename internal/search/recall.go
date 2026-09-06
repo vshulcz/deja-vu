@@ -74,10 +74,21 @@ func AutoRecallDigestFor(ss []model.Session, budget int, terms []string) string 
 // copy wins the opening slot on carrying every word of it, being the same
 // sentence. Measured on a real store, that was 22 of 104 injected blocks.
 func AutoRecallDigestForAsked(ss []model.Session, budget int, terms []string, asked string) string {
+	text, _ := AutoRecallDigestShowing(ss, budget, terms, asked)
+	return text
+}
+
+// AutoRecallDigestShowing is AutoRecallDigestForAsked that also says which
+// sessions made it into the text, in the order they appear. The first of them
+// is the one to cite: the top-ranked session is skipped when it has nothing
+// quotable, and a citation built from the ranking then named a session the
+// digest never showed.
+func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, asked string) (string, []model.Session) {
 	if budget <= 0 {
 		budget = 2000
 	}
 	var b strings.Builder
+	var shown []model.Session
 	for _, s := range ss {
 		if b.Len() >= budget {
 			break
@@ -86,6 +97,7 @@ func AutoRecallDigestForAsked(ss []model.Session, budget int, terms []string, as
 		if section == "" {
 			continue
 		}
+		shown = append(shown, s)
 		if b.Len()+len(section) > budget {
 			cut := budget - b.Len()
 			for cut > 0 && !utf8.RuneStart(section[cut]) {
@@ -95,7 +107,7 @@ func AutoRecallDigestForAsked(ss []model.Session, budget int, terms []string, as
 		}
 		b.WriteString(section)
 	}
-	return strings.TrimSpace(b.String())
+	return strings.TrimSpace(b.String()), shown
 }
 
 // BuildAutoRecall applies the session-start recall policy while constructing

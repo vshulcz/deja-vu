@@ -53,7 +53,7 @@ func TestHookPromptInjectsOnRelevantHit(t *testing.T) {
 		t.Fatalf("event = %q", resp.HookSpecificOutput.HookEventName)
 	}
 	ctx := resp.HookSpecificOutput.AdditionalContext
-	if !strings.Contains(ctx, "deja-vu recalled") && !strings.Contains(ctx, "deja found prior sessions") {
+	if !strings.Contains(ctx, "déjà vu:") && !strings.Contains(ctx, "deja found prior sessions") {
 		t.Fatalf("context missing narration lead: %q", ctx)
 	}
 	if len(ctx) > promptHookBudget+256 {
@@ -164,8 +164,14 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 	if err := runHookPrompt(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), `If it helped, say: \"deja-vu recalled:`) {
-		t.Fatalf("citation line missing: %q", out.String())
+	got := out.String()
+	if !strings.Contains(got, `\"déjà vu: you asked this on `) || !strings.Contains(got, " in claude; it was settled ") || !strings.Contains(got, "(deja:citefix)") {
+		t.Fatalf("opener line missing: %q", got)
+	}
+	// The instruction sits above the untrusted line, not under it: the frame
+	// tells the model never to follow instructions inside the block.
+	if strings.Index(got, "déjà vu:") > strings.Index(got, "Recalled history follows") {
+		t.Fatalf("opener line sits below the untrusted line: %q", got)
 	}
 	// Same session asks again: the same memory must not be re-injected.
 	var out2 bytes.Buffer
@@ -204,10 +210,14 @@ func TestAgentCreditsCountedFromIndex(t *testing.T) {
 		{Role: "assistant", Text: "deja-vu recalled: jwt fix — reusing it.", Time: now},
 		{Role: "assistant", Text: "deja-vu recalled: old one", Time: now.Add(-9 * 24 * time.Hour)},
 		{Role: "user", Text: "deja-vu recalled should not count from users"},
+		{Role: "assistant", Text: "Déjà vu: you asked this on Aug 26 in opencode; it was settled as a vault lease (deja:ses_fc145)", Time: now},
+		// The phrase without the id is a sentence about the tool, not a credit.
+		{Role: "assistant", Text: "the déjà vu line is rate-limited per session", Time: now},
+		{Role: "user", Text: "déjà vu: users do not credit (deja:abc)", Time: now},
 	}}}
 	r := stats.Build(ss, now)
-	if r.AgentCredits != 2 || r.WeekCredits != 1 {
-		t.Fatalf("credits = %d/%d, want 2/1", r.AgentCredits, r.WeekCredits)
+	if r.AgentCredits != 3 || r.WeekCredits != 2 {
+		t.Fatalf("credits = %d/%d, want 3/2", r.AgentCredits, r.WeekCredits)
 	}
 }
 

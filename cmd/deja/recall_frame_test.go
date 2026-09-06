@@ -74,7 +74,7 @@ func TestInstallBackupAndNewConfigOwnerOnly(t *testing.T) {
 // The narration protocol must be present on every agent-facing surface, and
 // must carry the only-when-it-helped guard so it cannot become spam.
 func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
-	if !strings.Contains(guidanceBody, "deja-vu recalled:") || !strings.Contains(guidanceBody, "Never credit recalls that did not help") {
+	if !strings.Contains(guidanceBody, "déjà vu:") || !strings.Contains(guidanceBody, "Never credit recalls that did not help") {
 		t.Fatal("guidance missing narration protocol")
 	}
 	for _, m := range []string{"initialize", "tools/list"} {
@@ -88,7 +88,7 @@ func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
 	// Once, not twice: the six tools became one with modes, so the sentence
 	// that tells the agent to say what it reused is written once and covers
 	// every mode.
-	if n := strings.Count(string(b), "deja-vu recalled"); n < 1 {
+	if n := strings.Count(string(b), "déjà vu:"); n < 1 {
 		t.Fatalf("MCP tool descriptions carry the narration %d times, want at least once", n)
 	}
 	if !strings.Contains(string(b), "Say nothing about recalls that did not help") {
