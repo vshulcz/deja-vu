@@ -50,7 +50,12 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 	if err := json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
-	installID := map[string]string{"claude": "claude-code"}
+	// The registry names a harness; install names a target. Where the two differ
+	// the checks below have to ask under the target's id, or they answer about a
+	// harness deja does not wire under that name — copilot-chat's guidance is
+	// written by the vscode target, and without this the skill check read false
+	// on a harness that gets a file.
+	installID := map[string]string{"claude": "claude-code", "copilot-chat": "vscode"}
 	// aider is auto-capable without an -auto target: the wrapper refreshes the
 	// read-only file, which aider re-reads on every message.
 	autoCapable := map[string]bool{"claude": true, "codex": true, "opencode": true, "aider": true}

@@ -236,7 +236,7 @@
       "capabilities": {
         "mcp": true,
         "auto": false,
-        "skill": false,
+        "skill": true,
         "command": false,
         "resume": false,
         "handoff": "paste",
@@ -246,10 +246,6 @@
         "auto": {
           "state": "impossible",
           "why": "VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install"
-        },
-        "skill": {
-          "state": "todo",
-          "why": "a skill file could be placed where Copilot Chat loads Agent Skills; not written yet"
         },
         "command": {
           "state": "todo",
