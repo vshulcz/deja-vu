@@ -67,6 +67,10 @@ Both ISO-8601 strings (`"timestamp"` in the envelope) and Unix milliseconds (`"t
 
 The `id` field from the session header line is used as the session ID. The UUID also appears in the filename.
 
+## Package
+
+`pi install npm:@vshulcz/pi-deja` installs the recall extension as a pi package (`pi-package` keyword, `pi.extensions`); it stands down when `deja install pi-auto` already wrote `~/.pi/agent/extensions/deja.ts`.
+
 ## MCP
 
 pi does not include built-in MCP but supports it via the `pi-mcp-adapter` package (`pi install npm:pi-mcp-adapter`). The adapter reads `~/.pi/agent/mcp.json` with the standard `mcpServers` shape. `deja install pi` writes to that file.

@@ -100,6 +100,9 @@
 <p>Neither has hooks. Both have an extension API, and extensions under the agent's <code>extensions/</code> directory are auto-discovered — so installing is one file and no settings edit, and removing it is deleting the file.</p>
 
 <h2>Adding recall</h2>
+<p>From npm, without the deja CLI on hand:</p>
+<pre>pi install npm:@vshulcz/pi-deja</pre>
+<p>The package brings the binary along: a digest at session start, recall on every prompt, <code>/deja</code> to search by hand. Or, with the CLI installed:</p>
 <pre>deja install pi-auto
 deja install omp-auto</pre>
 <p>Each writes the MCP server, so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision — and one extension:</p>

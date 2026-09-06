@@ -1,0 +1,48 @@
+{
+  "name": "@vshulcz/pi-deja",
+  "version": "0.19.3",
+  "description": "deja-vu memory for pi: the coding sessions already on this machine — pi, Claude Code, Codex, Cursor and 18 more — recalled at session start and on every prompt, searchable with /deja. A local index, no LLM.",
+  "type": "module",
+  "files": [
+    "index.ts",
+    "lib.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vshulcz/deja-vu.git",
+    "directory": "extensions/pi"
+  },
+  "homepage": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html",
+  "bugs": {
+    "url": "https://github.com/vshulcz/deja-vu/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "pi-coding-agent",
+    "omp",
+    "memory",
+    "recall",
+    "session-history",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@vshulcz/deja-vu": "^0.19.0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"],
+    "image": "https://raw.githubusercontent.com/vshulcz/deja-vu/assets/listings/recall-card.png"
+  },
+  "omp": {
+    "extensions": ["./index.ts"]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  }
+}

@@ -9,6 +9,7 @@ const names = {
   "extensions/opencode": { name: "opencode-deja" },
   "extensions/dsh": { name: "dsh-deja" },
   "extensions/openclaw": { name: "@vshulcz/openclaw-deja" },
+  "extensions/pi": { name: "@vshulcz/pi-deja" },
 };
 const readPkg = (dir) => names[dir];
 
@@ -37,7 +38,7 @@ test("what cannot be answered is not drift", () => {
 
 test("every package is reported when all are stranded", () => {
   const bad = stranded(PACKAGES, readPkg, () => "0.21.0", "0.19.2");
-  assert.deepEqual(bad.map((p) => p.name).sort(), ["@vshulcz/openclaw-deja", "dsh-deja", "opencode-deja"]);
+  assert.deepEqual(bad.map((p) => p.name).sort(), ["@vshulcz/openclaw-deja", "@vshulcz/pi-deja", "dsh-deja", "opencode-deja"]);
 });
 
 test("versions order by number", () => {

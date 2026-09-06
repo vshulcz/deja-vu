@@ -95,6 +95,38 @@ jobs:
 
       - run: npm test
 
+  pi:
+    name: pi-deja
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: extensions/pi
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+
+      - name: The extension has to load under node's type stripping, the way pi loads it
+        run: |
+          node --check lib.mjs
+          node --experimental-strip-types -e "const m = await import('./index.ts'); if (typeof m.default !== 'function') throw new Error('no default export')"
+
+      - name: The manifest carries the gallery keyword and the entry it points at exists
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            if (!pkg.keywords.includes("pi-package")) throw new Error("pi-package keyword missing: the gallery lists by it");
+            for (const key of ["pi", "omp"]) {
+              for (const e of pkg[key].extensions) if (!fs.existsSync(e)) throw new Error(key + ".extensions names a missing file: " + e);
+            }
+            console.log("ok:", pkg.pi.extensions.join(","));
+          '
+
+      - run: npm test
+
   dsh:
     name: dsh-deja
     runs-on: ubuntu-latest
@@ -307,7 +339,7 @@ jobs:
           node -e '
             const fs = require("node:fs");
             let bad = 0;
-            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw"]) {
+            for (const dir of ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi"]) {
               const pkg = JSON.parse(fs.readFileSync(dir + "/package.json", "utf8"));
               const repo = pkg.repository || {};
               if (!String(repo.url || "").includes("vshulcz/deja-vu")) {

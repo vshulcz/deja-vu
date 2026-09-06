@@ -84,6 +84,8 @@
 <p>Both ISO-8601 strings (<code>&#34;timestamp&#34;</code> in the envelope) and Unix milliseconds (<code>&#34;timestamp&#34;</code> inside <code>message</code>) are observed. The parser uses the envelope timestamp.</p>
 <h2 id="session-identity">Session identity</h2>
 <p>The <code>id</code> field from the session header line is used as the session ID. The UUID also appears in the filename.</p>
+<h2 id="package">Package</h2>
+<p><code>pi install npm:@vshulcz/pi-deja</code> installs the recall extension as a pi package (<code>pi-package</code> keyword, <code>pi.extensions</code>); it stands down when <code>deja install pi-auto</code> already wrote <code>~/.pi/agent/extensions/deja.ts</code>.</p>
 <h2 id="mcp">MCP</h2>
 <p>pi does not include built-in MCP but supports it via the <code>pi-mcp-adapter</code> package (<code>pi install npm:pi-mcp-adapter</code>). The adapter reads <code>~/.pi/agent/mcp.json</code> with the standard <code>mcpServers</code> shape. <code>deja install pi</code> writes to that file.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>

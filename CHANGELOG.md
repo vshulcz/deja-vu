@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- pi and omp: `@vshulcz/pi-deja`, the recall extension as a pi package — `pi install npm:@vshulcz/pi-deja` — session-start digest, per-prompt recall and `/deja`; it stands down when `deja install pi-auto` already wrote its extension. (#3092)
+
+### Added
 - OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — with `before_prompt_build` recall and `deja_recall`, `deja_fix`, `deja_blame` as tools; it reads what `deja install openclaw-auto` wrote and adds only what is missing. (#3047)
 
 ## [0.19.3] - 2026-09-04
