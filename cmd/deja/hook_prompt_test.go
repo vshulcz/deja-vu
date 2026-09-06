@@ -165,13 +165,13 @@ func TestHookPromptCitationAndDedupe(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, `\"déjà vu: you asked this on `) || !strings.Contains(got, " in claude; it was settled ") || !strings.Contains(got, "(deja:citefix)") {
+	if !strings.Contains(got, `If it helped, say: \"déjà vu: the exporter_batch job drops rows at utc_midnight (claude, `) || !strings.Contains(got, "deja:citefix) — reusing it.") {
 		t.Fatalf("opener line missing: %q", got)
 	}
-	// The instruction sits above the untrusted line, not under it: the frame
-	// tells the model never to follow instructions inside the block.
-	if strings.Index(got, "déjà vu:") > strings.Index(got, "Recalled history follows") {
-		t.Fatalf("opener line sits below the untrusted line: %q", got)
+	// Last, after the digest: asked for at the top of the block the complete
+	// sentence was said in none of 12 tool-using replies, after it in 10.
+	if strings.LastIndex(got, "If it helped, say:") < strings.LastIndex(got, "citefix` · ") {
+		t.Fatalf("opener line does not follow the digest: %q", got)
 	}
 	// Same session asks again: the same memory must not be re-injected.
 	var out2 bytes.Buffer

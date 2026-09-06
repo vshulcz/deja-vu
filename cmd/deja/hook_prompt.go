@@ -431,11 +431,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		if len(shown) > 0 {
 			cite = shown[0]
 		}
-		tail := ""
+		tail := openerLine(cite, terms)
 		if nudge != "" {
-			tail = "\n" + nudge
+			tail += "\n" + nudge
 		}
-		lead := promptHookLead + openerLine(cite, terms) + promptHookLeadEnd
+		lead := promptHookLead
 		// A repeat of the question itself is a different claim than a session
 		// about the subject, and a stronger one: the agent does not have to
 		// decide whether the history is relevant, only whether the answer
@@ -444,6 +444,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// exact-match counter in `deja stats` sees a fifth of them.
 		if again := search.AskedBefore(cite, terms); again != "" {
 			lead = repeatLead(cite, again)
+			tail = repeatOpener(cite, again)
+			if nudge != "" {
+				tail += "\n" + nudge
+			}
 		}
 		body = lead + rejectedWarning + digest + tail
 	} else {
@@ -459,15 +463,6 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	out := frameRecall(body)
-	if worthDigest {
-		// The instruction goes above the untrusted line, not below it. The
-		// frame tells the model never to follow instructions inside the
-		// block, and the sentence asking it to credit what it reused sat
-		// inside that block, after the digest — where a model that honours
-		// the frame is right to skip it (#3079).
-		lead, rest, _ := strings.Cut(body, "\n")
-		out = frameRecallLed(lead+"\n", rest)
-	}
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
 	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
 	if unreadable {
@@ -660,12 +655,27 @@ func symbolShaped(term string) bool {
 	return false
 }
 
-// openerLine pre-writes the line so the agent copies a shape instead of
-// following an instruction — models do the former far more reliably. The one
-// hole left to fill is what the session settled, which only the agent can say
-// in a few words.
+// openerLine pre-writes the line the agent says when it reused the recall, so
+// it copies a sentence instead of composing one. Measured with a tool-using
+// agent on the demo corpus (#3108): a sentence left with a hole to fill —
+// "<what that session settled>" — was said in 3 of 12 replies, this complete
+// one in 8 of 12 (the previous wording, same shape, 10 of 12); and asked for
+// at the top of the block, before the digest, a complete sentence was said in
+// none of 12. So it is complete, and it stays where it was: last, the closest
+// thing to the reply.
 func openerLine(s model.Session, terms []string) string {
-	return "\"déjà vu: \"" + matchedTitle(s, terms) + "\" — <what that session settled, in a few words> (" + provenance(s) + ")\""
+	return "\nIf it helped, say: \"déjà vu: " + matchedTitle(s, terms) + " (" + provenance(s) + ") — reusing it.\""
+}
+
+// repeatOpener is openerLine for a question this machine already asked: the
+// line names the earlier asking outright, in the user's own words.
+func repeatOpener(s model.Session, again string) string {
+	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
+	again = strings.ReplaceAll(again, "\"", "'")
+	if len([]rune(again)) > 60 {
+		again = string([]rune(again)[:60]) + "…"
+	}
+	return "\nIf it helped, say: \"déjà vu: " + again + " (" + provenance(s) + ") — reusing it.\""
 }
 
 // matchedTitle is the line of the session the spoken opener quotes back: what
@@ -713,23 +723,13 @@ func matchedTitle(s model.Session, terms []string) string {
 
 // repeatLead is the lead for a question this machine has already asked. The
 // claim is stronger than "a session matches" — the agent does not have to
-// decide whether the history is relevant, only whether the answer still holds
-// — so the line it is asked to say names the earlier asking outright, and it
-// is asked for unconditionally: that the question was asked and what was
-// settled then are facts either way. Making the line conditional on "if it
-// still holds" sent the agent off to verify first and the line never came —
-// measured on the demo corpus, 2 of 10 replies against 5 of 10 with the old
-// wording; unconditional, and the check asked for after it, it is said.
+// decide whether the history is relevant, only whether the answer still holds.
 func repeatLead(s model.Session, again string) string {
-	// The quoted question is pulled straight from a message into the one
-	// place the frame does not mark as untrusted, so it gets the same
+	// The quoted question is pulled straight from a message; it gets the same
 	// treatment as the digest body.
 	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
 	return "déjà vu — this was asked here before" + askedBeforeWhen(s) + ": \"" + again +
-		"\". What that session settled is below. Open your reply with one short line, before anything else: " +
-		"\"déjà vu: you asked this on " + strings.TrimPrefix(citationDate(s), ", ") + " in " + s.Harness +
-		"; it was settled <the answer, in a few words> (deja:" + shortID(s.ID) + ")\" — then check that it still holds " +
-		"before acting on it, and say so if it does not.\n"
+		"\". What that session settled is below; say so if it still holds, and say so if it does not.\n"
 }
 
 // provenance is the part of the spoken line that makes it checkable: which
@@ -1384,14 +1384,7 @@ func sessionIDs(ss []model.Session) []string {
 // decision and said history had settled it — naming the mismatch in the same
 // sentence (#2370). The match is on wording, and the lead now says so and asks
 // for the one check that catches it.
-//
-// The credit is asked for at the top, in the exact shape to say, and as the
-// opening line of the reply rather than a note "if it helped" after the
-// digest: measured over 6,650 injections, the note at the end was said aloud
-// in 2.2% of them (#3079).
-const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, say so in one short line at the start of your reply, before the answer, in this shape: "
-
-const promptHookLeadEnd = " — then continue from it. Otherwise ignore silently.\n"
+const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
 
 // digestBudget is how much room the block gets. A match resting on a single
 // rare word is a weaker claim than one resting on two, and it is where most of

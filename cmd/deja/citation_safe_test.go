@@ -36,8 +36,14 @@ func TestRepeatLeadStripsDisplayControls(t *testing.T) {
 	if !strings.Contains(got, "deploy") || !strings.Contains(got, "plan") {
 		t.Fatalf("lead lost its readable words: %q", got)
 	}
-	if !strings.Contains(got, "deja:8f2c19ab77d") || !strings.Contains(got, " in claude;") {
-		t.Fatalf("lead lost its provenance: %q", got)
+	opener := repeatOpener(s, "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline \"quoted\"")
+	for _, r := range strings.TrimPrefix(opener, "\n") {
+		if unicode.IsControl(r) {
+			t.Fatalf("opener carried a control rune %U: %q", r, opener)
+		}
+	}
+	if !strings.Contains(opener, "deja:8f2c19ab77d") || !strings.Contains(opener, "(claude, Jan 2") || !strings.Contains(opener, "'quoted'") {
+		t.Fatalf("opener lost its provenance or kept a quote that closes the line: %q", opener)
 	}
 }
 
@@ -52,7 +58,9 @@ func TestOpenerLineStripsDisplayControls(t *testing.T) {
 		Title:   "deploy \u202eplan\u200b now\x1b[31m red\ttab\nline \"quoted\"",
 	}
 	got := openerLine(s, nil)
-	for _, r := range got {
+	// The line opens with a newline of its own; every other rune must be
+	// plain text.
+	for _, r := range strings.TrimPrefix(got, "\n") {
 		if unicode.IsControl(r) {
 			t.Fatalf("opener carried a control rune %U: %q", r, got)
 		}
