@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -134,13 +133,4 @@ func installVSCodeMCPAt(path, exe string, uninstall bool) (installResult, error)
 	}
 	a, err := writeIfChanged(path, old, next)
 	return installResult{Path: path, Action: a}, err
-}
-
-// vsCodeMCPWired reports whether a VS Code mcp.json names deja, for doctor.
-func vsCodeMCPWired(path string) bool {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(b), `"deja"`)
 }
