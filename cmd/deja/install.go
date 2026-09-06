@@ -715,6 +715,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installClineAuto(exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
+	case "vscode", "copilot-chat":
+		return installVSCodeMCP(exe, uninstall)
 	case "hermes":
 		return installHermesMCP(exe, uninstall)
 	case "hermes-auto":
@@ -3616,6 +3618,9 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"grok", "grok-auto", "copilot", "roo", "aider",
+		// VS Code Copilot Chat takes MCP servers and nothing else an outside CLI
+		// can reach — no hook, no plugin — so there is no -auto pair.
+		"vscode",
 		// Zed's agent takes MCP servers and nothing else: no CLI to hand a
 		// prompt to, so there is no -auto pair to install.
 		"zed",

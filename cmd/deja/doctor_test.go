@@ -198,6 +198,11 @@ func TestDoctorJSONGolden(t *testing.T) {
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Block/goose/config", "<tmp>/home/.config/goose")
 	// Zed is the other one: %APPDATA%\Zed on Windows, ~/.config/zed elsewhere.
 	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Zed", "<tmp>/home/.config/zed")
+	// VS Code's User folder: ~/Library/Application Support/Code on macOS and
+	// %APPDATA%/Code on Windows both normalise to the posix ~/.config/Code the
+	// golden stores.
+	got = strings.ReplaceAll(got, "<tmp>/home/Library/Application Support/Code", "<tmp>/home/.config/Code")
+	got = strings.ReplaceAll(got, "<tmp>/home/AppData/Roaming/Code", "<tmp>/home/.config/Code")
 	wantRaw, err := os.ReadFile(filepath.Join("testdata", "doctor.json"))
 	if err != nil {
 		t.Fatal(err)

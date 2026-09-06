@@ -231,10 +231,10 @@
         "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/chatSessions/3b7e1f1b-0000-4000-8000-000000000000.jsonl"
       ],
       "parser_source": "internal/sources/copilot_chat.go",
-      "last_verified": "2026-09-05",
+      "last_verified": "2026-09-06",
       "display_name": "VS Code Copilot Chat",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
         "skill": false,
         "command": false,
@@ -243,10 +243,6 @@
         "prereq": ""
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "install could write the user mcp.json VS Code Copilot Chat already reads; that target is not built yet"
-        },
         "auto": {
           "state": "impossible",
           "why": "VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install"

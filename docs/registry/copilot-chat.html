@@ -46,12 +46,13 @@
 <p><code>workspace.json</code> next to <code>chatSessions</code> holds <code>{&#34;folder&#34;:&#34;file:///…&#34;}</code> (or <code>workspace</code> for a multi-root <code>.code-workspace</code>); the project name is the last path segment. Empty-window sessions take <code>workingDirectory</code> the same way, or <code>-</code>. <code>inputState</code> is not read (it carries the GitHub account label).</p>
 <p>User turns are <code>message</code> as a string or <code>{text}</code>. Assistant speech is bare <code>{value}</code> markdown chunks (and a plain string in old files); <code>thinking</code> and UI chrome (<code>progressMessage</code>, <code>warning</code>, <code>info</code>, <code>systemNotification</code>) are skipped. Tool paths come from <code>toolInvocationSerialized.resultDetails</code> and <code>inlineReference</code>; terminal commands from <code>toolSpecificData.commandLine</code>.</p>
 <ul>
-<li><strong>MCP / skill / command</strong>: not wired. Index and search only.</li>
-<li><strong>Auto-recall</strong>: none. Copilot Chat has no session-start or per-prompt hook.</li>
+<li><strong>MCP</strong>: <code>deja install vscode</code> writes the user <code>mcp.json</code> VS Code reads in agent mode (top-level <code>servers</code>, <code>type: stdio</code>). Verified on VS Code 1.134.0: Copilot Chat started the server and called the <code>deja</code> tool with <code>mode: recall</code>.</li>
+<li><strong>Skill / command</strong>: not wired. No user-level command file, and Copilot Chat does not load Agent Skills from a shared directory.</li>
+<li><strong>Auto-recall</strong>: none. Copilot Chat has no session-start or per-prompt hook; recall arrives as MCP tools the agent calls.</li>
 <li><strong>Resume</strong>: Chat: Show Chats… in the editor, not a command.</li>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-05</p>
+<p><strong>Last verified:</strong> 2026-09-06</p>
 
 <hr>
 <p>deja reads this format and twenty-two others, and turns what it finds into memory your

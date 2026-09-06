@@ -295,6 +295,11 @@
       "path": "<tmp>/home/.copilot/skills/deja-history/SKILL.md"
     },
     {
+      "name": "vscode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/Code/User/mcp.json"
+    },
+    {
       "name": "hermes",
       "state": "config-missing",
       "path": "<tmp>/home/.hermes/config.yaml"

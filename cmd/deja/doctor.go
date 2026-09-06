@@ -1225,6 +1225,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, nil},
 		{"copilot", guidancePath("copilot"), doctorFileWired, nil},
+		{"vscode", doctorVSCodeMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
 		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired, nil},
 		{"zed", sources.ZedSettingsPath(), doctorZedWired, nil},
@@ -1251,6 +1252,17 @@ func doctorZedWired(path string) bool {
 func doctorFileWired(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// doctorVSCodeMCPPath is the mcp.json in the first VS Code User folder present.
+// VS Code Copilot Chat is wired through MCP alone — no hook, no plugin — and
+// the config key is `servers`, not the common `mcpServers`.
+func doctorVSCodeMCPPath() string {
+	dirs := vsCodeUserDirs()
+	if len(dirs) == 0 {
+		return filepath.Join(vsCodeDefaultUserDir(), "mcp.json")
+	}
+	return filepath.Join(dirs[0], "mcp.json")
 }
 
 func doctorOpencodeConfigPath() string {

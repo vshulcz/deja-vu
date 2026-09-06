@@ -9,9 +9,10 @@
 
 User turns are `message` as a string or `{text}`. Assistant speech is bare `{value}` markdown chunks (and a plain string in old files); `thinking` and UI chrome (`progressMessage`, `warning`, `info`, `systemNotification`) are skipped. Tool paths come from `toolInvocationSerialized.resultDetails` and `inlineReference`; terminal commands from `toolSpecificData.commandLine`.
 
-- **MCP / skill / command**: not wired. Index and search only.
-- **Auto-recall**: none. Copilot Chat has no session-start or per-prompt hook.
+- **MCP**: `deja install vscode` writes the user `mcp.json` VS Code reads in agent mode (top-level `servers`, `type: stdio`). Verified on VS Code 1.134.0: Copilot Chat started the server and called the `deja` tool with `mode: recall`.
+- **Skill / command**: not wired. No user-level command file, and Copilot Chat does not load Agent Skills from a shared directory.
+- **Auto-recall**: none. Copilot Chat has no session-start or per-prompt hook; recall arrives as MCP tools the agent calls.
 - **Resume**: Chat: Show Chats… in the editor, not a command.
 - **Handoff**: paste.
 
-**Last verified:** 2026-09-05
+**Last verified:** 2026-09-06
