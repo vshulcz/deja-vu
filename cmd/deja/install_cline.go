@@ -96,6 +96,52 @@ function userText(message) {
   return text.replace(/<\/?user_input[^>]*>/g, "").trim();
 }
 
+// The tools whose failure a shell error signature describes. cline's is
+// run_commands; the others let the same builder answer a harness that renamed
+// it. A file edit fails in ways this line cannot read, so it is left out.
+const COMMAND_TOOLS = new Set([
+  "run_commands", "execute_command", "run_command", "Bash", "bash", "shell", "terminal",
+]);
+
+// commandFailure finds the newest command tool_result that failed, as build()
+// sees it: {type:"tool_result", name, content:[{query,result,error,success}]}.
+// Returns the message index, the failing entry, and the text to look up — or
+// null when the last command did not fail.
+function commandFailure(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m || !Array.isArray(m.content)) continue;
+    for (const part of m.content) {
+      if (!part || part.type !== "tool_result" || !COMMAND_TOOLS.has(part.name)) continue;
+      const entries = Array.isArray(part.content) ? part.content : [];
+      for (const e of entries) {
+        if (!e || e.success !== false) continue;
+        const output = typeof e.result === "string" ? e.result : typeof e.error === "string" ? e.error : "";
+        if (!output.trim()) continue;
+        return { at: i, entry: e, id: part.tool_use_id || "", name: part.name, command: e.query || "", output };
+      }
+    }
+    // Only the most recent tool result is worth a repair; stop at the first
+    // message that carries one, failed or not.
+    if (m.content.some((p) => p && p.type === "tool_result")) break;
+  }
+  return null;
+}
+
+// appendRepair returns a copy of a tool_result part with the repair added to
+// the failing entry's result text. Editing result rather than adding a part of
+// a new shape keeps what cline serializes onto the wire valid.
+function appendRepair(part, line) {
+  return {
+    ...part,
+    content: (Array.isArray(part.content) ? part.content : []).map((e) =>
+      e && e.success === false && typeof e.result === "string"
+        ? { ...e, result: e.result + "\n\n" + line }
+        : e,
+    ),
+  };
+}
+
 export default {
   name: "deja",
   manifest: { capabilities: ["rules", "commands", "skills"] },
@@ -107,39 +153,80 @@ export default {
     // first call, which would inject into the copy nobody sends.
     let asked = "";
     let recalled = "";
+    // The repair for each failed command, kept by its tool_use id: build() runs
+    // many times for one turn, and hook-tool-after must be asked once, not on
+    // every rebuild of the same array.
+    const repairs = new Map();
     api.registerMessageBuilder({
       id: "deja:prompt",
       source: "deja-vu",
       build: (messages) => {
         if (!Array.isArray(messages)) return;
+        let out = null;
+        const edit = () => out || (out = messages.slice());
+
+        // The question just asked, answered from history. Prepended to the last
+        // user message.
         let at = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i] && messages[i].role === "user") {
+          if (messages[i] && messages[i].role === "user" && userText(messages[i])) {
             at = i;
             break;
           }
         }
-        if (at < 0) return;
-        const prompt = userText(messages[at]);
-        if (!prompt) return;
-        if (prompt !== asked) {
-          asked = prompt;
-          recalled = run(["hook-prompt", "--plain"], JSON.stringify({
-            prompt,
-            session_id: sessionID,
-            cwd: process.cwd(),
-          }));
+        if (at >= 0) {
+          const prompt = userText(messages[at]);
+          if (prompt !== asked) {
+            asked = prompt;
+            recalled = run(["hook-prompt", "--plain"], JSON.stringify({
+              prompt,
+              session_id: sessionID,
+              cwd: process.cwd(),
+            }));
+          }
+          // Silence is the common case: the hook only speaks when the history
+          // actually answers the question.
+          if (recalled) {
+            edit();
+            out[at] = {
+              ...messages[at],
+              content: [{ type: "text", text: recalled }, ...messages[at].content],
+            };
+          }
         }
-        // Silence is the common case: the hook only speaks when the history
-        // actually answers the question.
-        const recall = recalled;
-        if (!recall) return;
-        const out = messages.slice();
-        out[at] = {
-          ...messages[at],
-          content: [{ type: "text", text: recall }, ...messages[at].content],
-        };
-        return out;
+
+        // The command that just failed, and what this machine ran after that
+        // same error before. cline's PreToolUse hook cannot carry this — it
+        // keeps only cancel and overrideInput — but the builder's return is
+        // what gets sent, so the repair rides beside the failing result in the
+        // same turn rather than a turn later. Silence unless the store holds a
+        // pair.
+        const fail = commandFailure(messages);
+        if (fail) {
+          if (!repairs.has(fail.id)) {
+            repairs.set(fail.id, run(["hook-tool-after", "--plain"], JSON.stringify({
+              tool_name: fail.name,
+              tool_response: fail.output,
+              session_id: sessionID,
+              cwd: process.cwd(),
+            })));
+          }
+          const line = repairs.get(fail.id);
+          if (line) {
+            edit();
+            const m = out[fail.at];
+            out[fail.at] = {
+              ...m,
+              content: m.content.map((p) =>
+                p === fail.entry || (p && p.type === "tool_result" && p.tool_use_id === fail.id)
+                  ? appendRepair(p, line)
+                  : p,
+              ),
+            };
+          }
+        }
+
+        return out || undefined;
       },
     });
     api.registerRule({

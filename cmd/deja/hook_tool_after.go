@@ -60,6 +60,13 @@ type toolAfterInput struct {
 }
 
 func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
+	return runHookToolAfterMode(dir, stdin, stdout, false)
+}
+
+// plain=true prints the block itself rather than the PostToolUse envelope, for
+// a host that puts it somewhere of its own. cline's message builder appends it
+// to the failing tool result the model is about to read.
+func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
 	var input toolAfterInput
 	raw := readHookPayload(stdin, hookStdinWait)
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
@@ -123,6 +130,10 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 	rememberInjectedIDs(dir, input.SessionID, token)
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
 	usage.RecordResult(dir, usage.KindTool, len(payload), 1, false)
+	if plain {
+		fmt.Fprint(stdout, payload)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	resp.HookSpecificOutput.HookEventName = "PostToolUse"
 	resp.HookSpecificOutput.AdditionalContext = payload
@@ -140,7 +151,7 @@ func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
 func isCommandTool(name string) bool {
 	switch name {
 	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal",
-		"run_shell_command", "run_terminal_command":
+		"run_shell_command", "run_terminal_command", "run_commands":
 		return true
 	}
 	return false

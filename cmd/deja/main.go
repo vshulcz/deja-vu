@@ -239,11 +239,12 @@ var commands = map[string]command{
 		}
 		return runHookTool(dir, os.Stdin, os.Stdout)
 	},
-	"hook-tool-after": func(dir string, _ []string) error {
+	"hook-tool-after": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-tool-after") {
 			return nil
 		}
-		return runHookToolAfter(dir, os.Stdin, os.Stdout)
+		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
+		return runHookToolAfterMode(dir, os.Stdin, os.Stdout, plain)
 	},
 	"check": func(dir string, rest []string) error {
 		return runCheck(dir, rest, os.Stdin, os.Stdout)
