@@ -40,8 +40,10 @@ var frameMarkerRe = regexp.MustCompile(`(?i)(?:<|&lt;)(?:\s|/|&#x2f;|&#47;)*deja
 // instruction that has to be followed cannot sit inside it. The header text is
 // shorter than recallFrameHeader, so recallFrameOverhead still covers it.
 func frameRecallLed(lead, text string) string {
+	// No history, no block: a lead over nothing would be an instruction to
+	// credit a recall that was never made.
 	if strings.TrimSpace(text) == "" {
-		return text
+		return ""
 	}
 	return "<deja-recall>\n" + neutralizeFrameMarkers(lead) + recallFrameLedHeader + neutralizeFrameMarkers(text) + recallFrameFooter
 }

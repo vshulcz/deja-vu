@@ -40,3 +40,29 @@ func TestRepeatLeadStripsDisplayControls(t *testing.T) {
 		t.Fatalf("lead lost its provenance: %q", got)
 	}
 }
+
+// The opener quotes the matched line straight from a session, above the
+// untrusted line, so it gets the same treatment as the repeat lead — and a
+// quote inside the title must not close the quoted line early.
+func TestOpenerLineStripsDisplayControls(t *testing.T) {
+	s := model.Session{
+		Harness: "claude",
+		ID:      "8f2c19ab77d40e6b5c31",
+		Updated: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
+		Title:   "deploy ‮plan​ now\x1b[31m red\ttab\nline \"quoted\"",
+	}
+	got := openerLine(s, nil)
+	for _, r := range got {
+		if unicode.IsControl(r) {
+			t.Fatalf("opener carried a control rune %U: %q", r, got)
+		}
+	}
+	for _, bad := range []rune{'‮', '​'} {
+		if strings.ContainsRune(got, bad) {
+			t.Fatalf("opener carried %U: %q", bad, got)
+		}
+	}
+	if !strings.Contains(got, "deploy") || !strings.Contains(got, "'quoted'") {
+		t.Fatalf("opener lost its readable words or kept a quote that closes the line: %q", got)
+	}
+}

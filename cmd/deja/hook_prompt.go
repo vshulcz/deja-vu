@@ -427,7 +427,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// the digest shows. The top of the ranking is skipped when it has
 		// nothing quotable, and the opener then credited a session that was
 		// not in the block.
-		cite := shown[0]
+		cite := ss[0]
+		if len(shown) > 0 {
+			cite = shown[0]
+		}
 		tail := ""
 		if nudge != "" {
 			tail = "\n" + nudge
@@ -657,8 +660,10 @@ func symbolShaped(term string) bool {
 	return false
 }
 
-// citationLine pre-writes the narration so the agent copies structure instead
-// of having to follow an instruction — models do the former far more reliably.
+// openerLine pre-writes the line so the agent copies a shape instead of
+// following an instruction — models do the former far more reliably. The one
+// hole left to fill is what the session settled, which only the agent can say
+// in a few words.
 func openerLine(s model.Session, terms []string) string {
 	return "\"déjà vu: \"" + matchedTitle(s, terms) + "\" — <what that session settled, in a few words> (" + provenance(s) + ")\""
 }
@@ -697,6 +702,9 @@ func matchedTitle(s model.Session, terms []string) string {
 	// otherwise ride into the context unaltered. Collapse whitespace too so a
 	// newline cannot split the one-line opener.
 	title = strings.Join(strings.Fields(redact.SafeForDisplay(title)), " ")
+	// The title sits between double quotes in the line; a quote of its own
+	// would close them early.
+	title = strings.ReplaceAll(title, "\"", "'")
 	if len([]rune(title)) > 60 {
 		title = string([]rune(title)[:60]) + "…"
 	}
