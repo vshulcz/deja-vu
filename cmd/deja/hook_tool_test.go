@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -134,6 +135,48 @@ func TestToolHookIgnoresNonEditingTools(t *testing.T) {
 	// Edit on the same file: speaks.
 	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"now","cwd":"/work/alpha"}`); got == "" {
 		t.Error("the hook stayed silent for an Edit on a file with history")
+	}
+}
+
+// pi and omp have no seam that runs before an edit — their one handler whose
+// return the model reads holds a finished tool result — so the file's history
+// goes out on their lowercase `read`, the step before the edit. Claude Code's
+// capitalised "Read" stays silent: its hook fires before the action, so it has
+// the edit itself to speak at.
+func TestToolHookSpeaksForALowercaseRead(t *testing.T) {
+	tmp := hermeticEnv(t)
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 6; i++ {
+		id := "s" + string(rune('0'+i))
+		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+		})
+	}
+	if _, err := captureRun(t, "index"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
+	if got := toolHookRun(t, `{"tool_name":"read","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"pi-1","cwd":"/work/alpha"}`); got == "" {
+		t.Error("the hook stayed silent for a read on a file with history")
+	}
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"claude-1","cwd":"/work/alpha"}`); got != "" {
+		t.Errorf("Claude Code's Read fired: %q", got)
+	}
+	// --plain is how those two read it: they take a string back from a handler
+	// and have no hook stdout to parse.
+	var plain bytes.Buffer
+	in := strings.NewReader(`{"tool_name":"read","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"pi-2","cwd":"/work/alpha"}`)
+	if err := runHookToolMode(os.Getenv("DEJA_INDEX_DIR"), in, &plain, true); err != nil {
+		t.Fatal(err)
+	}
+	got := plain.String()
+	if !strings.Contains(got, "config.go has been worked on in") {
+		t.Fatalf("--plain did not deliver the file's history:\n%s", got)
+	}
+	if strings.Contains(got, "hookSpecificOutput") || strings.Contains(got, "PreToolUse") {
+		t.Fatalf("--plain kept the hook envelope:\n%s", got)
 	}
 }
 

@@ -69,6 +69,21 @@ func TestOmpRepairsCommandsThatExitedNonZero(t *testing.T) {
 	}
 }
 
+// Same seam as pi: nothing runs before an edit whose return the model reads, so
+// the file's history goes out on the read that precedes it.
+func TestOmpCarriesFileHistoryOnRead(t *testing.T) {
+	js := ompExtensionJS("/bin/deja")
+	for _, want := range []string{
+		`event.toolName === "read"`,
+		`"hook-tool", "--plain"`,
+		"event.input.path",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("no file history at the read, missing %q:\n%s", want, js)
+		}
+	}
+}
+
 // Compaction drops the blocks this session was shown; the list that keeps them
 // from repeating outlives it. omp emits session_compact — the name in its own
 // extension types — and a handler on anything else never runs.

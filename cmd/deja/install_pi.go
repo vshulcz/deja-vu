@@ -175,7 +175,30 @@ export default function (pi: any) {
   const repaired: Record<string, string> = {};
   pi.on("tool_result", async (event: any) => {
     try {
-      if (!event || !event.isError) return;
+      if (!event) return;
+      // A file the agent just opened is the step before it changes that file,
+      // and pi has no handler that runs earlier whose return the model reads.
+      // So the file's own history goes out here: what was decided about it,
+      // from the sessions that decided it. deja answers once per session per
+      // fact, so re-reading the same file stays quiet.
+      if (event.toolName === "read") {
+        const path = String((event.input && (event.input.path || event.input.file_path)) || "");
+        if (!path) return;
+        const parts = Array.isArray(event.content) ? event.content : [];
+        const id = "read:" + String(event.toolCallId || "");
+        if (!(id in repaired)) {
+          repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
+            tool_name: "read",
+            tool_input: { file_path: path },
+            session_id: sessionID(),
+            cwd: process.cwd(),
+          }));
+        }
+        const note = repaired[id];
+        if (!note) return;
+        return { content: parts.concat([{ type: "text", text: note }]) };
+      }
+      if (!event.isError) return;
       if (event.toolName !== "bash") return;
       const parts = Array.isArray(event.content) ? event.content : [];
       const output = parts
