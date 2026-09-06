@@ -44,6 +44,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html)
 - [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html)
 - [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html)
+- [VS Code Copilot Chat](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html)
 - [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html)
 - [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)

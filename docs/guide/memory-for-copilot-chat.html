@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Adding memory to VS Code Copilot Chat — deja-vu</title>
+<meta name="description" content="How to give VS Code Copilot Chat recall over every coding agent's sessions on the machine, the mcp.json shape VS Code actually reads, and the hook it does not have.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to VS Code Copilot Chat">
+<meta property="og:description" content="How to give VS Code Copilot Chat recall over every coding agent's sessions on the machine, the mcp.json shape VS Code actually reads, and the hook it does not have.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to VS Code Copilot Chat">
+<meta name="twitter:description" content="How to give VS Code Copilot Chat recall over every coding agent's sessions on the machine, the mcp.json shape VS Code actually reads, and the hook it does not have.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Adding memory to VS Code Copilot Chat","description":"How to give VS Code Copilot Chat recall over every coding agent's sessions on the machine, the mcp.json shape VS Code actually reads, and the hook it does not have.","url":"https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for VS Code Copilot Chat","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can VS Code Copilot Chat search my past sessions?","acceptedAnswer":{"@type":"Answer","text":"In agent mode it can. deja adds an MCP server that searches every agent's transcripts on the machine, including Copilot Chat's own."}},{"@type":"Question","name":"Where does VS Code Copilot Chat store its history?","acceptedAnswer":{"@type":"Answer","text":"In the VS Code User folder, one file per session under workspaceStorage/<hash>/chatSessions — a JSONL mutation log on current builds, a flat .json on older ones."}},{"@type":"Question","name":"Does recall arrive automatically in Copilot Chat?","acceptedAnswer":{"@type":"Answer","text":"No. Copilot Chat has no session-start or per-prompt hook an outside tool can use, so memory arrives when the agent calls the deja tool or when you ask for it."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">17</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html" aria-current="page">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to VS Code Copilot Chat</h1>
+<p class="pagelede">one config file, the shape VS Code actually reads, and one honest gap<span class="mins" data-mins></span></p>
+
+<p>Copilot Chat opens every conversation from nothing. The chat you had in this repo last week is on disk, in the editor's own store, and nothing consults it while you work — nor the sessions from the terminal agents beside it.</p>
+
+<h2>What VS Code already has</h2>
+<p>Sessions live in the VS Code User folder, one file per conversation under <code>workspaceStorage/&lt;hash&gt;/chatSessions</code>, with chats from windows that had no folder open under <code>globalStorage/emptyWindowChatSessions</code>. Current builds write a JSONL mutation log — a first line holding the session, then one line per change — and older ones a flat <code>.json</code>. deja reads both, and takes the log when a session has both files, the way VS Code does.</p>
+
+<h2>Adding recall</h2>
+<p>Copilot Chat takes memory as an MCP server in agent mode:</p>
+<pre>deja install vscode</pre>
+<p>writes <code>mcp.json</code> in the User folder — one per host you have, Code, Insiders or VSCodium. VS Code's config is its own shape: a top-level <code>servers</code> map rather than the <code>mcpServers</code> most agents use, and every entry carries a <code>type</code>. A file in the other shape loads nothing and the chat quietly gets no tools.</p>
+<p>Your own servers and any comments in the file are left alone, and uninstall takes only deja's entry.</p>
+
+<h2>What arrives, and what does not</h2>
+<p>The six tools, in agent mode. Measured on VS Code 1.134.0: Copilot Chat starts the server, lists its tools, and calls <code>recall</code> when the conversation implies earlier work, because the tool description tells it to.</p>
+<p>What Copilot Chat cannot give you today is memory that arrives unasked. It has no session-start and no per-prompt hook an outside tool can use, and it loads no shared skill directory — so there is nowhere to put a block that is simply there before the model reads the question. Most harnesses in the matrix get that; this one does not, and it is a limitation of what the extension exposes rather than something we chose to skip.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). Copilot Chat's own store carries a GitHub account label in the part deja does not read.</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="../registry/copilot-chat.html">How the Copilot Chat store is read</a> · <a href="memory-for-copilot.html">Copilot CLI is a different harness</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
