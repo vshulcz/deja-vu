@@ -55,6 +55,7 @@ func autoWirings() []autoWiring {
 		{"omp", func() string {
 			return filepath.Join(sources.OmpConfigDir(), "extensions", "deja", "index.js")
 		}, "hook-prompt", ""},
+		{"amp", func() string { return ampPluginPath() }, "hook-context", ""},
 		{"deepseek", func() string { return dshAutoPath() }, "hook-prompt", ""},
 		{"goose", func() string { return gooseHookPath() }, "hook-goose", ""},
 		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},

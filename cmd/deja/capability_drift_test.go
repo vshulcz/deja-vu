@@ -129,6 +129,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
 		case "pi":
 			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
+		case "amp":
+			// Amp's command palette entry is registered by the plugin, the way
+			// pi's is.
+			gotCommand = strings.Contains(ampPluginTS("/bin/deja"), "registerCommand")
 		case "deepseek":
 			// dsh registers commands in code, so deja ships a plugin file the
 			// profile row names by path.

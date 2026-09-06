@@ -285,6 +285,11 @@
       "path": "<tmp>/home/.omp/agent/mcp.json"
     },
     {
+      "name": "amp",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/amp/settings.json"
+    },
+    {
       "name": "openclaw",
       "state": "config-missing",
       "path": "<tmp>/home/.openclaw/openclaw.json"

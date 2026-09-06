@@ -185,6 +185,9 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return piProjectDirFor(s), "pi --session " + s.ID, nil
 	case "omp":
 		return "", "omp --resume " + s.ID, nil
+	case "amp":
+		// Amp takes the thread id as a positional argument; there is no flag.
+		return "", "amp threads continue " + s.ID, nil
 	case "copilot":
 		return "", "copilot --resume=" + s.ID, nil
 	case "copilot-chat":

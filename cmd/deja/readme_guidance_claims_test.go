@@ -29,6 +29,7 @@ var readmeGuidanceNames = map[string]string{
 	"hermes":      "Hermes",
 	"roo":         "Roo Code",
 	"omp":         "omp",
+	"amp":         "Amp",
 	"deepseek":    "DeepSeek Harness",
 	"zed":         "Zed",
 	"vscode":      "VS Code Copilot Chat",

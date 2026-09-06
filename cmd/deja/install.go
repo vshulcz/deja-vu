@@ -729,6 +729,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall)
 	case "omp-auto":
 		return installOmpAuto(exe, uninstall)
+	case "amp":
+		return installAmpMCP(exe, uninstall)
+	case "amp-auto":
+		return installAmpAuto(exe, uninstall)
 	case "deepseek":
 		return installDeepSeekMCP(exe, uninstall)
 	case "deepseek-auto":
@@ -3613,6 +3617,7 @@ func installTargetNames() []string {
 		"hermes", "hermes-auto",
 		"pi", "pi-auto",
 		"omp", "omp-auto",
+		"amp", "amp-auto",
 		"deepseek", "deepseek-auto",
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
