@@ -419,11 +419,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// way of its own to tell "mm_status" from "decide", and the session
 		// that answers often says both — measured live, ten of the answers
 		// this hook newly returns open on the ordinary word.
-		digest := search.AutoRecallDigestForAsked(ss, digestBudget(confident), byIdentifying(terms, idfOf), string(input.Prompt))
+		digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), string(input.Prompt))
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
-		tail := citationLine(ss[0], terms)
+		// The line the agent is asked to say names a session; it has to be one
+		// the digest shows. The top of the ranking is skipped when it has
+		// nothing quotable, and the opener then credited a session that was
+		// not in the block.
+		cite := ss[0]
+		if len(shown) > 0 {
+			cite = shown[0]
+		}
+		tail := openerLine(cite, terms)
 		if nudge != "" {
 			tail += "\n" + nudge
 		}
@@ -434,10 +442,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// still holds. Measured over this machine's own sessions, 6.5% of
 		// substantial questions are asked again in a later session, and the
 		// exact-match counter in `deja stats` sees a fifth of them.
-		if again := search.AskedBefore(ss[0], terms); again != "" {
-			lead = "This was asked here before" + askedBeforeWhen(ss[0]) +
-				" — \"" + again + "\". What that session settled is below; " +
-				"say so if it still holds, and say so if it does not.\n"
+		if again := search.AskedBefore(cite, terms); again != "" {
+			lead = repeatLead(cite, again)
+			tail = repeatOpener(cite, again)
+			if nudge != "" {
+				tail += "\n" + nudge
+			}
 		}
 		body = lead + rejectedWarning + digest + tail
 	} else {
@@ -645,12 +655,34 @@ func symbolShaped(term string) bool {
 	return false
 }
 
-// citationLine pre-writes the narration so the agent copies structure instead
-// of having to follow an instruction — models do the former far more reliably.
-func citationLine(s model.Session, terms []string) string {
-	// What the digest quoted, so the sentence the agent says names the thing
-	// the user can see. Falls through to the session's opening when nothing
-	// matched literally.
+// openerLine pre-writes the line the agent says when it reused the recall, so
+// it copies a sentence instead of composing one. Measured with a tool-using
+// agent on the demo corpus (#3108): a sentence left with a hole to fill —
+// "<what that session settled>" — was said in 3 of 12 replies, this complete
+// one in 8 of 12 (the previous wording, same shape, 10 of 12); and asked for
+// at the top of the block, before the digest, a complete sentence was said in
+// none of 12. So it is complete, and it stays where it was: last, the closest
+// thing to the reply.
+func openerLine(s model.Session, terms []string) string {
+	return "\nIf it helped, say: \"déjà vu: " + matchedTitle(s, terms) + " (" + provenance(s) + ") — reusing it.\""
+}
+
+// repeatOpener is openerLine for a question this machine already asked: the
+// line names the earlier asking outright, in the user's own words.
+func repeatOpener(s model.Session, again string) string {
+	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
+	again = strings.ReplaceAll(again, "\"", "'")
+	if len([]rune(again)) > 60 {
+		again = string([]rune(again)[:60]) + "…"
+	}
+	return "\nIf it helped, say: \"déjà vu: " + again + " (" + provenance(s) + ") — reusing it.\""
+}
+
+// matchedTitle is the line of the session the spoken opener quotes back: what
+// the digest matched, so the sentence the agent says names the thing the user
+// can see. Falls through to the session's opening when nothing matched
+// literally.
+func matchedTitle(s model.Session, terms []string) string {
 	title := search.MatchedUserLine(s, terms)
 	for _, m := range s.Messages {
 		if title != "" {
@@ -674,35 +706,55 @@ func citationLine(s model.Session, terms []string) string {
 		title = s.Title
 	}
 	// The digest body is display-safe (contextText strips it), but this title
-	// is pulled straight from a message or the stored title and appended to the
-	// same agent-facing block. An escape sequence or an invisible tag-block
-	// character in a hostile session's title would otherwise ride into the
-	// context unaltered — the injection the frame warns about, one layer down.
-	// Collapse whitespace too so a newline cannot split the one-line citation.
+	// is pulled straight from a message or the stored title into the one part
+	// of the block the frame does not mark as untrusted. An escape sequence or
+	// an invisible tag-block character in a hostile session's title would
+	// otherwise ride into the context unaltered. Collapse whitespace too so a
+	// newline cannot split the one-line opener.
 	title = strings.Join(strings.Fields(redact.SafeForDisplay(title)), " ")
+	// The title sits between double quotes in the line; a quote of its own
+	// would close them early.
+	title = strings.ReplaceAll(title, "\"", "'")
 	if len([]rune(title)) > 60 {
 		title = string([]rune(title)[:60]) + "…"
 	}
-	date := ""
-	if !s.Updated.IsZero() {
-		// With the year, when it is not this one. Every other date deja prints
-		// carries it; the sentence the agent is told to say aloud did not, so
-		// a decision from July 2025 was narrated to the user as "Jul 3" —
-		// reading as five weeks ago on the one recall where the age is the
-		// thing worth knowing (#R13).
-		layout := "Jan 2"
-		if s.Updated.Local().Year() != time.Now().Year() {
-			layout = "Jan 2 2006"
-		}
-		date = ", " + s.Updated.Local().Format(layout)
+	return title
+}
+
+// repeatLead is the lead for a question this machine has already asked. The
+// claim is stronger than "a session matches" — the agent does not have to
+// decide whether the history is relevant, only whether the answer still holds.
+func repeatLead(s model.Session, again string) string {
+	// The quoted question is pulled straight from a message; it gets the same
+	// treatment as the digest body.
+	again = strings.Join(strings.Fields(redact.SafeForDisplay(again)), " ")
+	return "déjà vu — this was asked here before" + askedBeforeWhen(s) + ": \"" + again +
+		"\". What that session settled is below; say so if it still holds, and say so if it does not.\n"
+}
+
+// provenance is the part of the spoken line that makes it checkable: which
+// agent, when, and the session id that links the credit back to the session
+// that earned it. The agent's reply is indexed like any other message, so
+// `deja:<id>` in it is the only place a recall that actually helped becomes an
+// observable fact; matching on title text was lexical and unreliable.
+func provenance(s model.Session) string {
+	return s.Harness + citationDate(s) + ", deja:" + shortID(s.ID)
+}
+
+func citationDate(s model.Session) string {
+	if s.Updated.IsZero() {
+		return ""
 	}
-	// The citation carries the session id because it is the only place a recall
-	// that actually helped becomes an observable fact: the agent's reply is
-	// indexed like any other message, so `deja:<id>` in it links the credit back
-	// to the session that earned it. Matching on title text instead was lexical
-	// and unreliable — two sessions opening with the same question are common.
-	return fmt.Sprintf("\nIf it helped, say: \"deja-vu recalled: %s (%s%s, deja:%s) — reusing it.\"",
-		title, s.Harness, date, shortID(s.ID))
+	// With the year, when it is not this one. Every other date deja prints
+	// carries it; the sentence the agent is told to say aloud did not, so
+	// a decision from July 2025 was narrated to the user as "Jul 3" —
+	// reading as five weeks ago on the one recall where the age is the
+	// thing worth knowing (#R13).
+	layout := "Jan 2"
+	if s.Updated.Local().Year() != time.Now().Year() {
+		layout = "Jan 2 2006"
+	}
+	return ", " + s.Updated.Local().Format(layout)
 }
 
 // hookseenKey makes an agent session id safe to be one field of a `.hookseen`
@@ -1332,7 +1384,7 @@ func sessionIDs(ss []model.Session) []string {
 // decision and said history had settled it — naming the mismatch in the same
 // sentence (#2370). The match is on wording, and the lead now says so and asks
 // for the one check that catches it.
-const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line what deja-vu recalled; otherwise ignore silently.\n"
+const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
 
 // digestBudget is how much room the block gets. A match resting on a single
 // rare word is a weaker claim than one resting on two, and it is where most of

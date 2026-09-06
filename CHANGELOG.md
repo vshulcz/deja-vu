@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The line an agent says when it reused a recall is now `déjà vu: <what you asked then> (<agent>, <date>, deja:<id>) — reusing it.`, on every surface that asks for one; a question this machine already asked is quoted back in its own words. The line names the session the digest shows, not the top of the ranking. `deja stats` counts the new shape alongside "deja-vu recalled". (#3108)
+
 ### Added
 - pi and omp: `@vshulcz/pi-deja`, the recall extension as a pi package — `pi install npm:@vshulcz/pi-deja` — session-start digest, per-prompt recall and `/deja`; it stands down when `deja install pi-auto` already wrote its extension. (#3092)
 

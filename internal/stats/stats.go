@@ -493,10 +493,23 @@ func questionStemFor(text string) string {
 	return strings.Join(strings.Fields(b.String()), " ")
 }
 
+// CreditedAloud reports whether an assistant turn named deja's memory as the
+// source of what it says. The current shape is a "déjà vu" line carrying a
+// deja:<id> — the id is required because "déjà vu" alone is an ordinary
+// phrase, and a session discussing the tool says it without crediting
+// anything. "deja-vu recalled" is the shape agents were asked for before, and
+// the transcripts that say it are still on disk.
+func CreditedAloud(text string) bool {
+	if strings.Contains(text, "deja-vu recalled") {
+		return true
+	}
+	return strings.Contains(text, "deja:") && strings.Contains(strings.ToLower(text), "déjà vu")
+}
+
 // AgentCredits counts, over the whole corpus and over the last week, the
 // assistant turns that named deja out loud.
 //
-// The attribution loop: agents saying "deja-vu recalled" end up in the very
+// The attribution loop: agents saying "déjà vu: … (deja:<id>)" end up in the very
 // transcripts deja indexes, so the next pass can count how often memory was
 // credited out loud — a measured magic metric with zero telemetry. It is the
 // only signal that separates memory that was used from memory that was merely
@@ -506,7 +519,7 @@ func AgentCredits(ss []model.Session, now time.Time) (total, week int) {
 	weekCut := usage.WeekCut(now)
 	for _, s := range ss {
 		for _, msg := range s.Messages {
-			if msg.Role != "assistant" || !strings.Contains(msg.Text, "deja-vu recalled") {
+			if msg.Role != "assistant" || !CreditedAloud(msg.Text) {
 				continue
 			}
 			total++

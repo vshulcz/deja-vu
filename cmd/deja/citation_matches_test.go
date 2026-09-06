@@ -13,7 +13,7 @@ import (
 // session about token rotation while the citation under it named "migration
 // locked the table" — the first user line of the matched window, which after
 // focusing a long session is whatever chatter began it.
-func TestCitationNamesWhatWasMatched(t *testing.T) {
+func TestOpenerNamesWhatWasMatched(t *testing.T) {
 	s := model.Session{
 		Harness: "claude", ID: "work-02", Project: "goprojects/deja-vu",
 		Updated: time.Now(),
@@ -25,7 +25,7 @@ func TestCitationNamesWhatWasMatched(t *testing.T) {
 		},
 	}
 
-	got := citationLine(s, []string{"deploy", "token", "rotate"})
+	got := openerLine(s, []string{"deploy", "token", "rotate"})
 	if !strings.Contains(got, "deploy token") {
 		t.Fatalf("citation names something the digest never showed:\n%s", got)
 	}
@@ -35,7 +35,7 @@ func TestCitationNamesWhatWasMatched(t *testing.T) {
 
 	// Without terms — the session-start path — the opening line is still the
 	// best summary there is.
-	plain := citationLine(s, nil)
+	plain := openerLine(s, nil)
 	if !strings.Contains(plain, "migration locked") {
 		t.Fatalf("the no-terms fallback changed:\n%s", plain)
 	}

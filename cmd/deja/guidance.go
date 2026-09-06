@@ -22,7 +22,7 @@ const guidanceBody = `Before re-deriving past work, search deja when the user re
 
 Example: for "what did we decide about token refresh?", call recall with query "token refresh decision", then call recall_context if the result needs more detail.
 
-When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
+When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — say so to the user in one short line at the start of your reply: "déjà vu: <what> — <how it was reused> (deja:<session id>)". Never credit recalls that did not help.`
 
 // skillBody is the same guidance for harnesses that read a skill file. A skill
 // is loaded when its description looks relevant, so the manual costs nothing in
@@ -48,7 +48,7 @@ A result may carry a bracketed marker with a date — that is the user's own lat
 
 ## Saying what you used
 
-When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — tell the user in one short line what was recalled and how you used it: "deja-vu recalled: we hit this JWT skew in March — reusing that fix". Say nothing about recalls that did not help. This is provenance, not advertising; a note on every call would be noise.
+When recalled history genuinely helps — a reused fix, a skipped re-debug, even a partial hint that changed your approach — tell the user in one short line at the start of your reply, naming the session: "déjà vu: we hit this JWT skew in March — reusing that fix (deja:a1b2c3d4-e5f)". Say nothing about recalls that did not help. This is provenance, not advertising; a note on every call would be noise.
 
 ## Limits worth respecting
 
@@ -174,7 +174,7 @@ If MCP is not available, use the deja CLI via bash instead:
 
 Example: for "what did we decide about token refresh?", try recall first; if unavailable, run bash("deja 'token refresh decision'").
 
-When recalled history genuinely helps, say so to the user in one short line: "deja-vu recalled: <what> — <how it was reused>". Never credit recalls that did not help.`
+When recalled history genuinely helps, say so to the user in one short line at the start of your reply: "déjà vu: <what> — <how it was reused> (deja:<session id>)". Never credit recalls that did not help.`
 		}
 
 		if harness == "vscode" {
