@@ -6,7 +6,7 @@
 | **Default store path** | `~/.pi/agent/sessions/<encoded-project>/<timestamp>_<uuid>.jsonl` |
 | **Env override** | `DEJA_PI_ROOT` |
 | **deja parser** | `internal/sources/pi.go` |
-| **Last verified** | 2026-07-19 |
+| **Last verified** | 2026-09-06 |
 
 ## Discovery
 
@@ -81,4 +81,4 @@ pi does not include built-in MCP but supports it via the `pi-mcp-adapter` packag
 - Version field observed: `3`. No version migration behavior is known.
 - The `parentId` chain forms a tree, not a flat list; deja ignores the tree structure and processes messages in file order.
 
-**Last verified:** 2026-07-19
+**Last verified:** 2026-09-06

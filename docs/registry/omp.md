@@ -6,7 +6,7 @@
 | **Default store path** | `~/.omp/agent/sessions/<encoded-project>/<ISO-timestamp>_<uuid>.jsonl` |
 | **Env override** | `DEJA_OMP_ROOT` |
 | **deja parser** | `internal/sources/omp.go` |
-| **Last verified** | 2026-08-21 |
+| **Last verified** | 2026-09-06 |
 
 ## Discovery
 
@@ -143,4 +143,4 @@ were watched with a probe extension against omp 17.4.1.
 - The `parentId` chain forms a tree, not a flat list; deja ignores the tree
   structure and processes messages in file order.
 
-**Last verified:** 2026-08-21
+**Last verified:** 2026-09-06

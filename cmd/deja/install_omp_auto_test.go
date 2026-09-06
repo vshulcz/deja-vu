@@ -26,9 +26,10 @@ func TestInstallOmpAutoWritesAnExtensionModule(t *testing.T) {
 	}
 	js := string(body)
 
-	// The context event is the only seam that reaches the model before it
-	// answers: `input` never fires in print mode and `before_agent_start`
-	// carries the prompt but not the context to change.
+	// The context event is where a per-prompt block goes in: it hands over the
+	// message list on the way to the provider, and `input` never fires in print
+	// mode. The once-per-session digest goes in through before_agent_start,
+	// which stores what it returns as a message of its own.
 	if !strings.Contains(js, `pi.on("context"`) {
 		t.Errorf("the extension listens on no event that can inject:\n%s", js)
 	}
@@ -47,6 +48,53 @@ func TestInstallOmpAutoWritesAnExtensionModule(t *testing.T) {
 	// answer is cached against the prompt itself rather than merely stored.
 	if !strings.Contains(js, "prompt !== asked") {
 		t.Errorf("no guard on the cached prompt, so deja runs again for every provider request:\n%s", js)
+	}
+}
+
+// omp's bash tool leaves isError false on a command that exits non-zero and
+// reports the exit code in details.exitCode instead. Measured on omp 18.1.12: a
+// failing build arrived as tool_result isError=false, details.exitCode=1, so a
+// repair gated on isError alone never speaks.
+func TestOmpRepairsCommandsThatExitedNonZero(t *testing.T) {
+	js := ompExtensionJS("/bin/deja")
+	for _, want := range []string{
+		`pi.on("tool_result"`,
+		`"hook-tool-after", "--plain"`,
+		`typeof event.details.exitCode === "number"`,
+		"event.toolCallId",
+	} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("no fix pair at the point of action, missing %q:\n%s", want, js)
+		}
+	}
+}
+
+// Compaction drops the blocks this session was shown; the list that keeps them
+// from repeating outlives it. omp emits session_compact — the name in its own
+// extension types — and a handler on anything else never runs.
+func TestOmpForgetsAfterCompaction(t *testing.T) {
+	js := ompExtensionJS("/bin/deja")
+	if !strings.Contains(js, `pi.on("session_compact"`) {
+		t.Fatalf("nothing forgets after compaction:\n%s", js)
+	}
+	if !strings.Contains(js, "hook-precompact") {
+		t.Fatalf("session_compact is wired to something other than the forget hook:\n%s", js)
+	}
+}
+
+// Without the session digest, omp starts every session empty and only speaks
+// when a prompt happens to match. The digest is what makes the first answer
+// carry the project's recent history.
+func TestOmpInjectsTheSessionDigestOnce(t *testing.T) {
+	js := ompExtensionJS("/bin/deja")
+	if !strings.Contains(js, `pi.on("before_agent_start"`) || !strings.Contains(js, "hook-context") {
+		t.Fatalf("no session digest:\n%s", js)
+	}
+	if !strings.Contains(js, "if (injected) return;") {
+		t.Fatalf("the digest is not held to one per session:\n%s", js)
+	}
+	if !strings.Contains(js, "customType: \"deja-recall\"") {
+		t.Fatalf("the digest is not returned as a message, so omp drops it:\n%s", js)
 	}
 }
 
