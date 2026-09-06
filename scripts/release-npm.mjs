@@ -10,7 +10,7 @@
 // a plugin by hand — which is how opencode-deja sat unpublished while its
 // install instructions were already in the README.
 // Requires NODE_AUTH_TOKEN (set by actions/setup-node from the NPM_TOKEN secret).
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -27,7 +27,7 @@ const platforms = [
 ];
 
 const work = fs.mkdtempSync("/tmp/deja-npm-");
-const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: "inherit" });
+const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 
 for (const [goos, goarch] of platforms) {
   const ext = goos === "windows" ? "zip" : "tar.gz";
@@ -40,9 +40,9 @@ for (const [goos, goarch] of platforms) {
   const dir = path.join(work, pkg);
   fs.mkdirSync(path.join(dir, "bin"), { recursive: true });
   if (ext === "zip") {
-    run(`unzip -o -q ${JSON.stringify(archive)} deja.exe -d ${JSON.stringify(path.join(dir, "bin"))}`);
+    run("unzip", ["-o", "-q", archive, "deja.exe", "-d", path.join(dir, "bin")]);
   } else {
-    run(`tar -xzf ${JSON.stringify(archive)} -C ${JSON.stringify(path.join(dir, "bin"))} deja`);
+    run("tar", ["-xzf", archive, "-C", path.join(dir, "bin"), "deja"]);
   }
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({
     name: `@vshulcz/${pkg}`,
@@ -54,7 +54,7 @@ for (const [goos, goarch] of platforms) {
     cpu: [goarch === "amd64" ? "x64" : "arm64"],
     files: ["bin"],
   }, null, 2));
-  run("npm publish --access public", dir);
+  run("npm", ["publish", "--access", "public"], dir);
 }
 
 // main wrapper package from npm/ in the repo
@@ -67,7 +67,7 @@ main.optionalDependencies = Object.fromEntries(
   platforms.map(([o, a]) => [`@vshulcz/deja-vu-${o}-${a}`, version]),
 );
 fs.writeFileSync(mainPkgPath, JSON.stringify(main, null, 2));
-run("npm publish --access public", mainDir);
+run("npm", ["publish", "--access", "public"], mainDir);
 
 // The harness packages ride the same version. Two of them were versioned
 // independently before this, so a release whose version is behind what npm
@@ -92,7 +92,7 @@ for (const name of extensions) {
     outPkg.dependencies["@vshulcz/deja-vu"] = `^${version}`;
   }
   fs.writeFileSync(outPkgPath, JSON.stringify(outPkg, null, 2) + "\n");
-  run("npm publish --access public", out);
+  run("npm", ["publish", "--access", "public"], out);
   published.push(outPkg.name);
 }
 
@@ -105,7 +105,7 @@ console.log(
 // never been published.
 function npmLatest(name) {
   try {
-    return execSync(`npm view ${name} version`, { encoding: "utf8" }).trim();
+    return execFileSync("npm", ["view", name, "version"], { encoding: "utf8" }).trim();
   } catch {
     return "";
   }

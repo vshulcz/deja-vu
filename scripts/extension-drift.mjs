@@ -14,7 +14,7 @@
 // exists to catch.
 //
 // Nothing here publishes.
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 
 export const PACKAGES = ["extensions/opencode", "extensions/dsh", "extensions/openclaw", "extensions/pi"];
@@ -24,7 +24,7 @@ export const PACKAGES = ["extensions/opencode", "extensions/dsh", "extensions/op
 // network failure must not fail a pull request.
 export function npmLatest(name) {
   try {
-    return execSync(`npm view ${name} version`, {
+    return execFileSync("npm", ["view", name, "version"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -38,7 +38,7 @@ export function npmLatest(name) {
 // again, not drift.
 export function releaseLine() {
   try {
-    const tag = execSync("git tag --list 'v*' --sort=-v:refname", {
+    const tag = execFileSync("git", ["tag", "--list", "v*", "--sort=-v:refname"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).split("\n")[0].trim();
