@@ -181,7 +181,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Your agent is about to re-debug something you fixed in March.",
+		"Your agent is about to re-debug something you fixed in March — in a different agent.",
 		"deja starts full",
 	} {
 		if !strings.Contains(string(main), line) {

@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>给编程智能体的记忆，从你已经有的历史开始。</b></p>
+<p align="center"><b>所有编程智能体共用的一份记忆，来自你磁盘上已有的历史。</b></p>
 
-<p align="center">你的智能体正准备重新调试一个你三月份就修好的问题。deja 索引 Claude Code、Codex、Cursor
-以及这台机器上其他所有智能体本来就写在磁盘上的会话，并在需要时把对的那一条交回来。</p>
+<p align="center">你的智能体正准备重新调试一个你三月份就修好的问题——当时是在另一个智能体里修的。deja 索引 Claude Code、Codex、Cursor
+以及这台机器上其他所有智能体本来就写在磁盘上的会话，无论哪个智能体来问，都把对的那一条交回来。</p>
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
 
