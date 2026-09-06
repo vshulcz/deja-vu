@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Memory for coding agents, starting with the history you already have.</b></p>
+<p align="center"><b>The one memory your coding agents share, built from the history already on your disk.</b></p>
 
-<p align="center">Your agent is about to re-debug something you fixed in March. deja indexes the
-sessions Claude Code, Codex, Cursor and every other agent on this machine already wrote to
-disk, and hands the right one back when it is needed.</p>
+<p align="center">Your agent is about to re-debug something you fixed in March — in a different agent.
+deja indexes the sessions Claude Code, Codex, Cursor and every other agent on this machine
+already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 

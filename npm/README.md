@@ -5,11 +5,12 @@
   </picture>
 </p>
 
-<p align="center"><strong>Your agent is about to re-debug something you fixed in March.</strong></p>
+<p align="center"><strong>Your agent is about to re-debug something you fixed in March — in a different agent.</strong></p>
 
 Every memory tool starts empty and records forward. **deja starts full.** It
-indexes the sessions your coding agents already wrote to disk — months of
-history from before you installed it — and serves them back over MCP.
+indexes the sessions all 23 of your coding agents already wrote to disk — months
+of history from before you installed it — and serves them back over MCP, in
+whichever agent asks.
 
 Twenty-three coding agents write every conversation to local files: Claude Code,
 Codex, Cursor, opencode, Gemini CLI, Cline, Copilot CLI, VS Code Copilot Chat, Roo Code, aider,
