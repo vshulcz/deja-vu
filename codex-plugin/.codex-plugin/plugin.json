@@ -17,9 +17,7 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "hooks": [
-    "./hooks/hooks.json"
-  ],
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "deja-vu",
     "shortDescription": "Search and recall your own past AI coding sessions.",
@@ -32,8 +30,9 @@
       "What did we decide about this last time?",
       "Have I hit this error before?"
     ],
-    "privacyPolicyUrl": "https://vshulcz.github.io/deja-vu/guide/privacy.html",
-    "termsOfServiceUrl": "https://github.com/vshulcz/deja-vu/blob/main/LICENSE",
+    "privacyPolicyURL": "https://vshulcz.github.io/deja-vu/guide/privacy.html",
+    "termsOfServiceURL": "https://github.com/vshulcz/deja-vu/blob/main/LICENSE",
+    "composerIcon": "./assets/icon.svg",
     "logo": "./assets/logo.svg",
     "logoDark": "./assets/logo-dark.svg",
     "brandColor": "#1f6feb"
