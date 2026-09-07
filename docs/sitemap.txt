@@ -22,6 +22,7 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html

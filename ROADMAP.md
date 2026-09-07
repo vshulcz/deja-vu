@@ -28,8 +28,12 @@ the place to discuss design.
   session pulled for one query is lifted for every query. A per-query signal —
   recording what a recall was for, not only that it happened — would let reuse be
   both stronger and precise without lifting an off-topic session.
-- **Point-of-action beyond codex and Claude.** Carry the file's or command's
-  prior decision into other harnesses as their hook contracts allow.
+- **Point-of-action in the harnesses that still refuse it.** The repair beside a
+  failed command and the file's prior decision now reach Claude Code, Codex,
+  Cursor, Gemini, Qwen, Cline, Amp, Antigravity, pi and omp. What is left is
+  where the harness itself drops what a hook returns — Kimi's post-tool events,
+  prime-agent's tool events, Roo until its hooks ship — and each is recorded in
+  the registry with the measurement behind it.
 - **Follow the work an agent handed off.** A subagent's run is its own session
   now, and where a harness records the edge — Grok's `summary.json`, Claude's
   sidechain files — recall can name the parent and the children. Cursor writes

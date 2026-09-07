@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for prime-agent: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="prime-agent has no hooks and an extension API; one file under ~/.prime/agent/extensions opens a session with what this project settled and recalls on every prompt after it.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to prime-agent">
+<meta property="og:description" content="prime-agent has no hooks and an extension API; one file under ~/.prime/agent/extensions opens a session with what this project settled and recalls on every prompt after it.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to prime-agent">
+<meta name="twitter:description" content="prime-agent has no hooks and an extension API; one file under ~/.prime/agent/extensions opens a session with what this project settled and recalls on every prompt after it.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to prime-agent", "description": "prime-agent has no hooks and an extension API; one file under ~/.prime/agent/extensions opens a session with what this project settled and recalls on every prompt after it.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for prime-agent", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does prime-agent remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to disk under ~/.prime/agent/sessions and can list them, but a new session starts empty and reads none of them."}}, {"@type": "Question", "name": "How do I add memory to prime-agent?", "acceptedAnswer": {"@type": "Answer", "text": "deja install prime writes the deja MCP server into ~/.prime/agent/settings.json and an extension under ~/.prime/agent/extensions that hands the project digest to the first turn, recalls on each prompt, forgets what a compaction threw away, and adds a /deja command."}}, {"@type": "Question", "name": "Can prime-agent see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-three agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">20</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html" aria-current="page">Memory for prime-agent</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to prime-agent</h1>
+<p class="pagelede">no hooks, an extension API — and one file is the whole install<span class="mins" data-mins></span></p>
+
+<p>prime-agent writes every session to <code>~/.prime/agent/sessions</code> as JSONL and can list them. A new session reads none of them, and none of the sessions the other agents on this machine wrote either — including the one where the same problem was already solved.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install prime</pre>
+<p>That writes two things: the deja MCP server into <code>~/.prime/agent/settings.json</code>, so the model can ask for history itself, and an extension at <code>~/.prime/agent/extensions/deja.ts</code>, which is what makes recall arrive without being asked:</p>
+<ul>
+<li><b>The project digest</b> on the first turn — what this machine settled here — followed by recall on every prompt, both through <code>before_agent_start</code>.</li>
+<li><b>Forgetting on compaction</b>: when <code>session_compact</code> throws away the blocks the session was shown, the list that stops them repeating goes too, so recall can say them again.</li>
+<li><b>A <code>/deja</code> command</b> in the same session, for asking directly.</li>
+</ul>
+
+<h2>What is deliberately not wired</h2>
+<p>The repair beside a failed command, which Claude Code, Codex, Gemini and Qwen all get, is missing here for a measured reason: on prime-agent 0.9.1 the <code>tool_call</code> and <code>tool_result</code> events never fire, so a handler on them is a process spawned for nothing. It becomes work the day they do.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked here, including sessions from before any of this was installed. An injection is capped at 1,536 bytes per prompt — <a href="token-cost.html">what memory costs</a> has the measured comparison. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/prime.html">The prime-agent session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

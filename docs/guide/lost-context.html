@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"The agent lost the context you had","description":"A crash, a cleared window or a restart takes the agent's context but not the transcript — how to get the work back and stop paying for it next time.","url":"https://vshulcz.github.io/deja-vu/guide/lost-context.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/lost-context.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Lost context","item":"https://vshulcz.github.io/deja-vu/guide/lost-context.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What do I do when my coding agent loses context?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts it already wrote to disk with deja and a phrase you remember, or deja ctx for a digest of the best-matching session. Sixteen of twenty harnesses can also be reopened with deja resume."}},{"@type":"Question","name":"Is the context recoverable after a crash?","acceptedAnswer":{"@type":"Answer","text":"The transcript is, because agents write each turn to disk as it happens. What a crash destroys is the model's working set, not the file."}},{"@type":"Question","name":"How do I stop losing it?","acceptedAnswer":{"@type":"Answer","text":"deja install --auto wires recall at session start and on each prompt, so a fresh window opens already knowing the project's recent decisions."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What do I do when my coding agent loses context?","acceptedAnswer":{"@type":"Answer","text":"Search the transcripts it already wrote to disk with deja and a phrase you remember, or deja ctx for a digest of the best-matching session. Nineteen of twenty-three harnesses can also be reopened with deja resume."}},{"@type":"Question","name":"Is the context recoverable after a crash?","acceptedAnswer":{"@type":"Answer","text":"The transcript is, because agents write each turn to disk as it happens. What a crash destroys is the model's working set, not the file."}},{"@type":"Question","name":"How do I stop losing it?","acceptedAnswer":{"@type":"Answer","text":"deja install --auto wires recall at session start and on each prompt, so a fresh window opens already knowing the project's recent decisions."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">19</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">20</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -69,6 +69,7 @@
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
 <a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html" aria-current="page">Lost context</a>
@@ -99,12 +100,12 @@
 <p>It happens mid-task, not between tasks: the window is cleared, the CLI is restarted, a session is resumed and comes back empty, the tab is closed by something that is not you. The agent is now confidently a stranger to work you did an hour ago.</p>
 
 <h2>The context is not gone, the pointer to it is</h2>
-<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty formats, one per tool</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
+<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty-three formats, one per tool</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
 
 <h2>Getting it back into the session you are in</h2>
 <pre>deja "the thing you were doing"</pre>
 <p>Search runs over every agent's history on the machine, so it does not matter which tool held the lost context — or whether that tool still exists. <code>deja ctx &lt;query&gt;</code> gives the single best-matching session as a digest rather than a wall of transcript, which is what you want to paste back into a fresh window.</p>
-<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — sixteen of the twenty do.</p>
+<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — nineteen of the twenty-three do.</p>
 
 <h2>Not losing it the next time</h2>
 <pre>deja install --auto</pre>

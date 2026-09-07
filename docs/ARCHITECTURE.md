@@ -25,10 +25,14 @@ against the loader list.
 | Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
 | VS Code Copilot Chat | `copilot_chat.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions` |
 | Cline | `cline.go` | task JSON under the VS Code extension's storage, both store generations |
-| Roo Code | `roo.go` | task JSON under `rooveterinaryinc.roo-cline` in VS Code globalStorage |
+| Roo Code | `roo.go` | task JSON under `rooveterinaryinc.roo-cline` in VS Code globalStorage, and the CLI's own store under `~/.vscode-mock/global-storage` |
 | Goose | `goose.go` | legacy JSONL sessions and the newer SQLite session store |
 | Kimi Code | `kimi.go` | per-agent `wire.jsonl` under `~/.kimi-code/sessions` |
 | OpenClaw | `openclaw.go` | append-only pi-format JSONL under `~/.openclaw/agents` |
+| omp (Oh My Pi) | `omp.go` | JSONL transcripts under `~/.omp/agent/sessions` and each profile beside it |
+| prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
+| DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
+| Zed | `zed.go` | threads in the SQLite store at `Zed/threads/threads.db` |
 | Hermes | `hermes.go`, `hermes_pg.go` | SQLite state per profile, or Postgres when `DEJA_HERMES_PG_DSN` is set |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
