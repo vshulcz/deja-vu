@@ -494,6 +494,11 @@ func printMemoryProofOf(dir, heading string, keep func(model.Session) bool, lead
 		fmt.Fprintln(os.Stderr, l)
 	}
 	fmt.Fprintln(os.Stderr, "ask your agent about any of these — it will remember.")
+	// Under the proof, because it is the moment the reader has just been shown
+	// something real and might want to know where the rest is (#3030).
+	if line := whereToLook(dir); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 }
 
 // recurringErrorLine is the top row of `deja friction`, as one sentence, or ""
