@@ -159,14 +159,16 @@ func TestCodexPluginHooks(t *testing.T) {
 		t.Fatalf("codex-plugin/hooks/deja.sh is recorded as %q, not 100755 — Codex runs it directly", mode)
 	}
 
+	// The spec documents `hooks` as one path; Codex's loader also takes a
+	// list, but the catalogue validators read the documented form.
 	var manifest struct {
-		Hooks []string `json:"hooks"`
+		Hooks string `json:"hooks"`
 	}
 	if err := json.Unmarshal(repoFile(t, "codex-plugin/.codex-plugin/plugin.json"), &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if len(manifest.Hooks) != 1 || manifest.Hooks[0] != "./hooks/hooks.json" {
-		t.Fatalf("the manifest does not declare the hooks file: %v", manifest.Hooks)
+	if manifest.Hooks != "./hooks/hooks.json" {
+		t.Fatalf("the manifest does not declare the hooks file as a path: %q", manifest.Hooks)
 	}
 }
 
