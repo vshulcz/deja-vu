@@ -88,13 +88,6 @@ type Hit struct {
 	Superseded string `json:"superseded,omitempty"`
 	// Reused counts recent agent recalls that served this session.
 	Reused int `json:"reused,omitempty"`
-	// Revisited is the date this session last came back to the query, after the
-	// passages shown as excerpts. The excerpts are the strongest match rather
-	// than the last word, so a session that reversed itself served the half it
-	// argued hardest and nothing said the rest was there (#2976). A date rather
-	// than a time.Time for the same reason Superseded is one: an empty struct
-	// is not omitted from JSON, and the field is read by people.
-	Revisited string `json:"revisited,omitempty"`
 	// Lifecycle carries what was later recorded about this session: that its
 	// decision was rejected, superseded or has gone stale. A hit on a raw
 	// transcript used to arrive with no trace of that, so a decision someone
@@ -332,29 +325,30 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			}
 			return a.weight > b.weight
 		})
+		// The last passage that matched, whether or not it matched hardest. A
+		// long session is answered by the fragment that scored, and twice now
+		// the fragment that answered was a different one in the same session:
+		// a status line saying the PR had already been opened and closed, and
+		// the ClawHub submission going through. Both were the session's later
+		// word on the subject, and both cost a duplicate outward action
+		// (#3007, #2976). It takes the third slot, so the two strongest
+		// passages are still first.
+		lastIdx := -1
+		for i, c := range snipCands {
+			if lastIdx < 0 || c.at > snipCands[lastIdx].at {
+				lastIdx = i
+			}
+		}
 		shown := -1
 		for i := 0; i < len(snipCands) && i < 3; i++ {
-			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[i].text, o.Query, re))
-			if snipCands[i].at > shown {
-				shown = snipCands[i].at
+			pick := i
+			if i == 2 && lastIdx >= 0 && snipCands[lastIdx].at > snipCands[0].at && snipCands[lastIdx].at > snipCands[1].at {
+				pick = lastIdx
 			}
-		}
-		// A session that says one thing and later says the opposite is served
-		// by the strongest passage, which is usually the first argument rather
-		// than the conclusion: recall answered "we are not on ClawHub yet" from
-		// a session that, further down, records the submission going through,
-		// and the reader acted on the stale half (#2976). The excerpts stay as
-		// they are — they are what matched — and the answer says the session
-		// comes back to this later.
-		doc.hit.Revisited = ""
-		var last time.Time
-		for _, c := range snipCands {
-			if c.at > shown && c.when.After(last) {
-				last = c.when
+			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[pick].text, o.Query, re))
+			if snipCands[pick].at > shown {
+				shown = snipCands[pick].at
 			}
-		}
-		if !last.IsZero() {
-			doc.hit.Revisited = last.Local().Format("2006-01-02")
 		}
 		// The index hands ranking the records that matched, not the session, so
 		// doc.length measures the size of the match. Normalising by that told
@@ -993,20 +987,6 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
-// RevisitedLine is the one line a hit gets when the session went on talking
-// about the query after the passages above it. Exported because the CLI and
-// the MCP tool build their answers separately and this has to read the same in
-// both — the reader acts on it either way.
-func RevisitedLine(h Hit) string { return revisitedLine(h) }
-
-func revisitedLine(h Hit) string {
-	if h.Revisited == "" {
-		return ""
-	}
-	return "  this session comes back to this later (" + h.Revisited +
-		") — what is above may be the half it reversed"
-}
-
 // lifecycleSummary words a hit's recorded state for a person. It says what
 // happened rather than naming the state: "superseded" is our vocabulary, not
 // the reader's.
@@ -1342,15 +1322,6 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			// characters the terminal counts, so trimming the rendered string
 			// would cut a different number of visible runes on every line.
 			fmt.Fprintf(w, "  %s\n", highlight(SafeText(fitLine(sn, o.Width-2)), o.Query, o.Regex, color))
-		}
-		// After the excerpts, because it is about them: the session had more to
-		// say on this afterwards, and what is above may be the half it later
-		// reversed.
-		if line := revisitedLine(h); line != "" {
-			if color {
-				line = cDim + line + cReset
-			}
-			fmt.Fprintln(w, line)
 		}
 	}
 }
