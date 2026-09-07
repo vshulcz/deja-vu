@@ -97,6 +97,9 @@ var resumeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // metacharacters into a printed command.
 var openclawKeyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 
+// Crush names its sessions with a uuid. Nothing else goes on a command line.
+var crushSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
 // resumeCommand maps a session to (workdir, command). workdir is empty when
 // the harness resumes globally or the original directory is unknown.
 func resumeCommand(s model.Session) (string, string, error) {
@@ -189,6 +192,14 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "kimi --session " + s.ID, nil
 	case "goose":
 		return "", "goose session --resume --session-id " + s.ID, nil
+	case "crush":
+		// In the project directory, not anywhere: Crush keeps one store per
+		// project and looks for the session in the one under the current
+		// directory, so the same id resolves to nothing from elsewhere.
+		if !crushSessionID.MatchString(s.ID) {
+			return "", "", fmt.Errorf("session id %q is not the uuid crush --session takes", s.ID)
+		}
+		return sources.CrushProjectDir(s.Path), "crush --session " + s.ID, nil
 	case "pi":
 		return piProjectDirFor(s), "pi --session " + s.ID, nil
 	case "omp":

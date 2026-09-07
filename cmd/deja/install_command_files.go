@@ -80,6 +80,8 @@ func commandFilePath(harness string) string {
 		return filepath.Join(sources.CursorCLIHome(), "commands", "deja.md")
 	case "roo":
 		return filepath.Join(homeDir(), ".roo", "commands", "deja.md")
+	case "crush":
+		return crushCommandPath()
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "commands", "deja.toml")
 	case "omp":

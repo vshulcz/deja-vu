@@ -72,6 +72,9 @@ var sharedSkillHarnesses = map[string]bool{
 	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
 	"omp": true, "deepseek": true, "zed": true, "amp": true, "prime": true,
+	// Crush's own config source lists ~/.agents/skills among the directories it
+	// scans by default, alongside ~/.claude/skills and its own.
+	"crush": true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately

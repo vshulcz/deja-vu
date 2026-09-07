@@ -103,13 +103,13 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets a skill at `~/.cursor/skills/` instead, read only when something looks relevant rather than every session.
 
 </details>
 
 ## What you get
 
-**Solve it in Codex. Claude remembers.** Twenty-four coding agents write every conversation
+**Solve it in Codex. Claude remembers.** Twenty-five coding agents write every conversation
 to local files, and deja turns those files into one memory layer all of them read.
 
 | | |
@@ -240,7 +240,7 @@ anything already wired to them.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
 
 <details>
 <summary>What each one supports</summary>
@@ -266,6 +266,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Continue | ✅ | ⚠ | ✅ | ✅ | — | paste | — |
+| Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |

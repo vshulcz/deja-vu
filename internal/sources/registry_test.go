@@ -212,6 +212,27 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		} else {
 			sessions, err = ParseOpenClawFile(path)
 		}
+	case "crush":
+		if !SQLite3Available() {
+			t.Skip("sqlite3 not installed")
+		}
+		sql, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		// <project>/.crush/crush.db: the project is the directory the store
+		// sits under, so the fixture goes in at the same depth or the parser
+		// names the wrong one.
+		db := filepath.Join(t.TempDir(), "demo", ".crush", "crush.db")
+		if mkErr := os.MkdirAll(filepath.Dir(db), 0o755); mkErr != nil {
+			t.Fatal(mkErr)
+		}
+		cmd := exec.Command("sqlite3", db)
+		cmd.Stdin = strings.NewReader(string(sql))
+		if out, runErr := cmd.CombinedOutput(); runErr != nil {
+			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+		}
+		sessions, err = ParseCrushDB(db)
 	case "hermes":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")

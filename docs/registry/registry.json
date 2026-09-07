@@ -536,6 +536,31 @@
       }
     },
     {
+      "id": "crush",
+      "store_paths": [
+        "<project>/.crush/crush.db",
+        "~/.local/share/crush/projects.json",
+        "${XDG_DATA_HOME}/crush/projects.json",
+        "${DEJA_CRUSH_ROOT}/projects.json"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/crush/crush.sql"
+      ],
+      "parser_source": "internal/sources/crush.go",
+      "last_verified": "2026-09-07",
+      "display_name": "Crush",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
+      }
+    },
+    {
       "id": "pi",
       "store_paths": [
         "${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"

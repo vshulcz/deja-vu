@@ -144,6 +144,32 @@ func TestResumeQwenRunsInTheProjectDirectory(t *testing.T) {
 	}
 }
 
+// Crush looks for a session in the store under the current directory and
+// nowhere else, so the same id resolves to nothing when the command is run
+// anywhere but the project the store sits under.
+func TestCrushResumeRunsInTheProject(t *testing.T) {
+	tmp := t.TempDir()
+	project := filepath.Join(tmp, "my-app")
+	path := filepath.Join(project, ".crush", "crush.db")
+	id := "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
+
+	dir, cmd, err := resumeCommand(model.Session{Harness: "crush", ID: id, Project: "my-app", Path: path})
+	if err != nil {
+		t.Fatalf("crush resume: %v", err)
+	}
+	if cmd != "crush --session "+id {
+		t.Fatalf("cmd = %q", cmd)
+	}
+	if dir != project {
+		t.Fatalf("dir = %q, want the project directory %q", dir, project)
+	}
+
+	// An id that is not a uuid never reaches a command line.
+	if _, _, err := resumeCommand(model.Session{Harness: "crush", ID: "x; rm -rf /", Project: "p", Path: path}); err == nil {
+		t.Fatal("a non-uuid id was accepted")
+	}
+}
+
 // Cursor's CLI transcripts are named after the chat id `--resume` takes, while
 // IDE chats come out of a different store and reopen only in the editor.
 func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {

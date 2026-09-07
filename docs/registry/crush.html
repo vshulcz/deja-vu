@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Crush stores its history — session format</title>
+<meta name="description" content="Where Crush writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/crush.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Crush stores its history — session format">
+<meta property="og:description" content="Where Crush writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/crush.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Crush stores its history — session format">
+<meta name="twitter:description" content="Where Crush writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Crush writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Crush","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/crush.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/crush.html","name":"Crush","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html" aria-current="page">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Crush</h1>
+<ul>
+<li><strong>ID</strong>: <code>crush</code></li>
+<li><strong>Store</strong>: <code>&lt;project&gt;/.crush/crush.db</code>, one SQLite store per project, listed in <code>${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</code>.</li>
+<li><strong>Read override</strong>: <code>DEJA_CRUSH_ROOT</code> (the data home holding that registry)</li>
+<li><strong>Format</strong>: SQLite; <code>sessions</code> joined to <code>messages</code>, incremental by <code>sessions.updated_at</code>.</li>
+</ul>
+<p>Crush is the only harness here that keeps its history beside the work rather</p>
+<p>than in one place. Nothing under the data home holds a transcript: the registry</p>
+<p>does, as <code>{&#34;projects&#34;:[{&#34;path&#34;,&#34;data_dir&#34;,&#34;last_accessed&#34;}]}</code>, and `crush</p>
+<p>projects` prints the same pairs. A registry entry whose project has since been</p>
+<p>deleted is ordinary and is skipped rather than reported.</p>
+<p>A message&#39;s <code>parts</code> column is a JSON array of <code>{type, data}</code>. <code>text</code> carries</p>
+<p><code>data.text</code>; <code>tool_call</code> carries the tool&#39;s name and a JSON *string* of its</p>
+<p>arguments, so the shell command and the edited path are one decode further in;</p>
+<p><code>tool_result</code> carries what the tool printed with a <code>&lt;cwd&gt;…&lt;/cwd&gt;</code> tag appended,</p>
+<p>which is the same directory on every line in the store and is stripped rather</p>
+<p>than indexed — left in, a search for the project name would match every tool</p>
+<p>output there is. <code>finish</code> is bookkeeping.</p>
+<p>Both stamp columns are commented &#34;Unix timestamp in milliseconds&#34; in Crush&#39;s own</p>
+<p>schema and hold whole seconds in what v0.92.0 writes — its update trigger sets</p>
+<p><code>strftime(&#39;%s&#39;,&#39;now&#39;)</code>. Both units are read. The project is the directory the</p>
+<p>store sits under; Crush records no working directory on the session row.</p>
+<p><code>parent_session_id</code> is the only place the subagent edge exists, so a subagent&#39;s</p>
+<p>turns are filed under their parent rather than as separate work.</p>
+<p>Shape verified against crush v0.92.0 by running one against a recording</p>
+<p>endpoint: the store landed beside the project, the registry gained its path and</p>
+<p><code>data_dir</code>, and deja indexed the result.</p>
+<ul>
+<li><strong>MCP</strong>: <code>deja install crush</code> adds the server under <code>mcp</code> in</li>
+</ul>
+<p><code>~/.config/crush/crush.json</code> — Crush keys it <code>mcp</code>, not the common</p>
+<p><code>mcpServers</code>. Crush&#39;s own <code>crush_info</code> reports `deja = connected (1 tools, 0</p>
+<p>resources)<code>, and the tool arrives as </code>mcp_deja_deja`. Verified against the</p>
+<p>recorder: a scripted call came back with the seeded decision in the bytes</p>
+<p>Crush sent next.</p>
+<ul>
+<li><strong>Skill</strong>: the same install writes the shared</li>
+</ul>
+<p><code>~/.agents/skills/deja-history/SKILL.md</code>, which Crush scans by default</p>
+<p>alongside <code>~/.claude/skills</code> and its own directory. It appears in the system</p>
+<p>prompt&#39;s <code>&lt;available_skills&gt;</code> block and in <code>crush_info</code> as `deja-history =</p>
+<p>user`.</p>
+<ul>
+<li><strong>Command</strong>: <code>~/.config/crush/commands/deja.md</code>, which Crush lists as</li>
+</ul>
+<p><code>/user:deja</code>. The palette is a TUI surface, so the entry is written but its</p>
+<p>expansion is unverified here.</p>
+<ul>
+<li><strong>Auto-recall</strong>: <code>deja install crush-auto</code> adds a <code>PreToolUse</code> hook —</li>
+</ul>
+<p><code>deja hook-tool --crush</code>, matcher <code>^(bash|edit|write|multiedit)$</code>. <code>PreToolUse</code></p>
+<p>is the only event Crush fires, so there is no session-start or per-prompt</p>
+<p>channel: the command-and-file line is the whole of it. A hook answers with a</p>
+<p>flat <code>{&#34;version&#34;:1,&#34;context&#34;:…}</code> rather than Claude&#39;s nested envelope, which</p>
+<p>is what the <code>--crush</code> flag writes; no <code>decision</code> field, because <code>&#34;allow&#34;</code></p>
+<p>there is affirmative pre-approval and would skip the permission prompt on</p>
+<p>every call the hook fires on. Measured: with a scripted <code>go build ./...</code></p>
+<p>against a store holding that command&#39;s history, the recall block reached the</p>
+<p>model appended to the tool result, in the request Crush sent next.</p>
+<ul>
+<li><strong>Resume</strong>: <code>crush --session &lt;uuid&gt;</code>, run in the project directory — Crush</li>
+</ul>
+<p>looks for the session in the store under the current directory and nowhere</p>
+<p>else, so the same id resolves to nothing from elsewhere.</p>
+<ul>
+<li><strong>Handoff</strong>: exec, <code>crush run</code>.</li>
+</ul>
+<p>Costs on that version, measured from the recorded requests: deja&#39;s tool schema</p>
+<p>is 3,138 bytes of the 29,754-byte tool block in every request, the skill&#39;s</p>
+<p>catalogue entry adds 384 bytes to the 22,487-byte system prompt, and a recall</p>
+<p>that answers adds 269 bytes to the turn that asked. With the binary moved aside</p>
+<p>and the wiring left in place, the turn still completed: 28 tools instead of 29,</p>
+<p>the hook&#39;s failure logged and ignored, the tool call through.</p>
+<p><strong>Last verified:</strong> 2026-09-07</p>
+
+<hr>
+<p>deja reads this format and twenty-four others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

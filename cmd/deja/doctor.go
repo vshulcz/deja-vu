@@ -808,6 +808,15 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()
 	printRow("zed", zedDB, doctorFilePresent(zedDB), doctorSQLiteDetail(zedDB, sqlite))
+	// One store per project rather than one per machine, so the registry is
+	// what makes them findable at all. Name it even when it lists nothing:
+	// "the registry is empty" is the answer for someone whose crush sessions
+	// did not come back.
+	crushRegistry := filepath.Join(sources.CrushDataHome(), "projects.json")
+	printRow("crush", crushRegistry, doctorFilePresent(crushRegistry), doctorCount(len(sources.CrushDBs()), "store"))
+	for _, db := range sources.CrushDBs() {
+		printRow("crush", db, doctorFilePresent(db), doctorSQLiteDetail(db, sqlite))
+	}
 	printRow("deja", sources.NotesFile(), doctorFilePresent(sources.NotesFile()), "notes")
 	if n := noteBucketsRegrouped(dir); n > 0 {
 		fmt.Fprintf(w, "  warning      %s of notes in the index %s not what this machine would build now — the zone changed, so the days regrouped; `deja index` renames them\n",
@@ -1251,6 +1260,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
 		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired, nil},
 		{"continue", continueConfigPath(), doctorContinueWired, nil},
+		{"crush", crushConfigPath(), doctorJSONWired("mcp"), doctorJSONDejaKeys("mcp")},
 		{"zed", sources.ZedSettingsPath(), doctorZedWired, nil},
 	}
 }

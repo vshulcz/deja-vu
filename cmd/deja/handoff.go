@@ -311,6 +311,9 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"prime-agent", "--print", prompt}, true
 	case "grok":
 		return []string{"grok", prompt}, true
+	case "crush":
+		// `crush run` answers once and exits; the bare command opens the TUI.
+		return []string{"crush", "run", prompt}, true
 	case "cursor":
 		return []string{"cursor-agent", prompt}, true
 	case "copilot":
@@ -341,5 +344,5 @@ var handoffAlias = map[string]string{"agy": "antigravity"}
 var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "zed": true, "deepseek": true, "copilot-chat": true, "continue": true}
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush"}
 }

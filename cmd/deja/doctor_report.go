@@ -434,6 +434,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles(), sources.ParseKimiFile},
 		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
 		{"continue", []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles(), sources.ParseContinueFile},
+		{"crush", []string{sources.CrushDataHome()}, sources.CrushDBs(), sources.ParseCrushDB},
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},
 		{"omp", []string{sources.OmpRoot()}, sources.OmpSessionFiles(), sources.ParseOmpFile},
 		{"prime", []string{sources.PrimeRoot()}, sources.PrimeSessionFiles(), sources.ParsePrimeFile},
