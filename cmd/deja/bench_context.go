@@ -268,4 +268,9 @@ func printContextReport(w io.Writer, report contextReport) {
 		span := fmt.Sprintf("%.0f-%.0f", r.P10Tokens, r.P90Tokens)
 		fmt.Fprintf(w, "%-13s %-14.0f %-13s %-16.2f %.0f\n", name, r.MedianTokens, span, r.MedianCoverage, r.NegativeMedian)
 	}
+	// deja-recall is the union of the two surfaces below it, and each of them
+	// reaches the chain's facts on its own — so its coverage cannot fall until
+	// both are broken. Read the two halves for a regression; the union is a
+	// floor (#2931).
+	fmt.Fprintln(w, "deja-recall is the union of the two rows under it: its coverage only falls when both do — read those.")
 }
