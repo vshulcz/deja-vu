@@ -397,6 +397,9 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 // value is visible before the first agent session ever runs.
 func printInstallProof(dir string) {
 	printMemoryProofOf(dir, "deja already knows this machine:", nil, installLead(dir))
+	if line := starLine(dir); line != "" {
+		fmt.Fprintln(os.Stderr, line)
+	}
 }
 
 // printMemoryProofOf is the proof narrowed to the rows a caller can honestly
