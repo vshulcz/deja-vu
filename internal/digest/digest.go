@@ -612,6 +612,10 @@ func IsAgentArtifact(text string) bool {
 	return false
 }
 
+// compactionOutlineRE is the numbered outline the summary opens with; a person
+// asking "Summary: what is the Primary Request and Intent here?" has no "1.".
+var compactionOutlineRE = regexp.MustCompile(`(?m)^\s*1\.\s*Primary Request and Intent`)
+
 // IsCompactionSummary reports whether a message is the block a harness writes
 // as the first user turn after a compaction — Claude Code's "Summary: 1.
 // Primary Request and Intent: …" and the "This session is being continued
@@ -620,10 +624,6 @@ func IsAgentArtifact(text string) bool {
 // session "Summary: 1. Primary Request and Intent: - MOST R…" and told the
 // reader nothing (#3157). Judged on the opening, since a person can write
 // "Summary:" and go on to say something.
-// compactionOutlineRE is the numbered outline the summary opens with; a person
-// asking "Summary: what is the Primary Request and Intent here?" has no "1.".
-var compactionOutlineRE = regexp.MustCompile(`(?m)^\s*1\.\s*Primary Request and Intent`)
-
 func IsCompactionSummary(t string) bool {
 	t = strings.TrimSpace(t)
 	if strings.HasPrefix(t, "This session is being continued from a previous conversation") {
