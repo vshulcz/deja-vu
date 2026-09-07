@@ -41,6 +41,12 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dsh": "0.1.1-rc.2",
+      "dshReleases": {
+        "0.1.1-rc.2": "compatible"
+      }
     }
   },
   "dependencies": {
