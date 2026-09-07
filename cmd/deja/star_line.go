@@ -2,7 +2,7 @@ package main
 
 import "os"
 
-// starLine is the one sentence deja says about itself, once per index: after
+// starText is the one sentence deja says about itself, once per index: after
 // the install proof, or in the first week note if the install never printed
 // it. deja has no telemetry and no account, so a star is the only signal that
 // reaches the project from a machine that uses it — and the install proof is
