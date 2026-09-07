@@ -3,6 +3,7 @@
 package stats
 
 import (
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -46,7 +47,12 @@ type Report struct {
 	HandoffsIn       int            `json:"handoffs_received"`
 	AgentCredits     int            `json:"agent_credits"`
 	WeekCredits      int            `json:"week_agent_credits"`
-	SidecarSize      int64          `json:"sidecar_size,omitempty"`
+	// UsedNotCredited is the other half of the 2% (#3079): a reply that names
+	// a recalled session and does not say the line. An upper bound — see
+	// UsedNotCredited.
+	UsedNotCredited     int   `json:"used_not_credited"`
+	WeekUsedNotCredited int   `json:"week_used_not_credited"`
+	SidecarSize         int64 `json:"sidecar_size,omitempty"`
 	// Spans and SpanFiles are what `deja restore` can hand back: the exact
 	// bytes an agent replaced, which no other tool keeps. Filled by the
 	// caller, not by Build — replaced spans are deliberately kept out of
@@ -235,6 +241,7 @@ func Build(ss []model.Session, now time.Time) Report {
 	}
 	out.RepeatQuestions = RepeatQuestions(ss)
 	out.AgentCredits, out.WeekCredits = AgentCredits(ss, now)
+	out.UsedNotCredited, out.WeekUsedNotCredited = UsedNotCredited(ss, now)
 	for _, s := range ss {
 		for _, msg := range s.Messages {
 			if msg.Role != "user" {
@@ -504,6 +511,40 @@ func CreditedAloud(text string) bool {
 		return true
 	}
 	return strings.Contains(text, "deja:") && strings.Contains(strings.ToLower(text), "déjà vu")
+}
+
+// dejaSessionRef matches a session id named the way a recall block names one.
+// Eight characters of hex is the shortest prefix deja itself prints, and the
+// bound keeps an ordinary "deja:" in prose from counting as a reference.
+var dejaSessionRef = regexp.MustCompile(`deja:[0-9a-zA-Z][0-9a-zA-Z_.-]{7,}`)
+
+// UsedNotCredited counts assistant turns that name a recalled session without
+// saying the credit line — the second of the two things folded into the 2% in
+// #3079: injections the model used and did not credit, as opposed to
+// injections it rightly ignored.
+//
+// An upper bound, deliberately. The id is the evidence: a reply carrying
+// `deja:<id>` had the recall block in front of it. But a session *about* deja
+// quotes ids in prose, and on the machine that develops deja those turns are
+// counted here too. Read it as "at most this many", and the gap between it and
+// AgentCredits as the size of the question rather than as an answer.
+func UsedNotCredited(ss []model.Session, now time.Time) (total, week int) {
+	weekCut := usage.WeekCut(now)
+	for _, s := range ss {
+		for _, msg := range s.Messages {
+			if msg.Role != "assistant" || CreditedAloud(msg.Text) {
+				continue
+			}
+			if !dejaSessionRef.MatchString(msg.Text) {
+				continue
+			}
+			total++
+			if !msg.Time.IsZero() && msg.Time.After(weekCut) {
+				week++
+			}
+		}
+	}
+	return total, week
 }
 
 // AgentCredits counts, over the whole corpus and over the last week, the
