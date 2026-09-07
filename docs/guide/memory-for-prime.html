@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to prime-agent", "description": "prime-agent has no hooks and an extension API; one file under ~/.prime/agent/extensions opens a session with what this project settled and recalls on every prompt after it.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for prime-agent", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does prime-agent remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to disk under ~/.prime/agent/sessions and can list them, but a new session starts empty and reads none of them."}}, {"@type": "Question", "name": "How do I add memory to prime-agent?", "acceptedAnswer": {"@type": "Answer", "text": "deja install prime writes the deja MCP server into ~/.prime/agent/settings.json and an extension under ~/.prime/agent/extensions that hands the project digest to the first turn, recalls on each prompt, forgets what a compaction threw away, and adds a /deja command."}}, {"@type": "Question", "name": "Can prime-agent see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-four agents on the machine, including sessions from before deja was installed."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does prime-agent remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to disk under ~/.prime/agent/sessions and can list them, but a new session starts empty and reads none of them."}}, {"@type": "Question", "name": "How do I add memory to prime-agent?", "acceptedAnswer": {"@type": "Answer", "text": "deja install prime writes the deja MCP server into ~/.prime/agent/settings.json and an extension under ~/.prime/agent/extensions that hands the project digest to the first turn, recalls on each prompt, forgets what a compaction threw away, and adds a /deja command."}}, {"@type": "Question", "name": "Can prime-agent see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-five agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">21</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">22</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -71,6 +71,7 @@
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html" aria-current="page">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -113,7 +114,7 @@
 <p>The repair beside a failed command, which Claude Code, Codex, Gemini and Qwen all get, is missing here for a measured reason: on prime-agent 0.9.1 the <code>tool_call</code> and <code>tool_result</code> events never fire, so a handler on them is a process spawned for nothing. It becomes work the day they do.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — twenty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked here, including sessions from before any of this was installed. An injection is capped at 1,536 bytes per prompt — <a href="token-cost.html">what memory costs</a> has the measured comparison. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — twenty-five of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked here, including sessions from before any of this was installed. An injection is capped at 1,536 bytes per prompt — <a href="token-cost.html">what memory costs</a> has the measured comparison. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/prime.html">The prime-agent session format</a></p>
 </article>

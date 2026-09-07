@@ -41,7 +41,7 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 	words := map[int]string{
 		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
 		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
-		23: "twenty-three", 24: "twenty-four",
+		23: "twenty-three", 24: "twenty-four", 25: "twenty-five",
 	}
 	want, ok := words[n]
 	if !ok {
@@ -235,7 +235,7 @@ func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]s
 	words := map[int]string{
 		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
 		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
-		23: "twenty-three", 24: "twenty-four",
+		23: "twenty-three", 24: "twenty-four", 25: "twenty-five",
 	}
 	want, ok := words[n]
 	if !ok {
@@ -250,7 +250,7 @@ func harnessCountWords(t *testing.T, root string, offset int) (string, map[int]s
 func TestGuidePagesCountTheHarnessesTheyList(t *testing.T) {
 	root := filepath.Join("..", "..")
 	want, words := harnessCountWords(t, root, 0)
-	phrase := regexp.MustCompile(`([a-z]+(?:-[a-z]+)?) of them today`)
+	phrase := regexp.MustCompile(`([a-z]+(?:-[a-z]+)?) of them(?:,| today)`)
 	pages, err := filepath.Glob(filepath.Join(root, "docs", "guide", "*.html"))
 	if err != nil {
 		t.Fatal(err)

@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Continue", "description": "Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Continue", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Continue remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to ~/.continue/sessions and can reopen the last one, but a new session reads none of the others."}}, {"@type": "Question", "name": "How do I add memory to Continue?", "acceptedAnswer": {"@type": "Answer", "text": "deja install continue adds the deja MCP server and a /deja command to ~/.continue/config.yaml and writes a skill into ~/.continue/skills, which Continue names in its Skills tool on every turn."}}, {"@type": "Question", "name": "Can Continue see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-four agents on the machine, including sessions from before deja was installed."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Continue remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to ~/.continue/sessions and can reopen the last one, but a new session reads none of the others."}}, {"@type": "Question", "name": "How do I add memory to Continue?", "acceptedAnswer": {"@type": "Answer", "text": "deja install continue adds the deja MCP server and a /deja command to ~/.continue/config.yaml and writes a skill into ~/.continue/skills, which Continue names in its Skills tool on every turn."}}, {"@type": "Question", "name": "Can Continue see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-five agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">21</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">22</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -71,6 +71,7 @@
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html" aria-current="page">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -116,7 +117,7 @@
 <p>From the recorded requests on that version: deja's tool schema is 3,112 bytes of the 10 KB of tools Continue sends with every request, the skill adds 700 bytes to the <code>Skills</code> tool's description, and a recall that answers adds 1,384 bytes to the turn that asked for it. A recall with no answer adds nothing.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — twenty-four of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Continue, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — twenty-five of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Continue, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/continue.html">The Continue session format</a></p>
 </article>

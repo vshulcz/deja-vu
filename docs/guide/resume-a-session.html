@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">21</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">22</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -71,6 +71,7 @@
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -108,7 +109,7 @@
 <pre>deja resume &lt;id&gt;</pre>
 <p>It prints the command that reopens that exact conversation, including the directory it has to run in when the tool scopes its session list by working directory:</p>
 <pre>cd '/path/to/project' &amp;&amp; grok --resume 01a03433-0c67-7331-8eb1-cd6173d4c8f9</pre>
-<p>Nineteen of the twenty-four harnesses deja indexes can be reopened this way. The other four are refusals with a reason rather than silence: aider appends to a transcript file and has no notion of reopening one conversation, Zed and VS Code Copilot Chat reopen from their own UI rather than a terminal, and neither of DeepSeek Harness's two apps takes a session id. Roo Code splits: what its CLI wrote resumes, what the editor wrote reopens there. The <a href="../registry/README.html">format registry</a> records which is which, and why.</p>
+<p>Nineteen of the twenty-five harnesses deja indexes can be reopened this way. The other four are refusals with a reason rather than silence: aider appends to a transcript file and has no notion of reopening one conversation, Zed and VS Code Copilot Chat reopen from their own UI rather than a terminal, and neither of DeepSeek Harness's two apps takes a session id. Roo Code splits: what its CLI wrote resumes, what the editor wrote reopens there. The <a href="../registry/README.html">format registry</a> records which is which, and why.</p>
 
 <h2>When resuming is the wrong tool</h2>
 <p>Reopening a session brings back the whole conversation, including the parts that were wrong before they were right. Often what you want is the conclusion, not the road to it:</p>

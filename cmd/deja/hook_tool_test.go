@@ -168,7 +168,7 @@ func TestToolHookSpeaksForALowercaseRead(t *testing.T) {
 	// and have no hook stdout to parse.
 	var plain bytes.Buffer
 	in := strings.NewReader(`{"tool_name":"read","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"pi-2","cwd":"/work/alpha"}`)
-	if err := runHookToolMode(os.Getenv("DEJA_INDEX_DIR"), in, &plain, true); err != nil {
+	if err := runHookToolMode(os.Getenv("DEJA_INDEX_DIR"), in, &plain, hookToolPlain); err != nil {
 		t.Fatal(err)
 	}
 	got := plain.String()
