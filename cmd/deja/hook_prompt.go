@@ -166,11 +166,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if recallIsOff() {
 		return nil
 	}
+	// What the person typed, with the host's envelopes taken off: a task
+	// notification, a system reminder, a teammate message, deja's own block
+	// echoed back. A turn that is only the host talking to itself gets no
+	// recall at all — it once made this hook say "you have been here" about
+	// another notification, on the envelope's field names (#3156).
+	asked := digest.StripHarnessBlocks(string(input.Prompt))
+	if asked == "" {
+		return nil
+	}
 	// The failure the user just reported is worth capturing whether or not
 	// this prompt also earns a recall, so it is decided before the gates that
 	// silence the recall path.
-	nudge := failureNudge(dir, string(input.Prompt))
-	terms := prompt.Terms(string(input.Prompt))
+	nudge := failureNudge(dir, asked)
+	terms := prompt.Terms(asked)
 	if !promptTermsWorthAsking(terms) {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
@@ -419,7 +428,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// way of its own to tell "mm_status" from "decide", and the session
 		// that answers often says both — measured live, ten of the answers
 		// this hook newly returns open on the ordinary word.
-		digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), string(input.Prompt))
+		digest, shown := search.AutoRecallDigestShowing(ss, digestBudget(confident), byIdentifying(terms, idfOf), asked)
 		if strings.TrimSpace(digest) == "" {
 			return emitNudgeOnly(stdout, plain, nudge)
 		}
