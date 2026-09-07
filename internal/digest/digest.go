@@ -567,6 +567,29 @@ var agentArtifactMarkers = []string{
 	`{"type":`,
 }
 
+// isCompactionSummary recognises the block a harness writes as the first user
+// turn after a context compaction. It is the agent's own summary of the session
+// so far, not something the user said, and as a session title it reads
+// "Summary: 1. Primary Request and Intent: - MOST R…" — which says nothing
+// about the session while pushing the real question out of the line (#3157).
+//
+// Two shapes, both anchored: the resumption preamble, and "Summary:" followed
+// by the numbered heading that always opens one. An ordinary message that
+// happens to begin "Summary:" carries neither and stays a title.
+func isCompactionSummary(trimmed string) bool {
+	if strings.HasPrefix(trimmed, "This session is being continued from a previous conversation") {
+		return true
+	}
+	if !strings.HasPrefix(trimmed, "Summary:") {
+		return false
+	}
+	head := trimmed
+	if len(head) > 400 {
+		head = head[:400]
+	}
+	return strings.Contains(head, "1. Primary Request and Intent")
+}
+
 func IsAgentArtifact(text string) bool {
 	for _, m := range agentArtifactMarkers {
 		if strings.Contains(text, m) {
@@ -577,6 +600,9 @@ func IsAgentArtifact(text string) bool {
 	// Harness preambles injected as user turns: <environment_context>,
 	// <user_instructions> and similar XML-wrapped plumbing.
 	if strings.HasPrefix(trimmed, "<") && strings.Contains(trimmed, "</") {
+		return true
+	}
+	if isCompactionSummary(trimmed) {
 		return true
 	}
 	// ls dumps recorded under a user role.

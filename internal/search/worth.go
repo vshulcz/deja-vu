@@ -1,6 +1,9 @@
 package search
 
-import "unicode/utf8"
+import (
+	"strings"
+	"unicode/utf8"
+)
 
 // RecallWorthShowing is the one bar both the hook and the benchmark apply. It
 // lived in two places with two slightly different expressions, so the
@@ -112,6 +115,11 @@ func IdentifyingTerms(terms []string, known map[string]float64) []string {
 // something that reads like a term of art — long, or shaped like a symbol.
 func HasIdentifierTerm(terms []string) bool {
 	for _, t := range terms {
+		// An id names one record and nothing else, and every rule below reads
+		// it as a term of art.
+		if isOpaqueID(t) {
+			continue
+		}
 		// Letters, not bytes. Counting bytes read "omoda" as filler and every
 		// Cyrillic word of three letters as a term of art, because Cyrillic
 		// takes two bytes a letter. Measured on a real store: "напомни, что мы
@@ -132,6 +140,50 @@ func HasIdentifierTerm(terms []string) bool {
 		}
 	}
 	return false
+}
+
+// isOpaqueID reports a token that identifies one record somewhere and nothing
+// else: a task id, a tool-call id, a uuid fragment. It looks like a term of art
+// to every rule above — long, mixed letters and digits — and carries the
+// opposite: it exists in exactly one place, so a question holding nothing else
+// can only match another record that happens to carry an id of the same shape
+// (#3156).
+//
+// Three tests, all needed to keep real vocabulary out of it: long enough that a
+// word is unlikely, alphanumeric after an optional `prefix_` (so `x86_64` and
+// `go1.22` are never candidates), and switching between letters and digits at
+// least three times. `sha256sum` and `iso8601` switch once or twice and stay
+// identifiers; `br50mykp6` and `942cbc1e` switch three times and do not.
+func isOpaqueID(t string) bool {
+	if i := strings.IndexByte(t, '_'); i >= 0 {
+		// One leading prefix only: `toolu_01A2B3` is an id, `snake_case_name`
+		// is not a candidate at all.
+		if strings.IndexByte(t[i+1:], '_') >= 0 {
+			return false
+		}
+		t = t[i+1:]
+	}
+	if utf8.RuneCountInString(t) < 8 {
+		return false
+	}
+	runs, digit, first := 0, false, true
+	for _, r := range t {
+		switch {
+		case r >= '0' && r <= '9':
+			if first || !digit {
+				runs++
+			}
+			digit, first = true, false
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'):
+			if first || digit {
+				runs++
+			}
+			digit, first = false, false
+		default:
+			return false
+		}
+	}
+	return runs >= 4
 }
 
 // soleWorkingWord is the ordinary vocabulary a session is made of, long enough

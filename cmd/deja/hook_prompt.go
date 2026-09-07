@@ -170,6 +170,16 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// this prompt also earns a recall, so it is decided before the gates that
 	// silence the recall path.
 	nudge := failureNudge(dir, string(input.Prompt))
+	// Nobody asked. A harness delivers its own plumbing as the next user turn —
+	// a finished background task, a system reminder, a slash command's envelope
+	// — and the hook fires on it like a question. The terms are then the
+	// envelope's own field names plus an id that exists nowhere else, and what
+	// they match is another notification in another session: a block of noise
+	// injected as recalled history, under a line telling the user deja fires on
+	// noise (#3156). Same test the digest uses on transcript messages.
+	if digest.IsAgentArtifact(string(input.Prompt)) {
+		return emitNudgeOnly(stdout, plain, nudge)
+	}
 	terms := prompt.Terms(string(input.Prompt))
 	if !promptTermsWorthAsking(terms) {
 		return emitNudgeOnly(stdout, plain, nudge)
