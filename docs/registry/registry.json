@@ -339,7 +339,7 @@
         "fixtures/registry/goose/sessions/goose.sql"
       ],
       "parser_source": "internal/sources/goose.go",
-      "last_verified": "2026-07-28",
+      "last_verified": "2026-09-07",
       "display_name": "Goose",
       "capabilities": {
         "mcp": true,
