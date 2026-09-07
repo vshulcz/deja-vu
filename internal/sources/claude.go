@@ -27,7 +27,70 @@ func ClaudeJSONPath() string {
 }
 
 func ClaudeRoot() string {
-	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(ClaudeConfigDir(), "projects"))
+	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(ClaudeConfigDir(), claudeProjectsDirName()))
+}
+
+// claudeProjectsDirName is what Claude Code calls the directory it keeps
+// transcripts in. CLAUDE_CODE_PROJECT_DIR_NAME is documented and renames it;
+// deja hard-coded "projects" and read nothing on a machine that set it (#2996).
+func claudeProjectsDirName() string {
+	if name := strings.TrimSpace(os.Getenv("CLAUDE_CODE_PROJECT_DIR_NAME")); name != "" {
+		return name
+	}
+	return "projects"
+}
+
+// ClaudeRoots is every directory Claude Code transcripts are written to on this
+// machine, not only the main one:
+//
+//   - <config>/<projects>, the ordinary store;
+//   - <config>/transcripts, a sibling where headless and SDK-driven clients
+//     write bare transcripts;
+//   - ~/.cc-mirror/<variant>/.claude/<projects>, the isolated variants
+//     cc-mirror runs — a session run through one reached nothing before.
+//
+// DEJA_CLAUDE_ROOT stays the whole answer when it is set: it is how a stand
+// pins the store, and adding the machine's own directories to it would let the
+// real history into an isolated run.
+func ClaudeRoots() []string {
+	if p := os.Getenv("DEJA_CLAUDE_ROOT"); p != "" {
+		return []string{p}
+	}
+	cfg := ClaudeConfigDir()
+	roots := []string{filepath.Join(cfg, claudeProjectsDirName())}
+	roots = append(roots, filepath.Join(cfg, "transcripts"))
+	roots = append(roots, ccMirrorRoots()...)
+	var out []string
+	for _, r := range roots {
+		if fi, err := os.Stat(r); err == nil && fi.IsDir() {
+			out = append(out, r)
+		}
+	}
+	if len(out) == 0 {
+		// Nothing exists yet: the main root is still the answer, so a fresh
+		// machine reports the path it will use rather than none at all.
+		return roots[:1]
+	}
+	return out
+}
+
+// ccMirrorRoots lists the transcript directories of cc-mirror's isolated
+// variants. Each variant is its own Claude home under ~/.cc-mirror/<variant>,
+// so a session run through one is invisible to a reader of ~/.claude.
+func ccMirrorRoots() []string {
+	base := EnvPath("DEJA_CC_MIRROR_ROOT", filepath.Join(Home(), ".cc-mirror"))
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		out = append(out, filepath.Join(base, e.Name(), ".claude", claudeProjectsDirName()))
+	}
+	return out
 }
 
 func LoadClaude() []model.Session {
@@ -37,7 +100,23 @@ func LoadClaude() []model.Session {
 // ClaudeFiles lists the transcript files under the Claude root without parsing
 // them — a cheap count for diagnostics.
 func ClaudeFiles() []string {
-	return walkFiles(ClaudeRoot(), ClaudeFileWanted)
+	var out []string
+	for _, root := range ClaudeRoots() {
+		out = append(out, walkFiles(root, ClaudeFileWanted)...)
+	}
+	return out
+}
+
+// UnderClaudeRoot reports whether a path is inside any of the roots above. The
+// registry matches a transcript to its harness by prefix, and with more than
+// one root that question is no longer "does it start with ClaudeRoot()".
+func UnderClaudeRoot(p string) bool {
+	for _, root := range ClaudeRoots() {
+		if strings.HasPrefix(p, root) {
+			return true
+		}
+	}
+	return false
 }
 
 // ClaudeFileWanted reports whether a path under the Claude root belongs in

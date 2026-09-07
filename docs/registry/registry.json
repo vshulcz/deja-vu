@@ -98,7 +98,9 @@
     {
       "id": "claude",
       "store_paths": [
-        "${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl",
+        "${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
+        "${CLAUDE_CONFIG_DIR:-~/.claude}/transcripts/**/*.jsonl",
+        "${DEJA_CC_MIRROR_ROOT:-~/.cc-mirror}/*/.claude/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
         "${DEJA_CLAUDE_ROOT}/**/*.jsonl"
       ],
       "format_kind": "jsonl",
