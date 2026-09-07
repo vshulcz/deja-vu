@@ -12,9 +12,12 @@ import (
 
 // OpenClaw's bootstrap hook recalls once against the session and only in
 // gateway mode, so a local run had no memory of the project at all until it
-// happened to ask a question the store answered. before_agent_start is the
+// happened to ask a question the store answered. agent_turn_prepare is the
 // plugin's session-start channel and its prependContext reaches the model
-// (measured on OpenClaw 2026.7.1-2, read off the provider request).
+// (measured on OpenClaw 2026.7.1-2, read off the provider request). OpenClaw's
+// own docs call before_agent_start a compatibility-only combined phase and ask
+// new plugins to use this hook, which is also where queued next-turn
+// injections are drained.
 //
 // It fires once per agent run rather than once per session, which is why the
 // payload carries deja_once: without it the project digest would go in front of
@@ -42,7 +45,7 @@ func TestOpenClawPluginOpensWithTheProjectDigest(t *testing.T) {
 	driver := `
 import plugin from "` + plugin + `";
 let handler;
-plugin.register({ on: (name, fn) => { if (name === "before_agent_start") handler = fn } });
+plugin.register({ on: (name, fn) => { if (name === "agent_turn_prepare") handler = fn } });
 if (!handler) { console.log("NOHOOK"); process.exit(0) }
 const out = await handler({ prompt: "hello" }, { sessionKey: "agent:main:explicit:s1" });
 console.log(JSON.stringify(out ?? null));
@@ -57,7 +60,7 @@ console.log(JSON.stringify(out ?? null));
 	}
 	first := strings.TrimSpace(strings.Split(strings.TrimSpace(string(out)), "\n")[0])
 	if first == "NOHOOK" {
-		t.Fatal("the plugin registers no before_agent_start handler, so a local " +
+		t.Fatal("the plugin registers no agent_turn_prepare handler, so a local " +
 			"session still opens with no memory of the project")
 	}
 	var got map[string]string

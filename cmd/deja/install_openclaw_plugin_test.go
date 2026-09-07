@@ -182,3 +182,36 @@ console.log(JSON.stringify(quiet ?? null));
 		t.Errorf("the prompt never reached the hook:\n%s", body)
 	}
 }
+
+// Compaction throws away the blocks a session was shown, and the list that
+// stops them repeating outlives it. before_compaction fires in the plugin —
+// measured on OpenClaw 2026.7.1-2, with the session key on the hook context —
+// and nothing is read back from it, which is all a compaction hook can carry.
+func TestOpenClawPluginForgetsOnCompaction(t *testing.T) {
+	js := openclawPluginJS("/bin/deja")
+	if !strings.Contains(js, `"before_compaction"`) {
+		t.Fatalf("nothing forgets after a compaction:\n%s", js)
+	}
+	// The whole call, not the pieces: the digest handler carries the same
+	// session-id expression, so half of this matches even when the forget has
+	// lost it and would clear nothing.
+	if !strings.Contains(js, `ask(["hook-precompact"], { session_id: ctx?.sessionKey || ctx?.sessionId || "" })`) {
+		t.Fatalf("the forget is not the one deja means — no hook-precompact with this session:\n%s", js)
+	}
+}
+
+// OpenClaw's own docs call before_agent_start a compatibility-only combined
+// phase and ask new plugins to use the explicit ones. agent_turn_prepare is
+// also where queued next-turn injections are drained, so the digest sits where
+// that seam would arrive if it ever starts delivering.
+func TestOpenClawPluginUsesThePhaseHooks(t *testing.T) {
+	js := openclawPluginJS("/bin/deja")
+	if strings.Contains(js, `"before_agent_start"`) {
+		t.Fatalf("the digest is still on the compatibility hook:\n%s", js)
+	}
+	for _, want := range []string{`"agent_turn_prepare"`, `"before_prompt_build"`} {
+		if !strings.Contains(js, want) {
+			t.Fatalf("missing %s:\n%s", want, js)
+		}
+	}
+}
