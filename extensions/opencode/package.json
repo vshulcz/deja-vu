@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": ">=1.0.0",
-    "@vshulcz/deja-vu": "^0.18.0"
+    "@vshulcz/deja-vu": "^0.19.4"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

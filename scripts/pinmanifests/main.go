@@ -69,6 +69,11 @@ const (
 	assetBase  = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
+// npmHarnessPackages are the plugins published to npm that install the deja
+// binary package as a dependency. Their own version is set at publish time;
+// what is pinned here is which deja they ask for.
+var npmHarnessPackages = []string{"dsh", "opencode", "openclaw", "pi"}
+
 type pins struct {
 	version string
 	amd64   string
@@ -137,8 +142,12 @@ func parse(version, checksums string) (pins, error) {
 	return p, nil
 }
 
-func write(root string, p pins) error {
-	for path, render := range map[string]func(pins) ([]byte, error){
+// targets is the whole pinned set, in one place. The writer and the check used
+// to carry their own copy of this list, so a target added to one and not the
+// other was pinned at release time and never verified again — or verified and
+// never written.
+func targets() map[string]func(pins) ([]byte, error) {
+	t := map[string]func(pins) ([]byte, error){
 		scoopPath:         renderScoop,
 		versionPath:       renderVersion,
 		localePath:        renderLocale,
@@ -151,7 +160,25 @@ func write(root string, p pins) error {
 		kimiPacked:        renderPluginVersion(kimiPacked),
 		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:       renderPluginVersion(agentPlugin),
-	} {
+	}
+	// The harness packages depend on the deja binary package. The pin is a
+	// caret on a 0.x version, which npm reads as "this minor and no further",
+	// so a plugin left behind installs a binary from an older release for the
+	// one user who has no deja on PATH — the user who installed the plugin to
+	// get one (#2993).
+	for _, dir := range npmHarnessPackages {
+		path := filepath.Join("extensions", dir, "package.json")
+		t[path] = renderNpmDejaDep(path)
+	}
+	// The root manifest mirrors the dsh plugin — DSH installs a plugin from a
+	// repository root — and a test pins the two to agree, so it carries the
+	// same dependency and moves with it.
+	t["package.json"] = renderNpmDejaDep("package.json")
+	return t
+}
+
+func write(root string, p pins) error {
+	for path, render := range targets() {
 		body, err := render(p)
 		if err != nil {
 			return err
@@ -259,6 +286,23 @@ func renderGoVersionConst(path, name string) func(pins) ([]byte, error) {
 	}
 }
 
+// renderNpmDejaDep pins a harness package's dependency on the deja binary
+// package. Only that one line: these manifests carry keywords, engines and a
+// description no release derives.
+func renderNpmDejaDep(path string) func(pins) ([]byte, error) {
+	re := regexp.MustCompile(`("@vshulcz/deja-vu":\s*)"[^"]*"`)
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if !re.Match(b) {
+			return nil, fmt.Errorf("%s does not depend on @vshulcz/deja-vu", path)
+		}
+		return re.ReplaceAll(b, []byte(`${1}"^`+p.version+`"`)), nil
+	}
+}
+
 func renderPluginVersion(path string) func(pins) ([]byte, error) {
 	return func(p pins) ([]byte, error) {
 		b, err := os.ReadFile(path)
@@ -331,20 +375,7 @@ func runCheck(root string) error {
 	if err != nil {
 		return err
 	}
-	for path, render := range map[string]func(pins) ([]byte, error){
-		scoopPath:         renderScoop,
-		versionPath:       renderVersion,
-		localePath:        renderLocale,
-		installer:         renderInstaller,
-		codexPlugin:       renderPluginVersion(codexPlugin),
-		claudePlugin:      renderPluginVersion(claudePlugin),
-		claudeAgentPlugin: renderPluginVersion(claudeAgentPlugin),
-		geminiExtension:   renderPluginVersion(geminiExtension),
-		kimiPlugin:        renderPluginVersion(kimiPlugin),
-		kimiPacked:        renderPluginVersion(kimiPacked),
-		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
-		agentPlugin:       renderPluginVersion(agentPlugin),
-	} {
+	for path, render := range targets() {
 		want, err := render(p)
 		if err != nil {
 			return err
