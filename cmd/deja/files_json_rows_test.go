@@ -82,6 +82,21 @@ func TestFilesJSONCarriesTheRankedRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if st, err := captureRun(t, "stats"); err == nil {
+		t.Logf("PROBE stats:\n%s", st)
+	} else {
+		t.Logf("PROBE stats error: %v", err)
+	}
+	if sr, err := captureRun(t, "search", "--json", "singbox"); err == nil {
+		t.Logf("PROBE search --json singbox: %s", sr)
+	} else {
+		t.Logf("PROBE search error: %v", err)
+	}
+	if ls, err := os.ReadDir(proj); err == nil {
+		for _, e := range ls {
+			t.Logf("PROBE fixture file %s", e.Name())
+		}
+	}
 	out, err := captureRun(t, "files", "--json", "singbox")
 	if err != nil {
 		t.Fatalf("files --json: %v\n%s", err, out)

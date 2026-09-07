@@ -61,7 +61,14 @@ func TestDejaOnceKeepsTheDigestToTheFirstTurn(t *testing.T) {
 		return captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
 	}
 
-	if first := ask("once-1", true); strings.TrimSpace(first) == "" {
+	first := ask("once-1", true)
+	if seen, err := os.ReadFile(index.DefaultDir() + ".hookseen"); err != nil {
+		t.Logf("PROBE hookseen after first call: read error %v (dir=%q)", err, index.DefaultDir())
+	} else {
+		t.Logf("PROBE hookseen after first call:\n%s", seen)
+	}
+	t.Logf("PROBE first output %d bytes", len(first))
+	if strings.TrimSpace(first) == "" {
 		t.Fatal("the session opened with nothing, so there is no repeat to test")
 	}
 	if again := ask("once-1", true); strings.TrimSpace(again) != "" {
