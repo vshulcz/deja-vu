@@ -142,6 +142,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		case "goose":
 			// Goose declares commands in config.yaml, not a commands directory.
 			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")
+		case "continue":
+			// Continue declares its slash commands in the assistant config, as
+			// `prompts:`, so the artifact to read is the config deja writes.
+			gotCommand = strings.Contains(continueInstalledConfig(t, "/bin/deja"), "- name: deja")
 		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok", "zed":
 			// These make a skill invocable by name, so the skill deja installs
 			// is the command and a second file would only add another entry.

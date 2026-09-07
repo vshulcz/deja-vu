@@ -50,7 +50,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">20</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">21</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -69,6 +69,7 @@
 <a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -117,7 +118,7 @@
 <tr><td><a href="../registry/omp.html">omp (Oh My Pi)</a></td><td><code>${DEJA_OMP_ROOT:-~/.omp/agent/sessions}/**/*.jsonl</code><br><code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code><br><code>${XDG_DATA_HOME}/omp/sessions/**/*.jsonl</code><br><code>${XDG_DATA_HOME}/omp/profiles/*/sessions/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/agent/openclaw-agent.sqlite</code><br><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl</code><br><code>${DEJA_OPENCLAW_ROOT}/*/agent/openclaw-agent.sqlite</code><br><code>${DEJA_OPENCLAW_ROOT}/*/sessions/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>paste</td><td>—</td></tr>
 <tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code><br><code>${XDG_DATA_HOME}/opencode/opencode.db</code><br><code>${DEJA_OPENCODE_DB}</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>sqlite3</td></tr>
-<tr><td><a href="../registry/continue.html">Continue</a></td><td><code>${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json</code><br><code>${DEJA_CONTINUE_ROOT}/sessions/*.json</code></td><td>—</td><td>✕</td><td>—</td><td>—</td><td>✕</td><td>paste</td><td>—</td></tr>
+<tr><td><a href="../registry/continue.html">Continue</a></td><td><code>${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json</code><br><code>${DEJA_CONTINUE_ROOT}/sessions/*.json</code></td><td>✅</td><td>⚠</td><td>✅</td><td>✅</td><td>—</td><td>paste</td><td>—</td></tr>
 <tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code><br><code>${PRIME_AGENT_SESSION_DIR}/**/*.jsonl</code><br><code>${PRIME_AGENT_CODING_AGENT_SESSION_DIR}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
@@ -131,7 +132,7 @@
 <li>aider <code>command</code> — the slash command set is built in; adding custom commands is an open feature request upstream, not something a third party can wire today (https://github.com/Aider-AI/aider/issues/894)</li>
 <li>Copilot CLI <code>auto</code> — Copilot runs the hooks but drops their context, so recall there is MCP plus the skill</li>
 <li>VS Code Copilot Chat <code>auto</code> — VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install</li>
-<li>Continue <code>auto</code> — Continue has no session-start, per-prompt or tool hook — there is no event deja could answer</li>
+<li>Continue <code>auto</code> — Continue&#39;s CLI carries a Claude-shaped hooks system — Claude&#39;s own event set, additionalContext, settings read from ~/.continue/settings.json — and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (&#34;Hooks loaded: 8 handler(s)&#34; in its own log) and no handler ran, while the same run&#39;s tool call went through. Becomes work the day a release fires them (https://github.com/continuedev/continue/tree/main/extensions/cli/src/hooks)</li>
 <li>Roo Code <code>auto</code> — Roo&#39;s hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user&#39;s bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges (https://github.com/RooCodeInc/Roo-Code/pull/10785)</li>
 <li>Zed <code>auto</code> — Zed&#39;s agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one (no hook API in Zed 1.16.1 or extension API 0.7)</li>
 </ul><!-- matrix:end -->

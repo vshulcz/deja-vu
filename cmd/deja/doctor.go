@@ -1250,6 +1250,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"vscode", doctorVSCodeMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
 		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired, nil},
+		{"continue", continueConfigPath(), doctorContinueWired, nil},
 		{"zed", sources.ZedSettingsPath(), doctorZedWired, nil},
 	}
 }

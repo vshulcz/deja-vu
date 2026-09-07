@@ -25,12 +25,33 @@ Shape verified against Continue's own types (`core/index.d.ts`: `Session`,
 `ChatHistoryItem`, `ChatMessage`) and `core/util/paths.ts`; a live-store
 validation is still welcome.
 
-- **MCP**: not wired yet. Continue reads MCP servers from
-  `~/.continue/config.yaml` under `mcpServers:`, which deja does not write.
-- **Auto-recall**: none — Continue has no session-start, per-prompt or tool
-  hook, so there is no event to answer.
-- **Resume**: from Continue's history view in the editor; nothing takes a
-  session id from a shell.
+- **MCP**: `deja install continue` adds the server to `mcpServers:` in
+  `~/.continue/config.yaml` — a list of mappings, not the keyed object other
+  harnesses use, so the entry is found again by its `name`. Verified on
+  @continuedev/cli 1.5.47 against a recording endpoint: the `deja` tool is in
+  the tool list of every request, and a call came back with the seeded decision
+  in the bytes Continue sent next. The TUI header lists it under `MCP Servers`.
+- **Skill**: the same install writes `~/.continue/skills/deja-history/SKILL.md`.
+  Continue reads skills from its global folder and from `<workspace>/.claude/skills`,
+  and names each one in the `Skills` tool's own description — so it is in front
+  of the model on every turn, which is what makes recall arrive unasked.
+- **Command**: `prompts:` in the same config carries `/deja`. Continue expands
+  slash commands in its TUI; in `-p` headless mode the text goes through
+  verbatim, so the entry is written but its expansion is unverified here.
+- **Auto-recall**: none yet. The CLI carries a Claude-shaped hooks system —
+  Claude's own event set, `additionalContext`, settings read from
+  `~/.continue/settings.json` — and nothing fires it in 1.5.47: hooks written
+  for every event loaded (its own log says "Hooks loaded: 8 handler(s) across 8
+  event type(s)") and no handler ran, while the same run's tool call went
+  through. It becomes work the day a release fires them.
+- **Resume**: `cn --resume` reopens the last session and `--fork <id>` branches
+  from one, but nothing takes the id of an arbitrary session; the editor
+  reopens one from its history view.
 - **Handoff**: paste.
+
+Costs on that version, measured from the recorded requests: deja's tool schema
+is 3,112 bytes of the 10 KB tool block in every request, the skill adds 700
+bytes to the `Skills` tool's description, and a recall that answers adds 1,384
+bytes to the turn that asked.
 
 **Last verified:** 2026-09-07

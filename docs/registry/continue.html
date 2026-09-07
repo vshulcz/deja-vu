@@ -61,20 +61,44 @@
 <p><code>ChatHistoryItem</code>, <code>ChatMessage</code>) and <code>core/util/paths.ts</code>; a live-store</p>
 <p>validation is still welcome.</p>
 <ul>
-<li><strong>MCP</strong>: not wired yet. Continue reads MCP servers from</li>
+<li><strong>MCP</strong>: <code>deja install continue</code> adds the server to <code>mcpServers:</code> in</li>
 </ul>
-<p><code>~/.continue/config.yaml</code> under <code>mcpServers:</code>, which deja does not write.</p>
+<p><code>~/.continue/config.yaml</code> — a list of mappings, not the keyed object other</p>
+<p>harnesses use, so the entry is found again by its <code>name</code>. Verified on</p>
+<p>@continuedev/cli 1.5.47 against a recording endpoint: the <code>deja</code> tool is in</p>
+<p>the tool list of every request, and a call came back with the seeded decision</p>
+<p>in the bytes Continue sent next. The TUI header lists it under <code>MCP Servers</code>.</p>
 <ul>
-<li><strong>Auto-recall</strong>: none — Continue has no session-start, per-prompt or tool</li>
+<li><strong>Skill</strong>: the same install writes <code>~/.continue/skills/deja-history/SKILL.md</code>.</li>
 </ul>
-<p>hook, so there is no event to answer.</p>
+<p>Continue reads skills from its global folder and from <code>&lt;workspace&gt;/.claude/skills</code>,</p>
+<p>and names each one in the <code>Skills</code> tool&#39;s own description — so it is in front</p>
+<p>of the model on every turn, which is what makes recall arrive unasked.</p>
 <ul>
-<li><strong>Resume</strong>: from Continue&#39;s history view in the editor; nothing takes a</li>
+<li><strong>Command</strong>: <code>prompts:</code> in the same config carries <code>/deja</code>. Continue expands</li>
 </ul>
-<p>session id from a shell.</p>
+<p>slash commands in its TUI; in <code>-p</code> headless mode the text goes through</p>
+<p>verbatim, so the entry is written but its expansion is unverified here.</p>
+<ul>
+<li><strong>Auto-recall</strong>: none yet. The CLI carries a Claude-shaped hooks system —</li>
+</ul>
+<p>Claude&#39;s own event set, <code>additionalContext</code>, settings read from</p>
+<p><code>~/.continue/settings.json</code> — and nothing fires it in 1.5.47: hooks written</p>
+<p>for every event loaded (its own log says &#34;Hooks loaded: 8 handler(s) across 8</p>
+<p>event type(s)&#34;) and no handler ran, while the same run&#39;s tool call went</p>
+<p>through. It becomes work the day a release fires them.</p>
+<ul>
+<li><strong>Resume</strong>: <code>cn --resume</code> reopens the last session and <code>--fork &lt;id&gt;</code> branches</li>
+</ul>
+<p>from one, but nothing takes the id of an arbitrary session; the editor</p>
+<p>reopens one from its history view.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
+<p>Costs on that version, measured from the recorded requests: deja&#39;s tool schema</p>
+<p>is 3,112 bytes of the 10 KB tool block in every request, the skill adds 700</p>
+<p>bytes to the <code>Skills</code> tool&#39;s description, and a recall that answers adds 1,384</p>
+<p>bytes to the turn that asked.</p>
 <p><strong>Last verified:</strong> 2026-09-07</p>
 
 <hr>

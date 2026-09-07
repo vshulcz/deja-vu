@@ -329,6 +329,11 @@
       "path": "<tmp>/home/.config/goose/config.yaml"
     },
     {
+      "name": "continue",
+      "state": "config-missing",
+      "path": "<tmp>/home/.continue/config.yaml"
+    },
+    {
       "name": "zed",
       "state": "config-missing",
       "path": "<tmp>/home/.config/zed/settings.json"

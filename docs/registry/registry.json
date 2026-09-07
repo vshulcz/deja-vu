@@ -515,34 +515,23 @@
       "last_verified": "2026-09-07",
       "display_name": "Continue",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
-        "skill": false,
-        "command": false,
+        "skill": true,
+        "command": true,
         "resume": false,
         "handoff": "paste",
         "prereq": ""
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Continue reads MCP servers from ~/.continue/config.yaml under mcpServers:; deja does not write that file yet"
-        },
         "auto": {
-          "state": "impossible",
-          "why": "Continue has no session-start, per-prompt or tool hook — there is no event deja could answer"
-        },
-        "skill": {
-          "state": "todo",
-          "why": "Continue reads rules from ~/.continue/rules; deja writes no guidance there yet"
-        },
-        "command": {
-          "state": "todo",
-          "why": "Continue has slash commands in config.yaml rather than a command file, and deja writes none yet"
+          "state": "blocked",
+          "why": "Continue's CLI carries a Claude-shaped hooks system — Claude's own event set, additionalContext, settings read from ~/.continue/settings.json — and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (\"Hooks loaded: 8 handler(s)\" in its own log) and no handler ran, while the same run's tool call went through. Becomes work the day a release fires them",
+          "source": "https://github.com/continuedev/continue/tree/main/extensions/cli/src/hooks"
         },
         "resume": {
-          "state": "impossible",
-          "why": "Continue reopens a session from its history view in the editor; nothing takes a session id from a shell"
+          "state": "todo",
+          "why": "The CLI has --resume for the last session and --fork <sessionId>, but nothing that takes the id of an arbitrary session; the editor reopens one from its history view"
         }
       }
     },
