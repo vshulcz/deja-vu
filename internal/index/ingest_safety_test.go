@@ -113,11 +113,24 @@ func TestSubagentTranscriptsSkipped(t *testing.T) {
 	if err := EnsureForSearch(dir, search.Options{Query: "subneedle"}, false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if ss, err := Search(dir, search.Options{Query: "subneedle", All: true}); err != nil || len(ss) != 0 {
-		t.Fatalf("subagent indexed by default: %#v err=%v", ss, err)
+	// A child run is in the index by default now, as its task and its answer
+	// (#3009): a quarter of a real machine's Claude messages were in these
+	// files, including the turns that read like a settled answer.
+	if ss, err := Search(dir, search.Options{Query: "subneedle", All: true}); err != nil || len(ss) != 1 {
+		t.Fatalf("subagent not indexed by default: %#v err=%v", ss, err)
 	}
 	if ss, err := Search(dir, search.Options{Query: "mainneedle", All: true}); err != nil || len(ss) != 1 {
 		t.Fatalf("main session missing: %#v err=%v", ss, err)
+	}
+
+	// And the opt-out puts it back.
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	dirOff := filepath.Join(tmp, "index-off.db")
+	if err := EnsureForSearch(dirOff, search.Options{Query: "subneedle"}, false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if ss, err := Search(dirOff, search.Options{Query: "subneedle", All: true}); err != nil || len(ss) != 0 {
+		t.Fatalf("the opt-out indexed the subagent anyway: %#v err=%v", ss, err)
 	}
 
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")

@@ -43,17 +43,52 @@ func ClaudeFiles() []string {
 // ClaudeFileWanted reports whether a path under the Claude root belongs in
 // the index. A subagent's transcript is not a copy of its parent: the parent
 // keeps the launch, the agent id and a summary of what came back, while the
-// turns and the tool stream live only in the child file. They are skipped for
-// index size, not because the work is already there — DEJA_INCLUDE_SUBAGENTS=1
-// takes them in, as their own sessions (#1384).
+// turns and the tool stream live only in the child file (#1384).
+//
+// They used to be skipped whole, for index size. Measured on a real store that
+// was 863 files, 96,168 messages and 299 MB against a 1.4 GB index — a quarter
+// of the machine's Claude messages, holding 387 assistant turns that read like
+// a settled answer, outside recall by default (#3009). They come in now as the
+// task they were given and the answer they came back with; the reasoning and
+// the tool stream in between stay out, which is where the volume is.
+//
+// DEJA_INCLUDE_SUBAGENTS=1 takes the whole child transcript, as before.
+// DEJA_INCLUDE_SUBAGENTS=0 goes back to skipping them entirely.
 func ClaudeFileWanted(p string) bool {
 	if !strings.HasSuffix(p, ".jsonl") {
 		return false
 	}
-	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1" {
-		return true
+	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
+		return !IsSubagentPath(p)
 	}
-	return !strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+	return true
+}
+
+// IsSubagentPath reports whether a transcript is a child run, by where it sits.
+// The file's own isSidechain flag says the same thing for the files that carry
+// it, and a sidechain transcript outside such a directory is a full session as
+// far as this rule is concerned — the same reading the count in #3009 used.
+func IsSubagentPath(p string) bool {
+	return strings.Contains(p, string(filepath.Separator)+"subagents"+string(filepath.Separator))
+}
+
+// SubagentTailKept is how many of a child's own turns are indexed: the task it
+// was handed and the last few things it said. Four is what covers a closing
+// answer split across a couple of turns without taking the tool stream with it.
+const SubagentTailKept = 4
+
+// KeepSubagentTail cuts a child run down to what a reader needs from it: the
+// first turn, which is the task the parent handed over, and the last few, which
+// are what it concluded. The middle is the reading and the searching — verbose,
+// often duplicated in the parent's summary, and the reason these files were
+// skipped whole.
+func KeepSubagentTail(ms []model.Message) []model.Message {
+	if len(ms) <= SubagentTailKept+1 {
+		return ms
+	}
+	kept := make([]model.Message, 0, SubagentTailKept+1)
+	kept = append(kept, ms[0])
+	return append(kept, ms[len(ms)-SubagentTailKept:]...)
 }
 
 func ParseClaudeFile(path string) ([]model.Session, error) {
@@ -127,6 +162,11 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 	})
 	if len(s.Messages) == 0 {
 		return nil, err
+	}
+	// The same cut the typed parser makes: this is the reference it is proved
+	// against, and a difference here reads as a parser bug (#3009).
+	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		s.Messages = KeepSubagentTail(s.Messages)
 	}
 	if p := projectFromPaths(s.Messages); p != "" {
 		s.Project = p

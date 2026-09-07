@@ -36,15 +36,27 @@ func TestDoctorSaysHowToIndexSubagentTranscripts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("doctor: %v", err)
 	}
-	// No skipping: a test that passes by not running is what let the old
-	// wording stand.
-	if !strings.Contains(out, "subagent transcripts skipped") {
-		t.Fatalf("the fixture did not produce the row this test is about:\n%s", out)
+	// The default reads them as their task and their answer, so the row says
+	// which half is searchable and how to get the rest (#3009).
+	if !strings.Contains(out, "subagent transcripts read as task and answer") {
+		t.Fatalf("the row does not say how these files are read:\n%s", out)
 	}
-	if !strings.Contains(out, "set DEJA_INCLUDE_SUBAGENTS=1 to index them") {
-		t.Errorf("the row does not say how to index them:\n%s", out)
+	if !strings.Contains(out, "set DEJA_INCLUDE_SUBAGENTS=1 for the whole run") {
+		t.Errorf("the row does not say how to index them in full:\n%s", out)
 	}
 	if strings.Contains(out, "skipped (DEJA_INCLUDE_SUBAGENTS=1)") {
-		t.Error("the row still reads as if the variable caused the skip")
+		t.Error("the row still reads as if the variable caused a skip")
+	}
+
+	// And with the opt-out set, the row goes back to naming the skip and its
+	// remedy — the wording that was wrong before is still the right one there.
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	out, err = captureRun(t, "doctor")
+	if err != nil {
+		t.Fatalf("doctor: %v", err)
+	}
+	if !strings.Contains(out, "subagent transcripts skipped") ||
+		!strings.Contains(out, "set DEJA_INCLUDE_SUBAGENTS=1 to index them") {
+		t.Errorf("with the opt-out set, the row does not name the skip:\n%s", out)
 	}
 }
