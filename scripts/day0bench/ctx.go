@@ -22,9 +22,13 @@ import (
 	"time"
 )
 
+// ctx 1.3 names the session by the id the harness gave it, provider_session_id,
+// which for a Claude transcript is the file's own sessionId; older builds only
+// carried the source path in the citations, so both are read.
 type ctxResults struct {
 	Results []struct {
-		Citations []struct {
+		ProviderSessionID string `json:"provider_session_id"`
+		Citations         []struct {
 			SourcePath string `json:"source_path"`
 		} `json:"citations"`
 	} `json:"results"`
@@ -88,7 +92,9 @@ func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 	}
 
 	t0 := time.Now()
-	if _, err := ctx(true, "setup"); err != nil {
+	// 1.3 hands the index refresh to a daemon it starts; --wait returns once
+	// that refresh has published, so the searches below read a full index.
+	if _, err := ctx(true, "setup", "--wait"); err != nil {
 		return out, fmt.Errorf("ctx setup: %w", err)
 	}
 	out.build = time.Since(t0)
@@ -106,7 +112,7 @@ func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 
 	for i, q := range qs {
 		t1 := time.Now()
-		raw, err := ctx(true, "search", q.Question, "--limit", strconv.Itoa(depthK), "--json")
+		raw, err := ctx(true, "search", q.Question, "--limit", strconv.Itoa(depthK), "--format", "json")
 		if err != nil {
 			return out, fmt.Errorf("ctx search: %w", err)
 		}
@@ -123,7 +129,7 @@ func runCtx(bin string, all, qs []question, control bool) (runResult, error) {
 		}
 		out.n++
 		for rank, r := range res.Results {
-			hit := false
+			hit := want[r.ProviderSessionID]
 			for _, c := range r.Citations {
 				if want[strings.TrimSuffix(filepath.Base(c.SourcePath), ".jsonl")] {
 					hit = true

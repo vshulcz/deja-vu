@@ -179,7 +179,7 @@
 <table>
 <tr><th></th><th class="us">deja-vu</th><th>cass</th><th>Agent Sessions</th><th>agent-historian</th><th>casr</th><th>Agent Session Viewer</th></tr>
 <tr><td>What it is</td><td class="us">index the agent queries</td><td>TUI and CLI over one timeline</td><td>macOS app</td><td>CLI for agents</td><td>session converter</td><td>web viewer</td></tr>
-<tr><td>Agents read</td><td class="us">20</td><td>25 providers</td><td>14 CLIs</td><td>5 CLIs</td><td>Claude, Codex, Gemini and more</td><td>Claude Code, Codex</td></tr>
+<tr><td>Agents read</td><td class="us">24</td><td>25 providers</td><td>14 CLIs</td><td>5 CLIs</td><td>Claude, Codex, Gemini and more</td><td>Claude Code, Codex</td></tr>
 <tr><td>Recall without being asked</td><td class="us y">✓ hooks at session start, before an edit, after a failure</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Serves an agent</td><td class="us y">✓ MCP + skill</td><td class="y">✓ MCP</td><td class="n">—</td><td class="y">✓ MCP</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Secrets stripped at index time</td><td class="us y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
@@ -188,6 +188,8 @@
 <tr><td>Written in</td><td class="us">Go, one binary</td><td>Rust</td><td>Swift, macOS only</td><td>TypeScript</td><td>Rust</td><td>Python</td></tr>
 </table>
 </div>
+
+<p>One more belongs here since September 2026: Hugging Face's <a href="https://github.com/huggingface/funes">funes</a> reads existing transcripts of Claude Code, Codex, pi and Hermes into a local vector index with a reranker, and serves an agent over MCP and per-turn hooks — the closest thing to deja's shape. Measured on the <a href="day-zero.html">day-zero corpus</a>: two hours to index what deja indexes in half a minute, six seconds a query against 155 ms, and once its recency weighting is off it ranks a little better at rank five (46 against 35) and the same at rank one. Four agents against twenty-four, and nothing arrives at a failed command or a file about to be edited. <a href="https://ctx.rs">ctx</a> is the nearest sibling in shape — a Rust lexical index over thirty-odd agents' files, with MCP and a paid blame tier — and on the same corpus it finds half as many sessions at every depth (hit@1 8, found@50 42) at 0.8 s a query; its automatic setup could not index the directory at all and needed an explicit import.</p>
 
 <div class="note">The row that matters is the third one. Every tool here can find the session you are thinking of; deja is the one where nobody has to be thinking of it — the hook fires at session start and before an edit, so the earlier decision arrives whether or not anyone remembered to look. That is a different job from browsing, and on browsing several of these are better than we are.</div>
 
