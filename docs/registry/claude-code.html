@@ -38,7 +38,7 @@
 <article>
 <h1>Claude Code session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Claude Code writes transcripts below <code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/</code>. deja can point only session reads elsewhere with <code>DEJA_CLAUDE_ROOT</code>. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with <code>-</code>; nested <code>subagents/*.jsonl</code> files are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
+<p>Claude Code writes transcripts below <code>${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/</code>. deja also reads two siblings of it: <code>&lt;config&gt;/transcripts/</code>, where headless and SDK-driven clients write, and <code>~/.cc-mirror/&lt;variant&gt;/.claude/&lt;projects&gt;/</code>, the isolated Claude homes cc-mirror runs — a session run through a variant reached nothing before. <code>DEJA_CLAUDE_ROOT</code> points session reads at one directory and is then the whole answer, so a seeded stand cannot pick up the machine&#39;s own history; <code>DEJA_CC_MIRROR_ROOT</code> moves the variant base. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with <code>-</code>; nested <code>subagents/*.jsonl</code> files are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
 <p>A subagent&#39;s transcript is not a copy of its parent. The parent keeps the launch,</p>
 <p>the <code>agentId</code> and a summary of what came back; the child&#39;s own turns and tool</p>
 <p>stream exist only in the sidechain file, where every line carries</p>

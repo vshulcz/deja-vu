@@ -19,8 +19,12 @@ rule, so the numbers on the site's day-zero page can be reproduced end to end.
        CASS=/path/to/cass python3 scripts/day0compare/cass.py /tmp/day0
        AGENTMEMORY=/path/to/agentmemory python3 scripts/day0compare/agentmemory.py /tmp/day0
        MEMPALACE=mempalace python3 scripts/day0compare/mempalace.py /tmp/day0
+       FUNES=funes python3 scripts/day0compare/funes.py /tmp/day0 [--half-life 0]
 
-   agentmemory needs its worker running first (`agentmemory` with
+   funes indexes the Claude layout in full (`funes index <path> --yes`, about
+   two hours of local embedding for 19k sessions); its first recall downloads
+   ~1.1 GB of models, and the header shortens session ids, so the driver reads
+   the full id from the `→ get` line. agentmemory needs its worker running first (`agentmemory` with
    `HOME`/`AGENTMEMORY_DATA_DIR` set) and imports in batches of at most 1000
    files, its own cap; the driver builds the batches. MemPalace mines the
    Claude layout only — the sessions are the same files under both roots.

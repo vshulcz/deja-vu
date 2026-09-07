@@ -377,6 +377,13 @@ func printStats(w io.Writer, r stats.Report) {
 	if r.AgentCredits > 0 {
 		fmt.Fprintf(w, "  Credited aloud   agents said \"déjà vu\" %d time%s (%d this week)\n", r.AgentCredits, pluralS(r.AgentCredits), r.WeekCredits)
 	}
+	if r.UsedNotCredited > 0 {
+		// The other half of the credit rate: a reply that names a recalled
+		// session and does not say the line. At most — a session about deja
+		// quotes ids in prose too (#3079).
+		fmt.Fprintf(w, "  Used, not said   at most %d repl%s named a recalled session without the line (%d this week)\n",
+			r.UsedNotCredited, map[bool]string{true: "y", false: "ies"}[r.UsedNotCredited == 1], r.WeekUsedNotCredited)
+	}
 	if r.HandoffsIn > 0 {
 		fmt.Fprintf(w, "  Handoffs         %d session%s started from a handoff\n", r.HandoffsIn, pluralS(r.HandoffsIn))
 	}

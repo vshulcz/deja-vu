@@ -78,7 +78,7 @@ func Registry() []Harness {
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,
 			Kinds: []FileKind{{
 				Name:      "claude",
-				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, ClaudeRoot()) },
+				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
 				Parse:     fullParse(ParseClaudeFile),
 				ParseFrom: offsetParse(ParseClaudeFileFromOffset),
 			}},

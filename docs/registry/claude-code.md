@@ -2,7 +2,7 @@
 
 ## Store and files
 
-Claude Code writes transcripts below `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/`. deja can point only session reads elsewhere with `DEJA_CLAUDE_ROOT`. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with `-`; nested `subagents/*.jsonl` files are excluded unless `DEJA_INCLUDE_SUBAGENTS=1`.
+Claude Code writes transcripts below `${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/`. deja also reads two siblings of it: `<config>/transcripts/`, where headless and SDK-driven clients write, and `~/.cc-mirror/<variant>/.claude/<projects>/`, the isolated Claude homes cc-mirror runs — a session run through a variant reached nothing before. `DEJA_CLAUDE_ROOT` points session reads at one directory and is then the whole answer, so a seeded stand cannot pick up the machine's own history; `DEJA_CC_MIRROR_ROOT` moves the variant base. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with `-`; nested `subagents/*.jsonl` files are excluded unless `DEJA_INCLUDE_SUBAGENTS=1`.
 
 A subagent's transcript is not a copy of its parent. The parent keeps the launch,
 the `agentId` and a summary of what came back; the child's own turns and tool
