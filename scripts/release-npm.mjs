@@ -69,36 +69,41 @@ main.optionalDependencies = Object.fromEntries(
 fs.writeFileSync(mainPkgPath, JSON.stringify(main, null, 2));
 run("npm", ["publish", "--access", "public"], mainDir);
 
-// The harness packages ride the same version. Two of them were versioned
-// independently before this, so a release whose version is behind what npm
-// already has would move the `latest` tag backwards: skip those and say so,
-// and the lines converge on their own as soon as deja passes them.
+// The harness packages ride the same version where they can. Two of them were
+// versioned independently before this, and publishing them at a release behind
+// what npm already has would move the `latest` tag backwards, which cannot be
+// undone. Those get the next patch of their own line rather than being skipped:
+// skipping left dsh-deja on npm asking for a deja two releases old, and its
+// version line is ahead of deja's, so "they converge on their own" never came
+// (#2993).
 const extensions = ["opencode", "dsh", "openclaw", "pi"];
 const published = [];
 for (const name of extensions) {
   const dir = path.join("extensions", name);
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8"));
   const live = npmLatest(pkg.name);
-  if (live && compareVersions(version, live) <= 0) {
-    console.log(`skipping ${pkg.name}: npm has ${live}, this release is ${version}`);
-    continue;
+  const publishAs = live && compareVersions(version, live) <= 0 ? nextPatch(live) : version;
+  if (publishAs !== version) {
+    console.log(`${pkg.name}: npm has ${live}, this release is ${version} — publishing ${publishAs}`);
   }
   const out = path.join(work, name);
   fs.cpSync(dir, out, { recursive: true });
   const outPkgPath = path.join(out, "package.json");
   const outPkg = JSON.parse(fs.readFileSync(outPkgPath, "utf8"));
-  outPkg.version = version;
+  outPkg.version = publishAs;
+  // The dependency names this release either way: what the plugin installs
+  // when there is no deja on PATH has to be the binary this release built.
   if (outPkg.dependencies?.["@vshulcz/deja-vu"]) {
     outPkg.dependencies["@vshulcz/deja-vu"] = `^${version}`;
   }
   fs.writeFileSync(outPkgPath, JSON.stringify(outPkg, null, 2) + "\n");
   run("npm", ["publish", "--access", "public"], out);
-  published.push(outPkg.name);
+  published.push(`${outPkg.name}@${publishAs}`);
 }
 
 console.log(
   `published ${platforms.length} platform packages + @vshulcz/deja-vu@${version}` +
-    (published.length ? ` + ${published.join(", ")}@${version}` : ""),
+    (published.length ? ` + ${published.join(", ")}` : ""),
 );
 
 // npmLatest is the version npm serves as `latest`, or "" when the package has
@@ -109,6 +114,17 @@ function npmLatest(name) {
   } catch {
     return "";
   }
+}
+
+// nextPatch is the next version on a package's own line. A harness package
+// whose version has run ahead of deja's is published here rather than skipped,
+// and this is the smallest version npm accepts from it.
+function nextPatch(v) {
+  const parts = v.split(".").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n))) {
+    throw new Error(`not a plain version: ${v}`);
+  }
+  return `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
 }
 
 // compareVersions orders two plain x.y.z versions. Releases here are always

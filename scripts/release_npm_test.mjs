@@ -19,6 +19,7 @@ function extract(name) {
 }
 
 const compareVersions = extract("compareVersions");
+const nextPatch = extract("nextPatch");
 
 test("plain versions order by number, not by string", () => {
   assert.equal(compareVersions("0.18.0", "0.20.3"), -1);
@@ -36,12 +37,18 @@ test("anything that is not a plain x.y.z stops the release", () => {
 test("the extension packages are published from the release version", () => {
   // The dependency has to move with it: a plugin pinned to an older deja is a
   // plugin that ships the wrong binary as its fallback.
-  assert.match(source, /outPkg\.version = version/);
+  assert.match(source, /outPkg\.version = publishAs/);
   assert.match(source, /outPkg\.dependencies\["@vshulcz\/deja-vu"\] = `\^\$\{version\}`/);
   assert.match(source, /const extensions = \["opencode", "dsh", "openclaw", "pi"\]/);
 });
 
-test("a release behind npm skips instead of moving latest backwards", () => {
-  assert.match(source, /compareVersions\(version, live\) <= 0/);
-  assert.match(source, /skipping \$\{pkg\.name\}/);
+test("a package whose line runs ahead is published, not skipped", () => {
+  // dsh-deja sat on npm at 0.20.5 asking for deja ^0.19.2 while deja shipped
+  // 0.19.4: skipping it meant the pin was never refreshed, and its version line
+  // is ahead, so nothing was going to catch up (#2993).
+  assert.equal(nextPatch("0.20.5"), "0.20.6");
+  assert.throws(() => nextPatch("0.21.0-rc.1"), /not a plain version/);
+  assert.match(source, /const publishAs = live && compareVersions\(version, live\) <= 0 \? nextPatch\(live\) : version/);
+  assert.match(source, /outPkg\.version = publishAs/);
+  assert.doesNotMatch(source, /continue;\n\s*\}\n\s*const out = path\.join\(work, name\)/);
 });

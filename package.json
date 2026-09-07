@@ -41,6 +41,6 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.19.2"
+    "@vshulcz/deja-vu": "^0.19.4"
   }
 }
