@@ -113,6 +113,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "continue",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.continue/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "pi",
       "state": "missing",
       "paths": [

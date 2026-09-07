@@ -144,6 +144,8 @@ func parseRegistryFixture(t *testing.T, id, path string) []model.Session {
 		sessions, err = ParseClineFile(path)
 	case "roo":
 		sessions, err = ParseRooTask(path)
+	case "continue":
+		sessions, err = ParseContinueFile(path)
 	case "opencode":
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")

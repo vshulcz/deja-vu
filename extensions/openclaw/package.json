@@ -1,7 +1,7 @@
 {
   "name": "@vshulcz/openclaw-deja",
   "version": "0.19.3",
-  "description": "deja-vu memory for OpenClaw: the coding sessions already on this machine \u2014 OpenClaw, Claude Code, Codex, Cursor and 19 more \u2014 recalled before each turn and searchable as tools. A local index, no LLM.",
+  "description": "deja-vu memory for OpenClaw: the coding sessions already on this machine \u2014 OpenClaw, Claude Code, Codex, Cursor and 20 more \u2014 recalled before each turn and searchable as tools. A local index, no LLM.",
   "type": "module",
   "main": "index.mjs",
   "files": [
