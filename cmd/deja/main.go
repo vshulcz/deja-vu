@@ -3618,7 +3618,7 @@ Usage:
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
-  deja files <topic> [--project name] [--limit n]
+  deja files <topic> [--project name] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]
   deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
