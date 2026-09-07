@@ -38,5 +38,11 @@ func builtNote(dir string) string {
 	} else {
 		line += " — what they decided now arrives before you re-ask"
 	}
+	// A marketplace install never runs `deja install`, so this notice is the
+	// first thing deja says to that person. It is also the only place left to
+	// say where the docs and the tracker are (#3030).
+	if where := whereToLook(dir); where != "" {
+		line += "\n" + where
+	}
 	return line
 }
