@@ -30,4 +30,4 @@ encoded path and prints `cd <project> && qwen -r <id>`.
 - System, tool-result, and other control records do not become messages.
 - Project path encoding is ambiguous because `-` represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-07

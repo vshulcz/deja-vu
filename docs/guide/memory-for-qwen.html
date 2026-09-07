@@ -113,6 +113,17 @@
 # or
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 
+<h2>What gets wired</h2>
+<p><code>deja install qwen-auto</code> writes four hooks into <code>~/.qwen/settings.json</code>, next to whatever else is in it:</p>
+<ul>
+<li>The project digest at <code>SessionStart</code>: what this project's past sessions settled, before you type anything.</li>
+<li>Recall on <code>UserPromptSubmit</code>, silent when the history has no answer.</li>
+<li>The repair on <code>PostToolUseFailure</code>, for <code>run_shell_command</code> only: when a command fails with an error that has been solved here before, what followed it last time arrives on the failing tool result itself.</li>
+<li>Forgetting on <code>PreCompact</code>, so the blocks a compacted thread just lost can be said again.</li>
+</ul>
+<p>Measured on Qwen Code 0.20.0 by reading the requests it sent. <code>PostToolUse</code> fires only when the tool succeeded — Qwen guards it and calls <code>PostToolUseFailure</code> otherwise — so the repair used to sit on the one event that never fires at a failure; an install over an older one drops that entry. <code>PreToolUse</code> runs but its output is discarded. The failure payload carries the command's output under <code>error</code>, inside a <code>Command: / Output: / Exit Code:</code> block Qwen writes itself, and deja unwraps it before matching.</p>
+<p>Costs on that version, on a seeded store: 2.3 KB at session start, 397 bytes for a repair block, 0 bytes and about 30 ms when there is nothing to say.</p>
+
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — twenty-three of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
 <p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>

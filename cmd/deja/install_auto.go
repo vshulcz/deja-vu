@@ -409,21 +409,37 @@ func installGeminiAuto(exe string, uninstall bool) (installResult, error) {
 // SessionStart used to be dropped here: qwen ran it and consumed nothing, so
 // deja retired the entry rather than leave a hook answering into the void. That
 // is no longer true — on qwen-code 0.20.0 the digest reaches the model, and so
-// does what a PostToolUse hook returns. PreToolUse fires and its output does
+// does what a hook returns after a tool. PreToolUse fires and its output does
 // not, so it stays unwired.
+//
+// The failure is its own event. Measured on 0.20.0 against a recording
+// endpoint: PostToolUse fires only when the tool succeeded — qwen guards it
+// with `!toolResult.error` and calls firePostToolUseFailureHook otherwise — so
+// the fix pair sat on the one event that never fires at a failure, which is the
+// moment it exists for.
 var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	{"SessionStart", "hook-context", ""},
 	{"UserPromptSubmit", "hook-prompt", ""},
 	// The fix pair, at the failure. Matched on the tool that runs a command so
 	// it never spawns on a read.
-	{"PostToolUse", "hook-tool-after", "run_shell_command"},
+	{"PostToolUseFailure", "hook-tool-after", "run_shell_command"},
+	// Compaction throws away the blocks this session was shown while the list
+	// that stops them repeating outlives them, so without this the memory qwen
+	// just lost is the memory recall refuses to send again.
+	{"PreCompact", "hook-precompact", ""},
 }
+
+// qwenRetiredEvents are events deja used to write for qwen and no longer does.
+// The PostToolUse entry fired only after a tool that succeeded, so it looked
+// up a repair for commands that did not need one and stayed quiet for the ones
+// that did; leaving it behind would keep that cost on every green command.
+var qwenRetiredEvents = map[string]bool{"PostToolUse": true}
 
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.QwenConfigDir(), "settings.json")
 	var res installResult
 	for i, h := range qwenHookWiring {
-		r, err := installSettingsHookCmd(path, h.Event, h.Matcher, 60000, exe+" "+h.Sub, uninstall)
+		r, err := installSettingsHookRetiring(path, h.Event, h.Matcher, 60000, exe+" "+h.Sub, uninstall, qwenRetiredEvents)
 		if err != nil {
 			return installResult{}, err
 		}
@@ -669,7 +685,10 @@ func dejaHookEntry(entry map[string]any) bool {
 		cmd, _ := m["command"].(string)
 		// Any deja subcommand counts: the point is to find wiring we wrote,
 		// whatever the old binary called.
-		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity"} {
+		// Both tool subcommands are spelled out: the match wants the whole
+		// token, so "hook-tool" does not find "hook-tool-after".
+		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity",
+			"hook-tool", "hook-tool-after", "hook-spawn"} {
 			if isDejaHookCommand(cmd, "deja "+sub) {
 				return true
 			}
