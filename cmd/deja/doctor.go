@@ -1224,6 +1224,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"pi", filepath.Join(sources.PiConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"omp", filepath.Join(sources.OmpConfigDir(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"amp", sources.AmpSettingsFile(), doctorJSONWired(ampServersKey), doctorJSONDejaKeys(ampServersKey)},
+		{"prime", primeSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, nil},
 		{"copilot", guidancePath("copilot"), doctorFileWired, nil},
 		{"vscode", doctorVSCodeMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},

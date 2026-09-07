@@ -40,7 +40,10 @@ func TestHandoffCommandTable(t *testing.T) {
 		"omp":      {"omp", "P"},
 		// Amp's execute mode, from `amp --help` on 0.0.1788724845: -x takes the
 		// message and prints the last assistant reply.
-		"amp":     {"amp", "-x", "P"},
+		"amp": {"amp", "-x", "P"},
+		// prime-agent takes the message as a trailing argument; --print answers
+		// once and exits (0.9.1).
+		"prime":   {"prime-agent", "--print", "P"},
 		"grok":    {"grok", "P"},
 		"cursor":  {"cursor-agent", "P"},
 		"copilot": {"copilot", "-p", "P"},

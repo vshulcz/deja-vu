@@ -733,6 +733,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installAmpMCP(exe, uninstall)
 	case "amp-auto":
 		return installAmpAuto(exe, uninstall)
+	case "prime":
+		return installPrimeMCP(exe, uninstall)
+	case "prime-auto":
+		return installPrimeAuto(exe, uninstall)
 	case "deepseek":
 		return installDeepSeekMCP(exe, uninstall)
 	case "deepseek-auto":
@@ -3618,6 +3622,7 @@ func installTargetNames() []string {
 		"pi", "pi-auto",
 		"omp", "omp-auto",
 		"amp", "amp-auto",
+		"prime", "prime-auto",
 		"deepseek", "deepseek-auto",
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",

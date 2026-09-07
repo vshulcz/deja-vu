@@ -305,6 +305,10 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		// Amp's execute mode: it takes the prompt as the flag's value and
 		// prints the last assistant message.
 		return []string{"amp", "-x", prompt}, true
+	case "prime":
+		// prime-agent takes the message as its trailing argument, and --print
+		// answers once and exits.
+		return []string{"prime-agent", "--print", prompt}, true
 	case "grok":
 		return []string{"grok", prompt}, true
 	case "cursor":
@@ -334,8 +338,8 @@ var handoffAlias = map[string]string{"agy": "antigravity"}
 // capability drift test keeps the two in sync.
 // Zed is paste-only for the same reason Roo is: the agent lives in the editor,
 // so there is no CLI invocation to hand a prompt to.
-var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "zed": true, "deepseek": true, "prime": true, "copilot-chat": true}
+var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "zed": true, "deepseek": true, "copilot-chat": true}
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "amp", "grok", "cline", "goose", "kimi"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi"}
 }
