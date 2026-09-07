@@ -73,3 +73,4 @@ https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html
 https://vshulcz.github.io/deja-vu/card/
 https://vshulcz.github.io/deja-vu/registry/amp.html
 https://vshulcz.github.io/deja-vu/registry/copilot-chat.html
+https://vshulcz.github.io/deja-vu/registry/continue.html

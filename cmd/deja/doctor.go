@@ -776,6 +776,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
 
+	continueDir := filepath.Join(sources.ContinueRoot(), "sessions")
+	printFiles("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles())
+
 	piRoot := sources.PiRoot()
 	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
 	openclawRoot := sources.OpenClawRoot()

@@ -502,6 +502,51 @@
       }
     },
     {
+      "id": "continue",
+      "store_paths": [
+        "${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json",
+        "${DEJA_CONTINUE_ROOT}/sessions/*.json"
+      ],
+      "format_kind": "json",
+      "fixture_paths": [
+        "fixtures/registry/continue/sessions/8f1c2a3e-0000-4000-8000-000000000000.json"
+      ],
+      "parser_source": "internal/sources/continuedev.go",
+      "last_verified": "2026-09-07",
+      "display_name": "Continue",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": ""
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Continue reads MCP servers from ~/.continue/config.yaml under mcpServers:; deja does not write that file yet"
+        },
+        "auto": {
+          "state": "impossible",
+          "why": "Continue has no session-start, per-prompt or tool hook — there is no event deja could answer"
+        },
+        "skill": {
+          "state": "todo",
+          "why": "Continue reads rules from ~/.continue/rules; deja writes no guidance there yet"
+        },
+        "command": {
+          "state": "todo",
+          "why": "Continue has slash commands in config.yaml rather than a command file, and deja writes none yet"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "Continue reopens a session from its history view in the editor; nothing takes a session id from a shell"
+        }
+      }
+    },
+    {
       "id": "pi",
       "store_paths": [
         "${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl"

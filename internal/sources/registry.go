@@ -308,6 +308,16 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "continue", Load: LoadContinue, Files: ContinueSessionFiles,
+			Kinds: []FileKind{{
+				Name: "continue",
+				Match: func(p string) bool {
+					return continueSessionFile(p) && strings.HasPrefix(p, filepath.Join(ContinueRoot(), "sessions"))
+				},
+				Parse: fullParse(ParseContinueFile),
+			}},
+		},
+		{
 			Name: "pi", Load: LoadPi, Files: PiSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "pi",
