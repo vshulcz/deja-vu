@@ -133,6 +133,8 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// Amp's command palette entry is registered by the plugin, the way
 			// pi's is.
 			gotCommand = strings.Contains(ampPluginTS("/bin/deja"), "registerCommand")
+		case "prime":
+			gotCommand = strings.Contains(primeExtensionTS("/bin/deja"), "registerCommand")
 		case "deepseek":
 			// dsh registers commands in code, so deja ships a plugin file the
 			// profile row names by path.

@@ -71,7 +71,7 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 var sharedSkillHarnesses = map[string]bool{
 	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
-	"omp": true, "deepseek": true, "zed": true, "amp": true,
+	"omp": true, "deepseek": true, "zed": true, "amp": true, "prime": true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately
