@@ -23,6 +23,7 @@ func TestSearchJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// hit
 		"session": true, "count": true, "snippets": true, "score": true,
 		"tier_detail": true, "superseded": true, "reused": true, "moved": true,
+		"revisited": true,
 		"lifecycle": true, "lifecycle_note": true, "lifecycle_at": true,
 		// session
 		"id": true, "harness": true, "project": true, "path": true, "title": true,

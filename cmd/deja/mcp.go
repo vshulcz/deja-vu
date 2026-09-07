@@ -1296,6 +1296,14 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		for _, sn := range h.Snippets {
 			fmt.Fprintf(&hb, "- %s\n", recallListingLine(sn))
 		}
+		// After the excerpts, because it is about them. The excerpts are the
+		// passages that matched hardest, which in a session that changed its
+		// mind is the argument rather than the conclusion — recall answered
+		// "we are not on ClawHub yet" out of a session that later records the
+		// submission going through, and the caller acted on it (#2976).
+		if line := strings.TrimSpace(search.RevisitedLine(h)); line != "" {
+			fmt.Fprintf(&hb, "[%s]\n", line)
+		}
 		// Under the best hit only, and only when there is budget left: the
 		// excerpts say where the query words appear, which is not the same as
 		// what the session concluded. An agent had to open the session to learn

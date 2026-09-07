@@ -128,7 +128,10 @@ written against version 1:
 Stemmed search may also include `variants`; semantic search sets `semantic`.
 `superseded` (optional) carries the date of a newer same-project session whose
 matches overlap this hit — an earlier-attempt signal. `reused` (optional)
-counts recent agent recalls that served this session.
+counts recent agent recalls that served this session. `revisited` (optional) is
+the timestamp of a later message in *this* session that also matched, after the
+passages the excerpts came from: the session went on talking about the query,
+so what the excerpts say may be the half it later reversed.
 
 `--limit N` bounds the ranked result set to 1–100 hits, on the tiers that serve
 that cap (see [`hits` is not a fixed
