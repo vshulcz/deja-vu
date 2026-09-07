@@ -95,6 +95,11 @@ func guidancePath(harness string) string {
 		// guidance missing on a machine where the skill was installed and
 		// working.
 		return filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName, "skills", "deja-history", "SKILL.md")
+	case "continue":
+		// Continue reads skills from its global folder, and what lands there is
+		// named in the `Skills` tool's own description — in front of the model
+		// on every turn, which is what makes recall arrive unasked (#3062).
+		return continueSkillPath()
 	case "copilot":
 		return filepath.Join(homeDir(), ".copilot", "skills", "deja-history", "SKILL.md")
 	case "pi":
@@ -651,7 +656,7 @@ func guidanceOwnsWholeFile(harness string) bool {
 		return true
 	}
 	switch harness {
-	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes", "vscode":
+	case "claude-code", "claude", "antigravity", "copilot", "pi", "opencode", "hermes", "vscode", "continue":
 		return true
 	}
 	return false

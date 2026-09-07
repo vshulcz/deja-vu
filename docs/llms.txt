@@ -54,6 +54,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
 - [Roo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html)
 - [prime-agent (PrimeIntellect)](https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html)
+- [Continue](https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html)
 - [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html)
 - [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html)
 - [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html)

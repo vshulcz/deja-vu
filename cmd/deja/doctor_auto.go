@@ -141,6 +141,17 @@ func doctorHermesWired(path string) bool {
 	return yamlHasChildKey(path, "mcp_servers:", "deja:")
 }
 
+// Continue keys its servers by a name field inside a list item rather than by a
+// key, so the child-key check above has nothing to look for: the row asks
+// whether an item under mcpServers names deja.
+func doctorContinueWired(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return removeContinueItem(string(b), "mcpServers", "deja") != string(b)
+}
+
 // yamlHasChildKey reports whether a key sits directly under a top-level parent.
 //
 // The indent is whatever the reader wrote the block at, and asking for exactly

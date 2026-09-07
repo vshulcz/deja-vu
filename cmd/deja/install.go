@@ -726,6 +726,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 			return installResult{}, err
 		}
 		return installClineAuto(exe, uninstall)
+	case "continue":
+		return installContinue(exe, uninstall)
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "vscode", "copilot-chat":
@@ -3641,6 +3643,10 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"grok", "grok-auto", "copilot", "roo", "aider",
+		// Continue keeps the server and the slash command in one assistant
+		// config, and its skill in the folder beside it; there is no hook to
+		// wire, so there is nothing an -auto target would add (#3062).
+		"continue",
 		// VS Code Copilot Chat takes MCP servers and nothing else an outside CLI
 		// can reach — no hook, no plugin — so there is no -auto pair.
 		"vscode",
