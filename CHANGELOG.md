@@ -7,17 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The release where every agent on the machine gets the same memory. Four more
+harnesses are wired for the moments recall is worth most — the first prompt,
+the failing command, the file about to be edited, the turn after a compaction —
+VS Code Copilot Chat joins as the twenty-third, and the agent now says
+"déjà vu" with a date and a session id when it reuses what it was handed.
+
+### Added
+- VS Code Copilot Chat: its chat sessions are indexed (`chatSessions/*.jsonl`, the append log VS Code writes since 1.109), the twenty-third harness — contributed by @Sora-bluesky. (#3088)
+- VS Code: `deja install vscode` writes the `mcp.json` Copilot Chat reads in agent mode, one per host present (Code, Insiders, VSCodium), and a `deja.instructions.md` applied to every chat so recall arrives without being asked for; measured on VS Code 1.134.0 from the MCP traffic. (#3102, #3107)
+- Amp: `deja install amp` writes the MCP server the way `amp mcp add` does; `amp-auto` adds a plugin under `~/.config/amp/plugins` that hands the project digest to the first turn, per-prompt recall after it, and the repair beside a failed command in the same turn. (#3118)
+- Kimi Code: the session digest rides the first prompt and a compaction forgets what it threw away, measured on 0.28.1 — `UserPromptSubmit` is the one event whose output reaches the model. (#3121)
+- pi and omp: `@vshulcz/pi-deja`, the recall extension as a pi package — `pi install npm:@vshulcz/pi-deja` — session-start digest, per-prompt recall and `/deja`. (#3095)
+- pi and omp: a failed command gets its repair in the same turn (`tool_result` is the event whose return reaches the model; omp's bash tool reports the exit code in `details.exitCode`), a compaction forgets, and a file's history arrives when the agent reads it — the step before the edit, since neither harness has a pre-edit hook. (#3112, #3113)
+- Cline: the repair for a failed command arrives in the same turn, appended to the tool result by the message builder; `hook-tool-after` learns cline's `run_commands` and grows `--plain`. (#3098)
+- OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — and a local session opens with the project digest via `before_agent_start` (74 ms and 1.6 KB on the first turn, nothing after). (#3058, #3087)
+- DeepSeek Harness: a session opens knowing what the project settled — a second `systemPrompt.context` contributor ahead of per-prompt recall, once per session. (#3094)
+- Antigravity: `PreInvocation` answers the question instead of only opening with the digest (the invocation counter is zero-based and restarts every turn); the repair arrives at the failing command; what a compaction threw away is served again; and the project is recalled when the payload names no workspace, read from `cache/last_conversations.json`. Measured on antigravity-cli 1.1.13. (#3059, #3063, #3077, #3078)
+- Install: the proof opens with the questions this machine asked more than once, and one of them — `26 questions asked more than once on this machine — one of them: "…"`. (#3071)
+- The first session after an index build hears what was indexed — `deja indexed 1,444 sessions from 19 agents on this machine — 27 questions asked more than once` — once per index. (#3074)
+- Once a week, session start says what the week looked like: `deja this week: 41 recalls, 3 déjà vu — deja stats --card`. (#3070)
+
 ### Changed
 - The line an agent says when it reused a recall is now `déjà vu: <what you asked then> (<agent>, <date>, deja:<id>) — reusing it.`, on every surface that asks for one; a question this machine already asked is quoted back in its own words. The line names the session the digest shows, not the top of the ranking. `deja stats` counts the new shape alongside "deja-vu recalled". (#3108)
-
-### Added
-- pi and omp: `@vshulcz/pi-deja`, the recall extension as a pi package — `pi install npm:@vshulcz/pi-deja` — session-start digest, per-prompt recall and `/deja`; it stands down when `deja install pi-auto` already wrote its extension. (#3092)
-
-### Added
-- OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — with `before_prompt_build` recall and `deja_recall`, `deja_fix`, `deja_blame` as tools; it reads what `deja install openclaw-auto` wrote and adds only what is missing. (#3047)
+- `deja stats --card` leads with the questions asked more than once, the week moves to the supporting row, and the footer links to the repository. (#3069)
+- The README, the site and the npm page lead with what the harness count is for: one memory every agent on the machine reads. (#3109)
 
 ### Fixed
+- Grok Build: `SessionStart` and `PreCompact` matchers that grok never fired are dropped and corrected on machines that already installed deja; hook inputs read grok's camelCase; agents it spawns are reached. (#3085)
+- Zed: the `/deja` fix from #3020 never shipped because `extension.toml` still said 0.1.0; the version moves and CI fails when a change outruns it. (#3081)
+- pi: the generated `/deja` command declared `args` twice, so pi loaded the extension with no deja at all. (#3096)
+- A compiler error is one wall wherever the line moves: the position is masked on the repair signature, so adding an import no longer turns one recurring error into a new one on every edit. (#3080)
 - Search: offer `--limit` in bash, zsh, fish, and PowerShell completions. (#1929)
+- The README GIF recipe is complete and reproducible. (#1832)
+- Release scripts run npm, tar and unzip without a shell, and the digest marker constants are named as markers — the plugin scanner the Codex plugin catalogue pins reports nothing on main. (#3114, #3116)
 
 ## [0.19.3] - 2026-09-04
 
