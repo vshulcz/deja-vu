@@ -51,5 +51,11 @@ func weekNoteAt(dir string, now time.Time) string {
 	if dv := usage.DejaVuWeek(dir); dv > 0 {
 		line += fmt.Sprintf(", %d déjà vu", dv)
 	}
-	return line + " — deja stats --card"
+	line += " — deja stats --card"
+	// The first week note carries the one sentence deja says about itself, when
+	// the install never printed it (a plugin or package install has no proof).
+	if star := starLine(dir); star != "" {
+		line += " · " + star
+	}
+	return line
 }

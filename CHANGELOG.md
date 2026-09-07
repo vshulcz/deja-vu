@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- After the install proof, once per index, deja says where it lives — one line with the repository address; a package or plugin install that printed no proof gets the same line in its first week note, and never again. (#3159)
+
 ## [0.19.4] - 2026-09-07
 
 The release where every agent on the machine gets the same memory. Amp,
