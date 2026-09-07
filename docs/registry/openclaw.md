@@ -21,10 +21,15 @@ back whole. Explicit deletes keep a compressed archive in
 `session_transcript_archives`, which is not read. The fixture database is the
 output of `openclaw doctor --session-sqlite import` over the JSONL fixture.
 
-Skipped in the sessions directory: `sessions.json` (store metadata),
-compaction checkpoints (`<id>.checkpoint.<uuid>.jsonl`), archived
-transcripts (`.deleted`/`.reset`/`.bak` suffixes) and the
-`session-sqlite-import-archive/` copies the migration leaves. Format verified
+Read in the sessions directory beside the live transcripts: what a reset or a
+delete left behind — `<id>.jsonl.reset.<ts>`, `<id>.jsonl.deleted.<ts>` and the
+compressed `<id>.jsonl.deleted.<ts>.zst` an explicit delete writes since the
+SQLite flip. That is the history someone asks for after losing it. An archive
+whose live file is back stands down, so a reset conversation is indexed once.
+Skipped: `sessions.json` (store metadata), compaction checkpoints
+(`<id>.checkpoint.<uuid>.jsonl`), `.bak` copies and the
+`session-sqlite-import-archive/` copies the migration leaves — those sessions
+are in the SQLite store deja already reads. Format verified
 against a 2026.8.2 store and openclaw source
 (`src/config/sessions/session-accessor.sqlite-*.ts`, `paths.ts`).
 

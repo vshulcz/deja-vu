@@ -1,8 +1,11 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -15,9 +18,12 @@ import (
 //
 //	${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/<agentId>/sessions/<sessionId>.jsonl
 //
-// sessions.json in the same directory is store metadata, compaction
-// checkpoints (<id>.checkpoint.<uuid>.jsonl) are context snapshots, and
-// archived transcripts carry .deleted/.reset/.bak suffixes — all skipped.
+// sessions.json in the same directory is store metadata and compaction
+// checkpoints (<id>.checkpoint.<uuid>.jsonl) are context snapshots; both are
+// skipped. What a reset or a delete leaves behind is not: OpenClaw renames the
+// transcript to <id>.jsonl.reset.<ts> or <id>.jsonl.deleted.<ts>, and since the
+// SQLite flip an explicit delete writes <id>.jsonl.deleted.<ts>.zst — which is
+// exactly the history someone asks deja for after losing it (#2997).
 // Verified against openclaw src/config/sessions/{paths,artifacts}.ts.
 
 // OpenClawStateDir is the OpenClaw state root.
@@ -32,10 +38,19 @@ func OpenClawRoot() string {
 
 var openclawCheckpointRE = regexp.MustCompile(`(?i)\.checkpoint\.[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.jsonl$`)
 
+// openclawArchiveRE matches what a reset or a delete renames a transcript to.
+// The timestamp is whatever OpenClaw stamped it with, and the .zst is the
+// compressed form an explicit delete writes since the SQLite flip.
+var openclawArchiveRE = regexp.MustCompile(`\.jsonl\.(reset|deleted)\.[0-9]+(\.zst)?$`)
+
 // openclawTranscript reports whether p is a live transcript directly inside
 // an agent's sessions dir (agents/<id>/sessions/<file>.jsonl).
 func openclawTranscript(root, p string) bool {
-	if !strings.HasSuffix(p, ".jsonl") || openclawCheckpointRE.MatchString(p) {
+	archived := openclawArchiveRE.MatchString(p)
+	if !strings.HasSuffix(p, ".jsonl") && !archived {
+		return false
+	}
+	if openclawCheckpointRE.MatchString(p) {
 		return false
 	}
 	rel, err := filepath.Rel(root, p)
@@ -43,7 +58,27 @@ func openclawTranscript(root, p string) bool {
 		return false
 	}
 	parts := strings.Split(filepath.ToSlash(rel), "/")
-	return len(parts) == 3 && parts[1] == "sessions"
+	if len(parts) != 3 || parts[1] != "sessions" {
+		return false
+	}
+	// A reset writes the archive and starts a new transcript under the old
+	// name; taking both would index the same conversation twice. The live file
+	// is the one the agent is still writing to, so the archive stands down.
+	if archived {
+		if _, err := os.Stat(openclawArchiveLive(p)); err == nil {
+			return false
+		}
+	}
+	return true
+}
+
+// openclawArchiveLive is the transcript an archive was renamed from.
+func openclawArchiveLive(p string) string {
+	at := strings.Index(p, ".jsonl.")
+	if at < 0 {
+		return p
+	}
+	return p[:at] + ".jsonl"
 }
 
 // OpenClawSessionFiles lists live transcript files for all agents.
@@ -69,7 +104,68 @@ func ParseOpenClawFile(path string) ([]model.Session, error) {
 
 // ParseOpenClawFileFromOffset parses an OpenClaw transcript from a byte offset.
 func ParseOpenClawFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	if openclawArchiveRE.MatchString(path) {
+		return parseOpenClawArchive(path)
+	}
 	return parsePiShaped(path, offset, "openclaw", openclawProject(path), true)
+}
+
+// parseOpenClawArchive reads what a reset or a delete left behind. The file
+// never grows, so it is read whole rather than from an offset, and the session
+// keeps the id it had before the rename — that is the id the store, the key
+// mapping and anyone looking for it still use.
+func parseOpenClawArchive(path string) ([]model.Session, error) {
+	read := path
+	if strings.HasSuffix(path, ".zst") {
+		plain, err := zstdToTemp(path)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = os.Remove(plain) }()
+		read = plain
+	}
+	ss, err := parsePiShaped(read, 0, "openclaw", openclawProject(path), true)
+	for i := range ss {
+		ss[i].Path = path
+		ss[i].ID = strings.TrimSuffix(filepath.Base(openclawArchiveLive(path)), ".jsonl")
+	}
+	return ss, err
+}
+
+// zstdToTemp decompresses a .zst archive into a temporary file and returns its
+// path. deja carries no Go dependencies, so the frames go through the same
+// `zstd` CLI the Zed and DeepSeek stores already need; the caller removes the
+// file. A scanner that reads from a path is what every transcript parser here
+// takes, and an archive is small enough that a temporary copy is cheaper than
+// teaching all of them to read a stream.
+func zstdToTemp(path string) (string, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.Command("zstd", "-d", "-c", "-q")
+	cmd.Stdin = bytes.NewReader(raw)
+	var out, errBuf bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("openclaw: zstd -d %s: %w: %s", filepath.Base(path), err,
+			strings.TrimSpace(errBuf.String()))
+	}
+	f, err := os.CreateTemp("", "deja-openclaw-*.jsonl")
+	if err != nil {
+		return "", err
+	}
+	if _, err := f.Write(out.Bytes()); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 // openclawProject attributes a session to its agent id; the header cwd, when
