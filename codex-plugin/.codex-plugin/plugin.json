@@ -17,9 +17,7 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
-  "hooks": [
-    "./hooks/hooks.json"
-  ],
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "deja-vu",
     "shortDescription": "Search and recall your own past AI coding sessions.",
