@@ -114,6 +114,43 @@ func TestQwenReinstallRetiresTheOldPostToolUseHook(t *testing.T) {
 	}
 }
 
+// qwen-auto writes two things into one file, and it reported only the second.
+// On a machine that already had the MCP entry — every machine that installed
+// before — rewiring the hooks printed "unchanged", so the reader was told
+// nothing happened while the repair hook was being added under them.
+func TestQwenAutoReportsTheHookItRewired(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	exe := "/bin/deja"
+	path := filepath.Join(home, ".qwen", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// The MCP half already in place, the hooks in the shape an older deja left.
+	before := `{"mcpServers":{"deja":{"command":"` + exe + `","args":["mcp"]}},"hooks":{"PostToolUse":[` +
+		`{"matcher":"run_shell_command","hooks":[{"type":"command","command":"` + exe + ` hook-tool-after","timeout":60000}]}]}}`
+	if err := os.WriteFile(path, []byte(before), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	res, err := installTarget("qwen-auto", exe, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Action == "unchanged" {
+		b, _ := os.ReadFile(path)
+		t.Fatalf("install reported unchanged after rewiring the hooks:\n%s", b)
+	}
+	// And it stays honest: a second install really does change nothing.
+	res2, err := installTarget("qwen-auto", exe, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res2.Action != "unchanged" {
+		t.Fatalf("a second install reported %q, and the file was already right", res2.Action)
+	}
+}
+
 // Qwen sends the command's output under `error`, inside a block it wrote
 // itself. Both halves matter: reading only tool_response finds nothing, and
 // scanning the frame hashes `Output: <error>` — a signature no session ever

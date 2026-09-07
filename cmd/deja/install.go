@@ -691,10 +691,18 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		// refusal after the entry was written left the target reported as
 		// refused with half its wiring in the file and a .bak beside it
 		// (#2745, the shape #2744 was about).
-		if _, err := installQwenAuto(exe, uninstall); err != nil {
+		hooks, err := installQwenAuto(exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+		mcp, err := installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Both halves, not just the last one. Returning the MCP result alone
+		// meant a machine that already had the server was told "unchanged"
+		// while the hooks under it were being rewired.
+		return wroteAll(hooks, mcp), nil
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "kimi-auto":
