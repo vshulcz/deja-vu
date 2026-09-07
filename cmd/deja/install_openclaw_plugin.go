@@ -179,10 +179,14 @@ export default {
     // where a session had no memory of the project at all until it happened to
     // ask a question the store answered.
     //
-    // before_agent_start fires once per agent run rather than once per session,
-    // so deja_once is what keeps the digest to the first of them.
+    // agent_turn_prepare is the phase hook OpenClaw asks new plugins to use —
+    // before_agent_start is kept only for compatibility — and it is also where
+    // queued next-turn injections are drained, so this sits in the right place
+    // if that seam ever starts delivering. It fires once per agent run rather
+    // than once per session, so deja_once is what keeps the digest to the first
+    // of them.
     api.on(
-      "before_agent_start",
+      "agent_turn_prepare",
       async (_event, ctx) => {
         const digest = ask(["hook-context", "--plain"], {
           session_id: ctx?.sessionKey || ctx?.sessionId || "",
@@ -213,6 +217,17 @@ export default {
         // own history answers what they just asked.
         if (!recall) return;
         return { prependContext: recall };
+      },
+      { timeoutMs: 15000 },
+    );
+    // Compaction throws away the blocks this session was shown while the list
+    // that stops them repeating outlives it, so without this the memory the
+    // session just lost is the memory recall refuses to send again. Nothing is
+    // read back: forgetting is a side effect, which is all this hook can carry.
+    api.on(
+      "before_compaction",
+      async (_event, ctx) => {
+        ask(["hook-precompact"], { session_id: ctx?.sessionKey || ctx?.sessionId || "" });
       },
       { timeoutMs: 15000 },
     );
