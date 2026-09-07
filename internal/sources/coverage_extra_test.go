@@ -252,13 +252,20 @@ func TestSourceRemainingDiscoveryBranches(t *testing.T) {
 		t.Fatal("ClaudeFileWanted suffix branch failed")
 	}
 	sub := filepath.Join("parent", "subagents", "child.jsonl")
-	if ClaudeFileWanted(sub) {
-		t.Fatal("subagent should be skipped by default")
+	// A child run is read by default now — as its task and its answer, cut by
+	// the parser — so the path is wanted (#3009).
+	if !ClaudeFileWanted(sub) || !IsSubagentPath(sub) {
+		t.Fatal("subagent transcripts are read by default")
 	}
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
 	if !ClaudeFileWanted(sub) {
 		t.Fatal("subagent include override failed")
 	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "0")
+	if ClaudeFileWanted(sub) {
+		t.Fatal("the opt-out no longer skips subagent transcripts")
+	}
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
 	if got := itoa(0); got != "0" {
 		t.Fatalf("itoa(0)=%q", got)
 	}

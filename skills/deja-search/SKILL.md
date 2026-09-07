@@ -49,5 +49,5 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 
 - Result windows are bounded. Do not report corpus-wide counts, or claim a complete audit, from the number of hits you got back.
 - If `deja` is not on PATH or the index is empty, say that history search is unavailable. Do not invent what it might have found.
-- Work a subagent did is not in the index by default. A Claude Task or a Cursor subagent writes its turns and tool calls to its own transcript, and the parent session keeps only the launch and a summary of what came back — so a hit on the parent can look complete while the actual run is missing. `DEJA_INCLUDE_SUBAGENTS=1` takes those transcripts in, as sessions of their own.
+- Work a subagent did is in the index as its task and its answer, not in full. A Claude Task or a Cursor subagent writes its turns and tool calls to its own transcript, and the parent keeps only the launch and a summary — so a hit on the parent can look complete while the run itself is elsewhere. `DEJA_INCLUDE_SUBAGENTS=1` takes the whole child transcript in; Cursor's are still left out by default.
 - Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.

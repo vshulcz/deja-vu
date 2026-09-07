@@ -44,6 +44,19 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 	}
 }
 
+// countSubagentFiles counts the child transcripts among the files a harness
+// offered. They are read as their task and their answer rather than in full, so
+// the row says how much of them is searchable.
+func countSubagentFiles(seen []string) int {
+	n := 0
+	for _, p := range seen {
+		if sources.IsSubagentPath(p) {
+			n++
+		}
+	}
+	return n
+}
+
 // runDoctor prints a self-diagnosis report. Diagnosis itself never fails, so
 // both human and JSON reports keep exit status 0.
 func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir string) error {
@@ -700,6 +713,10 @@ func doctorHarnesses(w io.Writer, dir string) {
 			// wanted those transcripts indexed set the thing the line said
 			// was already set. It is the remedy, and it reads as one now.
 			detail += fmt.Sprintf(", %d subagent transcripts skipped — set DEJA_INCLUDE_SUBAGENTS=1 to index them", byRule)
+		} else if short := countSubagentFiles(seen); short > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+			// Read, but not in full: what a reader needs to know is which half
+			// of those files is searchable, and how to get the rest (#3009).
+			detail += fmt.Sprintf(", %d subagent transcripts read as task and answer — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
 		}
 		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)

@@ -114,6 +114,11 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
+	// A child run comes in as the task it was handed and the answer it came
+	// back with, unless the reader asked for the whole thing (#3009).
+	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		s.Messages = KeepSubagentTail(s.Messages)
+	}
 	// The directory a session was started from is a weak guess at what it was
 	// about; the files it touched are a strong one.
 	if p := projectFromPaths(s.Messages); p != "" {
