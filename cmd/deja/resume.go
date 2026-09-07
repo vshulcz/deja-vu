@@ -158,7 +158,15 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		return "", "cline --id " + s.ID, nil
 	case "roo":
-		return "", "", fmt.Errorf("roo tasks reopen from the extension's history UI, not the terminal")
+		// The Roo CLI runs the extension against a VS Code shim and keeps its
+		// tasks in a store of its own, which is the half that reopens from a
+		// terminal: `roo --session-id`, scoped to the workspace the task was
+		// in. Editor tasks live under the host's globalStorage, the CLI never
+		// lists them, and there is still no command for those.
+		if id, ws := sources.RooCLITask(s.Path); id != "" {
+			return ws, "roo --session-id " + id, nil
+		}
+		return "", "", fmt.Errorf("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
 	case "zed":
 		// These two used to fall through to "don't know how to resume", which
 		// reads like deja is missing something. Both are settled answers, and

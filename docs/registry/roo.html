@@ -46,18 +46,22 @@
 <p>The transcript shape matches Cline&#39;s legacy store (Roo is a Cline fork), so</p>
 <p>the same text-block extraction and <code>&lt;task&gt;</code> envelope unwrapping apply.</p>
 <p>Format verified against Roo-Code source (<code>src/shared/globalFileNames.ts</code>,</p>
-<p><code>src/core/task-persistence</code>); a live-loop validation with the running</p>
-<p>extension is still welcome — Roo is GUI-only, so deja reads its history and</p>
-<p>serves it to other agents rather than injecting into Roo itself.</p>
+<p><code>src/core/task-persistence</code>) and against a live run of the Roo CLI, which</p>
+<p>drives the same extension against a VS Code shim and writes the same files</p>
+<p>under <code>~/.vscode-mock/global-storage</code>.</p>
 <ul>
-<li><strong>MCP</strong>: Roo manages its own MCP servers from the extension UI</li>
+<li><strong>MCP</strong>: <code>deja install roo</code> writes the server into <code>mcp_settings.json</code> for</li>
 </ul>
-<p>(<code>mcp_settings.json</code>); point it at <code>deja mcp</code> manually if desired.</p>
+<p>every host Roo has run in, and names deja&#39;s own tool in that entry&#39;s</p>
+<p><code>alwaysAllow</code> — without it Roo asks before every recall.</p>
 <ul>
-<li><strong>Resume</strong>: extension UI only.</li>
+<li><strong>Resume</strong>: <code>roo --session-id &lt;uuid&gt;</code>, run in the task&#39;s workspace, for tasks</li>
+</ul>
+<p>the CLI created. Editor tasks reopen from the extension&#39;s history UI.</p>
+<ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-27</p>
+<p><strong>Last verified:</strong> 2026-09-07</p>
 
 <hr>
 <p>deja reads this format and twenty-two others, and turns what it finds into memory your

@@ -581,27 +581,22 @@
         "fixtures/registry/roo/tasks/1767225700000/api_conversation_history.json"
       ],
       "parser_source": "internal/sources/roo.go",
-      "last_verified": "2026-07-27",
+      "last_verified": "2026-09-07",
       "display_name": "Roo Code",
       "capabilities": {
         "mcp": true,
         "auto": false,
         "skill": true,
         "command": true,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
-        "prereq": ""
+        "prereq": "roo CLI (editor tasks reopen in the editor)"
       },
       "gaps": {
         "auto": {
           "state": "blocked",
           "why": "Roo's hooks are in flight upstream, not shipped: PR #10785 implements a Claude Code-style hooks system, #11128 is Hooks beta and #11663 Hooks phase 1, all still open, and no release names lifecycle hooks. A user's bug report about PreToolUse coverage (#10834) shows they work on a branch build. Becomes work the day one of those merges",
           "source": "https://github.com/RooCodeInc/Roo-Code/pull/10785"
-        },
-        "resume": {
-          "state": "impossible",
-          "why": "Roo Code is a VS Code extension with no command line at all, so there is nothing for deja to print. Its transcripts are read from disk; reopening one is a thing the editor does, not a command.",
-          "source": "no CLI ships with the extension"
         }
       }
     },

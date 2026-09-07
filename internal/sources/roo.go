@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -227,6 +228,33 @@ func RooCLIRoot() string {
 		return p
 	}
 	return filepath.Join(Home(), ".vscode-mock", "global-storage")
+}
+
+// rooCLISessionID is the shape the Roo CLI accepts after --session-id: it
+// validates the argument as a UUID and refuses anything else, so a task
+// numbered the old way is not one this command can reopen.
+var rooCLISessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// RooCLITask reports the session id and workspace of a task the Roo CLI wrote,
+// and empty strings for anything else. The CLI lists tasks from its own storage
+// path alone, so a task from the editor is not something `roo --session-id`
+// can find even though both stores hold the same file names (measured on
+// @roo-code/cli 0.1.17).
+func RooCLITask(path string) (id, workspace string) {
+	root := RooCLIRoot()
+	if root == "" || !strings.HasPrefix(filepath.Clean(path), filepath.Clean(root)+string(filepath.Separator)) {
+		return "", ""
+	}
+	dir := filepath.Dir(path)
+	id = filepath.Base(dir)
+	if !rooCLISessionID.MatchString(id) {
+		return "", ""
+	}
+	var item rooHistoryItem
+	if b, err := os.ReadFile(filepath.Join(dir, "history_item.json")); err == nil {
+		_ = json.Unmarshal(b, &item)
+	}
+	return id, item.Workspace
 }
 
 func RooTaskFiles() []string {

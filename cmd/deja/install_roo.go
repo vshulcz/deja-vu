@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,6 +101,15 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
+		if !uninstall {
+			changed, err := rooAllowDejasTool(p)
+			if err != nil {
+				return installResult{}, err
+			}
+			if changed && res.Action == "unchanged" {
+				res.Action = "updated"
+			}
+		}
 		last = res
 		if res.Action != "unchanged" {
 			wrote = true
@@ -122,6 +133,52 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 		return installResult{Action: "no Roo host found — open Roo in VS Code once, then re-run"}, nil
 	}
 	return last, nil
+}
+
+// rooAllowDejasTool names deja's own tool in the entry's alwaysAllow list, the
+// per-server approval Roo reads before it runs an MCP tool.
+//
+// Without it Roo asks first, every time. In the editor that is a click before
+// each recall; in the CLI's non-interactive mode there is nobody to click, and
+// the run waits: measured on @roo-code/cli 0.1.17 against a recording
+// endpoint, the turn stopped after the first request and never finished, while
+// the same run with the list in place came back with the recall in the next
+// request it sent.
+//
+// Only when the entry says nothing about approvals. A list that is there and
+// does not name deja is the reader's own answer, and re-running install must
+// not overrule it.
+func rooAllowDejasTool(path string) (bool, error) {
+	old, err := readConfig(path)
+	if err != nil || len(bytes.TrimSpace(old)) == 0 {
+		return false, err
+	}
+	// A settings file carrying comments cannot be rewritten without losing
+	// them, and this is an addition rather than the wiring itself — the server
+	// still works, it just asks first.
+	if configIsJSONC(old) {
+		return false, nil
+	}
+	var root map[string]any
+	if err := json.Unmarshal(old, &root); err != nil {
+		return false, nil
+	}
+	servers, _ := root["mcpServers"].(map[string]any)
+	entry, _ := servers[dejaEntryKey(servers)].(map[string]any)
+	if entry == nil {
+		return false, nil
+	}
+	if _, said := entry["alwaysAllow"]; said {
+		return false, nil
+	}
+	entry["alwaysAllow"] = []any{"deja"}
+	next, err := marshalConfigLike(old, root)
+	if err != nil {
+		return false, err
+	}
+	next = append(next, '\n')
+	a, err := writeIfChanged(path, old, next)
+	return a != "unchanged", err
 }
 
 // rooRulesPath is where deja used to write guidance: the global rules
