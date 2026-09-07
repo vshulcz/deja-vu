@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,14 +32,32 @@ func TestDejaOnceKeepsTheDigestToTheFirstTurn(t *testing.T) {
 	}
 	t.Chdir(cwd)
 
+	// Marshalled rather than pasted: a Windows temp path inside a JSON string
+	// is a run of backslash escapes, the payload decodes to nothing, and the
+	// hook then has no session id to hold the digest against — which reads as
+	// the once rule failing when it never ran.
+	payload := func(fields map[string]any) string {
+		t.Helper()
+		b, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The hook reads this back; a payload it cannot decode has no session
+		// id, and every assertion below would fail for that instead.
+		var back map[string]any
+		if err := json.Unmarshal(b, &back); err != nil || back["cwd"] != cwd {
+			t.Fatalf("the payload does not survive a decode: %v\n%s", err, b)
+		}
+		return string(b)
+	}
+
 	ask := func(sid string, once bool) string {
 		t.Helper()
-		payload := `{"session_id":"` + sid + `","cwd":"` + cwd + `","source":"startup"`
+		fields := map[string]any{"session_id": sid, "cwd": cwd, "source": "startup"}
 		if once {
-			payload += `,"deja_once":true`
+			fields["deja_once"] = true
 		}
-		payload += `}`
-		withHookStdin(t, payload)
+		withHookStdin(t, payload(fields))
 		return captureStdout(t, func() { _ = runHookContext(index.DefaultDir(), true) })
 	}
 
@@ -65,8 +84,10 @@ func TestDejaOnceKeepsTheDigestToTheFirstTurn(t *testing.T) {
 	// every message of the session.
 	fromFlag := func(sid string) string {
 		t.Helper()
-		withHookStdin(t, `{"hook_event_name":"UserPromptSubmit","session_id":"`+sid+
-			`","cwd":"`+cwd+`","prompt":[{"type":"text","text":"anything"}]}`)
+		withHookStdin(t, payload(map[string]any{
+			"hook_event_name": "UserPromptSubmit", "session_id": sid, "cwd": cwd,
+			"prompt": []any{map[string]any{"type": "text", "text": "anything"}},
+		}))
 		return captureStdout(t, func() { _ = runHookContextMode(index.DefaultDir(), true, true) })
 	}
 	if first := fromFlag("flag-1"); strings.TrimSpace(first) == "" {
