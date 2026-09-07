@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -35,23 +36,43 @@ func TestFilesJSONCarriesTheRankedRows(t *testing.T) {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// Marshalled rather than pasted together: a Windows path inside a JSON
+	// string is full of backslash escapes — `repo\render.go` carries a \r — so
+	// a hand-built line parses as nothing there and the store comes up empty.
+	rec := func(sid, role string, content any, at string) []byte {
+		b, err := json.Marshal(map[string]any{
+			"type": role, "sessionId": sid, "cwd": repo, "timestamp": at,
+			"message": map[string]any{"role": role, "content": content},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return append(b, '\n')
+	}
+	edit := func(path string) []any {
+		return []any{map[string]any{"type": "tool_use", "name": "Edit",
+			"input": map[string]any{"file_path": path, "old_string": "a", "new_string": "b"}}}
+	}
 	// Three sessions on the topic. render.go is touched in all three, routes.go
 	// in one, so the ranking has something to order and `sessions` differs
 	// between the two rows.
 	for i, sid := range []string{"s1", "s2", "s3"} {
-		body := `{"type":"user","sessionId":"` + sid + `","cwd":"` + repo + `","timestamp":"2026-10-0` +
-			string(rune('1'+i)) + `T09:00:00Z","message":{"role":"user","content":"the singbox renderer keeps dropping routes"}}
-{"type":"assistant","sessionId":"` + sid + `","cwd":"` + repo + `","timestamp":"2026-10-0` +
-			string(rune('1'+i)) + `T09:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` +
-			render + `","old_string":"a","new_string":"b"}}]}}
-`
+		day := string(rune('1' + i))
+		body := rec(sid, "user", "the singbox renderer keeps dropping routes", "2026-10-0"+day+"T09:00:00Z")
+		body = append(body, rec(sid, "assistant", edit(render), "2026-10-0"+day+"T09:01:00Z")...)
 		if sid == "s1" {
-			body += `{"type":"assistant","sessionId":"s1","cwd":"` + repo + `","timestamp":"2026-10-01T09:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` +
-				routes + `","old_string":"c","new_string":"d"}}]}}
-`
+			body = append(body, rec(sid, "assistant", edit(routes), "2026-10-01T09:02:00Z")...)
 		}
-		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), []byte(body), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(proj, sid+".jsonl"), body, 0o600); err != nil {
 			t.Fatal(err)
+		}
+		// A seed the parser cannot read indexes as nothing, and the assertions
+		// below then fail for a reason that has nothing to do with ranking —
+		// which is how this test went red on Windows and nowhere else.
+		for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+			if !json.Valid([]byte(line)) {
+				t.Fatalf("the seeded transcript is not JSON: %s", line)
+			}
 		}
 	}
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
