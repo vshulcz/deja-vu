@@ -57,10 +57,15 @@
 <p>back whole. Explicit deletes keep a compressed archive in</p>
 <p><code>session_transcript_archives</code>, which is not read. The fixture database is the</p>
 <p>output of <code>openclaw doctor --session-sqlite import</code> over the JSONL fixture.</p>
-<p>Skipped in the sessions directory: <code>sessions.json</code> (store metadata),</p>
-<p>compaction checkpoints (<code>&lt;id&gt;.checkpoint.&lt;uuid&gt;.jsonl</code>), archived</p>
-<p>transcripts (<code>.deleted</code>/<code>.reset</code>/<code>.bak</code> suffixes) and the</p>
-<p><code>session-sqlite-import-archive/</code> copies the migration leaves. Format verified</p>
+<p>Read in the sessions directory beside the live transcripts: what a reset or a</p>
+<p>delete left behind — <code>&lt;id&gt;.jsonl.reset.&lt;ts&gt;</code>, <code>&lt;id&gt;.jsonl.deleted.&lt;ts&gt;</code> and the</p>
+<p>compressed <code>&lt;id&gt;.jsonl.deleted.&lt;ts&gt;.zst</code> an explicit delete writes since the</p>
+<p>SQLite flip. That is the history someone asks for after losing it. An archive</p>
+<p>whose live file is back stands down, so a reset conversation is indexed once.</p>
+<p>Skipped: <code>sessions.json</code> (store metadata), compaction checkpoints</p>
+<p>(<code>&lt;id&gt;.checkpoint.&lt;uuid&gt;.jsonl</code>), <code>.bak</code> copies and the</p>
+<p><code>session-sqlite-import-archive/</code> copies the migration leaves — those sessions</p>
+<p>are in the SQLite store deja already reads. Format verified</p>
 <p>against a 2026.8.2 store and openclaw source</p>
 <p>(<code>src/config/sessions/session-accessor.sqlite-*.ts</code>, <code>paths.ts</code>).</p>
 <ul>
