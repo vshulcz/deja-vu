@@ -40,8 +40,27 @@ var harnessBlockRe = func() *regexp.Regexp {
 // hook say "you have been here" about another notification, with the
 // envelope's field names as the identifying terms (#3156).
 func StripHarnessBlocks(prompt string) string {
-	if !strings.Contains(prompt, "<") {
-		return strings.TrimSpace(prompt)
+	if strings.Contains(prompt, "<") {
+		prompt = harnessBlockRe.ReplaceAllString(prompt, "")
 	}
-	return strings.TrimSpace(harnessBlockRe.ReplaceAllString(prompt, ""))
+	if strings.Contains(prompt, " says: ") {
+		prompt = stripHookStatusLines(prompt)
+	}
+	return strings.TrimSpace(prompt)
+}
+
+// stripHookStatusLines drops the lines that are a hook's status bar pasted
+// into the turn — `UserPromptSubmit says: deja-vu — you have been here: …`
+// above the question a person went on to ask about it (#3168). The question
+// stays; the bar is neither a title nor terms.
+func stripHookStatusLines(text string) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	for _, l := range lines {
+		if hookStatusLineRE.MatchString(strings.TrimSpace(l)) {
+			continue
+		}
+		kept = append(kept, l)
+	}
+	return strings.Join(kept, "\n")
 }

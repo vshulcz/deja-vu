@@ -645,10 +645,12 @@ func IsCompactionSummary(t string) bool {
 // deja-vu — you have been h…'" (#3168).
 var hookStatusLineRE = regexp.MustCompile(`^(?:⎿\s*)?(?:SessionStart|SessionEnd|UserPromptSubmit|PreToolUse|PostToolUse|PostToolUseFailure|PreCompact|Stop|SubagentStart|SubagentStop|Notification|PermissionRequest|Setup)(?::[a-z]+)? says: `)
 
-// IsHookStatusLine reports whether a message is a hook's status line recorded
-// by the host, not something the person typed.
+// IsHookStatusLine reports whether a message is nothing but a hook's status
+// line — the bar pasted on its own, no question under it. With a question
+// under it the message is the person's; StripHarnessBlocks takes the bar off.
 func IsHookStatusLine(t string) bool {
-	return hookStatusLineRE.MatchString(strings.TrimSpace(t))
+	t = strings.TrimSpace(t)
+	return hookStatusLineRE.MatchString(t) && strings.TrimSpace(stripHookStatusLines(t)) == ""
 }
 
 // cleanSession drops agent artifacts and exact repeats so the digest carries
