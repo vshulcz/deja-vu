@@ -55,8 +55,13 @@ type toolAfterInput struct {
 	// string: {"output":"…","exitCode":0} (measured on cursor-agent
 	// 2026.09.02). Reading only tool_response left the fix pair with nothing.
 	ToolOutput json.RawMessage `json:"tool_output"`
-	SessionID  string          `json:"session_id"`
-	CWD        string          `json:"cwd"`
+	// Qwen Code has a separate event for a failed tool, and its payload carries
+	// the command's output under `error` rather than tool_response — measured
+	// on qwen-code 0.20.0. Without this the hook fires at the failure and finds
+	// nothing to look up.
+	Error     json.RawMessage `json:"error"`
+	SessionID string          `json:"session_id"`
+	CWD       string          `json:"cwd"`
 }
 
 func runHookToolAfter(dir string, stdin io.Reader, stdout io.Writer) error {
@@ -105,6 +110,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	if len(bytes.TrimSpace(response)) == 0 {
 		response = input.ToolOutput
 	}
+	if len(bytes.TrimSpace(response)) == 0 {
+		response = input.Error
+	}
 	out := toolResponseText(response)
 	if out == "" {
 		// readHookPayload stops at 1 MiB, so a verbose build cuts the JSON
@@ -119,6 +127,12 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	if out == "" {
 		return nil
 	}
+	// The same labelled report gemini and qwen wrap a command's output in,
+	// arriving as a plain string rather than under llmContent: qwen's failure
+	// payload carries it in `error`. With the frame in place the error reads as
+	// `Output: ./main.go:9:2: …` and hashes to a signature no session recorded.
+	// Output without the frame comes back untouched.
+	out = unwrapGeminiShellOutput(out)
 	line := fixPairLine(dir, out)
 	if line == "" {
 		return nil

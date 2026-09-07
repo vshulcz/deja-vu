@@ -556,7 +556,7 @@
         "fixtures/registry/qwen/projects/-workspace-registry-demo/chats/registry-qwen.jsonl"
       ],
       "parser_source": "internal/sources/qwen.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-07",
       "display_name": "Qwen Code",
       "capabilities": {
         "mcp": true,
