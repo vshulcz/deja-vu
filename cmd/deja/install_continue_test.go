@@ -26,6 +26,36 @@ func continueInstalledConfig(t *testing.T, exe string) string {
 	return string(b)
 }
 
+// continueCommandLine is the `command:` line install writes on this platform.
+// Windows spawns a stdio MCP client through cmd, so the executable is an
+// argument there rather than the command — three of these tests asserted the
+// POSIX shape and were red on the Windows leg and nowhere else.
+func continueCommandLine(exe string) string {
+	cmd, _ := mcpCommandArgs(exe)
+	return `command: "` + cmd + `"`
+}
+
+// continueNamesBinary counts the entries that carry this executable, wherever
+// the platform puts it: in `command:` or in the args list under it.
+func continueNamesBinary(config, exe string) int {
+	return strings.Count(config, `"`+exe+`"`)
+}
+
+// The Windows leg is the only place the wrapped shape appears, so pin the
+// counter against both spellings here rather than only where it runs.
+func TestContinueNamesBinaryCountsEitherShape(t *testing.T) {
+	posix := "mcpServers:\n  - name: deja\n    command: \"/bin/deja\"\n    args:\n      - \"mcp\"\n"
+	windows := "mcpServers:\n  - name: deja\n    command: \"cmd\"\n    args:\n      - \"/c\"\n      - \"/bin/deja\"\n      - \"mcp\"\n"
+	for name, config := range map[string]string{"posix": posix, "windows": windows} {
+		if got := continueNamesBinary(config, "/bin/deja"); got != 1 {
+			t.Errorf("%s: the binary is named %d times, want once:\n%s", name, got, config)
+		}
+		if got := continueNamesBinary(config+config, "/bin/deja"); got != 2 {
+			t.Errorf("%s: a doubled entry counted %d, so doubling would go unnoticed", name, got)
+		}
+	}
+}
+
 // Continue keeps the MCP server and the slash command in the same assistant
 // config, both as sequences of mappings rather than the keyed objects every
 // other harness uses. Measured on @continuedev/cli 1.5.47: with this entry the
@@ -35,7 +65,7 @@ func TestInstallContinueWritesTheServerAndTheCommand(t *testing.T) {
 	for _, want := range []string{
 		"mcpServers:",
 		"  - name: deja",
-		"command: \"/usr/local/bin/deja\"",
+		continueCommandLine("/usr/local/bin/deja"),
 		"      - \"mcp\"",
 		"prompts:",
 		"description: Search this machine's past coding sessions",
@@ -97,7 +127,7 @@ rules:
 		t.Fatal(err)
 	}
 	twice := readFileString(t, path)
-	if strings.Count(twice, `command: "/bin/deja"`) != 1 {
+	if continueNamesBinary(twice, "/bin/deja") != 1 {
 		t.Fatalf("a second install doubled the entry:\n%s", twice)
 	}
 
@@ -130,7 +160,7 @@ func TestInstallContinueAdoptsAMovedBinary(t *testing.T) {
 	if strings.Contains(got, "/old/deja") {
 		t.Fatalf("the old path is still there:\n%s", got)
 	}
-	if strings.Count(got, `command: "/new/deja"`) != 1 {
+	if continueNamesBinary(got, "/new/deja") != 1 {
 		t.Fatalf("the moved binary is not named once:\n%s", got)
 	}
 }
