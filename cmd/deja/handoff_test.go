@@ -52,6 +52,8 @@ func TestHandoffCommandTable(t *testing.T) {
 		"cline": {"cline", "P"},
 		"goose": {"goose", "run", "-t", "P"},
 		"kimi":  {"kimi", "-p", "P"},
+		// `crush run` answers once and exits; bare `crush` opens the TUI.
+		"crush": {"crush", "run", "P"},
 		// Antigravity's CLI is `agy`, verified on 1.1.7.
 		"antigravity": {"agy", "-i", "P"},
 	}

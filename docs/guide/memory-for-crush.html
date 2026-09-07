@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crush memory: recall of past sessions, from every agent on the machine — deja-vu</title>
+<meta name="description" content="Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook that answers at the point of action.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Crush">
+<meta property="og:description" content="Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook that answers at the point of action.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Crush">
+<meta name="twitter:description" content="Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook that answers at the point of action.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Crush", "description": "Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook that answers at the point of action.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Crush", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Crush remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes every session to .crush/crush.db inside the project and can reopen one with crush --session, but a new session reads none of the others, and a store in one project is invisible from another."}}, {"@type": "Question", "name": "How do I add memory to Crush?", "acceptedAnswer": {"@type": "Answer", "text": "deja install crush-auto adds the deja MCP server and a PreToolUse hook to ~/.config/crush/crush.json, writes the shared deja-history skill, and puts a /user:deja command in ~/.config/crush/commands."}}, {"@type": "Question", "name": "Can Crush see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-five agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">22</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html" aria-current="page">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Crush</h1>
+<p class="pagelede">history per project, and every other project invisible from here<span class="mins" data-mins></span></p>
+
+<p>Crush is the only agent here that keeps its history beside the work: <code>.crush/crush.db</code> inside the project, with <code>~/.local/share/crush/projects.json</code> listing where those stores are. So a Crush session forgets what the last one did, the way they all do — and also cannot see the work in the repository next door, or any of the sessions the other agents on this machine wrote.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install crush-auto</pre>
+<p>Four things, in the three places Crush reads:</p>
+<ul>
+<li><b>A <code>PreToolUse</code> hook</b> in <code>~/.config/crush/crush.json</code>, matching <code>bash</code>, <code>edit</code>, <code>write</code> and <code>multiedit</code>. Before the agent runs a command or changes a file, deja answers with what this machine already knows about that command or that file — and says nothing when it knows nothing.</li>
+<li><b>The MCP server</b>, under <code>mcp</code> in the same file, so history is a tool the agent can also reach for by name.</li>
+<li><b>The <code>deja-history</code> skill</b> in <code>~/.agents/skills</code>, which Crush scans by default. It appears in the system prompt's <code>&lt;available_skills&gt;</code> list, so the reason to look at history is in front of the model rather than only when someone asks.</li>
+<li><b>A <code>/user:deja</code> command</b> in <code>~/.config/crush/commands</code>.</li>
+</ul>
+<p>Crush's own <code>crush_info</code> reports all of it back: <code>deja = connected (1 tools, 0 resources)</code> under MCP, <code>deja-history = user</code> under skills, and the hook with its matcher and timeout.</p>
+
+<h2>What the hook actually says</h2>
+<p>Measured against a recording endpoint on crush v0.92.0, with a store holding four earlier sessions that ran <code>go build ./...</code>. The agent went to run it again, and the request Crush sent next carried the recall alongside the command's own output:</p>
+<pre>&lt;deja-recall&gt;
+Last time this machine ran go build ./... it ended with:
+./queue.go:31:2: undefined: zibblexEnqueue (in 4 sessions)
+&lt;/deja-recall&gt;</pre>
+<p><code>PreToolUse</code> is the only event Crush fires, so this is the whole of automatic recall here — there is no session-start digest and no per-prompt channel. It is also the moment that matters most: the answer arrives where the mistake would be made, not at the top of a session where it scrolls away.</p>
+
+<h2>What it costs</h2>
+<p>From the recorded requests on that version: deja's tool schema is 3,138 bytes of the 29,754-byte tool block Crush sends with every request, the skill's catalogue entry adds 384 bytes to the 22,487-byte system prompt, and a recall that answers adds 269 bytes to the turn that asked. A recall with no answer adds nothing. With the binary moved aside and the wiring left in place, the turn still completed — the hook's failure is logged and ignored, and Crush is one tool lighter.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-five of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Crush, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/crush.html">The Crush session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

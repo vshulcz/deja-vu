@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Roo Code", "description": "Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server it may call, a skill that tells it when to, and a /deja command — plus the approval entry that keeps it from asking first.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Roo Code", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Roo Code remember previous tasks?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps every task on disk and can reopen one from its history, but a new task starts with your rules files and nothing else — not last week's task, and not the session you had open in another agent."}}, {"@type": "Question", "name": "How do I add memory to Roo Code?", "acceptedAnswer": {"@type": "Answer", "text": "deja install roo writes the deja MCP server into mcp_settings.json for every editor Roo has run in, installs the deja-history skill and a /deja command, and names deja's own tool in the entry's alwaysAllow list so Roo does not ask before every recall."}}, {"@type": "Question", "name": "Can Roo Code see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-four agents on the machine, including sessions from before deja was installed."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Roo Code remember previous tasks?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps every task on disk and can reopen one from its history, but a new task starts with your rules files and nothing else — not last week's task, and not the session you had open in another agent."}}, {"@type": "Question", "name": "How do I add memory to Roo Code?", "acceptedAnswer": {"@type": "Answer", "text": "deja install roo writes the deja MCP server into mcp_settings.json for every editor Roo has run in, installs the deja-history skill and a /deja command, and names deja's own tool in the entry's alwaysAllow list so Roo does not ask before every recall."}}, {"@type": "Question", "name": "Can Roo Code see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-five agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">21</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">22</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -71,6 +71,7 @@
 <a href="memory-for-roo.html" aria-current="page">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -120,7 +121,7 @@
 <p><code>deja resume &lt;id&gt;</code> prints <code>roo --session-id &lt;uuid&gt;</code> with the workspace the task was in, for tasks the Roo CLI created — it lists only tasks belonging to the directory it is standing in. Tasks from the editor reopen from Roo's own history view; deja says so rather than printing a command that would not work.</p>
 
 <h2>The part that is not about this harness</h2>
-<p>The index covers every agent's transcripts on the machine — twenty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Roo, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — twenty-five of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Roo, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/roo.html">The Roo Code session format</a></p>
 </article>

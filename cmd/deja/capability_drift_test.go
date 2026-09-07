@@ -275,6 +275,12 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		t.Setenv("DEJA_ROO_CLI_ROOT", root)
 		s.Path = filepath.Join(dir, "api_conversation_history.json")
 	}
+	if harness == "crush" {
+		// Crush names sessions with a uuid and runs `--session` in the
+		// project the store sits under, so both have to be real here.
+		s.ID = "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
+		s.Path = filepath.Join(t.TempDir(), "app", ".crush", "crush.db")
+	}
 	if harness == "openclaw" {
 		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
 		if err := os.MkdirAll(dir, 0o755); err != nil {

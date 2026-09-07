@@ -12,7 +12,7 @@ indexes the sessions all 24 of your coding agents already wrote to disk — mont
 of history from before you installed it — and serves them back over MCP, in
 whichever agent asks.
 
-Twenty-four coding agents write every conversation to local files: Claude Code,
+Twenty-five coding agents write every conversation to local files: Claude Code,
 Codex, Cursor, opencode, Gemini CLI, Cline, Copilot CLI, VS Code Copilot Chat, Roo Code, aider,
 Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, OpenClaw, pi, omp,
 DeepSeek Harness, Hermes and Zed.

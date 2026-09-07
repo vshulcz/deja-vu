@@ -237,8 +237,7 @@ var commands = map[string]command{
 		if sayIfTypedByHand("hook-tool") {
 			return nil
 		}
-		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
-		return runHookToolMode(dir, os.Stdin, os.Stdout, plain)
+		return runHookToolMode(dir, os.Stdin, os.Stdout, hookToolShapeOf(rest))
 	},
 	"hook-tool-after": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-tool-after") {
@@ -2524,6 +2523,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--to":               "handoff",
 	"--exec":             "resume",
 	"--plain":            "hook-prompt",
+	"--crush":            "hook-tool",
 	"--no-open":          "view",
 	"--full":             "sync export",
 	"--include-imported": "sync export",
@@ -2972,6 +2972,10 @@ func printSources(dir string) {
 		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawStoreFiles, sources.LoadOpenClaw},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
 		{"zed", sources.ZedDB(), []string{sources.ZedDB()}, func() []string { return presentFiles(sources.ZedDB()) }, sources.LoadZed},
+		// The location is the registry, not a store: Crush keeps one store per
+		// project, under the project, and the registry is the only thing that
+		// says where they are.
+		{"crush", sources.CrushDataHome(), sources.CrushDBs(), sources.CrushDBs, sources.LoadCrush},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, func() []string { return presentFiles(sources.NotesFile()) }, sources.LoadNotes},
 	}
 	for _, it := range items {
@@ -3613,7 +3617,7 @@ Usage:
   deja hook-context [--plain] [--once]  (session start: the project digest, once per session)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
-  deja hook-tool     (PreToolUse Bash/Edit hook: one line on what this command or file already has)
+  deja hook-tool [--plain] [--crush]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)
   deja hook-tool-after  (PostToolUse Bash hook: the command that followed this error before)
   deja check -       (read a plan from stdin and print factual co-occurrences)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)

@@ -63,6 +63,9 @@ func autoWirings() []autoWiring {
 		{"prime", func() string { return primeExtensionPath() }, "hook-context", ""},
 		{"deepseek", func() string { return dshAutoPath() }, "hook-prompt", ""},
 		{"goose", func() string { return gooseHookPath() }, "hook-goose", ""},
+		// PreToolUse is the only event Crush fires, so the tool hook is the
+		// whole of auto-recall here — there is no digest hook to look for.
+		{"crush", func() string { return crushConfigPath() }, "hook-tool", ""},
 		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},
 		{"aider", func() string { return aiderContextPath() }, "",
 			"context file — refreshed by `deja aider`, not by aider itself"},

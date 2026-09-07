@@ -122,6 +122,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "crush",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.local/share/crush"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "pi",
       "state": "missing",
       "paths": [
@@ -332,6 +341,11 @@
       "name": "continue",
       "state": "config-missing",
       "path": "<tmp>/home/.continue/config.yaml"
+    },
+    {
+      "name": "crush",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/crush/crush.json"
     },
     {
       "name": "zed",
