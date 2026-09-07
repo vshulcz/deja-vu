@@ -620,6 +620,10 @@ func IsAgentArtifact(text string) bool {
 // session "Summary: 1. Primary Request and Intent: - MOST R…" and told the
 // reader nothing (#3157). Judged on the opening, since a person can write
 // "Summary:" and go on to say something.
+// compactionOutlineRE is the numbered outline the summary opens with; a person
+// asking "Summary: what is the Primary Request and Intent here?" has no "1.".
+var compactionOutlineRE = regexp.MustCompile(`(?m)^\s*1\.\s*Primary Request and Intent`)
+
 func IsCompactionSummary(t string) bool {
 	t = strings.TrimSpace(t)
 	if strings.HasPrefix(t, "This session is being continued from a previous conversation") {
@@ -629,16 +633,17 @@ func IsCompactionSummary(t string) bool {
 	if len(head) > 300 {
 		head = head[:300]
 	}
-	return strings.HasPrefix(t, "Summary:") && strings.Contains(head, "Primary Request and Intent")
+	return strings.HasPrefix(t, "Summary:") && compactionOutlineRE.MatchString(head)
 }
 
 // hookStatusLineRE is the shape Claude Code uses to record what a hook said
 // in its systemMessage: `UserPromptSubmit says: …`, `SessionStart:compact
-// says: …`, sometimes behind the tree glyph. The line is deja's own status
+// says: …`, sometimes behind the tree glyph. Only the host's event names
+// count — "Vlad says: no" is a person. The line is deja's own status
 // bar coming back through the transcript under the user role, and it was
 // quoted as a session title: "you have been here: 'UserPromptSubmit says:
 // deja-vu — you have been h…'" (#3168).
-var hookStatusLineRE = regexp.MustCompile(`^(?:⎿\s*)?[A-Z][A-Za-z]*(?::[a-z]+)? says: `)
+var hookStatusLineRE = regexp.MustCompile(`^(?:⎿\s*)?(?:SessionStart|SessionEnd|UserPromptSubmit|PreToolUse|PostToolUse|PostToolUseFailure|PreCompact|Stop|SubagentStart|SubagentStop|Notification|PermissionRequest|Setup)(?::[a-z]+)? says: `)
 
 // IsHookStatusLine reports whether a message is a hook's status line recorded
 // by the host, not something the person typed.

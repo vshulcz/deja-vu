@@ -9,6 +9,7 @@ func TestCompactionSummaryIsNotAPersonsLine(t *testing.T) {
 	}
 	no := []string{
 		"Summary: the migration locked the table, we rolled it back",
+		"Summary: what is the Primary Request and Intent here, in one line?",
 		"what did we decide about the primary request timeout?",
 	}
 	for _, s := range yes {
@@ -35,6 +36,8 @@ func TestHookStatusLinesAreTheHosts(t *testing.T) {
 	}
 	no := []string{
 		"the changelog says: nothing about hooks, so where is it documented?",
+		"Vlad says: ship it without the retry",
+		"Codex says: the lock is held by the daemon, is that right?",
 		"Says who? the test passes locally",
 	}
 	for _, s := range yes {
