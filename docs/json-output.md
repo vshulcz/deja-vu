@@ -269,6 +269,8 @@ the end returns an empty `messages` array and a `returned` count of zero.
   "handoffs_received": 0,
   "agent_credits": 1,
   "week_agent_credits": 0,
+  "used_not_credited": 4,
+  "week_used_not_credited": 1,
   "sidecar_size": 12345
 }
 ```
@@ -276,12 +278,20 @@ the end returns an empty `messages` array and a `returned` count of zero.
 `spans` and `span_files` count the replaced spans `deja restore` can hand back
 and the files they belong to. Both are omitted when the index holds none.
 
+`agent_credits` counts assistant turns that said the credit line. Beside it,
+`used_not_credited` counts turns that name a recalled session — `deja:<id>` —
+and do not say the line: memory that was used without being credited, as
+opposed to memory that was rightly ignored. It is an upper bound, because a
+session *about* deja quotes ids in prose; read the two together as the size of
+the question rather than as an answer.
+
 Inside `recall`, `raw_bytes` is the size of the source transcripts the served
 digests distilled and `since` is the oldest event still in the usage log; both
 are omitted when zero, so a store with no recall history yet shows neither.
 
 
-`week_recalls`, `week_bytes`, `week_injected` and `week_agent_credits` cover
+`week_recalls`, `week_bytes`, `week_injected`, `week_agent_credits` and
+`week_used_not_credited` cover
 seven calendar days back from now, at the same wall clock — not a fixed 168
 hours. Across a clock change that means the week runs an hour longer in autumn
 and an hour shorter in spring; and where a spring-forward removed the wall time

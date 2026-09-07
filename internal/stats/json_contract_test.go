@@ -47,6 +47,7 @@ func TestStatsJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"longest_session": true, "busiest_day": true, "recall": true,
 		"week_recalls": true, "week_bytes": true, "week_injected": true,
 		"handoffs_received": true, "agent_credits": true, "week_agent_credits": true,
+		"used_not_credited": true, "week_used_not_credited": true,
 		"sidecar_size": true, "spans": true, "span_files": true,
 		// HarnessStats / ProjectStats / MonthStats
 		"harness": true, "sessions": true, "messages": true, "project": true, "month": true,
