@@ -7,21 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The release where every agent on the machine gets the same memory. Four more
-harnesses are wired for the moments recall is worth most — the first prompt,
-the failing command, the file about to be edited, the turn after a compaction —
-VS Code Copilot Chat joins as the twenty-third, and the agent now says
+## [0.19.4] - 2026-09-07
+
+The release where every agent on the machine gets the same memory. Amp,
+prime-agent and VS Code Copilot Chat are wired from nothing — the last of them
+joining as the twenty-third harness — and the ones that were already wired now
+reach the moments recall is worth most: the first prompt, the failing command,
+the file about to be edited, the turn after a compaction. The agent now says
 "déjà vu" with a date and a session id when it reuses what it was handed.
 
 ### Added
 - VS Code Copilot Chat: its chat sessions are indexed (`chatSessions/*.jsonl`, the append log VS Code writes since 1.109), the twenty-third harness — contributed by @Sora-bluesky. (#3088)
 - VS Code: `deja install vscode` writes the `mcp.json` Copilot Chat reads in agent mode, one per host present (Code, Insiders, VSCodium), and a `deja.instructions.md` applied to every chat so recall arrives without being asked for; measured on VS Code 1.134.0 from the MCP traffic. (#3102, #3107)
 - Amp: `deja install amp` writes the MCP server the way `amp mcp add` does; `amp-auto` adds a plugin under `~/.config/amp/plugins` that hands the project digest to the first turn, per-prompt recall after it, and the repair beside a failed command in the same turn. (#3118)
+- prime-agent (PrimeIntellect): `deja install prime` writes the MCP server into `~/.prime/agent/settings.json` and an extension that opens a session with the project digest, recalls on each prompt, forgets on compaction, and adds `/deja`. Its `tool_call` and `tool_result` events never fire on 0.9.1, so the fix pair is deliberately not wired there. (#3125)
 - Kimi Code: the session digest rides the first prompt and a compaction forgets what it threw away, measured on 0.28.1 — `UserPromptSubmit` is the one event whose output reaches the model. (#3121)
+- Roo Code: `deja install roo` names deja's own tool in the entry's `alwaysAllow`, so Roo stops asking before every recall — without it a non-interactive run waits at the first one forever. `deja resume` prints `roo --session-id <uuid>` for tasks the Roo CLI created, with the workspace it must run in; editor tasks still reopen from the editor. Measured against a recording endpoint on @roo-code/cli 0.1.17 with the 3.53 extension. (#3130)
+- `deja files --json`: the ranked rows a caller had to parse out of padded columns, with the three counts the ranking is built from. (#3106, #3124)
 - pi and omp: `@vshulcz/pi-deja`, the recall extension as a pi package — `pi install npm:@vshulcz/pi-deja` — session-start digest, per-prompt recall and `/deja`. (#3095)
 - pi and omp: a failed command gets its repair in the same turn (`tool_result` is the event whose return reaches the model; omp's bash tool reports the exit code in `details.exitCode`), a compaction forgets, and a file's history arrives when the agent reads it — the step before the edit, since neither harness has a pre-edit hook. (#3112, #3113)
 - Cline: the repair for a failed command arrives in the same turn, appended to the tool result by the message builder; `hook-tool-after` learns cline's `run_commands` and grows `--plain`. (#3098)
-- OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — and a local session opens with the project digest via `before_agent_start` (74 ms and 1.6 KB on the first turn, nothing after). (#3058, #3087)
+- OpenClaw: `@vshulcz/openclaw-deja`, the recall plugin as a package — `openclaw plugins install clawhub:@vshulcz/openclaw-deja` — and a local session opens with the project digest via `before_agent_start` (74 ms and 1.6 KB on the first turn, nothing after). A compaction now forgets what it threw away, and the digest moved to the phase hook that fires once a turn. (#3058, #3087, #3123)
 - DeepSeek Harness: a session opens knowing what the project settled — a second `systemPrompt.context` contributor ahead of per-prompt recall, once per session. (#3094)
 - Antigravity: `PreInvocation` answers the question instead of only opening with the digest (the invocation counter is zero-based and restarts every turn); the repair arrives at the failing command; what a compaction threw away is served again; and the project is recalled when the payload names no workspace, read from `cache/last_conversations.json`. Measured on antigravity-cli 1.1.13. (#3059, #3063, #3077, #3078)
 - Install: the proof opens with the questions this machine asked more than once, and one of them — `26 questions asked more than once on this machine — one of them: "…"`. (#3071)
@@ -34,7 +40,11 @@ VS Code Copilot Chat joins as the twenty-third, and the agent now says
 - The README, the site and the npm page lead with what the harness count is for: one memory every agent on the machine reads. (#3109)
 
 ### Fixed
+- Qwen Code: the repair sat on `PostToolUse`, which qwen fires only when the tool succeeded — the one event that never comes at a failure. It moves to `PostToolUseFailure`, whose return is appended to the tool result the model reads, and the old entry is dropped on install. The failing output arrives under `error` inside qwen's own `Command: / Output: / Exit Code:` block, which is unwrapped before the signature is taken. Measured on qwen-code 0.20.0. (#3126)
+- Qwen Code: `install qwen-auto` reported "unchanged" while it rewired the hooks, because it returned only the MCP half of the same file. (#3127)
 - Grok Build: `SessionStart` and `PreCompact` matchers that grok never fired are dropped and corrected on machines that already installed deja; hook inputs read grok's camelCase; agents it spawns are reached. (#3085)
+- Codex: the plugin manifest carries its icon, spells the URL keys the way the spec does, and names its hooks file as one path. (#3132)
+- DeepSeek Harness: the plugin declares the DSH release it was measured on. (#3129)
 - Zed: the `/deja` fix from #3020 never shipped because `extension.toml` still said 0.1.0; the version moves and CI fails when a change outruns it. (#3081)
 - pi: the generated `/deja` command declared `args` twice, so pi loaded the extension with no deja at all. (#3096)
 - A compiler error is one wall wherever the line moves: the position is masked on the repair signature, so adding an import no longer turns one recurring error into a new one on every edit. (#3080)
@@ -1117,7 +1127,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.3...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.4...HEAD
+[0.19.4]: https://github.com/vshulcz/deja-vu/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/vshulcz/deja-vu/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...v0.19.2
 [0.19.1]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...v0.19.1

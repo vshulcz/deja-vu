@@ -11,7 +11,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Getting started](https://vshulcz.github.io/deja-vu/guide/getting-started.html): install, wire an agent, and the first query
 - [Why agents forget](https://vshulcz.github.io/deja-vu/guide/forgetting.html): what ends with a session and what survives on disk
 - [Does my agent remember previous conversations](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html): what Claude Code, Codex and Cursor keep between sessions, and what they do not
-- [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the twenty agents writes, and its format
+- [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the twenty-three agents writes, and its format
 - [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how to delete Claude Code sessions, how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
@@ -40,6 +40,10 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 ## Per-harness setup
 
 - [Claude Code, Codex and the rest](https://vshulcz.github.io/deja-vu/guide/harnesses.html): the full support matrix
+- [Claude Code](https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html)
+- [Codex](https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html)
+- [Cursor](https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html)
+- [Copilot CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html)
 - [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html)
 - [DeepSeek Harness](https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html)
 - [Kimi Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html)
@@ -49,6 +53,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
 - [Roo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html)
+- [prime-agent (PrimeIntellect)](https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html)
 - [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html)
 - [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html)
 - [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html)
@@ -60,7 +65,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 
 - [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S, 69.6% on LoCoMo, both harnesses in the repository
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem and agentmemory
-- [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the twenty agents stores its sessions, with fixtures
+- [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the twenty-three agents stores its sessions, with fixtures
 - [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): what is read, what is redacted, what never leaves
 
 ## Optional
