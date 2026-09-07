@@ -14,6 +14,10 @@ func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
 		"what did we decide about token refresh?\n<task-notification>\n<task-id>x</task-id>":                         "what did we decide about token refresh?",
 		// deja's own block echoed back is not the person either.
 		"<deja-recall>\nRecalled history…\n</deja-recall>\nand the second one?": "and the second one?",
+		// The `!` shell: what ran and what it printed is not a question.
+		"<bash-input>git status</bash-input>\n<bash-stdout>On branch main</bash-stdout>": "",
+		// A tag name that is only a prefix of a word in prose is not a tag.
+		"the <metadata> table has no meta column": "the <metadata> table has no meta column",
 		// No tags at all: untouched.
 		"plain question about <T> generics": "plain question about <T> generics",
 	}

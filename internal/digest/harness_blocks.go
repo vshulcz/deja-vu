@@ -9,12 +9,19 @@ import (
 // a user turn: what the host says to the model, recorded under the user's
 // role. A prompt is often a person's words with one of these appended; a
 // prompt that is only one of these is the host talking to itself.
+//
+// The list is what this machine's own transcripts hold under the user role
+// (counted on 2026-09-08): Claude Code's teammate-message ×656,
+// task-notification ×653, command-message ×108, bash-input/stdout/stderr
+// (the `!` shell), local-command-stdout; Copilot's skill-context; Kimi's
+// hook_result; opencode's meta; Codex's environment and instruction blocks.
 var harnessBlockTags = []string{
 	"task-notification", "system-reminder", "teammate-message",
 	"local-command-stdout", "local-command-stderr", "local-command-caveat",
 	"command-name", "command-message", "command-args",
+	"bash-input", "bash-stdout", "bash-stderr",
 	"environment_context", "user_instructions", "permissions instructions",
-	"hook_result", "hook_context", "deja-recall",
+	"skill-context", "meta", "hook_result", "hook_context", "deja-recall",
 }
 
 var harnessBlockRe = func() *regexp.Regexp {
