@@ -69,9 +69,75 @@ func CopilotChatRoots() []string {
 func CopilotChatSessionFiles() []string {
 	var files []string
 	for _, root := range CopilotChatRoots() {
-		files = append(files, walkFiles(root, copilotChatFile)...)
+		dirs := copilotChatStoreDirs(root)
+		if dirs == nil {
+			// A root laid out in none of the shapes below: walk it, as this
+			// always did. Costs what it costs, and finds what is there.
+			files = append(files, walkFiles(root, copilotChatFile)...)
+			continue
+		}
+		for _, dir := range dirs {
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				continue
+			}
+			for _, e := range entries {
+				p := filepath.Join(dir, e.Name())
+				if e.Type().IsRegular() && copilotChatFile(p) {
+					files = append(files, p)
+				}
+			}
+		}
 	}
 	return copilotChatDropJSONSiblings(files)
+}
+
+// copilotChatStoreDirs names the directories transcripts live in, instead of
+// walking the User folder to find them. It returns nil when the root has none
+// of VS Code's own top-level directories, which is the signal to walk instead.
+//
+// The root belongs to the editor, and almost none of it is ours: extension
+// caches, the editor's history, per-workspace state. Measured on a working
+// machine, the walk read 2,643 workspace directories to reach 28 that hold
+// chat sessions — 72 ms of the 95 ms every search spends discovering the stores
+// of all twenty-five harnesses, and by a wide margin the largest single term in
+// it. Asking for `<hash>/chatSessions` directly turns each of those workspace
+// directories from a directory read into one failed open (#3167).
+func copilotChatStoreDirs(root string) []string {
+	sessionDirs := func(base string) []string {
+		var out []string
+		out = append(out, filepath.Join(base, "globalStorage", "emptyWindowChatSessions"))
+		entries, err := os.ReadDir(filepath.Join(base, "workspaceStorage"))
+		if err != nil {
+			return out
+		}
+		for _, e := range entries {
+			if e.IsDir() {
+				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), "chatSessions"))
+			}
+		}
+		return out
+	}
+	known := false
+	for _, name := range []string{"workspaceStorage", "globalStorage", "profiles"} {
+		if fi, err := os.Stat(filepath.Join(root, name)); err == nil && fi.IsDir() {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return nil
+	}
+	dirs := sessionDirs(root)
+	// A named profile keeps its own copy of both, one level down.
+	if profiles, err := os.ReadDir(filepath.Join(root, "profiles")); err == nil {
+		for _, e := range profiles {
+			if e.IsDir() {
+				dirs = append(dirs, sessionDirs(filepath.Join(root, "profiles", e.Name()))...)
+			}
+		}
+	}
+	return dirs
 }
 
 func LoadCopilotChat() []model.Session {
