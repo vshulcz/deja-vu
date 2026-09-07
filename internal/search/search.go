@@ -88,6 +88,13 @@ type Hit struct {
 	Superseded string `json:"superseded,omitempty"`
 	// Reused counts recent agent recalls that served this session.
 	Reused int `json:"reused,omitempty"`
+	// Revisited is the date this session last came back to the query, after the
+	// passages shown as excerpts. The excerpts are the strongest match rather
+	// than the last word, so a session that reversed itself served the half it
+	// argued hardest and nothing said the rest was there (#2976). A date rather
+	// than a time.Time for the same reason Superseded is one: an empty struct
+	// is not omitted from JSON, and the field is read by people.
+	Revisited string `json:"revisited,omitempty"`
 	// Lifecycle carries what was later recorded about this session: that its
 	// decision was rejected, superseded or has gone stale. A hit on a raw
 	// transcript used to arrive with no trace of that, so a decision someone
@@ -182,6 +189,11 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		// window is how tightly the query's words meet in this message; 0 means
 		// they never do.
 		window int
+		// at is where in the session this was said: the excerpts are chosen by
+		// how well they match, so the strongest passage is often not the last
+		// word the session had on the subject.
+		at   int
+		when time.Time
 	}
 	snipCands := make([]snipCand, 0, 16)
 	df := make([]int, len(qtoks))
@@ -221,7 +233,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			doc.userCount = []int{0}
 		}
 		snipCands = snipCands[:0]
-		for _, m := range s.Messages {
+		for mi, m := range s.Messages {
 			if o.Role != "" && !roleMatches(m.Role, o.Role) {
 				continue
 			}
@@ -279,7 +291,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// first three showed wherever a word happened to appear early
 				// rather than the passage that carries the answer.
 				w := tokenWindow(windowText, windowToks)
-				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w})
+				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time})
 				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
 					doc.minWindow = w
 				}
@@ -320,8 +332,29 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			}
 			return a.weight > b.weight
 		})
+		shown := -1
 		for i := 0; i < len(snipCands) && i < 3; i++ {
 			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[i].text, o.Query, re))
+			if snipCands[i].at > shown {
+				shown = snipCands[i].at
+			}
+		}
+		// A session that says one thing and later says the opposite is served
+		// by the strongest passage, which is usually the first argument rather
+		// than the conclusion: recall answered "we are not on ClawHub yet" from
+		// a session that, further down, records the submission going through,
+		// and the reader acted on the stale half (#2976). The excerpts stay as
+		// they are — they are what matched — and the answer says the session
+		// comes back to this later.
+		doc.hit.Revisited = ""
+		var last time.Time
+		for _, c := range snipCands {
+			if c.at > shown && c.when.After(last) {
+				last = c.when
+			}
+		}
+		if !last.IsZero() {
+			doc.hit.Revisited = last.Local().Format("2006-01-02")
 		}
 		// The index hands ranking the records that matched, not the session, so
 		// doc.length measures the size of the match. Normalising by that told
@@ -960,6 +993,20 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
+// RevisitedLine is the one line a hit gets when the session went on talking
+// about the query after the passages above it. Exported because the CLI and
+// the MCP tool build their answers separately and this has to read the same in
+// both — the reader acts on it either way.
+func RevisitedLine(h Hit) string { return revisitedLine(h) }
+
+func revisitedLine(h Hit) string {
+	if h.Revisited == "" {
+		return ""
+	}
+	return "  this session comes back to this later (" + h.Revisited +
+		") — what is above may be the half it reversed"
+}
+
 // lifecycleSummary words a hit's recorded state for a person. It says what
 // happened rather than naming the state: "superseded" is our vocabulary, not
 // the reader's.
@@ -1295,6 +1342,15 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			// characters the terminal counts, so trimming the rendered string
 			// would cut a different number of visible runes on every line.
 			fmt.Fprintf(w, "  %s\n", highlight(SafeText(fitLine(sn, o.Width-2)), o.Query, o.Regex, color))
+		}
+		// After the excerpts, because it is about them: the session had more to
+		// say on this afterwards, and what is above may be the half it later
+		// reversed.
+		if line := revisitedLine(h); line != "" {
+			if color {
+				line = cDim + line + cReset
+			}
+			fmt.Fprintln(w, line)
 		}
 	}
 }
