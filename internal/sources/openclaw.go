@@ -121,7 +121,7 @@ func parseOpenClawArchive(path string) ([]model.Session, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer os.Remove(plain)
+		defer func() { _ = os.Remove(plain) }()
 		read = plain
 	}
 	ss, err := parsePiShaped(read, 0, "openclaw", openclawProject(path), true)
@@ -157,12 +157,12 @@ func zstdToTemp(path string) (string, error) {
 		return "", err
 	}
 	if _, err := f.Write(out.Bytes()); err != nil {
-		f.Close()
-		os.Remove(f.Name())
+		_ = f.Close()
+		_ = os.Remove(f.Name())
 		return "", err
 	}
 	if err := f.Close(); err != nil {
-		os.Remove(f.Name())
+		_ = os.Remove(f.Name())
 		return "", err
 	}
 	return f.Name(), nil
