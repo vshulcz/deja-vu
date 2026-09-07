@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -46,8 +48,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	var terms []string
 	limit := 10
 	project := ""
+	asJSON := false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--json":
+			asJSON = true
 		case "--limit":
 			// A flag typed with nothing after it used to be dropped in silence,
 			// and so did an unknown one and an empty --project: the answer came
@@ -83,7 +88,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja files <topic> [--project name] [--limit n]")
+		return fmt.Errorf("usage: deja files <topic> [--project name] [--limit n] [--json]")
 	}
 	q := strings.Join(terms, " ")
 	o := search.Options{Query: q, All: true, Project: project}
@@ -106,6 +111,20 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// (#1026).
 	hits, hidden := policyFilterSessionsCounted(policy.ActivationSearch, hits)
 	if len(hits) == 0 {
+		// The prose branches below each name *why* the list is empty, and a
+		// consumer needs the same distinction: `files: []` on its own reads as
+		// "looked, nothing there" when it can mean a rule withheld every
+		// session (#1930, the same argument `how --json` makes for carrying
+		// withheld and ignored).
+		if asJSON {
+			return writeFilesJSON(stdout, filesJSON{
+				SchemaVersion: jsonout.Version,
+				Query:         q,
+				Withheld:      hidden,
+				Ignored:       index.IgnoredWithAllTerms(dir, query.Tokens(q)),
+				Files:         []filesRowJSON{},
+			})
+		}
 		// The topic did match — a rule withheld it. Saying "no sessions
 		// mention it" reads as looked-and-absent, the same misread search and
 		// last already avoid by naming the rule (#686, #680).
@@ -237,6 +256,21 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(near) == 0 {
+		// Sessions matched and no file sat near the topic. Still an envelope:
+		// the counts beside the empty list are what distinguish this from a
+		// topic nobody discussed, and `filtered` distinguishes it again from
+		// files that were recorded and are not on this disk today.
+		if asJSON {
+			return writeFilesJSON(stdout, filesJSON{
+				SchemaVersion:   jsonout.Version,
+				Query:           q,
+				SessionsScanned: scanned,
+				Matched:         matched,
+				ReadCapped:      matched > filesMaxSessions,
+				Filtered:        filtered,
+				Files:           []filesRowJSON{},
+			})
+		}
 		// "Recorded nothing" and "recorded files this build will not show" are
 		// different answers, and only the first is a fact about the past.
 		if filtered > 0 {
@@ -280,6 +314,32 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		cut = len(rows)
 		rows = rows[:limit]
 	}
+	if asJSON {
+		out := make([]filesRowJSON, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, filesRowJSON{
+				Path:     r.path,
+				Near:     r.n,
+				Sessions: nearSessions[r.path],
+				Total:    total[r.path],
+			})
+		}
+		return writeFilesJSON(stdout, filesJSON{
+			SchemaVersion:   jsonout.Version,
+			Query:           q,
+			SessionsScanned: scanned,
+			Matched:         matched,
+			// Two different truncations, and a consumer that conflated them
+			// would report the wrong thing. `truncated` is the caller's
+			// --limit biting on the file list; `read_capped` is the read
+			// budget biting on the sessions behind it, which is what
+			// filesReadNote says in the prose.
+			Truncated:  cut > 0,
+			ReadCapped: matched > filesMaxSessions,
+			Filtered:   filtered,
+			Files:      out,
+		})
+	}
 	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
 	// The path column was a fixed 56, which on a 60-column pane leaves nothing
 	// for the count and wraps every row (#604). Budgeted against the window
@@ -304,6 +364,52 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), cut)
 	}
 	return nil
+}
+
+// filesJSON is the `deja files --json` envelope. See docs/json-output.md.
+//
+// The counts beside the list are the ones a caller cannot recover from it. An
+// empty `files` can mean the topic was not discussed, that a rule withheld
+// every session, or that a tree is kept out of recall, and the prose path
+// distinguishes all three; the envelope has to as well (#1930).
+type filesJSON struct {
+	SchemaVersion int    `json:"schema_version"`
+	Query         string `json:"query"`
+	// SessionsScanned is the sessions actually read, ReadCapped whether the
+	// read budget cut that short, and Matched how many mentioned the topic in
+	// the first place. Reporting only the first would let a store where 301
+	// sessions matched report 250 as though that were the number.
+	SessionsScanned int  `json:"sessions_scanned"`
+	Matched         int  `json:"matched"`
+	ReadCapped      bool `json:"read_capped"`
+	// Truncated is the caller's --limit biting on the file list, which is a
+	// different cut from ReadCapped and would be wrong to fold into it.
+	Truncated bool `json:"truncated"`
+	// Filtered is recorded paths dropped because they are not under a
+	// repository on this disk -- moved, archived, or an unmounted volume.
+	Filtered int `json:"filtered"`
+	Withheld int `json:"withheld"`
+	Ignored  int `json:"ignored"`
+
+	Files []filesRowJSON `json:"files"`
+}
+
+// filesRowJSON is one file. The three counts are what the ranking is built
+// from, so a consumer can re-rank or threshold without re-deriving them: Near
+// is touches close to the topic, Sessions how many separate sessions those
+// came from, and Total touches anywhere in the sessions read -- the
+// denominator that makes a file specific to the topic rather than merely busy.
+type filesRowJSON struct {
+	Path     string `json:"path"`
+	Near     int    `json:"near"`
+	Sessions int    `json:"sessions"`
+	Total    int    `json:"total"`
+}
+
+func writeFilesJSON(stdout io.Writer, v filesJSON) error {
+	enc := json.NewEncoder(stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 // filesReadNote names the read budget when it bit, so the session counts above
