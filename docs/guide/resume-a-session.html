@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Resuming the session you had yesterday","description":"Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.","url":"https://vshulcz.github.io/deja-vu/guide/resume-a-session.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Resuming a session","item":"https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I resume a previous coding session?","acceptedAnswer":{"@type":"Answer","text":"deja resume <id> prints the command that reopens that exact conversation, including the directory it must run in. Sixteen of the twenty indexed harnesses support it."}},{"@type":"Question","name":"Can I find a session from a different agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja searches every agent's transcripts at once and each hit carries its harness and session id, which the agents' own resume commands cannot do."}},{"@type":"Question","name":"What if I only want the conclusion?","acceptedAnswer":{"@type":"Answer","text":"deja ctx <id-prefix> returns the session as a digest — decisions, files touched, commands run — small enough to paste into a session you are already in."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I resume a previous coding session?","acceptedAnswer":{"@type":"Answer","text":"deja resume <id> prints the command that reopens that exact conversation, including the directory it must run in. Nineteen of the twenty-three indexed harnesses support it."}},{"@type":"Question","name":"Can I find a session from a different agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja searches every agent's transcripts at once and each hit carries its harness and session id, which the agents' own resume commands cannot do."}},{"@type":"Question","name":"What if I only want the conclusion?","acceptedAnswer":{"@type":"Answer","text":"deja ctx <id-prefix> returns the session as a digest — decisions, files touched, commands run — small enough to paste into a session you are already in."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +51,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">18</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">19</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -68,6 +68,7 @@
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -105,7 +106,7 @@
 <pre>deja resume &lt;id&gt;</pre>
 <p>It prints the command that reopens that exact conversation, including the directory it has to run in when the tool scopes its session list by working directory:</p>
 <pre>cd '/path/to/project' &amp;&amp; grok --resume 01a03433-0c67-7331-8eb1-cd6173d4c8f9</pre>
-<p>Sixteen of the twenty harnesses deja indexes can be reopened this way. The other four are refusals with a reason rather than silence: aider appends to a transcript file and has no notion of reopening one conversation, Roo and Zed reopen from their own UI rather than a terminal, and neither of DeepSeek Harness's two apps takes a session id. The <a href="../registry/README.html">format registry</a> records which is which, and why.</p>
+<p>Nineteen of the twenty-three harnesses deja indexes can be reopened this way. The other four are refusals with a reason rather than silence: aider appends to a transcript file and has no notion of reopening one conversation, Zed and VS Code Copilot Chat reopen from their own UI rather than a terminal, and neither of DeepSeek Harness's two apps takes a session id. Roo Code splits: what its CLI wrote resumes, what the editor wrote reopens there. The <a href="../registry/README.html">format registry</a> records which is which, and why.</p>
 
 <h2>When resuming is the wrong tool</h2>
 <p>Reopening a session brings back the whole conversation, including the parts that were wrong before they were right. Often what you want is the conclusion, not the road to it:</p>

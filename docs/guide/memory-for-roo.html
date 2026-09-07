@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory for Roo Code: recall across Claude Code, Codex and the rest — deja-vu</title>
+<meta name="description" content="Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server it may call, a skill that tells it when to, and a /deja command — plus the approval entry that keeps it from asking first.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Adding memory to Roo Code">
+<meta property="og:description" content="Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server it may call, a skill that tells it when to, and a /deja command — plus the approval entry that keeps it from asking first.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Adding memory to Roo Code">
+<meta name="twitter:description" content="Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server it may call, a skill that tells it when to, and a /deja command — plus the approval entry that keeps it from asking first.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Roo Code", "description": "Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server it may call, a skill that tells it when to, and a /deja command — plus the approval entry that keeps it from asking first.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Roo Code", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Roo Code remember previous tasks?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps every task on disk and can reopen one from its history, but a new task starts with your rules files and nothing else — not last week's task, and not the session you had open in another agent."}}, {"@type": "Question", "name": "How do I add memory to Roo Code?", "acceptedAnswer": {"@type": "Answer", "text": "deja install roo writes the deja MCP server into mcp_settings.json for every editor Roo has run in, installs the deja-history skill and a /deja command, and names deja's own tool in the entry's alwaysAllow list so Roo does not ask before every recall."}}, {"@type": "Question", "name": "Can Roo Code see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of twenty-three agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">19</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html" aria-current="page">Memory for Roo Code</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Roo Code</h1>
+<p class="pagelede">no hooks yet, so recall arrives as a tool it can reach for<span class="mins" data-mins></span></p>
+
+<p>Roo keeps every task on disk — the transcript under the editor's global storage, and the same files under <code>~/.vscode-mock/global-storage</code> when you drive it from the Roo CLI. A new task reads your rules and nothing else: not the task you closed on Friday, and not the Claude Code or Codex session on the same machine where the problem was already solved.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install roo</pre>
+<p>That writes four things, and only into editors Roo has actually run in:</p>
+<ul>
+<li><b>The MCP server</b>, in <code>mcp_settings.json</code> for each host — VS Code, Insiders, VSCodium, Cursor, Windsurf, and the CLI's own store. One tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</li>
+<li><b>The approval</b>: deja's own tool named in that entry's <code>alwaysAllow</code>. Roo asks before it runs an MCP tool otherwise — a click before every recall in the editor, and in the CLI's non-interactive mode a run that waits for an answer nobody can give.</li>
+<li><b>The <code>deja-history</code> skill</b> in <code>~/.agents/skills</code>, which Roo reads along with <code>~/.roo/skills</code>. It is what tells the model when to look: before re-debugging an error, when you say "didn't we fix this".</li>
+<li><b>A <code>/deja</code> command</b> in <code>~/.roo/commands</code>, for asking directly.</li>
+</ul>
+
+<h2>Why there is no session-start injection</h2>
+<p>Roo has no lifecycle hooks. A Claude Code-style hooks system is in flight upstream — <a href="https://github.com/RooCodeInc/Roo-Code/pull/10785">PR #10785</a> and two more — and until one of them ships there is no event deja can answer, so recall is something the model reaches for rather than something that arrives. Checked against Roo Code 3.53: nothing in the released extension runs a command at session start, before a tool, or on compaction.</p>
+
+<h2>What it costs</h2>
+<p>Measured against a recording endpoint on Roo Code 3.53 with the CLI: deja's tool declaration is 3.1 KB of the 26 KB of tools Roo sends with every request, and a recall that answers adds about 1.3 KB to the one turn that asked for it. A recall with no answer adds nothing.</p>
+
+<h2>Reopening a session</h2>
+<p><code>deja resume &lt;id&gt;</code> prints <code>roo --session-id &lt;uuid&gt;</code> with the workspace the task was in, for tasks the Roo CLI created — it lists only tasks belonging to the directory it is standing in. Tasks from the editor reopen from Roo's own history view; deja says so rather than printing a command that would not work.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — twenty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Claude Code answers a question asked in Roo, including sessions from before any of this was installed. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/roo.html">The Roo Code session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

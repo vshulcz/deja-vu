@@ -50,7 +50,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">18</span></summary>
+<details class="grpfold"><summary>Per-agent guides <span class="n">19</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -67,6 +67,7 @@
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
 <a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-hermes.html">Memory for Hermes</a>
 </details>
 <a href="lost-context.html">Lost context</a>
@@ -118,7 +119,7 @@
 <tr><td><a href="../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code><br><code>${PRIME_AGENT_SESSION_DIR}/**/*.jsonl</code><br><code>${PRIME_AGENT_CODING_AGENT_SESSION_DIR}/**/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
 <tr><td><a href="../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>—</td></tr>
-<tr><td><a href="../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code><br><code>${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json</code><br><code>~/.vscode-mock/global-storage/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>⚠</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>—</td></tr>
+<tr><td><a href="../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code><br><code>${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json</code><br><code>~/.vscode-mock/global-storage/tasks/*/api_conversation_history.json</code></td><td>✅</td><td>⚠</td><td>✅</td><td>✅</td><td>✅</td><td>paste</td><td>roo CLI (editor tasks reopen in the editor)</td></tr>
 <tr><td><a href="../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code><br><code>${XDG_DATA_HOME}/zed/threads/threads.db</code><br><code>%LOCALAPPDATA%/Zed/threads/threads.db</code><br><code>${DEJA_ZED_ROOT}/threads/threads.db</code><br><code>${DEJA_ZED_DB}</code></td><td>✅</td><td>✕</td><td>✅</td><td>✅</td><td>✕</td><td>paste</td><td>sqlite3 + zstd</td></tr>
 </table>
 <p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>

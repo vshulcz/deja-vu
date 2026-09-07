@@ -254,6 +254,23 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		// under this harness come from the grok-dev database and cannot resume.
 		s.Path = filepath.Join(t.TempDir(), "sessions", "workspace%2Fp", "abc123", "updates.jsonl")
 	}
+	if harness == "roo" {
+		// Only the CLI's own store resumes, and the command carries the
+		// workspace out of history_item.json — a bare path would fail the
+		// check for the right reason and the wrong one at once.
+		root := filepath.Join(t.TempDir(), "vscode-mock", "global-storage")
+		id := "01a07bf9-8882-7703-a3fa-245deb8ea752"
+		dir := filepath.Join(root, "tasks", id)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":"/work/app"}`
+		if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("DEJA_ROO_CLI_ROOT", root)
+		s.Path = filepath.Join(dir, "api_conversation_history.json")
+	}
 	if harness == "openclaw" {
 		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
 		if err := os.MkdirAll(dir, 0o755); err != nil {
