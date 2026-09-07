@@ -406,13 +406,13 @@ func noisyMessage(s string) bool {
 	// <teammate-message ...>" — slipped past the prefix check and reached the
 	// session-start block, where truncated inter-agent JSON was among the first
 	// things an agent read. Nobody writes these tags in prose.
-	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "<system-reminder"} {
+	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "<system-reminder", "<deja-recall"} {
 		if strings.Contains(t, p) {
 			return true
 		}
 	}
 	// Prose, so only where it opens the message.
-	if strings.HasPrefix(t, "Caveat:") || IsCompactionSummary(t) {
+	if strings.HasPrefix(t, "Caveat:") || IsCompactionSummary(t) || IsHookStatusLine(t) {
 		return true
 	}
 	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
@@ -574,7 +574,7 @@ func IsAgentArtifact(text string) bool {
 		}
 	}
 	trimmed := strings.TrimSpace(text)
-	if IsCompactionSummary(trimmed) {
+	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) {
 		return true
 	}
 	// Harness preambles injected as user turns: <environment_context>,
@@ -630,6 +630,20 @@ func IsCompactionSummary(t string) bool {
 		head = head[:300]
 	}
 	return strings.HasPrefix(t, "Summary:") && strings.Contains(head, "Primary Request and Intent")
+}
+
+// hookStatusLineRE is the shape Claude Code uses to record what a hook said
+// in its systemMessage: `UserPromptSubmit says: …`, `SessionStart:compact
+// says: …`, sometimes behind the tree glyph. The line is deja's own status
+// bar coming back through the transcript under the user role, and it was
+// quoted as a session title: "you have been here: 'UserPromptSubmit says:
+// deja-vu — you have been h…'" (#3168).
+var hookStatusLineRE = regexp.MustCompile(`^(?:⎿\s*)?[A-Z][A-Za-z]*(?::[a-z]+)? says: `)
+
+// IsHookStatusLine reports whether a message is a hook's status line recorded
+// by the host, not something the person typed.
+func IsHookStatusLine(t string) bool {
+	return hookStatusLineRE.MatchString(strings.TrimSpace(t))
 }
 
 // cleanSession drops agent artifacts and exact repeats so the digest carries
