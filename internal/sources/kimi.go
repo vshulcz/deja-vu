@@ -35,6 +35,15 @@ func KimiSessionFiles() []string {
 	})
 }
 
+// KimiSidecarFiles lists the per-session state.json the reader opens itself
+// for the title and the working directory. doctor counted one per session as a
+// transcript it could not read (#3309).
+func KimiSidecarFiles() []string {
+	return walkFiles(filepath.Join(KimiRoot(), "sessions"), func(p string) bool {
+		return filepath.Base(p) == "state.json"
+	})
+}
+
 func LoadKimi() []model.Session { return parseFiles(KimiSessionFiles(), ParseKimiFile) }
 
 func ParseKimiFile(path string) ([]model.Session, error) {
