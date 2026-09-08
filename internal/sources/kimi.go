@@ -66,6 +66,20 @@ type kimiState struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// kimiPersonsOrigin reports whether a message's origin says a person wrote it:
+// kind "user", a skill or plugin command the person typed (Kimi marks those
+// with trigger "user-slash"), or no origin at all — the same disposition
+// Kimi's own context builder applies.
+func kimiPersonsOrigin(origin any) bool {
+	o, ok := origin.(map[string]any)
+	if !ok {
+		return true
+	}
+	kind, _ := o["kind"].(string)
+	trigger, _ := o["trigger"].(string)
+	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user") || trigger == "user-slash"
+}
+
 func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	// .../sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl
 	sessionDir := filepath.Dir(filepath.Dir(filepath.Dir(path)))
@@ -105,6 +119,17 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			}
 			role, _ := msg["role"].(string)
 			if role != "user" && role != "assistant" {
+				return
+			}
+			// Kimi appends the host's own lines under role user too — an
+			// injected reminder, a hook's wrapped stdout, a background task's
+			// notice — and names the author in origin.kind. Only the person's
+			// are user turns; a message with no origin is an older protocol's
+			// and was always the person's (#3199).
+			if role == "user" && !kimiPersonsOrigin(msg["origin"]) {
+				// The host's line still moves the clock: a session whose
+				// last record is a hook's output ended when that arrived.
+				s.Touch(parseTimeAny(m["time"]))
 				return
 			}
 			if role == "assistant" {
