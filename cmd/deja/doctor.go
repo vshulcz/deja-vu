@@ -726,6 +726,20 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles := func(name, path string, present bool, seen []string) {
 		printFilesSkipping(name, path, present, seen, nil)
 	}
+	// printFilesBeside is printFiles for a harness whose store keeps a file
+	// beside the transcripts that deja reads but does not index — Continue's
+	// sessions.json, the list. Counted with the files, it made `doctor`
+	// disagree with `deja sources` by one; counted as unread, it made every
+	// store report a file deja could not read (#3297). So it is neither: the
+	// count is the transcripts, and the note leaves the list alone.
+	printFilesBeside := func(name, path string, present bool, seen []string, beside ...string) {
+		detail := doctorCount(len(seen), "file")
+		placed := append(append([]string{}, seen...), beside...)
+		if unread, _ := unplacedFiles(path, placed, nil); unread > 0 {
+			detail += fmt.Sprintf(", %d not recognised here", unread)
+		}
+		printRow(name, path, present, detail)
+	}
 
 	claudeRoot := sources.ClaudeRoot()
 	printFilesSkipping("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles(),
@@ -777,7 +791,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
 
 	continueDir := filepath.Join(sources.ContinueRoot(), "sessions")
-	printFiles("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles())
+	printFilesBeside("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles(),
+		filepath.Join(continueDir, "sessions.json"))
 
 	piRoot := sources.PiRoot()
 	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
