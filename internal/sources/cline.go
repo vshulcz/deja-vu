@@ -401,7 +401,7 @@ func clineContentText(raw json.RawMessage) string {
 // unwrapClineTask strips the legacy <task>...</task> envelope (and its modern
 // user-input equivalent) so the tags themselves are not indexed.
 func unwrapClineTask(text string) string {
-	t := strings.TrimSpace(text)
+	t := stripClineHostBlocks(strings.TrimSpace(text))
 	for _, tag := range []string{"task", "user_message", "user_input"} {
 		open := "<" + tag
 		if !strings.HasPrefix(t, open) {
@@ -420,6 +420,44 @@ func unwrapClineTask(text string) string {
 		return strings.TrimSpace(rest)
 	}
 	return t
+}
+
+// clineHostBlocks are the envelopes Roo Code and Cline append to a user turn:
+// the workspace listing, the open tabs, the clock, the running cost, the mode.
+// They are the host's words inside the person's message, so before this a query
+// on "files", "current", "time" or any open tab's path hit every Roo and Cline
+// session, and `ctx` printed the listing where the reader's own question goes
+// (#3255).
+//
+// Stripped at the parser rather than at display: the block lands in the store,
+// so every surface that reads a message sees it — search, titles, the digest,
+// the excerpt. `internal/digest/harness_blocks.go` does the same job for text
+// that only ever passes through a prompt.
+var clineHostBlocks = []string{"environment_details", "workspace_diagnostics", "slash_command"}
+
+// stripClineHostBlocks removes those blocks wherever they sit in the message.
+// Roo appends them after the task text in the same turn, so a prefix check
+// would miss every one of them.
+func stripClineHostBlocks(t string) string {
+	for _, tag := range clineHostBlocks {
+		open, close := "<"+tag+">", "</"+tag+">"
+		for {
+			i := strings.Index(t, open)
+			if i < 0 {
+				break
+			}
+			j := strings.Index(t[i:], close)
+			if j < 0 {
+				// An unterminated block runs to the end of the message: the
+				// listing was cut mid-write, and what follows it is not the
+				// person's either.
+				t = t[:i]
+				break
+			}
+			t = t[:i] + t[i+j+len(close):]
+		}
+	}
+	return strings.TrimSpace(t)
 }
 
 func firstNonEmpty(a, b string) string {
