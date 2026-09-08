@@ -57,9 +57,9 @@ func TestTheReadPhaseMovesPerFile(t *testing.T) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		line := fmt.Sprintf(`{"type":"user","sessionId":"s%d","timestamp":%q,`+
+		line := fmt.Sprintf(`{"type":"user","sessionId":"quokkabloom-%d","timestamp":%q,`+
 			`"message":{"role":"user","content":"the quokkabloom exporter drops spans"}}`, i, at)
-		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("s%d.jsonl", i)), []byte(line+"\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("quokkabloom-%d.jsonl", i)), []byte(line+"\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -85,5 +85,52 @@ func TestTheReadPhaseMovesPerFile(t *testing.T) {
 	}
 	if total := rec.totals["reading sessions"]; sum != total {
 		t.Errorf("the read phase advanced %d of %d units — a store counted twice or not at all", sum, total)
+	}
+}
+
+// The indexing phase counted sessions the moment they were handed to the
+// spiller, so the bar read 1% and then 99% while the workers still had a third
+// of the corpus to go. It counts messages now, reported as each batch is
+// actually indexed (#3372).
+func TestTheIndexingPhaseCountsMessagesAsTheyAreIndexed(t *testing.T) {
+	tmp := t.TempDir()
+	claude := filepath.Join(tmp, "claude", "proj")
+	if err := os.MkdirAll(claude, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
+	const sessions, msgs = 3, 40
+	for i := 0; i < sessions; i++ {
+		var lines []byte
+		for k := 0; k < msgs; k++ {
+			lines = append(lines, []byte(fmt.Sprintf(
+				`{"type":"user","sessionId":"quokkabloom-%d","timestamp":%q,`+
+					`"message":{"role":"user","content":"quokkabloom span %d of session %d"}}`+"\n",
+				i, at, k, i))...)
+		}
+		if err := os.WriteFile(filepath.Join(claude, fmt.Sprintf("quokkabloom-%d.jsonl", i)), lines, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+
+	rec := newPerFileProgress()
+	SetProgress(rec)
+	defer SetProgress(nil)
+	if err := Ensure(filepath.Join(tmp, "index.db"), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	if total := rec.totals["indexing messages"]; total < sessions*msgs {
+		t.Errorf("the phase counts %d units for %d messages — still counting sessions", total, sessions*msgs)
+	}
+	sum := 0
+	for _, n := range rec.advances("indexing messages") {
+		sum += n
+	}
+	if sum < sessions*msgs {
+		t.Errorf("the phase advanced %d of %d messages", sum, sessions*msgs)
 	}
 }

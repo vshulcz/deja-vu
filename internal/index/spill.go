@@ -151,6 +151,11 @@ func (s *spiller) run(feed func(push func(tokenJob)) error) error {
 					}
 					bufs[sh] = buf[:0]
 				}
+				// Work done, not work handed over: the phase that feeds this
+				// pool used to report a session the moment it was pushed, so
+				// the bar read 99% while the workers still had a third of the
+				// corpus to go (#3372).
+				reportAdvance(len(batch))
 			}
 			s.noteBuckets(seen)
 		}()
