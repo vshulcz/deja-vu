@@ -453,10 +453,14 @@ func fixLine(p index.FixPair, sessions int) string {
 	// the line reads as an instruction, so it should not start with a shell
 	// prompt the reader would have to mentally strip.
 	cmd, ok := withoutFailedExit(strings.TrimPrefix(strings.TrimSpace(search.SafeText(p.Command)), "$ "))
+	// An edit remedy (#2163) has no command: what fixed a failing test was a
+	// change to a file, and the useful half is which file. `deja fix` said so;
+	// the hook, the surface that fires at the failure, said nothing (#3259).
+	edit := strings.TrimSpace(search.SafeLine(p.Edit))
 	// codex and opencode record the exit status on the command; a remedy that
 	// exited non-zero is not one, and handing it over as "what followed it"
 	// tells an agent to run something that already failed here.
-	if !ok || cmd == "" {
+	if (!ok || cmd == "") && edit == "" {
 		return ""
 	}
 	when := ""
@@ -485,6 +489,15 @@ func fixLine(p index.FixPair, sessions int) string {
 	// the same error is evidence it worked; one session doing something is what
 	// one session did, and an agent handed it at the moment it is stuck has to
 	// be told which of the two it is holding.
+	if edit != "" && (!ok || cmd == "") {
+		// Not something to run, so not offered as one: the file, in the words
+		// `deja fix` uses for the same pair.
+		if p.Candidate {
+			return "deja: this error came up" + how + " " + where + " before" + when +
+				" — one session changed this file after it, and nothing confirms it worked: " + edit
+		}
+		return "deja: this error came up" + how + " " + where + " before" + when + " — changed next: " + edit
+	}
 	if p.Candidate {
 		return "deja: this error came up" + how + " " + where + " before" + when +
 			" — one session ran this after it, and nothing confirms it worked: " + cmd
