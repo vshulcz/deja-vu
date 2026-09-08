@@ -382,7 +382,7 @@ func isFriction(l string) bool {
 		// in the real stores, and sqlite saying a table is missing, 4 times.
 		// "no such file or directory" was already here; its sibling was not
 		// (#3373).
-		"go.mod file not found", "does not contain main module", "no such table",
+		"go.mod file not found", "does not contain main module",
 	} {
 		if strings.Contains(low, p) {
 			return true
@@ -392,7 +392,12 @@ func isFriction(l string) bool {
 	// line opens with the server's ERROR marker. The phrase on its own is a
 	// sentence people write — "the orders table does not exist yet" — so it is
 	// only a wall where the server said it.
-	if strings.HasPrefix(low, "error") && strings.Contains(low, "does not exist") {
+	// A database saying a thing is not there says it in its own shape, and
+	// "no such table" needs the same guard for the same reason: "there is no
+	// such table in the spec, so I improvised one" is a sentence someone
+	// writes (review of #3373).
+	if strings.HasPrefix(low, "error") &&
+		(strings.Contains(low, "does not exist") || strings.Contains(low, "no such table")) {
 		return true
 	}
 	return false

@@ -31,3 +31,20 @@ func TestFrictionReadsTheGoModuleAndSqliteWalls(t *testing.T) {
 		}
 	}
 }
+
+// "no such table" is what sqlite says and also what a person writes about a
+// specification. The server's own shape is the difference, the same guard
+// "does not exist" has carried since #2431 (review of #3373).
+func TestNoSuchTableNeedsTheServersOwnShape(t *testing.T) {
+	if _, ok := FrictionLine("Error: in prepare, no such table: part"); !ok {
+		t.Error("sqlite saying a table is missing is not read as friction")
+	}
+	for _, prose := range []string{
+		"there is no such table in the spec, so I improvised one",
+		"we have no such table yet — add a migration",
+	} {
+		if _, ok := FrictionLine(prose); ok {
+			t.Errorf("a sentence about tables is read as an error: %q", prose)
+		}
+	}
+}
