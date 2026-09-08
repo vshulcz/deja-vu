@@ -58,11 +58,11 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 			// the functionResponse. Skipped with the other types, a failing
 			// command's error never reached search or the fix pairs (#3281).
 			t := parseTimeAny(m["timestamp"])
+			// Touched like a user or assistant record, output or not: the
+			// session's clock moves with every record it holds.
+			s.Touch(t)
 			if msg, ok := m["message"].(map[string]any); ok {
-				if recs := qwenWorkRecords(msg["parts"], t); len(recs) > 0 {
-					s.Touch(t)
-					s.Messages = append(s.Messages, recs...)
-				}
+				s.Messages = append(s.Messages, qwenWorkRecords(msg["parts"], t)...)
 			}
 			return
 		}
