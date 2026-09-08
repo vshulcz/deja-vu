@@ -75,8 +75,11 @@ func TestParseHermesDB(t *testing.T) {
 	if first.Project != "architect" {
 		t.Fatalf("project = %q, want the profile name", first.Project)
 	}
-	if first.Title == "" {
-		t.Fatal("title not derived from the first message")
+	// No title from the parser: setting one here skipped the index's own rule,
+	// which prefers the first user line and steps past a one- or two-word
+	// opener (#790, #3241, #3251).
+	if first.Title != "" {
+		t.Fatalf("the parser titled the session %q; that is the index's job", first.Title)
 	}
 }
 

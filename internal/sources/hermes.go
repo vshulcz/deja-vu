@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -170,7 +171,57 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	if err := cmd.Wait(); err != nil {
 		return nil, err
 	}
+	applyHermesCWD(out, hermesSessionCWD(db))
 	return out, nil
+}
+
+// applyHermesCWD moves each session into the project it was worked in, where
+// the store says. Sessions the table does not name keep the profile.
+func applyHermesCWD(ss []model.Session, cwd map[string]string) {
+	for i := range ss {
+		dir := strings.TrimSpace(cwd[ss[i].ID])
+		if dir == "" {
+			continue
+		}
+		if name := claudeProjectName(pathToProjectKey(dir)); name != "" {
+			ss[i].Project = name
+		}
+	}
+}
+
+// hermesSessionCWD reads where each session was worked, from the `sessions`
+// table Hermes keeps beside `messages`.
+//
+// Every session used to be stamped with the profile directory — "hermes" —
+// because the schema was read as having no working directory. It has one, and
+// the cost of missing it is that the per-prompt hook, which ranks the payload's
+// project, never served a Hermes session to the project it was about: measured
+// on a real store, the same prompt returned 2,006 bytes from ~/hermes and
+// nothing at all from the project the sessions actually name (#3257).
+//
+// Best-effort by design: an older store has no such table, and a Hermes that
+// renames the column should cost the grouping rather than the harness. A failed
+// query gives an empty map and every session keeps the profile.
+func hermesSessionCWD(db string) map[string]string {
+	out, err := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
+		"select id, coalesce(cwd,'') as cwd from sessions where cwd is not null and cwd <> ''").Output()
+	if err != nil || len(bytes.TrimSpace(out)) == 0 {
+		return nil
+	}
+	var rows []struct {
+		ID  string `json:"id"`
+		CWD string `json:"cwd"`
+	}
+	if json.Unmarshal(out, &rows) != nil {
+		return nil
+	}
+	m := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.ID != "" && r.CWD != "" {
+			m[r.ID] = r.CWD
+		}
+	}
+	return m
 }
 
 // decodeHermesArray reads a json array of {session_id,role,content,timestamp}
@@ -213,9 +264,12 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 		if len(s.Messages) == 0 {
 			continue
 		}
-		if s.Title == "" {
-			s.Title = firstLineTrim(s.Messages[0].Text)
-		}
+		// No title from here. Setting one in the parser skipped the index's own
+		// rule: a one- or two-word opener gives way to the next user turn that
+		// can name the session (#790), and the first row is not always the
+		// user's — a store opening with the assistant's greeting was titled by
+		// the greeting (#3241, #3251). Every other parser leaves this empty
+		// unless the harness recorded a title of its own.
 		out = append(out, *s)
 	}
 	return out, nil
