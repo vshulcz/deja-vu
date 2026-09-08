@@ -92,3 +92,30 @@ func TestClineSessionFilesHonorsOverrides(t *testing.T) {
 		t.Fatalf("sessions = %d", len(ss))
 	}
 }
+
+// The roots are what doctor walks and what it names, so they have to be the
+// tasks trees themselves rather than the extension roots holding them (#3399).
+func TestClineStoreRootsNamesEachTasksTree(t *testing.T) {
+	tmp := t.TempDir()
+	sessions := filepath.Join(tmp, "cline", "data", "sessions")
+	one := filepath.Join(tmp, "vscode", "globalStorage", "saoudrizwan.claude-dev")
+	two := filepath.Join(tmp, "cursor", "globalStorage", "saoudrizwan.claude-dev")
+	for _, d := range []string{one, two} {
+		if err := os.MkdirAll(filepath.Join(d, "tasks"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLINE_ROOT", sessions)
+	t.Setenv("DEJA_CLINE_ROOTS", one+string(os.PathListSeparator)+two)
+
+	got := ClineStoreRoots()
+	want := []string{sessions, filepath.Join(one, "tasks"), filepath.Join(two, "tasks")}
+	if len(got) != len(want) {
+		t.Fatalf("roots = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("root %d = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
