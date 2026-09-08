@@ -165,10 +165,12 @@ func instructionsFile(body string) string {
 
 func guidanceText(harness string) string {
 	if guidanceOwnsWholeFile(harness) {
+		// Copilot used to open with "deja does not index Copilot history. It is
+		// a consumer…", written in #133 when that was true. The parser landed
+		// in #655 and the registry has documented the store since, so the same
+		// binary was indexing Copilot sessions and telling Copilot it did not
+		// (#3222). It gets the same skill as every other harness.
 		body := skillBody
-		if harness == "copilot" {
-			body = "deja does not index Copilot history. It is a consumer: search the memory the other harnesses on this machine wrote.\n\n" + skillBody
-		}
 		if harness == "pi" {
 			body = `If the deja MCP tools are available (via pi-mcp-adapter), use them:
 
