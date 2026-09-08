@@ -118,7 +118,19 @@ import (
 // check — an index directory that cannot be locked is served without one —
 // gets errCorruptIndex rather than session ids that are wrong without saying
 // so (#492).
-const version = 34
+//
+// 35 carries no format change at all — the parsers changed what they hand over,
+// and an index built before them keeps rows the readers would no longer write
+// (#3289). Kimi filed injections and its own hook's output under the person
+// (#3199); Roo and Cline kept the <environment_details> listing inside every
+// user turn and aider kept /undo and /clear as questions (#3255, #3248); Hermes
+// stamped every session with the profile instead of the directory it was worked
+// in, and titled by whichever row came first (#3257, #3251, #3241); Crush is a
+// new reader whose stores nothing had walked. None of that reaches an existing
+// store without a re-read, and the repo's precedent for a content-changing
+// parser fix is exactly this: #2875 for goose, #1383 for the greeting rule,
+// #2905 for the Thai bigrams.
+const version = 35
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
