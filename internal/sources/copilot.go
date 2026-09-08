@@ -21,6 +21,15 @@ func CopilotSessionFiles() []string {
 	})
 }
 
+// CopilotSidecarFiles lists the IDE's bookkeeping beside each session —
+// vscode.metadata.json — which doctor counted as a transcript deja could not
+// read, once per session (#3303).
+func CopilotSidecarFiles() []string {
+	return walkFiles(CopilotRoot(), func(p string) bool {
+		return filepath.Base(p) == "vscode.metadata.json"
+	})
+}
+
 // LoadCopilot loads all Copilot CLI sessions.
 func LoadCopilot() []model.Session { return parseFiles(CopilotSessionFiles(), ParseCopilotFile) }
 
