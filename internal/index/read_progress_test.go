@@ -134,3 +134,42 @@ func TestTheIndexingPhaseCountsMessagesAsTheyAreIndexed(t *testing.T) {
 		t.Errorf("the phase advanced %d of %d messages", sum, sessions*msgs)
 	}
 }
+
+// The four sidecar builders walked every session under the previous phase's
+// last percentage, so a build stood still for the eight seconds they took on a
+// real store (#3372). They are a phase of their own now.
+func TestTheSidecarsAreAPhaseOfTheirOwn(t *testing.T) {
+	tmp := t.TempDir()
+	claude := filepath.Join(tmp, "claude", "proj")
+	if err := os.MkdirAll(claude, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	at := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
+	line := fmt.Sprintf(`{"type":"user","sessionId":"quokkabloom-side","timestamp":%q,`+
+		`"message":{"role":"user","content":"the quokkabloom exporter drops spans"}}`, at)
+	if err := os.WriteFile(filepath.Join(claude, "side.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
+	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
+
+	rec := newPerFileProgress()
+	SetProgress(rec)
+	defer SetProgress(nil)
+	if err := Ensure(filepath.Join(tmp, "index.db"), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	const phase = "mining fixes and commands"
+	if total := rec.totals[phase]; total != 4 {
+		t.Fatalf("%q reports %d units, want one per builder", phase, total)
+	}
+	sum := 0
+	for _, n := range rec.advances(phase) {
+		sum += n
+	}
+	if sum != 4 {
+		t.Errorf("%q advanced %d of 4 — a builder reports nothing", phase, sum)
+	}
+}
