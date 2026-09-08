@@ -377,6 +377,12 @@ func isFriction(l string) bool {
 		"failed to connect to", "cannot import name", "symbol(s) not found",
 		"failed to push some refs", "acquiring the state lock",
 		"no space left on device",
+		// Three this machine hits that nothing above reached: the two ways the
+		// go toolchain says there is no module here, counted 17 and 12 times
+		// in the real stores, and sqlite saying a table is missing, 4 times.
+		// "no such file or directory" was already here; its sibling was not
+		// (#3373).
+		"go.mod file not found", "does not contain main module", "no such table",
 	} {
 		if strings.Contains(low, p) {
 			return true
