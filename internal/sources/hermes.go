@@ -158,6 +158,12 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	if err := cmd.Wait(); err != nil {
 		return nil, err
 	}
+	cwds := hermesSessionCwds(db)
+	for i := range out {
+		if cwd := cwds[out[i].ID]; cwd != "" {
+			out[i].Project = claudeProjectName(pathToProjectKey(cwd))
+		}
+	}
 	return out, nil
 }
 
@@ -240,8 +246,36 @@ func nonEmptyFile(p string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// hermesProfile names the session's project after the profile directory, the
-// only grouping Hermes stores — there is no working directory in the schema.
+// hermesSessionCwds reads the directory each session was recorded in, from the
+// sessions table Hermes keeps beside messages. Stamped with the profile alone,
+// every session fell into one project, and the prompt hook — which ranks the
+// payload's project only — never served a Hermes session in the directory it
+// was about (#3257). Best effort: a store from before the table, or a row with
+// no cwd, keeps the profile.
+func hermesSessionCwds(db string) map[string]string {
+	q := `select id,cwd from sessions where cwd is not null and cwd <> ''`
+	out, err := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q).Output()
+	if err != nil {
+		return nil
+	}
+	var rows []struct {
+		ID  string `json:"id"`
+		Cwd string `json:"cwd"`
+	}
+	if json.Unmarshal(out, &rows) != nil {
+		return nil
+	}
+	cwds := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.ID != "" && strings.TrimSpace(r.Cwd) != "" {
+			cwds[r.ID] = strings.TrimSpace(r.Cwd)
+		}
+	}
+	return cwds
+}
+
+// hermesProfile names the session's project after the profile directory when
+// the store says nothing about where the session was recorded.
 func hermesProfile(db string) string {
 	name := filepath.Base(filepath.Dir(db))
 	// The root store has no profile directory to be named after.
