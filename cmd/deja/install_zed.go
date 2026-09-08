@@ -94,12 +94,18 @@ func zedSettingsWith(text, entry string, uninstall bool) (string, error) {
 		if uninstall {
 			return text, nil
 		}
+		// The file's own line ending: Zed on Windows keeps CRLF, and a block
+		// written with LF left the file mixed (#3231).
+		eol := "\n"
+		if strings.Contains(text, "\r\n") {
+			eol = "\r\n"
+		}
 		if block := zedFindKey(text, open+1, zedServerKey); block != nil {
-			insert := fmt.Sprintf("\n    %q: %s,", zedServerID, entry)
+			insert := fmt.Sprintf("%s    %q: %s,", eol, zedServerID, entry)
 			return text[:block.valueOpen+1] + insert + text[block.valueOpen+1:], nil
 		}
 		open = zedTopLevelOpen(text)
-		insert := fmt.Sprintf("\n  %q: {\n    %q: %s\n  },", zedServerKey, zedServerID, entry)
+		insert := fmt.Sprintf("%s  %q: {%s    %q: %s%s  },", eol, zedServerKey, eol, zedServerID, entry, eol)
 		return text[:open+1] + insert + text[open+1:], nil
 	}
 	// The same id is the extension's, and Zed writes its own entry there when
@@ -201,7 +207,7 @@ type zedSpan struct {
 // behind is still well formed.
 func zedEntrySpan(text string, s *zedSpan) [2]int {
 	start := s.keyStart
-	for start > 0 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n') {
+	for start > 0 && (text[start-1] == ' ' || text[start-1] == '\t' || text[start-1] == '\n' || text[start-1] == '\r') {
 		start--
 	}
 	end := s.valueEnd
