@@ -346,6 +346,17 @@ func stripDSHBlock(s string) string {
 	return strings.TrimRight(strings.Join(out, "\n"), "\n")
 }
 
+// dshHadArrayLine reports whether the layer carries the `[]` placeholder on a
+// line of its own — the shape a generated layer has, and what install replaced.
+func dshHadArrayLine(doc string) bool {
+	for _, line := range strings.Split(doc, "\n") {
+		if strings.TrimSpace(line) == "[]" {
+			return true
+		}
+	}
+	return false
+}
+
 // dshLayerHasEntry reports whether a layer still carries anything YAML would
 // read as content — a line that is neither blank nor a comment.
 func dshLayerHasEntry(doc string) bool {
@@ -387,11 +398,13 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 			return installResult{}, err
 		}
 		rest := stripDSHBlock(string(old))
-		if !dshLayerHasEntry(rest) {
+		if !dshLayerHasEntry(rest) && (strings.TrimSpace(rest) == "" || dshHadArrayLine(string(old))) {
 			// An empty layer is the empty array, not an empty file or a
 			// comment alone: dsh parses either as null and refuses to load
-			// the profile. The generated layer is a comment and `[]`, so the
-			// comment stays and the array comes back under it (#3271).
+			// the profile. The generated layer is a comment and `[]`; the
+			// install replaced the array, so uninstall puts it back under
+			// the comment (#3271). A file that never held one is handed back
+			// as it was.
 			rest = strings.TrimRight(rest, "\n")
 			if rest != "" {
 				rest += "\n"
