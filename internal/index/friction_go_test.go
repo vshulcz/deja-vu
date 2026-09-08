@@ -31,3 +31,36 @@ func TestFrictionReadsTheGoModuleAndSqliteWalls(t *testing.T) {
 		}
 	}
 }
+
+// "no such table" is what sqlite says and also what a person writes about a
+// specification. The server's own shape is the difference, the same guard
+// "does not exist" has carried since #2431 (review of #3373).
+func TestNoSuchTableNeedsTheServersOwnShape(t *testing.T) {
+	// Every runtime puts its marker somewhere different, and one of them puts
+	// none at all — what they share is naming the table (second review).
+	for _, wall := range []string{
+		"Error: in prepare, no such table: part",
+		"D1_ERROR: no such table: users",
+		"sqlite3.OperationalError: no such table: users",
+		"Parse error: no such table: x",
+		"no such table: users",
+		"SQL logic error: no such table: main.sessions",
+	} {
+		if _, ok := FrictionLine(wall); !ok {
+			t.Errorf("not read as friction: %q", wall)
+		}
+	}
+	for _, prose := range []string{
+		"there is no such table in the spec, so I improvised one",
+		"we have no such table yet — add a migration",
+		"Error handling for missing tables is not written yet, so no such table checks run",
+		// A sentence can end a clause on a colon too, and what follows is not
+		// a table name (third review).
+		"I checked and there is no such table: the schema only has runs",
+		"the docs say: no such table exists for this mapping",
+	} {
+		if _, ok := FrictionLine(prose); ok {
+			t.Errorf("a sentence about tables is read as an error: %q", prose)
+		}
+	}
+}

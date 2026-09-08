@@ -382,7 +382,7 @@ func isFriction(l string) bool {
 		// in the real stores, and sqlite saying a table is missing, 4 times.
 		// "no such file or directory" was already here; its sibling was not
 		// (#3373).
-		"go.mod file not found", "does not contain main module", "no such table",
+		"go.mod file not found", "does not contain main module",
 	} {
 		if strings.Contains(low, p) {
 			return true
@@ -395,8 +395,29 @@ func isFriction(l string) bool {
 	if strings.HasPrefix(low, "error") && strings.Contains(low, "does not exist") {
 		return true
 	}
+	// "no such table" is what every sqlite driver says and also what a person
+	// writes about a schema. What separates them is the shape around it: the
+	// driver names the table after a colon — `no such table: part` — and the
+	// report carries an error marker wherever its runtime puts it, which is
+	// not always the first word: `D1_ERROR: …`, `sqlite3.OperationalError: …`,
+	// `Parse error: …`. Requiring the line to *open* with "error" dropped all
+	// three and still let "Error handling for missing tables…" through
+	// (second review of #3373). The colon alone is not enough either: a
+	// sentence can end a clause on one — "there is no such table: the schema
+	// only has runs" — so the line either opens with the phrase, which is how
+	// the bare driver line arrives, or carries the marker somewhere in it
+	// (third review).
+	if noSuchTableRE.MatchString(low) &&
+		(strings.HasPrefix(low, "no such table:") || strings.Contains(low, "error")) {
+		return true
+	}
 	return false
 }
+
+// noSuchTableRE is the driver's own shape: the table is named right after the
+// phrase. Prose about schemas — "there is no such table in the spec" — does
+// not name one there.
+var noSuchTableRE = regexp.MustCompile(`no such table:\s*\S`)
 
 // FrictionHash is frictionHash for callers outside the package.
 func FrictionHash(line string) uint64 { return frictionHash(line) }
