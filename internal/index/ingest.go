@@ -513,7 +513,11 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
-	reportPhase("indexing messages", len(ss))
+	// Counted in messages and reported when a batch has actually been
+	// indexed, not when it was handed to the spiller: reporting per session
+	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
+	// while the workers drained — a third of the phase (#3372).
+	reportPhase("indexing messages", countMessages(ss))
 	wrote := map[string]bool{}
 	var wroteMu sync.Mutex
 	sp, err := newSpiller(tmp)
@@ -524,7 +528,6 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	defer sp.cleanup()
 	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
-			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
@@ -683,6 +686,17 @@ func safeLoad(name string, load func() []model.Session, progress io.Writer) (ss 
 		}
 	}()
 	return load()
+}
+
+// countMessages is the unit the indexing phase works through. A message that
+// strips to nothing is skipped by the loop, so the count is an upper bound and
+// the bar finishes a little short rather than sitting at 99%.
+func countMessages(ss []model.Session) int {
+	n := 0
+	for _, s := range ss {
+		n += len(s.Messages)
+	}
+	return n
 }
 
 // progressWeights is how many files each store contributes, set by the caller
@@ -1044,7 +1058,11 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	// secrets straight out of the unredacted commands.
 	preRedactSessions(&m, ss)
 	seenMsgs := msgSeen{}
-	reportPhase("indexing messages", len(ss))
+	// Counted in messages and reported when a batch has actually been
+	// indexed, not when it was handed to the spiller: reporting per session
+	// pushed sent the bar from 1% to 99% in one step and then held it at 99%
+	// while the workers drained — a third of the phase (#3372).
+	reportPhase("indexing messages", countMessages(ss))
 	wrote := map[string]bool{}
 	var wroteMu sync.Mutex
 	sp, err := newSpiller(tmp)
@@ -1055,7 +1073,6 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	defer sp.cleanup()
 	err = sp.run(func(push func(tokenJob)) error {
 		for _, s := range ss {
-			reportAdvance(1)
 			key := s.Harness + ":" + s.ID
 			ord := uint32(0)
 			if old, ok := m.Sessions[key]; ok {
