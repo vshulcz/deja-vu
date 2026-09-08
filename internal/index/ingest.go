@@ -692,6 +692,30 @@ var progressWeights = map[string]int{}
 // loadProgress narrates a full rebuild per harness: a cold pass over a large
 // corpus takes seconds and used to look hung.
 func loadProgress(h string, progress io.Writer) []model.Session {
+	// Per file while the stores parse, and the remainder of each store's
+	// weight when it lands. Advancing only per store left the bar at 0% for as
+	// long as the largest one took — on a machine where Claude Code holds most
+	// of the corpus, ten seconds of a thirty-second rebuild (#3372). A store
+	// that parses no files through the pool (the SQLite ones) is unchanged: it
+	// counts nothing here and its whole weight arrives at the end.
+	var readMu sync.Mutex
+	readPerHarness := map[string]int{}
+	restore := sources.SetFileProgress(func(path string) {
+		name := harnessForPath(path)
+		if store := sources.HarnessForKind(name); store != "" {
+			name = store
+		}
+		readMu.Lock()
+		counted := readPerHarness[name] < progressWeights[name]
+		if counted {
+			readPerHarness[name]++
+		}
+		readMu.Unlock()
+		if counted {
+			reportAdvance(1)
+		}
+	})
+	defer restore()
 	// Harness stores are independent files owned by different tools; parsing
 	// them is CPU-bound JSON/regex work with no shared state, so the cold
 	// build parses all stores concurrently. Results keep registry order so a
@@ -719,7 +743,15 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 				msgs += len(x.Messages)
 			}
 			reportHarness(name, len(ss), msgs)
-			reportAdvance(progressWeights[name])
+			// Only what the per-file reports did not already cover, so a store
+			// counts its weight once.
+			readMu.Lock()
+			rest := progressWeights[name] - readPerHarness[name]
+			readPerHarness[name] = progressWeights[name]
+			readMu.Unlock()
+			if rest > 0 {
+				reportAdvance(rest)
+			}
 		}(i, hr.Name, hr.Load)
 	}
 	wg.Wait()
