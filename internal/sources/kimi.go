@@ -107,6 +107,15 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			if role != "user" && role != "assistant" {
 				return
 			}
+			// Kimi writes everything it appends to the context under the user
+			// role and says who wrote it in message.origin.kind: the person, a
+			// <system-reminder> injection, a hook's stdout, a background task,
+			// a compaction summary. Keyed on the role alone, all of them were
+			// the person's — so deja recalled its own hook's output back as
+			// something the user said (#3199).
+			if role == "user" && !kimiUserOrigin(msg["origin"]) {
+				return
+			}
 			if role == "assistant" {
 				// Non-streamed assistant records exist in older protocols;
 				// close any open step first to keep message order stable.
@@ -205,6 +214,27 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// kimiUserOrigin reports that a user-role record is the person's. Kimi's own
+// Disposition keeps `user` and the user's slash commands and treats the rest —
+// `injection`, `hook_result`, `background_task`, `system_trigger`,
+// `compaction_summary` — as the host's.
+//
+// A record with no origin at all is the person's: older protocols wrote none,
+// and reading their absence as "not the user" would empty every session
+// written before the field existed.
+func kimiUserOrigin(v any) bool {
+	o, ok := v.(map[string]any)
+	if !ok {
+		return true
+	}
+	kind, _ := o["kind"].(string)
+	switch kind {
+	case "", "user", "slash_command":
+		return true
+	}
+	return false
 }
 
 // kimiText joins the text parts of an append_message content array.
