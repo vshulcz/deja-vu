@@ -979,13 +979,24 @@ func forgetInjected(dir, sid string) {
 	if err != nil {
 		return
 	}
-	key := hookseenKey(sid)
+	// Every key this session's memory is filed under, not only the one the
+	// per-prompt hook writes: the session-start rows are `start:<sid>` and the
+	// once mark is `once:<sid>`, so a compaction dropped the prompt rows and
+	// kept the two that say the digest has already been sent — leaving the
+	// next start refusing to send back exactly what the compaction lost. On a
+	// harness whose only rows are those two, nothing was forgotten at all
+	// (#3307).
+	keys := map[string]bool{
+		hookseenKey(sid):                         true,
+		hookseenKey(sessionStartKeyPrefix + sid): true,
+		hookseenKey(onceDigestKey(sid)):          true,
+	}
 	var kept []string
 	for _, line := range strings.Split(string(b), "\n") {
 		if line == "" {
 			continue
 		}
-		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == key {
+		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] {
 			continue
 		}
 		kept = append(kept, line)
