@@ -3058,7 +3058,7 @@ func printSources(dir string) {
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
 	}
-	s, m, _ := sources.OpencodeCounts()
+	s, m, countErr := sources.OpencodeCounts()
 	// The counts come out of sqlite, which knows nothing about the exclude
 	// list, so with a pattern in force this row kept reporting sessions that
 	// are not indexed, not searchable and not exported while every other row
@@ -3090,6 +3090,21 @@ func printSources(dir string) {
 	}
 	if opencodeExcluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", opencodeExcluded)
+	}
+	// A store sqlite could not open — locked past the timeout, or a file the
+	// reader may not open — looked like one nobody had used, the shape #1000
+	// fixed for the file stores (#3190).
+	if countErr != nil && sources.SQLite3Available() {
+		reason := "sqlite3: " + countErr.Error()
+		if line := sources.ExitStderrLine(countErr); line != "" {
+			reason = "sqlite3: " + line
+		}
+		if f, err := os.Open(sources.OpencodeDB()); err != nil {
+			reason = err.Error()
+		} else {
+			f.Close()
+		}
+		note = "\t(cannot be read — " + reason + ")" + note
 	}
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
