@@ -55,28 +55,36 @@ var harnessBlockRe = func() *regexp.Regexp {
 	return regexp.MustCompile(`(?is)<(` + strings.Join(alts, "|") + `)(?:\s[^>]*)?>(?:.*?</\s*` + "(?:" + strings.Join(alts, "|") + `)\s*>|.*$)`)
 }()
 
-// closedHarnessBlockRe is harnessBlockRe without the run-to-the-end arm: only
-// a block that is closed. An unclosed tag is not always the host — a person
-// asking "why does <system-reminder> show up in my prompt?" opens one and
-// never closes it, and taking everything after it would take the question
-// (review of #3323).
-var closedHarnessBlockRe = func() *regexp.Regexp {
-	alts := make([]string, 0, len(harnessBlockTags))
+// closedHarnessBlockREs is one regexp per tag: a block that opens and closes
+// with the same name. harnessBlockRe closes on any listed name, which is what
+// a nested Cursor block needs, but on a turn where two different envelopes
+// stand apart it swallowed the sentence between them (review of #3323).
+var closedHarnessBlockREs = func() []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(harnessBlockTags))
 	for _, t := range harnessBlockTags {
-		alts = append(alts, regexp.QuoteMeta(t))
+		q := regexp.QuoteMeta(t)
+		out = append(out, regexp.MustCompile(`(?is)<`+q+`(?:\s[^>]*)?>.*?</\s*`+q+`\s*>`))
 	}
-	return regexp.MustCompile(`(?is)<(` + strings.Join(alts, "|") + `)(?:\s[^>]*)?>.*?</\s*(?:` + strings.Join(alts, "|") + `)\s*>`)
+	return out
 }()
 
-// StripClosedHarnessBlocks removes the envelopes a harness closed and leaves
-// everything else as it stands. The prompt hook wants the stricter rule — a
-// truncated notification is still not the person — but a surface that prints
-// the turn back must not lose words to a tag somebody typed themselves.
+// StripClosedHarnessBlocks removes the envelopes a harness opened and closed
+// under one name, and leaves everything else as it stands. The prompt hook
+// wants the stricter rule — a truncated notification is still not the person —
+// but a surface that prints the turn back must not lose words to a tag
+// somebody typed themselves.
 func StripClosedHarnessBlocks(text string) string {
 	if !strings.Contains(text, "<") {
 		return strings.TrimSpace(text)
 	}
-	return strings.TrimSpace(closedHarnessBlockRe.ReplaceAllString(text, ""))
+	for _, re := range closedHarnessBlockREs {
+		text = re.ReplaceAllString(text, "")
+	}
+	// What a nested block leaves behind, and Cursor's wrapper around the words
+	// a person typed: the tags go, the words stay.
+	text = orphanCloseRe.ReplaceAllString(text, "")
+	text = userQueryTagRe.ReplaceAllString(text, "")
+	return strings.TrimSpace(text)
 }
 
 // StripHarnessBlocks returns what is left of a prompt once the harness's own

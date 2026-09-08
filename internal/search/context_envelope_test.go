@@ -83,3 +83,27 @@ func TestContextKeepsTheQuestionUnderAnUnclosedTag(t *testing.T) {
 		t.Errorf("a question that names a tag lost its words:\n%s", got)
 	}
 }
+
+// Two different envelopes standing apart are two blocks, not one: the words
+// between them are a person's. And what a nested block leaves behind — an
+// orphan closing tag, Cursor's wrapper — does not reach the agent reading the
+// context (second review of #3323).
+func TestContextKeepsWordsBetweenTwoEnvelopes(t *testing.T) {
+	s := model.Session{Harness: "claude", Project: "p", ID: "id", Messages: []model.Message{
+		{Role: "user", Text: "<meta>\nsome session meta\n</meta>\nI wanted to also ask: why did the deploy fail last night?\n<deja-recall>\nan old block\n</deja-recall>"},
+		{Role: "user", Text: "<additional_data>\nsome file dump\n<attached_files>\nfile1.go\n</attached_files>\n</additional_data>\nplease review the retry loop off-by-one"},
+		{Role: "user", Text: "<user_query>\nwhy is the retry loop dropping the last attempt\n</user_query>"},
+	}}
+	var b bytes.Buffer
+	PrintContext(&b, s, "deploy")
+	got := b.String()
+	if !strings.Contains(got, "why did the deploy fail last night?") {
+		t.Errorf("the sentence between two envelopes was eaten:\n%s", got)
+	}
+	if strings.Contains(got, "</additional_data>") || strings.Contains(got, "<user_query>") {
+		t.Errorf("a bare tag reached the context:\n%s", got)
+	}
+	if !strings.Contains(got, "why is the retry loop dropping the last attempt") {
+		t.Errorf("the words inside Cursor's wrapper are gone:\n%s", got)
+	}
+}
