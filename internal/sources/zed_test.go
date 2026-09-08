@@ -133,8 +133,11 @@ func TestParseZedDBReadsBothStorageEncodings(t *testing.T) {
 			if got.Messages[j].Role != role || got.Messages[j].Text != text {
 				t.Fatalf("session %d message %d = %#v, want %s/%q", i, j, got.Messages[j], role, text)
 			}
-			if !got.Messages[j].Time.Equal(got.Started) {
-				t.Fatalf("session %d message %d time = %v, want the thread start %v", i, j, got.Messages[j].Time, got.Started)
+			// The thread has no clock of its own, so the place in the array
+			// is one: the start plus a millisecond per record, which is what
+			// tells two identical turns apart (#3333).
+			if want := got.Started.Add(time.Duration(j) * time.Millisecond); !got.Messages[j].Time.Equal(want) {
+				t.Fatalf("session %d message %d time = %v, want %v", i, j, got.Messages[j].Time, want)
 			}
 		}
 	}
