@@ -41,6 +41,11 @@ type claudeLine struct {
 	IsSidechain      bool   `json:"isSidechain"`
 	AgentID          string `json:"agentId"`
 	AttributionAgent string `json:"attributionAgent"`
+	// IsMeta marks a user-role record Claude Code wrote itself — a loaded
+	// skill's body, a prompt a cron job re-fired, the /fork notice, an image
+	// placeholder. Indexed as the person's words, a skill body became 52
+	// questions nobody asked on one machine (#3267).
+	IsMeta bool `json:"isMeta"`
 }
 
 type claudeMessage struct {
@@ -62,6 +67,9 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 			return
 		}
 		if v.Type != "user" && v.Type != "assistant" {
+			return
+		}
+		if v.Type == "user" && v.IsMeta {
 			return
 		}
 		if v.IsSidechain && v.AgentID != "" {
