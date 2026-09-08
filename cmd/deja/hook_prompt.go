@@ -191,6 +191,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		requestWarmup(dir)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
+	// The same question, from the same reader, was answered a moment ago. The
+	// cooldowns below are per session shown, so an identical prompt arriving
+	// every minute — a `/loop 1m …` sends the same text on each tick — walked
+	// one session further down the ranking each time: 25 blocks from 21
+	// different sessions in one evening, none of them the loop's subject
+	// (#3189). "You have been here" is about the question, not the tick.
+	//
+	// Not for a spawned agent: a fleet is many readers behind one key, and ten
+	// agents sent out on the same work each need the answer once rather than
+	// the first one taking it for all of them (#2534).
+	if !isSpawnedReader(input.SessionID) &&
+		askedRecently(dir, input.SessionID, askKey(terms), repeatAskWindow) {
+		return emitNudgeOnly(stdout, plain, nudge)
+	}
 	// The payload first, then the export, then where the process stands: the
 	// export is set once per process and will not change, so reading it alone
 	// answered a second payload with the first one's project (#2182).
@@ -474,6 +488,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	}
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
+	// Stamped, because the question is answered again once the window passes,
+	// where a block fingerprint holds for the life of the session.
+	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
 	rememberInjectedFor(dir, input.SessionID, projectKey, ss)
 	if unreadable {
 		usage.RecordDigestFromUnread(dir, usage.KindDejaVu, out, input.SessionID, len(ss), rawSize(ss),
@@ -821,6 +838,54 @@ func alreadyInjected(dir, sid string) map[string]bool {
 func blockFingerprint(body string) string {
 	sum := sha256.Sum256([]byte(strings.Join(strings.Fields(body), " ")))
 	return hex.EncodeToString(sum[:8])
+}
+
+// repeatAskWindow is how long one reader's question stays answered. An hour is
+// long enough to cover a loop that ticks every minute and short enough that
+// coming back to the same subject after real work is answered again — and what
+// the reader was shown is still on screen for that stretch, so a second copy
+// adds nothing.
+const repeatAskWindow = time.Hour
+
+// askKey identifies a question by the terms it searches on rather than by its
+// text: the same question typed twice with different filler is the same
+// question, and terms are what the ranking sees.
+func askKey(terms []string) string {
+	sorted := append([]string(nil), terms...)
+	sort.Strings(sorted)
+	sum := sha256.Sum256([]byte(strings.Join(sorted, " ")))
+	// The prefix keeps it out of the session-id space this file also holds.
+	return "ask:" + hex.EncodeToString(sum[:8])
+}
+
+// askedRecently reports whether this reader already had an answer to the same
+// question inside the window. Scanned from the end, like the cooldowns: the
+// file is append-only and the newest rows are the ones that matter.
+func askedRecently(dir, sid, key string, window time.Duration) bool {
+	if sid == "" || key == "" || window <= 0 {
+		return false
+	}
+	b, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		return false
+	}
+	want := hookseenKey(sid)
+	cutoff := time.Now().UTC().Add(-window)
+	lines := strings.Split(string(b), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		parts := strings.Fields(lines[i])
+		if len(parts) < 3 || parts[0] != want || parts[1] != key {
+			continue
+		}
+		// A row with an unreadable stamp is one this hook wrote in a shape it
+		// no longer writes; answering again is the safe way to be wrong.
+		t, err := time.Parse(time.RFC3339, parts[2])
+		if err != nil {
+			return false
+		}
+		return t.After(cutoff)
+	}
+	return false
 }
 
 // isSpawnedReader reports whether this recall is for an agent the parent just
