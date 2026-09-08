@@ -282,6 +282,10 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 	if uninstall {
 		// The hook lives in its own plugin directory; leaving it behind means
 		// Goose keeps running a command that no longer exists.
+		hooks := installResult{Path: gooseHookPath(), Action: "unchanged"}
+		if _, statErr := os.Stat(gooseHookPath()); statErr == nil {
+			hooks.Action = "removed"
+		}
 		_ = os.RemoveAll(filepath.Dir(filepath.Dir(gooseHookPath())))
 		// The recall now lives in the reader's own AGENTS.md, so uninstall
 		// takes deja's block out and leaves the file. Removing it was right
@@ -293,7 +297,9 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 		if rerr := dropRetiredGooseHints(); rerr != nil {
 			return installResult{}, rerr
 		}
-		return res, nil
+		// The plugin's removal rides with the result, the way the install
+		// names its creation (#3208).
+		return wroteAll(res, hooks), nil
 	}
 	if err := refreshGooseHints(); err != nil {
 		return installResult{}, err
