@@ -97,7 +97,10 @@ func TestReadmeCursorGetsASkill(t *testing.T) {
 	if r.Path == "" {
 		t.Fatal("cursor writes no guidance again — the README paragraph now says it does")
 	}
-	if !strings.Contains(para, "~/.cursor/skills/") {
-		t.Errorf("README does not say where Cursor's skill goes:\n%s", para)
+	// The directory the installer writes, not a path the test remembers:
+	// the skill moved to the shared ~/.agents/skills and the README lagged (#3187).
+	want := shortHome(filepath.Dir(filepath.Dir(r.Path)))
+	if !strings.Contains(para, want) {
+		t.Errorf("README does not say where Cursor's skill goes (%s):\n%s", want, para)
 	}
 }
