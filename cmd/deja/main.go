@@ -2955,7 +2955,19 @@ func printSources(dir string) {
 		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.GeminiChatFiles, sources.LoadGemini},
 		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorReadFiles, sources.LoadCursor},
 		{"antigravity", antigravityLocation, antigravityRoots, sources.AntigravityTranscripts, sources.LoadAntigravity},
-		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.GrokSessionFiles, sources.LoadGrok},
+		// Both stores, as the registry loads them: the JSONL reader alone read a
+		// Grok Build grok.db as sessions=0 while doctor counted it (#3225).
+		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()},
+			func() []string {
+				files := sources.GrokSessionFiles()
+				if db := sources.GrokDB(); db != "" {
+					if _, err := os.Stat(db); err == nil {
+						files = append(files, db)
+					}
+				}
+				return files
+			},
+			func() []model.Session { return append(sources.LoadGrok(), sources.LoadGrokDB()...) }},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles, sources.LoadGoose},
