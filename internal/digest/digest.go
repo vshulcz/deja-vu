@@ -669,6 +669,71 @@ func IsAgentArtifact(text string) bool {
 	return false
 }
 
+// compactedHalf returns what the harness said the session was about before the
+// compaction, when its summary is the first thing in the session — the shape a
+// resumed session has, and the only place the earlier half survives. Empty for
+// every other session, including one whose summary sits after turns of its own:
+// there the person has already said what the work is.
+//
+// Bounded to the intent the summary opens with. The whole block runs to
+// kilobytes and the handoff has a budget to spend on what was actually said.
+func compactedHalf(s model.Session) string {
+	for _, m := range s.Messages {
+		if m.Role != "user" {
+			continue
+		}
+		trimmed := strings.TrimSpace(m.Text)
+		if !isCompactionSummary(trimmed) {
+			return ""
+		}
+		return compactionIntent(trimmed)
+	}
+	return ""
+}
+
+// compactionIntent is the "Primary Request and Intent" section of a compaction
+// summary, cut to the first few lines of it.
+func compactionIntent(summary string) string {
+	const heading = "1. Primary Request and Intent"
+	i := strings.Index(summary, heading)
+	if i < 0 {
+		return ""
+	}
+	rest := summary[i+len(heading):]
+	rest = strings.TrimLeft(rest, ":* \n")
+	// The next numbered heading ends it; a summary that has none is cut by the
+	// line budget below.
+	if j := strings.Index(rest, "\n2. "); j > 0 {
+		rest = rest[:j]
+	}
+	var kept []string
+	for _, line := range strings.Split(rest, "\n") {
+		line = strings.TrimRight(line, " \t")
+		if strings.TrimSpace(line) == "" {
+			if len(kept) == 0 {
+				continue
+			}
+			break
+		}
+		kept = append(kept, line)
+		if len(kept) == compactionIntentLines {
+			break
+		}
+	}
+	out := strings.TrimSpace(strings.Join(kept, "\n"))
+	if len(out) > compactionIntentBytes {
+		out = strings.TrimSpace(out[:compactionIntentBytes]) + cutMark
+	}
+	return out
+}
+
+// How much of the summary the handoff carries: enough to say what the work was,
+// far short of the kilobytes the whole block runs to.
+const (
+	compactionIntentLines = 6
+	compactionIntentBytes = 700
+)
+
 // cleanSession drops agent artifacts and exact repeats so the digest carries
 // conversation, not tool output replayed under a user role.
 func cleanSession(s model.Session) model.Session {
@@ -701,6 +766,7 @@ const (
 )
 
 func Handoff(s model.Session, budget int) string {
+	earlier := compactedHalf(s)
 	s = cleanSession(s)
 	var b strings.Builder
 	date := "unknown"
@@ -723,6 +789,17 @@ func Handoff(s model.Session, budget int) string {
 	// Drop the share header line; the framing above replaces it.
 	if i := strings.Index(body, "\n"); i > 0 && strings.HasPrefix(body, "# deja share:") {
 		body = strings.TrimSpace(body[i:])
+	}
+	// A session resumed after a compaction opens on the harness's summary of
+	// the half it dropped, and that summary is the only record of what the
+	// work was: without it the handoff's problem statement is whatever the
+	// person typed after the resume — "продолжай" (#3266). It is the
+	// harness's text rather than theirs, so it is named as such and kept
+	// short, and it is taken only when it opens the session: a summary with
+	// the person's own turns above it adds nothing they did not already say.
+	if earlier != "" {
+		body = "## Earlier, from the harness's summary of the compacted half\n\n" +
+			earlier + "\n\n" + body
 	}
 	// The marker says the passage before it was cut and that the block ends
 	// there — that is the rule Share and the tail each keep on their own. The
