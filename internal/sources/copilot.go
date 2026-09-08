@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -75,6 +77,9 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 		ID:      filepath.Base(filepath.Dir(path)),
 		Path:    path,
 	}
+	// Which message holds each shell command, by the call id the completion
+	// event repeats: Copilot files the command and its outcome as two records.
+	commandAt := map[string]int{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		data, _ := m["data"].(map[string]any)
@@ -134,8 +139,10 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 					records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
 				}
 			}
+			cmdAt := -1
 			if IndexCommands() {
 				for _, cmd := range commandsIn(part, copilotDialect) {
+					cmdAt = len(records)
 					records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
 				}
 			}
@@ -143,6 +150,9 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 				return
 			}
 			s.Touch(t)
+			if id, _ := data["toolCallId"].(string); id != "" && cmdAt >= 0 {
+				commandAt[id] = len(s.Messages) + cmdAt
+			}
 			s.Messages = append(s.Messages, records...)
 		case "tool.execution_complete":
 			// Kept whether or not the call succeeded: the error a command hit
@@ -153,6 +163,17 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			}
 			result, _ := data["result"].(map[string]any)
 			out, _ := result["content"].(string)
+			// What the command did, which Copilot does not put in `success`:
+			// that field is true on every completion in a real store, failed
+			// runs included, and the code lives in the telemetry and in a
+			// trailer inside the output (#3369).
+			if code := copilotExitCode(data, out); code > 0 {
+				if id, _ := data["toolCallId"].(string); id != "" {
+					if i, ok := commandAt[id]; ok && i < len(s.Messages) {
+						s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+					}
+				}
+			}
 			if out = strings.TrimSpace(out); out == "" {
 				return
 			}
@@ -164,6 +185,31 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// copilotShellExitRe is the trailer Copilot writes under a shell run's output:
+// "<shellId: 0 completed with exit code 1>". The tool's own documentation
+// mentions the words "exit code" in prose, which is why this asks for the
+// whole shape rather than the phrase.
+var copilotShellExitRe = regexp.MustCompile(`<shellId:[^>]*completed with exit code (\d+)>`)
+
+// copilotExitCode reads what a shell call actually did. The telemetry carries
+// the number when Copilot recorded one; the trailer under the output is the
+// fallback, and both are absent for a call that is not a shell run.
+func copilotExitCode(data map[string]any, out string) int {
+	if tel, ok := data["toolTelemetry"].(map[string]any); ok {
+		if metrics, ok := tel["metrics"].(map[string]any); ok {
+			if code, ok := metrics["exit_code"].(float64); ok {
+				return int(code)
+			}
+		}
+	}
+	if m := copilotShellExitRe.FindStringSubmatch(out); m != nil {
+		if code, err := strconv.Atoi(m[1]); err == nil {
+			return code
+		}
+	}
+	return 0
 }
 
 // copilotProjectName mirrors the codex convention: the last two path segments
