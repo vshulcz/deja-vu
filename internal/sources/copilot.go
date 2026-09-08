@@ -25,7 +25,6 @@ func CopilotSessionFiles() []string {
 // LoadCopilot loads all Copilot CLI sessions.
 func LoadCopilot() []model.Session { return parseFiles(CopilotSessionFiles(), ParseCopilotFile) }
 
-// ParseCopilotFile parses a single Copilot events.jsonl.
 // copilotSkillContextRe is the wrapper Copilot CLI puts around a skill's body
 // when it injects it as a user.message: the block is the host's, and the
 // whole skill indexed as the person's words (#3305). A person's words beside
@@ -39,6 +38,7 @@ func copilotStripSkillContext(txt string) string {
 	return strings.TrimSpace(copilotSkillContextRe.ReplaceAllString(txt, ""))
 }
 
+// ParseCopilotFile parses a single Copilot events.jsonl.
 func ParseCopilotFile(path string) ([]model.Session, error) {
 	return parseCopilotFileFromOffset(path, 0)
 }
