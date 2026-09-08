@@ -27,7 +27,11 @@ func TestAmpPluginInjectsTheDigestOncePerThread(t *testing.T) {
 	dir := t.TempDir()
 	stub := filepath.Join(dir, "deja")
 	if err := os.WriteFile(stub, []byte("#!/bin/sh\n"+
-		`case "$1" in hook-context) echo '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<deja-recall>\nrecent history\n</deja-recall>"},"systemMessage":"deja recalled 1 session"}';; *) cat >/dev/null; echo "";; esac`+"\n"), 0o755); err != nil {
+		// The stub drains stdin on every branch: the plugin hands hook-context a
+		// JSON payload since #3264, and a child that exits without reading it
+		// gives execFileSync EPIPE on the runners, which the plugin swallows
+		// into "nothing" (#3283).
+		`cat >/dev/null; case "$1" in hook-context) echo '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"<deja-recall>\nrecent history\n</deja-recall>"},"systemMessage":"deja recalled 1 session"}';; *) echo "";; esac`+"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	plugin := filepath.Join(dir, "deja.ts")
