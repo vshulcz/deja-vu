@@ -36,7 +36,8 @@ func TestGooseRecallClearsTheFileItUsedToWrite(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(retired), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(retired, []byte("recall from an older deja\n"), 0o644); err != nil {
+	// The shape an older deja wrote there whole: the framed recall.
+	if err := os.WriteFile(retired, []byte(frameRecall("recall from an older deja\n")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := installGooseAuto("/bin/deja", false); err != nil {
