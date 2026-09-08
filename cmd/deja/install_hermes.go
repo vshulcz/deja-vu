@@ -99,10 +99,23 @@ def _provider_active():
         from hermes_cli.config import cfg_get, load_config
         if cfg_get(load_config(), "memory", "provider") != "deja-memory":
             return False
-        # Config can outlive the provider (an uninstall, a deleted directory);
-        # then the hook is the memory again, or there would be none at all.
+        # Config can outlive the provider (an uninstall, a deleted directory),
+        # and a provider that is there can still fail to load on a Hermes build
+        # it was not written for — the hook then stood down for a provider that
+        # was answering nothing (#3390). Ask the loader, and fall back to the
+        # file when this build has no loader to ask.
         here = os.path.dirname(os.path.abspath(__file__))
-        return os.path.isfile(os.path.join(os.path.dirname(here), "deja-memory", "__init__.py"))
+        present = os.path.isfile(os.path.join(os.path.dirname(here), "deja-memory", "__init__.py"))
+        if not present:
+            return False
+        try:
+            from plugins.memory import load_memory_provider
+        except Exception:
+            return True
+        try:
+            return load_memory_provider("deja-memory") is not None
+        except Exception:
+            return False
     except Exception:
         return False
 
