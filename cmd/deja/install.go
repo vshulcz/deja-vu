@@ -1311,8 +1311,15 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// deja's wiring or stops on a conflict. Follow the link and write where it
 	// points, so the link stays a link and the change lands in the repo.
 	// A dangling link has nothing to follow and keeps the old behaviour.
+	given := path
 	if resolved, rerr := filepath.EvalSymlinks(path); rerr == nil && resolved != path {
 		path = resolved
+		// The snapshot is taken under the resolved name a line below, and a
+		// later run may ask under either spelling — a link that has since been
+		// replaced by the real directory, a record written by an older deja.
+		// Recording both is the only way back, since no resolution runs
+		// backwards (review of #3340).
+		rememberSnapshot(given + ".bak")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return "", err
 		}

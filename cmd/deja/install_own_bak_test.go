@@ -171,3 +171,38 @@ func TestUninstallDropsItsOwnSnapshotThroughASymlink(t *testing.T) {
 		t.Error("deja kept its own snapshot because the recorded path was the resolved one")
 	}
 }
+
+// Either spelling finds it: the record now carries the name the caller gave
+// as well as the resolved one, because nothing can resolve a real path back to
+// the link that pointed at it (second review of #3340).
+func TestUninstallDropsASnapshotRecordedUnderTheOtherSpelling(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "real")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	own := "# deja mcp:start\n- insert:\n    - id: mcp-deja\n      command: \"deja\"\n# deja mcp:end\n"
+	viaLink := filepath.Join(link, "cordis.patch.yml")
+	if err := os.WriteFile(viaLink, []byte(own), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := writeIfChanged(viaLink, []byte(own), []byte(own+"# again\n")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The uninstall arrives with the real path, not the link.
+	viaReal := filepath.Join(real, "cordis.patch.yml")
+	removingWiring = true
+	createdByThisRun = append(createdByThisRun, viaReal)
+	defer func() { removingWiring = false; createdByThisRun = nil; snapshotsByThisRun = nil }()
+	if _, err := writeIfChanged(viaReal, []byte(own), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(viaReal + ".bak"); err == nil {
+		t.Error("deja's own snapshot outlived the uninstall because it was recorded under the other spelling")
+	}
+}
