@@ -121,3 +121,31 @@ func TestContextKeepsASentenceThatNamesTheWrapper(t *testing.T) {
 		t.Errorf("the sentence lost the tag it was naming:\n%s", b.String())
 	}
 }
+
+// Each close pairs with the nearest open before it. A turn that opens one
+// wrapper and never closes it, then closes a later one, used to hand the stray
+// tag back inside the text (third review of #3323).
+func TestContextPairsEachWrapperWithTheNearestOpen(t *testing.T) {
+	s := model.Session{Harness: "cursor", Project: "p", ID: "id", Messages: []model.Message{
+		{Role: "user", Text: "<user_query>open one never closed about the retry loop, then <user_query>why does it drop the last attempt</user_query> after it"},
+	}}
+	var b bytes.Buffer
+	PrintContext(&b, s, "retry loop")
+	got := b.String()
+	if strings.Contains(got, "</user_query>") {
+		t.Errorf("a closing tag was left where its pair was unwrapped:\n%s", got)
+	}
+	if !strings.Contains(got, "why does it drop the last attempt") {
+		t.Errorf("the question inside the closed wrapper is gone:\n%s", got)
+	}
+	// The open with no close is the person naming the tag, and stays where it
+	// is — the same rule every other tag gets here.
+	if strings.Count(got, "<user_query>") != 1 {
+		t.Errorf("the unclosed tag a person typed was taken out:\n%s", got)
+	}
+	// And it is the one they left open, at the head — not the wrapper's own,
+	// which the close paired with.
+	if !strings.Contains(got, "then why does it drop the last attempt") {
+		t.Errorf("the close paired with the wrong open, so the tag sits against the question:\n%s", got)
+	}
+}

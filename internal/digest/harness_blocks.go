@@ -68,9 +68,27 @@ var closedHarnessBlockREs = func() []*regexp.Regexp {
 	return out
 }()
 
-// closedUserQueryRe is Cursor's wrapper with both of its tags: the words
-// between them are the person's and stay.
-var closedUserQueryRe = regexp.MustCompile(`(?is)<user_query>(.*?)</user_query>`)
+// unwrapUserQuery removes Cursor's wrapper where both of its tags are there,
+// keeping the words between them. Each close pairs with the nearest open
+// before it: a regexp runs from the first open to the first close, so a turn
+// that opens one and never closes it, and closes a later one, kept the stray
+// tag inside what it handed back (review of #3323). An open with no close is
+// a person naming the tag, and is left where it is.
+func unwrapUserQuery(text string) string {
+	const open, close = "<user_query>", "</user_query>"
+	for {
+		end := strings.Index(text, close)
+		if end < 0 {
+			return text
+		}
+		start := strings.LastIndex(text[:end], open)
+		if start < 0 {
+			// A close with nothing open before it: the orphan rule owns that.
+			return text
+		}
+		text = text[:start] + text[start+len(open):end] + text[end+len(close):]
+	}
+}
 
 // StripClosedHarnessBlocks removes the envelopes a harness opened and closed
 // under one name, and leaves everything else as it stands. The prompt hook
@@ -90,7 +108,7 @@ func StripClosedHarnessBlocks(text string) string {
 	// naming the tag, and taking it out of their prose mangles the sentence
 	// (review of #3323).
 	text = orphanCloseRe.ReplaceAllString(text, "")
-	text = closedUserQueryRe.ReplaceAllString(text, "$1")
+	text = unwrapUserQuery(text)
 	return strings.TrimSpace(text)
 }
 
