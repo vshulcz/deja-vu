@@ -17,7 +17,11 @@ test("a query that starts with a dash gets the flag terminator", () => {
   assert.deepEqual(argv("search", [], "pgbouncer"), ["search", "pgbouncer"])
 })
 
-test("the session key comes from the event first, then the context", () => {
+test("the session key is what pi keeps on the session manager", () => {
+  // pi 0.73 / omp 18: the event carries prompt and images only, the context a
+  // sessionManager — the shapes the installer's extension reads (#3179).
+  assert.equal(sessionKey({ prompt: "why" }, { sessionManager: { getSessionId: () => "s1" } }), "s1")
+  assert.equal(sessionKey({ prompt: "why" }, { sessionManager: { sessionId: "s2" } }), "s2")
   assert.equal(sessionKey({ sessionId: "e1" }, { session: { id: "c1" } }), "e1")
   assert.equal(sessionKey({}, { session: { id: "c1" } }), "c1")
   assert.equal(sessionKey({}, {}), "")
