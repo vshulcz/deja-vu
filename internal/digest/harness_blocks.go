@@ -35,13 +35,14 @@ var userQueryTagRe = regexp.MustCompile(`(?i)</?user_query>`)
 // orphanCloseRe is the closing tag a nested block leaves behind: the block
 // regexp stops at the first closing tag of any listed name, so Cursor's
 // `<additional_data>…<attached_files>…</attached_files></additional_data>`
-// keeps its outer close. A closing tag on its own is nobody's words.
+// keeps its outer close. Only a closing tag standing on a line of its own
+// goes — "I removed the </attached_files> line" is a person's sentence.
 var orphanCloseRe = func() *regexp.Regexp {
 	alts := make([]string, 0, len(harnessBlockTags))
 	for _, t := range harnessBlockTags {
 		alts = append(alts, regexp.QuoteMeta(t))
 	}
-	return regexp.MustCompile(`(?i)</\s*(?:` + strings.Join(alts, "|") + `)\s*>`)
+	return regexp.MustCompile(`(?im)^[ \t]*</\s*(?:` + strings.Join(alts, "|") + `)\s*>[ \t]*$`)
 }()
 
 var harnessBlockRe = func() *regexp.Regexp {
