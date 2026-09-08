@@ -12,9 +12,9 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-var (
-	antigravityRequestOpenRE  = regexp.MustCompile(`^\s*<USER_REQUEST>\s*`)
-	antigravityRequestCloseRE = regexp.MustCompile(`\s*</USER_REQUEST>\s*$`)
+const (
+	antigravityRequestOpen  = "<USER_REQUEST>"
+	antigravityRequestClose = "</USER_REQUEST>"
 )
 
 var antigravityUserBlockREs = []*regexp.Regexp{
@@ -113,11 +113,22 @@ func antigravitySessionID(path string) string {
 }
 
 func cleanAntigravityUserContent(text string) string {
+	// What is inside the request tag is the person's turn, wherever the tag
+	// stands. Approving a plan writes the IDE's own comment above an empty
+	// one — "Comments on artifact URI: … The user has approved this document."
+	// — and taking the tag off only when it opened the content indexed that
+	// comment as their words (#3326). deja's own antigravity hook has read the
+	// tag this way since it was written.
+	if open := strings.Index(text, antigravityRequestOpen); open >= 0 {
+		text = text[open+len(antigravityRequestOpen):]
+		if close := strings.Index(text, antigravityRequestClose); close >= 0 {
+			text = text[:close]
+		}
+	}
+	// The IDE's own blocks can sit inside the request tag as well as beside it.
 	for _, re := range antigravityUserBlockREs {
 		text = re.ReplaceAllString(text, "")
 	}
-	text = antigravityRequestOpenRE.ReplaceAllString(text, "")
-	text = antigravityRequestCloseRE.ReplaceAllString(text, "")
 	return strings.TrimSpace(text)
 }
 
