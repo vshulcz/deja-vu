@@ -167,7 +167,13 @@ export default function (amp: any) {
       const id = threadID(event)
       if (injected !== (id || "*")) {
         injected = id || "*"
-        const raw = run(["hook-context"], "")
+        // The thread goes with it, so deja's own once-per-session mark holds
+        // across a restart of the process the way it does for Claude Code.
+        const raw = run(["hook-context"], JSON.stringify({
+          session_id: id,
+          cwd: process.cwd(),
+          deja_once: true,
+        }))
         let digest = raw
         let receipt = ""
         try {
