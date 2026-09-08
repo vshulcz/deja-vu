@@ -140,6 +140,20 @@ func runHookPrecompact(dir string) {
 	requestWarmup(dir)
 }
 
+// withoutSubagentRuns drops the sessions a parent spawned. The caller keeps
+// the original pool when this leaves nothing, so a project whose only history
+// is subagent runs still gets a digest.
+func withoutSubagentRuns(ss []model.Session) []model.Session {
+	out := make([]model.Session, 0, len(ss))
+	for _, s := range ss {
+		if s.Kind == "sidechain" {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 // sessionHadDigest reports whether this session has already had its one
 // session-start attempt, for a host that fires that event every turn. Antigravity
 // keeps the same record under a key of its own; this one is for hosts that come
@@ -1014,6 +1028,16 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		}
 	}
 	mark("load-sessions")
+	// A subagent run is the parent's work seen from inside, and what it says
+	// on its own is the process talk a spawned agent produces — "Sending
+	// verdict", "Worktrees cleaned up". Indexing already treats these runs as
+	// secondary (#3009 keeps only the task and the answer); the digest picked
+	// them like any other session and let one lead the block ahead of the
+	// session that settled the work (#3368). Kept only when the project has
+	// nothing else: a subagent's transcript still beats an empty digest.
+	if kept := withoutSubagentRuns(ss); len(kept) > 0 {
+		ss = kept
+	}
 	if len(ss) == 0 {
 		// A project can have settled decisions and no recent session left to
 		// show them (the transcript was forgotten, or aged past the window).
