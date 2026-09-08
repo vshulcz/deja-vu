@@ -707,10 +707,18 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err := readableStrictJSON(probe...); err != nil {
 			return installResult{}, err
 		}
-		if _, err := installGrok(exe, uninstall); err != nil {
+		base, err := installGrok(exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installGrokAuto(exe, uninstall)
+		hooks, err := installGrokAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Both halves in one result, in the order they run: the config and
+		// settings writes reached nobody while the first result was dropped
+		// (#3220, the #3185 shape).
+		return wroteAll(base, hooks), nil
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
