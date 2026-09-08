@@ -482,6 +482,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	reportPhase("reading sessions", total)
 	ss := sources.FilterSessions(filterTombstonedSet(loadProgress(harness, progress), dead))
+	forgetUnreadStores(files)
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
@@ -870,6 +871,19 @@ func markShared(sessions map[string]SessionMeta, key string) {
 	}
 }
 
+// forgetUnreadStores drops from the file table every path the loaders could
+// not read this pass. Recorded with its size and mtime, a store locked past
+// the sqlite timeout made the next pass call the index up to date, and its
+// history stayed missing until someone rebuilt by hand. Left out, the next
+// pass parses it again — and skips it again, aloud, while it stays closed
+// (#3176). Both rebuild paths, since a damaged index reaches the search one
+// directly.
+func forgetUnreadStores(files map[string]FileState) {
+	for p := range sources.DiagFailedPaths() {
+		delete(files, p)
+	}
+}
+
 func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
 	beginPass()
 	tmp := dir + ".tmp"
@@ -888,6 +902,7 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 	}
 	reportPhase("reading sessions", total)
 	ss := sources.FilterSessions(filterTombstoned(loadProgress("", progress)))
+	forgetUnreadStores(files)
 	imported := importedSessions(dir)
 	ss = append(ss, imported.sessions...)
 	ss = filterTombstoned(ss)
