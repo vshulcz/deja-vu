@@ -186,7 +186,11 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// The words the person typed, not the expanded variant list: that one runs
 	// to eighteen stemmed forms for a two-word query, and requiring most of them
 	// in one message matches nothing.
-	needles := lowerAll(terms)
+	//
+	// The words, not the arguments: quoting a topic put the whole sentence in
+	// as one needle, which no single message carries, so `deja files "a b c"`
+	// answered nothing where `deja files a b c` answered (#3409).
+	needles := lowerAll(strings.Fields(q))
 	filtered := 0                    // recorded paths dropped by the repository filter
 	near := map[string]int{}         // path -> times touched near the topic
 	nearSessions := map[string]int{} // path -> how many sessions touched it near the topic
