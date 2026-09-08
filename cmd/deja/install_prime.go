@@ -39,6 +39,13 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 	if err != nil {
 		return installResult{}, err
 	}
+	// A JSONC file goes through the text writer, so a comment the reader
+	// kept stays; re-marshalling the object dropped it for good (#3243).
+	if len(bytes.TrimSpace(old)) > 0 && configIsJSONC(old) {
+		command, args := mcpCommandArgs(exe)
+		return writeJSONCEntry(path, old, "mcpServers",
+			map[string]any{"type": "stdio", "command": command, "args": args}, uninstall)
+	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {
 		if uninstall {
