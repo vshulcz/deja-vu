@@ -2362,6 +2362,12 @@ func parseLast(args []string) (int, search.Options, string, error) {
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
+				if flagName(a) == "--limit" {
+					// The two commands beside this one take --limit, so the
+					// reader is carrying it over rather than guessing; the
+					// count last takes is a bare argument (#3405).
+					return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q — the count is a bare argument, `deja last 3`", a)
+				}
 				return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q", a)
 			}
 			// The only bare argument last takes is the count. Dropping anything
@@ -2631,6 +2637,10 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
+				if flagName(a) == "--limit" {
+					// blame widens with --all rather than a count (#3405).
+					return "", o, false, fmt.Errorf("blame: unknown flag %q — it takes --all to show every session", a)
+				}
 				return "", o, false, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
 			}
 			if path != "" {
@@ -4567,4 +4577,13 @@ func betweenAll(s, marker string) []string {
 		out = append(out, strings.TrimSpace(rest[:j]))
 		s = rest[j+len(marker):]
 	}
+}
+
+// flagName is the flag without its value, so `--limit=3` and `--limit 3` are
+// recognised as the same spelling.
+func flagName(a string) string {
+	if i := strings.IndexByte(a, '='); i >= 0 {
+		return a[:i]
+	}
+	return a
 }
