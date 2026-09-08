@@ -433,7 +433,9 @@ func firstNonEmpty(a, b string) string {
 // key claudeProjectName expects, so cline/roo sessions land in the same
 // project namespace as every other harness.
 func pathToProjectKey(p string) string {
-	return strings.ReplaceAll(p, "/", "-")
+	// A Windows path folds the same way: backslashes are separators too, and
+	// the drive letter's colon is not a character a key carries (#3217).
+	return strings.NewReplacer("/", "-", "\\", "-", ":", "-").Replace(p)
 }
 
 func firstLineTrim(s string) string {
