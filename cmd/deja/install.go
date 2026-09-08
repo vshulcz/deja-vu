@@ -1026,6 +1026,22 @@ func backupOnce(path string) (bool, error) {
 	return true, os.WriteFile(bak, b, 0o600)
 }
 
+// backupOnceUnlessCreated is backupOnce for a file that was already there
+// before this run; one this run created is deja's and needs no snapshot. The
+// record holds the path as given, the write may have followed a symlink, so
+// both forms are compared.
+func backupOnceUnlessCreated(path string) (bool, error) {
+	for _, p := range createdByThisRun {
+		if p == path {
+			return false, nil
+		}
+		if r, err := filepath.EvalSymlinks(p); err == nil && r == path {
+			return false, nil
+		}
+	}
+	return backupOnce(path)
+}
+
 // removingWiring is set for the length of an uninstall run. Thirty-seven call
 // sites write configs through writeIfChanged, and on the uninstall path each
 // one computes "the file without deja in it" — which, for a file that does not
@@ -1266,7 +1282,11 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			return "", err
 		}
 	}
-	if _, err := backupOnce(path); err != nil {
+	// No snapshot of a file this run created: a second write to it in the
+	// same run — roo allows deja's tool right after writing the entry — was
+	// backing up deja's own file from a moment before, and the uninstall then
+	// called it a config the reader already had (#3245).
+	if _, err := backupOnceUnlessCreated(path); err != nil {
 		return "", err
 	}
 	// On the way out, a snapshot that itself contains deja's wiring is deja's
