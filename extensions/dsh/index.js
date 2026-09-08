@@ -2,7 +2,7 @@
 //
 // dsh answers questions about its own sessions through the built-in
 // session-query subsystem. This plugin answers the other question: what you did
-// in Claude Code, Codex, Cursor, opencode and sixteen more agents, on this
+// in Claude Code, Codex, Cursor, opencode and twenty-one more agents, on this
 // machine, before dsh existed. The index is deja's; this file is the seam.
 
 import { createRequire } from "node:module";

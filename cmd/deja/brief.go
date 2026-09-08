@@ -552,7 +552,10 @@ func printNoHistory(w io.Writer, stale bool) {
 	fmt.Fprintln(w, "deja-vu "+version+" · no agent history found yet")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "deja reads the session stores your agents already write —")
-	fmt.Fprintln(w, "Claude Code, Codex, opencode, Cursor, Gemini, Copilot and twelve more.")
+	// Counted from the registry: this line is the first screen a machine with
+	// no history sees, and it stood at eighteen while seven more harnesses
+	// landed (#3385).
+	fmt.Fprintf(w, "Claude Code, Codex, opencode, Cursor, Gemini, Copilot and %s more.\n", spelledCount(harnessCount()-6))
 	// A store deja is not allowed to open is not a machine no agent has used,
 	// and this is the first screen a new user sees: sending them after a
 	// missing store when the fix is a permission is the worst place to make
