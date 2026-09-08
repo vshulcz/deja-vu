@@ -41,6 +41,36 @@ func AntigravityRoots() []string {
 	return out
 }
 
+// AntigravitySidecarFiles lists what an Antigravity store keeps beside the
+// transcript deja reads: the full log, the chunk files it is written in, the
+// message records and the metadata beside a plan. Everything lives under
+// `.system_generated`, so the row could say nothing about any of it until
+// #3377.
+func AntigravitySidecarFiles() []string {
+	var out []string
+	for _, root := range AntigravityRoots() {
+		out = append(out, walkFiles(root, func(p string) bool {
+			dir := filepath.ToSlash(filepath.Dir(p))
+			// A conversation lives under brain/<id>; the settings, the caches,
+			// the update marker and the extension deja installs sit beside it
+			// and are not transcripts at all.
+			if !strings.Contains(dir, "/brain/") {
+				return true
+			}
+			base := filepath.Base(p)
+			switch {
+			case base == "transcript_full.jsonl", base == "read.json", base == "remember.json":
+				return true
+			case strings.HasSuffix(base, ".metadata.json"):
+				return true
+			}
+			return strings.Contains(dir, "/.system_generated/messages") ||
+				strings.Contains(dir, "/logs/chunks/")
+		})...)
+	}
+	return out
+}
+
 func AntigravityTranscripts() []string {
 	var out []string
 	for _, root := range AntigravityRoots() {

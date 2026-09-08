@@ -420,6 +420,12 @@ func inDotDir(root, p string) bool {
 // large reads as the tool failing to understand the user's own history, which
 // is the one thing doctor exists to rule out.
 func unplacedFiles(root string, seen []string, skipped func(string) bool) (unread, byRule int) {
+	return unplacedFilesIn(root, seen, skipped, false)
+}
+
+// unplacedFilesIn is unplacedFiles with the one decision a caller can make:
+// whether a dot directory under this root is the store itself.
+func unplacedFilesIn(root string, seen []string, skipped func(string) bool, dotDirsAreTheStore bool) (unread, byRule int) {
 	have := make(map[string]bool, len(seen))
 	for _, p := range seen {
 		have[filepath.Clean(p)] = true
@@ -439,7 +445,15 @@ func unplacedFiles(root string, seen []string, skipped func(string) bool) (unrea
 		// A store's own scratch is not a transcript deja failed to read: 452
 		// of the 482 this machine reported for codex sat in `.tmp`, and a
 		// count that size reads as a parser that cannot cope with the store.
-		if inDotDir(root, p) {
+		//
+		//
+		// Unless the store keeps its transcripts there: Antigravity files
+		// everything under `.system_generated`, so the rule silenced its row
+		// completely rather than trimming its noise. Codex is the opposite —
+		// it writes in-progress rollouts under `.tmp` — which is why this is
+		// the caller's decision and not something inferred from the files
+		// (#3377).
+		if !dotDirsAreTheStore && inDotDir(root, p) {
 			return nil
 		}
 		if skipped != nil && skipped(p) {
@@ -737,12 +751,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// printFilesBesideIn is printFilesBeside for a row whose printed location is
 	// not one directory: cline names its modern store and its legacy roots on
 	// the same line, and that string cannot be walked (#3360).
-	printFilesBesideIn := func(name, loc string, walks []string, present bool, seen []string, beside ...string) {
+	printFilesBesideIn := func(name, loc string, walks []string, dotDirsAreTheStore, present bool, seen []string, beside ...string) {
 		detail := doctorCount(len(seen), "file")
 		placed := append(append([]string{}, seen...), beside...)
 		unread := 0
 		for _, walk := range walks {
-			u, _ := unplacedFiles(walk, placed, nil)
+			u, _ := unplacedFilesIn(walk, placed, nil, dotDirsAreTheStore)
 			unread += u
 		}
 		if unread > 0 {
@@ -751,7 +765,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		printRow(name, loc, present, detail)
 	}
 	printFilesBeside := func(name, path string, present bool, seen []string, beside ...string) {
-		printFilesBesideIn(name, path, []string{path}, present, seen, beside...)
+		printFilesBesideIn(name, path, []string{path}, false, present, seen, beside...)
 	}
 
 	claudeRoot := sources.ClaudeRoot()
@@ -771,7 +785,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 
 	printRow("cursor", doctorCursorLocation(), doctorCursorPresent(), doctorCursorDetail(sqlite))
 
-	printRow("antigravity", doctorAntigravityLocation(), len(sources.AntigravityRoots()) > 0, doctorCount(len(sources.AntigravityTranscripts()), "file"))
+	agyRoots := sources.AntigravityRoots()
+	printFilesBesideIn("antigravity", doctorAntigravityLocation(), agyRoots, true, len(agyRoots) > 0,
+		sources.AntigravityTranscripts(), sources.AntigravitySidecarFiles()...)
 
 	// The store root also holds Grok's settings, credentials and caches, which
 	// are not transcripts and never will be; the sessions directory is what the
@@ -804,7 +820,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	for _, root := range sources.ClineLegacyRoots() {
 		clineWalks = append(clineWalks, filepath.Join(root, "tasks"))
 	}
-	printFilesBesideIn("cline", clineLoc, clineWalks, clineFiles > 0 || doctorExists(clineModern),
+	printFilesBesideIn("cline", clineLoc, clineWalks, false, clineFiles > 0 || doctorExists(clineModern),
 		sources.ClineSessionFiles(), sources.ClineSidecarFiles()...)
 
 	rooFiles := len(sources.RooTaskFiles())
