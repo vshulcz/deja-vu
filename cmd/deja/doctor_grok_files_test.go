@@ -72,3 +72,32 @@ func TestDoctorDoesNotCallGroksOwnFilesUnrecognised(t *testing.T) {
 		}
 	}
 }
+
+// The row and the JSON name the same place. doctorStoreChecks keeps its own
+// path per harness, and leaving grok's at the store root made `doctor --json`
+// say ~/.grok where the row says ~/.grok/sessions — and, on a store deja is
+// not allowed to read, turned "denied" into "missing" (review of #3319).
+func TestDoctorJSONNamesTheSameGrokPathAsTheRow(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "grok")
+	dir := filepath.Join(root, "sessions", "%2Fw%2Fapi", "6f0a1b2c-0000-4000-8000-000000000001")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_GROK_ROOT", root)
+	if err := os.WriteFile(filepath.Join(dir, "updates.jsonl"),
+		[]byte(`{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"why does the retry loop drop the last attempt"}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(root, "sessions")
+	for _, c := range doctorStoreChecks() {
+		if c.name != "grok" {
+			continue
+		}
+		if len(c.paths) != 1 || c.paths[0] != want {
+			t.Fatalf("grok paths = %v, want %q — the row says that one", c.paths, want)
+		}
+		return
+	}
+	t.Fatal("no grok entry in doctorStoreChecks at all")
+}
