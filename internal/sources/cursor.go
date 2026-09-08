@@ -124,7 +124,8 @@ func fileExists(p string) bool {
 func LoadCursor() []model.Session {
 	var ss []model.Session
 	for _, db := range CursorDBs() {
-		got, _ := ParseCursorDB(db)
+		got, err := ParseCursorDB(db)
+		diagFileError(db, err)
 		ss = append(ss, got...)
 	}
 	ss = append(ss, parseFiles(CursorTranscripts(), ParseCursorTranscript)...)

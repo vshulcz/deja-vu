@@ -38,7 +38,11 @@ func OpencodeDB() string {
 }
 
 func LoadOpencode() []model.Session {
-	ss, _ := ParseOpencodeDBWhere(OpencodeDB(), "", 0)
+	// A store that would not open — locked past the timeout by the agent
+	// using it, or unreadable — is reported like a transcript that would not
+	// parse, so the pass says so and does not record the store as read.
+	ss, err := ParseOpencodeDBWhere(OpencodeDB(), "", 0)
+	diagFileError(OpencodeDB(), err)
 	return ss
 }
 

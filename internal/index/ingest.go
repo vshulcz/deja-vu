@@ -482,6 +482,14 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	reportPhase("reading sessions", total)
 	ss := sources.FilterSessions(filterTombstonedSet(loadProgress(harness, progress), dead))
+	// A store the loaders could not read is not recorded as read: with its
+	// size and mtime on file the next pass would call the index up to date
+	// and the store's history would stay missing until someone rebuilt by
+	// hand. Left out, the next pass parses it again — and skips it again,
+	// aloud, while it stays closed (#3176).
+	for p := range sources.DiagFailedPaths() {
+		delete(files, p)
+	}
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
