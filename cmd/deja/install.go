@@ -1023,7 +1023,13 @@ func backupOnce(path string) (bool, error) {
 	}
 	// Configs can carry MCP credentials; the snapshot is owner-only even
 	// when the live file is looser.
-	return true, os.WriteFile(bak, b, 0o600)
+	if err := os.WriteFile(bak, b, 0o600); err != nil {
+		return true, err
+	}
+	// Whose snapshot this is cannot be read back out of its bytes, so it is
+	// recorded here: the uninstall deletes one only if deja took it (#3340).
+	rememberSnapshot(bak)
+	return true, nil
 }
 
 // backupOnceUnlessCreated is backupOnce for a file that was already there
@@ -1091,6 +1097,24 @@ func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, erro
 		return nil, false, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, key)
 	}
 	return m, true, nil
+}
+
+// dropOwnBackup removes the snapshot beside path when the snapshot is deja's
+// own wiring and nothing else. A snapshot of the reader's config stays even
+// when the live file has come back to exactly it: that copy is theirs, and
+// TestUninstallLeavesNoFileOrDirItCreated has said so since #840 — "the user's
+// own config and its snapshot are not ours to delete" (#2604). It runs on the
+// paths that delete the file too, which is where a config deja wrote whole and
+// then edited again left a .bak the uninstall called the reader's (#3340).
+func dropOwnBackup(path string) {
+	bak := path + ".bak"
+	b, err := os.ReadFile(bak)
+	if err != nil {
+		return
+	}
+	if mentionsDeja(b) {
+		_ = os.Remove(bak)
+	}
 }
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
@@ -1246,6 +1270,14 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return "", err
 			}
+			// Only a snapshot deja took itself. mentionsDeja is a content guess
+			// and a loose one — a reader's own config that says the word, or
+			// their own snapshot of an older deja block, matches it — which is
+			// fine for deciding whether a file may be overwritten and not for
+			// deciding whether one may be deleted (review of #3340).
+			if snapshotTaken(path) {
+				dropOwnBackup(path)
+			}
 			return "removed", nil
 		}
 		// The same rule for the structured writers, which never reach zero
@@ -1260,6 +1292,9 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			// condition wanted (same rule as pruneGuidanceDirs).
 			if dir := filepath.Dir(path); isRealDir(dir) {
 				_ = os.Remove(dir)
+			}
+			if snapshotTaken(path) {
+				dropOwnBackup(path)
 			}
 			return "removed", nil
 		}
@@ -1276,8 +1311,15 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// deja's wiring or stops on a conflict. Follow the link and write where it
 	// points, so the link stays a link and the change lands in the repo.
 	// A dangling link has nothing to follow and keeps the old behaviour.
+	given := path
 	if resolved, rerr := filepath.EvalSymlinks(path); rerr == nil && resolved != path {
 		path = resolved
+		// The snapshot is taken under the resolved name a line below, and a
+		// later run may ask under either spelling — a link that has since been
+		// replaced by the real directory, a record written by an older deja.
+		// Recording both is the only way back, since no resolution runs
+		// backwards (review of #3340).
+		rememberSnapshot(given + ".bak")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return "", err
 		}
@@ -1297,21 +1339,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// write, so the uninstall that meets it did not create it and would
 	// otherwise leave it (goose). A backup with no deja in it is the user's.
 	if removingWiring {
-		defer func() {
-			bak := path + ".bak"
-			b, err := os.ReadFile(bak)
-			if err != nil {
-				return
-			}
-			// Only deja's own. A snapshot of the reader's config stays even
-			// when the live file has come back to exactly it: that copy is
-			// theirs, and TestUninstallLeavesNoFileOrDirItCreated has said so
-			// since #840 — "the user's own config and its snapshot are not
-			// ours to delete" (#2604).
-			if mentionsDeja(b) {
-				_ = os.Remove(bak)
-			}
-		}()
+		defer func() { dropOwnBackup(path) }()
 	}
 	tmp, terr := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
 	if terr != nil {
