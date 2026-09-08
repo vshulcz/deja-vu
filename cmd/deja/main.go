@@ -1243,10 +1243,15 @@ func runBareSearch(dir string, args []string, sourceInstance string) error {
 // keep the window they have always served, which the JSON envelope's own test
 // pins; only what the reader asked for binds them.
 func capTierHits(hits []search.Hit, o search.Options) ([]search.Hit, bool) {
-	if o.Limit == 0 || o.All {
+	if o.Limit == 0 {
 		return hits, false
 	}
-	return search.CapHits(hits, o.Limit, o.All)
+	// A limit the reader typed binds even beside --all, which is how the exact
+	// tier has always read the pair: --all lifts the default, and the number
+	// asked for is still the number wanted. Letting --all win here made the
+	// same two flags mean opposite things depending on which tier answered
+	// (review of #3345).
+	return search.CapHits(hits, o.Limit, false)
 }
 
 func runSearch(dir string, args []string, sourceInstance string) error {

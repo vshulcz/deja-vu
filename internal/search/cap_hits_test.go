@@ -37,3 +37,13 @@ func TestCapHitsBoundsWhatEachTierHandsBack(t *testing.T) {
 		})
 	}
 }
+
+// --all lifts the default, and a limit the reader typed still binds: the two
+// flags together must mean the same thing on every tier (review of #3345).
+func TestCapHitsHonoursALimitBesideAll(t *testing.T) {
+	hits := make([]Hit, 20)
+	got, capped := CapHits(hits, 5, true)
+	if len(got) != 5 || !capped {
+		t.Errorf("CapHits(20 hits, limit 5, all) = %d hits capped %v, want 5 and true", len(got), capped)
+	}
+}
