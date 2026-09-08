@@ -221,6 +221,24 @@ type promptReport struct {
 	// the whole corpus turned against itself, and it grows whenever a chain is
 	// added.
 	CrossPaired promptArmReport `json:"cross_paired"`
+	// Every question of the corpus asked at home with a paste above it — a repo
+	// listing, a set of @file mentions, a stack trace. The six terms are spent
+	// before the question is reached unless the extractor reads the question
+	// first, and a person pasting context then asking about it is the shape the
+	// hook meets most (#3183).
+	Pasted promptArmReport `json:"pasted_preamble"`
+}
+
+// pastedPreambles are what sits above a question in a real prompt: a repo
+// listing, Amp's @file mentions, a stack trace. Each carries at least six
+// identifier-shaped tokens, which is the whole term budget, and none of them
+// name anything the corpus holds.
+func pastedPreambles() []string {
+	return []string{
+		"cmd/quokkabloom main.go install.go index.go search.go docs/registry Makefile go.mod",
+		"@quokkabloom/fetch.go @quokkabloom/fetch_test.go @quokkabloom/client.go @quokkabloom/retry.go @quokkabloom/dial.go",
+		"panic: runtime error: index out of range [7]\n\tgoroutine 41 [running]:\n\tquokkabloom/retry.dialLoop(0xc000123456)",
+	}
 }
 
 // awayFor picks where a chain's question is asked: forward to the first chain
@@ -561,6 +579,19 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 	}
 	finishPromptArm(&report.CrossPaired, nil)
+	// The same questions asked at home, each under a paste. The answer is
+	// there and the question is the one that fires without the paste, so
+	// anything below that rate is the term budget going to someone else's
+	// file names.
+	for i, c := range crossed {
+		pre := pastedPreambles()[i%len(pastedPreambles())]
+		report.Pasted.Cases++
+		if fired, _ := promptBenchProbe(indexDir, c.Project, c.ID, prompt.Terms(pre+"\n"+c.Question)); fired {
+			report.Pasted.Fired++
+			report.Pasted.Correct++
+		}
+	}
+	finishPromptArm(&report.Pasted, nil)
 	finishPromptArm(&report.Real, realTerms)
 	finishPromptArm(&report.Negative, negTerms)
 	finishPromptArm(&report.Marathon, nil)
