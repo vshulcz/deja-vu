@@ -88,7 +88,7 @@ func TestReadmeNamesEveryHarnessThatGetsGuidance(t *testing.T) {
 // skill, so the general test above covers it and the paragraph has to say where
 // that skill lands rather than that there is nowhere to put one.
 func TestReadmeCursorGetsASkill(t *testing.T) {
-	hermeticEnv(t)
+	home := hermeticEnv(t)
 	para := readmeGuidanceParagraph(t)
 	r, err := guidanceResult("cursor", false)
 	if err != nil {
@@ -97,7 +97,25 @@ func TestReadmeCursorGetsASkill(t *testing.T) {
 	if r.Path == "" {
 		t.Fatal("cursor writes no guidance again — the README paragraph now says it does")
 	}
-	if !strings.Contains(para, "~/.cursor/skills/") {
-		t.Errorf("README does not say where Cursor's skill goes:\n%s", para)
+	// Taken from the path install writes rather than pinned to a literal: this
+	// test held the README to `~/.cursor/skills/` for as long as install had
+	// been writing the shared directory and removing that one as retired
+	// (#3187).
+	dir := filepath.ToSlash(filepath.Dir(filepath.Dir(r.Path)))
+	dir = "~" + strings.TrimPrefix(dir, filepath.ToSlash(filepath.Join(home, "home")))
+	// The sentence about Cursor, not the paragraph: the paragraph names the
+	// shared directory for Grok too, so a Cursor sentence that said nothing at
+	// all would pass on someone else's words.
+	sentence := ""
+	for _, s := range strings.Split(para, ". ") {
+		if strings.Contains(s, "Cursor has no user-level instructions file") {
+			sentence = s
+		}
+	}
+	if sentence == "" {
+		t.Fatalf("the README paragraph no longer says what Cursor gets:\n%s", para)
+	}
+	if !strings.Contains(sentence, dir) {
+		t.Errorf("README does not say Cursor's skill goes to %s:\n%s", dir, sentence)
 	}
 }
