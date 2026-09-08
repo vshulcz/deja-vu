@@ -81,3 +81,32 @@ func TestCopilotFailedRunIsNotOfferedAsTheRemedy(t *testing.T) {
 		}
 	}
 }
+
+// The scanner decodes numbers with UseNumber, so the telemetry's exit code
+// arrives as json.Number. Asserting float64 made that path dead and left every
+// marker to the trailer, which a run without one never has (review of #3369).
+func TestCopilotReadsTheExitCodeFromTelemetryWithoutATrailer(t *testing.T) {
+	dir := t.TempDir()
+	sess := filepath.Join(dir, "s2")
+	if err := os.MkdirAll(sess, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(sess, "events.jsonl")
+	lines := strings.Join([]string{
+		`{"type":"session.start","timestamp":"2026-09-05T10:00:00Z","data":{"sessionId":"s2","startTime":"2026-09-05T10:00:00Z","context":{"cwd":"/w/api"}}}`,
+		`{"type":"tool.execution_start","timestamp":"2026-09-05T10:00:01Z","data":{"toolName":"bash","toolCallId":"c1","arguments":{"command":"go test ./..."}}}`,
+		`{"type":"tool.execution_complete","timestamp":"2026-09-05T10:00:02Z","data":{"toolCallId":"c1","success":true,"result":{"content":"--- FAIL: TestRetry (0.01s)\nFAIL\tqueue\t0.4s"},"toolTelemetry":{"metrics":{"exit_code":1}}}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCopilotFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand && !strings.HasSuffix(m.Text, "  → exit 1") {
+			t.Errorf("command = %q, want the outcome the telemetry recorded", m.Text)
+		}
+	}
+}

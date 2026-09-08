@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -79,7 +80,7 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	}
 	// Which message holds each shell command, by the call id the completion
 	// event repeats: Copilot files the command and its outcome as two records.
-	commandAt := map[string]int{}
+	commandAt := map[string][]int{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		data, _ := m["data"].(map[string]any)
@@ -139,10 +140,12 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 					records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
 				}
 			}
-			cmdAt := -1
+			// Every command of the call, not the last one: a dialect that
+			// hands back an array would otherwise mark one of them.
+			var cmdAt []int
 			if IndexCommands() {
 				for _, cmd := range commandsIn(part, copilotDialect) {
-					cmdAt = len(records)
+					cmdAt = append(cmdAt, len(records))
 					records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
 				}
 			}
@@ -150,8 +153,10 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 				return
 			}
 			s.Touch(t)
-			if id, _ := data["toolCallId"].(string); id != "" && cmdAt >= 0 {
-				commandAt[id] = len(s.Messages) + cmdAt
+			if id, _ := data["toolCallId"].(string); id != "" && len(cmdAt) > 0 {
+				for _, at := range cmdAt {
+					commandAt[id] = append(commandAt[id], len(s.Messages)+at)
+				}
 			}
 			s.Messages = append(s.Messages, records...)
 		case "tool.execution_complete":
@@ -169,8 +174,10 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			// trailer inside the output (#3369).
 			if code := copilotExitCode(data, out); code > 0 {
 				if id, _ := data["toolCallId"].(string); id != "" {
-					if i, ok := commandAt[id]; ok && i < len(s.Messages) {
-						s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+					for _, i := range commandAt[id] {
+						if i < len(s.Messages) {
+							s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+						}
 					}
 				}
 			}
@@ -187,6 +194,24 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	return []model.Session{s}, err
 }
 
+// jsonInt reads a number the scanner decoded with UseNumber, and the two other
+// shapes a store can hold it in.
+func jsonInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case json.Number:
+		if i, err := n.Int64(); err == nil {
+			return int(i), true
+		}
+	case float64:
+		return int(n), true
+	case string:
+		if i, err := strconv.Atoi(n); err == nil {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
 // copilotShellExitRe is the trailer Copilot writes under a shell run's output:
 // "<shellId: 0 completed with exit code 1>". The tool's own documentation
 // mentions the words "exit code" in prose, which is why this asks for the
@@ -199,8 +224,12 @@ var copilotShellExitRe = regexp.MustCompile(`<shellId:[^>]*completed with exit c
 func copilotExitCode(data map[string]any, out string) int {
 	if tel, ok := data["toolTelemetry"].(map[string]any); ok {
 		if metrics, ok := tel["metrics"].(map[string]any); ok {
-			if code, ok := metrics["exit_code"].(float64); ok {
-				return int(code)
+			// The scanner decodes with UseNumber, so a JSON number arrives as
+			// json.Number and never as float64: asserting the latter made this
+			// whole path dead code and left every marker to the trailer below
+			// (review of #3369).
+			if code, ok := jsonInt(metrics["exit_code"]); ok {
+				return code
 			}
 		}
 	}
