@@ -56,7 +56,9 @@ A document written by the previous agent generation names the title `summary` an
 
 Both matter. Zed rewrites a thread in the current shape only when that thread is next saved, so a store mixes generations indefinitely.
 
-`User` maps to `user` and `Agent` to `assistant`; a legacy document's `role` is already lowercase (`user`, `assistant`, `system`), and `system` is dropped as harness-authored. `Text` blocks are indexed and joined with newlines, and a `Mention`'s inlined `content` is indexed because that is the text Zed put in front of the model. Thinking, redacted thinking, tool calls, tool results, images and the `Resume` control marker are skipped.
+`User` maps to `user` and `Agent` to `assistant`; a legacy document's `role` is already lowercase (`user`, `assistant`, `system`), and `system` is dropped as harness-authored. `Text` blocks are indexed and joined with newlines, and a `Mention`'s inlined `content` is indexed because that is the text Zed put in front of the model. Thinking, redacted thinking, images and the `Resume` control marker are skipped.
+
+A `ToolUse` block is read for the work it did: a `terminal` call becomes a command record, and the path arguments of the file tools become a files record. An `Agent` message's `tool_results` map — keyed by tool use id, so it is emitted in id order to keep a rebuild stable — becomes tool-output records, taking `content.Text` and falling back to `output` when it is a string. That is where a failed terminal run's exit code and error text live, which is what `deja fix` pairs a command with. Each of the three follows its own switch (`DEJA_INDEX_COMMANDS`, `DEJA_INDEX_PATHS`, `DEJA_INDEX_TOOL_OUTPUT`).
 
 `folder_paths` is a serialized `PathList`: the workspace roots newline-joined in lexicographic order, with `folder_paths_order` holding comma-joined display indices. The first path names the project.
 

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -416,9 +417,13 @@ func zedMessage(raw json.RawMessage) (role, text string) {
 // measured there: 797 ToolUse blocks against 69 Agent.Text ones, so the parser
 // was indexing the talk and none of the work.
 //
-// Tool results are not here to be indexed: Zed stores the call and not what
-// came back, so a Zed session cannot pair an error with the command that
-// followed it the way `deja fix` does elsewhere.
+// What came back is here too, and this said otherwise. An Agent message carries
+// `tool_results`, a map keyed by tool_use_id holding `tool_name`, `is_error`,
+// `content: {Text: …}` and `output`. Measured on a real store of 30 threads:
+// 3,059 results, 141 of them errors, 98 carrying "failed with exit code" — none
+// of it indexed, so `deja fix` had nothing to pair an error with and a search
+// for a failure that happened in Zed answered "this index holds no tool
+// records at all" (#3291).
 //
 // Modern threads only. An agent-1 message carries `segments` rather than a
 // tagged content array, and whether tool calls appear there is not something
@@ -446,6 +451,16 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 				Input json.RawMessage `json:"input"`
 			} `json:"ToolUse"`
 		} `json:"content"`
+		// Keyed by tool_use_id, so the order is the map's; the results are
+		// sorted below to keep a rebuild's records stable.
+		ToolResults map[string]struct {
+			ToolName string `json:"tool_name"`
+			IsError  bool   `json:"is_error"`
+			Content  struct {
+				Text string `json:"Text"`
+			} `json:"content"`
+			Output json.RawMessage `json:"output"`
+		} `json:"tool_results"`
 	}
 	if json.Unmarshal(body, &msg) != nil {
 		return nil
@@ -467,7 +482,39 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 	if len(paths) > 0 && IndexToolPaths() {
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: t})
 	}
+	if IndexToolOutput() && len(msg.ToolResults) > 0 {
+		ids := make([]string, 0, len(msg.ToolResults))
+		for id := range msg.ToolResults {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			r := msg.ToolResults[id]
+			text := strings.TrimSpace(r.Content.Text)
+			if text == "" {
+				text = strings.TrimSpace(zedResultOutput(r.Output))
+			}
+			if text == "" {
+				continue
+			}
+			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: t})
+		}
+	}
 	return out
+}
+
+// zedResultOutput reads the `output` field, which Zed writes as a string on the
+// results seen and leaves free to be a structure. Only a string is text; a
+// structure has already been rendered into content.Text where it matters.
+func zedResultOutput(raw json.RawMessage) string {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return s
+	}
+	return ""
 }
 
 // zedCommand is the shell line a terminal call ran, or "" when the call is not
