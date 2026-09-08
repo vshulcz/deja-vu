@@ -23,6 +23,9 @@ func hermeticIndexEnv(t *testing.T) string {
 	tmp := t.TempDir()
 	setHome(t, filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
+	// Hermes's own switch moves deja with it (#3203): pinned so a developer
+	// with HERMES_HOME exported never has a test read or write their Hermes.
+	t.Setenv("HERMES_HOME", "")
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "default-index"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))

@@ -14,11 +14,10 @@ import (
 )
 
 // HermesHome is the Hermes root: profiles, plugins and config.yaml live here.
+// HERMES_HOME is Hermes's own switch and moves install, parse and doctor
+// together; DEJA_HERMES_HOME overrides it for deja alone (#3203).
 func HermesHome() string {
-	if p := os.Getenv("DEJA_HERMES_HOME"); p != "" {
-		return p
-	}
-	return filepath.Join(Home(), ".hermes")
+	return EnvPath("DEJA_HERMES_HOME", EnvPath("HERMES_HOME", filepath.Join(Home(), ".hermes")))
 }
 
 // Hermes keeps one SQLite store per profile under ~/.hermes/profiles/<name>,
