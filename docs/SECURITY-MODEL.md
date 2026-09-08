@@ -215,3 +215,8 @@ unchanged.
 modification. Backups and newly created configs are written owner-only
 (0600) because these files can carry MCP server credentials; the mode of an
 existing live config is preserved on update.
+
+`deja uninstall` takes back a snapshot whose content is deja's own wiring,
+including the one left behind when a config deja wrote whole is removed
+outright. A snapshot of a config that was already there stays, and is reported
+as yours to remove.

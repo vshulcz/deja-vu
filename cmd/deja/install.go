@@ -1041,6 +1041,29 @@ func isRealDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// dropOurOwnBackup removes the snapshot beside path when it holds deja's
+// wiring: that copy is deja's own and nothing the user asked to keep, and
+// leaving it puts a file naming a binary they just removed back in their
+// config directory. Ownership is read from the content rather than from who
+// wrote it — installing a harness whose config deja edits twice takes the
+// snapshot on the second write, so the uninstall that meets it did not create
+// it and would otherwise leave it (goose).
+//
+// A snapshot of the reader's config stays even when the live file has come
+// back to exactly it: that copy is theirs, and
+// TestUninstallLeavesNoFileOrDirItCreated has said so since #840 — "the user's
+// own config and its snapshot are not ours to delete" (#2604).
+func dropOurOwnBackup(path string) {
+	bak := path + ".bak"
+	b, err := os.ReadFile(bak)
+	if err != nil {
+		return
+	}
+	if mentionsDeja(b) {
+		_ = os.Remove(bak)
+	}
+}
+
 // backupOnce reports whether it created the snapshot, so an uninstall can take
 // its own back out afterwards without touching one the user made.
 func backupOnce(path string) (bool, error) {
@@ -1264,6 +1287,12 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return "", err
 			}
+			// A snapshot left by an earlier write of the same file is deja's
+			// too, and this path returns before the defer below is registered:
+			// `deja uninstall deepseek-auto` left a .bak holding nothing but
+			// deja's own block and called it a config the reader already had
+			// (#3340).
+			dropOurOwnBackup(path)
 			return "removed", nil
 		}
 		// The same rule for the structured writers, which never reach zero
@@ -1279,6 +1308,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if dir := filepath.Dir(path); isRealDir(dir) {
 				_ = os.Remove(dir)
 			}
+			dropOurOwnBackup(path)
 			return "removed", nil
 		}
 	}
@@ -1303,29 +1333,8 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if _, err := backupOnce(path); err != nil {
 		return "", err
 	}
-	// On the way out, a snapshot that itself contains deja's wiring is deja's
-	// own and nothing the user asked to keep: leaving it puts a file naming a
-	// binary they just removed back in their config directory. Ownership is
-	// read from the content rather than from who wrote it — installing a
-	// harness whose config deja edits twice takes the snapshot on the second
-	// write, so the uninstall that meets it did not create it and would
-	// otherwise leave it (goose). A backup with no deja in it is the user's.
 	if removingWiring {
-		defer func() {
-			bak := path + ".bak"
-			b, err := os.ReadFile(bak)
-			if err != nil {
-				return
-			}
-			// Only deja's own. A snapshot of the reader's config stays even
-			// when the live file has come back to exactly it: that copy is
-			// theirs, and TestUninstallLeavesNoFileOrDirItCreated has said so
-			// since #840 — "the user's own config and its snapshot are not
-			// ours to delete" (#2604).
-			if mentionsDeja(b) {
-				_ = os.Remove(bak)
-			}
-		}()
+		defer func() { dropOurOwnBackup(path) }()
 	}
 	tmp, terr := os.CreateTemp(filepath.Dir(path), ".deja-tmp-")
 	if terr != nil {
