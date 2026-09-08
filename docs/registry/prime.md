@@ -4,7 +4,7 @@
 | --- | --- |
 | **Format** | JSONL transcript |
 | **Default store path** | `~/.prime/agent/sessions/<uuid7>.jsonl` |
-| **Env override** | `DEJA_PRIME_ROOT`, `PRIME_AGENT_SESSION_DIR`, `PRIME_AGENT_CODING_AGENT_SESSION_DIR` |
+| **Env override** | `DEJA_PRIME_ROOT`, `PRIME_AGENT_SESSION_DIR`, `PRIME_AGENT_CODING_AGENT_SESSION_DIR`; `PRIME_AGENT_CODING_AGENT_DIR` moves the whole `~/.prime/agent` directory (settings, extensions, the default session root) for prime and for deja alike |
 | **deja parser** | `internal/sources/prime.go` |
 | **Last verified** | 2026-08-30 |
 

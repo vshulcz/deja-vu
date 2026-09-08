@@ -42,3 +42,16 @@ func TestPrimeSessionDirPrecedenceMatchesPrime(t *testing.T) {
 		t.Errorf("root = %q, want the current variable %q", got, want)
 	}
 }
+
+// A leading ~ is prime's own spelling for the variable (its README shows it);
+// prime expands it, so deja does too.
+func TestPrimeAgentDirExpandsTilde(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_PRIME_ROOT", "")
+	t.Setenv("PRIME_AGENT_CODING_AGENT_DIR", "~/custom/agent")
+	if got, want := PrimeConfigDir(), filepath.Join(home, "custom", "agent"); got != want {
+		t.Errorf("config dir = %q, want %q", got, want)
+	}
+}

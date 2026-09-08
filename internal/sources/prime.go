@@ -28,7 +28,12 @@ import (
 // variables, deja wrote settings.json where prime never looked and called it
 // wired (#3276).
 func PrimeConfigDir() string {
-	return EnvPath("PRIME_AGENT_CODING_AGENT_DIR", filepath.Join(Home(), ".prime", "agent"))
+	// prime expands a leading ~ itself (config.ts expandTildePath); read the
+	// same value the same way.
+	if p := EnvPath("PRIME_AGENT_CODING_AGENT_DIR", ""); p != "" {
+		return expandTilde(p)
+	}
+	return filepath.Join(Home(), ".prime", "agent")
 }
 
 // PrimeRoot returns the session store root.
