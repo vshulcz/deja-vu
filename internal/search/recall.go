@@ -11,6 +11,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 )
 
 const (
@@ -470,7 +471,13 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 		}
 		switch m.Role {
 		case "user":
-			if problem == "" && !noiseMessage(m.Text) {
+			// A line that names nothing is not the session's problem. The
+			// digest opened on "продолжай" — a real message, not plumbing, and
+			// the whole first block then said "go on" and "nothing settled
+			// yet" while the session that settled the thing came second
+			// (#3412). prompt.Terms is what the recall side already searches
+			// on: no terms means there is nothing in the line to search for.
+			if problem == "" && !noiseMessage(m.Text) && len(prompt.Terms(text)) > 0 {
 				problem = firstLine(text, 160)
 			}
 		case "assistant":
