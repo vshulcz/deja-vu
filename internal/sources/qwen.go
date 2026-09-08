@@ -53,6 +53,19 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
+		if typ == "tool_result" {
+			// Every tool result is its own record, role user, parts holding
+			// the functionResponse. Skipped with the other types, a failing
+			// command's error never reached search or the fix pairs (#3281).
+			t := parseTimeAny(m["timestamp"])
+			// Touched like a user or assistant record, output or not: the
+			// session's clock moves with every record it holds.
+			s.Touch(t)
+			if msg, ok := m["message"].(map[string]any); ok {
+				s.Messages = append(s.Messages, qwenWorkRecords(msg["parts"], t)...)
+			}
+			return
+		}
 		if typ != "user" && typ != "assistant" {
 			return
 		}
@@ -131,8 +144,14 @@ func qwenWorkRecords(v any, t time.Time) []model.Message {
 		if resp, ok := m["functionResponse"].(map[string]any); ok {
 			r, _ := resp["response"].(map[string]any)
 			out, _ := r["output"].(string)
-			if out = strings.TrimSpace(out); out != "" {
-				results = append(results, out)
+			if out = strings.TrimSpace(out); out == "" {
+				// A failed call answers in `error`, the field the fix pairs
+				// are mined from (#3281).
+				out, _ = r["error"].(string)
+				out = strings.TrimSpace(out)
+			}
+			if out != "" {
+				results = append(results, capParsedMessage(out))
 			}
 		}
 	}
