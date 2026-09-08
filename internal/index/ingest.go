@@ -591,10 +591,20 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	dropEmptySessions(&m, wrote)
+	// The four sidecars walk every session again — what co-occurs, which
+	// command followed which error, what was run and what failed. On a real
+	// store that is eight seconds of a twenty-second build, and it used to run
+	// under the previous phase's last percentage, so the bar sat still through
+	// it (#3372).
+	reportPhase("mining fixes and commands", 4)
 	buildCooccur(tmp, ss)
+	reportAdvance(1)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+	reportAdvance(1)
 	buildCommands(tmp, ss)
+	reportAdvance(1)
 	buildCommandFails(tmp, ss)
+	reportAdvance(1)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -1145,10 +1155,20 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if len(ss) >= cooccurMinDF && len(ss) <= cooccurMaxSessions {
 		preRedactSessions(nil, ss)
 	}
+	// The four sidecars walk every session again — what co-occurs, which
+	// command followed which error, what was run and what failed. On a real
+	// store that is eight seconds of a twenty-second build, and it used to run
+	// under the previous phase's last percentage, so the bar sat still through
+	// it (#3372).
+	reportPhase("mining fixes and commands", 4)
 	buildCooccur(tmp, ss)
+	reportAdvance(1)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
+	reportAdvance(1)
 	buildCommands(tmp, ss)
+	reportAdvance(1)
 	buildCommandFails(tmp, ss)
+	reportAdvance(1)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
