@@ -748,7 +748,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
 	codexRoot := sources.CodexRoot()
-	printFiles("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles())
+	printFilesBeside("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles(), sources.CodexSidecarFiles()...)
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
