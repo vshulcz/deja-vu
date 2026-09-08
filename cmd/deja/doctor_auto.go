@@ -120,7 +120,10 @@ func doctorAutoRecall(w io.Writer) {
 		case err != nil:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "missing", reportPath(path), note)
 		case a.marker != "" && !strings.Contains(string(b), a.marker):
-			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — reinstall)\n", a.name, "stale", reportPath(path), a.marker)
+			// "reinstall" was the advice, and for the common way to get here
+			// it cannot work: the MCP install writes this same file, and only
+			// the -auto target writes the hook (#3313). Name that target.
+			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — `deja install %s-auto`)\n", a.name, "stale", reportPath(path), a.marker, a.name)
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
 			// Only the rows that run the binary. aider's file is a digest of
