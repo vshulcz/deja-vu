@@ -1,7 +1,7 @@
 // opencode-deja — the sessions you already have, inside opencode.
 //
 // opencode remembers its own sessions. This plugin answers the other question:
-// what you did in Claude Code, Codex, Cursor, Gemini and sixteen more agents on
+// what you did in Claude Code, Codex, Cursor, Gemini and twenty-one more agents on
 // this machine, including months before deja existed. The index is deja's; this
 // file is the seam: six tools the model can call, plus recall that arrives
 // without being asked for.
