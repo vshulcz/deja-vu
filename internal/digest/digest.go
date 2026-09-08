@@ -396,6 +396,25 @@ func IsToolCallRecord(line string) bool {
 	return toolCallRecordRE.MatchString(line)
 }
 
+// hookEchoRE matches a host repeating what a hook returned. Claude Code writes
+// `UserPromptSubmit says: …`, `SessionStart:compact says: …` and
+// `⎿ SessionStart:startup says: …` into the transcript under the user role, so
+// deja's own status line comes back as something the person said and can be
+// quoted as the session's title (#3168).
+//
+// The event has to be one a harness actually fires, not merely a capitalised
+// word: "Vlad says: rebase first" opens a message the same way and is the
+// person's. Optional `:variant` for the spellings Claude Code uses —
+// SessionStart:startup, PreCompact:manual.
+var hookEchoRE = regexp.MustCompile(`^(?:⎿\s*)?(?:` + strings.Join([]string{
+	"SessionStart", "SessionEnd", "UserPromptSubmit", "PreToolUse", "PostToolUse",
+	"PostToolUseFailure", "PreToolUseResult", "PreCompact", "SubagentStop", "Stop",
+	"Notification", "PreInvocation", "BeforeShellExecution", "AfterShellExecution",
+	"BeforeReadFile", "AfterFileEdit",
+}, "|") + `)(?::[A-Za-z]+)? says: `)
+
+func isHookEcho(t string) bool { return hookEchoRE.MatchString(t) }
+
 func noisyMessage(s string) bool {
 	t := strings.TrimSpace(s)
 	if t == "" {
@@ -413,6 +432,16 @@ func noisyMessage(s string) bool {
 	}
 	// Prose, so only where it opens the message.
 	if strings.HasPrefix(t, "Caveat:") {
+		return true
+	}
+	if isHookEcho(t) {
+		return true
+	}
+	// deja's own block, echoed back into the transcript under a user role by a
+	// host that records what a hook returned. It is in the artifact list and
+	// was not here, so a line out of deja's recall could still be picked as the
+	// session's title — recall quoting itself (#3168).
+	if strings.Contains(t, "<deja-recall>") {
 		return true
 	}
 	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
@@ -603,6 +632,11 @@ func IsAgentArtifact(text string) bool {
 		return true
 	}
 	if isCompactionSummary(trimmed) {
+		return true
+	}
+	// The host repeating a hook's own status line back into the transcript,
+	// and deja's block echoed with it (#3168).
+	if isHookEcho(trimmed) || strings.Contains(trimmed, "<deja-recall>") {
 		return true
 	}
 	// ls dumps recorded under a user role.

@@ -27,6 +27,20 @@ type installResult struct {
 	// about, could not act on, and left as it found it. Empty in every ordinary
 	// case, so a printer can append it blind (#2218).
 	Note string
+	// Also is every other config this target wrote, for the callers that need
+	// the paths rather than the sentence about them. An -auto target writes two
+	// files and folds them into one result, so the screen that names what was
+	// left behind saw one of them and reported "kept 1 snapshot" beside two
+	// .bak files (#3171).
+	Also []string
+}
+
+// paths is every config this result covers, the named one first.
+func (r installResult) paths() []string {
+	if r.Path == "" {
+		return r.Also
+	}
+	return append([]string{r.Path}, r.Also...)
 }
 
 func runInstall(dir string, args []string, uninstall bool) error {
@@ -204,7 +218,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				pruneGuidanceDirs(cr.Path)
 			}
 		}
-		touchedPaths = append(touchedPaths, r.Path)
+		touchedPaths = append(touchedPaths, r.paths()...)
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note})
 		} else {
@@ -815,12 +829,21 @@ func wroteAll(rs ...installResult) installResult {
 		}
 	}
 	var also []string
+	// Every other config this target touched, whether or not it changed: the
+	// snapshot beside an unchanged file is still one deja left behind, and the
+	// screen that names what stays behind needs the path, not the sentence.
+	var paths []string
 	for _, r := range rs {
-		if r.Path == "" || r.Action == "unchanged" || r.Path == out.Path {
+		if r.Path == "" || r.Path == out.Path {
+			continue
+		}
+		paths = append(paths, r.Path)
+		if r.Action == "unchanged" {
 			continue
 		}
 		also = append(also, fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path)))
 	}
+	out.Also = append(out.Also, paths...)
 	for _, line := range also {
 		if out.Note != "" {
 			out.Note += "; "
