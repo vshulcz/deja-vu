@@ -36,12 +36,23 @@ func TestFrictionReadsTheGoModuleAndSqliteWalls(t *testing.T) {
 // specification. The server's own shape is the difference, the same guard
 // "does not exist" has carried since #2431 (review of #3373).
 func TestNoSuchTableNeedsTheServersOwnShape(t *testing.T) {
-	if _, ok := FrictionLine("Error: in prepare, no such table: part"); !ok {
-		t.Error("sqlite saying a table is missing is not read as friction")
+	// Every runtime puts its marker somewhere different, and one of them puts
+	// none at all — what they share is naming the table (second review).
+	for _, wall := range []string{
+		"Error: in prepare, no such table: part",
+		"D1_ERROR: no such table: users",
+		"sqlite3.OperationalError: no such table: users",
+		"Parse error: no such table: x",
+		"no such table: users",
+	} {
+		if _, ok := FrictionLine(wall); !ok {
+			t.Errorf("not read as friction: %q", wall)
+		}
 	}
 	for _, prose := range []string{
 		"there is no such table in the spec, so I improvised one",
 		"we have no such table yet — add a migration",
+		"Error handling for missing tables is not written yet, so no such table checks run",
 	} {
 		if _, ok := FrictionLine(prose); ok {
 			t.Errorf("a sentence about tables is read as an error: %q", prose)

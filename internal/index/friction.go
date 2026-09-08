@@ -392,16 +392,28 @@ func isFriction(l string) bool {
 	// line opens with the server's ERROR marker. The phrase on its own is a
 	// sentence people write — "the orders table does not exist yet" — so it is
 	// only a wall where the server said it.
-	// A database saying a thing is not there says it in its own shape, and
-	// "no such table" needs the same guard for the same reason: "there is no
-	// such table in the spec, so I improvised one" is a sentence someone
-	// writes (review of #3373).
-	if strings.HasPrefix(low, "error") &&
-		(strings.Contains(low, "does not exist") || strings.Contains(low, "no such table")) {
+	if strings.HasPrefix(low, "error") && strings.Contains(low, "does not exist") {
+		return true
+	}
+	// "no such table" is what every sqlite driver says and also what a person
+	// writes about a schema. What separates them is the shape around it: the
+	// driver names the table after a colon — `no such table: part` — and the
+	// report carries an error marker wherever its runtime puts it, which is
+	// not always the first word: `D1_ERROR: …`, `sqlite3.OperationalError: …`,
+	// `Parse error: …`. Requiring the line to *open* with "error" dropped all
+	// three and still let "Error handling for missing tables…" through
+	// (second review of #3373).
+	if strings.Contains(low, "no such table") &&
+		(noSuchTableRE.MatchString(low) || strings.Contains(low, "error:")) {
 		return true
 	}
 	return false
 }
+
+// noSuchTableRE is the driver's own shape: the table is named right after the
+// phrase. Prose about schemas — "there is no such table in the spec" — does
+// not name one there.
+var noSuchTableRE = regexp.MustCompile(`no such table:\s*\S`)
 
 // FrictionHash is frictionHash for callers outside the package.
 func FrictionHash(line string) uint64 { return frictionHash(line) }
