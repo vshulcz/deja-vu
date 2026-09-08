@@ -777,7 +777,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
 
 	continueDir := filepath.Join(sources.ContinueRoot(), "sessions")
-	printFiles("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles())
+	// sessions.json is the list beside the documents: read for titles and
+	// dates, never a transcript. Counted with the files deja placed, or every
+	// Continue store reports one file it could not read (#3297).
+	continueSeen := sources.ContinueSessionFiles()
+	if list := filepath.Join(continueDir, "sessions.json"); doctorExists(list) {
+		continueSeen = append(continueSeen, list)
+	}
+	printFiles("continue", continueDir, doctorExists(continueDir), continueSeen)
 
 	piRoot := sources.PiRoot()
 	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
