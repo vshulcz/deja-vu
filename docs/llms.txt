@@ -1,6 +1,6 @@
 # deja-vu
 
-> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and fifteen more agents wrote on this machine — including the months before it was installed — and answers from them over MCP or the command line. BM25 over the transcripts: no model, no embeddings, nothing leaves the machine.
+> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and nineteen more agents wrote on this machine — including the months before it was installed — and answers from them over MCP or the command line. BM25 over the transcripts: no model, no embeddings, nothing leaves the machine.
 
 Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, and after a command fails. Credentials are stripped as the index is built.
 
