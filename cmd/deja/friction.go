@@ -9,12 +9,16 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
+
+// frictionRowBytes is what one row of the list holds.
+const frictionRowBytes = 79
 
 // `deja friction` names what this machine keeps tripping over.
 //
@@ -156,9 +160,10 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 		rows = rows[:limit]
 	}
 	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", sessions, pluralS(sessions))
-	for _, r := range rows {
+	lines := frictionRowLines(rows)
+	for i, r := range rows {
 		where := strings.Join(r.harnesses, ", ")
-		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, trimFriction(r.line))
+		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, lines[i])
 		fmt.Fprintf(stdout, "               %s", where)
 		if !r.when.IsZero() {
 			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
@@ -300,6 +305,50 @@ func scanFriction(dir string, pol policy.Policy) (*frictionScan, error) {
 	}, nil
 }
 
+// frictionRowLines renders the lines about to be printed. Two failures of one
+// service can share every byte before the cut — a connection refused and a
+// connection reset carry the same URL first — and the list then printed one
+// line twice with a count beside each, which reads as a single error counted
+// wrong (#3401). Where the cut collides, it moves into the middle of the line
+// so the end that tells them apart survives.
+func frictionRowLines(rows []frictionRow) []string {
+	out := make([]string, len(rows))
+	same := map[string]int{}
+	for i, r := range rows {
+		out[i] = trimFriction(r.line)
+		same[out[i]]++
+	}
+	for i, r := range rows {
+		if same[out[i]] > 1 {
+			out[i] = elideFrictionMiddle(r.line)
+		}
+	}
+	return out
+}
+
+// elideFrictionMiddle keeps both ends of a line within the row's width. Same
+// bound and same sanitising as trimFriction, rune-safe at both cuts.
+func elideFrictionMiddle(l string) string {
+	const ellipsis = "…"
+	s := search.SafeLine(l)
+	if len(s) <= frictionRowBytes {
+		return s
+	}
+	tail := (frictionRowBytes - len(ellipsis)) / 2
+	head := frictionRowBytes - len(ellipsis) - tail
+	for head > 0 && !utf8.ValidString(s[:head]) {
+		head--
+	}
+	start := len(s) - tail
+	for start < len(s) && !utf8.ValidString(s[start:]) {
+		start++
+	}
+	if head == 0 || start >= len(s) {
+		return truncatePlanBytes(s, frictionRowBytes)
+	}
+	return strings.TrimSpace(s[:head]) + ellipsis + strings.TrimSpace(s[start:])
+}
+
 func trimFriction(l string) string {
 	// Sanitised first. A wall is text out of a transcript deja did not write,
 	// and this was the one surface printing it as recorded: an ANSI escape
@@ -310,7 +359,7 @@ func trimFriction(l string) string {
 	// Rune-safe: a wall recorded in Russian or Chinese was cut mid-character
 	// and printed as a broken byte (#1319). The bound includes the mark, so a
 	// line loses one character rather than gaining one.
-	return truncatePlanBytes(search.SafeLine(l), 79)
+	return truncatePlanBytes(search.SafeLine(l), frictionRowBytes)
 }
 
 // emptiedBy names the rule that leaves a path nothing to read. Both can be in
