@@ -29,7 +29,7 @@ func sampleReport() stats.Report {
 	// A Cyrillic title is the case that broke the width maths: 22 printed
 	// columns and 40 bytes. Without one here the border test measured only
 	// ASCII and passed while the shipped card came out short.
-	r.Longest = stats.SessionStat{Title: "продолжай DDD-рефактор", Messages: 31868}
+	r.Longest = stats.SessionStat{Title: "продолжай рефактор виджет-сервиса", Messages: 31868}
 	r.Heatmap.Max = 8
 	r.Heatmap.Weeks = make([][7]int, 53)
 	for w := 40; w < 53; w++ {

@@ -86,9 +86,9 @@ func negativeQuestions() []string {
 		"open the file and read it",
 		"write the code for this",
 		// The same shape in Russian: an imperative that opens a message and
-		// names nothing. Measured on a real store, "продолжай DDD-рефактор"
+		// names nothing. Measured on a real store, "продолжай рефактор виджет-сервиса"
 		// matched a session on "продолжай" and showed "продолжай и не отключай
-		// больше streisand"; five messages of 142 got a block whose only terms
+		// больше сборку"; five messages of 142 got a block whose only terms
 		// were words like these.
 		"продолжай",
 		"хорошо, продолжи",

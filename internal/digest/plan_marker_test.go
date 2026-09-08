@@ -30,7 +30,7 @@ func TestAStateStillCountsAsADecision(t *testing.T) {
 	for _, line := range []string{
 		"позиция восстановления теперь точная, дампы 389 МБ ежедневно",
 		"PR #810 теперь закрывает #813 и #814",
-		"прод-пины теперь ложатся на deploy/prod",
+		"прод-пины теперь ложатся на релиз-ветку",
 		"the retry budget now lives in config",
 	} {
 		if !CarriesDecision(line) {

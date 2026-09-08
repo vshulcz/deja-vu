@@ -8,7 +8,7 @@ import "testing"
 // assistant lines, and the misses were declarative like these.
 func TestCarriesDecisionReadsAStateAsAConclusion(t *testing.T) {
 	concluded := []string{
-		"прод-пины теперь ложатся на `deploy/prod`, она сбрасывается на main",
+		"прод-пины теперь ложатся на `релиз-ветку`, она сбрасывается на main",
 		"бывшая ведущая становится ведомой, роли поменялись",
 		"конфиг лежит в /etc/deja и читается на старте",
 		"аутентификация работает через прокси, напрямую больше не ходим",

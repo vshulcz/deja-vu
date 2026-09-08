@@ -20,7 +20,7 @@ func TestPunctuationDoesNotHideAnOpeningNow(t *testing.T) {
 
 	// Mid-sentence it still reports where something ended up.
 	states := []string{
-		"прод-пины теперь ложатся на deploy/prod, а не на общий кластер",
+		"прод-пины теперь ложатся на релиз-ветку, а не на общий кластер",
 		"дамп теперь на двух нодах, обе отвечают",
 	}
 	for _, line := range states {

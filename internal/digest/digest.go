@@ -967,7 +967,7 @@ var decisionMarkers = []string{
 	// A decision is as often reported as the state something ended up in as by
 	// the act of deciding. Measured over 4000 assistant lines from a real
 	// store, the list above marks 4% of them, and lines like "прод-пины теперь
-	// ложатся на deploy/prod" or "бывшая ведущая становится ведомой" — plainly
+	// ложатся на релиз-ветку" or "бывшая ведущая становится ведомой" — plainly
 	// the outcome of a decision — were read as passing mentions. With these the
 	// share is 9%, the benchmark does not move, and one off-topic block of 58
 	// live questions turns into a pointer.
@@ -1006,7 +1006,7 @@ var planAfterMarker = []string{
 
 // blankOpeningNow removes "теперь" where it opens a clause, which is how a
 // plan starts — "Теперь SQL — 2 SELECT" — and leaves it where it reports a
-// state: "прод-пины теперь ложатся на deploy/prod". Both readings were counted
+// state: "прод-пины теперь ложатся на релиз-ветку". Both readings were counted
 // as decisions; reading ten such lines on a real store, four were plans.
 func blankOpeningNow(low string) string {
 	const word = "теперь"

@@ -17,7 +17,7 @@ import (
 // cards for a day. This is the test that would have caught it.
 func TestNeitherCardPrintsContentFromTheHistory(t *testing.T) {
 	const (
-		title   = "продолжай DDD-рефактор для платёжного шлюза"
+		title   = "продолжай рефактор виджет-сервиса"
 		project = "acme-payments-internal"
 	)
 	r := stats.Report{

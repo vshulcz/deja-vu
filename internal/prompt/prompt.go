@@ -169,7 +169,7 @@ func hasWordRune(s string) bool {
 func cyrPromptTerm(f string) bool {
 	// A hyphen joins two words into one name as readily in Russian as in
 	// English. Requiring every rune to be Cyrillic threw the whole compound
-	// away, and the ASCII path would not take it either, so "коорд-сообщение"
+	// away, and the ASCII path would not take it either, so "лог-сообщение"
 	// could not become a search term at all — measured on a real store, one
 	// direct question in seven that got no answer was exactly this.
 	letters := 0
@@ -357,12 +357,12 @@ var cyrPromptStop = map[string]bool{
 	// count as a conclusion because the asker had used the phrase.
 	"итоге": true, "итог": true, "конце": true, "концов": true,
 	// Imperatives that open a message and name nothing. Measured on a real
-	// store, "продолжай DDD-рефактор" matched a session on "продолжай" and
-	// showed "продолжай и не отключай больше streisand"; five messages of 142
+	// store, "продолжай рефактор виджет-сервиса" matched a session on "продолжай" and
+	// showed "продолжай и не отключай больше сборку"; five messages of 142
 	// got a block whose only terms were words of this kind.
 	// Imperatives that open a message and name nothing. Measured on a real
-	// store, "продолжай DDD-рефактор" matched a session on "продолжай" and
-	// showed "продолжай и не отключай больше streisand"; five messages of 142
+	// store, "продолжай рефактор виджет-сервиса" matched a session on "продолжай" and
+	// showed "продолжай и не отключай больше сборку"; five messages of 142
 	// got a block whose only terms were words of this kind.
 	"продолжай": true, "продолжи": true, "хорошо": true,
 	"для": true, "при": true, "над": true, "под": true, "без": true,

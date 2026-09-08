@@ -144,8 +144,8 @@ func promptRussianTopics() []promptTopic {
 		// Russian as readily as in English. Measured on a real store, one direct
 		// question in seven that got no answer at all was this: the subject word
 		// never became a search term, so nothing could match it.
-		{"коорд-сообщение", "коорд-сообщение теперь шлём одним пакетом на всю группу",
-			"напомни, что мы решали про коорд-сообщение",
+		{"лог-сообщение", "лог-сообщение теперь шлём одним пакетом на всю группу",
+			"напомни, что мы решали про лог-сообщение",
 			"как теперь рассылаем оповещение всей группе"},
 		// Four letters, which is where Russian keeps its short subjects — сеть,
 		// порт, диск, кеш. The floor for Cyrillic stands at five, so none of

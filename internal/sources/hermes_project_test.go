@@ -41,7 +41,7 @@ func hermesStoreWithSessions(t *testing.T, dir, rows string) string {
 // about (#3257).
 func TestHermesSessionsLandInTheProjectTheyWereWorkedIn(t *testing.T) {
 	db := hermesStoreWithSessions(t, filepath.Join(t.TempDir(), "architect"), `
-INSERT INTO sessions VALUES ('s1','/Users/me/coding/routepilot',NULL,NULL);
+INSERT INTO sessions VALUES ('s1','/Users/me/coding/widgetd',NULL,NULL);
 INSERT INTO sessions VALUES ('s2',NULL,NULL,NULL);
 INSERT INTO messages (session_id,role,content,timestamp) VALUES ('s1','user','why does the vantrell import drop configs',1785000000.5);
 INSERT INTO messages (session_id,role,content,timestamp) VALUES ('s1','assistant','the parser skips a null host',1785000001);
@@ -58,7 +58,7 @@ INSERT INTO messages (session_id,role,content,timestamp) VALUES ('s2','user','an
 	// The same name a Cline or Roo session from that workspace gets — two
 	// segments, so two projects called "api" under different parents stay
 	// apart — which is what makes the hook's project scoping match.
-	want := claudeProjectName(pathToProjectKey("/Users/me/coding/routepilot"))
+	want := claudeProjectName(pathToProjectKey("/Users/me/coding/widgetd"))
 	if want == "" || want == "hermes" || want == "architect" {
 		t.Fatalf("the shared naming gave %q, so this test proves nothing", want)
 	}
