@@ -88,8 +88,9 @@
 <p>home-level patch layer every profile composes over its own. An MCP server here</p>
 <p>is a plugin row (<code>@deepseek-ai/dsh-mcp-client</code>) inside an <code>insert:</code> list — a</p>
 <p>bare row is rejected with <code>entry &#34;mcp-deja&#34; not found</code>, because a patch entry</p>
-<p>addresses a row that already exists. After it, dsh lists <code>mcp__deja__recall</code>,</p>
-<p><code>recall_context</code>, <code>remember</code>, <code>blame</code>, <code>fix</code> and <code>how</code> itself.</p>
+<p>addresses a row that already exists. After it dsh lists one tool, <code>deja</code>,</p>
+<p>called with a <code>mode</code> of <code>recall</code>, <code>context</code>, <code>blame</code>, <code>fix</code>, <code>how</code> or</p>
+<p><code>remember</code>.</p>
 <ul>
 <li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. dsh splices a</li>
 </ul>
@@ -113,12 +114,12 @@
 <ul>
 <li><strong>Auto-recall</strong>: <code>deja install deepseek-auto</code> writes a second plugin at</li>
 </ul>
-<p><code>$DSH_HOME/plugins/deja/auto.js</code>. It listens on <code>agent/pre-step</code>, the event</p>
-<p>that carries the messages entering the step the agent is about to take, and</p>
-<p>splices the recall block in front of the last user message. The handler is</p>
-<p>middleware, so it calls <code>next()</code> first and returns that decision with the</p>
-<p>longer message list — returning a bare <code>{messages}</code> ends the turn with</p>
-<p><code>Cannot read properties of undefined (reading &#39;kind&#39;)</code>. The plain</p>
+<p><code>$DSH_HOME/plugins/deja/auto.js</code>. Recall arrives through</p>
+<p><code>ctx.systemPrompt.context</code>, evaluated on every assembly. The obvious</p>
+<p>alternative — a middleware on <code>agent/pre-step</code> that splices a message into</p>
+<p>the step — loads, completes the turn and never reaches the model: a later</p>
+<p>listener rebuilds its answer from the payload and the added message is</p>
+<p>dropped with nothing reported. The plain</p>
 <p><code>deja install deepseek</code> target keeps the MCP server and <code>/deja</code> but writes no</p>
 <p>such plugin, and removes it along with its row when someone drops back to it.</p>
 <p>Verified against a local model with no tools in play: dsh answered a question</p>

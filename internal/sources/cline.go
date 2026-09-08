@@ -123,6 +123,18 @@ func ClineSessionFiles() []string {
 	return files
 }
 
+// ClineSidecarFiles lists the per-session manifest the reader opens itself for
+// the title, the working directory and the timestamps. doctor counted one per
+// session as a transcript it could not read, the same shape as #3297 (#3360).
+func ClineSidecarFiles() []string {
+	return walkFiles(ClineSessionsDir(), func(p string) bool {
+		// The manifest is named after the directory it sits in, which is what
+		// the reader opens; anything else under a session is a file deja has
+		// no account of and the row should say so.
+		return filepath.Base(p) == filepath.Base(filepath.Dir(p))+".json"
+	})
+}
+
 func LoadCline() []model.Session {
 	return parseFiles(ClineSessionFiles(), ParseClineFile)
 }

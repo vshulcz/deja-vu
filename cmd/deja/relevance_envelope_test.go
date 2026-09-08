@@ -103,3 +103,63 @@ func TestRelevanceEnvelopeReportsThePreCapTotal(t *testing.T) {
 		t.Fatalf("empty: total = %d capped = %v hits = %d\n%s", env.Total, env.Capped, len(env.Hits), out)
 	}
 }
+
+// `--limit n` binds every tier. It did not bind these two, which build their
+// own hits and never went through RunDetailed's cap: the same flag that gave
+// three sessions on the exact tier gave the whole window of fifty here
+// (#3345).
+func TestLimitBindsTheRankedTier(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 60; i++ {
+		id := fmt.Sprintf("lim%02d", i)
+		writeClaudeFixture(t, filepath.Join(root, "relevance", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes ` + id + `"}}`,
+		})
+	}
+	writeClaudeFixture(t, filepath.Join(root, "relevance", "dash.jsonl"), "dash", []string{
+		`{"type":"user","sessionId":"dash","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"dashboards"}}`,
+	})
+
+	out, err := captureRun(t, "--json", "--no-embed", "--limit", "3", "kubernetes autoscaler telemetry dashboards")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := decodeEnvelope(t, out)
+	if env.Tier != "relevance" {
+		t.Fatalf("tier = %q, want relevance — the fixture stopped exercising the path", env.Tier)
+	}
+	if len(env.Hits) != 3 {
+		t.Errorf("hits = %d, want the 3 the reader asked for", len(env.Hits))
+	}
+	if env.Total != 61 || !env.Capped {
+		t.Errorf("total = %d capped = %v, want 61 and true", env.Total, env.Capped)
+	}
+}
+
+// And the same pair on the ranked tier: `--all --limit 3` gives three, not the
+// window, so the flags do not change meaning with the tier (review of #3345).
+func TestAllWithALimitStillBindsTheRankedTier(t *testing.T) {
+	hermeticEnv(t)
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for i := 0; i < 60; i++ {
+		id := fmt.Sprintf("alim%02d", i)
+		writeClaudeFixture(t, filepath.Join(root, "relevance", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"kubernetes autoscaler telemetry notes ` + id + `"}}`,
+		})
+	}
+	writeClaudeFixture(t, filepath.Join(root, "relevance", "dash.jsonl"), "dash", []string{
+		`{"type":"user","sessionId":"dash","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"dashboards"}}`,
+	})
+	out, err := captureRun(t, "--json", "--no-embed", "--all", "--limit", "3", "kubernetes autoscaler telemetry dashboards")
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := decodeEnvelope(t, out)
+	if env.Tier != "relevance" {
+		t.Fatalf("tier = %q, want relevance", env.Tier)
+	}
+	if len(env.Hits) != 3 {
+		t.Errorf("hits = %d, want the 3 the reader asked for", len(env.Hits))
+	}
+}

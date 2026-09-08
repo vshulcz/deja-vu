@@ -13,8 +13,10 @@ import (
 )
 
 var (
-	antigravityRequestOpenRE  = regexp.MustCompile(`^\s*<USER_REQUEST>\s*`)
-	antigravityRequestCloseRE = regexp.MustCompile(`\s*</USER_REQUEST>\s*$`)
+	antigravityRequestTagRE = regexp.MustCompile(`[ \t]*\n?\s*</?USER_REQUEST>\s*`)
+	// "Comments on artifact URI: file:///…/implementation_plan.md" and the
+	// sentence under it, which is the IDE recording what the person clicked.
+	antigravityArtifactCommentRE = regexp.MustCompile(`(?m)^Comments on artifact URI:.*$|^The user has (?:approved|rejected) this document\.$`)
 )
 
 var antigravityUserBlockREs = []*regexp.Regexp{
@@ -113,11 +115,17 @@ func antigravitySessionID(path string) string {
 }
 
 func cleanAntigravityUserContent(text string) string {
+	// The IDE's own blocks can sit inside the request tag as well as beside it.
 	for _, re := range antigravityUserBlockREs {
 		text = re.ReplaceAllString(text, "")
 	}
-	text = antigravityRequestOpenRE.ReplaceAllString(text, "")
-	text = antigravityRequestCloseRE.ReplaceAllString(text, "")
+	// The comment the IDE writes when a document is approved or rejected: it
+	// stands above an empty <USER_REQUEST>, and taking the tag off only when it
+	// opened the content indexed that comment as the person's words (#3326).
+	text = antigravityArtifactCommentRE.ReplaceAllString(text, "")
+	// The tags come off wherever they stand and whatever is around them stays:
+	// a person can write above the tag, and a turn can carry two of them.
+	text = antigravityRequestTagRE.ReplaceAllString(text, "\n")
 	return strings.TrimSpace(text)
 }
 
