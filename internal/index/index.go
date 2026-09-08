@@ -121,7 +121,8 @@ import (
 // 35: the readers changed what they take from seven harnesses on one branch —
 // Kimi's origin.kind (#3235), Roo and Cline's environment block (#3256) and
 // tool results (#3269), Claude's isMeta records (#3267), Qwen's tool results
-// (#3281), Grok's tool input (#3285), Antigravity's edits (#3279). A store
+// (#3281), Grok's tool input (#3285), Antigravity's edits (#3279), Zed's
+// tool results (#3291). A store
 // built before holds skill bodies as the person's words and none of the new
 // tool output, and nothing re-reads a source without the bump (#3289).
 const version = 35
