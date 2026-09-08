@@ -70,7 +70,7 @@
       "name": "grok",
       "state": "missing",
       "paths": [
-        "<tmp>/grok"
+        "<tmp>/grok/sessions"
       ],
       "files": 0,
       "indexed_sessions": 0
