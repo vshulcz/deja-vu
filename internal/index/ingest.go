@@ -1461,6 +1461,17 @@ func metaForSession(s model.Session) SessionMeta {
 		// this is the line break). Derived titles have been collapsed and cut
 		// since they existed.
 		title = boundSourceTitle(s.Harness, title)
+		// A name too short to name anything gives way to the question, the way
+		// a derived title has since #790: dsh's title model answered "ok" and
+		// "47" for sessions whose user turn is a whole sentence — 39 of the 43
+		// on this machine's store (#3328). Notes name themselves.
+		if s.Harness != "deja" && thinTitle(title) {
+			if next := nextSubstantialTitle(s.Messages, title); next != "" {
+				next, _ = redact.Text(next)
+				title = truncateTitle(next, 60)
+				agentTitle = false
+			}
+		}
 	}
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
