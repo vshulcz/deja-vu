@@ -56,3 +56,11 @@ func TestUnwrapClineTaskKeepsWordsAroundTheBlock(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+// A store written with CRLF carries the block with \r before every \n.
+func TestUnwrapClineTaskDropsACRLFBlock(t *testing.T) {
+	got := unwrapClineTask("<task>\r\nfix the build\r\n</task>\r\n<environment_details>\r\n# Current Cost\r\n$0.12\r\n</environment_details>\r\n")
+	if got != "fix the build" {
+		t.Errorf("got %q", got)
+	}
+}
