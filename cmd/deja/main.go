@@ -2957,7 +2957,16 @@ func printSources(dir string) {
 		{"antigravity", antigravityLocation, antigravityRoots, sources.AntigravityTranscripts, sources.LoadAntigravity},
 		// Both stores, as the registry loads them: the JSONL reader alone read a
 		// Grok Build grok.db as sessions=0 while doctor counted it (#3225).
-		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.GrokSessionFiles,
+		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()},
+			func() []string {
+				files := sources.GrokSessionFiles()
+				if db := sources.GrokDB(); db != "" {
+					if _, err := os.Stat(db); err == nil {
+						files = append(files, db)
+					}
+				}
+				return files
+			},
 			func() []model.Session { return append(sources.LoadGrok(), sources.LoadGrokDB()...) }},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},

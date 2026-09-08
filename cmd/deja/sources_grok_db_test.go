@@ -20,6 +20,7 @@ func TestSourcesCountsGrokDBSessions(t *testing.T) {
 	t.Setenv("HERMES_HOME", "")
 	db := filepath.Join(tmp, "grok.db")
 	t.Setenv("DEJA_GROK_DB", db)
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none.db"))
@@ -39,7 +40,7 @@ INSERT INTO messages VALUES ('g2',0,'user','{"content":"a second session"}','202
 	out := captureStdout(t, func() { printSources(filepath.Join(tmp, "index.db")) })
 	for _, l := range strings.Split(out, "\n") {
 		if strings.HasPrefix(l, "grok\t") {
-			if !strings.Contains(l, "sessions=2") {
+			if !strings.Contains(l, "sessions=2") || strings.Contains(l, "size=0 B") {
 				t.Fatalf("grok row misses the store's sessions: %s", l)
 			}
 			return
