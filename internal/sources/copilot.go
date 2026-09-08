@@ -2,6 +2,7 @@ package sources
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -32,6 +33,19 @@ func CopilotSidecarFiles() []string {
 
 // LoadCopilot loads all Copilot CLI sessions.
 func LoadCopilot() []model.Session { return parseFiles(CopilotSessionFiles(), ParseCopilotFile) }
+
+// copilotSkillContextRe is the wrapper Copilot CLI puts around a skill's body
+// when it injects it as a user.message: the block is the host's, and the
+// whole skill indexed as the person's words (#3305). A person's words beside
+// it stay.
+var copilotSkillContextRe = regexp.MustCompile(`(?s)<skill-context\b[^>]*>.*?</skill-context>`)
+
+func copilotStripSkillContext(txt string) string {
+	if !strings.Contains(txt, "<skill-context") {
+		return txt
+	}
+	return strings.TrimSpace(copilotSkillContextRe.ReplaceAllString(txt, ""))
+}
 
 // ParseCopilotFile parses a single Copilot events.jsonl.
 func ParseCopilotFile(path string) ([]model.Session, error) {
@@ -88,7 +102,11 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 				role = "assistant"
 			}
 			s.Touch(t)
-			if txt, _ := data["content"].(string); txt != "" {
+			txt, _ := data["content"].(string)
+			if role == "user" {
+				txt = copilotStripSkillContext(txt)
+			}
+			if txt != "" {
 				s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 			}
 		case "tool.execution_start":
