@@ -1492,6 +1492,30 @@ func isWorkRecord(role string) bool {
 // recall_context away when an agent genuinely needs it.
 const ContextBudget = 8000
 
+// withoutHarnessEnvelopes takes the host's own blocks off the user turns
+// before the window is chosen: teammate messages, task notifications, system
+// reminders, deja's own recall coming back. Every user turn was kept whatever
+// it held, so a session that carries a few of these spent the budget on them —
+// ten real questions on this machine's index came back 38% envelope, three of
+// them 89%, one of them twelve idle notifications (#3323). A turn that was
+// nothing but the envelope is not context and goes; a turn with the person's
+// words beside it keeps the words.
+func withoutHarnessEnvelopes(s model.Session) model.Session {
+	msgs := make([]model.Message, 0, len(s.Messages))
+	for _, m := range s.Messages {
+		if m.Role == "user" && strings.Contains(m.Text, "<") {
+			left := digest.StripHarnessBlocks(m.Text)
+			if left == "" {
+				continue
+			}
+			m.Text = left
+		}
+		msgs = append(msgs, m)
+	}
+	s.Messages = msgs
+	return s
+}
+
 func PrintContext(w io.Writer, s model.Session, query string) {
 	// Project and id are transcript text a harness wrote, and this is one line:
 	// an escape byte in either recolours the header and a carriage return
@@ -1512,6 +1536,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		fmt.Fprintf(w, " · updated %s", s.Updated.Local().Format("2006-01-02"))
 	}
 	fmt.Fprintln(w)
+	s = withoutHarnessEnvelopes(s)
 	qlow := strings.ToLower(query)
 	terms, phrases := QueryParts(query)
 	budget := ContextBudget
