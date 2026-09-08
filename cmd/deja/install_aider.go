@@ -67,16 +67,42 @@ func addAiderReadEntry(s, ctx string) string {
 		at := i + len("\nread:\n") - 1
 		return s[:at] + entry + s[at:]
 	}
-	// The scalar form takes a single file; promote it to a list so both survive.
+	// The scalar form takes a single file; promote it to a list so both
+	// survive. A flow list — `read: [a, b]` — is spread the same way: taken
+	// for a scalar it became one item holding both names, and aider dropped
+	// both files (#3197).
 	for _, line := range strings.Split(s, "\n") {
 		if v, ok := strings.CutPrefix(line, "read: "); ok && strings.TrimSpace(v) != "" {
-			return strings.Replace(s, line+"\n", "read:\n  - "+strings.TrimSpace(v)+"\n"+entry, 1)
+			items := "  - " + strings.TrimSpace(v) + "\n"
+			if flow, ok := aiderFlowItems(strings.TrimSpace(v)); ok {
+				items = ""
+				for _, it := range flow {
+					items += "  - " + it + "\n"
+				}
+			}
+			return strings.Replace(s, line+"\n", "read:\n"+items+entry, 1)
 		}
 	}
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		s += "\n"
 	}
 	return s + "read:\n" + entry
+}
+
+// aiderFlowItems reads a YAML flow list of plain or quoted names; anything
+// else is not one.
+func aiderFlowItems(v string) ([]string, bool) {
+	if !strings.HasPrefix(v, "[") || !strings.HasSuffix(v, "]") {
+		return nil, false
+	}
+	var out []string
+	for _, it := range strings.Split(v[1:len(v)-1], ",") {
+		it = strings.Trim(strings.TrimSpace(it), "\"'")
+		if it != "" {
+			out = append(out, it)
+		}
+	}
+	return out, len(out) > 0
 }
 
 func removeAiderReadEntry(s string) string {

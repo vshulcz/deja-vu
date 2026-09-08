@@ -112,3 +112,28 @@ func TestInstallAiderPromotesAScalarRead(t *testing.T) {
 		t.Fatalf("both files must end up in the list:\n%s", conf)
 	}
 }
+
+// A flow list — `read: [a, b]` — is a list already; treated as the scalar form
+// it became one item holding both names, and aider dropped both files (#3197).
+func TestInstallAiderSpreadsAFlowListRead(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "cfg"))
+	path := filepath.Join(home, ".aider.conf.yml")
+	if err := os.WriteFile(path, []byte("model: gpt-4o\nread: [CONVENTIONS.md, \"notes.md\"]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := installAider("/bin/echo", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	conf := aiderConf(t, home)
+	if strings.Contains(conf, "[CONVENTIONS.md") {
+		t.Fatalf("the flow list was kept as one item:\n%s", conf)
+	}
+	for _, want := range []string{"  - CONVENTIONS.md\n", "  - notes.md\n", "aider-context.md"} {
+		if !strings.Contains(conf, want) {
+			t.Fatalf("missing %q in:\n%s", want, conf)
+		}
+	}
+}
