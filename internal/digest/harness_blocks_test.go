@@ -18,6 +18,12 @@ func TestStripHarnessBlocksLeavesThePersonsWords(t *testing.T) {
 		"<bash-input>git status</bash-input>\n<bash-stdout>On branch main</bash-stdout>": "",
 		// A tag name that is only a prefix of a word in prose is not a tag.
 		"the <metadata> table has no meta column": "the <metadata> table has no meta column",
+		// Amp's attachment block ahead of the question, and Cursor's wrapper:
+		// the file bodies go, the question stays (#3182).
+		"<attached_files>\n<file path=\"zebraquux/fetch.go\">package zebraquux\nfunc Fetch() {}\n</file>\n</attached_files>\nwhy does the zebraquux fetcher time out?":                                                                                         "why does the zebraquux fetcher time out?",
+		"<additional_data>\nBelow are some potentially helpful/relevant pieces of information\n<attached_files>\n<file_contents>x</file_contents>\n</attached_files>\n</additional_data>\n\n<user_query>why does the pager quokkabloom on scroll</user_query>": "why does the pager quokkabloom on scroll",
+		// A closing tag inside a sentence is the sentence's.
+		"I removed the </attached_files> line, is that right?": "I removed the </attached_files> line, is that right?",
 		// No tags at all: untouched.
 		"plain question about <T> generics": "plain question about <T> generics",
 	}

@@ -22,7 +22,28 @@ var harnessBlockTags = []string{
 	"bash-input", "bash-stdout", "bash-stderr",
 	"environment_context", "user_instructions", "permissions instructions",
 	"skill-context", "meta", "hook_result", "hook_context", "deja-recall",
+	// Amp and Cursor put the attached file bodies ahead of the words: the
+	// question under them spent the term budget on `attached_files`, `file`,
+	// `path` and the file's opening and never reached the ranking.
+	"attached_files", "additional_data",
 }
+
+// userQueryTagRe is Cursor's wrapper around the words a person typed; the
+// tags go, the words stay.
+var userQueryTagRe = regexp.MustCompile(`(?i)</?user_query>`)
+
+// orphanCloseRe is the closing tag a nested block leaves behind: the block
+// regexp stops at the first closing tag of any listed name, so Cursor's
+// `<additional_data>…<attached_files>…</attached_files></additional_data>`
+// keeps its outer close. Only a closing tag standing on a line of its own
+// goes — "I removed the </attached_files> line" is a person's sentence.
+var orphanCloseRe = func() *regexp.Regexp {
+	alts := make([]string, 0, len(harnessBlockTags))
+	for _, t := range harnessBlockTags {
+		alts = append(alts, regexp.QuoteMeta(t))
+	}
+	return regexp.MustCompile(`(?im)^[ \t]*</\s*(?:` + strings.Join(alts, "|") + `)\s*>[ \t]*$`)
+}()
 
 var harnessBlockRe = func() *regexp.Regexp {
 	alts := make([]string, 0, len(harnessBlockTags))
@@ -42,6 +63,8 @@ var harnessBlockRe = func() *regexp.Regexp {
 func StripHarnessBlocks(prompt string) string {
 	if strings.Contains(prompt, "<") {
 		prompt = harnessBlockRe.ReplaceAllString(prompt, "")
+		prompt = orphanCloseRe.ReplaceAllString(prompt, "")
+		prompt = userQueryTagRe.ReplaceAllString(prompt, "")
 	}
 	if strings.Contains(prompt, " says: ") {
 		prompt = stripHookStatusLines(prompt)
