@@ -334,7 +334,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// Cursor's sessionStart names the conversation conversation_id
 		// (#3287); the once mark and the audit log key on it.
 		ConversationID string `json:"conversation_id"`
-		CWD       string `json:"cwd"`
+		CWD            string `json:"cwd"`
 		// Cursor leaves cwd empty and names the project here instead.
 		WorkspaceRoots []string `json:"workspace_roots"`
 		// Grok spells all of this in camelCase. See hook_grok.go.
