@@ -55,6 +55,30 @@ var harnessBlockRe = func() *regexp.Regexp {
 	return regexp.MustCompile(`(?is)<(` + strings.Join(alts, "|") + `)(?:\s[^>]*)?>(?:.*?</\s*` + "(?:" + strings.Join(alts, "|") + `)\s*>|.*$)`)
 }()
 
+// closedHarnessBlockRe is harnessBlockRe without the run-to-the-end arm: only
+// a block that is closed. An unclosed tag is not always the host — a person
+// asking "why does <system-reminder> show up in my prompt?" opens one and
+// never closes it, and taking everything after it would take the question
+// (review of #3323).
+var closedHarnessBlockRe = func() *regexp.Regexp {
+	alts := make([]string, 0, len(harnessBlockTags))
+	for _, t := range harnessBlockTags {
+		alts = append(alts, regexp.QuoteMeta(t))
+	}
+	return regexp.MustCompile(`(?is)<(` + strings.Join(alts, "|") + `)(?:\s[^>]*)?>.*?</\s*(?:` + strings.Join(alts, "|") + `)\s*>`)
+}()
+
+// StripClosedHarnessBlocks removes the envelopes a harness closed and leaves
+// everything else as it stands. The prompt hook wants the stricter rule — a
+// truncated notification is still not the person — but a surface that prints
+// the turn back must not lose words to a tag somebody typed themselves.
+func StripClosedHarnessBlocks(text string) string {
+	if !strings.Contains(text, "<") {
+		return strings.TrimSpace(text)
+	}
+	return strings.TrimSpace(closedHarnessBlockRe.ReplaceAllString(text, ""))
+}
+
 // StripHarnessBlocks returns what is left of a prompt once the harness's own
 // envelopes are removed: the person's words, or "" when the turn was the host
 // alone. A task notification delivered as a user turn once made the prompt

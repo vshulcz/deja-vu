@@ -63,3 +63,23 @@ func TestContextOverviewSkipsTheHostsOwnTurns(t *testing.T) {
 		t.Errorf("the overview is the host's own turn:\n%s", b.String())
 	}
 }
+
+// The strip must not take a person's words with it. An unclosed tag runs to
+// the end of the text under the prompt hook's rule, and a person who quotes a
+// tag name in a question opens one without closing it — the review of #3323
+// found both, on the shapes Codex and Copilot write.
+func TestContextKeepsTheQuestionUnderAnUnclosedTag(t *testing.T) {
+	s := model.Session{Harness: "codex", Project: "p", ID: "id", Messages: []model.Message{
+		{Role: "user", Text: "<environment_context>\n  <cwd>/repo</cwd>\nCan you fix the failing test in parser_test.go?"},
+		{Role: "user", Text: "why does <system-reminder> show up in my prompt when I did not add it?"},
+	}}
+	var b bytes.Buffer
+	PrintContext(&b, s, "parser_test.go")
+	got := b.String()
+	if !strings.Contains(got, "Can you fix the failing test in parser_test.go?") {
+		t.Errorf("the question under an unclosed tag was cut:\n%s", got)
+	}
+	if !strings.Contains(got, "show up in my prompt when I did not add it?") {
+		t.Errorf("a question that names a tag lost its words:\n%s", got)
+	}
+}

@@ -1499,12 +1499,14 @@ const ContextBudget = 8000
 // ten real questions on this machine's index came back 38% envelope, three of
 // them 89%, one of them twelve idle notifications (#3323). A turn that was
 // nothing but the envelope is not context and goes; a turn with the person's
-// words beside it keeps the words.
+// words beside it keeps the words. Only a closed block goes: an unclosed tag
+// is as often a person quoting one as a host truncating one, and this surface
+// prints the turn back.
 func withoutHarnessEnvelopes(s model.Session) model.Session {
 	msgs := make([]model.Message, 0, len(s.Messages))
 	for _, m := range s.Messages {
 		if m.Role == "user" && strings.Contains(m.Text, "<") {
-			left := digest.StripHarnessBlocks(m.Text)
+			left := digest.StripClosedHarnessBlocks(m.Text)
 			if left == "" {
 				continue
 			}
