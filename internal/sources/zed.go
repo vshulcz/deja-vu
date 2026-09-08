@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -416,9 +417,11 @@ func zedMessage(raw json.RawMessage) (role, text string) {
 // measured there: 797 ToolUse blocks against 69 Agent.Text ones, so the parser
 // was indexing the talk and none of the work.
 //
-// Tool results are not here to be indexed: Zed stores the call and not what
-// came back, so a Zed session cannot pair an error with the command that
-// followed it the way `deja fix` does elsewhere.
+// Tool results ride on the same agent message, `tool_results` keyed by the
+// call id — tool_name, is_error, content.Text and output. This comment used
+// to say Zed stores the call and not what came back; a real store held 3059
+// results, 97 of them failed terminal runs, and none reached search or the
+// fix pairs (#3291). They are indexed as tool output like every other reader's.
 //
 // Modern threads only. An agent-1 message carries `segments` rather than a
 // tagged content array, and whether tool calls appear there is not something
@@ -446,12 +449,40 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 				Input json.RawMessage `json:"input"`
 			} `json:"ToolUse"`
 		} `json:"content"`
+		ToolResults map[string]struct {
+			Content struct {
+				Text string `json:"Text"`
+			} `json:"content"`
+			Output json.RawMessage `json:"output"`
+		} `json:"tool_results"`
 	}
 	if json.Unmarshal(body, &msg) != nil {
 		return nil
 	}
 	var out []model.Message
 	var paths []string
+	if IndexToolOutput() && len(msg.ToolResults) > 0 {
+		// A map, so the order is fixed by the call id rather than by the
+		// decoder: the same thread indexes the same way twice.
+		ids := make([]string, 0, len(msg.ToolResults))
+		for id := range msg.ToolResults {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			r := msg.ToolResults[id]
+			text := strings.TrimSpace(r.Content.Text)
+			if text == "" {
+				var s string
+				if json.Unmarshal(r.Output, &s) == nil {
+					text = strings.TrimSpace(s)
+				}
+			}
+			if text != "" {
+				out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: t})
+			}
+		}
+	}
 	for _, block := range msg.Content {
 		if block.ToolUse == nil {
 			continue
