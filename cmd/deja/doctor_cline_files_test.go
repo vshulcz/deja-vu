@@ -53,3 +53,37 @@ func TestDoctorNamesAnUnreadClineTranscriptButNotItsManifest(t *testing.T) {
 		t.Errorf("row = %q, want it to name the transcript deja did not read", got)
 	}
 }
+
+// The row names the legacy VS Code roots on the same line, so they are walked
+// too: a stray file under a legacy task was invisible while the line said the
+// root was covered (review of #3360).
+func TestDoctorCountsAStrayFileUnderAClineLegacyRoot(t *testing.T) {
+	tmp := hermeticEnv(t)
+	legacy := filepath.Join(tmp, "vscode", "globalStorage", "saoudrizwan.claude-dev")
+	task := filepath.Join(legacy, "tasks", "1757000000")
+	if err := os.MkdirAll(task, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLINE_ROOTS", legacy)
+	t.Setenv("DEJA_CLINE_ROOT", filepath.Join(tmp, "cline", "data", "sessions"))
+
+	if err := os.WriteFile(filepath.Join(task, "api_conversation_history.json"),
+		[]byte(`[{"role":"user","content":[{"type":"text","text":"why does the retry loop drop the last attempt"}]}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(task, "ui_messages.json"), []byte(`[]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	doctorHarnesses(&buf, t.TempDir())
+	for _, l := range strings.Split(buf.String(), "\n") {
+		if strings.Contains(l, "cline") && strings.Contains(l, "file") {
+			if !strings.Contains(l, "1 not recognised here") {
+				t.Errorf("row = %q, want the stray file under the legacy root counted", l)
+			}
+			return
+		}
+	}
+	t.Fatal("no cline file row in the report at all")
+}

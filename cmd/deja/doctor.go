@@ -737,16 +737,21 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// printFilesBesideIn is printFilesBeside for a row whose printed location is
 	// not one directory: cline names its modern store and its legacy roots on
 	// the same line, and that string cannot be walked (#3360).
-	printFilesBesideIn := func(name, loc, walk string, present bool, seen []string, beside ...string) {
+	printFilesBesideIn := func(name, loc string, walks []string, present bool, seen []string, beside ...string) {
 		detail := doctorCount(len(seen), "file")
 		placed := append(append([]string{}, seen...), beside...)
-		if unread, _ := unplacedFiles(walk, placed, nil); unread > 0 {
+		unread := 0
+		for _, walk := range walks {
+			u, _ := unplacedFiles(walk, placed, nil)
+			unread += u
+		}
+		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
 		printRow(name, loc, present, detail)
 	}
 	printFilesBeside := func(name, path string, present bool, seen []string, beside ...string) {
-		printFilesBesideIn(name, path, path, present, seen, beside...)
+		printFilesBesideIn(name, path, []string{path}, present, seen, beside...)
 	}
 
 	claudeRoot := sources.ClaudeRoot()
@@ -789,7 +794,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 	if legacy := sources.ClineLegacyRoots(); len(legacy) > 0 {
 		clineLoc += ", " + strings.Join(legacy, string(os.PathListSeparator))
 	}
-	printFilesBesideIn("cline", clineLoc, clineModern, clineFiles > 0 || doctorExists(clineModern),
+	// Every root the line names is walked, or the count would promise coverage
+	// the row does not have: a stray file under a legacy tasks tree was
+	// invisible while the line advertised that root (review of #3360).
+	clineWalks := []string{clineModern}
+	for _, root := range sources.ClineLegacyRoots() {
+		clineWalks = append(clineWalks, filepath.Join(root, "tasks"))
+	}
+	printFilesBesideIn("cline", clineLoc, clineWalks, clineFiles > 0 || doctorExists(clineModern),
 		sources.ClineSessionFiles(), sources.ClineSidecarFiles()...)
 
 	rooFiles := len(sources.RooTaskFiles())
