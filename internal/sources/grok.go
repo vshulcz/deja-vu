@@ -137,6 +137,7 @@ func parseGrokFileFromOffset(path string, offset int64) ([]model.Session, error)
 		s.Touch(t)
 
 		if role == RoleToolOutput {
+			s.Messages = append(s.Messages, grokWorkRecords(event, t)...)
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 			return
 		}
@@ -162,8 +163,15 @@ type grokUpdateEvent struct {
 			Content  json.RawMessage `json:"content"`
 			Title    string          `json:"title"`
 			ToolKind string          `json:"kind"`
+			// RawInput is the call's input, the ACP field Grok's own guide
+			// names: the command for run_terminal_command, the file for
+			// read_file and the edit tools (#3285).
+			RawInput json.RawMessage `json:"rawInput"`
 			Meta     struct {
 				PromptIndex *int `json:"promptIndex"`
+				Tool        struct {
+					Name string `json:"name"`
+				} `json:"x.ai/tool"`
 			} `json:"_meta"`
 		} `json:"update"`
 		Meta struct {
@@ -171,6 +179,36 @@ type grokUpdateEvent struct {
 			AgentTimestamp json.Number `json:"agentTimestampMs"`
 		} `json:"_meta"`
 	} `json:"params"`
+}
+
+// grokWorkRecords reads what a tool_call was asked to do off its rawInput:
+// the command for run_terminal_command, the file for the tools that take one.
+// The reader indexed the title and the output and dropped the input, so no
+// Grok session ever yielded a command or a file record (#3285).
+func grokWorkRecords(event grokUpdateEvent, t time.Time) []model.Message {
+	if event.Params.Update.Kind != "tool_call" || len(event.Params.Update.RawInput) == 0 {
+		return nil
+	}
+	var in map[string]any
+	if json.Unmarshal(event.Params.Update.RawInput, &in) != nil {
+		return nil
+	}
+	name := event.Params.Update.Meta.Tool.Name
+	if name == "" {
+		name = strings.TrimSpace(event.Params.Update.Title)
+	}
+	var out []model.Message
+	if name == "run_terminal_command" && IndexCommands() {
+		if cmd, _ := in["command"].(string); strings.TrimSpace(cmd) != "" && worthIndexing(cmd) {
+			out = append(out, model.Message{Role: RoleCommand, Text: "$ " + strings.TrimSpace(cmd), Time: t})
+		}
+	}
+	if IndexToolPaths() {
+		if p, _ := in["target_file"].(string); strings.TrimSpace(p) != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: strings.TrimSpace(p), Time: t})
+		}
+	}
+	return out
 }
 
 func grokMessageKey(role string, event grokUpdateEvent) string {
