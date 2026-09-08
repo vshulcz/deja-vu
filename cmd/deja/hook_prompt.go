@@ -47,6 +47,10 @@ const dejaVuMaxMessages = 300
 type promptHookInput struct {
 	Prompt    hookPromptText `json:"prompt"`
 	SessionID string         `json:"session_id"`
+	// Cursor names the conversation conversation_id and sends no session_id;
+	// read as no session at all, the cooldown never recorded and the same
+	// block went out on every prompt of the conversation (#3287).
+	ConversationID string `json:"conversation_id"`
 	// CWD is what the harness says the project is. Reading only the
 	// environment meant a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR recalled nothing (#759).
@@ -60,7 +64,7 @@ type promptHookInput struct {
 // adopt fills in what grok spells differently, so this prompt's recall is filed
 // under the session that asked for it.
 func (i *promptHookInput) adopt() {
-	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.SessionID = adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID)
 	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
 }
 

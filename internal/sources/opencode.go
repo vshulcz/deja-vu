@@ -99,6 +99,11 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	q := `select s.id,s.directory,s.time_created,s.time_updated,` +
 		`json_extract(m.data,'$.role') as role,` +
 		`json_extract(p.data,'$.text') as text,` +
+		// The text opencode wrote itself under the user role — "Continue if
+		// you have next steps…", "The following tool was executed by the
+		// user" — carries this flag; 338 of them indexed as the person's words
+		// on one store (#3299).
+		`json_extract(p.data,'$.synthetic') as synthetic,` +
 		`json_extract(p.data,'$.state.input.filePath') as path,` +
 		`json_extract(p.data,'$.state.input.command') as cmd,` +
 		`json_extract(p.data,'$.state.input.patchText') as patch,` +
@@ -196,6 +201,9 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		}
 		role := str(r["role"])
 		txt := str(r["text"])
+		if opencodeSynthetic(r["synthetic"]) {
+			continue
+		}
 		// A read call carries no text, only the file it opened. Recorded under
 		// the files role so it can answer "which files" without competing in
 		// ordinary search.
@@ -270,7 +278,45 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	for _, s := range by {
 		out = append(out, *s)
 	}
+	// A subagent run is its own session with parent_id naming the spawner —
+	// 922 of 1472 on one store; read without it, every child listed as a
+	// person's own session (#3301). Read beside the rows, best effort: a store
+	// from before the column keeps its sessions standalone.
+	if parents := opencodeParents(db); len(parents) > 0 {
+		for i := range out {
+			if p := parents[out[i].ID]; p != "" {
+				out[i].Kind = "subagent"
+				out[i].Parent = p
+			}
+		}
+	}
 	return out, nil
+}
+
+// opencodeParents maps a session id to its parent's, for the sessions that
+// have one. The column arrived with subagents; a query that fails is a store
+// without it, and nothing is stamped.
+func opencodeParents(db string) map[string]string {
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
+		`select id, parent_id from session where parent_id is not null and parent_id <> ''`)
+	b, err := cmd.Output()
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	var rows []struct {
+		ID     string `json:"id"`
+		Parent string `json:"parent_id"`
+	}
+	if json.Unmarshal(b, &rows) != nil {
+		return nil
+	}
+	m := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.ID != "" && r.Parent != "" && r.ID != r.Parent {
+			m[r.ID] = r.Parent
+		}
+	}
+	return m
 }
 
 func OpencodeCounts() (sessions, messages int, err error) {
@@ -340,6 +386,22 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return ParseOpencodeDBWhere(db, " and s.id='"+sqlEscape(id)+"'", 0)
+}
+
+// opencodeSynthetic reads the part's synthetic flag off the sqlite3 -json row:
+// true comes back as 1, json.Number or bool depending on the shape.
+func opencodeSynthetic(v any) bool {
+	switch x := v.(type) {
+	case bool:
+		return x
+	case float64:
+		return x != 0
+	case json.Number:
+		return x.String() != "0" && x.String() != ""
+	case string:
+		return x == "1" || x == "true"
+	}
+	return false
 }
 
 // partTime prefers the part's own timestamp and falls back to the message's.
