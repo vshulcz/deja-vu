@@ -891,7 +891,7 @@ func cmdCtx(dir string, rest []string) error {
 	} else {
 		for _, a := range rest {
 			if strings.HasPrefix(a, "--") {
-				return fmt.Errorf("ctx takes no flags, only a query or id-prefix — got %q", a)
+				return fmt.Errorf("ctx takes no flags, only a query or id-prefix — got %q; a question that starts with a dash goes after `--`", a)
 			}
 		}
 	}
@@ -2631,7 +2631,7 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 			}
 		default:
 			if strings.HasPrefix(a, "-") {
-				return "", o, false, fmt.Errorf("blame: unknown flag %q", a)
+				return "", o, false, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
 			}
 			if path != "" {
 				return "", o, false, fmt.Errorf("blame accepts one path")
