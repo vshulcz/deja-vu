@@ -26,6 +26,8 @@ Message records have `type`, `sessionId`, `timestamp`, and a `message` object. `
 
 `type: "user"` maps to `user` and `type: "assistant"` maps to `assistant`; a non-empty `message.role` takes precedence. Timestamps are RFC 3339 strings in observed files. deja also accepts numeric Unix seconds or milliseconds.
 
+`isMeta: true` marks a user record Claude Code wrote itself — the body of a skill it loaded, a prompt a cron job re-fired, the `/fork` notice, an `[Image: …]` placeholder, the local-command caveat. Its text is not a turn and is dropped; the record's tool calls, if it ever carries any, are read as usual. On this machine that is 779 records, none on an assistant record and none carrying a tool call.
+
 ## Known quirks and drift
 
 - JSONL can end in a partial line while Claude is writing. Malformed lines are skipped; a later indexing pass reads the completed tail.

@@ -53,6 +53,7 @@
 <p>Message records have <code>type</code>, <code>sessionId</code>, <code>timestamp</code>, and a <code>message</code> object. <code>message.content</code> is either a string or an array whose useful parts have <code>text</code> or <code>content</code>.</p>
 <pre><code class="language-json">{&#34;type&#34;:&#34;assistant&#34;,&#34;sessionId&#34;:&#34;session-7&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;message&#34;:{&#34;role&#34;:&#34;assistant&#34;,&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The failing check is in parser.go.&#34;}]}}</code></pre>
 <p><code>type: &#34;user&#34;</code> maps to <code>user</code> and <code>type: &#34;assistant&#34;</code> maps to <code>assistant</code>; a non-empty <code>message.role</code> takes precedence. Timestamps are RFC 3339 strings in observed files. deja also accepts numeric Unix seconds or milliseconds.</p>
+<p><code>isMeta: true</code> marks a user record Claude Code wrote itself — the body of a skill it loaded, a prompt a cron job re-fired, the <code>/fork</code> notice, an <code>[Image: …]</code> placeholder, the local-command caveat. Its text is not a turn and is dropped; the record&#39;s tool calls, if it ever carries any, are read as usual. On this machine that is 779 records, none on an assistant record and none carrying a tool call.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>JSONL can end in a partial line while Claude is writing. Malformed lines are skipped; a later indexing pass reads the completed tail.</li>
