@@ -112,7 +112,7 @@
 <p>The same command writes <code>&lt;User&gt;/prompts/deja.instructions.md</code>. VS Code applies a custom-instructions file to every chat when its frontmatter says <code>applyTo: "**"</code>, and that is what makes recall arrive without being asked for: the block is in front of the model before it reads your question, and it says to search history first.</p>
 
 <h2>What arrives, and what does not</h2>
-<p>The six tools, in agent mode, and the instruction to use them. Measured on VS Code 1.134.0: with the instructions file installed and deja never mentioned in the question, "the packer keeps refusing our manifest — why?" made Copilot Chat call <code>recall</code> on its own, and answer from a session it had never seen.</p>
+<p>The <code>deja</code> tool with its six modes, in agent mode, and the instruction to use it. Measured on VS Code 1.134.0: with the instructions file installed and deja never mentioned in the question, "the packer keeps refusing our manifest — why?" made Copilot Chat call <code>recall</code> on its own, and answer from a session it had never seen.</p>
 <p>What Copilot Chat still does not have is a hook. There is no session-start and no per-prompt event an outside tool can use, so nothing can hand it a block at a fixed moment or react to a failing command — the instructions file steers the agent, it does not inject. A slash command is the other gap: deja serves an MCP prompt and VS Code lists it, but its slash form is not something we have driven end to end.</p>
 
 <h2>The part that is not about this harness</h2>
