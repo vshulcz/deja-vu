@@ -67,6 +67,17 @@ func vsCodeGuidanceDir() string {
 	return vsCodeDefaultUserDir()
 }
 
+// vsCodeFirstRoot is the User folder of a host that is actually here, for the
+// detection `--auto` does. It differs from vsCodeGuidanceDir on purpose: that
+// one falls back to a default so an install can write ahead of the editor,
+// which as a detection would report VS Code on every machine (#3192).
+func vsCodeFirstRoot() string {
+	if dirs := vsCodeUserDirs(); len(dirs) > 0 {
+		return dirs[0]
+	}
+	return filepath.Join(os.DevNull, "vscode")
+}
+
 func installVSCodeMCP(exe string, uninstall bool) (installResult, error) {
 	dirs := vsCodeUserDirs()
 	if len(dirs) == 0 {

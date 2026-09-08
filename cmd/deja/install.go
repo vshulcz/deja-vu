@@ -610,8 +610,12 @@ func refusalRemedy(errs []error) string {
 	return "fix what each one reports and run it again"
 }
 
-func existingTargets() []string {
-	checks := map[string]string{
+// existingTargetChecks is what says a harness is on this machine: one path the
+// harness itself creates, per install target. Named rather than inline so the
+// test that holds it to the target list can ask for a path instead of
+// repeating the platform switches (#3192).
+func existingTargetChecks() map[string]string {
+	return map[string]string{
 		"claude-code": sources.ClaudeConfigDir(),
 		"codex":       sources.CodexHome(),
 		"opencode":    filepath.Join(opencodeConfigHome(), "opencode"),
@@ -637,7 +641,37 @@ func existingTargets() []string {
 		// machine after one install.
 		"goose": sources.GooseRoot(),
 		"roo":   rooFirstRoot(),
+		// These six have install targets and were in the matrix with nothing
+		// looking for them, so `--auto` wired the other nineteen and said
+		// nothing about Amp, prime-agent, Crush, Continue, Zed or VS Code on a
+		// machine that had them (#3192). Each is keyed on something the harness
+		// writes for itself, for the reason goose's entry gives.
+		//
+		// Amp's thread store rather than its settings file: deja writes into
+		// the settings file.
+		"amp": sources.AmpRoot(),
+		// prime-agent's sessions directory, and it honours the harness's own
+		// relocation variables, so a moved store is still found.
+		"prime": sources.PrimeRoot(),
+		// Crush's project registry, in its data home. Its config directory is
+		// where deja writes crush.json, so keying on that would make every
+		// machine a Crush machine after one install.
+		"crush": filepath.Join(sources.CrushDataHome(), "projects.json"),
+		// Continue's session directory. The folder above it holds the config
+		// deja writes, and Continue creates the sessions directory on its
+		// first conversation — so a Continue that has been installed and never
+		// used is not detected, which is the same bar the aider entry sets.
+		"continue": filepath.Join(sources.ContinueRoot(), "sessions"),
+		// Zed's data directory, not the config file deja edits.
+		"zed": sources.ZedRoot(),
+		// VS Code's own User folder, which the editor creates on first run;
+		// deja only ever writes inside it.
+		"vscode": vsCodeFirstRoot(),
 	}
+}
+
+func existingTargets() []string {
+	checks := existingTargetChecks()
 	var out []string
 	for name, p := range checks {
 		if _, err := os.Stat(p); err == nil {
