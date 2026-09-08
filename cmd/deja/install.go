@@ -673,17 +673,24 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "gemini":
 		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
 	case "gemini-auto":
-		// MCP first, then the hooks extension. `--auto` maps gemini to this
-		// target alone, so installing only the extension left the harness
-		// without the tools: its own `gemini mcp list` said "No MCP servers
+		// The hooks extension, then MCP. `--auto` maps gemini to this target
+		// alone, so installing only the extension left the harness without
+		// the tools: its own `gemini mcp list` said "No MCP servers
 		// configured" on a machine that had just run `deja install --auto`.
-		// grok-auto pairs them the same way.
-		// Same file, same reason as qwen-auto: whichever half may refuse goes
-		// first (#2745).
-		if _, err := installGeminiAuto(exe, uninstall); err != nil {
+		// grok-auto pairs them the same way. The extension goes first for the
+		// reason qwen-auto has: whichever half may refuse goes first (#2745).
+		ext, err := installGeminiAuto(exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
+		mcp, err := installMCPJSON(filepath.Join(sources.GeminiHome(), "settings.json"), exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Both writes in one result, like every other -auto target: the
+		// extension's path and its note about hooksConfig reached nobody
+		// while the first result was dropped (#3185).
+		return wroteAll(ext, mcp), nil
 	case "antigravity":
 		return installMCPJSON(filepath.Join(antigravityConfigHome(), "mcp_config.json"), exe, uninstall)
 	case "antigravity-auto":
@@ -828,7 +835,13 @@ func wroteAll(rs ...installResult) installResult {
 		if r.Path == "" || r.Action == "unchanged" || r.Path == out.Path {
 			continue
 		}
-		also = append(also, fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path)))
+		line := fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path))
+		// The other write's own note rides with its line: gemini's extension
+		// says what switch it left on, and that was lost with the result.
+		if r.Note != "" {
+			line += " — " + r.Note
+		}
+		also = append(also, line)
 		out.also = append(out.also, r.Path)
 	}
 	for _, line := range also {
