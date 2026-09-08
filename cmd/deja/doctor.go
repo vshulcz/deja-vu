@@ -704,9 +704,13 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// — the one thing `doctor` exists to rule out (#701).
 	// printFilesSkipping is printFiles for a harness that declines some of its
 	// own files by a rule, so the two can be told apart in the row.
-	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
+	// printFilesUnder is printFilesSkipping for a store whose transcripts live
+	// in one subtree while the row names the store: Codex keeps its plugin
+	// cache, model cache, hooks and credentials beside `sessions`, and walking
+	// the root reported all of it as transcripts deja could not read (#3321).
+	printFilesUnder := func(name, path, walk string, present bool, seen []string, skipped func(string) bool) {
 		detail := doctorCount(len(seen), "file")
-		unread, byRule := unplacedFiles(path, seen, skipped)
+		unread, byRule := unplacedFiles(walk, seen, skipped)
 		if byRule > 0 {
 			// The variable named the way it was read as the cause of the
 			// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
@@ -722,6 +726,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
 		printRow(name, path, present, detail)
+	}
+	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
+		printFilesUnder(name, path, path, present, seen, skipped)
 	}
 	printFiles := func(name, path string, present bool, seen []string) {
 		printFilesSkipping(name, path, present, seen, nil)
@@ -748,7 +755,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
 	codexRoot := sources.CodexRoot()
-	printFiles("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles())
+	printFilesUnder("codex", codexRoot, filepath.Join(codexRoot, "sessions"), doctorExists(codexRoot), sources.CodexFiles(), nil)
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
