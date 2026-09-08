@@ -278,7 +278,45 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	for _, s := range by {
 		out = append(out, *s)
 	}
+	// A subagent run is its own session with parent_id naming the spawner —
+	// 922 of 1472 on one store; read without it, every child listed as a
+	// person's own session (#3301). Read beside the rows, best effort: a store
+	// from before the column keeps its sessions standalone.
+	if parents := opencodeParents(db); len(parents) > 0 {
+		for i := range out {
+			if p := parents[out[i].ID]; p != "" {
+				out[i].Kind = "subagent"
+				out[i].Parent = p
+			}
+		}
+	}
 	return out, nil
+}
+
+// opencodeParents maps a session id to its parent's, for the sessions that
+// have one. The column arrived with subagents; a query that fails is a store
+// without it, and nothing is stamped.
+func opencodeParents(db string) map[string]string {
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
+		`select id, parent_id from session where parent_id is not null and parent_id <> ''`)
+	b, err := cmd.Output()
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	var rows []struct {
+		ID     string `json:"id"`
+		Parent string `json:"parent_id"`
+	}
+	if json.Unmarshal(b, &rows) != nil {
+		return nil
+	}
+	m := make(map[string]string, len(rows))
+	for _, r := range rows {
+		if r.ID != "" && r.Parent != "" && r.ID != r.Parent {
+			m[r.ID] = r.Parent
+		}
+	}
+	return m
 }
 
 func OpencodeCounts() (sessions, messages int, err error) {
