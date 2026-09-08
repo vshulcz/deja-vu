@@ -89,9 +89,10 @@ func OpenClawSessionFiles() []string {
 
 // OpenClawSidecarFiles lists the json and jsonl files an OpenClaw store keeps
 // beside its transcripts that the reader declines on purpose: the per-session
-// trajectory-path.json, the sessions.json list, the checkpoint snapshots and
-// the archive of a reset whose live transcript is still there. doctor counted
-// them as transcripts it could not read, once per session (#3317).
+// trajectory-path.json, the sessions.json list and the checkpoint snapshots.
+// doctor counted them as transcripts it could not read, once per session
+// (#3317). An archive of a reset needs no entry: its name ends in the
+// timestamp or .zst, so the walk never reaches it.
 func OpenClawSidecarFiles() []string {
 	root := OpenClawRoot()
 	return walkFiles(root, func(p string) bool {
@@ -104,8 +105,6 @@ func OpenClawSidecarFiles() []string {
 		case filepath.Base(p) == "sessions.json":
 			return true
 		case openclawCheckpointRE.MatchString(p):
-			return true
-		case openclawArchiveRE.MatchString(p):
 			return true
 		}
 		return false
