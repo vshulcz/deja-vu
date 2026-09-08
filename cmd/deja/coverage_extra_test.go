@@ -27,6 +27,9 @@ func hermeticEnv(t *testing.T) string {
 	home := filepath.Join(tmp, "home")
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	// Hermes's own switch moves deja with it (#3203): pinned so a developer
+	// with HERMES_HOME exported never has a test read or write their Hermes.
+	t.Setenv("HERMES_HOME", "")
 	// Windows resolvers read APPDATA rather than the home directory — goose's
 	// config is one — so leaving it alone lets one test's install show up in
 	// another's report.
