@@ -110,6 +110,18 @@ func ClineLegacyRoots() []string {
 	return out
 }
 
+// ClineStoreRoots names every directory the transcript walk covers: the
+// CLI/SDK sessions directory and each legacy extension root's tasks tree. Both
+// doctor forms read it, so the row and the machine report cannot disagree on
+// where a cline transcript is looked for (#3399).
+func ClineStoreRoots() []string {
+	roots := []string{ClineSessionsDir()}
+	for _, root := range ClineLegacyRoots() {
+		roots = append(roots, filepath.Join(root, "tasks"))
+	}
+	return roots
+}
+
 // ClineSessionFiles lists both generations' transcript files.
 func ClineSessionFiles() []string {
 	files := walkFiles(ClineSessionsDir(), func(p string) bool {

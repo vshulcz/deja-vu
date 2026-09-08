@@ -823,10 +823,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// Every root the line names is walked, or the count would promise coverage
 	// the row does not have: a stray file under a legacy tasks tree was
 	// invisible while the line advertised that root (review of #3360).
-	clineWalks := []string{clineModern}
-	for _, root := range sources.ClineLegacyRoots() {
-		clineWalks = append(clineWalks, filepath.Join(root, "tasks"))
-	}
+	clineWalks := sources.ClineStoreRoots()
 	printFilesBesideIn("cline", clineLoc, clineWalks, false, clineFiles > 0 || doctorExists(clineModern),
 		sources.ClineSessionFiles(), sources.ClineSidecarFiles()...)
 
