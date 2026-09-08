@@ -57,11 +57,11 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 		// Install merged deja's entries beside the reader's own; uninstall
 		// removed the file whole and took theirs with it (#3219). deja's
 		// entries come out, and the file goes only when nothing else is in it.
-		for ev, hook := range map[string]string{
-			"SessionStart": "hook-context", "PreCompact": "hook-precompact",
-			"UserPromptSubmit": "hook-prompt", "PreToolUse": "hook-tool",
+		for _, ev := range [][2]string{
+			{"SessionStart", "hook-context"}, {"PreCompact", "hook-precompact"},
+			{"UserPromptSubmit", "hook-prompt"}, {"PreToolUse", "hook-tool"},
 		} {
-			root = updateClaudeHook(root, ev, exe+" "+hook, "", true)
+			root = updateClaudeHook(root, ev[0], exe+" "+ev[1], "", true)
 		}
 		if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 			delete(root, "hooks")
