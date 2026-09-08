@@ -192,6 +192,11 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 		if typ != "user" && typ != "assistant" {
 			return
 		}
+		if meta, _ := m["isMeta"].(bool); meta && typ == "user" {
+			// The harness's own user-role record (#3267); the typed parser
+			// skips it the same way.
+			return
+		}
 		side, _ := m["isSidechain"].(bool)
 		agent, _ := m["agentId"].(string)
 		if side && agent != "" {
