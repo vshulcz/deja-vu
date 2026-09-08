@@ -968,7 +968,7 @@ func MatchedUserLine(s model.Session, terms []string) string {
 		if m.Role != "user" || noiseMessage(m.Text) {
 			continue
 		}
-		line, hits := densestLine(m.Text, terms)
+		line, hits := densestLine(digest.StripHarnessBlocks(m.Text), terms)
 		if hits > bestHits {
 			best, bestHits = strings.TrimSpace(line), hits
 		}

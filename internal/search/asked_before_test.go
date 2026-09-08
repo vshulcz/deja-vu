@@ -1,9 +1,11 @@
 package search
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/prompt"
 )
 
 func askedSession(texts ...string) model.Session {
@@ -59,5 +61,26 @@ func TestAskedBeforeIgnoresTheAgentsOwnWords(t *testing.T) {
 	}}
 	if got := AskedBefore(s, []string{"scheduler", "retrying", "pgbouncer"}); got != "" {
 		t.Errorf("the agent's own restatement counted as a repeat: %q", got)
+	}
+}
+
+// Two task notifications share every word; that is the host repeating itself,
+// not a question asked twice. A person's question with a reminder appended is
+// still the question, and the quote is the question alone (#3156, #3157).
+func TestAskedBeforeSkipsTheHostsOwnLines(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: "user", Text: "<task-notification>\n<task-id>br50mykp6</task-id>\n<status>failed</status>\n<summary>Background command failed with exit code 2</summary>\n</task-notification>"},
+		{Role: "user", Text: "Summary:\n1. Primary Request and Intent:\n   - fix the exporter_batch rows dropped at utc_midnight"},
+	}}
+	if got := AskedBefore(s, prompt.Terms("<task-notification>\n<task-id>x</task-id>\n<status>failed</status>\n<summary>Background command failed with exit code 2</summary>\n</task-notification>")); got != "" {
+		t.Fatalf("a notification was asked before: %q", got)
+	}
+	if got := AskedBefore(s, prompt.Terms("fix the exporter_batch rows dropped at utc_midnight")); got != "" {
+		t.Fatalf("a compaction summary was asked before: %q", got)
+	}
+	s.Messages = append(s.Messages, model.Message{Role: "user", Text: "why does exporter_batch drop rows at utc_midnight?\n<system-reminder>\nthe file changed on disk\n</system-reminder>"})
+	got := AskedBefore(s, prompt.Terms("why does exporter_batch drop rows at utc_midnight"))
+	if !strings.HasPrefix(got, "why does exporter_batch") || strings.Contains(got, "system-reminder") {
+		t.Fatalf("the person's question with a reminder appended: %q", got)
 	}
 }

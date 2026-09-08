@@ -406,13 +406,13 @@ func noisyMessage(s string) bool {
 	// <teammate-message ...>" — slipped past the prefix check and reached the
 	// session-start block, where truncated inter-agent JSON was among the first
 	// things an agent read. Nobody writes these tags in prose.
-	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "<system-reminder"} {
+	for _, p := range []string{"<local-command", "<command-", "<task-notification", "<teammate-message", "<bash-", "<system-reminder", "<deja-recall"} {
 		if strings.Contains(t, p) {
 			return true
 		}
 	}
 	// Prose, so only where it opens the message.
-	if strings.HasPrefix(t, "Caveat:") {
+	if strings.HasPrefix(t, "Caveat:") || IsCompactionSummary(t) || IsHookStatusLine(t) {
 		return true
 	}
 	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
@@ -574,6 +574,9 @@ func IsAgentArtifact(text string) bool {
 		}
 	}
 	trimmed := strings.TrimSpace(text)
+	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) {
+		return true
+	}
 	// Harness preambles injected as user turns: <environment_context>,
 	// <user_instructions> and similar XML-wrapped plumbing.
 	if strings.HasPrefix(trimmed, "<") && strings.Contains(trimmed, "</") {
@@ -607,6 +610,47 @@ func IsAgentArtifact(text string) bool {
 		}
 	}
 	return false
+}
+
+// compactionOutlineRE is the numbered outline the summary opens with; a person
+// asking "Summary: what is the Primary Request and Intent here?" has no "1.".
+var compactionOutlineRE = regexp.MustCompile(`(?m)^\s*1\.\s*Primary Request and Intent`)
+
+// IsCompactionSummary reports whether a message is the block a harness writes
+// as the first user turn after a compaction — Claude Code's "Summary: 1.
+// Primary Request and Intent: …" and the "This session is being continued
+// from a previous conversation" preamble in front of it. The model wrote it
+// and the host filed it under the user's role, so as a title it named a
+// session "Summary: 1. Primary Request and Intent: - MOST R…" and told the
+// reader nothing (#3157). Judged on the opening, since a person can write
+// "Summary:" and go on to say something.
+func IsCompactionSummary(t string) bool {
+	t = strings.TrimSpace(t)
+	if strings.HasPrefix(t, "This session is being continued from a previous conversation") {
+		return true
+	}
+	head := t
+	if len(head) > 300 {
+		head = head[:300]
+	}
+	return strings.HasPrefix(t, "Summary:") && compactionOutlineRE.MatchString(head)
+}
+
+// hookStatusLineRE is the shape Claude Code uses to record what a hook said
+// in its systemMessage: `UserPromptSubmit says: …`, `SessionStart:compact
+// says: …`, sometimes behind the tree glyph. Only the host's event names
+// count — "Vlad says: no" is a person. The line is deja's own status
+// bar coming back through the transcript under the user role, and it was
+// quoted as a session title: "you have been here: 'UserPromptSubmit says:
+// deja-vu — you have been h…'" (#3168).
+var hookStatusLineRE = regexp.MustCompile(`^(?:⎿\s*)?(?:SessionStart|SessionEnd|UserPromptSubmit|PreToolUse|PostToolUse|PostToolUseFailure|PreCompact|Stop|SubagentStart|SubagentStop|Notification|PermissionRequest|Setup)(?::[a-z]+)? says: `)
+
+// IsHookStatusLine reports whether a message is nothing but a hook's status
+// line — the bar pasted on its own, no question under it. With a question
+// under it the message is the person's; StripHarnessBlocks takes the bar off.
+func IsHookStatusLine(t string) bool {
+	t = strings.TrimSpace(t)
+	return hookStatusLineRE.MatchString(t) && strings.TrimSpace(stripHookStatusLines(t)) == ""
 }
 
 // cleanSession drops agent artifacts and exact repeats so the digest carries

@@ -1,6 +1,7 @@
 package search
 
 import (
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -45,7 +46,16 @@ func AskedBefore(s model.Session, terms []string) string {
 		if m.Role != "user" {
 			continue
 		}
-		past := prompt.Terms(m.Text)
+		// The host's own turns and the model's compaction summary sit under the
+		// user role too; two task notifications share every word and are not
+		// a question asked twice. A person's question with a reminder appended
+		// is still the question, so the envelope comes off rather than the
+		// message being skipped.
+		text := digest.StripHarnessBlocks(m.Text)
+		if text == "" || digest.IsCompactionSummary(text) {
+			continue
+		}
+		past := prompt.Terms(text)
 		if len(past) < askedAgainMinTerms {
 			continue
 		}
@@ -63,7 +73,7 @@ func AskedBefore(s model.Session, terms []string) string {
 			continue
 		}
 		if shared > bestShared {
-			best, bestShared = strings.TrimSpace(firstSentence(m.Text)), shared
+			best, bestShared = strings.TrimSpace(firstSentence(text)), shared
 		}
 	}
 	return best
