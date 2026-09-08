@@ -633,6 +633,12 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	// nothing for the manifest read.
 	var ignored map[string]bool
 	loaded := false
+	ignoredProject := func(project string) bool {
+		if !loaded {
+			ignored, loaded = ProjectsTouchedByIgnore(dir), true
+		}
+		return ignored[project]
+	}
 	for _, p := range ReadFixes(dir) {
 		if !sigs[p.Sig] {
 			continue
@@ -650,10 +656,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		if allow != nil && !allow(p.Project) {
 			continue
 		}
-		if !loaded {
-			ignored, loaded = ProjectsTouchedByIgnore(dir), true
-		}
-		if ignored[p.Project] {
+		if ignoredProject(p.Project) {
 			continue
 		}
 		out = append(out, p)
@@ -667,6 +670,13 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if len(out) == 0 {
 		for _, p := range held {
 			if allow != nil && !allow(p.Project) {
+				continue
+			}
+			// The rule the confirmed pairs are held to. A sighting was
+			// appended before that check ran, so the one branch that answers
+			// most real errors handed back a command out of the tree search
+			// and `how` refuse to read (#3403).
+			if ignoredProject(p.Project) {
 				continue
 			}
 			out = append(out, p)
