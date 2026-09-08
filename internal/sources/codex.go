@@ -53,6 +53,32 @@ func codexRolloutWanted(p string) bool {
 	return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-")
 }
 
+// CodexSidecarFiles lists what a Codex store keeps beside its transcripts: the
+// plugin and app-server caches, and the configuration and credentials at the
+// root. doctor counted all of it as transcripts it could not read — 29 of them
+// on a store with 35 (#3321). Anything else, a rollout in the wrong place
+// included, stays unaccounted for, which is what the row is for.
+func CodexSidecarFiles() []string {
+	root := CodexRoot()
+	return walkFiles(root, func(p string) bool {
+		if codexRolloutWanted(p) {
+			return false
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return false
+		}
+		parts := strings.Split(filepath.ToSlash(rel), "/")
+		if len(parts) > 1 && (parts[0] == "plugins" || parts[0] == "cache") {
+			return true
+		}
+		// The store's own settings sit at the root; history.jsonl is read and
+		// is already counted, and a .jsonl the reader does not take is not
+		// configuration.
+		return len(parts) == 1 && strings.HasSuffix(parts[0], ".json")
+	})
+}
+
 // CodexFiles lists the rollout transcripts (plus history.jsonl when present)
 // without parsing them — a cheap count for diagnostics.
 func CodexFiles() []string {

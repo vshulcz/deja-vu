@@ -60,4 +60,11 @@ func TestDoctorDoesNotCallCodexCachesUnrecognised(t *testing.T) {
 	if got := row(); !strings.Contains(got, "1 not recognised here") {
 		t.Errorf("row = %q, want it to name the one file in sessions deja did not read", got)
 	}
+	// And a transcript in the wrong place is exactly what the row is for: a
+	// rollout restored to the store root, outside the sessions tree, must not
+	// disappear from the count (review of #3321).
+	write(filepath.Join(root, "rollout-2026-09-07T11-00-00-"+sid+".jsonl"), "{}\n")
+	if got := row(); !strings.Contains(got, "2 not recognised here") {
+		t.Errorf("row = %q, want the stray rollout at the store root counted too", got)
+	}
 }
