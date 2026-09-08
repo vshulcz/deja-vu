@@ -107,3 +107,17 @@ func TestContextKeepsWordsBetweenTwoEnvelopes(t *testing.T) {
 		t.Errorf("the words inside Cursor's wrapper are gone:\n%s", got)
 	}
 }
+
+// Naming a tag is not writing one: a sentence that quotes Cursor's wrapper
+// keeps its words, where a global strip of the bare tag gutted it (third
+// review of #3323).
+func TestContextKeepsASentenceThatNamesTheWrapper(t *testing.T) {
+	s := model.Session{Harness: "claude", Project: "p", ID: "id", Messages: []model.Message{
+		{Role: "user", Text: "the three things Cursor wraps around a user message: `<user_query>`, `<additional_data>`, `<attached_files>`"},
+	}}
+	var b bytes.Buffer
+	PrintContext(&b, s, "cursor wraps")
+	if !strings.Contains(b.String(), "`<user_query>`") {
+		t.Errorf("the sentence lost the tag it was naming:\n%s", b.String())
+	}
+}

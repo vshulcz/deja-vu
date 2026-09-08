@@ -68,6 +68,10 @@ var closedHarnessBlockREs = func() []*regexp.Regexp {
 	return out
 }()
 
+// closedUserQueryRe is Cursor's wrapper with both of its tags: the words
+// between them are the person's and stay.
+var closedUserQueryRe = regexp.MustCompile(`(?is)<user_query>(.*?)</user_query>`)
+
 // StripClosedHarnessBlocks removes the envelopes a harness opened and closed
 // under one name, and leaves everything else as it stands. The prompt hook
 // wants the stricter rule — a truncated notification is still not the person —
@@ -81,9 +85,12 @@ func StripClosedHarnessBlocks(text string) string {
 		text = re.ReplaceAllString(text, "")
 	}
 	// What a nested block leaves behind, and Cursor's wrapper around the words
-	// a person typed: the tags go, the words stay.
+	// a person typed: the tags go, the words stay. The wrapper is unwrapped as
+	// a pair — a lone `<user_query>` in a sentence about Cursor is someone
+	// naming the tag, and taking it out of their prose mangles the sentence
+	// (review of #3323).
 	text = orphanCloseRe.ReplaceAllString(text, "")
-	text = userQueryTagRe.ReplaceAllString(text, "")
+	text = closedUserQueryRe.ReplaceAllString(text, "$1")
 	return strings.TrimSpace(text)
 }
 
