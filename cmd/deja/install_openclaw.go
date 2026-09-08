@@ -102,14 +102,19 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		// records a block it created, so an uninstall gives back a setting the
 		// reader had rather than deleting one deja only overwrote (#2830, the
 		// rule the text writer got in #2811).
+		// The switch goes back whether or not the reader's own hooks remain:
+		// with an entry left the restore was skipped, and a hook the reader
+		// had switched off ran once deja was gone (#3204).
+		// No record means deja set the switch on a file that had none: the
+		// key goes, entries or not — what the JSONC writer does.
+		if was := hookSwitchWas(path); was == nil {
+			delete(internal, "enabled")
+		} else {
+			internal["enabled"] = was
+		}
+		forgetHookSwitch(path)
 		if len(entries) == 0 {
 			delete(internal, "entries")
-			if was := hookSwitchWas(path); was == nil {
-				delete(internal, "enabled")
-			} else {
-				internal["enabled"] = was
-			}
-			forgetHookSwitch(path)
 		}
 		if len(internal) == 0 {
 			delete(hooks, "internal")

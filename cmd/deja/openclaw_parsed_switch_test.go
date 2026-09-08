@@ -37,6 +37,19 @@ func TestTheParsedPathGivesBackASwitchTheReaderSet(t *testing.T) {
 			start: map[string]any{},
 			want:  nil,
 		},
+		{
+			// The reader's own hook stays, and so must their switch: with an
+			// entry left behind the restore was skipped and their hook, which
+			// they had off, ran after deja was gone (#3204).
+			name:  "the reader had no switch and keeps a hook of their own",
+			start: map[string]any{"hooks": map[string]any{"internal": map[string]any{"entries": map[string]any{"theirs": map[string]any{"enabled": true}}}}},
+			want:  nil,
+		},
+		{
+			name:  "the reader had it off and keeps a hook of their own",
+			start: map[string]any{"hooks": map[string]any{"internal": map[string]any{"enabled": false, "entries": map[string]any{"theirs": map[string]any{"enabled": true}}}}},
+			want:  false,
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			hermeticEnv(t)
