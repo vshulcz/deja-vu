@@ -77,6 +77,24 @@ func LoadAider() []model.Session {
 
 const aiderSessionMark = "# aider chat started at "
 
+// aiderSlashCommand reports whether a logged input line is one of aider's own
+// commands: a slash, a bare word, then the end of the line or a space.
+func aiderSlashCommand(t string) bool {
+	if !strings.HasPrefix(t, "/") {
+		return false
+	}
+	word := strings.TrimPrefix(strings.Fields(t)[0], "/")
+	if word == "" {
+		return false
+	}
+	for _, r := range word {
+		if (r < 'a' || r > 'z') && r != '-' {
+			return false
+		}
+	}
+	return true
+}
+
 func ParseAiderFile(path string) ([]model.Session, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -152,11 +170,19 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		}
 		switch {
 		case strings.HasPrefix(line, "#### "):
+			t := strings.TrimPrefix(line, "#### ")
+			// aider logs its own commands the same way — `/undo`, `/clear`,
+			// `/add x` — and they are not the person's question; a message
+			// that merely opens with a path ("/etc/hosts is wrong") is (#3248).
+			if aiderSlashCommand(t) {
+				flush()
+				role = ""
+				continue
+			}
 			if role != "user" {
 				flush()
 				role = "user"
 			}
-			t := strings.TrimPrefix(line, "#### ")
 			if t == "<blank>" {
 				t = ""
 			}
