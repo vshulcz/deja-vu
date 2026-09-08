@@ -309,22 +309,30 @@ func rememberSnapshot(bak string) {
 // the resolved one while the caller here still holds the name it was given
 // (review of #3340).
 func snapshotTaken(path string) bool {
-	names := []string{path + ".bak"}
-	// The directory rather than the file: by the time an uninstall asks, the
-	// file it is removing may already be gone, and EvalSymlinks needs
-	// something that still exists.
-	if dir, err := filepath.EvalSymlinks(filepath.Dir(path)); err == nil {
-		if resolved := filepath.Join(dir, filepath.Base(path)); resolved != path {
-			names = append(names, resolved+".bak")
-		}
-	}
+	want := canonicalSnapshotPath(path + ".bak")
 	st := readWiringState()
-	for _, bak := range names {
-		if slices.Contains(snapshotsByThisRun, bak) || slices.Contains(st.Snapshots, bak) {
-			return true
+	for _, list := range [][]string{snapshotsByThisRun, st.Snapshots} {
+		for _, bak := range list {
+			if bak == path+".bak" || canonicalSnapshotPath(bak) == want {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// canonicalSnapshotPath is a snapshot's name with its directory resolved, so
+// the two spellings of one file meet. Resolution only runs forwards — nothing
+// recovers which link pointed at a real directory — so both sides are put in
+// the same form rather than one being converted into the other (review of
+// #3340). A directory that is already gone resolves to itself, which is the
+// uninstall's own case and is why the file itself is never resolved.
+func canonicalSnapshotPath(bak string) string {
+	dir, err := filepath.EvalSymlinks(filepath.Dir(bak))
+	if err != nil {
+		return bak
+	}
+	return filepath.Join(dir, filepath.Base(bak))
 }
 
 func wiringCreated(path string) bool {

@@ -190,9 +190,13 @@ func TestUninstallDropsASnapshotRecordedUnderTheOtherSpelling(t *testing.T) {
 	if err := os.WriteFile(viaLink, []byte(own), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := writeIfChanged(viaLink, []byte(own), []byte(own+"# again\n")); err != nil {
+	if err := os.WriteFile(viaLink+".bak", []byte(own), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The record holds the link spelling, which is what an older deja wrote
+	// and what any write that did not resolve the path leaves behind.
+	snapshotsByThisRun = nil
+	rememberSnapshot(viaLink + ".bak")
 
 	// The uninstall arrives with the real path, not the link.
 	viaReal := filepath.Join(real, "cordis.patch.yml")
