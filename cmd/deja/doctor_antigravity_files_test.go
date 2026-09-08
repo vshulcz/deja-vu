@@ -62,3 +62,47 @@ func TestDoctorNamesAnUnreadAntigravityTranscriptButNotItsBookkeeping(t *testing
 		t.Errorf("row = %q, want it to name the transcript deja did not read", got)
 	}
 }
+
+// The two shapes the first cut swallowed: a transcript restored beside the
+// conversations rather than inside one, and a session whose only artefact is
+// the full log — the row said nothing about either (review of #3377).
+func TestDoctorNamesAnAntigravityTranscriptInTheWrongPlace(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "antigravity")
+	logs := filepath.Join(root, "brain", "sessA", ".system_generated", "logs")
+	onlyFull := filepath.Join(root, "brain", "sessB", ".system_generated", "logs")
+	restored := filepath.Join(root, "restored_backup")
+	for _, d := range []string{logs, onlyFull, restored, filepath.Join(root, "cache")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
+
+	line := `{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","created_at":"2026-07-08T14:18:27Z","content":"<USER_REQUEST>\nwhy does the retry loop drop the last attempt\n</USER_REQUEST>"}`
+	write := func(path string) {
+		t.Helper()
+		if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(logs, "transcript.jsonl"))
+	write(filepath.Join(logs, "transcript_full.jsonl")) // the second copy: not a loss
+	write(filepath.Join(onlyFull, "transcript_full.jsonl"))
+	write(filepath.Join(restored, "transcript.jsonl"))
+	if err := os.WriteFile(filepath.Join(root, "settings.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	doctorHarnesses(&buf, t.TempDir())
+	for _, l := range strings.Split(buf.String(), "\n") {
+		if strings.Contains(l, "antigravity") && strings.Contains(l, "file") {
+			if !strings.Contains(l, "2 not recognised here") {
+				t.Errorf("row = %q, want both the restored transcript and the session whose only log is the full one", l)
+			}
+			return
+		}
+	}
+	t.Fatal("no antigravity file row in the report at all")
+}
