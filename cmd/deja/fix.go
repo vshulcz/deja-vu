@@ -141,7 +141,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			if p.Candidate {
 				changed = "changed next, unconfirmed"
 			}
-			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafeLine(p.Edit))
+			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(p.Edit))
 			continue
 		}
 		ran := "ran next"
@@ -217,7 +217,7 @@ func writeFixJSON(stdout io.Writer, pairs []index.FixPair) error {
 		row := fixRowJSON{
 			Error:     search.SafeLine(p.Error),
 			Command:   search.SafeCommand(p.Command),
-			Edit:      search.SafeLine(p.Edit),
+			Edit:      search.SafePath(p.Edit),
 			Candidate: p.Candidate,
 		}
 		if !p.When.IsZero() {

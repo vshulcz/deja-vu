@@ -684,7 +684,7 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 				changed = "changed next, unconfirmed"
 			}
 			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, changed,
-				recallListingLine(p.Edit))
+				search.SafePath(p.Edit))
 			continue
 		}
 		ran := "ran next"

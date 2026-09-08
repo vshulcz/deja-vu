@@ -23,7 +23,7 @@ func editRemedyStore(t *testing.T) string {
 			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":"the pool test keeps failing"}}`,
 			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","id":"t` + id + `","input":{"command":"go test ./internal/pool"}}]}}`,
 			`{"type":"user","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t` + id + `","content":"--- FAIL: TestPoolDrainsOnClose (0.09s)"}]}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","id":"x` + id + `","input":{"file_path":"/tmp/app/internal/pool/pool.go","old_string":"close(c)","new_string":"c.drain()"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","timestamp":"` + at + `","cwd":"/tmp/app","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","id":"x` + id + `","input":{"file_path":"/tmp/app/internal/two  spaces/pool.go","old_string":"close(c)","new_string":"c.drain()"}}]}}`,
 		})
 	}
 	dir := index.DefaultDir()
@@ -33,6 +33,7 @@ func editRemedyStore(t *testing.T) string {
 	return dir
 }
 
+// The path keeps its spacing (#2044): a file is named, not read aloud.
 // The edit remedy reached the terminal `fix` only: --json printed an empty
 // command and no file, and the MCP fix mode printed "ran next:" with nothing
 // after it (#3261).
@@ -54,7 +55,7 @@ func TestFixJSONCarriesTheEditRemedy(t *testing.T) {
 	if len(got.Fixes) == 0 {
 		t.Fatalf("no fixes:\n%s", out)
 	}
-	if got.Fixes[0].Edit != "/tmp/app/internal/pool/pool.go" || got.Fixes[0].Command != "" {
+	if got.Fixes[0].Edit != "/tmp/app/internal/two  spaces/pool.go" || got.Fixes[0].Command != "" {
 		t.Errorf("row = %+v, want the edited file and no command", got.Fixes[0])
 	}
 }
@@ -65,7 +66,7 @@ func TestMCPFixNamesTheFileThatChangedNext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fix: %v", err)
 	}
-	if !strings.Contains(got, "changed next: /tmp/app/internal/pool/pool.go") {
+	if !strings.Contains(got, "changed next: /tmp/app/internal/two  spaces/pool.go") {
 		t.Errorf("the answer does not name the file:\n%s", got)
 	}
 	if strings.Contains(got, "ran next") {
