@@ -402,9 +402,13 @@ func isFriction(l string) bool {
 	// not always the first word: `D1_ERROR: …`, `sqlite3.OperationalError: …`,
 	// `Parse error: …`. Requiring the line to *open* with "error" dropped all
 	// three and still let "Error handling for missing tables…" through
-	// (second review of #3373).
-	if strings.Contains(low, "no such table") &&
-		(noSuchTableRE.MatchString(low) || strings.Contains(low, "error:")) {
+	// (second review of #3373). The colon alone is not enough either: a
+	// sentence can end a clause on one — "there is no such table: the schema
+	// only has runs" — so the line either opens with the phrase, which is how
+	// the bare driver line arrives, or carries the marker somewhere in it
+	// (third review).
+	if noSuchTableRE.MatchString(low) &&
+		(strings.HasPrefix(low, "no such table:") || strings.Contains(low, "error")) {
 		return true
 	}
 	return false

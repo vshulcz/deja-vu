@@ -44,6 +44,7 @@ func TestNoSuchTableNeedsTheServersOwnShape(t *testing.T) {
 		"sqlite3.OperationalError: no such table: users",
 		"Parse error: no such table: x",
 		"no such table: users",
+		"SQL logic error: no such table: main.sessions",
 	} {
 		if _, ok := FrictionLine(wall); !ok {
 			t.Errorf("not read as friction: %q", wall)
@@ -53,6 +54,10 @@ func TestNoSuchTableNeedsTheServersOwnShape(t *testing.T) {
 		"there is no such table in the spec, so I improvised one",
 		"we have no such table yet — add a migration",
 		"Error handling for missing tables is not written yet, so no such table checks run",
+		// A sentence can end a clause on a colon too, and what follows is not
+		// a table name (third review).
+		"I checked and there is no such table: the schema only has runs",
+		"the docs say: no such table exists for this mapping",
 	} {
 		if _, ok := FrictionLine(prose); ok {
 			t.Errorf("a sentence about tables is read as an error: %q", prose)
