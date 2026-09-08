@@ -130,7 +130,12 @@ func stripSelfRecall(text string) string {
 		text = unwrapBlock(text, m[0], m[1])
 	}
 	text = stripInjectedPrefixes(text)
-	return stripInjectedLines(text)
+	text = stripInjectedLines(text)
+	// Removing a block or unwrapping a tag leaves the newline that separated it
+	// from the words: every Cursor turn was indexed with a blank line ahead of
+	// the question, because the stamp above it and the wrapper around it each
+	// left one (#3357). The paragraph breaks inside what a person wrote stay.
+	return strings.Trim(text, "\n")
 }
 
 // stripInjectedLines drops lines that are entirely a harness marker. The line
