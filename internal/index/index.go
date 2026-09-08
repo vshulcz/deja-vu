@@ -124,7 +124,9 @@ import (
 // (#3281), Grok's tool input (#3285), Antigravity's edits (#3279), Zed's
 // tool results (#3291), Gemini's toolCalls (#3293), Roo and legacy Cline's
 // tool calls (#3295), opencode's synthetic parts (#3299) and subagent parents
-// (#3301), Copilot's injected skills (#3305). A store
+// (#3301), Copilot's injected skills (#3305), aider's banner and its
+// continuation lines (#3311), opencode's own session titles (#3315),
+// Antigravity's plan approvals (#3326). A store
 // built before holds skill bodies as the person's words and none of the new
 // tool output, and nothing re-reads a source without the bump (#3289).
 const version = 35
