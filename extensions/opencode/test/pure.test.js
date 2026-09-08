@@ -159,6 +159,10 @@ test("mcpWired reads the entry the installer writes, comments and all", () => {
 }`
   assert.equal(mcpWired(config), true)
   assert.equal(mcpWired(`{"mcp": {"other": {}}}`), false)
+  // opencode keeps a switched-off server in the file; switched off, it offers
+  // nothing, so the package's tools are not a second copy (#3193).
+  assert.equal(mcpWired(`{"mcp": {"deja": {"type": "local", "command": ["deja", "mcp"], "enabled": false}}}`), false)
+  assert.equal(mcpWired(`{"mcp": {"deja": {"type": "local", "command": ["deja", "mcp"], "enabled": true}}}`), true)
   assert.equal(mcpWired("{}"), false)
   assert.equal(mcpWired("not json"), false)
   assert.equal(mcpWired(""), false)

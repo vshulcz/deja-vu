@@ -65,7 +65,10 @@ export function configPaths(env, home) {
 export function mcpWired(text) {
   try {
     const config = JSON.parse(stripJSONComments(String(text || "")))
-    return Boolean(config && config.mcp && config.mcp.deja)
+    const entry = config && config.mcp && config.mcp.deja
+    // A server kept in the file but switched off offers nothing, so the
+    // tools here are not a second copy of it.
+    return Boolean(entry) && entry.enabled !== false
   } catch {
     return false
   }
