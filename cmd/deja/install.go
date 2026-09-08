@@ -27,6 +27,15 @@ type installResult struct {
 	// about, could not act on, and left as it found it. Empty in every ordinary
 	// case, so a printer can append it blind (#2218).
 	Note string
+	// also holds the other files an -auto target changed in the same run;
+	// the printer folds them into Note, the kept-snapshot line needs the paths.
+	also []string
+}
+
+// touched is every file this result changed: the one it is named for and the
+// ones that rode along in the note (#3171).
+func (r installResult) touched() []string {
+	return append([]string{r.Path}, r.also...)
 }
 
 func runInstall(dir string, args []string, uninstall bool) error {
@@ -204,7 +213,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				pruneGuidanceDirs(cr.Path)
 			}
 		}
-		touchedPaths = append(touchedPaths, r.Path)
+		touchedPaths = append(touchedPaths, r.touched()...)
 		if banner {
 			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note})
 		} else {
@@ -805,6 +814,7 @@ func wroteAll(rs ...installResult) installResult {
 			continue
 		}
 		also = append(also, fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path)))
+		out.also = append(out.also, r.Path)
 	}
 	for _, line := range also {
 		if out.Note != "" {
