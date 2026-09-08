@@ -24,7 +24,8 @@ func TestUninstallDropsASnapshotThatIsOnlyDejas(t *testing.T) {
 	}
 
 	removingWiring = true
-	defer func() { removingWiring = false }()
+	createdByThisRun = append(createdByThisRun, path)
+	defer func() { removingWiring = false; createdByThisRun = nil }()
 
 	got, err := writeIfChanged(path, []byte(own), nil)
 	if err != nil {
@@ -59,6 +60,36 @@ func TestUninstallKeepsASnapshotThatIsTheReadersOwn(t *testing.T) {
 	b, err := os.ReadFile(path + ".bak")
 	if err != nil {
 		t.Fatalf("the reader's own snapshot was deleted: %v", err)
+	}
+	if !strings.Contains(string(b), "something-of-mine") {
+		t.Errorf("snapshot = %q, want the reader's own config", b)
+	}
+}
+
+// And the guard on that: a config the reader wrote themselves is not deja's to
+// delete, whatever its snapshot happens to say. mentionsDeja matches a comment
+// with the word in it, so on a file deja never created the snapshot stays
+// (review of #3340).
+func TestUninstallKeepsASnapshotBesideAFileDejaDidNotCreate(t *testing.T) {
+	tmp := t.TempDir()
+	path := filepath.Join(tmp, "cordis.patch.yml")
+	if err := os.WriteFile(path, []byte("# deja mcp:start\n- insert: []\n# deja mcp:end\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	theirs := "# my note: I looked at \"deja\" last year\nplugins:\n  - name: something-of-mine\n"
+	if err := os.WriteFile(path+".bak", []byte(theirs), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	removingWiring = true
+	defer func() { removingWiring = false }()
+
+	if _, err := writeIfChanged(path, []byte("x"), nil); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path + ".bak")
+	if err != nil {
+		t.Fatalf("a snapshot beside a file deja never created was deleted: %v", err)
 	}
 	if !strings.Contains(string(b), "something-of-mine") {
 		t.Errorf("snapshot = %q, want the reader's own config", b)

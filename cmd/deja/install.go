@@ -1264,7 +1264,15 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return "", err
 			}
-			dropOwnBackup(path)
+			// Only when deja made the file. mentionsDeja is a content guess and
+			// a loose one — a reader's own config that says the word, or their
+			// own snapshot of an older deja block, matches it — which is fine
+			// for deciding whether a file may be overwritten and not for
+			// deciding whether one may be deleted. On a file deja created
+			// there is nothing of theirs beside it to lose (review of #3340).
+			if wiringCreated(path) {
+				dropOwnBackup(path)
+			}
 			return "removed", nil
 		}
 		// The same rule for the structured writers, which never reach zero
