@@ -117,7 +117,6 @@ var unwrapBlocks = [][2]string{
 // to a real user turn, so dropping the whole message would lose the question
 // that prompted the session.
 func stripSelfRecall(text string) string {
-	original := text
 	for _, m := range selfRecallMarkers {
 		text = stripBetween(text, m[0], m[1])
 	}
@@ -131,18 +130,7 @@ func stripSelfRecall(text string) string {
 		text = unwrapBlock(text, m[0], m[1])
 	}
 	text = stripInjectedPrefixes(text)
-	text = stripInjectedLines(text)
-	if text == original {
-		// Nothing was taken out, so nothing here is an artefact of taking it:
-		// a message that opens or closes with a blank line on purpose — a code
-		// block, a pasted diff — keeps it (review of #3357).
-		return text
-	}
-	// Removing a block or unwrapping a tag leaves the newline that separated it
-	// from the words: every Cursor turn was indexed with a blank line ahead of
-	// the question, because the stamp above it and the wrapper around it each
-	// left one (#3357).
-	return strings.Trim(text, "\n")
+	return stripInjectedLines(text)
 }
 
 // stripInjectedLines drops lines that are entirely a harness marker. The line
@@ -171,7 +159,10 @@ func stripInjectedLines(text string) string {
 func stripInjectedPrefixes(text string) string {
 	for again := true; again; {
 		again = false
-		trimmed := strings.TrimSpace(text)
+		// Only the head is trimmed for the match. Trimming both ends here took
+		// the blank line an author left after their own paste, at the far end
+		// of a message whose head happened to carry a block (review of #3357).
+		trimmed := strings.TrimLeft(text, " \t\n")
 		if rest, ok := stripAgentsBlock(trimmed); ok {
 			text, again = rest, true
 			continue
@@ -184,7 +175,12 @@ func stripInjectedPrefixes(text string) string {
 			if !ok {
 				continue
 			}
-			text = trimmed[end:]
+			// The newline the block left behind goes with it, and only that
+			// one: every Cursor turn opened on a blank line because the stamp
+			// above the question left its own break (#3357). Trimming the
+			// whole message instead ate blank lines an author wrote at the
+			// far end, which is action at a distance (review of #3357).
+			text = strings.TrimLeft(trimmed[end:], "\n")
 			again = true
 			break
 		}
@@ -249,7 +245,10 @@ func unwrapBlock(text, open, close string) string {
 		if end < 0 {
 			return text
 		}
-		text = text[:start] + rest[:end] + rest[end+len(close):]
+		// A wrapper writes its own line breaks around what a person typed:
+		// Cursor's <user_query> puts the question on its own line. Those two
+		// belong to the tags, not to the words.
+		text = text[:start] + strings.Trim(rest[:end], "\n") + rest[end+len(close):]
 	}
 }
 

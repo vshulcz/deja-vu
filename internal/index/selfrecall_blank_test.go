@@ -27,3 +27,25 @@ func TestStripSelfRecallLeavesAnUntouchedMessageAlone(t *testing.T) {
 		t.Errorf("stripSelfRecall = %q, want the message unchanged — nothing was stripped from it", got)
 	}
 }
+
+// The trim belongs where the removal happened. Trimming the whole message
+// instead ate what an author wrote at the far end — a blank line after their
+// pasted diff — and made a message's edges depend on whether a marker fired
+// somewhere else entirely (second review of #3357).
+func TestStripSelfRecallTrimsOnlyWhereItCut(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{
+			"<timestamp>Sunday, Jul 26, 2026, 1:06 PM</timestamp>\n\nhere is my diff:\n\n```\n+foo\n```\n\n",
+			"here is my diff:\n\n```\n+foo\n```\n\n",
+		},
+		{
+			"\n\nfirst paragraph\n\n<system-reminder>noise</system-reminder>\n\nsecond paragraph\n\n",
+			"\n\nfirst paragraph\n\n\n\nsecond paragraph\n\n",
+		},
+	}
+	for _, c := range cases {
+		if got := stripSelfRecall(c.in); got != c.want {
+			t.Errorf("stripSelfRecall(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
