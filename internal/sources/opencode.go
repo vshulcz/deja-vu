@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -430,4 +431,16 @@ func withStderr(err error, buf *bytes.Buffer) error {
 		msg = strings.TrimSpace(msg[:sqliteStderrMax]) + "…"
 	}
 	return fmt.Errorf("%s (%w)", msg, err)
+}
+
+// ExitStderrLine is the first line sqlite3 wrote to stderr before it exited,
+// or "" when the error carries none: "database is locked" says more than
+// "exit status 5".
+func ExitStderrLine(err error) string {
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		return ""
+	}
+	line := strings.TrimSpace(strings.SplitN(string(ee.Stderr), "\n", 2)[0])
+	return line
 }

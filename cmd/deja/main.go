@@ -3094,8 +3094,11 @@ func printSources(dir string) {
 	// A store sqlite could not open — locked past the timeout, or a file the
 	// reader may not open — looked like one nobody had used, the shape #1000
 	// fixed for the file stores (#3190).
-	if countErr != nil {
+	if countErr != nil && sources.SQLite3Available() {
 		reason := "sqlite3: " + countErr.Error()
+		if line := sources.ExitStderrLine(countErr); line != "" {
+			reason = "sqlite3: " + line
+		}
 		if f, err := os.Open(sources.OpencodeDB()); err != nil {
 			reason = err.Error()
 		} else {
