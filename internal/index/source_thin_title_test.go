@@ -1,6 +1,7 @@
 package index
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -75,5 +76,46 @@ func TestACJKTitleThatSaysSomethingIsNotThin(t *testing.T) {
 	s.ID = "cjk2"
 	if got := metaForSession(s).Title; got == "你好" {
 		t.Errorf("title = %q, want the turn under a two-character greeting", got)
+	}
+}
+
+// Korean writes its words apart, so a one-word acknowledgement is thin the way
+// "ok" is, and a sentence in it is not (review of #3328).
+func TestKoreanIsCountedByItsWordsNotItsSyllables(t *testing.T) {
+	at := time.Date(2026, 9, 2, 20, 23, 0, 0, time.UTC)
+	s := model.Session{
+		Harness: "opencode", Project: "api", ID: "ko1", Title: "고마워",
+		Messages: []model.Message{
+			{Role: "user", Text: "the checkout worker drops connections under load", Time: at},
+		},
+	}
+	if got := metaForSession(s).Title; got != "the checkout worker drops connections under load" {
+		t.Errorf("title = %q, want the question — a one-word thanks names nothing", got)
+	}
+	s.Title = "결제 워커가 연결을 끊는 이유"
+	s.ID = "ko2"
+	if got := metaForSession(s).Title; got != "결제 워커가 연결을 끊는 이유" {
+		t.Errorf("title = %q, want the store's own name — it is a whole sentence", got)
+	}
+}
+
+// The turn that takes over must be something a person said. A resume preamble
+// is the harness's, and notAsked has rejected it for the repeat counter all
+// along (review of #3328).
+func TestAWidenedTitleIsNeverTheHarnessOwnPreamble(t *testing.T) {
+	at := time.Date(2026, 9, 2, 20, 23, 0, 0, time.UTC)
+	s := model.Session{
+		Harness: "deepseek", Project: "api", ID: "pre1", Title: "ok",
+		Messages: []model.Message{
+			{Role: "user", Text: "This session is being continued from a previous conversation that ran out of context. The conversation is summarized below:", Time: at},
+			{Role: "user", Text: "cap the retries at three and log the last attempt", Time: at.Add(time.Minute)},
+		},
+	}
+	got := metaForSession(s).Title
+	if strings.Contains(got, "This session is being continued") {
+		t.Errorf("title = %q, want the person's own turn", got)
+	}
+	if got != "cap the retries at three and log the last attempt" {
+		t.Errorf("title = %q, want the sentence under the preamble", got)
 	}
 }

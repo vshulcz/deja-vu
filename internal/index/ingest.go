@@ -2204,7 +2204,11 @@ func titleWords(t string) int {
 	words, inWord := 0, false
 	for _, r := range t {
 		switch {
-		case cjkfold.Unspaced(r):
+		// Hangul is in cjkfold's CJK set because that is what folds, but Korean
+		// writes its words apart like Latin does: counting each syllable as a
+		// word made "고마워" — one word, three syllables — look substantial and
+		// left it as a session's name (review of #3328).
+		case cjkfold.Unspaced(r) && !unicode.Is(unicode.Hangul, r):
 			words++
 			inWord = false
 		case unicode.IsSpace(r):
@@ -2250,9 +2254,12 @@ func nextSubstantialTitle(ms []model.Message, skip string) string {
 // slash command's expansion, a task notification, the compaction caveat — and
 // naming a session after one of those is how the titles in #636 happened.
 func titleWorthy(t string) bool {
-	return t != "" && !strings.HasPrefix(t, "<local-command") && !strings.HasPrefix(t, "<command-") &&
-		!strings.HasPrefix(t, "<task-notification") && !strings.HasPrefix(t, "<teammate-message") &&
-		!strings.HasPrefix(t, "Caveat:")
+	// The same list the repeat-question counter rejects: the two were written
+	// apart and drifted, so a session whose store title was thin could be
+	// renamed after a resume preamble — "This session is being continued from a
+	// previous conversation…" — which notAsked has rejected all along (review
+	// of #3328).
+	return strings.TrimSpace(t) != "" && !notAsked(t)
 }
 
 // widenThinSourceTitle gives a name too short to name anything way to the
