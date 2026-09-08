@@ -40,8 +40,16 @@ export function argv(cmd, flags, text) {
 }
 
 // sessionKey is what per-prompt recall dedups on: a hit shown once in a
-// session is not shown again. Without one it repeats itself every message.
-// Same order as the extension `deja install pi-auto` writes.
+// session is not shown again. Without one it repeats itself every message —
+// which it did, because pi keeps the id on ctx.sessionManager and nowhere the
+// event or ctx.session shapes below look (#3179). The manager first, the same
+// order as the extension `deja install pi-auto` writes; the rest for hosts
+// that put an id on the event.
 export function sessionKey(event, ctx) {
+  try {
+    const m = ctx && ctx.sessionManager
+    const id = m && (typeof m.getSessionId === "function" ? m.getSessionId() : m.sessionId)
+    if (id) return String(id)
+  } catch {}
   return (event && (event.sessionId || event.session_id)) || (ctx && ctx.session && ctx.session.id) || ""
 }
