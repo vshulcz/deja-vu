@@ -88,7 +88,7 @@ func aiderSlashCommand(t string) bool {
 		return false
 	}
 	for _, r := range word {
-		if !(r >= 'a' && r <= 'z' || r == '-') {
+		if (r < 'a' || r > 'z') && r != '-' {
 			return false
 		}
 	}
