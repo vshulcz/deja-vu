@@ -37,16 +37,28 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 	// runner busy with the rest of the suite stretches such a sample by more
 	// than the bar below allows — the same flake #2193 caught in the usage
 	// package. The minimum is the run that was not interrupted.
+	//
+	// Each round times a batch rather than one call. Windows' clock ticks in
+	// milliseconds, so a single enumeration measured as exactly 0 there: the
+	// bar below collapsed to its own slack and `main` went red on an answer
+	// that took 2.0169ms. A batch lifts both sides above the tick, and the
+	// ratio then means what it says on every platform.
+	const batch = 20
 	enumerate, asked := time.Duration(1<<62-1), time.Duration(1<<62-1)
 	var checks []doctorStoreCheck
 	for round := 0; round < 3; round++ {
 		start := time.Now()
-		checks = doctorStoreChecks()
+		for i := 0; i < batch; i++ {
+			checks = doctorStoreChecks()
+		}
 		if took := time.Since(start); took < enumerate {
 			enumerate = took
 		}
+		answer := false
 		start = time.Now()
-		answer := noAgentHistoryFound()
+		for i := 0; i < batch; i++ {
+			answer = noAgentHistoryFound()
+		}
 		if took := time.Since(start); took < asked {
 			asked = took
 		}
@@ -54,13 +66,17 @@ func TestTheEmptyScreenDoesNotParseEveryStore(t *testing.T) {
 			t.Fatal("the fixture has history, so this measures nothing")
 		}
 	}
+	if enumerate <= 0 {
+		t.Fatalf("%d enumerations measured as %v: the clock cannot resolve this and the ratio below means nothing", batch, enumerate)
+	}
 	// Four times the enumeration, plus a millisecond or two of slack for a
 	// loaded runner: far above the spread between runs, far below the cost of
 	// reading and parsing a store's newest file.
 	if asked > 4*enumerate+2*time.Millisecond {
-		t.Errorf("the question took %v against %v to enumerate the stores: it is parsing them", asked, enumerate)
+		t.Errorf("the question took %v against %v to enumerate the stores %d times: it is parsing them",
+			asked, enumerate, batch)
 	}
-	t.Logf("enumerate %v, answer %v (%d stores)", enumerate, asked, len(checks))
+	t.Logf("%d rounds: enumerate %v, answer %v (%d stores)", batch, enumerate, asked, len(checks))
 
 	if _, err := os.Stat(filepath.Join(claude, "-app")); err != nil {
 		t.Fatal(err)
