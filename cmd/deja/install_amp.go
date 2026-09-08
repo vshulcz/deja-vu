@@ -136,7 +136,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (amp: any) {
-  let injected = false
+  // The thread that has had its digest. Amp keeps one process across threads,
+  // and a flag set once per process left every thread after the first with no
+  // memory (#3263).
+  let injected = ""
   // Amp's events carry the thread, and the thread id is what recall dedupes on:
   // without it the same block goes out on every message of the session.
   let thread = ""
@@ -162,8 +165,8 @@ export default function (amp: any) {
   amp.on("agent.start", async (event: any, ctx: any) => {
     try {
       const id = threadID(event)
-      if (!injected) {
-        injected = true
+      if (injected !== (id || "*")) {
+        injected = id || "*"
         const raw = run(["hook-context"], "")
         let digest = raw
         let receipt = ""
