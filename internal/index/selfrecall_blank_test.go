@@ -18,3 +18,12 @@ func TestStripSelfRecallLeavesNoBlankLineWhereABlockWas(t *testing.T) {
 		t.Errorf("stripSelfRecall = %q — a stamp that is not the head of the message is prose", got)
 	}
 }
+
+// And nothing is trimmed from a message the cleaning did not touch: a code
+// block that opens and closes with a blank line keeps both (review of #3357).
+func TestStripSelfRecallLeavesAnUntouchedMessageAlone(t *testing.T) {
+	in := "\n\n```\n\nfunc foo() {}\n```\n\n"
+	if got := stripSelfRecall(in); got != in {
+		t.Errorf("stripSelfRecall = %q, want the message unchanged — nothing was stripped from it", got)
+	}
+}

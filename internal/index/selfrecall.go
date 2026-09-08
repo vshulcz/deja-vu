@@ -117,6 +117,7 @@ var unwrapBlocks = [][2]string{
 // to a real user turn, so dropping the whole message would lose the question
 // that prompted the session.
 func stripSelfRecall(text string) string {
+	original := text
 	for _, m := range selfRecallMarkers {
 		text = stripBetween(text, m[0], m[1])
 	}
@@ -131,10 +132,16 @@ func stripSelfRecall(text string) string {
 	}
 	text = stripInjectedPrefixes(text)
 	text = stripInjectedLines(text)
+	if text == original {
+		// Nothing was taken out, so nothing here is an artefact of taking it:
+		// a message that opens or closes with a blank line on purpose — a code
+		// block, a pasted diff — keeps it (review of #3357).
+		return text
+	}
 	// Removing a block or unwrapping a tag leaves the newline that separated it
 	// from the words: every Cursor turn was indexed with a blank line ahead of
 	// the question, because the stamp above it and the wrapper around it each
-	// left one (#3357). The paragraph breaks inside what a person wrote stay.
+	// left one (#3357).
 	return strings.Trim(text, "\n")
 }
 
