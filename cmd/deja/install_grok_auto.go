@@ -48,6 +48,15 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
+		if uninstall {
+			// A file deja cannot read is still one the uninstall has to take,
+			// or grok keeps calling a binary wired nowhere else — the contract
+			// TestUninstallStillTakesAHookFileTheInstallWouldRefuse pins.
+			if rerr := os.Remove(path); rerr != nil {
+				return installResult{}, rerr
+			}
+			return installResult{Path: path, Action: "removed"}, nil
+		}
 		return installResult{}, configParseError(path, err)
 	}
 	if uninstall {
