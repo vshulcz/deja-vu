@@ -221,6 +221,10 @@ type promptReport struct {
 	// the whole corpus turned against itself, and it grows whenever a chain is
 	// added.
 	CrossPaired promptArmReport `json:"cross_paired"`
+	// The marathon that also decides things, in the project it shares with the
+	// sessions that settled what is being asked. Correct is the short session;
+	// a fire on the long one is the shape #3214 measured on a real index.
+	SpecificVsMarathon promptArmReport `json:"specific_vs_marathon"`
 	// Every question of the corpus asked at home with a paste above it — a repo
 	// listing, a set of @file mentions, a stack trace. The six terms are spent
 	// before the question is reached unless the extractor reads the question
@@ -329,7 +333,8 @@ func measurePrompt(seed int64) (promptReport, error) {
 		}
 		// Filler that only exists to fill the bucket has no question of its
 		// own; it is asked about through the bucket-answer chain below.
-		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" || chain.Kind == "concluded-noise" || chain.Kind == "background" {
+		if chain.Kind == "bucket" || chain.Kind == "haystack-noise" || chain.Kind == "concluded-noise" || chain.Kind == "marathon-vs-noise" ||
+			chain.Kind == "background" {
 			continue
 		}
 		terms := prompt.Terms(chain.Question)
@@ -377,6 +382,11 @@ func measurePrompt(seed int64) (promptReport, error) {
 				report.Decision.Fired++
 				report.Decision.Correct++
 			}
+		case "marathon-vs":
+			// Which session is served, not whether the words are in the block:
+			// the long one holds the topic too, so a text test cannot tell the
+			// two apart. Correct is the chain's own session ranking first.
+			arm = &report.SpecificVsMarathon
 		case "concluded":
 			arm = &report.Concluded
 			arm.Cases++
@@ -523,6 +533,12 @@ func measurePrompt(seed int64) (promptReport, error) {
 			if chain.Kind == "bucket-answer" {
 				arm.FalseFires++
 			}
+			// The long session in the same project is not an answer either:
+			// the arm exists to count the times it takes the place of the one
+			// that settled the question (#3214).
+			if chain.Kind == "marathon-vs" && !correct {
+				arm.FalseFires++
+			}
 		}
 		if correct {
 			arm.Correct++
@@ -622,6 +638,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Decision, nil)
 	finishPromptArm(&report.DecisionInline, nil)
 	finishPromptArm(&report.Concluded, nil)
+	finishPromptArm(&report.SpecificVsMarathon, nil)
 	finishPromptArm(&report.ShortSubject, nil)
 	finishPromptArm(&report.Echo, nil)
 	finishPromptArm(&report.Compound, nil)

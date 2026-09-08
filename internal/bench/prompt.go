@@ -548,6 +548,77 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			}},
 		})
 	}
+	// The marathon that also decides things. The haystack above only mentions
+	// its topics in passing, which is the easy half; on a real index the
+	// sessions that win are the long ones that discussed the same subjects and
+	// settled things about them — on ten questions phrased from last week's PR
+	// titles, two were topped by one of the three biggest sessions rather than
+	// by the session that did the work (#3214).
+	//
+	// One project, so project scope cannot separate them: one long session that
+	// says every topic over and over and concludes something adjacent about
+	// each, against four short sessions that each settled the thing being
+	// asked about. Correct is the short one.
+	// paraphrase carries the noun the question uses beside the subject, so the
+	// long session below can repeat both.
+	marathonTopics := []promptTopic{
+		{"wheatear", "wheatear retries stop after the second timeout",
+			"what did we decide about wheatear retries", "retries"},
+		{"samphire", "samphire uploads are chunked at eight megabytes",
+			"what did we decide about samphire uploads", "uploads"},
+		{"brambling", "brambling reads come from the follower now",
+			"what did we decide about brambling reads", "reads"},
+		{"chicory", "chicory tokens are rotated every sunday",
+			"what did we decide about chicory tokens", "tokens"},
+	}
+	const marathonProject = "promptbenchmarathonvs"
+	marathonStart := base.Add(3300 * time.Minute)
+	var longSession []model.Message
+	for k := 0; k < 90; k++ {
+		at := marathonStart.Add(time.Duration(k) * time.Minute)
+		longSession = append(longSession,
+			model.Message{Role: "user", Text: fillerText(rng, "another pass over the same branch"), Time: at},
+			model.Message{Role: "assistant", Text: fillerText(rng, "tweaked it and ran the suite again"), Time: at.Add(time.Second)})
+		for _, m := range marathonTopics {
+			// It settles something — just not the thing the question asks
+			// about, which is what makes it a competitor rather than an answer.
+			// The same words the question uses, over and over: the subject and
+			// the noun beside it. On a real index that is what the giants have
+			// — hundreds of turns sharing the vocabulary of the question —
+			// while the decision itself lives in the short session.
+			longSession = append(longSession,
+				model.Message{Role: "user",
+					Text: "where are we on " + m.word + " " + m.paraphrase,
+					Time: at.Add(2 * time.Second)},
+				model.Message{Role: "assistant",
+					Text: "we settled the " + m.word + " " + m.paraphrase + " log format today, and looked at " +
+						m.word + " again after",
+					Time: at.Add(3 * time.Second)})
+		}
+	}
+	chains = append(chains, PromptChain{
+		ID: "prompt-marathonvs-noise", Project: marathonProject, Kind: "marathon-vs-noise",
+		Sessions: []model.Session{{
+			ID: "prompt-marathonvs-noise-session", Harness: "claude", Project: marathonProject,
+			Started: marathonStart, Updated: marathonStart.Add(90 * time.Minute), Messages: longSession,
+		}},
+	})
+	for i, m := range marathonTopics {
+		id := fmt.Sprintf("prompt-marathonvs-%02d", i)
+		at := marathonStart.Add(time.Duration(-100-i*10) * time.Minute)
+		chains = append(chains, PromptChain{
+			ID: id, Project: marathonProject, Kind: "marathon-vs",
+			Topic: m.word, Question: m.question, Fact: m.fact,
+			Sessions: []model.Session{{
+				ID: id + "-session", Harness: "claude", Project: marathonProject,
+				Started: at, Updated: at.Add(4 * time.Minute),
+				Messages: []model.Message{
+					{Role: "user", Text: "what should we do about " + m.word, Time: at},
+					{Role: "assistant", Text: "the fix: " + m.fact, Time: at.Add(time.Minute)},
+				},
+			}},
+		})
+	}
 	// The short subject. Measured on a real store over the questions the user
 	// actually typed: five of the nine that recalled nothing named their
 	// subject in two characters — "как там pr, смержился?", "ну что там v3
