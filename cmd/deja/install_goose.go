@@ -535,14 +535,24 @@ func dropGooseRecallBlock(path string) error {
 	return err
 }
 
-// dropRetiredGooseHints removes the file deja used to write, once it holds
-// nothing but what deja put there.
+// dropRetiredGooseHints takes deja's block out of the file deja used to write
+// and removes the file only when nothing else was in it — the rule AGENTS.md
+// gets. It removed the file outright, and a person's own global hints went
+// with it on every turn (#3196).
 func dropRetiredGooseHints() error {
 	path := retiredGooseHintsPath()
-	if _, err := os.Stat(path); err != nil {
+	old, err := readConfig(path)
+	if err != nil || len(old) == 0 {
 		return nil
 	}
-	return os.Remove(path)
+	// What an older deja wrote there whole: the framed recall, or the line
+	// it left when there was nothing to recall. Either way the file was
+	// deja's and goes.
+	text := strings.TrimSpace(string(old))
+	if strings.HasPrefix(text, strings.TrimSpace(recallFrameHeader)) || text == "No matching history yet." {
+		return os.Remove(path)
+	}
+	return dropGooseRecallBlock(path)
 }
 
 const gooseLead = "The sessions below are from this project's recent history. " +
