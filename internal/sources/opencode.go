@@ -290,6 +290,18 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 			}
 		}
 	}
+	// opencode names every session, and for the 922 subagent runs of one real
+	// store that name is the only short thing about them — the first user line
+	// there is the whole brief (#3315). Read beside the rows, not in the main
+	// projection: a store from before the column would fail the whole query
+	// and take the harness with it.
+	if titles := opencodeTitles(db); len(titles) > 0 {
+		for i := range out {
+			if t := titles[out[i].ID]; t != "" {
+				out[i].Title = t
+			}
+		}
+	}
 	return out, nil
 }
 
@@ -402,6 +414,45 @@ func opencodeSynthetic(v any) bool {
 		return x == "1" || x == "true"
 	}
 	return false
+}
+
+// opencodeTitles maps a session id to the name opencode gave it, for the names
+// worth having. A store without the column stamps nothing.
+func opencodeTitles(db string) map[string]string {
+	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
+		`select id, title from session where title is not null and title <> ''`)
+	b, err := cmd.Output()
+	if err != nil || len(b) == 0 {
+		return nil
+	}
+	var rows []struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+	if json.Unmarshal(b, &rows) != nil {
+		return nil
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		t := strings.TrimSpace(r.Title)
+		if r.ID == "" || opencodeThinTitle(t) {
+			continue
+		}
+		out[r.ID] = t
+	}
+	return out
+}
+
+// opencodeThinTitle reports whether opencode's own name for a session says
+// less than its first line would: its "New session - <timestamp>" placeholder
+// (31 of 1472 on a real store), or a name of two words or fewer and short —
+// "done" ×12, "ok", "Greeting" ×11 there, where the first line is the better
+// name. Same shape as Continue's placeholders (#3274).
+func opencodeThinTitle(t string) bool {
+	if strings.HasPrefix(t, "New session - ") || t == "New session" {
+		return true
+	}
+	return len(strings.Fields(t)) <= 2 && len([]rune(t)) <= 12
 }
 
 // partTime prefers the part's own timestamp and falls back to the message's.
