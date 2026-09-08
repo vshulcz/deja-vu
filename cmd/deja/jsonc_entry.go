@@ -25,8 +25,7 @@ func configIsJSONC(b []byte) bool {
 	if json.Unmarshal(b, &probe) == nil {
 		return false
 	}
-	stripped := stripTrailingCommas(stripJSONComments(string(b)))
-	return json.Unmarshal([]byte(stripped), &probe) == nil
+	return json.Unmarshal([]byte(jsoncToJSON(string(b))), &probe) == nil
 }
 
 // jsoncToJSON is what a strict decoder can read of an editor's JSONC: comments
@@ -292,7 +291,7 @@ func jsoncEntryText(entry map[string]any) (string, error) {
 func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]any, uninstall bool) (installResult, error) {
 	text := string(old)
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripTrailingCommas(stripJSONComments(text))), &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(text)), &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
 	// A key that is there but holds something else — null, a list, a string.
