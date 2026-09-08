@@ -66,6 +66,17 @@ type kimiState struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// kimiPersonsOrigin reports whether a message's origin says a person wrote it:
+// kind "user" (and the user's own slash commands), or no origin at all.
+func kimiPersonsOrigin(origin any) bool {
+	o, ok := origin.(map[string]any)
+	if !ok {
+		return true
+	}
+	kind, _ := o["kind"].(string)
+	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user")
+}
+
 func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	// .../sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl
 	sessionDir := filepath.Dir(filepath.Dir(filepath.Dir(path)))
@@ -105,6 +116,14 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			}
 			role, _ := msg["role"].(string)
 			if role != "user" && role != "assistant" {
+				return
+			}
+			// Kimi appends the host's own lines under role user too — an
+			// injected reminder, a hook's wrapped stdout, a background task's
+			// notice — and names the author in origin.kind. Only the person's
+			// are user turns; a message with no origin is an older protocol's
+			// and was always the person's (#3199).
+			if role == "user" && !kimiPersonsOrigin(msg["origin"]) {
 				return
 			}
 			if role == "assistant" {
