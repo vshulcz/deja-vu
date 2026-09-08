@@ -128,3 +128,46 @@ func TestUninstallKeepsASnapshotDejaDidNotTake(t *testing.T) {
 		t.Errorf("snapshot = %q, want the reader's own file", b)
 	}
 }
+
+// The write side follows a symlink before taking the snapshot, so the record
+// holds the resolved name while the uninstall still has the one it was given —
+// on macOS every t.TempDir() path is /var, resolving to /private/var, and a
+// config in a dotfiles repository is the real-world case. Both spellings are
+// asked, or deja would keep its own snapshot forever (second review of #3340).
+func TestUninstallDropsItsOwnSnapshotThroughASymlink(t *testing.T) {
+	tmp := t.TempDir()
+	real := filepath.Join(tmp, "real")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	path := filepath.Join(link, "cordis.patch.yml")
+	own := "# deja mcp:start\n- insert:\n    - id: mcp-deja\n      command: \"deja\"\n# deja mcp:end\n"
+	// The file already holds deja's block from an earlier run, so the snapshot
+	// taken now is deja's own — the case the drop rule is about.
+	if err := os.WriteFile(path, []byte(own), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Install: the snapshot is taken through the link and recorded resolved.
+	if _, err := writeIfChanged(path, []byte(own), []byte(own+"# again\n")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path + ".bak"); err != nil {
+		t.Fatalf("install took no snapshot: %v", err)
+	}
+
+	removingWiring = true
+	createdByThisRun = append(createdByThisRun, path)
+	defer func() { removingWiring = false; createdByThisRun = nil; snapshotsByThisRun = nil }()
+
+	if _, err := writeIfChanged(path, []byte(own), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path + ".bak"); err == nil {
+		t.Error("deja kept its own snapshot because the recorded path was the resolved one")
+	}
+}

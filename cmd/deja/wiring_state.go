@@ -299,14 +299,32 @@ func rememberSnapshot(bak string) {
 	}
 }
 
-// snapshotTaken reports whether deja wrote the snapshot at bak, this run or an
-// earlier one. A snapshot the reader put there themselves is theirs whatever
-// it holds.
-func snapshotTaken(bak string) bool {
-	if slices.Contains(snapshotsByThisRun, bak) {
-		return true
+// snapshotTaken reports whether deja wrote the snapshot beside path, this run
+// or an earlier one. A snapshot the reader put there themselves is theirs
+// whatever it holds.
+//
+// Both spellings of the path are asked. The write side follows a symlink
+// before taking the snapshot — a config in a dotfiles repository, and on macOS
+// every /var path, which resolves to /private/var — so the recorded name is
+// the resolved one while the caller here still holds the name it was given
+// (review of #3340).
+func snapshotTaken(path string) bool {
+	names := []string{path + ".bak"}
+	// The directory rather than the file: by the time an uninstall asks, the
+	// file it is removing may already be gone, and EvalSymlinks needs
+	// something that still exists.
+	if dir, err := filepath.EvalSymlinks(filepath.Dir(path)); err == nil {
+		if resolved := filepath.Join(dir, filepath.Base(path)); resolved != path {
+			names = append(names, resolved+".bak")
+		}
 	}
-	return slices.Contains(readWiringState().Snapshots, bak)
+	st := readWiringState()
+	for _, bak := range names {
+		if slices.Contains(snapshotsByThisRun, bak) || slices.Contains(st.Snapshots, bak) {
+			return true
+		}
+	}
+	return false
 }
 
 func wiringCreated(path string) bool {

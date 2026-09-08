@@ -1275,7 +1275,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			// their own snapshot of an older deja block, matches it — which is
 			// fine for deciding whether a file may be overwritten and not for
 			// deciding whether one may be deleted (review of #3340).
-			if snapshotTaken(path + ".bak") {
+			if snapshotTaken(path) {
 				dropOwnBackup(path)
 			}
 			return "removed", nil
@@ -1293,7 +1293,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if dir := filepath.Dir(path); isRealDir(dir) {
 				_ = os.Remove(dir)
 			}
-			if snapshotTaken(path + ".bak") {
+			if snapshotTaken(path) {
 				dropOwnBackup(path)
 			}
 			return "removed", nil
