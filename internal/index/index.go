@@ -127,7 +127,8 @@ import (
 // (#3301), Copilot's injected skills (#3305), aider's banner and its
 // continuation lines (#3311), opencode's own session titles (#3315),
 // Antigravity's plan approvals (#3326), Zed's inlined thread mentions (#3336)
-// and its per-message stamps (#3333), Cursor's per-turn stamps (#3349). A store
+// and its per-message stamps (#3333), Cursor's per-turn stamps (#3349),
+// Copilot's exit codes (#3369). A store
 // built before holds skill bodies as the person's words and none of the new
 // tool output, and nothing re-reads a source without the bump (#3289).
 const version = 35
