@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -17,8 +18,11 @@ func TestGrokAutoNamesBothHalves(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	// Through ToSlash: the report prints the host's separator, so a literal
+	// "hooks/deja.json" passes everywhere and fails on the Windows leg alone.
+	slashed := filepath.ToSlash(out)
 	for _, want := range []string{"config.toml", "hooks/deja.json"} {
-		if !strings.Contains(out, want) {
+		if !strings.Contains(slashed, want) {
 			t.Errorf("the report does not name %s:\n%s", want, out)
 		}
 	}
