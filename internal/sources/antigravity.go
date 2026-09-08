@@ -140,8 +140,16 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 			out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
 		}
 	case "VIEW_FILE", "CODE_ACTION", "LIST_DIRECTORY":
-		if p := antigravityPath(text); p != "" && IndexToolPaths() {
+		p := antigravityPath(text)
+		if p != "" && IndexToolPaths() {
 			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+		// An edit tool writes the change as a diff block; the removed lines
+		// are the span the other harnesses record as an edit (#3279).
+		if p != "" && IndexEdits() {
+			if span := antigravityRemovedLines(text); span != "" {
+				out = append(out, model.Message{Role: RoleEdit, Text: p + "\n" + span, Time: t})
+			}
 		}
 	}
 	if IndexToolOutput() {
@@ -163,9 +171,40 @@ func antigravityField(text, label string) string {
 	return ""
 }
 
+// antigravityEditSentence is how the edit tools name their file: "The
+// following changes were made by the replace_file_content tool to: <path>."
+// — a sentence, not a labelled line, so the label list never saw an edit
+// (#3279).
+var antigravityEditSentence = regexp.MustCompile(`changes were made by the \S+ tool to: (\S+?)\.?(?:\s|$)`)
+
+// antigravityRemovedLines is the span an edit took out: the "-" lines of the
+// step's diff block, without the hunk headers, bounded like every edit span.
+func antigravityRemovedLines(text string) string {
+	var lines []string
+	in := false
+	for _, line := range strings.Split(text, "\n") {
+		switch {
+		case strings.HasPrefix(line, "[diff_block_start]"):
+			in = true
+		case strings.HasPrefix(line, "[diff_block_end]"):
+			in = false
+		case in && strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
+			lines = append(lines, line[1:])
+		}
+	}
+	span := strings.TrimSpace(strings.Join(lines, "\n"))
+	if len(span) > editSpanMax {
+		span = span[:editSpanMax]
+	}
+	return span
+}
+
 // antigravityPath pulls the file a step names, as a plain path: the transcript
 // writes them as file:// URIs, sometimes in backticks.
 func antigravityPath(text string) string {
+	if m := antigravityEditSentence.FindStringSubmatch(text); m != nil {
+		return strings.TrimPrefix(strings.Trim(m[1], "`"), "file://")
+	}
 	for _, label := range []string{"File Path:", "Created file", "Edited file", "Modified file"} {
 		v := antigravityField(text, label)
 		if v == "" {
