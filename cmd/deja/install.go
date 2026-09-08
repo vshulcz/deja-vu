@@ -840,7 +840,16 @@ func wroteAll(rs ...installResult) installResult {
 	}
 	var also []string
 	for _, r := range rs {
-		if r.Path == "" || r.Action == "unchanged" || r.Path == out.Path {
+		if r.Path == "" || r.Path == out.Path {
+			continue
+		}
+		// Every file this target handled rides along, changed or not, and so
+		// does anything the other result was already carrying: the
+		// kept-snapshot line reads these paths, and a second run that changes
+		// nothing still has a snapshot beside each of them (review of #3389).
+		out.also = append(out.also, r.Path)
+		out.also = append(out.also, r.also...)
+		if r.Action == "unchanged" {
 			continue
 		}
 		line := fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path))
@@ -850,7 +859,6 @@ func wroteAll(rs ...installResult) installResult {
 			line += " — " + r.Note
 		}
 		also = append(also, line)
-		out.also = append(out.also, r.Path)
 	}
 	for _, line := range also {
 		if out.Note != "" {
@@ -1889,33 +1897,13 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 		return res, err
 	}
 	// The other CLI sharing this directory reads a different file entirely.
+	// Both go through wroteAll, so the pair is accounted for the way every
+	// other target's pair is — including on a run that changes neither.
 	user, uerr := installGrokUserSettings(exe, uninstall)
 	if uerr != nil {
 		return res, uerr
 	}
-	// Both files, whichever of them the printer is named for: the kept-snapshot
-	// line reads the paths, and dropping the other one meant a snapshot beside
-	// it was never counted — "kept 1 snapshot" with two on disk (#3388).
-	if res.Action == "unchanged" {
-		if res.Note != "" {
-			if user.Note != "" {
-				user.Note = res.Note + "; " + user.Note
-			} else {
-				user.Note = res.Note
-			}
-		}
-		user.also = append(user.also, res.Path)
-		return user, nil
-	}
-	res.also = append(res.also, user.Path)
-	if user.Note != "" {
-		if res.Note != "" {
-			res.Note += "; " + user.Note
-		} else {
-			res.Note = user.Note
-		}
-	}
-	return res, nil
+	return wroteAll(res, user), nil
 }
 
 type tomlMCPBlock struct {
