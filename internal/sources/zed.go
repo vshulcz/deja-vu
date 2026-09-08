@@ -609,9 +609,20 @@ func zedContentText(body json.RawMessage, keep ...string) string {
 			if err := json.Unmarshal(raw, &part); err != nil {
 				// Mention is a struct, not a string.
 				var m struct {
-					Content string `json:"content"`
+					URI     json.RawMessage `json:"uri"`
+					Content string          `json:"content"`
 				}
 				if err := json.Unmarshal(raw, &m); err != nil {
+					continue
+				}
+				var kind map[string]json.RawMessage
+				_ = json.Unmarshal(m.URI, &kind)
+				// A thread mention carries Zed's own summary of a conversation
+				// deja has already indexed under its own id, and it stood above
+				// the sentence the person typed: 48798 characters of it across
+				// the twelve mentions on a real store (#3336). Every other kind
+				// — a selection, a file — is what they attached on purpose.
+				if _, ok := kind["Thread"]; ok {
 					continue
 				}
 				part = m.Content
