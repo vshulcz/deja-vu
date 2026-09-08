@@ -40,15 +40,6 @@ func grokHooksPath() string {
 
 func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	path := grokHooksPath()
-	if uninstall {
-		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		if err := os.Remove(path); err != nil {
-			return installResult{}, err
-		}
-		return installResult{Path: path, Action: "removed"}, nil
-	}
 	old, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
@@ -57,7 +48,45 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	if len(bytes.TrimSpace(old)) == 0 {
 		root = map[string]any{}
 	} else if err := json.Unmarshal(old, &root); err != nil {
+		if uninstall {
+			// A file deja cannot read is still one the uninstall has to take,
+			// or grok keeps calling a binary wired nowhere else — the contract
+			// TestUninstallStillTakesAHookFileTheInstallWouldRefuse pins.
+			if rerr := os.Remove(path); rerr != nil {
+				return installResult{}, rerr
+			}
+			return installResult{Path: path, Action: "removed"}, nil
+		}
 		return installResult{}, configParseError(path, err)
+	}
+	if uninstall {
+		if len(old) == 0 {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		// Install merged deja's entries beside the reader's own; uninstall
+		// removed the file whole and took theirs with it (#3219). deja's
+		// entries come out, and the file goes only when nothing else is in it.
+		for _, ev := range [][2]string{
+			{"SessionStart", "hook-context"}, {"PreCompact", "hook-precompact"},
+			{"UserPromptSubmit", "hook-prompt"}, {"PreToolUse", "hook-tool"},
+		} {
+			root = updateClaudeHook(root, ev[0], exe+" "+ev[1], "", true)
+		}
+		if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
+			delete(root, "hooks")
+		}
+		if len(root) == 0 {
+			if err := os.Remove(path); err != nil {
+				return installResult{}, err
+			}
+			return installResult{Path: path, Action: "removed"}, nil
+		}
+		next, err := marshalConfigLike(old, root)
+		if err != nil {
+			return installResult{}, err
+		}
+		a, err := writeIfChanged(path, old, append(next, '\n'))
+		return installResult{Path: path, Action: a}, err
 	}
 	// No matcher. Grok's own docs name the session sources `startup` and
 	// `resume`, but 1.0.5 sends `new` for a fresh session and `load` for a
