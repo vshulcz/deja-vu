@@ -69,13 +69,23 @@ func CodexSidecarFiles() []string {
 			return false
 		}
 		parts := strings.Split(filepath.ToSlash(rel), "/")
+		// The caches hold json the CLI wrote for itself. A .jsonl under them is
+		// not configuration, and swallowing it would hide a transcript restored
+		// into the wrong place, which is the one thing the row is for (review
+		// of #3321).
 		if len(parts) > 1 && (parts[0] == "plugins" || parts[0] == "cache") {
-			return true
+			return strings.HasSuffix(rel, ".json")
 		}
-		// The store's own settings sit at the root; history.jsonl is read and
-		// is already counted, and a .jsonl the reader does not take is not
-		// configuration.
-		return len(parts) == 1 && strings.HasSuffix(parts[0], ".json")
+		// The store's own settings sit at the root, and they are named rather
+		// than matched by extension: a .json arriving there under a name deja
+		// does not know may be a transcript in a format it cannot read yet.
+		if len(parts) == 1 {
+			switch parts[0] {
+			case "version.json", "models_cache.json", "hooks.json", "auth.json", "config.json":
+				return true
+			}
+		}
+		return false
 	})
 }
 

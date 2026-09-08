@@ -67,4 +67,12 @@ func TestDoctorDoesNotCallCodexCachesUnrecognised(t *testing.T) {
 	if got := row(); !strings.Contains(got, "2 not recognised here") {
 		t.Errorf("row = %q, want the stray rollout at the store root counted too", got)
 	}
+	// Neither does the cache swallow a transcript: a .jsonl under it, and a
+	// .json at the root under a name deja does not know, are both files it
+	// cannot account for (review of #3321).
+	write(filepath.Join(root, "plugins", "cache", "openai-templates", "queue.jsonl"), "{}\n")
+	write(filepath.Join(root, "newformat-transcript.json"), "{}")
+	if got := row(); !strings.Contains(got, "4 not recognised here") {
+		t.Errorf("row = %q, want the cache jsonl and the unknown root json counted as well", got)
+	}
 }
