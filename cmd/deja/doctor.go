@@ -1365,7 +1365,9 @@ func doctorJSONDejaKeys(key string) func(string) []string {
 			return nil
 		}
 		var root map[string]any
-		if json.Unmarshal(b, &root) != nil {
+		// The file may be JSONC — the install keeps a reader's comments and
+		// trailing commas (#3243) — so it is read the way install reads it.
+		if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 			return nil
 		}
 		m, _ := root[key].(map[string]any)
