@@ -674,6 +674,19 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		if !p.When.IsZero() {
 			when = " (" + p.When.Local().Format("2006-01-02") + ")"
 		}
+		if p.Edit != "" {
+			// An edit is not something to run, so it is not offered as one:
+			// the file, in the words `deja fix` uses for the same pair
+			// (#2163). This surface said "ran next:" with nothing after it
+			// (#3261).
+			changed := "changed next"
+			if p.Candidate {
+				changed = "changed next, unconfirmed"
+			}
+			fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, changed,
+				search.SafePath(p.Edit))
+			continue
+		}
 		ran := "ran next"
 		if p.Candidate {
 			ran = "ran next, unconfirmed"
