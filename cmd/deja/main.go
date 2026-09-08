@@ -2887,6 +2887,18 @@ func cursorReadFiles() []string {
 	return append(sources.CursorTranscripts(), sources.CursorDBs()...)
 }
 
+// grokReadFiles is both of Grok's stores: the session files Grok Build writes,
+// and the SQLite store the maintained CLI writes instead. The row listed only
+// the first, so the size column read 0 B on a machine whose whole history is in
+// the database (#3225).
+func grokReadFiles() []string {
+	files := sources.GrokSessionFiles()
+	if db := sources.GrokDB(); db != "" {
+		files = append(files, db)
+	}
+	return files
+}
+
 // filesSize sums what the parser would open, counting each path once: cursor
 // and hermes list a file under more than one discovery rule.
 func filesSize(paths []string) int64 {
@@ -2955,7 +2967,13 @@ func printSources(dir string) {
 		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.GeminiChatFiles, sources.LoadGemini},
 		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorReadFiles, sources.LoadCursor},
 		{"antigravity", antigravityLocation, antigravityRoots, sources.AntigravityTranscripts, sources.LoadAntigravity},
-		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, sources.GrokSessionFiles, sources.LoadGrok},
+		// Both halves, the way the registry's grok entry loads them: the
+		// maintained CLI writes one SQLite store beside the config and no
+		// session files at all, so a machine on that build read as zero
+		// sessions here while doctor and search both found them (#3225).
+		{"grok", sources.GrokRoot(), []string{sources.GrokRoot()}, grokReadFiles, func() []model.Session {
+			return append(sources.LoadGrok(), sources.LoadGrokDB()...)
+		}},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
 		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles, sources.LoadGoose},
