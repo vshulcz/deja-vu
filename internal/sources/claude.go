@@ -218,6 +218,11 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 				role = RoleToolOutput
 			}
 		}
+		// The same cut the typed parser makes on a record Claude Code wrote
+		// itself (#3267).
+		if meta, _ := m["isMeta"].(bool); meta && role == "user" {
+			txt = ""
+		}
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
