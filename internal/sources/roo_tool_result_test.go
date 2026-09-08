@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,5 +72,28 @@ func TestClineLegacyToolResultIsIndexedAsToolOutput(t *testing.T) {
 	}
 	if len(toolOut) != 1 || !strings.Contains(toolOut[0], "undefined: frobnicateWidget") {
 		t.Fatalf("tool output = %q, want the failing command's output", toolOut)
+	}
+}
+
+// A build log of a few megabytes is capped like every other harness's tool
+// output.
+func TestRooToolResultIsCapped(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "tasks", "1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	big := strings.Repeat("line of build output\n", maxParsedMessage/10)
+	quoted, _ := json.Marshal(big)
+	body := `[{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":` + string(quoted) + `}]}]`
+	path := filepath.Join(dir, "api_conversation_history.json")
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseRooTask(path)
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 1 {
+		t.Fatalf("parse: %v, %d sessions", err, len(ss))
+	}
+	if n := len(ss[0].Messages[0].Text); n > maxParsedMessage+64 {
+		t.Errorf("tool output not capped: %d bytes", n)
 	}
 }

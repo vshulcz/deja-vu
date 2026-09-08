@@ -371,7 +371,7 @@ func clineTurnToolOutput(raw json.RawMessage, ts time.Time) []model.Message {
 	}
 	var out []model.Message
 	for _, body := range clineToolResults(blocks) {
-		out = append(out, model.Message{Role: RoleToolOutput, Text: body, Time: ts})
+		out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(body), Time: ts})
 	}
 	return out
 }
