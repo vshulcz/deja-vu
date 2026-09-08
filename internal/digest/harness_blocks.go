@@ -55,6 +55,63 @@ var harnessBlockRe = func() *regexp.Regexp {
 	return regexp.MustCompile(`(?is)<(` + strings.Join(alts, "|") + `)(?:\s[^>]*)?>(?:.*?</\s*` + "(?:" + strings.Join(alts, "|") + `)\s*>|.*$)`)
 }()
 
+// closedHarnessBlockREs is one regexp per tag: a block that opens and closes
+// with the same name. harnessBlockRe closes on any listed name, which is what
+// a nested Cursor block needs, but on a turn where two different envelopes
+// stand apart it swallowed the sentence between them (review of #3323).
+var closedHarnessBlockREs = func() []*regexp.Regexp {
+	out := make([]*regexp.Regexp, 0, len(harnessBlockTags))
+	for _, t := range harnessBlockTags {
+		q := regexp.QuoteMeta(t)
+		out = append(out, regexp.MustCompile(`(?is)<`+q+`(?:\s[^>]*)?>.*?</\s*`+q+`\s*>`))
+	}
+	return out
+}()
+
+// unwrapUserQuery removes Cursor's wrapper where both of its tags are there,
+// keeping the words between them. Each close pairs with the nearest open
+// before it: a regexp runs from the first open to the first close, so a turn
+// that opens one and never closes it, and closes a later one, kept the stray
+// tag inside what it handed back (review of #3323). An open with no close is
+// a person naming the tag, and is left where it is.
+func unwrapUserQuery(text string) string {
+	const open, close = "<user_query>", "</user_query>"
+	for {
+		end := strings.Index(text, close)
+		if end < 0 {
+			return text
+		}
+		start := strings.LastIndex(text[:end], open)
+		if start < 0 {
+			// A close with nothing open before it: the orphan rule owns that.
+			return text
+		}
+		text = text[:start] + text[start+len(open):end] + text[end+len(close):]
+	}
+}
+
+// StripClosedHarnessBlocks removes the envelopes a harness opened and closed
+// under one name, and leaves everything else as it stands. The prompt hook
+// wants the stricter rule — a truncated notification is still not the person —
+// but a surface that prints the turn back must not lose words to a tag
+// somebody typed themselves.
+func StripClosedHarnessBlocks(text string) string {
+	if !strings.Contains(text, "<") {
+		return strings.TrimSpace(text)
+	}
+	for _, re := range closedHarnessBlockREs {
+		text = re.ReplaceAllString(text, "")
+	}
+	// What a nested block leaves behind, and Cursor's wrapper around the words
+	// a person typed: the tags go, the words stay. The wrapper is unwrapped as
+	// a pair — a lone `<user_query>` in a sentence about Cursor is someone
+	// naming the tag, and taking it out of their prose mangles the sentence
+	// (review of #3323).
+	text = orphanCloseRe.ReplaceAllString(text, "")
+	text = unwrapUserQuery(text)
+	return strings.TrimSpace(text)
+}
+
 // StripHarnessBlocks returns what is left of a prompt once the harness's own
 // envelopes are removed: the person's words, or "" when the turn was the host
 // alone. A task notification delivered as a user turn once made the prompt

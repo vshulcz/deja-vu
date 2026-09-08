@@ -159,7 +159,10 @@ func stripInjectedLines(text string) string {
 func stripInjectedPrefixes(text string) string {
 	for again := true; again; {
 		again = false
-		trimmed := strings.TrimSpace(text)
+		// Only the head is trimmed for the match. Trimming both ends here took
+		// the blank line an author left after their own paste, at the far end
+		// of a message whose head happened to carry a block (review of #3357).
+		trimmed := strings.TrimLeft(text, " \t\n")
 		if rest, ok := stripAgentsBlock(trimmed); ok {
 			text, again = rest, true
 			continue
@@ -172,7 +175,12 @@ func stripInjectedPrefixes(text string) string {
 			if !ok {
 				continue
 			}
-			text = trimmed[end:]
+			// The newline the block left behind goes with it, and only that
+			// one: every Cursor turn opened on a blank line because the stamp
+			// above the question left its own break (#3357). Trimming the
+			// whole message instead ate blank lines an author wrote at the
+			// far end, which is action at a distance (review of #3357).
+			text = strings.TrimLeft(trimmed[end:], "\n")
 			again = true
 			break
 		}
@@ -237,7 +245,10 @@ func unwrapBlock(text, open, close string) string {
 		if end < 0 {
 			return text
 		}
-		text = text[:start] + rest[:end] + rest[end+len(close):]
+		// A wrapper writes its own line breaks around what a person typed:
+		// Cursor's <user_query> puts the question on its own line. Those two
+		// belong to the tags, not to the words.
+		text = text[:start] + strings.Trim(rest[:end], "\n") + rest[end+len(close):]
 	}
 }
 
