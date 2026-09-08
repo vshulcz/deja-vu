@@ -74,6 +74,18 @@ func TestPageTitlesCountTheRestOfTheHarnesses(t *testing.T) {
 	if pages != n {
 		t.Errorf("%d registry pages for %d harnesses", pages, n)
 	}
+
+	// And llms.txt, which is the summary an agent reads instead of the site. It
+	// names six harnesses and spells the rest, and had stood at fifteen through
+	// four landing.
+	llms, err := os.ReadFile(filepath.Join(root, "docs", "llms.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	named := strings.Count("Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed", ",") + 1
+	if want := fmt.Sprintf("Zed and %s more agents", countWordForTest(n-named)); !strings.Contains(string(llms), want) {
+		t.Errorf("docs/llms.txt does not say %q — the registry has %d harnesses", want, n)
+	}
 }
 
 // countWordForTest spells the number the generator's template spells.
