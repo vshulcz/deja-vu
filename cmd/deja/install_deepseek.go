@@ -346,6 +346,18 @@ func stripDSHBlock(s string) string {
 	return strings.TrimRight(strings.Join(out, "\n"), "\n")
 }
 
+// dshLayerHasEntry reports whether a layer still carries anything YAML would
+// read as content — a line that is neither blank nor a comment.
+func dshLayerHasEntry(doc string) bool {
+	for _, line := range strings.Split(doc, "\n") {
+		t := strings.TrimSpace(line)
+		if t != "" && !strings.HasPrefix(t, "#") {
+			return true
+		}
+	}
+	return false
+}
+
 func installDeepSeekMCP(exe string, uninstall bool) (installResult, error) {
 	return installDeepSeek(exe, uninstall, false)
 }
@@ -375,10 +387,16 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 			return installResult{}, err
 		}
 		rest := stripDSHBlock(string(old))
-		if strings.TrimSpace(rest) == "" {
-			// An empty layer is the empty array, not an empty file: a patch
-			// file with nothing in it fails the profile load.
-			rest = "[]"
+		if !dshLayerHasEntry(rest) {
+			// An empty layer is the empty array, not an empty file or a
+			// comment alone: dsh parses either as null and refuses to load
+			// the profile. The generated layer is a comment and `[]`, so the
+			// comment stays and the array comes back under it (#3271).
+			rest = strings.TrimRight(rest, "\n")
+			if rest != "" {
+				rest += "\n"
+			}
+			rest += "[]"
 		}
 		a, err := writeIfChanged(path, old, []byte(rest+"\n"))
 		if err != nil {
