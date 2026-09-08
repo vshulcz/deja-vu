@@ -251,6 +251,28 @@ func jsonTypeName(k reflect.Kind) string {
 	}
 }
 
+// harnessFilterDescription names the filter's options without going stale.
+// The description used to carry nine hand-written names and stood while
+// sixteen more harnesses landed, so an agent reading the schema had no way to
+// know it could ask for zed, cline or hermes — the filter takes any of them
+// (#3382). A few names and a count cost a fraction of what listing them all
+// would, and the count comes from the registry.
+func harnessFilterDescription() string {
+	var names []string
+	for _, h := range sources.Registry() {
+		// The notes source is deja's own; it is not an agent that wrote a session.
+		if h.Name == "deja" {
+			continue
+		}
+		names = append(names, h.Name)
+	}
+	if len(names) <= 4 {
+		return "Optional filter: " + strings.Join(names, ", ") + "."
+	}
+	return fmt.Sprintf("Optional filter, the agent that wrote the session: %s and %d more — `deja sources` lists them.",
+		strings.Join(names[:4], ", "), len(names)-4)
+}
+
 // dejaTool is the whole surface as one tool with a mode.
 //
 // Six tools were six envelopes: the same query, harness, project and limit
@@ -285,7 +307,7 @@ func dejaTool() map[string]any {
 				"what":    map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
 				"text":    map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
 				"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
-				"harness": map[string]any{"type": "string", "description": "Optional filter: claude, codex, opencode, aider, gemini, cursor, antigravity, grok or qwen."},
+				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
 				"since":   map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
 				"limit":   map[string]any{"type": "number", "description": "Max results."},
