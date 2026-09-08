@@ -201,18 +201,10 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 		if len(s.Messages) == 0 {
 			continue
 		}
-		if s.Title == "" {
-			// The person's first line, as every other parser titles: a
-			// session Hermes opens with its own greeting was titled by the
-			// greeting (#3241). A session nobody typed in keeps its first line.
-			s.Title = firstLineTrim(s.Messages[0].Text)
-			for _, m := range s.Messages {
-				if m.Role == "user" {
-					s.Title = firstLineTrim(m.Text)
-					break
-				}
-			}
-		}
+		// No title here: the index derives one (the person's first line,
+		// a greeting giving way to the next turn, the agent's line when
+		// nobody typed). Titling in the parser skipped the greeting rule, so
+		// a session opened with "hi" listed as "hi" (#3241, #3251).
 		out = append(out, *s)
 	}
 	return out, nil
