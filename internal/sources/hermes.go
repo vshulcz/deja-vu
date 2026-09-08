@@ -14,8 +14,19 @@ import (
 )
 
 // HermesHome is the Hermes root: profiles, plugins and config.yaml live here.
+//
+// HERMES_HOME is Hermes's own variable, and deja reads it for the reason
+// PrimeRoot gives: a machine that moved its store has moved it for deja too,
+// and asking for a second variable saying what the first already said is the
+// kind of silence doctor cannot explain. Before this, a relocated Hermes was
+// installed into ~/.hermes — a directory Hermes does not read — and indexed as
+// nothing (#3203). DEJA_HERMES_HOME still wins, for tests and for a store that
+// is neither.
 func HermesHome() string {
 	if p := os.Getenv("DEJA_HERMES_HOME"); p != "" {
+		return p
+	}
+	if p := os.Getenv("HERMES_HOME"); p != "" {
 		return p
 	}
 	return filepath.Join(Home(), ".hermes")

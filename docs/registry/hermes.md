@@ -2,6 +2,7 @@
 
 - **ID**: `hermes`
 - **Store**: `~/.hermes/state.db` (0.17+) or `~/.hermes/profiles/<profile>/state.db` (older builds, one store per profile)
+- **Home**: `HERMES_HOME`, Hermes's own variable, is followed — profiles, plugins and `config.yaml` are read and written under it. `DEJA_HERMES_HOME` overrides it.
 - **Read overrides**: `DEJA_HERMES_PROFILES_ROOT` for the profiles directory, `DEJA_HERMES_DB` to pin a single store
 - **Format**: SQLite relational store
 

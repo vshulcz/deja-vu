@@ -74,6 +74,10 @@ func hermeticEnv(t *testing.T) string {
 	// a developer who exports either would put their own projects in a golden.
 	t.Setenv("DEJA_CRUSH_ROOT", "")
 	t.Setenv("CRUSH_GLOBAL_CONFIG", "")
+	// Hermes's own variable, now that deja follows it: a developer who exports
+	// it would put their real store in a golden.
+	t.Setenv("HERMES_HOME", "")
+	t.Setenv("DEJA_HERMES_HOME", "")
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }
