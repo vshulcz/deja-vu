@@ -780,8 +780,15 @@ func doctorHarnesses(w io.Writer, dir string) {
 
 	printRow("aider", doctorAiderLocation(), len(sources.AiderFiles()) > 0, doctorCount(len(sources.AiderFiles()), "file"))
 
+	// The row names the store and counts what is under `tmp`, where the chats
+	// are: Antigravity keeps its own store in a sibling directory of the same
+	// root and has its own row, so walking the whole of ~/.gemini reported its
+	// files — 55 of 77 on a real machine — as chats gemini failed to read
+	// (#3397). The settings and the extensions beside them are not chats
+	// either.
 	geminiRoot := sources.GeminiRoot()
-	printFiles("gemini", geminiRoot, doctorExists(geminiRoot), sources.GeminiChatFiles())
+	printFilesBesideIn("gemini", geminiRoot, []string{filepath.Join(geminiRoot, "tmp")}, false,
+		doctorExists(geminiRoot), sources.GeminiChatFiles(), sources.GeminiSidecarFiles()...)
 
 	printRow("cursor", doctorCursorLocation(), doctorCursorPresent(), doctorCursorDetail(sqlite))
 

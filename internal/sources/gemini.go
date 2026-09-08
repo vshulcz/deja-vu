@@ -32,6 +32,16 @@ func GeminiRoot() string {
 	return EnvPath("DEJA_GEMINI_ROOT", GeminiHome())
 }
 
+// GeminiSidecarFiles lists what a Gemini store keeps under `tmp` beside the
+// chats: the per-project log the CLI writes for itself. Everything outside
+// `tmp` is out of the walk entirely, because Antigravity's store lives in a
+// sibling directory of the same root and has its own row (#3397).
+func GeminiSidecarFiles() []string {
+	return walkFiles(filepath.Join(GeminiRoot(), "tmp"), func(p string) bool {
+		return filepath.Base(p) == "logs.json"
+	})
+}
+
 func GeminiChatFiles() []string {
 	root := filepath.Join(GeminiRoot(), "tmp")
 	var out []string
