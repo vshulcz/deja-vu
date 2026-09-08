@@ -29,7 +29,7 @@ func installAmpMCPAt(path, exe string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		root = map[string]any{}
-	} else if err := json.Unmarshal([]byte(stripJSONComments(string(old))), &root); err != nil {
+	} else if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
 	servers, _ := root[ampServersKey].(map[string]any)
