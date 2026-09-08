@@ -36,6 +36,11 @@ type wiringState struct {
 	// Knowing which files deja made is what lets the same rule apply to them
 	// without ever removing a config the reader already had (#2583).
 	Created []string `json:"created,omitempty"`
+	// Snapshots are the .bak files deja wrote itself. Ownership of a snapshot
+	// cannot be read out of its bytes — a reader's own config that merely says
+	// the word matches every marker list — so the uninstall that deletes one
+	// asks this instead (#3340).
+	Snapshots []string `json:"snapshots,omitempty"`
 	// Blocks are the containers deja added to a config that had none —
 	// "<path>#mcpServers". Removing only deja's entry left the reader with an
 	// empty block they never wrote (#2604); knowing deja added it is what
@@ -129,6 +134,16 @@ func recordWiring(targets []string, uninstall bool) {
 		created = nil
 	}
 	sort.Strings(created)
+	snapshots := append([]string(nil), st.Snapshots...)
+	for _, p := range snapshotsByThisRun {
+		if !slices.Contains(snapshots, p) {
+			snapshots = append(snapshots, p)
+		}
+	}
+	if len(kept) == 0 {
+		snapshots = nil
+	}
+	sort.Strings(snapshots)
 	blocks := append([]string(nil), st.Blocks...)
 	for _, b := range blocksAddedThisRun {
 		if !slices.Contains(blocks, b) {
@@ -140,7 +155,7 @@ func recordWiring(targets []string, uninstall bool) {
 		blocks = nil
 	}
 	sort.Strings(blocks)
-	st = wiringState{Version: version, Targets: kept, Created: created, Blocks: blocks, Exe: exe, Home: homeDir()}
+	st = wiringState{Version: version, Targets: kept, Created: created, Snapshots: snapshots, Blocks: blocks, Exe: exe, Home: homeDir()}
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -273,6 +288,27 @@ func refreshWiringAfterUpgrade() []string {
 }
 
 // wiringCreated reports that deja created this config rather than finding it.
+// snapshotsByThisRun are the .bak files this run wrote, before the record is
+// persisted at the end of it.
+var snapshotsByThisRun []string
+
+// rememberSnapshot records that deja took this snapshot.
+func rememberSnapshot(bak string) {
+	if !slices.Contains(snapshotsByThisRun, bak) {
+		snapshotsByThisRun = append(snapshotsByThisRun, bak)
+	}
+}
+
+// snapshotTaken reports whether deja wrote the snapshot at bak, this run or an
+// earlier one. A snapshot the reader put there themselves is theirs whatever
+// it holds.
+func snapshotTaken(bak string) bool {
+	if slices.Contains(snapshotsByThisRun, bak) {
+		return true
+	}
+	return slices.Contains(readWiringState().Snapshots, bak)
+}
+
 func wiringCreated(path string) bool {
 	for _, p := range readWiringState().Created {
 		if p == path {

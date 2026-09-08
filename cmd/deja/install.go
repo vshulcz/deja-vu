@@ -1023,7 +1023,13 @@ func backupOnce(path string) (bool, error) {
 	}
 	// Configs can carry MCP credentials; the snapshot is owner-only even
 	// when the live file is looser.
-	return true, os.WriteFile(bak, b, 0o600)
+	if err := os.WriteFile(bak, b, 0o600); err != nil {
+		return true, err
+	}
+	// Whose snapshot this is cannot be read back out of its bytes, so it is
+	// recorded here: the uninstall deletes one only if deja took it (#3340).
+	rememberSnapshot(bak)
+	return true, nil
 }
 
 // backupOnceUnlessCreated is backupOnce for a file that was already there
@@ -1264,13 +1270,12 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return "", err
 			}
-			// Only when deja made the file. mentionsDeja is a content guess and
-			// a loose one — a reader's own config that says the word, or their
-			// own snapshot of an older deja block, matches it — which is fine
-			// for deciding whether a file may be overwritten and not for
-			// deciding whether one may be deleted. On a file deja created
-			// there is nothing of theirs beside it to lose (review of #3340).
-			if wiringCreated(path) {
+			// Only a snapshot deja took itself. mentionsDeja is a content guess
+			// and a loose one — a reader's own config that says the word, or
+			// their own snapshot of an older deja block, matches it — which is
+			// fine for deciding whether a file may be overwritten and not for
+			// deciding whether one may be deleted (review of #3340).
+			if snapshotTaken(path + ".bak") {
 				dropOwnBackup(path)
 			}
 			return "removed", nil
@@ -1288,7 +1293,9 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if dir := filepath.Dir(path); isRealDir(dir) {
 				_ = os.Remove(dir)
 			}
-			dropOwnBackup(path)
+			if snapshotTaken(path + ".bak") {
+				dropOwnBackup(path)
+			}
 			return "removed", nil
 		}
 	}
