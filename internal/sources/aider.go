@@ -109,6 +109,16 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 	var buf []string
 	inFence := false
 	idx := 0
+	// aider marks its own output with "> " on the first line only: the
+	// --verbose configuration dump and a multi-line commit message continue
+	// unprefixed, and those lines read as the assistant speaking — one of them
+	// went on to title the session (#3311). Two rules cover what aider writes:
+	// nothing before the session's first `#### ` turn is speech (the banner
+	// and the dump come before anyone has asked anything, and the dump has
+	// blank lines inside it), and a line directly under a "> " line is the
+	// rest of that block.
+	afterOutput := false
+	seenUser := false
 
 	flush := func() {
 		if cur == nil || len(buf) == 0 {
@@ -151,6 +161,7 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 			id := aiderSessionID(path, idx)
 			cur = &model.Session{Harness: "aider", ID: id, Project: project, Path: path, Started: ts, Updated: ts}
 			inFence = false
+			afterOutput, seenUser = false, false
 			continue
 		}
 		if cur == nil {
@@ -158,6 +169,7 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		}
 		if strings.HasPrefix(line, "```") {
 			inFence = !inFence
+			afterOutput = false
 			if role == "" {
 				role = "assistant"
 			}
@@ -170,6 +182,8 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		}
 		switch {
 		case strings.HasPrefix(line, "#### "):
+			afterOutput = false
+			seenUser = true
 			t := strings.TrimPrefix(line, "#### ")
 			// aider logs its own commands the same way — `/undo`, `/clear`,
 			// `/add x` — and they are not the person's question; a message
@@ -190,8 +204,15 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		case strings.HasPrefix(line, "> "), line == ">":
 			// tool/system output: ends any assistant block, not indexed as a message
 			flush()
+			afterOutput = true
 		case strings.TrimSpace(line) == "":
+			afterOutput = false
 			buf = append(buf, "")
+		case afterOutput, !seenUser:
+			// The rest of the output block the "> " line opened, or the
+			// banner and the --verbose dump aider prints before the first
+			// turn.
+			continue
 		default:
 			if role != "assistant" {
 				flush()
