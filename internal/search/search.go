@@ -414,15 +414,23 @@ func RunDetailed(ss []model.Session, o Options) (Results, error) {
 		return Results{}, err
 	}
 	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
-	limit := o.Limit
-	if limit == 0 && !o.All {
+	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)
+	return r, nil
+}
+
+// CapHits bounds what a search hands back, with the default a reader gets when
+// they pass no flag. It lives here rather than inside RunDetailed because the
+// tiers that build their own hits — relevance, error signature — never went
+// through that path and printed the whole retrieval window instead: fifty
+// sessions for `--limit 3`, and fifty for no flag at all (#3345).
+func CapHits(hits []Hit, limit int, all bool) ([]Hit, bool) {
+	if limit == 0 && !all {
 		limit = 15
 	}
 	if limit > 0 && len(hits) > limit {
-		r.Hits = hits[:limit]
-		r.Capped = true
+		return hits[:limit], true
 	}
-	return r, nil
+	return hits, false
 }
 
 func setTier(o Options) string {

@@ -951,10 +951,13 @@ func cmdCtx(dir string, rest []string) error {
 	var hits []search.Hit
 	if result.Tier == search.TierError {
 		fmt.Fprintln(os.Stderr, "deja: matched by error signature; showing the sessions that hit it")
-		hits = search.ErrorHits(ss)
+		// Both tiers below build their own hits and never went through the cap
+		// in RunDetailed, so `--limit 3` printed the whole window — fifty
+		// sessions — and so did a query with no flag (#3345).
+		hits, _ = capTierHits(search.ErrorHits(ss), o)
 	} else if result.Tier == search.TierRelevance {
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF)
+		hits, _ = capTierHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), o)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
@@ -1233,6 +1236,24 @@ func runBareSearch(dir string, args []string, sourceInstance string) error {
 	return searchWithOptions(dir, args, sourceInstance, true)
 }
 
+// capTierHits bounds the two tiers that build their own hits — the ranked
+// relevance list and the error signature — which never went through the cap in
+// RunDetailed: `--limit 3` printed the whole retrieval window of fifty
+// sessions there while the exact tier printed three (#3345). With no flag they
+// keep the window they have always served, which the JSON envelope's own test
+// pins; only what the reader asked for binds them.
+func capTierHits(hits []search.Hit, o search.Options) ([]search.Hit, bool) {
+	if o.Limit == 0 {
+		return hits, false
+	}
+	// A limit the reader typed binds even beside --all, which is how the exact
+	// tier has always read the pair: --all lifts the default, and the number
+	// asked for is still the number wanted. Letting --all win here made the
+	// same two flags mean opposite things depending on which tier answered
+	// (review of #3345).
+	return search.CapHits(hits, o.Limit, false)
+}
+
 func runSearch(dir string, args []string, sourceInstance string) error {
 	return searchWithOptions(dir, args, sourceInstance, false)
 }
@@ -1310,6 +1331,11 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
+		// The cap the exact path gets from RunDetailed: without it `--json
+		// --limit 1` handed a consumer the whole window (#3345).
+		var capped bool
+		hits, capped = capTierHits(hits, o)
+		o.Capped = o.Capped || capped
 	case search.TierRelevance:
 		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
 		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF)
@@ -1325,6 +1351,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		if o.Total < len(hits) {
 			o.Total = len(hits)
 		}
+		var relCapped bool
+		hits, relCapped = capTierHits(hits, o)
+		o.Capped = o.Capped || relCapped
 	default:
 		// RunDetailed rather than Run: the JSON envelope reports how many
 		// sessions matched before the cap, and that is not recoverable from a
