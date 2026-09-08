@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -338,10 +340,21 @@ var cursorDialect = toolDialect{
 func ParseCursorTranscript(path string) ([]model.Session, error) {
 	id := strings.TrimSuffix(filepath.Base(path), ".jsonl")
 	s := model.Session{Harness: "cursor", ID: id, Project: cursorTranscriptProject(path), Path: path}
+	// The file's own time is the fallback: a transcript with no stamp in it at
+	// all still needs a date, and so does one whose stamps deja cannot read.
+	// Where Cursor wrote the turn's own time, that wins — a copy or a restore
+	// moves the modification time and nothing else (#3349).
+	var fileTime time.Time
 	fi, err := os.Stat(path)
 	if err == nil {
-		s.Touch(fi.ModTime()) // transcripts carry no timestamps
+		fileTime = fi.ModTime()
 	}
+	// The stamp Cursor writes ahead of the question, carried forward: an
+	// assistant turn has none of its own and belongs to the question it
+	// answers. Every turn took the modification time before, so a transcript
+	// holding turns a month apart read as one day.
+	at := fileTime
+	stamped := false
 	err = scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role != "user" && role != "assistant" {
@@ -351,32 +364,76 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 		if msg == nil {
 			return
 		}
-		if txt := textFromContent(msg["content"]); txt != "" {
-			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: s.Updated})
+		txt := textFromContent(msg["content"])
+		if t, ok := cursorTurnTime(txt); ok {
+			at = t
+			s.Touch(t)
+			stamped = true
+		}
+		if txt != "" {
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: at})
 		}
 		// A turn that only called tools has no text, so this cannot sit behind
 		// the text check: reading a file and running a build is exactly the
 		// turn that carries no prose.
 		if IndexToolPaths() {
 			if p := toolPathsIn(msg["content"], cursorDialect); p != "" {
-				s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: s.Updated})
+				s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: at})
 			}
 		}
 		if IndexEdits() {
 			for _, e := range editSpansIn(msg["content"], cursorDialect) {
-				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: s.Updated})
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: at})
 			}
 		}
 		if IndexCommands() {
 			for _, cmd := range commandsIn(msg["content"], cursorDialect) {
-				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: s.Updated})
+				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: at})
 			}
 		}
 	})
+	if !stamped {
+		s.Touch(fileTime)
+	}
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// cursorTurnTimeRE is the block Cursor puts ahead of a person's words:
+// `<timestamp>Sunday, Jul 26, 2026, 1:06 PM (UTC+3)</timestamp>`. The zone is
+// an offset from UTC, spelled the way the shell prints it.
+var cursorTurnTimeRE = regexp.MustCompile(`<timestamp>\s*(?:[A-Za-z]+,\s*)?([A-Za-z]{3,}\s+\d{1,2},\s+\d{4},\s+\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:\(UTC([+-]\d{1,2})(?::(\d{2}))?\))?`)
+
+// cursorTurnTime reads that block. A transcript without one, or with a shape
+// this cannot parse, keeps the file's modification time.
+func cursorTurnTime(text string) (time.Time, bool) {
+	m := cursorTurnTimeRE.FindStringSubmatch(text)
+	if m == nil {
+		return time.Time{}, false
+	}
+	zone := time.UTC
+	if m[2] != "" {
+		h, err := strconv.Atoi(m[2])
+		if err != nil {
+			return time.Time{}, false
+		}
+		mins := 0
+		if m[3] != "" {
+			mins, _ = strconv.Atoi(m[3])
+			if h < 0 {
+				mins = -mins
+			}
+		}
+		zone = time.FixedZone("", h*3600+mins*60)
+	}
+	for _, layout := range []string{"Jan 2, 2006, 3:04 PM", "January 2, 2006, 3:04 PM"} {
+		if t, err := time.ParseInLocation(layout, m[1], zone); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 // cursorTranscriptProject decodes ~/.cursor/projects/<Users-me-work-foo>/...
