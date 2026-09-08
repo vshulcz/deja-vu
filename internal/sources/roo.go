@@ -318,15 +318,71 @@ func ParseRooTask(path string) ([]model.Session, error) {
 		if m.Role == "user" {
 			text = unwrapClineTask(text)
 		}
-		if text == "" {
+		ts := base.Add(time.Duration(ti) * time.Second)
+		// The records first: a turn that only made a call carries no text, and
+		// skipping it on that alone is what left the work unindexed.
+		records := rooWorkRecords(m.Content, ts)
+		if text == "" && len(records) == 0 {
 			continue
 		}
-		ts := base.Add(time.Duration(ti) * time.Second)
 		s.Touch(ts)
-		s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		if text != "" {
+			s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		}
+		s.Messages = append(s.Messages, records...)
 	}
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// rooDialect is Roo Code's tool vocabulary, from its own Task.ts: the shell
+// tool is `execute_command` with the command under `command`, and the file
+// tools take `path`. The modern Cline CLI names all three differently, which
+// is why this is a dialect of its own rather than clineDialect reused.
+var rooDialect = toolDialect{
+	pathKey: "path",
+	pathTools: map[string]bool{
+		"read_file": true, "write_to_file": true, "apply_diff": true,
+		"insert_content": true, "search_and_replace": true,
+	},
+	shellTool: "execute_command",
+	editTools: map[string]bool{"apply_diff": true, "search_and_replace": true},
+}
+
+// rooWorkRecords is what a Roo turn did, as the records `how`, `files`, `blame`
+// and the fix-pair miner read.
+//
+// The reader indexed the words of a turn and nothing it did, so a Roo session
+// yielded no command record and no files record at all — those four surfaces
+// were blind to the harness while the modern Cline reader emitted all of them
+// (#3295).
+func rooWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(blocks, rooDialect); p != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(blocks, rooDialect) {
+			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range commandsIn(blocks, rooDialect) {
+			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
+		}
+	}
+	if IndexToolOutput() {
+		for _, body := range clineToolResults(blocks) {
+			out = append(out, model.Message{Role: RoleToolOutput, Text: body, Time: ts})
+		}
+	}
+	return out
 }
