@@ -20,7 +20,8 @@ seconds) and `content` blocks (`type: text` only for v1). SQLite: `sessions` joi
 - **Auto-recall**: `SessionStart` and `UserPromptSubmit` hooks in
   `~/.agents/plugins/deja/hooks/hooks.json`. Goose discards what a hook prints,
   so neither answers on stdout: they write the file Goose re-reads, which is
-  `.goosehints` at session start and the MOIM file per prompt.
+  deja's block in `~/.config/goose/AGENTS.md` at session start and the MOIM
+  file per prompt.
 - **Resume**: `goose session --resume --session-id <id>`.
 - **Handoff**: exec, `goose run -t`.
 - **Prerequisite**: the per-prompt half needs `GOOSE_MOIM_MESSAGE_FILE`, which
