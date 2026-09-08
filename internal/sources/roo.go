@@ -320,6 +320,9 @@ func ParseRooTask(path string) ([]model.Session, error) {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, tool...)
 			}
+		} else if work := rooWorkRecords(m.Content, ts); len(work) > 0 {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, work...)
 		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {

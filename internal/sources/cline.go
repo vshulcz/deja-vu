@@ -294,6 +294,9 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, tool...)
 			}
+		} else if work := rooWorkRecords(m.Content, ts); len(work) > 0 {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, work...)
 		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
@@ -324,6 +327,41 @@ var clineDialect = toolDialect{
 	commandKey:  "commands",
 	editTools:   map[string]bool{"editor": true},
 	oldKey:      "old_text",
+}
+
+// rooDialect is what the Roo Code and the legacy Cline extension call their
+// tools: execute_command with `command`, and `path` on the file tools —
+// read_file, write_to_file, apply_diff, insert_content, search_and_replace,
+// replace_in_file. Neither reader emitted a call as a work record before
+// #3295. The edit span is not read: apply_diff carries a SEARCH/REPLACE
+// block, not an old_string.
+var rooDialect = toolDialect{
+	pathKey: "path",
+	pathTools: map[string]bool{"read_file": true, "write_to_file": true, "apply_diff": true,
+		"insert_content": true, "search_and_replace": true, "replace_in_file": true},
+	shellTool: "execute_command",
+	editTools: map[string]bool{},
+}
+
+// rooWorkRecords is clineWorkRecords for the task files: the command a call
+// ran and the files it named, under the same switches.
+func rooWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(blocks, rooDialect); p != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range commandsIn(blocks, rooDialect) {
+			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
+		}
+	}
+	return out
 }
 
 // clineWorkRecords turns the tool blocks of one message into work records.

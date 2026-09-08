@@ -94,6 +94,11 @@ type geminiMessage struct {
 	Type      string          `json:"type"`
 	Content   json.RawMessage `json:"content"`
 	Model     string          `json:"model"`
+	// ToolCalls is what the model ran: id, name, args and the result the
+	// tool answered with. The reply also arrives as the next user record,
+	// content [{functionResponse}], which is where the output is read from
+	// so it is indexed once (#3293).
+	ToolCalls json.RawMessage `json:"toolCalls"`
 }
 
 func parseGeminiJSON(path string) ([]model.Session, error) {
@@ -211,17 +216,58 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		default:
 			continue // info/error/warning noise
 		}
-		text := geminiContentText(m.Content)
-		if text == "" {
-			continue
-		}
 		t, _ := time.Parse(time.RFC3339Nano, m.Timestamp)
 		if t.IsZero() {
 			t = s.Started
 		}
+		// The work rides on the same records as the talk: a gemini record's
+		// toolCalls name the command and the file, a user record made of
+		// functionResponse parts carries what came back. Read as text only,
+		// a Gemini store yielded no command, no tool output and no fix pair
+		// (#3293). Qwen's dialect follows Gemini's tool names, so the same
+		// reader serves both.
+		if work := geminiWorkRecords(m, t); len(work) > 0 {
+			s.Touch(t)
+			s.Messages = append(s.Messages, work...)
+		}
+		text := geminiContentText(m.Content)
+		if text == "" {
+			continue
+		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 	}
+}
+
+// geminiWorkRecords turns a record's toolCalls (the calls, without their
+// results) and its functionResponse parts (the results) into work records.
+func geminiWorkRecords(m geminiMessage, t time.Time) []model.Message {
+	var parts []any
+	if len(m.ToolCalls) > 0 {
+		var calls []struct {
+			Name string         `json:"name"`
+			Args map[string]any `json:"args"`
+		}
+		if json.Unmarshal(m.ToolCalls, &calls) == nil {
+			for _, c := range calls {
+				if c.Name != "" && c.Args != nil {
+					parts = append(parts, map[string]any{"functionCall": map[string]any{"name": c.Name, "args": c.Args}})
+				}
+			}
+		}
+	}
+	var blocks []map[string]any
+	if json.Unmarshal(m.Content, &blocks) == nil {
+		for _, p := range blocks {
+			if resp, ok := p["functionResponse"]; ok {
+				parts = append(parts, map[string]any{"functionResponse": resp})
+			}
+		}
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	return qwenWorkRecords(parts, t)
 }
 
 // content is a string or an array of Part objects ({"text": ...} и др.)
