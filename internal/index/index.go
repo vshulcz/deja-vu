@@ -126,7 +126,7 @@ import (
 // tool calls (#3295), opencode's synthetic parts (#3299) and subagent parents
 // (#3301), Copilot's injected skills (#3305), aider's banner and its
 // continuation lines (#3311), opencode's own session titles (#3315),
-// Antigravity's plan approvals (#3326). A store
+// Antigravity's plan approvals (#3326), Cursor's per-turn stamps (#3349). A store
 // built before holds skill bodies as the person's words and none of the new
 // tool output, and nothing re-reads a source without the bump (#3289).
 const version = 35
