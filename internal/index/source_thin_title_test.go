@@ -55,3 +55,25 @@ func TestAShortSourceTitleThatNamesTheWorkIsKept(t *testing.T) {
 		t.Errorf("title = %q, want the store's own name", got)
 	}
 }
+
+// A sentence in a script that does not space its words is not thin: eight
+// runes of Chinese say why the test failed, and a rune-length rule alone
+// replaced it with a longer, worse turn (review of #3328).
+func TestACJKTitleThatSaysSomethingIsNotThin(t *testing.T) {
+	at := time.Date(2026, 9, 2, 20, 23, 0, 0, time.UTC)
+	s := model.Session{
+		Harness: "opencode", Project: "api", ID: "cjk1", Title: "为什么测试失败了",
+		Messages: []model.Message{
+			{Role: "user", Text: "please look into this in more detail and explain step by step what happened", Time: at},
+		},
+	}
+	if got := metaForSession(s).Title; got != "为什么测试失败了" {
+		t.Errorf("title = %q, want the store's own name", got)
+	}
+	// A greeting in the same script still is thin.
+	s.Title = "你好"
+	s.ID = "cjk2"
+	if got := metaForSession(s).Title; got == "你好" {
+		t.Errorf("title = %q, want the turn under a two-character greeting", got)
+	}
+}
