@@ -59,12 +59,12 @@ harness falls back to the first prompt.
   command adapter, and what a headless boot proves is that the plugin registers
   cleanly.
 - **Auto-recall**: `deja install deepseek-auto` writes a second plugin at
-  `$DSH_HOME/plugins/deja/auto.js`. It listens on `agent/pre-step`, the event
-  that carries the messages entering the step the agent is about to take, and
-  splices the recall block in front of the last user message. The handler is
-  middleware, so it calls `next()` first and returns that decision with the
-  longer message list — returning a bare `{messages}` ends the turn with
-  `Cannot read properties of undefined (reading 'kind')`. The plain
+  `$DSH_HOME/plugins/deja/auto.js`. Recall arrives through
+  `ctx.systemPrompt.context`, evaluated on every assembly. The obvious
+  alternative — a middleware on `agent/pre-step` that splices a message into
+  the step — loads, completes the turn and never reaches the model: a later
+  listener rebuilds its answer from the payload and the added message is
+  dropped with nothing reported. The plain
   `deja install deepseek` target keeps the MCP server and `/deja` but writes no
   such plugin, and removes it along with its row when someone drops back to it.
   Verified against a local model with no tools in play: dsh answered a question
