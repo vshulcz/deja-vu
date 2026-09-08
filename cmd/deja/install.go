@@ -743,6 +743,21 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installClineAuto(exe, uninstall)
 	case "continue":
 		return installContinue(exe, uninstall)
+	case "crush":
+		return installCrushMCP(exe, uninstall)
+	case "crush-auto":
+		// The hook first: it shares crush.json with the MCP entry, and a
+		// refusal after the entry was written left the target reported as
+		// refused with half its wiring in the file (#2745).
+		hooks, err := installCrushAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		mcp, err := installCrushMCP(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(hooks, mcp), nil
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "vscode", "copilot-chat":
@@ -3658,6 +3673,7 @@ func installTargetNames() []string {
 		"openclaw", "openclaw-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",
+		"crush", "crush-auto",
 		"grok", "grok-auto", "copilot", "roo", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to

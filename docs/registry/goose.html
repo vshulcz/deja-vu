@@ -34,7 +34,7 @@
 <div class="glow"></div>
 <nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
 <div class="wrap"><div class="doc">
-<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html" aria-current="page">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html" aria-current="page">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
 <article>
 <h1>Goose</h1>
 <ul>
@@ -50,15 +50,55 @@
 <p>seconds) and <code>content</code> blocks (<code>type: text</code> only for v1). SQLite: <code>sessions</code> joined to</p>
 <p><code>messages</code> on <code>session_id</code>; <code>content_json</code> is a JSON array of content blocks.</p>
 <ul>
-<li><strong>MCP</strong>: Goose uses <code>~/.config/goose/config.yaml</code> extensions — no <code>deja install</code> target yet.</li>
-<li><strong>Resume</strong>: <code>goose session --resume --session-id &lt;id&gt;</code> (verified against upstream docs).</li>
-<li><strong>Handoff</strong>: paste — no documented start-with-prompt flag.</li>
+<li><strong>MCP</strong>: <code>deja install goose</code> adds the server as an extension in</li>
 </ul>
+<p><code>~/.config/goose/config.yaml</code>.</p>
+<ul>
+<li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>.</li>
+<li><strong>Command</strong>: Goose declares commands in the same config rather than a</li>
+</ul>
+<p>commands directory, so <code>/deja</code> is a recipe entry there.</p>
+<ul>
+<li><strong>Auto-recall</strong>: <code>SessionStart</code> and <code>UserPromptSubmit</code> hooks in</li>
+</ul>
+<p><code>~/.agents/plugins/deja/hooks/hooks.json</code>. Goose discards what a hook prints,</p>
+<p>so neither answers on stdout: they write the file Goose re-reads, which is</p>
+<p><code>.goosehints</code> at session start and the MOIM file per prompt.</p>
+<ul>
+<li><strong>Resume</strong>: <code>goose session --resume --session-id &lt;id&gt;</code>.</li>
+<li><strong>Handoff</strong>: exec, <code>goose run -t</code>.</li>
+<li><strong>Prerequisite</strong>: the per-prompt half needs <code>GOOSE_MOIM_MESSAGE_FILE</code>, which</li>
+</ul>
+<p>the <code>deja goose</code> wrapper sets.</p>
+<h2 id="what-the-other-nine-hook-events-can-carry">What the other nine hook events can carry</h2>
+<p>Goose has eleven hook events (twelve on 1.49, which adds <code>PreToolUseResult</code>).</p>
+<p>deja wires two. The rest were measured on a stand — isolated HOME, a recording</p>
+<p>endpoint, a hook on every event writing a marker into the MOIM file and a</p>
+<p><code>{&#34;additionalContext&#34;: …}</code> on stdout — on 1.46.0 and again on 1.49.0, with the</p>
+<p>same result both times.</p>
+<p>One turn whose shell command exits 3 fires <code>SessionStart</code>, <code>UserPromptSubmit</code>,</p>
+<p><code>PreToolUse</code>, <code>BeforeShellExecution</code>, <code>PostToolUseFailure</code>, <code>Stop</code> and</p>
+<p><code>SessionEnd</code>; <code>PostToolUse</code> and <code>AfterShellExecution</code> do not fire on a failure.</p>
+<p>Every tool event carries the same four fields — <code>event</code>, <code>session_id</code>,</p>
+<p><code>tool_name</code>, <code>tool_input</code>, plus <code>working_dir</code> — and no output, no error text and</p>
+<p>no exit code. <code>Stop</code> carries <code>last_assistant_message</code>.</p>
+<p>Two things follow, and they are why the other nine stay unwired:</p>
+<ul>
+<li>Hook stdout is discarded. No marker written there appeared in any recorded</li>
+</ul>
+<p>request, on either version.</p>
+<ul>
+<li>The MOIM file is re-read at each prompt, not between tool calls. A marker</li>
+</ul>
+<p>written by <code>PostToolUseFailure</code> is absent from the request Goose sends</p>
+<p>straight after the failure and present in the next prompt&#39;s. So a fix pair</p>
+<p>wired to that event would arrive one turn late, where the prompt hook already</p>
+<p>speaks — and with no error in the payload to key it on (#2952, #2956).</p>
 <p>Requested in <a href="https://github.com/vshulcz/deja-vu/issues/255">#255</a>.</p>
-<p><strong>Last verified:</strong> 2026-07-28</p>
+<p><strong>Last verified:</strong> 2026-09-07</p>
 
 <hr>
-<p>deja reads this format and twenty-two others, and turns what it finds into memory your
+<p>deja reads this format and twenty-four others, and turns what it finds into memory your
 agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
 wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
 history.</p>

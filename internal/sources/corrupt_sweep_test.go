@@ -85,7 +85,7 @@ func TestCorruptFixturesAcrossParsers(t *testing.T) {
 	var missed []string
 	for _, h := range Registry() {
 		switch h.Name {
-		case "deja", "opencode", "cursor", "zed", "hermes":
+		case "deja", "opencode", "cursor", "zed", "hermes", "crush":
 			// Database-backed or synthesised stores: their fixture is a SQL
 			// script or nothing at all, so there is no transcript to damage
 			// here. Their read paths are covered by their own tests.

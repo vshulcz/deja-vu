@@ -85,14 +85,37 @@ func (i *toolHookInput) adopt() {
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
 }
 
-func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
-	return runHookToolMode(dir, stdin, stdout, false)
+// hookToolShape is how the answer is framed on the way out. Claude Code's hook
+// envelope is the default; plain writes the block on its own, for the harnesses
+// that take a string back from a handler rather than reading a hook's stdout;
+// crush writes Crush's own envelope, which is a flat {"context": …} and reads
+// nothing nested (#2949).
+type hookToolShape int
+
+const (
+	hookToolClaude hookToolShape = iota
+	hookToolPlain
+	hookToolCrush
+)
+
+func hookToolShapeOf(rest []string) hookToolShape {
+	if len(rest) == 0 {
+		return hookToolClaude
+	}
+	switch rest[0] {
+	case "--plain", "-plain":
+		return hookToolPlain
+	case "--crush", "-crush":
+		return hookToolCrush
+	}
+	return hookToolClaude
 }
 
-// plain writes the block on its own instead of Claude Code's hook envelope, for
-// the harnesses that take a string back from a handler rather than reading a
-// hook's stdout.
-func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) error {
+func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
+	return runHookToolMode(dir, stdin, stdout, hookToolClaude)
+}
+
+func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookToolShape) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
 	_ = json.NewDecoder(bytes.NewReader(raw)).Decode(&input)
@@ -153,8 +176,22 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, plain bool) 
 	// stats and the receipt. Deduped above, so this counts a distinct fact
 	// served, not every action.
 	usage.RecordResult(dir, usage.KindTool, len(out), 1, false)
-	if plain {
+	switch shape {
+	case hookToolPlain:
 		fmt.Fprint(stdout, out)
+		return nil
+	case hookToolCrush:
+		// No decision field: Crush reads "allow" as affirmative pre-approval
+		// and would skip the permission prompt for every call this fires on.
+		// All deja wants is the context appended.
+		b, err := json.Marshal(struct {
+			Version int    `json:"version"`
+			Context string `json:"context"`
+		}{Version: 1, Context: out})
+		if err != nil {
+			return nil
+		}
+		fmt.Fprintln(stdout, string(b))
 		return nil
 	}
 	var resp sessionStartHookResponse
@@ -188,6 +225,8 @@ func toolHookLine(dir, cwd string, input toolHookInput) string {
 	case "Edit", "Write", "MultiEdit", "NotebookEdit",
 		// Grok's editor and its file writer.
 		"search_replace", "write",
+		// Crush names its editors in lowercase.
+		"edit", "multiedit",
 		// pi and omp have no pre-tool seam: the only handler whose return the
 		// model reads is the one holding a finished tool result. An edit there
 		// is already made, so the file's history goes out on their lowercase

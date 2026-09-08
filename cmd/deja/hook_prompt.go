@@ -172,7 +172,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// recall at all — it once made this hook say "you have been here" about
 	// another notification, on the envelope's field names (#3156).
 	asked := digest.StripHarnessBlocks(string(input.Prompt))
-	if asked == "" {
+	if asked == "" || digest.IsAgentArtifact(asked) {
 		return nil
 	}
 	// The failure the user just reported is worth capturing whether or not

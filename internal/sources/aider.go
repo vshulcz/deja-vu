@@ -188,7 +188,10 @@ func itoa(n int) string {
 	if n == 0 {
 		return "0"
 	}
-	var b [8]byte
+	// Wide enough for any int on a 64-bit build. At eight it panicked on the
+	// ninth digit, which nothing here reaches today and which a caller passing
+	// a unix stamp would.
+	var b [20]byte
 	i := len(b)
 	for n > 0 {
 		i--

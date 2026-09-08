@@ -70,6 +70,10 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("GEMINI_CLI_HOME", "")
 	t.Setenv("CURSOR_CONFIG_DIR", "")
 	t.Setenv("AIDER_CHAT_HISTORY_FILE", "")
+	// Crush resolves its store registry and its config from separate roots, and
+	// a developer who exports either would put their own projects in a golden.
+	t.Setenv("DEJA_CRUSH_ROOT", "")
+	t.Setenv("CRUSH_GLOBAL_CONFIG", "")
 	t.Setenv("NO_COLOR", "1")
 	return tmp
 }

@@ -339,7 +339,7 @@
         "fixtures/registry/goose/sessions/goose.sql"
       ],
       "parser_source": "internal/sources/goose.go",
-      "last_verified": "2026-07-28",
+      "last_verified": "2026-09-07",
       "display_name": "Goose",
       "capabilities": {
         "mcp": true,
@@ -533,6 +533,31 @@
           "state": "todo",
           "why": "The CLI has --resume for the last session and --fork <sessionId>, but nothing that takes the id of an arbitrary session; the editor reopens one from its history view"
         }
+      }
+    },
+    {
+      "id": "crush",
+      "store_paths": [
+        "<project>/.crush/crush.db",
+        "~/.local/share/crush/projects.json",
+        "${XDG_DATA_HOME}/crush/projects.json",
+        "${DEJA_CRUSH_ROOT}/projects.json"
+      ],
+      "format_kind": "sqlite",
+      "fixture_paths": [
+        "fixtures/registry/crush/crush.sql"
+      ],
+      "parser_source": "internal/sources/crush.go",
+      "last_verified": "2026-09-07",
+      "display_name": "Crush",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "sqlite3"
       }
     },
     {

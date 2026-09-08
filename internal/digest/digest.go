@@ -614,7 +614,7 @@ func IsAgentArtifact(text string) bool {
 
 // compactionOutlineRE is the numbered outline the summary opens with; a person
 // asking "Summary: what is the Primary Request and Intent here?" has no "1.".
-var compactionOutlineRE = regexp.MustCompile(`(?m)^\s*1\.\s*Primary Request and Intent`)
+var compactionOutlineRE = regexp.MustCompile(`^Summary:\s*1\.\s*Primary Request and Intent`)
 
 // IsCompactionSummary reports whether a message is the block a harness writes
 // as the first user turn after a compaction — Claude Code's "Summary: 1.

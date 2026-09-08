@@ -308,6 +308,25 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "crush", Load: LoadCrush, Files: CrushDBs,
+			Kinds: []FileKind{{
+				Name: "crush",
+				Match: func(p string) bool {
+					if !hasBase(p, "crush.db") {
+						return false
+					}
+					for _, db := range CrushDBs() {
+						if p == db {
+							return true
+						}
+					}
+					return false
+				},
+				Parse:     dbParse(ParseCrushDB, ParseCrushDBSince),
+				ParseFrom: dbParseFrom(ParseCrushDB, ParseCrushDBSince),
+			}},
+		},
+		{
 			Name: "continue", Load: LoadContinue, Files: ContinueSessionFiles,
 			Kinds: []FileKind{{
 				Name: "continue",

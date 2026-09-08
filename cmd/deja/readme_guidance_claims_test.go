@@ -34,6 +34,7 @@ var readmeGuidanceNames = map[string]string{
 	"deepseek":    "DeepSeek Harness",
 	"zed":         "Zed",
 	"continue":    "Continue",
+	"crush":       "Crush",
 	"vscode":      "VS Code Copilot Chat",
 	// Grok is named in its own sentence in the same paragraph, because the
 	// home copy only applies when a project has no .grok/GROK.md.
