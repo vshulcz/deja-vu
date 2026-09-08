@@ -102,7 +102,17 @@ def _provider_active():
         # Config can outlive the provider (an uninstall, a deleted directory);
         # then the hook is the memory again, or there would be none at all.
         here = os.path.dirname(os.path.abspath(__file__))
-        return os.path.isfile(os.path.join(os.path.dirname(here), "deja-memory", "__init__.py"))
+        init = os.path.join(os.path.dirname(here), "deja-memory", "__init__.py")
+        if not os.path.isfile(init):
+            return False
+        # The file can be there and still not load — it imports names from
+        # Hermes, and an older Hermes does not have all of them. Standing down
+        # for a provider that never loaded leaves the turn with no memory at
+        # all, which is worse than repeating it (#3202).
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("deja_memory_probe", init)
+        spec.loader.exec_module(importlib.util.module_from_spec(spec))
+        return True
     except Exception:
         return False
 
