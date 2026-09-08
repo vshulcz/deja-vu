@@ -16,6 +16,7 @@ func TestParseKimiKeepsOnlyThePersonsLinesAsUser(t *testing.T) {
 {"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"<system-reminder>\nAuto permission mode is active.\n</system-reminder>"}],"origin":{"kind":"injection","variant":"permission_mode"}},"time":1782295201300}
 {"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"quuxnotify: background task 7 finished"}],"origin":{"kind":"background_task"}},"time":1782295201400}
 {"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"older protocol, no origin"}]},"time":1782295201500}
+{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"/review the tokenizer"}],"origin":{"kind":"skill_activation","trigger":"user-slash"}},"time":1782295201600}
 {"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"the tokenizer trims it"}]},"time":1782295202000}
 `
 	if err := os.WriteFile(wire, []byte(body), 0o644); err != nil {
@@ -31,7 +32,7 @@ func TestParseKimiKeepsOnlyThePersonsLinesAsUser(t *testing.T) {
 			users = append(users, m.Text)
 		}
 	}
-	if len(users) != 2 || users[0] != "why does glimwrax drop the trailing newline" || users[1] != "older protocol, no origin" {
+	if len(users) != 3 || users[0] != "why does glimwrax drop the trailing newline" || users[1] != "older protocol, no origin" || users[2] != "/review the tokenizer" {
 		t.Fatalf("user lines = %q", users)
 	}
 }

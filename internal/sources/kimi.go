@@ -67,14 +67,17 @@ type kimiState struct {
 }
 
 // kimiPersonsOrigin reports whether a message's origin says a person wrote it:
-// kind "user" (and the user's own slash commands), or no origin at all.
+// kind "user", a skill or plugin command the person typed (Kimi marks those
+// with trigger "user-slash"), or no origin at all — the same disposition
+// Kimi's own context builder applies.
 func kimiPersonsOrigin(origin any) bool {
 	o, ok := origin.(map[string]any)
 	if !ok {
 		return true
 	}
 	kind, _ := o["kind"].(string)
-	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user")
+	trigger, _ := o["trigger"].(string)
+	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user") || trigger == "user-slash"
 }
 
 func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
@@ -124,6 +127,9 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 			// are user turns; a message with no origin is an older protocol's
 			// and was always the person's (#3199).
 			if role == "user" && !kimiPersonsOrigin(msg["origin"]) {
+				// The host's line still moves the clock: a session whose
+				// last record is a hook's output ended when that arrived.
+				s.Touch(parseTimeAny(m["time"]))
 				return
 			}
 			if role == "assistant" {
