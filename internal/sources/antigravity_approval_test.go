@@ -53,3 +53,18 @@ func TestAntigravitySkipsAPlanApprovalWithNoRequestInIt(t *testing.T) {
 		t.Errorf("second turn = %q, want the words inside the request tag", users[1])
 	}
 }
+
+// Whatever the person wrote around the tag stays: a line above it, and a turn
+// that carries two request blocks with words between them (review of #3326).
+func TestAntigravityKeepsWhatIsWrittenAroundTheRequestTag(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"also note: <USER_REQUEST>\nplease fix the bug\n</USER_REQUEST>", "also note:\nplease fix the bug"},
+		{"<USER_REQUEST>first</USER_REQUEST> and also <USER_REQUEST>second</USER_REQUEST>", "first\nand also\nsecond"},
+		{"Comments on artifact URI: file:///w/api/implementation_plan.md\n\nThe user has approved this document.\n\n\n<USER_REQUEST>\n\n</USER_REQUEST>", ""},
+	}
+	for _, c := range cases {
+		if got := cleanAntigravityUserContent(c.in); got != c.want {
+			t.Errorf("cleanAntigravityUserContent(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
