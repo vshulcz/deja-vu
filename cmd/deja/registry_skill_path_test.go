@@ -47,10 +47,13 @@ func TestRegistryPagesNameTheSkillPathInstallWrites(t *testing.T) {
 		}
 		for _, m := range claim.FindAllStringSubmatch(string(b), -1) {
 			said := strings.TrimSuffix(strings.TrimSpace(m[1]), "/")
-			// Compare home-relative, and accept the directory as well as the
-			// file: a page may name either.
-			got := strings.TrimSuffix(strings.TrimPrefix(want, home), "/")
-			got = "~" + got
+			// Compare home-relative and in the docs' own separator: the pages
+			// are written with "/" on every platform while guidancePath answers
+			// in the host's, which made this pass everywhere and fail on the
+			// Windows leg alone. Accept the directory as well as the file — a
+			// page may name either.
+			got := "~" + filepath.ToSlash(strings.TrimPrefix(want, home))
+			got = strings.TrimSuffix(got, "/")
 			if said != got && said != strings.TrimSuffix(got, "/SKILL.md") {
 				t.Errorf("docs/registry/%s says the skill lands at %s; install writes %s",
 					e.Name(), said, got)
