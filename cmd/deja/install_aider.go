@@ -41,7 +41,10 @@ func installAider(_ string, uninstall bool) (installResult, error) {
 	}
 	next := removeAiderReadEntry(string(old))
 	if !uninstall {
-		next = addAiderReadEntry(next, aiderContextPath())
+		var aerr error
+		if next, aerr = addAiderReadEntry(next, aiderContextPath()); aerr != nil {
+			return installResult{}, fmt.Errorf("%s: %w", shortHome(path), aerr)
+		}
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
 	if werr != nil {
@@ -61,22 +64,92 @@ func installAider(_ string, uninstall bool) (installResult, error) {
 
 // addAiderReadEntry keeps whatever list is already under read: — a user with
 // their own CONVENTIONS.md there must not lose it.
-func addAiderReadEntry(s, ctx string) string {
+func addAiderReadEntry(s, ctx string) (string, error) {
 	entry := "  - " + ctx + "\n"
 	if i := strings.Index("\n"+s, "\nread:\n"); i >= 0 {
 		at := i + len("\nread:\n") - 1
-		return s[:at] + entry + s[at:]
+		return s[:at] + entry + s[at:], nil
 	}
 	// The scalar form takes a single file; promote it to a list so both survive.
 	for _, line := range strings.Split(s, "\n") {
-		if v, ok := strings.CutPrefix(line, "read: "); ok && strings.TrimSpace(v) != "" {
-			return strings.Replace(s, line+"\n", "read:\n  - "+strings.TrimSpace(v)+"\n"+entry, 1)
+		v, ok := strings.CutPrefix(line, "read: ")
+		if !ok || strings.TrimSpace(v) == "" {
+			continue
 		}
+		// A flow list is not a scalar. Taken as one, `read: [a.md, b.md]`
+		// became a single entry `- [a.md, b.md]` and aider looked for a file
+		// with that name — the reader's two files gone from its view, reported
+		// as a successful install (#3197).
+		if items, isFlow := yamlFlowItems(strings.TrimSpace(v)); isFlow {
+			if items == nil {
+				// A shape this cannot take apart safely. Refuse, the way the
+				// goose and Continue writers do, rather than rewrite it wrong.
+				return "", fmt.Errorf("read: %s is a list deja cannot rewrite \u2014 move it to a block list and run this again", strings.TrimSpace(v))
+			}
+			var b strings.Builder
+			b.WriteString("read:\n")
+			for _, it := range items {
+				b.WriteString("  - " + it + "\n")
+			}
+			b.WriteString(entry)
+			return strings.Replace(s, line+"\n", b.String(), 1), nil
+		}
+		return strings.Replace(s, line+"\n", "read:\n  - "+strings.TrimSpace(v)+"\n"+entry, 1), nil
 	}
 	if s != "" && !strings.HasSuffix(s, "\n") {
 		s += "\n"
 	}
-	return s + "read:\n" + entry
+	return s + "read:\n" + entry, nil
+}
+
+// yamlFlowItems takes apart a YAML flow list \u2014 `[a, b]` \u2014 into its items, and
+// says whether the value was one at all. It gives nil items for a flow list
+// holding anything but plain scalars: a nested list or mapping, or a quote that
+// never closes. The caller refuses those rather than guess.
+func yamlFlowItems(v string) ([]string, bool) {
+	if !strings.HasPrefix(v, "[") {
+		return nil, false
+	}
+	if !strings.HasSuffix(v, "]") {
+		return nil, true
+	}
+	inner := strings.TrimSpace(v[1 : len(v)-1])
+	if inner == "" {
+		return []string{}, true
+	}
+	var items []string
+	var cur strings.Builder
+	quote := byte(0)
+	for i := 0; i < len(inner); i++ {
+		c := inner[i]
+		switch {
+		case quote != 0:
+			if c == quote {
+				quote = 0
+			}
+			cur.WriteByte(c)
+		case c == '\'' || c == '"':
+			quote = c
+			cur.WriteByte(c)
+		case c == '[' || c == ']' || c == '{' || c == '}':
+			return nil, true
+		case c == ',':
+			items = append(items, strings.TrimSpace(cur.String()))
+			cur.Reset()
+		default:
+			cur.WriteByte(c)
+		}
+	}
+	if quote != 0 {
+		return nil, true
+	}
+	items = append(items, strings.TrimSpace(cur.String()))
+	for _, it := range items {
+		if it == "" {
+			return nil, true
+		}
+	}
+	return items, true
 }
 
 func removeAiderReadEntry(s string) string {
