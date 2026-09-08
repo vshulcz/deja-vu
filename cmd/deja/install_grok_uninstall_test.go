@@ -16,7 +16,8 @@ func TestUninstallGrokAutoLeavesTheReadersHooks(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	seed := `{"hooks":{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"/usr/local/bin/other-tool session"}]}],"PreToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":"/usr/local/bin/lint-on-write"}]}]}}` + "\n"
+	// An entry from an older deja at another path sits beside the reader's.
+	seed := `{"hooks":{"SessionStart":[{"matcher":"startup|resume","hooks":[{"type":"command","command":"/usr/local/bin/other-tool session"},{"type":"command","command":"/old/path/deja hook-context"}]}],"PreToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":"/usr/local/bin/lint-on-write"}]}]}}` + "\n"
 	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +31,7 @@ func TestUninstallGrokAutoLeavesTheReadersHooks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("the reader's hooks file is gone: %v", err)
 	}
-	if strings.Contains(string(b), "/bin/deja") {
+	if strings.Contains(string(b), "/bin/deja") || strings.Contains(string(b), "/old/path/deja") {
 		t.Fatalf("deja's entries stayed:\n%s", b)
 	}
 	var root map[string]any
