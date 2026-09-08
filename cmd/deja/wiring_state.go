@@ -287,7 +287,6 @@ func refreshWiringAfterUpgrade() []string {
 	return changed
 }
 
-// wiringCreated reports that deja created this config rather than finding it.
 // snapshotsByThisRun are the .bak files this run wrote, before the record is
 // persisted at the end of it.
 var snapshotsByThisRun []string
@@ -335,6 +334,7 @@ func canonicalSnapshotPath(bak string) string {
 	return filepath.Join(dir, filepath.Base(bak))
 }
 
+// wiringCreated reports that deja created this config rather than finding it.
 func wiringCreated(path string) bool {
 	for _, p := range readWiringState().Created {
 		if p == path {
