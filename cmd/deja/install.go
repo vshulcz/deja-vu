@@ -1893,6 +1893,9 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 	if uerr != nil {
 		return res, uerr
 	}
+	// Both files, whichever of them the printer is named for: the kept-snapshot
+	// line reads the paths, and dropping the other one meant a snapshot beside
+	// it was never counted — "kept 1 snapshot" with two on disk (#3388).
 	if res.Action == "unchanged" {
 		if res.Note != "" {
 			if user.Note != "" {
@@ -1901,7 +1904,16 @@ func installGrok(exe string, uninstall bool) (installResult, error) {
 				user.Note = res.Note
 			}
 		}
+		user.also = append(user.also, res.Path)
 		return user, nil
+	}
+	res.also = append(res.also, user.Path)
+	if user.Note != "" {
+		if res.Note != "" {
+			res.Note += "; " + user.Note
+		} else {
+			res.Note = user.Note
+		}
 	}
 	return res, nil
 }
