@@ -79,15 +79,17 @@ func installVSCodeMCP(exe string, uninstall bool) (installResult, error) {
 		}
 		dirs = []string{vsCodeDefaultUserDir()}
 	}
-	var last installResult
+	// Every host's result, folded: the last host's alone was the answer, and
+	// the others were written in silence (#3233).
+	var results []installResult
 	for _, dir := range dirs {
 		r, err := installVSCodeMCPAt(filepath.Join(dir, "mcp.json"), exe, uninstall)
 		if err != nil {
 			return installResult{}, err
 		}
-		last = r
+		results = append(results, r)
 	}
-	return last, nil
+	return wroteAll(results...), nil
 }
 
 // installVSCodeMCPAt writes one mcp.json. deja's entry is merged into the
