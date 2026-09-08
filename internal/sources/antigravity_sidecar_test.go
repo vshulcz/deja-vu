@@ -59,3 +59,27 @@ func TestAntigravitySidecarFilesClaimsOnlyWhatItKnows(t *testing.T) {
 		}
 	}
 }
+
+// Gemini's own scratch under `tmp`: the per-project log the CLI writes beside
+// the chats. Everything else under that tree is a chat deja either read or did
+// not (#3397).
+func TestGeminiSidecarFilesClaimsOnlyTheLog(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_GEMINI_ROOT", root)
+	chats := filepath.Join(root, "tmp", "proj", "chats")
+	if err := os.MkdirAll(chats, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{
+		filepath.Join(root, "tmp", "proj", "logs.json"),
+		filepath.Join(chats, "session-2026-08-22T06-32-6b36be8d.jsonl"),
+	} {
+		if err := os.WriteFile(p, []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := GeminiSidecarFiles()
+	if len(got) != 1 || filepath.Base(got[0]) != "logs.json" {
+		t.Errorf("GeminiSidecarFiles() = %v, want the project log alone", got)
+	}
+}
