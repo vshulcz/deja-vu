@@ -121,7 +121,7 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("how: unknown flag %q", args[i])
+				return fmt.Errorf("how: unknown flag %q; a query that starts with a dash goes after `--`", args[i])
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])
