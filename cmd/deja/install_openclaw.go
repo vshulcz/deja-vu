@@ -105,10 +105,10 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		// The switch goes back whether or not the reader's own hooks remain:
 		// with an entry left the restore was skipped, and a hook the reader
 		// had switched off ran once deja was gone (#3204).
+		// No record means deja set the switch on a file that had none: the
+		// key goes, entries or not — what the JSONC writer does.
 		if was := hookSwitchWas(path); was == nil {
-			if len(entries) == 0 {
-				delete(internal, "enabled")
-			}
+			delete(internal, "enabled")
 		} else {
 			internal["enabled"] = was
 		}
