@@ -126,7 +126,10 @@ import (
 // user turn and aider kept /undo and /clear as questions (#3255, #3248); Hermes
 // stamped every session with the profile instead of the directory it was worked
 // in, and titled by whichever row came first (#3257, #3251, #3241); Zed threw
-// away every tool result it stored (#3291); Crush is a new reader whose stores
+// away every tool result it stored (#3291); Claude Code's own records — skill
+// bodies, re-fired prompts, the /fork notice — were indexed as the person's
+// words (#3267); Roo and legacy Cline yielded no command or file records
+// (#3295); Crush is a new reader whose stores
 // nothing had walked. None of that reaches an existing
 // store without a re-read, and the repo's precedent for a content-changing
 // parser fix is exactly this: #2875 for goose, #1383 for the greeting rule,
