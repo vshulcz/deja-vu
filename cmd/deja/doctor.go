@@ -729,7 +729,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// printFilesBeside is printFiles for a harness whose store keeps files
 	// beside the transcripts that are not transcripts — Continue's
 	// sessions.json (the list, which deja reads), Copilot's vscode.metadata.json
-	// (the IDE's bookkeeping, #3303). Counted with the files, it made `doctor`
+	// (the IDE's bookkeeping, #3303), Kimi's per-session state.json (the title
+	// and working directory, #3309). Counted with the files, it made `doctor`
 	// disagree with `deja sources` by one; counted as unread, it made every
 	// store report a file deja could not read (#3297). So it is neither: the
 	// count is the transcripts, and the note leaves the list alone.
@@ -768,7 +769,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("qwen", qwenRoot, doctorExists(qwenRoot), sources.QwenSessionFiles())
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
-	printFiles("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles())
+	printFilesBeside("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles(), sources.KimiSidecarFiles()...)
 
 	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
 	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))
