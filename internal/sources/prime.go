@@ -22,8 +22,19 @@ import (
 // shape a live install has. Reported with the paths and the version they were
 // read from (#2529).
 
-// PrimeConfigDir is the prime-agent configuration directory.
-func PrimeConfigDir() string { return filepath.Join(Home(), ".prime", "agent") }
+// PrimeConfigDir is the prime-agent user directory — settings, extensions,
+// skills and the default session root. PRIME_AGENT_CODING_AGENT_DIR moves it
+// (config.ts getAgentDir), and moves it for deja too: read only the session
+// variables, deja wrote settings.json where prime never looked and called it
+// wired (#3276).
+func PrimeConfigDir() string {
+	// prime expands a leading ~ itself (config.ts expandTildePath); read the
+	// same value the same way.
+	if p := EnvPath("PRIME_AGENT_CODING_AGENT_DIR", ""); p != "" {
+		return expandTilde(p)
+	}
+	return filepath.Join(Home(), ".prime", "agent")
+}
 
 // PrimeRoot returns the session store root.
 //
@@ -36,7 +47,10 @@ func PrimeRoot() string {
 	if p := EnvPath("DEJA_PRIME_ROOT", ""); p != "" {
 		return p
 	}
-	for _, name := range []string{"PRIME_AGENT_CODING_AGENT_SESSION_DIR", "PRIME_AGENT_SESSION_DIR"} {
+	// The current name first, the legacy one second — prime's own order
+	// (config.ts: ENV_SESSION_DIR ?? ENV_LEGACY_SESSION_DIR), so the two
+	// agree on the root when both are set (#3277).
+	for _, name := range []string{"PRIME_AGENT_SESSION_DIR", "PRIME_AGENT_CODING_AGENT_SESSION_DIR"} {
 		if p := EnvPath(name, ""); p != "" {
 			return p
 		}

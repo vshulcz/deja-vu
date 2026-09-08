@@ -314,6 +314,13 @@ func ParseRooTask(path string) ([]model.Session, error) {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
+		ts := base.Add(time.Duration(ti) * time.Second)
+		if m.Role == "user" {
+			if tool := clineTurnToolOutput(m.Content, ts); len(tool) > 0 {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, tool...)
+			}
+		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
 			text = unwrapClineTask(text)
@@ -321,7 +328,6 @@ func ParseRooTask(path string) ([]model.Session, error) {
 		if text == "" {
 			continue
 		}
-		ts := base.Add(time.Duration(ti) * time.Second)
 		s.Touch(ts)
 		s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
 	}

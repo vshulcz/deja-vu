@@ -156,7 +156,33 @@ func ParseContinueFile(path string) ([]model.Session, error) {
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
+	if continuePlaceholderTitle(s.Title, s.Messages) {
+		// Continue's own stand-ins and a title that is only the first line
+		// typed are no titles: left empty, the index derives one and looks
+		// past a greeting the way it does for every other harness (#3274).
+		s.Title = ""
+	}
 	return []model.Session{s}, nil
+}
+
+// continuePlaceholderTitle reports whether a title is Continue's placeholder —
+// "New Session" (NEW_SESSION_TITLE) or the CLI's "Untitled Session"
+// (DEFAULT_SESSION_TITLE) — or just the first user line again.
+func continuePlaceholderTitle(title string, ms []model.Message) bool {
+	t := strings.TrimSpace(title)
+	if t == "" {
+		return false
+	}
+	switch strings.ToLower(t) {
+	case "new session", "untitled session":
+		return true
+	}
+	for _, m := range ms {
+		if m.Role == "user" {
+			return strings.EqualFold(t, firstLineTrim(m.Text))
+		}
+	}
+	return false
 }
 
 // continueText reads the two shapes message.content takes: a plain string, or

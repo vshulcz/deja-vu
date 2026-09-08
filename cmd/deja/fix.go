@@ -141,7 +141,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			if p.Candidate {
 				changed = "changed next, unconfirmed"
 			}
-			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafeLine(p.Edit))
+			fmt.Fprintf(stdout, "  %s: %s\n", changed, search.SafePath(p.Edit))
 			continue
 		}
 		ran := "ran next"
@@ -197,6 +197,11 @@ type fixJSON struct {
 type fixRowJSON struct {
 	Error   string `json:"error"`
 	Command string `json:"command"`
+	// Edit is the file the sessions changed after the error, when the remedy
+	// was a change rather than a command (#2163); set instead of Command, and
+	// omitted when the remedy was a command. It reached the prose only, and a
+	// script read an empty command (#3261).
+	Edit string `json:"edit,omitempty"`
 	// Candidate is the half-evidence flag the prose renders as "ran next,
 	// unconfirmed": one session ran this after the error and nothing has
 	// confirmed it worked. A caller acting on a fix needs to know which it has.
@@ -212,6 +217,7 @@ func writeFixJSON(stdout io.Writer, pairs []index.FixPair) error {
 		row := fixRowJSON{
 			Error:     search.SafeLine(p.Error),
 			Command:   search.SafeCommand(p.Command),
+			Edit:      search.SafePath(p.Edit),
 			Candidate: p.Candidate,
 		}
 		if !p.When.IsZero() {
