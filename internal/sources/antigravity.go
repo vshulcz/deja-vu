@@ -41,6 +41,56 @@ func AntigravityRoots() []string {
 	return out
 }
 
+// AntigravitySidecarFiles lists what an Antigravity store keeps beside the
+// transcript deja reads: the full log, the chunk files it is written in, the
+// message records and the metadata beside a plan. Everything lives under
+// `.system_generated`, so the row could say nothing about any of it until
+// #3377.
+func AntigravitySidecarFiles() []string {
+	var out []string
+	for _, root := range AntigravityRoots() {
+		out = append(out, walkFiles(root, func(p string) bool {
+			rel, err := filepath.Rel(root, p)
+			if err != nil {
+				return false
+			}
+			parts := strings.Split(filepath.ToSlash(rel), "/")
+			// Outside a conversation: the settings, the caches, the update
+			// marker, the MCP and plugin files deja itself installs. Named one
+			// by one — exempting everything outside brain/ swallowed a
+			// transcript restored beside it, which is what this row exists to
+			// find (review of #3377).
+			if parts[0] != "brain" {
+				switch parts[0] {
+				case "cache", "mcp", "plugins", "updater", "tmp":
+					return true
+				}
+				switch filepath.Base(p) {
+				case "settings.json", "history.jsonl", "import_manifest.json":
+					return true
+				}
+				return false
+			}
+			base := filepath.Base(p)
+			dir := filepath.ToSlash(filepath.Dir(p))
+			switch {
+			case base == "read.json", base == "remember.json":
+				return true
+			case strings.HasSuffix(base, ".metadata.json"):
+				return true
+			case base == "transcript_full.jsonl":
+				// Only when it is the second copy of a log deja does read: a
+				// session whose only artefact is the full transcript has its
+				// content nowhere else, and the row must say so.
+				return fileExists(filepath.Join(filepath.Dir(p), "transcript.jsonl"))
+			}
+			return strings.Contains(dir, "/.system_generated/messages") ||
+				strings.Contains(dir, "/logs/chunks/")
+		})...)
+	}
+	return out
+}
+
 func AntigravityTranscripts() []string {
 	var out []string
 	for _, root := range AntigravityRoots() {
