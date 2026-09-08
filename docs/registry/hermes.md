@@ -14,7 +14,7 @@ the project, the same way a Cline or Roo workspace does. A store without that ta
 or a session whose row has no `cwd`, falls back to the profile name. The title is left
 to the index rather than taken from the first row.
 
-- **MCP**: `mcp_servers` in `~/.hermes/config.yaml`; `deja install hermes-auto` also drops a plugin whose `pre_llm_call` hook injects recall and registers `/deja`, and a memory provider (`deja-memory`) that `hermes memory setup` lists next to mem0 and supermemory — the same recall in the `memory.provider` slot, with `deja_recall`, `deja_fix` and `deja_blame` as its tools.
+- **MCP**: `mcp_servers` in `~/.hermes/config.yaml`; `deja install hermes-auto` also drops a plugin whose `pre_llm_call` hook injects recall and registers `/deja`, and a memory provider (`deja-memory`) that `hermes memory setup` lists next to mem0 and supermemory — the same recall in the `memory.provider` slot, with `deja_recall`, `deja_fix` and `deja_blame` as its tools. The provider is written against the interface Hermes has: `RecallStatus` arrived after `MemoryProvider`, so it is imported behind a guard and the status line is skipped where the class is missing — checked against Hermes 0.17.0, which has none. The hook stands aside for the provider only after loading it, so a provider that cannot import leaves the hook doing the recall rather than nobody.
 - **Resume**: Hermes has its own session commands; nothing documented that starts a session from a prompt.
 - **Handoff**: paste.
 

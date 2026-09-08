@@ -85,7 +85,15 @@ import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
 
-from agent.memory_provider import MemoryProvider, RecallStatus
+from agent.memory_provider import MemoryProvider
+
+try:
+    # The status line is newer than the provider interface: Hermes 0.17 has no
+    # RecallStatus, and importing it there fails the whole module, so the
+    # provider loads as unavailable while the hook has already stood down.
+    from agent.memory_provider import RecallStatus
+except ImportError:
+    RecallStatus = None
 
 DEJA = %s
 
@@ -227,8 +235,8 @@ class DejaMemoryProvider(MemoryProvider):
         self._last_count = sum(1 for line in text.splitlines() if line.startswith("- "))
         return text
 
-    def recall_status(self) -> Optional[RecallStatus]:
-        if not self._last_text:
+    def recall_status(self):
+        if not self._last_text or RecallStatus is None:
             return None
         return RecallStatus(provider_label="deja", count=self._last_count)
 
