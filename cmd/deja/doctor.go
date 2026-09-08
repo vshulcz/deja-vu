@@ -748,7 +748,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
 	codexRoot := sources.CodexRoot()
-	printFiles("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles())
+	printFilesBeside("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles(), sources.CodexSidecarFiles()...)
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
@@ -762,8 +762,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 
 	printRow("antigravity", doctorAntigravityLocation(), len(sources.AntigravityRoots()) > 0, doctorCount(len(sources.AntigravityTranscripts()), "file"))
 
-	grokRoot := sources.GrokRoot()
-	printFiles("grok", grokRoot, doctorExists(grokRoot), sources.GrokSessionFiles())
+	// The store root also holds Grok's settings, credentials and caches, which
+	// are not transcripts and never will be; the sessions directory is what the
+	// count is about (#3319).
+	grokRoot := filepath.Join(sources.GrokRoot(), "sessions")
+	printFilesBeside("grok", grokRoot, doctorExists(grokRoot), sources.GrokSessionFiles(), sources.GrokSidecarFiles()...)
 
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
 	printFiles("qwen", qwenRoot, doctorExists(qwenRoot), sources.QwenSessionFiles())
