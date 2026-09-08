@@ -903,6 +903,18 @@ func recentlyInjected(dir, sid string, window int) map[string]bool {
 	return out
 }
 
+// hookseenPrefixed reports whether a key already carries one of the prefixes
+// deja writes its own rows under, so a session id shaped like one of them does
+// not reach across into another session's rows.
+func hookseenPrefixed(key string) bool {
+	for _, p := range []string{sessionStartKeyPrefix, "once:", "agy:"} {
+		if strings.HasPrefix(key, p) {
+			return true
+		}
+	}
+	return false
+}
+
 // forgetInjected drops one agent session's entries from the seen list, so
 // recall may send it again what it was already shown. Used when the harness
 // truncates the conversation and the blocks go with it.
@@ -924,11 +936,15 @@ func forgetInjected(dir, sid string) {
 	// prompt rows alone left the digest the compaction had just thrown away as
 	// the one thing recall would not send again — on a harness whose only rows
 	// are those two, the next start was silent (#3307).
-	keys := map[string]bool{
-		key:                         true,
-		sessionStartKeyPrefix + key: true,
-		onceDigestKey(key):          true,
-		antigravityDigestKey(key):   true,
+	keys := map[string]bool{key: true}
+	// Only for an id that is not itself one of those keys. No harness writes a
+	// session id beginning with a prefix deja owns, and if one ever did, the
+	// prefixed forms would be another session's rows rather than this one's —
+	// so the narrow, exact behaviour is what that case gets.
+	if !hookseenPrefixed(key) {
+		keys[sessionStartKeyPrefix+key] = true
+		keys[onceDigestKey(key)] = true
+		keys[antigravityDigestKey(key)] = true
 	}
 	var kept []string
 	for _, line := range strings.Split(string(b), "\n") {

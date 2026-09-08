@@ -48,3 +48,36 @@ func TestPrecompactForgetsTheStartRowsAndTheOnceMark(t *testing.T) {
 		}
 	}
 }
+
+// A session id shaped like one of deja's own key prefixes forgets only its own
+// rows: the prefixed forms would belong to another session (#3307 review).
+func TestPrecompactDoesNotReachAcrossAPrefixedSessionID(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	seen := dir + ".hookseen"
+	lines := []string{
+		"once:xyz once-digest",
+		"once:once:xyz block",
+		"xyz block-fingerprint",
+	}
+	if err := os.WriteFile(seen, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	forgetInjected(dir, "once:xyz")
+	b, err := os.ReadFile(seen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	if strings.Contains(got, "once:xyz once-digest") {
+		t.Errorf("the id's own row survived:\n%s", got)
+	}
+	for _, kept := range []string{"once:once:xyz block", "xyz block-fingerprint"} {
+		if !strings.Contains(got, kept) {
+			t.Errorf("a prefixed id reached across into %q:\n%s", kept, got)
+		}
+	}
+}
