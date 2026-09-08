@@ -1460,7 +1460,7 @@ func metaForSession(s model.Session) SessionMeta {
 		// which is deja's own listing format (#1090 covers the escape bytes;
 		// this is the line break). Derived titles have been collapsed and cut
 		// since they existed.
-		title = boundSourceTitle(s.Harness, title)
+		title = widenThinSourceTitle(s, boundSourceTitle(s.Harness, title))
 	}
 	// The import fields travel with the session, not with the transcript: a
 	// rebuild reloads imported sessions out of the index itself, and rebuilding
@@ -1719,6 +1719,18 @@ func wordsFromRecords(recs []Record) int {
 // candidate this produced was "The following tool was executed by the user",
 // spanning April to July.
 func notAsked(text string) bool {
+	// "no visible output" is a shell record's phrase and not an opening, so it
+	// is asked about the whole turn here; a title candidate asks only
+	// harnessPreamble, because a person can write those words in a question
+	// ("why does the button have no visible output when clicked?") and that
+	// question is a perfectly good name for a session (review of #3328).
+	return harnessPreamble(text) || strings.Contains(strings.TrimSpace(text), "no visible output")
+}
+
+// harnessPreamble reports whether a turn opens with something the harness
+// wrote: an envelope, an interruption notice, a resume preamble, the
+// compaction caveat.
+func harnessPreamble(text string) bool {
 	t := strings.TrimSpace(text)
 	for _, p := range []string{
 		"<local-command", "<command-", "<task-notification", "<teammate-message",
@@ -1730,7 +1742,7 @@ func notAsked(text string) bool {
 			return true
 		}
 	}
-	return strings.Contains(t, "no visible output")
+	return false
 }
 
 // looksLikeQuestion keeps this to things a person actually asked. Without it
@@ -2192,7 +2204,35 @@ func earliestTitle(ms []model.Message, role string) string {
 // tests" — are not. A length rule rather than a vocabulary is the only version
 // of this that works in every language the store holds.
 func thinTitle(t string) bool {
-	return len(strings.Fields(t)) <= 2 && len([]rune(t)) <= 12
+	return titleWords(t) <= 2 && len([]rune(t)) <= 12
+}
+
+// titleWords counts what a reader would call words. Whitespace separates them
+// in most scripts and in none of the CJK ones, where a whole sentence is one
+// field and a rune-length rule alone called it a greeting: 为什么测试失败了 is
+// eight runes and says why the test failed (review of #3328). Thai is spaced
+// the same way, which is why Unspaced covers both.
+func titleWords(t string) int {
+	words, inWord := 0, false
+	for _, r := range t {
+		switch {
+		// Hangul is in cjkfold's CJK set because that is what folds, but Korean
+		// writes its words apart like Latin does: counting each syllable as a
+		// word made "고마워" — one word, three syllables — look substantial and
+		// left it as a session's name (review of #3328).
+		case cjkfold.Unspaced(r) && !unicode.Is(unicode.Hangul, r):
+			words++
+			inWord = false
+		case unicode.IsSpace(r):
+			inWord = false
+		default:
+			if !inWord {
+				words++
+				inWord = true
+			}
+		}
+	}
+	return words
 }
 
 // nextSubstantialTitle is the first later user turn that can name the session.
@@ -2226,9 +2266,28 @@ func nextSubstantialTitle(ms []model.Message, skip string) string {
 // slash command's expansion, a task notification, the compaction caveat — and
 // naming a session after one of those is how the titles in #636 happened.
 func titleWorthy(t string) bool {
-	return t != "" && !strings.HasPrefix(t, "<local-command") && !strings.HasPrefix(t, "<command-") &&
-		!strings.HasPrefix(t, "<task-notification") && !strings.HasPrefix(t, "<teammate-message") &&
-		!strings.HasPrefix(t, "Caveat:")
+	// The same list the repeat-question counter rejects: the two were written
+	// apart and drifted, so a session whose store title was thin could be
+	// renamed after a resume preamble — "This session is being continued from a
+	// previous conversation…" — which notAsked has rejected all along (review
+	// of #3328).
+	return strings.TrimSpace(t) != "" && !harnessPreamble(t)
+}
+
+// widenThinSourceTitle gives a name too short to name anything way to the
+// question under it, the way a derived title has since #790: dsh's title model
+// answered "ok" and "47" for sessions whose user turn is a whole sentence — 39
+// of the 43 on this machine's store (#3328). Notes name themselves.
+func widenThinSourceTitle(s model.Session, title string) string {
+	if s.Harness == "deja" || !thinTitle(title) {
+		return title
+	}
+	next := nextSubstantialTitle(s.Messages, title)
+	if next == "" {
+		return title
+	}
+	next, _ = redact.Text(next)
+	return truncateTitle(next, 60)
 }
 
 // boundSourceTitle collapses and bounds a title the source authored, the way
@@ -3237,8 +3296,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				// one-line surface — `deja last`, the digest, the citation the
 				// hook hands the agent to say aloud — reading "[accepted]"
 				// until an unrelated rebuild happened to run (#R11).
-				if t, _ := redact.Text(s.Title); boundSourceTitle(s.Harness, t) != meta.Title {
-					meta.Title, meta.AgentTitle = boundSourceTitle(s.Harness, t), s.AgentTitle
+				// The same widening the first naming does, or a session that
+				// gets its thin title later — dsh and opencode both retitle
+				// after the fact — would keep it until an unrelated rebuild.
+				if t, _ := redact.Text(s.Title); widenThinSourceTitle(s, boundSourceTitle(s.Harness, t)) != meta.Title {
+					meta.Title = widenThinSourceTitle(s, boundSourceTitle(s.Harness, t))
+					meta.AgentTitle = s.AgentTitle
 				}
 			}
 			// Only the session that owns this row. The full build writes these
