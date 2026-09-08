@@ -739,10 +739,18 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err := readableStrictJSON(probe...); err != nil {
 			return installResult{}, err
 		}
-		if _, err := installGrok(exe, uninstall); err != nil {
+		// Both halves. Discarding the first meant `install grok-auto` named
+		// GROK.md and the hook file while it had also written config.toml and
+		// user-settings.json — the shape #3185 fixed for gemini-auto (#3220).
+		mcp, err := installGrok(exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installGrokAuto(exe, uninstall)
+		hooks, err := installGrokAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(mcp, hooks), nil
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
