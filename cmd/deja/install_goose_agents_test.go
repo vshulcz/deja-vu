@@ -36,7 +36,11 @@ func TestGooseRecallClearsTheFileItUsedToWrite(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(retired), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(retired, []byte("recall from an older deja\n"), 0o644); err != nil {
+	// What an older deja actually wrote there: the recall frame, whole. The
+	// fixture used to be a line of plain prose — which is what the reader's own
+	// hints look like — and the code deleted the file on sight, so anyone
+	// keeping global hints there lost them on every turn (#3196).
+	if err := os.WriteFile(retired, []byte(frameRecall("recall from an older deja\n")), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := installGooseAuto("/bin/deja", false); err != nil {
@@ -44,6 +48,57 @@ func TestGooseRecallClearsTheFileItUsedToWrite(t *testing.T) {
 	}
 	if _, err := os.Stat(retired); !os.IsNotExist(err) {
 		t.Errorf("the retired file survived the install: %v", err)
+	}
+}
+
+// The same file, holding what the reader wrote. deja stopped writing here when
+// the block moved to AGENTS.md, so there is nothing of deja's to take out and
+// nothing to remove — on install, on uninstall, and on every hook-goose turn,
+// which is where it was seen (#3196).
+func TestGooseLeavesTheReadersOwnRetiredHints(t *testing.T) {
+	cfg := gooseHomeForTest(t)
+	retired := filepath.Join(cfg, "goose", ".goosehints")
+	if err := os.MkdirAll(filepath.Dir(retired), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const mine = "my own hints, written by the user\nalways run the linter first\n"
+	if err := os.WriteFile(retired, []byte(mine), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range []func() error{
+		func() error { _, err := installGooseAuto("/bin/deja", false); return err },
+		dropRetiredGooseHints,
+		func() error { _, err := installGooseAuto("/bin/deja", true); return err },
+	} {
+		if err := step(); err != nil {
+			t.Fatal(err)
+		}
+		b, err := os.ReadFile(retired)
+		if err != nil {
+			t.Fatalf("deja deleted hints it did not write: %v", err)
+		}
+		if string(b) != mine {
+			t.Fatalf("the reader's hints changed:\n%s", b)
+		}
+	}
+
+	// And a file holding both: deja's block comes out, theirs stays.
+	both := mine + "\n" + gooseRecallStart + "\nold recall\n" + gooseRecallEnd + "\n"
+	if err := os.WriteFile(retired, []byte(both), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := dropRetiredGooseHints(); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(retired)
+	if err != nil {
+		t.Fatalf("the file went with deja's block: %v", err)
+	}
+	if !strings.Contains(string(b), "always run the linter first") {
+		t.Fatalf("the reader's half went with deja's:\n%s", b)
+	}
+	if strings.Contains(string(b), gooseRecallStart) {
+		t.Fatalf("deja's block stayed:\n%s", b)
 	}
 }
 
