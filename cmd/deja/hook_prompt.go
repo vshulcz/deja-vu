@@ -918,12 +918,24 @@ func forgetInjected(dir, sid string) {
 		return
 	}
 	key := hookseenKey(sid)
+	// Every key this session's rows are written under, not just the one the
+	// per-prompt path uses: the session start writes `start:<sid>`
+	// (hook_context.go) and the once gate writes `once:<sid>`. Forgetting the
+	// prompt rows alone left the digest the compaction had just thrown away as
+	// the one thing recall would not send again — on a harness whose only rows
+	// are those two, the next start was silent (#3307).
+	keys := map[string]bool{
+		key:                         true,
+		sessionStartKeyPrefix + key: true,
+		onceDigestKey(key):          true,
+		antigravityDigestKey(key):   true,
+	}
 	var kept []string
 	for _, line := range strings.Split(string(b), "\n") {
 		if line == "" {
 			continue
 		}
-		if parts := strings.Fields(line); len(parts) >= 2 && parts[0] == key {
+		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] {
 			continue
 		}
 		kept = append(kept, line)
