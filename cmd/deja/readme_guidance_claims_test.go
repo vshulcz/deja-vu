@@ -99,7 +99,8 @@ func TestReadmeCursorGetsASkill(t *testing.T) {
 	}
 	// The directory the installer writes, not a path the test remembers:
 	// the skill moved to the shared ~/.agents/skills and the README lagged (#3187).
-	want := shortHome(filepath.Dir(filepath.Dir(r.Path)))
+	// The README writes the path with forward slashes on every platform.
+	want := filepath.ToSlash(shortHome(filepath.Dir(filepath.Dir(r.Path))))
 	if !strings.Contains(para, want) {
 		t.Errorf("README does not say where Cursor's skill goes (%s):\n%s", want, para)
 	}

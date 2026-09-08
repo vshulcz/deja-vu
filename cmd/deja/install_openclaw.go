@@ -228,7 +228,7 @@ func flagRecordKey(keys []string, flagKey string) string {
 func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string, on bool) (string, error) {
 	text := string(old)
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(text)), &root); err != nil {
 		return "", configParseError(path, err)
 	}
 	keys := strings.Split(blockKey, ".")

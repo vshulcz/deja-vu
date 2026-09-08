@@ -127,7 +127,7 @@ func geminiHooksEnabled() bool {
 		return false
 	}
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(string(b))), &root); err != nil {
 		return false
 	}
 	cfg, _ := root["hooksConfig"].(map[string]any)
@@ -176,7 +176,7 @@ func enableGeminiHooks() error {
 // and the switch written by text so everything else stays put.
 func enableGeminiHooksJSONC(path string, old []byte) error {
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripJSONComments(string(old))), &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
 		return fmt.Errorf("gemini settings: %w", err)
 	}
 	cfg, _ := root["hooksConfig"].(map[string]any)

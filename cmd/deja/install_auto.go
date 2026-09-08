@@ -481,7 +481,7 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 	jsonc := configIsJSONC(old)
 	source := old
 	if jsonc {
-		source = []byte(stripJSONComments(string(old)))
+		source = []byte(jsoncToJSON(string(old)))
 	}
 	if len(bytes.TrimSpace(source)) == 0 {
 		root = map[string]any{}

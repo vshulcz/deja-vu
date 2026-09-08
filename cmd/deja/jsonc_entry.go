@@ -25,8 +25,40 @@ func configIsJSONC(b []byte) bool {
 	if json.Unmarshal(b, &probe) == nil {
 		return false
 	}
-	stripped := stripJSONComments(string(b))
-	return json.Unmarshal([]byte(stripped), &probe) == nil
+	return json.Unmarshal([]byte(jsoncToJSON(string(b))), &probe) == nil
+}
+
+// jsoncToJSON is what a strict decoder can read of an editor's JSONC: comments
+// and trailing commas blanked, every other byte where it was.
+func jsoncToJSON(text string) string { return stripTrailingCommas(stripJSONComments(text)) }
+
+// stripTrailingCommas blanks a comma that only whitespace separates from the
+// `}` or `]` after it — the other thing an editor's JSONC carries besides
+// comments (#3223). Offsets are kept the way stripJSONComments keeps them.
+func stripTrailingCommas(text string) string {
+	out := []byte(text)
+	for i := 0; i < len(text); {
+		switch text[i] {
+		case '"':
+			end := zedStringEnd(text, i)
+			if end < 0 {
+				return string(out)
+			}
+			i = end
+		case ',':
+			j := i + 1
+			for j < len(text) && (text[j] == ' ' || text[j] == '\t' || text[j] == '\n' || text[j] == '\r') {
+				j++
+			}
+			if j < len(text) && (text[j] == '}' || text[j] == ']') {
+				out[i] = ' '
+			}
+			i++
+		default:
+			i++
+		}
+	}
+	return string(out)
 }
 
 // stripJSONComments blanks out comments, keeping every other byte where it is
@@ -259,7 +291,7 @@ func jsoncEntryText(entry map[string]any) (string, error) {
 func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]any, uninstall bool) (installResult, error) {
 	text := string(old)
 	var root map[string]any
-	if err := json.Unmarshal([]byte(stripJSONComments(text)), &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(text)), &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
 	// A key that is there but holds something else — null, a list, a string.

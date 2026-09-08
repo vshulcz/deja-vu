@@ -32,6 +32,7 @@ func rooMCPSettingsPaths() []string {
 func installRoo(exe string, uninstall bool) (installResult, error) {
 	paths := rooMCPSettingsPaths()
 	var last installResult
+	var results []installResult
 	var unread, unwritable []string
 	skip := map[string]bool{}
 	wrote := false
@@ -110,10 +111,15 @@ func installRoo(exe string, uninstall bool) (installResult, error) {
 				res.Action = "updated"
 			}
 		}
-		last = res
+		results = append(results, res)
 		if res.Action != "unchanged" {
 			wrote = true
 		}
+	}
+	// Every host's result, folded: the last host's alone was the answer and
+	// the others were written in silence (#3233).
+	if len(results) > 0 {
+		last = wroteAll(results...)
 	}
 	if note := rooLeftNote(unread, unwritable); note != "" {
 		// A host that was there and was skipped is not "no host found": deja
