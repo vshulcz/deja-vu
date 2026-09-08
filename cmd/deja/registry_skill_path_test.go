@@ -65,3 +65,26 @@ func TestRegistryPagesNameTheSkillPathInstallWrites(t *testing.T) {
 		t.Fatal("no page names a skill path, so this test checks nothing")
 	}
 }
+
+// The same drift in the README, which is where most people read it: it said
+// Cursor's skill lands in `~/.cursor/skills/` long after install moved to the
+// shared directory and started removing the old path as retired (#3187).
+func TestTheReadmeDoesNotNameARetiredSkillDirectory(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	readme := string(b)
+	if !strings.Contains(readme, "~/.agents/skills") {
+		t.Fatalf("the README names no skill directory at all, so this checks nothing")
+	}
+	for id := range sharedSkillHarnesses {
+		// A harness that reads the shared directory has no directory of its
+		// own to name — install writes one file and retires the rest.
+		own := "~/." + id + "/skills"
+		if strings.Contains(readme, own) {
+			t.Errorf("the README says %s gets a skill at %s; install writes the shared ~/.agents/skills",
+				id, own)
+		}
+	}
+}
