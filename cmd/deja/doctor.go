@@ -799,7 +799,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	piRoot := sources.PiRoot()
 	printFiles("pi", piRoot, doctorExists(piRoot), sources.PiSessionFiles())
 	openclawRoot := sources.OpenClawRoot()
-	printRow("openclaw", openclawRoot, doctorExists(openclawRoot), doctorCount(len(sources.OpenClawSessionFiles()), "file"))
+	printFilesBeside("openclaw", openclawRoot, doctorExists(openclawRoot), sources.OpenClawSessionFiles(), sources.OpenClawSidecarFiles()...)
 	for _, db := range sources.OpenClawAgentDBs() {
 		printRow("openclaw", db, doctorFilePresent(db), doctorSQLiteDetail(db, sqlite))
 	}

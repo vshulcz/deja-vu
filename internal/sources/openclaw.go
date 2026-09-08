@@ -87,6 +87,31 @@ func OpenClawSessionFiles() []string {
 	return walkFiles(root, func(p string) bool { return openclawTranscript(root, p) })
 }
 
+// OpenClawSidecarFiles lists the json and jsonl files an OpenClaw store keeps
+// beside its transcripts that the reader declines on purpose: the per-session
+// trajectory-path.json, the sessions.json list, the checkpoint snapshots and
+// the archive of a reset whose live transcript is still there. doctor counted
+// them as transcripts it could not read, once per session (#3317).
+func OpenClawSidecarFiles() []string {
+	root := OpenClawRoot()
+	return walkFiles(root, func(p string) bool {
+		if openclawTranscript(root, p) {
+			return false
+		}
+		switch {
+		case strings.HasSuffix(p, ".trajectory-path.json"):
+			return true
+		case filepath.Base(p) == "sessions.json":
+			return true
+		case openclawCheckpointRE.MatchString(p):
+			return true
+		case openclawArchiveRE.MatchString(p):
+			return true
+		}
+		return false
+	})
+}
+
 // LoadOpenClaw loads all OpenClaw sessions.
 func LoadOpenClaw() []model.Session {
 	ss := parseFiles(OpenClawSessionFiles(), ParseOpenClawFile)
