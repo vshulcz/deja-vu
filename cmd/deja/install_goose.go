@@ -502,7 +502,7 @@ func refreshGooseHintsFor(cwd string) error {
 		body = frameRecall(startLead(gooseLead) + digest)
 	}
 	if strings.TrimSpace(body) == "" {
-		body = "No matching history yet.\n"
+		body = gooseNoHistory
 	}
 	path := gooseRecallPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -535,15 +535,50 @@ func dropGooseRecallBlock(path string) error {
 	return err
 }
 
-// dropRetiredGooseHints removes the file deja used to write, once it holds
-// nothing but what deja put there.
+// dropRetiredGooseHints takes deja's block out of the file it used to write,
+// and removes the file only when nothing else was in it.
+//
+// It said that and did not do it: a Stat and a Remove, with no look at the
+// content. deja stopped writing this file when the block moved to AGENTS.md,
+// so anyone keeping their own global hints there lost them — on every install,
+// every uninstall, and every turn, since hook-goose calls this too (#3196).
+// The rule already existed one function up, for the file that replaced it.
 func dropRetiredGooseHints() error {
 	path := retiredGooseHintsPath()
-	if _, err := os.Stat(path); err != nil {
+	old, err := readConfig(path)
+	if err != nil || len(old) == 0 {
 		return nil
 	}
-	return os.Remove(path)
+	if strings.Contains(string(old), gooseRecallStart) {
+		return dropGooseRecallBlock(path)
+	}
+	// An older deja wrote this file whole and unmarked, so there is no block to
+	// cut — but what it wrote is still recognisable: the recall frame, or the
+	// placeholder it used when there was nothing to recall. Anything else in
+	// the file is the reader's.
+	if isRetiredGooseRecall(string(old)) {
+		return os.Remove(path)
+	}
+	return nil
 }
+
+// isRetiredGooseRecall reports that a file holds what deja used to write here
+// and nothing else.
+func isRetiredGooseRecall(s string) bool {
+	t := strings.TrimSpace(s)
+	if t == "" {
+		return true
+	}
+	if t == strings.TrimSpace(gooseNoHistory) {
+		return true
+	}
+	return strings.HasPrefix(t, strings.TrimSpace(recallFrameHeader)) &&
+		strings.HasSuffix(t, strings.TrimSpace(recallFrameFooter))
+}
+
+// gooseNoHistory is what goes in the file when there is nothing to recall, so
+// a later pass can tell deja's own placeholder from something the reader wrote.
+const gooseNoHistory = "No matching history yet.\n"
 
 const gooseLead = "The sessions below are from this project's recent history. " +
 	"If any is relevant to what the user asks next, say so and use it. " +
