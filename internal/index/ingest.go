@@ -1719,6 +1719,18 @@ func wordsFromRecords(recs []Record) int {
 // candidate this produced was "The following tool was executed by the user",
 // spanning April to July.
 func notAsked(text string) bool {
+	// "no visible output" is a shell record's phrase and not an opening, so it
+	// is asked about the whole turn here; a title candidate asks only
+	// harnessPreamble, because a person can write those words in a question
+	// ("why does the button have no visible output when clicked?") and that
+	// question is a perfectly good name for a session (review of #3328).
+	return harnessPreamble(text) || strings.Contains(strings.TrimSpace(text), "no visible output")
+}
+
+// harnessPreamble reports whether a turn opens with something the harness
+// wrote: an envelope, an interruption notice, a resume preamble, the
+// compaction caveat.
+func harnessPreamble(text string) bool {
 	t := strings.TrimSpace(text)
 	for _, p := range []string{
 		"<local-command", "<command-", "<task-notification", "<teammate-message",
@@ -1730,7 +1742,7 @@ func notAsked(text string) bool {
 			return true
 		}
 	}
-	return strings.Contains(t, "no visible output")
+	return false
 }
 
 // looksLikeQuestion keeps this to things a person actually asked. Without it
@@ -2259,7 +2271,7 @@ func titleWorthy(t string) bool {
 	// renamed after a resume preamble — "This session is being continued from a
 	// previous conversation…" — which notAsked has rejected all along (review
 	// of #3328).
-	return strings.TrimSpace(t) != "" && !notAsked(t)
+	return strings.TrimSpace(t) != "" && !harnessPreamble(t)
 }
 
 // widenThinSourceTitle gives a name too short to name anything way to the

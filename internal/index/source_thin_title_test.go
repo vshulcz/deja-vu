@@ -119,3 +119,21 @@ func TestAWidenedTitleIsNeverTheHarnessOwnPreamble(t *testing.T) {
 		t.Errorf("title = %q, want the sentence under the preamble", got)
 	}
 }
+
+// The phrase a shell record uses is not a reason to reject a person's
+// question: notAsked looks for "no visible output" anywhere in a turn, which
+// is right for counting repeated plumbing and wrong for naming a session
+// (second review of #3328).
+func TestAQuestionThatSaysNoVisibleOutputCanStillNameTheSession(t *testing.T) {
+	at := time.Date(2026, 9, 2, 20, 23, 0, 0, time.UTC)
+	s := model.Session{
+		Harness: "deepseek", Project: "api", ID: "nvo1", Title: "ok",
+		Messages: []model.Message{
+			{Role: "user", Text: "why does the button have no visible output when clicked, please debug", Time: at},
+		},
+	}
+	// Cut to sixty runes like every widened title.
+	if got := metaForSession(s).Title; got != "why does the button have no visible output when clicked, ple\u2026" {
+		t.Errorf("title = %q, want the question", got)
+	}
+}
