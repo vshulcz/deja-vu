@@ -40,8 +40,9 @@ harness falls back to the first prompt.
   home-level patch layer every profile composes over its own. An MCP server here
   is a plugin row (`@deepseek-ai/dsh-mcp-client`) inside an `insert:` list — a
   bare row is rejected with `entry "mcp-deja" not found`, because a patch entry
-  addresses a row that already exists. After it, dsh lists `mcp__deja__recall`,
-  `recall_context`, `remember`, `blame`, `fix` and `how` itself.
+  addresses a row that already exists. After it dsh lists one tool, `deja`,
+  called with a `mode` of `recall`, `context`, `blame`, `fix`, `how` or
+  `remember`.
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. dsh splices a
   skill catalogue into the turn and reads that directory, so it needs no file of
   its own — checked by asking a running dsh to list its skills.
