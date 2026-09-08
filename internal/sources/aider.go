@@ -160,6 +160,14 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 			if t == "<blank>" {
 				t = ""
 			}
+			// aider writes every input as a #### line, its own commands
+			// included, so `/undo` became a user message and `/clear` was
+			// glued onto the question typed after it (#3248). A command ends
+			// the turn rather than joining it.
+			if aiderSlashCommand(t) {
+				flush()
+				continue
+			}
 			buf = append(buf, t)
 		case strings.HasPrefix(line, "> "), line == ">":
 			// tool/system output: ends any assistant block, not indexed as a message
@@ -176,6 +184,39 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 	}
 	endSession()
 	return out, nil
+}
+
+// aiderCommands are aider's own inputs, which it records in the transcript the
+// same way it records a question. Only the ones that take no prose, or whose
+// argument is a path or a shell line rather than something the person said —
+// `/ask` and `/code` carry a real question and stay.
+var aiderCommands = map[string]bool{
+	"add": true, "architect": true, "chat-mode": true, "clear": true, "clipboard": true,
+	"code": false, "commit": true, "copy": true, "diff": true, "drop": true,
+	"editor": true, "exit": true, "git": true, "help": true, "lint": true, "load": true,
+	"ls": true, "map": true, "map-refresh": true, "model": true, "models": true,
+	"multiline-mode": true, "paste": true, "quit": true, "read-only": true, "report": true,
+	"reset": true, "run": true, "save": true, "settings": true, "test": true,
+	"tokens": true, "undo": true, "voice": true, "web": true,
+}
+
+// aiderSlashCommand reports that a line is one of aider's own commands rather
+// than something the person asked.
+//
+// The name has to be one aider has, not merely a leading slash: "/etc/hosts is
+// wrong on the build box" opens the same way and is the reader's, and so is a
+// line that starts with any absolute path.
+func aiderSlashCommand(line string) bool {
+	t := strings.TrimSpace(line)
+	if !strings.HasPrefix(t, "/") || len(t) < 2 {
+		return false
+	}
+	name := t[1:]
+	if i := strings.IndexAny(name, " \t"); i >= 0 {
+		name = name[:i]
+	}
+	drop, known := aiderCommands[strings.ToLower(name)]
+	return known && drop
 }
 
 // aider has no session ids; derive a stable one from file path + ordinal.
