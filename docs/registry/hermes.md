@@ -8,8 +8,11 @@
 
 A flat `messages` table, grouped by `session_id`: `role`, `content`, and `timestamp`
 as REAL epoch seconds. Rows with `role` of `tool` carry no prose and are skipped, as
-are rows with a null `content`. There is no working directory in the schema, so the
-profile name stands in for the project.
+are rows with a null `content`. A `sessions` table beside it carries `id`, `cwd`,
+`git_repo_root` and `title`; the `cwd` is where the work happened and is what names
+the project, the same way a Cline or Roo workspace does. A store without that table,
+or a session whose row has no `cwd`, falls back to the profile name. The title is left
+to the index rather than taken from the first row.
 
 - **MCP**: `mcp_servers` in `~/.hermes/config.yaml`; `deja install hermes-auto` also drops a plugin whose `pre_llm_call` hook injects recall and registers `/deja`, and a memory provider (`deja-memory`) that `hermes memory setup` lists next to mem0 and supermemory — the same recall in the `memory.provider` slot, with `deja_recall`, `deja_fix` and `deja_blame` as its tools.
 - **Resume**: Hermes has its own session commands; nothing documented that starts a session from a prompt.
