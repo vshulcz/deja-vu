@@ -154,9 +154,15 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			}
 			s.Touch(t)
 			if id, _ := data["toolCallId"].(string); id != "" && len(cmdAt) > 0 {
-				for _, at := range cmdAt {
-					commandAt[id] = append(commandAt[id], len(s.Messages)+at)
+				// Assigned, not appended: an id reused for a later call would
+				// otherwise carry the first call's commands too, and the second
+				// outcome would land on a run that had already finished
+				// (review of #3369).
+				at := make([]int, 0, len(cmdAt))
+				for _, i := range cmdAt {
+					at = append(at, len(s.Messages)+i)
 				}
+				commandAt[id] = at
 			}
 			s.Messages = append(s.Messages, records...)
 		case "tool.execution_complete":
@@ -179,6 +185,8 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 							s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 						}
 					}
+					// Consumed: one outcome belongs to one call.
+					delete(commandAt, id)
 				}
 			}
 			if out = strings.TrimSpace(out); out == "" {
@@ -201,6 +209,10 @@ func jsonInt(v any) (int, bool) {
 	case json.Number:
 		if i, err := n.Int64(); err == nil {
 			return int(i), true
+		}
+		// A store that wrote the code as 1.0 says the same thing.
+		if f, err := n.Float64(); err == nil && f == float64(int(f)) {
+			return int(f), true
 		}
 	case float64:
 		return int(n), true
