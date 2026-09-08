@@ -302,15 +302,27 @@ func zedSession(db string, r zedRow) (model.Session, bool) {
 		Started: started,
 		Updated: updated,
 	}
-	// Zed stores no per-message timestamp in either thread format, so every
-	// message inherits the thread's start the way aider's do. Order is carried
-	// by the array itself, which is what recall actually reads.
+	// Zed stores no per-message timestamp in either thread format, so the place
+	// in the array is the only clock there is, and it becomes one: the thread's
+	// start plus a millisecond per record. Sharing one stamp made two turns
+	// that say the same thing — the same file read twice, the same command run
+	// twice — indistinguishable to the ingest's duplicate check, which dropped
+	// 1385 of this machine's 6767 Zed messages (#3333).
+	at := started
+	tick := func() time.Time {
+		t := at
+		at = at.Add(time.Millisecond)
+		return t
+	}
 	for _, raw := range th.Messages {
 		role, text := zedMessage(raw)
 		if text != "" && !HarnessAuthored(role) {
-			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: started})
+			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: tick()})
 		}
-		s.Messages = append(s.Messages, zedWork(raw, started)...)
+		for _, w := range zedWork(raw, started) {
+			w.Time = tick()
+			s.Messages = append(s.Messages, w)
+		}
 	}
 	if len(s.Messages) == 0 {
 		return model.Session{}, false
