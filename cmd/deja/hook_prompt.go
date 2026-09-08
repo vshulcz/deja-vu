@@ -201,8 +201,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// Not for a spawned agent: a fleet is many readers behind one key, and ten
 	// agents sent out on the same work each need the answer once rather than
 	// the first one taking it for all of them (#2534).
+	// One read for every question this hook asks of the dedupe file (#3379).
+	seenFile := loadSeen(dir)
 	if !isSpawnedReader(input.SessionID) &&
-		askedRecently(dir, input.SessionID, askKey(terms), repeatAskWindow) {
+		seenFile.asked(input.SessionID, askKey(terms), repeatAskWindow) {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
 	// The payload first, then the export, then where the process stands: the
@@ -223,13 +225,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// same messages without the ban got thirty-eight, and only seven of those
 	// were word-for-word repeats. The same past session answers many questions
 	// in a day, and after the first answer it went silent.
-	seen := alreadyInjected(dir, input.SessionID)
+	seen := seenFile.injected(input.SessionID)
 	// A session shown a moment ago is skipped before it is read — that is what
 	// keeps an answering call from reading every candidate off disk. A session
 	// shown an hour ago is fair game again: the same past work answers many
 	// questions in a day, and what stops it repeating itself is the block
 	// fingerprint below, not a ban on where it came from.
-	recent := recentlyInjected(dir, input.SessionID, injectionCooldown)
+	recent := seenFile.recent(input.SessionID, injectionCooldown)
 	// The same cooldown across agent sessions in this project. Without it the
 	// window reset every time a new agent session opened, which is how one
 	// marathon reached 110 servings (#2038).
@@ -248,7 +250,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// stop the same agent being handed the same thing twice.
 	var inProject map[string]bool
 	if !isSpawnedReader(input.SessionID) {
-		inProject = recentlyInjectedInProject(dir, projectKey, injectionCooldown)
+		inProject = seenFile.recentInProject(projectKey, injectionCooldown)
 	}
 	skip := make(map[string]bool, len(recent)+len(inProject)+1)
 	for id := range recent {
@@ -812,24 +814,99 @@ func hookseenField(s string) bool { return s != "" && hookseenKey(s) == s }
 // alreadyInjected returns the session ids this hook already injected into the
 // given agent session, so follow-up prompts do not repeat the same memory.
 func alreadyInjected(dir, sid string) map[string]bool {
+	return loadSeen(dir).injected(sid)
+}
+
+// seenLines is the dedupe file read once. The per-prompt hook asks it four
+// questions — what this session has been shown, what it was shown lately, what
+// the project was shown lately, and whether this question was already answered
+// — and each used to read and split the whole file again. Measured on a
+// hermetic stand with a 648 KB list, that was 4 ms of a 24 ms call (#3379).
+//
+// Empty when the file is missing, which is the same answer every one of those
+// questions gave before.
+type seenLines []string
+
+func loadSeen(dir string) seenLines {
+	b, err := os.ReadFile(dir + ".hookseen")
+	if err != nil {
+		return nil
+	}
+	return seenLines(strings.Split(string(b), "\n"))
+}
+
+// injected is alreadyInjected over an already-read file.
+func (sl seenLines) injected(sid string) map[string]bool {
 	out := map[string]bool{}
 	if sid == "" {
 		return out
 	}
-	b, err := os.ReadFile(dir + ".hookseen")
-	if err != nil {
-		return out
-	}
 	key := hookseenKey(sid)
-	for _, line := range strings.Split(string(b), "\n") {
-		// Two fields when the entry is a block fingerprint, three when it is a
-		// session with the time it was shown.
+	for _, line := range sl {
 		parts := strings.Fields(line)
 		if len(parts) >= 2 && parts[0] == key {
 			out[parts[1]] = true
 		}
 	}
 	return out
+}
+
+// recent is recentlyInjected over an already-read file.
+func (sl seenLines) recent(sid string, window int) map[string]bool {
+	out := map[string]bool{}
+	if sid == "" || window <= 0 {
+		return out
+	}
+	key := hookseenKey(sid)
+	kept := 0
+	for i := len(sl) - 1; i >= 0 && kept < window; i-- {
+		parts := strings.Fields(sl[i])
+		if len(parts) < 2 || parts[0] != key {
+			continue
+		}
+		kept++
+		out[parts[1]] = true
+	}
+	return out
+}
+
+// recentInProject is recentlyInjectedInProject over an already-read file.
+func (sl seenLines) recentInProject(project string, window int) map[string]bool {
+	out := map[string]bool{}
+	if project == "" || window <= 0 {
+		return out
+	}
+	kept := 0
+	for i := len(sl) - 1; i >= 0 && kept < window; i-- {
+		parts := strings.Fields(sl[i])
+		if len(parts) < 4 || parts[3] != project {
+			continue
+		}
+		kept++
+		out[parts[1]] = true
+	}
+	return out
+}
+
+// asked is askedRecently over an already-read file.
+func (sl seenLines) asked(sid, key string, window time.Duration) bool {
+	if sid == "" || key == "" || window <= 0 {
+		return false
+	}
+	want := hookseenKey(sid)
+	cutoff := time.Now().UTC().Add(-window)
+	for i := len(sl) - 1; i >= 0; i-- {
+		parts := strings.Fields(sl[i])
+		if len(parts) < 3 || parts[0] != want || parts[1] != key {
+			continue
+		}
+		t, err := time.Parse(time.RFC3339, parts[2])
+		if err != nil {
+			return false
+		}
+		return t.After(cutoff)
+	}
+	return false
 }
 
 // blockFingerprint identifies what a block says, so the same words are not
@@ -862,30 +939,7 @@ func askKey(terms []string) string {
 // question inside the window. Scanned from the end, like the cooldowns: the
 // file is append-only and the newest rows are the ones that matter.
 func askedRecently(dir, sid, key string, window time.Duration) bool {
-	if sid == "" || key == "" || window <= 0 {
-		return false
-	}
-	b, err := os.ReadFile(dir + ".hookseen")
-	if err != nil {
-		return false
-	}
-	want := hookseenKey(sid)
-	cutoff := time.Now().UTC().Add(-window)
-	lines := strings.Split(string(b), "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		parts := strings.Fields(lines[i])
-		if len(parts) < 3 || parts[0] != want || parts[1] != key {
-			continue
-		}
-		// A row with an unreadable stamp is one this hook wrote in a shape it
-		// no longer writes; answering again is the safe way to be wrong.
-		t, err := time.Parse(time.RFC3339, parts[2])
-		if err != nil {
-			return false
-		}
-		return t.After(cutoff)
-	}
-	return false
+	return loadSeen(dir).asked(sid, key, window)
 }
 
 // isSpawnedReader reports whether this recall is for an agent the parent just
@@ -915,54 +969,13 @@ const injectionCooldown = 10
 // Scoped to the project on purpose: the same session answering the same
 // question in a different repository is not the repetition being fixed here.
 func recentlyInjectedInProject(dir, project string, window int) map[string]bool {
-	out := map[string]bool{}
-	if project == "" || window <= 0 {
-		return out
-	}
-	b, err := os.ReadFile(dir + ".hookseen")
-	if err != nil {
-		return out
-	}
-	lines := strings.Split(string(b), "\n")
-	kept := 0
-	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
-		// Four fields since this cooldown was added; lines written before it
-		// carry no project and match nothing, which is the right answer for
-		// them rather than a guess.
-		parts := strings.Fields(lines[i])
-		if len(parts) < 4 || parts[3] != project {
-			continue
-		}
-		kept++
-		out[parts[1]] = true
-	}
-	return out
+	return loadSeen(dir).recentInProject(project, window)
 }
 
 // recentlyInjected is alreadyInjected narrowed to the last few things this
 // agent session was shown.
 func recentlyInjected(dir, sid string, window int) map[string]bool {
-	out := map[string]bool{}
-	if sid == "" || window <= 0 {
-		return out
-	}
-	b, err := os.ReadFile(dir + ".hookseen")
-	if err != nil {
-		return out
-	}
-	lines := strings.Split(string(b), "\n")
-	key := hookseenKey(sid)
-	// Newest first: the window counts injections, and the file is append-only.
-	kept := 0
-	for i := len(lines) - 1; i >= 0 && kept < window; i-- {
-		parts := strings.Fields(lines[i])
-		if len(parts) < 2 || parts[0] != key {
-			continue
-		}
-		kept++
-		out[parts[1]] = true
-	}
-	return out
+	return loadSeen(dir).recent(sid, window)
 }
 
 // forgetInjected drops one agent session's entries from the seen list, so
