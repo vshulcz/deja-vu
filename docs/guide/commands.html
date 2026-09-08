@@ -129,6 +129,11 @@
 <tr><td><code>deja doctor</code></td><td>Diagnose stores, wiring, index and version. <code>--json</code>, <code>--offline</code>. <code>--deep</code> re-parses a sample of source files and resolves postings to prove the index against the sources; exits non-zero on drift.</td></tr>
 <tr><td><code>deja bench recall|context</code></td><td>Reproducible search-quality and context-readiness benchmarks.</td></tr>
 <tr><td><code>deja update</code></td><td>Update a standalone install (Homebrew/npm update via the package manager).</td></tr>
+<tr><td><code>deja index</code></td><td>Read what the agents on this machine have written since the last pass. <code>--rebuild</code> reads everything again, which is what a parser change needs.</td></tr>
+<tr><td><code>deja mcp</code></td><td>Run the MCP server on stdio. <code>deja install</code> wires this for you; run it by hand only to debug a client.</td></tr>
+<tr><td><code>deja share &lt;id-prefix&gt;</code></td><td>A redacted digest of one session, for pasting to someone else.</td></tr>
+<tr><td><code>deja handoff [id-prefix]</code></td><td>What the next agent needs to carry on: the problem, what was tried, what was settled, and where it stopped. <code>--to &lt;agent&gt;</code> phrases it for that agent and <code>--exec</code> opens it there.</td></tr>
+<tr><td><code>deja check -</code></td><td>Read a plan from stdin and print what this machine's history says about the things in it — what was decided, and what went wrong last time.</td></tr>
 </tbody></table>
 <div class="note">Bare <code>deja</code> on a terminal prints the living brief; piped or redirected it prints the usage summary, which <code>deja --help</code> also shows, and any command takes <code>--help</code> for its flags. Everything is offline except <code>update</code>, <code>sync ssh</code> and the <code>doctor</code> version check.</div>
 
