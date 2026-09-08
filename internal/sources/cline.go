@@ -291,12 +291,21 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		if m.Role == "user" {
 			text = unwrapClineTask(text)
 		}
-		if text == "" {
+		ts := base.Add(time.Duration(ti) * time.Second)
+		// The legacy VS Code store speaks Roo's vocabulary, not the modern
+		// CLI's — the extension the two share is where both came from — so the
+		// same records come out through the same dialect. Taken before the
+		// empty-text check: a turn that only made a call carries no text, and
+		// skipping it on that alone is what left the work unindexed (#3295).
+		records := rooWorkRecords(m.Content, ts)
+		if text == "" && len(records) == 0 {
 			continue
 		}
-		ts := base.Add(time.Duration(ti) * time.Second)
 		s.Touch(ts)
-		s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		if text != "" {
+			s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
+		}
+		s.Messages = append(s.Messages, records...)
 	}
 	if len(s.Messages) == 0 {
 		return nil, nil
