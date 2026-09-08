@@ -202,7 +202,16 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 			continue
 		}
 		if s.Title == "" {
+			// The person's first line, as every other parser titles: a
+			// session Hermes opens with its own greeting was titled by the
+			// greeting (#3241). A session nobody typed in keeps its first line.
 			s.Title = firstLineTrim(s.Messages[0].Text)
+			for _, m := range s.Messages {
+				if m.Role == "user" {
+					s.Title = firstLineTrim(m.Text)
+					break
+				}
+			}
 		}
 		out = append(out, *s)
 	}
