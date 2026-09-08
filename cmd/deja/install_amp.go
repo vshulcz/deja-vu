@@ -136,7 +136,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (amp: any) {
-  let injected = false
+  // The thread that has had its digest. Amp keeps one process across threads,
+  // and a flag set once per process left every thread after the first with no
+  // memory (#3263).
+  let injected = ""
   // Amp's events carry the thread, and the thread id is what recall dedupes on:
   // without it the same block goes out on every message of the session.
   let thread = ""
@@ -162,9 +165,15 @@ export default function (amp: any) {
   amp.on("agent.start", async (event: any, ctx: any) => {
     try {
       const id = threadID(event)
-      if (!injected) {
-        injected = true
-        const raw = run(["hook-context"], "")
+      if (injected !== (id || "*")) {
+        injected = id || "*"
+        // The thread goes with it, so deja's own once-per-session mark holds
+        // across a restart of the process the way it does for Claude Code.
+        const raw = run(["hook-context"], JSON.stringify({
+          session_id: id,
+          cwd: process.cwd(),
+          deja_once: true,
+        }))
         let digest = raw
         let receipt = ""
         try {
