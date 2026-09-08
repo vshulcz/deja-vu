@@ -3369,6 +3369,14 @@ func runForget(dir string, args []string) error {
 		shared = sharedRowsAmong(dir, pr.Keys)
 	}
 	result, err := index.Forget(dir, o)
+	if !o.DryRun {
+		// The digests cached beside the index quote sessions as prose, and a
+		// forget left them there: recall never served them past their minute,
+		// and the text was still on the disk (#3411). Dropped whether or not
+		// the rebuild succeeded — the next session start pays the ~120 ms the
+		// cache exists to save.
+		dropHookCaches(dir)
+	}
 	if err != nil {
 		// The tombstone is already written; what failed is the rebuild that
 		// takes the records out. Handing back `mkdir /…/idx.tmp: permission

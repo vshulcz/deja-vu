@@ -1353,3 +1353,20 @@ func startLead(narrow string) string {
 const wideRecallLead = "The sessions below are recent work on this machine, not only in this project — deja is set to recall widely. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, say so in one short line at the start of your reply: déjà vu: <what was recalled> — <how you reused it> (deja:<session id>); otherwise do not mention it.\n"
 
 const sessionStartLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, say so in one short line at the start of your reply: déjà vu: <what was recalled> — <how you reused it> (deja:<session id>); otherwise do not mention it.\n"
+
+// dropHookCaches removes every cached session-start digest beside this index.
+// They are keyed by working directory, so there is one per project a hook has
+// ever run in, and they hold the block as prose (#3411).
+func dropHookCaches(dir string) {
+	matches, err := filepath.Glob(dir + ".hookcache-*")
+	if err != nil {
+		return
+	}
+	// The first cache deja ever wrote had no suffix; a machine that has run
+	// hooks since then still carries it.
+	matches = append(matches, dir+".hookcache")
+	for _, p := range matches {
+		_ = os.Remove(p)
+		_ = os.Remove(p + ".refreshing")
+	}
+}
