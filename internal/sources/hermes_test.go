@@ -75,8 +75,9 @@ func TestParseHermesDB(t *testing.T) {
 	if first.Project != "architect" {
 		t.Fatalf("project = %q, want the profile name", first.Project)
 	}
-	if first.Title == "" {
-		t.Fatal("title not derived from the first message")
+	// The title is the index's to derive (#3251).
+	if first.Title != "" {
+		t.Fatalf("title = %q, want none", first.Title)
 	}
 }
 
