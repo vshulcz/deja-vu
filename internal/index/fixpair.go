@@ -633,6 +633,12 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	// nothing for the manifest read.
 	var ignored map[string]bool
 	loaded := false
+	isIgnored := func(project string) bool {
+		if !loaded {
+			ignored, loaded = ProjectsTouchedByIgnore(dir), true
+		}
+		return ignored[project]
+	}
 	for _, p := range ReadFixes(dir) {
 		if !sigs[p.Sig] {
 			continue
@@ -650,10 +656,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		if allow != nil && !allow(p.Project) {
 			continue
 		}
-		if !loaded {
-			ignored, loaded = ProjectsTouchedByIgnore(dir), true
-		}
-		if ignored[p.Project] {
+		if isIgnored(p.Project) {
 			continue
 		}
 		out = append(out, p)
@@ -667,6 +670,13 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if len(out) == 0 {
 		for _, p := range held {
 			if allow != nil && !allow(p.Project) {
+				continue
+			}
+			// The ignore rule holds for a sighting as well as for a pair:
+			// search and `deja how` refuse the session, and `deja fix` handed
+			// back what it ran there (#3403). #2660 fixed the confirmed half;
+			// the candidates arrived after it.
+			if isIgnored(p.Project) {
 				continue
 			}
 			out = append(out, p)
