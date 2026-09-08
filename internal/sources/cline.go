@@ -288,6 +288,13 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
+		ts := base.Add(time.Duration(ti) * time.Second)
+		if m.Role == "user" {
+			if tool := clineTurnToolOutput(m.Content, ts); len(tool) > 0 {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, tool...)
+			}
+		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
 			text = unwrapClineTask(text)
@@ -295,7 +302,6 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		if text == "" {
 			continue
 		}
-		ts := base.Add(time.Duration(ti) * time.Second)
 		s.Touch(ts)
 		s.Messages = append(s.Messages, model.Message{Role: m.Role, Text: text, Time: ts})
 	}
@@ -346,6 +352,26 @@ func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 		for _, body := range clineToolResults(blocks) {
 			out = append(out, model.Message{Role: RoleToolOutput, Text: body, Time: ts})
 		}
+	}
+	return out
+}
+
+// clineTurnToolOutput is what a turn's tool_result blocks printed, for the
+// legacy Cline and the Roo task files, which put a command's output there and
+// the person's words (if any) in text blocks beside it. Read as text blocks
+// only, a failing command's error reached neither search nor the fix pairs
+// (#3269). The same switch and the same role the modern reader uses.
+func clineTurnToolOutput(raw json.RawMessage, ts time.Time) []model.Message {
+	if !IndexToolOutput() {
+		return nil
+	}
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []model.Message
+	for _, body := range clineToolResults(blocks) {
+		out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(body), Time: ts})
 	}
 	return out
 }
