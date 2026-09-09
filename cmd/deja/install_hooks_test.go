@@ -129,7 +129,7 @@ func TestCodexHookInstallAdoptsAnOlderEntry(t *testing.T) {
 	if len(ours) != 1 {
 		t.Fatalf("%d deja hooks, want 1: %v", len(ours), ours)
 	}
-	if !strings.HasPrefix(ours[0], "/usr/local/bin/deja") {
+	if !strings.HasPrefix(ours[0], hookExeInConfigs("/usr/local/bin/deja")) {
 		t.Fatalf("kept the stale path: %s", ours[0])
 	}
 }

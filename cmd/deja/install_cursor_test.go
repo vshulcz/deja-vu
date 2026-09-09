@@ -46,7 +46,7 @@ func TestInstallCursorHooksWritesSessionStart(t *testing.T) {
 	}
 	root := cursorHooksFile(t, home)
 	// Cursor's own event names, not Claude's — the file is read by cursor.
-	if got := cursorCommands(t, root, "sessionStart"); len(got) != 1 || got[0] != "/bin/deja hook-context" {
+	if got := cursorCommands(t, root, "sessionStart"); len(got) != 1 || got[0] != hookExeInConfigs("/bin/deja")+" hook-context" {
 		t.Fatalf("sessionStart = %v", got)
 	}
 	if got := cursorCommands(t, root, "beforeSubmitPrompt"); len(got) != 1 {
@@ -120,7 +120,7 @@ func TestInstallCursorHooksRewritesItsOwnEntry(t *testing.T) {
 	got := cursorCommands(t, cursorHooksFile(t, home), "sessionStart")
 	want := []string{
 		"/usr/bin/mine",
-		"/new/bin/deja hook-context",
+		hookExeInConfigs("/new/bin/deja") + " hook-context",
 		"cd /tmp && /old/bin/deja hook-context | tee /tmp/log",
 	}
 	if len(got) != len(want) {
@@ -187,7 +187,7 @@ func TestInstallCursorHooksLeavesOneEntryBehind(t *testing.T) {
 		t.Fatalf("install: %v", err)
 	}
 	got = cursorCommands(t, cursorHooksFile(t, home), "sessionStart")
-	if len(got) != 1 || got[0] != "/new/bin/deja hook-context" {
+	if len(got) != 1 || got[0] != hookExeInConfigs("/new/bin/deja")+" hook-context" {
 		t.Errorf("the entries deja left behind were not collected: %v", got)
 	}
 }

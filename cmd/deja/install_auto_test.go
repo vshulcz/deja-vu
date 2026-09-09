@@ -37,7 +37,7 @@ func TestInstallCodexHooksMergeAndUninstall(t *testing.T) {
 	if len(entries) != 2 {
 		t.Fatalf("entries = %d, want foreign + ours", len(entries))
 	}
-	if !strings.Contains(string(b), "other-tool ctx") || !strings.Contains(string(b), "deja hook-context") {
+	if !strings.Contains(string(b), "other-tool ctx") || !strings.Contains(string(b), hookExeInConfigs("/usr/local/bin/deja")+" hook-context") {
 		t.Fatalf("merged file wrong: %s", b)
 	}
 	// idempotent
@@ -86,8 +86,8 @@ func TestInstallCodexWiresThePromptItself(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("UserPromptSubmit entries = %d, want 1: %s", len(entries), b)
 	}
-	if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, "deja hook-prompt") {
-		t.Fatalf("command = %q, want deja hook-prompt", got)
+	if want := hookExeInConfigs("/usr/local/bin/deja") + " hook-prompt"; entries[0].Hooks[0].Command != want {
+		t.Fatalf("command = %q, want %q", entries[0].Hooks[0].Command, want)
 	}
 	// Codex's own examples carry no matcher on an every-turn event, and an
 	// empty pattern is not the same thing as an absent one.
@@ -164,8 +164,8 @@ func TestInstallCodexWiresCompaction(t *testing.T) {
 	if len(entries) != 1 {
 		t.Fatalf("PreCompact entries = %d, want 1: %s", len(entries), b)
 	}
-	if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, "deja hook-precompact") {
-		t.Fatalf("command = %q, want deja hook-precompact", got)
+	if want := hookExeInConfigs("/usr/local/bin/deja") + " hook-precompact"; entries[0].Hooks[0].Command != want {
+		t.Fatalf("command = %q, want %q", entries[0].Hooks[0].Command, want)
 	}
 	// Codex sends "auto" when it compacts by itself, which is how it compacts.
 	if m := entries[0].Matcher; !strings.Contains(m, "auto") {

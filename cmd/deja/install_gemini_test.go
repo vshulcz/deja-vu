@@ -44,7 +44,7 @@ func TestInstallGeminiWritesAnExtension(t *testing.T) {
 		t.Fatalf("hooks = %v", inner)
 	}
 	h, _ := inner[0].(map[string]any)
-	if cmd, _ := h["command"].(string); !strings.HasPrefix(cmd, "/bin/deja") {
+	if cmd, _ := h["command"].(string); !strings.HasPrefix(cmd, hookExeInConfigs("/bin/deja")) {
 		t.Fatalf("command = %v", h["command"])
 	}
 	// Gemini reads timeout in milliseconds — a Claude-style 10 kills the hook.

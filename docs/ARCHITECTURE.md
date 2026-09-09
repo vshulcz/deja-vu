@@ -185,8 +185,16 @@ The MCP server calls the same index/search code as the CLI. It writes protocol r
 `deja install --auto` installs the Claude MCP entry and adds a matcher-less command hook to `~/.claude/settings.json`:
 
 ```json
-{"type":"command","command":"/abs/path/to/deja hook-context"}
+{"type":"command","command":"~/.config/deja/bin/deja-hook hook-context"}
 ```
+
+The path in the entry is a launcher deja writes, not the binary it installed
+from. The launcher is three lines of shell that resolve the binary when the
+hook runs — `DEJA_BIN`, the path the install ran from, the `PATH`, then the
+usual install locations — so a release, a Homebrew upgrade or an npm install
+somewhere else moves the binary without any config being rewritten. On Windows
+there is no launcher and the entry holds the binary's path, because a `.cmd`
+cannot be exec'd the way a shebang script can.
 
 `deja hook-context` is intentionally hidden from normal help. It derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code).
 

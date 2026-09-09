@@ -52,7 +52,7 @@ func TestInstallCursorWiresTheMomentOfTheAction(t *testing.T) {
 	// The command string is what cursor dedupes on against ~/.claude, so it has
 	// to be exactly what deja writes there — a wrapper or a flag here would
 	// give a user with both two hooks per action.
-	if got := root.Hooks["postToolUse"][0].Command; got != "/usr/local/bin/deja hook-tool-after" {
+	if got := root.Hooks["postToolUse"][0].Command; got != hookExeInConfigs("/usr/local/bin/deja")+" hook-tool-after" {
 		t.Errorf("command = %q, want the same string the claude wiring writes", got)
 	}
 	// And uninstall takes all five back out.

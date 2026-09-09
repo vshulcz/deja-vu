@@ -47,6 +47,7 @@ var codexHookWiring = []struct{ Event, Sub, Matcher string }{
 }
 
 func installCodexHooks(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	// Use CodexHome() (honours CODEX_HOME / DEJA_CODEX_ROOT) rather than a raw
 	// ~/.codex join, so a sandboxed install stays sandboxed and a non-default
 	// codex home gets its hooks written where codex actually reads them. Every
@@ -436,6 +437,7 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 var qwenRetiredEvents = map[string]bool{"PostToolUse": true}
 
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	path := filepath.Join(sources.QwenConfigDir(), "settings.json")
 	var res installResult
 	for i, h := range qwenHookWiring {
@@ -613,6 +615,7 @@ const kimiHookMarker = "# deja: auto-recall (managed by `deja install kimi-auto`
 // Several UserPromptSubmit hooks are allowed: kimi runs them all and joins
 // their output, each in its own <hook_result> block.
 func installKimiAuto(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	path := filepath.Join(sources.KimiConfigDir(), "config.toml")
 	old, err := readConfig(path)
 	if err != nil {

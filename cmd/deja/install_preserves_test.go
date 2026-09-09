@@ -60,7 +60,7 @@ func TestInstallPreservesWhatWasAlreadyThere(t *testing.T) {
 			}
 			after := readFile(t, path)
 			// The test means nothing if the install did not touch this file.
-			if !strings.Contains(after, "/usr/local/bin/deja") {
+			if !dejaWiringPresent(after, "/usr/local/bin/deja") {
 				t.Fatalf("install wrote no deja wiring into %s; this case proves nothing:\n%s", tc.rel, after)
 			}
 			for _, want := range tc.keep {

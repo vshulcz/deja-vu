@@ -38,7 +38,7 @@ func TestInstallClaudeHonorsConfigDir(t *testing.T) {
 	if b, err := os.ReadFile(mcp); err != nil || !strings.Contains(string(b), `"deja"`) {
 		t.Fatalf("mcp server not in %s: %s (%v)", mcp, b, err)
 	}
-	if b, err := os.ReadFile(settings); err != nil || !strings.Contains(string(b), "deja hook-context") || !strings.Contains(string(b), "deja statusline") {
+	if b, err := os.ReadFile(settings); err != nil || !strings.Contains(string(b), hookExeInConfigs("/bin/deja")+" hook-context") || !strings.Contains(string(b), "deja statusline") {
 		t.Fatalf("hook/statusline not in %s: %s (%v)", settings, b, err)
 	}
 
@@ -123,7 +123,7 @@ func TestClaudeHookInstallTakesOverAnOlderPath(t *testing.T) {
 		if len(ours) != 1 {
 			t.Errorf("%s: %d deja hooks, want 1: %v", event, len(ours), ours)
 		}
-		if len(ours) == 1 && !strings.HasPrefix(ours[0], "/usr/local/bin/deja") {
+		if len(ours) == 1 && !strings.HasPrefix(ours[0], hookExeInConfigs("/usr/local/bin/deja")) {
 			t.Errorf("%s: kept the stale path: %s", event, ours[0])
 		}
 	}

@@ -12,7 +12,7 @@ import (
 // reads back. The case fold covers the drive letter and the suffix only — on a
 // case-sensitive filesystem /opt/Deja is a different file, and calling it the
 // binary reports a healthy install broken.
-var hookExePath = regexp.MustCompile("(/[^\\s\"'`\\\\]*/deja(?:\\.[eE][xX][eE])?|[A-Za-z]:[\\\\/][^\\s\"'`\\n]*[\\\\/]deja(?:\\.[eE][xX][eE])?)")
+var hookExePath = regexp.MustCompile("(/[^\\s\"'`\\\\]*/deja(?:-hook|\\.[eE][xX][eE])?|[A-Za-z]:[\\\\/][^\\s\"'`\\n]*[\\\\/]deja(?:-hook|\\.[eE][xX][eE])?)")
 
 // hookExeRuns matches what follows the path when the path is being run: one of
 // deja's own subcommands, past whatever quoting the file uses.

@@ -17,6 +17,7 @@ import (
 // own by exact command string, so writing the same command here means a user
 // with both installed still gets one injection, not two.
 func installCursorHooks(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	path := filepath.Join(sources.CursorCLIHome(), "hooks.json")
 	old, err := readConfig(path)
 	if err != nil {

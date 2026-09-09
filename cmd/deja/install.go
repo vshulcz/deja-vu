@@ -1470,6 +1470,7 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	old, err := readConfig(path)
 	if err != nil {
@@ -1696,7 +1697,10 @@ func isDejaBinaryToken(tok string) bool {
 		tok = tok[i+1:]
 	}
 	tok = strings.ToLower(tok)
-	return tok == "deja" || tok == "deja.exe"
+	// deja-hook is the launcher deja installs so a config never has to name a
+	// build (#3422). It is deja's own file under deja's own name, and an entry
+	// running it is ours to adopt, rewrite and remove.
+	return tok == "deja" || tok == "deja.exe" || tok == "deja-hook"
 }
 
 // subcommandEndsAt reports whether the subcommand really ended where it was

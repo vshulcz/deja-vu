@@ -22,6 +22,7 @@ import (
 const geminiExtensionName = "deja"
 
 func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.GeminiHome(), "extensions", geminiExtensionName)
 	if uninstall {
 		// hooksConfig stays: other extensions may rely on it, and turning it

@@ -170,6 +170,9 @@ func recordWiring(targets []string, uninstall bool) {
 	// A path deja no longer wired is not one it will be asked about again.
 	if len(kept) == 0 {
 		created = nil
+		// And nothing is left pointing at the launcher, so it goes with them.
+		// While one target stays wired it is still the path that target runs.
+		removeDejaLauncher()
 	}
 	sort.Strings(created)
 	snapshots := append([]string(nil), st.Snapshots...)

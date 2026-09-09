@@ -114,11 +114,12 @@ func TestKimiWiresTheThreeChannelsItHas(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := string(b)
+	exe := hookExeInConfigs("/bin/deja")
 	for _, want := range []string{
-		`command = "/bin/deja hook-context --plain --once"`,
-		`command = "/bin/deja hook-prompt --plain"`,
+		`command = "` + exe + ` hook-context --plain --once"`,
+		`command = "` + exe + ` hook-prompt --plain"`,
 		`event = "PreCompact"`,
-		`command = "/bin/deja hook-precompact"`,
+		`command = "` + exe + ` hook-precompact"`,
 	} {
 		if !strings.Contains(cfg, want) {
 			t.Fatalf("missing %s:\n%s", want, cfg)

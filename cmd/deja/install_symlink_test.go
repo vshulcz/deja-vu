@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -58,7 +57,7 @@ func TestInstallWritesThroughASymlink(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(string(b), "/usr/local/bin/deja") {
+			if !dejaWiringPresent(string(b), "/usr/local/bin/deja") {
 				t.Fatalf("the wiring did not reach the file the link points at:\n%s", b)
 			}
 		})
