@@ -64,7 +64,11 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	if _, err := setOpenClawPluginEnabled(true); err != nil {
 		return installResult{}, err
 	}
-	return installResult{Path: entry, Action: a}, nil
+	// The manifest and package.json beside it are deja's own and went unnamed
+	// on the screen whose job is saying what was touched, so the directory
+	// rides along (#3254).
+	return wroteAll(installResult{Path: entry, Action: a},
+		installResult{Path: dir, Action: a}), nil
 }
 
 // setOpenClawPluginEnabled adds or removes our entry under plugins.entries,

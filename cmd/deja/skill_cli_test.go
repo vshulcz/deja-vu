@@ -105,7 +105,7 @@ func TestUninstallKeepsTheCLISkillWhileAnotherTargetStays(t *testing.T) {
 
 func TestRemoveCLISkillLeavesOneTheUserRewrote(t *testing.T) {
 	hermeticEnv(t)
-	if err := writeCLISkill(); err != nil {
+	if _, err := writeCLISkill(); err != nil {
 		t.Fatal(err)
 	}
 	mine := "my own wording\n"
@@ -123,7 +123,7 @@ func TestRemoveCLISkillLeavesOneTheUserRewrote(t *testing.T) {
 	if err := os.Remove(cliSkillPath()); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeCLISkill(); err != nil {
+	if _, err := writeCLISkill(); err != nil {
 		t.Fatal(err)
 	}
 	if err := removeCLISkill(); err != nil {

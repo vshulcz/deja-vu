@@ -389,7 +389,7 @@ func cmdWarmup(dir string, _ []string) error {
 	// for it, because the skill deja shipped described MCP tools that were
 	// never installed (#1320). A failure is not the warmup's failure — the
 	// index is built and search works either way.
-	_ = writeCLISkill()
+	_, _ = writeCLISkill()
 	return nil
 }
 

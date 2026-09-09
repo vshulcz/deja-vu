@@ -321,7 +321,9 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 	// -auto adds, so `deja install goose` followed by `goose-auto` said
 	// "unchanged" three times while switching session-start recall on.
 	if action != "unchanged" {
-		return installResult{Path: gooseHookPath(), Action: action}, nil
+		return wroteAll(installResult{Path: gooseHookPath(), Action: action},
+			installResult{Path: gooseHintsPath(), Action: action},
+			installResult{Path: gooseRecipePath(), Action: action}), nil
 	}
 	return res, nil
 }

@@ -441,7 +441,8 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := writeIfChanged(cmdPath, oldCmd, []byte(dshCommandJS(exe))); err != nil {
+	cmdAction, err := writeIfChanged(cmdPath, oldCmd, []byte(dshCommandJS(exe)))
+	if err != nil {
 		return installResult{}, err
 	}
 	if withAuto {
@@ -450,8 +451,12 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err != nil {
 			return installResult{}, err
 		}
-		if _, err := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(exe))); err != nil {
-			return installResult{}, err
+		autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(exe)))
+		if aerr != nil {
+			return installResult{}, aerr
+		}
+		if autoAction != "unchanged" {
+			cmdAction = autoAction
 		}
 	} else if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
 		return installResult{}, err
@@ -461,5 +466,11 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		return installResult{}, perr
 	}
 	a, err := writeIfChanged(path, old, []byte(patched))
-	return installResult{Path: path, Action: a}, err
+	if err != nil {
+		return installResult{}, err
+	}
+	// The plugin directory rides along: the two files in it are deja's own and
+	// went unnamed on the screen whose job is saying what was touched (#3254).
+	plugins := installResult{Path: filepath.Dir(cmdPath), Action: cmdAction}
+	return wroteAll(installResult{Path: path, Action: a}, plugins), nil
 }

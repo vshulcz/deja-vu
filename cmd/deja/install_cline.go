@@ -59,10 +59,14 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := writeGuidanceFile(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody))); err != nil {
+	skillAction, err := writeGuidanceFile(filepath.Join(skill, "SKILL.md"), oldSkill, []byte(skillFile(skillBody)))
+	if err != nil {
 		return installResult{}, err
 	}
-	return installResult{Path: path, Action: a}, nil
+	// The plugin directory rides along, so the skill inside it is covered by
+	// the line naming the directory rather than going unmentioned (#3254).
+	return wroteAll(installResult{Path: path, Action: a},
+		installResult{Path: dir, Action: skillAction}), nil
 }
 
 func clinePluginJS(exe string) string {

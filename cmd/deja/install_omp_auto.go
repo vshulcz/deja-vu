@@ -27,19 +27,23 @@ func ompExtensionDir() string {
 // --auto` installs the -auto target alone, so an -auto that skipped the server
 // would leave the agent with injected memory and no tool to follow it up with.
 func installOmpAuto(exe string, uninstall bool) (installResult, error) {
-	if _, err := installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+	// The MCP half rides in the result rather than being dropped: the report
+	// is what says which files were touched, and mcp.json was written without
+	// ever being named (#3254).
+	mcp, err := installMCPJSON(filepath.Join(sources.OmpConfigDir(), "mcp.json"), exe, uninstall)
+	if err != nil {
 		return installResult{}, err
 	}
 	dir := ompExtensionDir()
 	path := filepath.Join(dir, "index.js")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return wroteAll(installResult{Path: path, Action: "unchanged"}, mcp), nil
 		}
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
-		return installResult{Path: path, Action: "removed"}, nil
+		return wroteAll(installResult{Path: path, Action: "removed"}, mcp), nil
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
@@ -49,7 +53,10 @@ func installOmpAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	a, err := writeIfChanged(path, old, []byte(ompExtensionJS(exe)))
-	return installResult{Path: path, Action: a}, err
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(installResult{Path: path, Action: a}, mcp), nil
 }
 
 func ompExtensionJS(exe string) string {

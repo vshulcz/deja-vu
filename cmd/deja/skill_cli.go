@@ -86,11 +86,11 @@ func cliSkillFile() string {
 // touches an agent's configuration, and a skill file is deja's own directory
 // rather than a harness's config. An edited copy is kept, the same as any other
 // skill deja writes.
-func writeCLISkill() error {
+func writeCLISkill() (string, error) {
 	path := cliSkillPath()
 	old, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return "", err
 	}
 	// Kept without saying so. writeSkillOfOurs prints "skill: kept your edited
 	// …" when it refuses, which is right for an install someone is watching and
@@ -98,12 +98,12 @@ func writeCLISkill() error {
 	// that line would appear on every run for as long as the edit lives.
 	// `deja install --force` still takes deja's version back.
 	if !forceGuidance && skillWasEdited(path, old) {
-		return nil
+		return "", nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+		return "", err
 	}
-	return writeSkillOfOurs(path, old, []byte(cliSkillFile()))
+	return writeGuidanceFile(path, old, []byte(cliSkillFile()))
 }
 
 // cliSkillStillWanted reports whether any harness deja wired is staying. One

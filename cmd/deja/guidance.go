@@ -525,9 +525,16 @@ func installGuidance(harness string, uninstall bool) (installResult, error) {
 		if uerr != nil {
 			return installResult{}, markerErrorFor(alt, uerr)
 		}
-		if _, werr := writeIfChanged(alt, oldAlt, []byte(updatedAlt)); werr != nil {
+		altAction, werr := writeIfChanged(alt, oldAlt, []byte(updatedAlt))
+		if werr != nil {
 			return installResult{}, werr
 		}
+		// Both files, and the shared skill written above: the report is what
+		// says which files were touched, and these three were not among them
+		// (#3254).
+		return wroteAll(installResult{Path: path, Action: a, Note: retiredNote},
+			installResult{Path: alt, Action: altAction},
+			installResult{Path: sharedSkillPath(), Action: altAction}), nil
 	}
 	return installResult{Path: path, Action: a, Note: retiredNote}, nil
 }

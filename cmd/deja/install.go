@@ -245,7 +245,19 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		var err error
 		switch {
 		case !uninstall:
-			err = writeCLISkill()
+			var action string
+			action, err = writeCLISkill()
+			// Every -auto target wrote this file and not one of them said so:
+			// nineteen unreported writes on the screen whose job is saying what
+			// was touched (#3254). Named once, here, rather than in each
+			// target's line.
+			if err == nil && action != "" {
+				done = append(done, lineItem{target: "skill", action: action, path: shortHome(cliSkillPath())})
+				touchedPaths = append(touchedPaths, cliSkillPath())
+				if !banner {
+					fmt.Printf("skill: %s %s\n", action, shortHome(cliSkillPath()))
+				}
+			}
 		case !cliSkillStillWanted(targets):
 			err = removeCLISkill()
 		}
@@ -736,10 +748,17 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "kimi":
 		return installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
 	case "kimi-auto":
-		if _, err := installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall); err != nil {
+		// Both halves in the result: the report is what says which files were
+		// touched, and this one wrote mcp.json without ever naming it (#3254).
+		mcp, err := installMCPJSON(filepath.Join(sources.KimiConfigDir(), "mcp.json"), exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installKimiAuto(exe, uninstall)
+		hooks, err := installKimiAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(mcp, hooks), nil
 	case "zed":
 		return installZedMCP(sources.ZedSettingsPath(), exe, uninstall)
 	case "cline":
@@ -747,10 +766,15 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "roo":
 		return installRoo(exe, uninstall)
 	case "cline-auto":
-		if _, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall); err != nil {
+		mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installClineAuto(exe, uninstall)
+		plugin, err := installClineAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(mcp, plugin), nil
 	case "continue":
 		return installContinue(exe, uninstall)
 	case "crush":
