@@ -77,7 +77,7 @@ func TestCtxCacheActionWordsRemainHistoricalQueries(t *testing.T) {
 	if err := os.MkdirAll(store, 0700); err != nil {
 		t.Fatal(err)
 	}
-	const text = "resume refresh checkpoint status diff explain invalidate history lookup promote: the saved decision was to keep the old transport"
+	const text = "resume refresh checkpoint status diff explain invalidate history lookup promote prune: the saved decision was to keep the old transport"
 	record := `{"type":"user","message":{"role":"user","content":` + quoteJSON(text) + `},"timestamp":"2026-08-04T10:00:00Z","sessionId":"legacy-ctx-query","cwd":"/proj"}` + "\n"
 	if err := os.WriteFile(filepath.Join(store, "session.jsonl"), []byte(record), 0600); err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestCtxCacheActionWordsRemainHistoricalQueries(t *testing.T) {
 	if err := index.Ensure(os.Getenv("DEJA_INDEX_DIR"), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	for _, query := range []string{"resume", "refresh", "checkpoint", "status", "diff", "explain", "invalidate", "history", "lookup", "promote"} {
+	for _, query := range []string{"resume", "refresh", "checkpoint", "status", "diff", "explain", "invalidate", "history", "lookup", "promote", "prune"} {
 		out, err := captureRun(t, "ctx", query)
 		if err != nil || !strings.Contains(out, "keep the old transport") {
 			t.Errorf("ctx %s lost historical query: %v\n%s", query, err, out)

@@ -197,7 +197,8 @@ search historical sessions unless `lookup` is explicitly requested:
 | `deja ctx --cache resume [--workspace PATH] [--task ID] [--budget TOKENS]` | Return the newest bounded snapshot and say whether it is a hit, miss, or stale. |
 | `deja ctx --cache checkpoint [--workspace PATH] [--task ID]` | Read structured durable state as JSON from stdin; private reasoning should not be included. |
 | `deja ctx --cache status` / `deja ctx --cache refresh` | Explain component freshness or incrementally reconcile changed identity, Git, and task metadata. |
-| `deja ctx --cache diff` / `deja ctx --cache history` | Inspect immutable snapshot history and working-state changes. |
+| `deja ctx --cache diff` / `deja ctx --cache history` | Inspect retained immutable snapshots and working-state changes. |
+| `deja ctx --cache prune [--workspace PATH] [--task ID] [--keep COUNT]` | Keep the newest COUNT snapshots for this workspace/task (default 100), always preserving the current snapshot. |
 | `deja ctx --cache explain --item ID` | Show why a checkpoint item is active and where it came from. |
 | `deja ctx --cache promote --item ID --to project\|task\|permanent\|ephemeral` | Change an item's retention layer without rewriting its provenance. |
 | `deja ctx --cache invalidate [--layer NAME] [--source ALIAS]` | Mark all context or one component/source stale. |
@@ -213,7 +214,11 @@ independently; refresh records a required validation gap instead of pretending
 that cached task conclusions were automatically re-proven.
 
 Use `deja ctx --cache resume` or the `deja` MCP tool with a `ctx_*` mode only when the
-caller explicitly requests the cache workflow. The cache stores agent-authored
+caller explicitly requests the cache workflow. Set `DEJA_CTX_MCP=1` in the MCP
+server environment to advertise cache modes and their arguments; the default
+schema stays limited to history. Checkpoint text uses the standard secret
+redactor (`DEJA_NO_REDACT=1` opts out), and each workspace/task retains at most
+100 snapshots after a write. The cache stores agent-authored
 structured state and never turns it into standing instructions. See the
 [context-cache reference](docs/ctx-cache.md) for storage, freshness, and
 retention limits.
@@ -251,16 +256,16 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, so
 this is only needed to configure an agent by hand. The six older tool names
 (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
-anything already wired to them. Experimental `ctx_*` modes are available only
-when a client explicitly invokes them; they are not installed as a startup or
-checkpoint routine.
+anything already wired to them. Set `DEJA_CTX_MCP=1` in the server environment to advertise experimental
+`ctx_*` modes and their extra arguments. Explicit cache calls remain callable
+without advertising them; no startup or checkpoint routine is installed.
 
 <details>
 <summary>Arguments and return shapes</summary>
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?`, `workspace?`, `task_id?`, `token_budget?`, `component_versions?`, `state?`, `item_id?`, `layer?`, `source?`, `to?` | Depends on the mode, below. |
+| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?`, `workspace?`, `task_id?`, `token_budget?`, `component_versions?`, `state?`, `item_id?`, `layer?`, `source?`, `to?`, `keep?` | Depends on the mode, below. |
 
 | Mode | Arguments it reads | Returns |
 | --- | --- | --- |

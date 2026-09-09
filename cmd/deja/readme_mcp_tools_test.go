@@ -14,6 +14,7 @@ import (
 // This reads the tools the server actually registers and requires each one to
 // appear in the README, both in the sentence and in the argument table.
 func TestReadmeListsEveryMCPToolTheServerRegisters(t *testing.T) {
+	t.Setenv("DEJA_CTX_MCP", "1")
 	resp, code, msg := handleMCP(t.TempDir(), rpcRequest{Method: "tools/list"})
 	if code != 0 {
 		t.Fatalf("tools/list: %d %s", code, msg)

@@ -26,6 +26,7 @@ const mcpToolsListCharBudget = 3400
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)
+	t.Setenv("DEJA_CTX_MCP", "")
 
 	resp := driveMCP(t, `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}`)
 	res, ok := resp[0]["result"].(map[string]any)

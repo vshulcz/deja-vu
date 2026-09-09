@@ -11,25 +11,25 @@ import (
 	"github.com/vshulcz/deja-vu/internal/ctxcache"
 )
 
-var ctxCacheCommands = map[string]bool{"resume": true, "refresh": true, "checkpoint": true, "status": true, "diff": true, "explain": true, "invalidate": true, "history": true, "lookup": true, "promote": true}
+var ctxCacheCommands = map[string]bool{"resume": true, "refresh": true, "checkpoint": true, "status": true, "diff": true, "explain": true, "invalidate": true, "history": true, "lookup": true, "promote": true, "prune": true}
 
 func isCtxCacheCommand(s string) bool { return ctxCacheCommands[s] }
 
 type ctxOptions struct {
 	workspace, task, layer, source, item, query, state, to string
 	versions                                               map[string]string
-	budget                                                 int
+	budget, keep                                           int
 	json                                                   bool
 }
 
 func parseCtxOptions(args []string) (ctxOptions, error) {
-	var o ctxOptions
+	o := ctxOptions{keep: ctxcache.DefaultHistoryLimit}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch a {
 		case "--json":
 			o.json = true
-		case "--workspace", "--task", "--layer", "--source", "--item", "--query", "--state", "--budget", "--to", "--versions":
+		case "--workspace", "--task", "--layer", "--source", "--item", "--query", "--state", "--budget", "--to", "--versions", "--keep":
 			if i+1 >= len(args) {
 				return o, fmt.Errorf("%s needs a value", a)
 			}
@@ -56,6 +56,12 @@ func parseCtxOptions(args []string) (ctxOptions, error) {
 				o.query = v
 			case "--state":
 				o.state = v
+			case "--keep":
+				n, e := strconv.Atoi(v)
+				if e != nil || n < 1 {
+					return o, fmt.Errorf("--keep needs a positive integer")
+				}
+				o.keep = n
 			case "--budget":
 				n, e := strconv.Atoi(v)
 				if e != nil || n < 1 {
@@ -152,6 +158,12 @@ func runCtxCache(indexDir string, args []string, in io.Reader, out io.Writer) er
 			return e
 		}
 		return write(h)
+	case "prune":
+		r, e := ctxcache.Prune(root, id, o.keep)
+		if e != nil {
+			return e
+		}
+		return write(r)
 	case "diff":
 		h, e := ctxcache.History(root, id)
 		if e != nil {

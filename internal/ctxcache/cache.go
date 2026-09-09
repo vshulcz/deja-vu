@@ -213,51 +213,9 @@ func git(dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func gitBytes(dir string, args ...string) []byte {
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
-	if err != nil {
-		return nil
-	}
-	return out
-}
-
-// worktreeDigest includes the actual tracked diff and the names and bytes of
-// untracked files. Porcelain alone records only that a file is modified, which
-// made repeated edits to an already-dirty file invisible to freshness checks.
-func worktreeDigest(root string) string {
-	h := sha256.New()
-	_, _ = h.Write(gitBytes(root, "status", "--porcelain=v1", "-z", "--untracked-files=all"))
-	// Keep index and worktree diffs separate. `git diff HEAD` fails before the
-	// first commit, which used to make staged dirty-to-dirty transitions in an
-	// unborn repository invisible.
-	_, _ = h.Write([]byte("\x00unstaged\x00"))
-	_, _ = h.Write(gitBytes(root, "diff", "--no-ext-diff", "--binary"))
-	_, _ = h.Write([]byte("\x00staged\x00"))
-	_, _ = h.Write(gitBytes(root, "diff", "--cached", "--no-ext-diff", "--binary"))
-	for _, name := range strings.Split(string(gitBytes(root, "ls-files", "--others", "--exclude-standard", "-z")), "\x00") {
-		if name == "" {
-			continue
-		}
-		// Git paths are repository-relative. Do not follow an untracked symlink
-		// out of the workspace; hash the link itself instead.
-		path := filepath.Join(root, filepath.FromSlash(name))
-		info, err := os.Lstat(path)
-		if err != nil || info.IsDir() {
-			continue
-		}
-		_, _ = h.Write([]byte(name))
-		if info.Mode()&os.ModeSymlink != 0 {
-			if target, err := os.Readlink(path); err == nil {
-				_, _ = h.Write([]byte(target))
-			}
-			continue
-		}
-		if b, err := os.ReadFile(path); err == nil {
-			_, _ = h.Write(b)
-		}
-	}
-	return hex.EncodeToString(h.Sum(nil))
-}
+// worktreeDigest preserves the internal entry point while bounding untracked
+// content reads and marking incomplete scans explicitly.
+func worktreeDigest(root string) string { return boundedWorktreeDigest(root) }
 
 // ResolveIdentityWithVersions adds optional local-adapter freshness markers to
 // the normal repository identity. It is intentionally a wrapper rather than a
@@ -298,7 +256,15 @@ func Load(root string, id Identity) (Snapshot, error) {
 	return s, nil
 }
 
-func save(root string, s Snapshot) error {
+func save(root string, s *Snapshot) error {
+	// Redact at the shared persistence boundary, including refresh, promotion,
+	// and invalidation of older data. Update the caller's snapshot too so its
+	// returned state is the exact sanitized state that is written.
+	clean := RedactSnapshot(*s)
+	if err := validateState(clean.State); err != nil {
+		return fmt.Errorf("validate redacted context: %w", err)
+	}
+	*s = clean
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -309,6 +275,12 @@ func save(root string, s Snapshot) error {
 	}
 	if err := os.MkdirAll(filepath.Join(root, "snapshots"), 0700); err != nil {
 		return err
+	}
+	// Validate retention before publishing, but delete only after the new
+	// pointer is committed. A failed write must preserve all prior history.
+	retention, err := planPrune(root, s.Identity, DefaultHistoryLimit-1)
+	if err != nil {
+		return fmt.Errorf("plan context history retention: %w", err)
 	}
 	history := filepath.Join(root, "snapshots", s.ID+".json")
 	if err := writeImmutable(history, b); err != nil {
@@ -360,6 +332,11 @@ func save(root string, s Snapshot) error {
 		_ = d.Sync()
 		_ = d.Close()
 	}
+	if _, err := retention.apply(); err != nil {
+		// The checkpoint is already durable. Cleanup is maintenance: expose its
+		// failure on stderr without inviting a retry of a successful checkpoint.
+		fmt.Fprintf(os.Stderr, "deja ctx: snapshot %s saved; history cleanup failed: %v\n", s.ID, err)
+	}
 	return nil
 }
 
@@ -370,7 +347,7 @@ func writeImmutable(path string, b []byte) error {
 		return err
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	if err := tmp.Chmod(0600); err != nil {
 		_ = tmp.Close()
 		return err
@@ -449,6 +426,7 @@ func Resume(root string, id Identity, budget int) (ResumeResult, error) {
 		status = "stale"
 	}
 	sourceAvailabilityGaps(&s.State)
+	worktreeValidationGap(&s.State, id.WorktreeState)
 	r := ResumeResult{CacheStatus: status, Snapshot: s, TokenBudget: budget}
 	truncated, err := trimResult(&r, budget)
 	if err != nil {
@@ -460,7 +438,9 @@ func Resume(root string, id Identity, budget int) (ResumeResult, error) {
 }
 
 func emptySnapshot(id Identity) Snapshot {
-	return Snapshot{Fingerprint: fingerprint(id), Identity: id, State: State{Status: "unknown", Gaps: []Gap{{Subject: "working context", Severity: "required", Reason: "no local checkpoint exists", RetrievalHint: "checkpoint durable state or use historical lookup"}}}}
+	s := Snapshot{Fingerprint: fingerprint(id), Identity: id, State: State{Status: "unknown", Gaps: []Gap{{Subject: "working context", Severity: "required", Reason: "no local checkpoint exists", RetrievalHint: "checkpoint durable state or use historical lookup"}}}}
+	worktreeValidationGap(&s.State, id.WorktreeState)
+	return s
 }
 
 func Checkpoint(root string, id Identity, state State) (Snapshot, error) {
@@ -500,7 +480,8 @@ func checkpointStateLocked(root string, id Identity, state State, materialize bo
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", key(id), version, now.UnixNano())))
 	s := Snapshot{ID: hex.EncodeToString(sum[:12]), Fingerprint: fingerprint(id), Identity: id, State: state, Freshness: Freshness{SnapshotVersion: version, GitHead: id.GitHead, WorktreeState: id.WorktreeState, Checkpoint: checkpoint, ComponentVersions: copyStrings(id.ComponentVersions), GeneratedAt: now}}
 	stampCheckpointProvenance(&s)
-	err = save(root, s)
+	worktreeValidationGap(&s.State, id.WorktreeState)
+	err = save(root, &s)
 	if err == nil {
 		recordMetric(root, metricEvent{Kind: "checkpoint", Gaps: len(s.State.Gaps), Conflicts: len(s.State.Conflicts), SnapshotBytes: snapshotLen(s)})
 	}
@@ -608,12 +589,13 @@ func RefreshDetailed(root string, id Identity) (RefreshResult, error) {
 		s.State.Gaps = upsertGap(s.State.Gaps, Gap{Subject: "source " + source.Name + " unavailable", Severity: "required", Reason: source.Reason, RetrievalHint: "restore or repair the source file, then refresh", Source: "file://" + filepath.ToSlash(source.Path)})
 	}
 	s.State = reconcileGenericConflicts(normalize(s.State))
+	worktreeValidationGap(&s.State, id.WorktreeState)
 	if err := validateState(s.State); err != nil {
 		return RefreshResult{}, fmt.Errorf("validate refreshed context: %w", err)
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", key(id), s.Freshness.SnapshotVersion, s.Freshness.GeneratedAt.UnixNano())))
 	s.ID = hex.EncodeToString(sum[:12])
-	err = save(root, s)
+	err = save(root, &s)
 	if err == nil {
 		mode := "incremental"
 		if previousID == "" {
@@ -730,7 +712,7 @@ func detectChanges(s Snapshot, id Identity) ([]string, error) {
 	if s.Identity.GitHead != id.GitHead {
 		c = append(c, "git")
 	}
-	if s.Identity.WorktreeState != id.WorktreeState {
+	if s.Identity.WorktreeState != id.WorktreeState || strings.HasPrefix(id.WorktreeState, "partial:") {
 		c = append(c, "worktree")
 	}
 	if s.Fingerprint != fingerprint(id) {
@@ -1024,10 +1006,17 @@ func Invalidate(root string, id Identity, layer string) error {
 	s.Freshness.GeneratedAt = time.Now().UTC()
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", key(id), s.Freshness.SnapshotVersion, s.Freshness.GeneratedAt.UnixNano())))
 	s.ID = hex.EncodeToString(sum[:12])
-	return save(root, s)
+	return save(root, &s)
 }
 
 func History(root string, id Identity) ([]Snapshot, error) {
+	// Retention can unlink old immutable objects. Hold the writer lock while
+	// listing and reading so pruning cannot invalidate this history view.
+	unlock, err := lock(root)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	entries, err := os.ReadDir(filepath.Join(root, "snapshots"))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil

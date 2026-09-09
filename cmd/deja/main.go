@@ -3715,6 +3715,7 @@ Usage:
   deja ctx --cache checkpoint [--workspace path] [--task id] [--state json]
   deja ctx --cache diff | explain --item id | invalidate --layer name [--source name] | lookup --query text
   deja ctx --cache promote --item id --to permanent|project|task|ephemeral
+  deja ctx --cache prune [--workspace path] [--task id] [--keep count]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp
   deja version

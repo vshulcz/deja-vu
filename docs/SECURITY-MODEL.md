@@ -72,7 +72,13 @@ state, current-pointer files under `current/`, immutable JSON snapshots under
 may name absolute local files; their checkpointed content, provenance, and
 hashes can therefore reveal project state and paths.
 
-The cache has no secrets scanner or encryption. Do not checkpoint secrets,
+Agent-authored checkpoint text, including materialized source content and
+nested project/test values, passes through Deja's standard `redact.Text` secret
+redactor before persistence and before returning a newly written snapshot.
+`DEJA_NO_REDACT=1` disables this pass, matching the existing index opt-out.
+Operational identities, source paths, versions, and provenance remain intact.
+Older snapshots written without redaction are not retroactively rewritten.
+Redaction is heuristic and there is no encryption: do not checkpoint secrets,
 private reasoning, or data that should not be readable by another process with
 the same filesystem access. Cache directories are created with mode 0700 and
 new pointer, snapshot, lock, and metrics files with mode 0600 where the
@@ -82,8 +88,11 @@ write it can alter it. Checkpoints are untrusted data, not approved operating
 instructions. CLI and MCP responses can expose this state to the caller or
 connected agent; any onward model-provider use follows that client's configuration.
 
-Snapshots are append-only history for normal cache operations. `invalidate`
-marks state stale; it does not delete prior snapshots. To remove this cache,
+Snapshot contents are immutable while retained. Cache writes retain at most
+100 snapshots per workspace/task identity; `deja ctx --cache prune --keep N`
+(or MCP `ctx_prune` with `keep`) can retain fewer, always preserving the current
+snapshot. `invalidate` marks state stale and writes a new retained snapshot.
+To remove this cache,
 stop agents using it and delete only the selected cache root (`DEJA_CTX_DIR` if
 set, otherwise the `ctx` sibling of the selected index), not the parent cache
 directory or Deja's history index. That cleanup removes local context and metrics only; it does

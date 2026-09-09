@@ -565,7 +565,7 @@ func TestPersistenceRejectsCorruptionAndCleansFailedPointerWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := Snapshot{ID: "failed-pointer", Identity: id, State: State{Objective: "x"}}
-	if err := save(failed, s); err == nil {
+	if err := save(failed, &s); err == nil {
 		t.Fatal("saved over directory pointer")
 	}
 	if _, err := os.Stat(filepath.Join(failed, "snapshots", s.ID+".json")); !os.IsNotExist(err) {
@@ -574,10 +574,10 @@ func TestPersistenceRejectsCorruptionAndCleansFailedPointerWrite(t *testing.T) {
 
 	good := t.TempDir()
 	s.ID = "immutable"
-	if err := save(good, s); err != nil {
+	if err := save(good, &s); err != nil {
 		t.Fatal(err)
 	}
-	if err := save(good, s); err == nil {
+	if err := save(good, &s); err == nil {
 		t.Fatal("overwrote immutable history")
 	}
 }
@@ -650,21 +650,21 @@ func TestStorageAndWorktreeErrorBranches(t *testing.T) {
 	}
 
 	id := testIdentity("save")
-	if err := save(t.TempDir(), Snapshot{ID: "marshal", Identity: id, State: State{Project: map[string]any{"bad": func() {}}}}); err == nil {
+	if err := save(t.TempDir(), &Snapshot{ID: "marshal", Identity: id, State: State{Project: map[string]any{"bad": func() {}}}}); err == nil {
 		t.Fatal("marshaled function")
 	}
 	rootFile := filepath.Join(t.TempDir(), "root-file")
 	if err := os.WriteFile(rootFile, []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := save(rootFile, Snapshot{ID: "bad-root", Identity: id}); err == nil {
+	if err := save(rootFile, &Snapshot{ID: "bad-root", Identity: id}); err == nil {
 		t.Fatal("saved below regular root")
 	}
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "snapshots"), []byte("x"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := save(root, Snapshot{ID: "bad-snapshots", Identity: id}); err == nil {
+	if err := save(root, &Snapshot{ID: "bad-snapshots", Identity: id}); err == nil {
 		t.Fatal("saved below snapshots file")
 	}
 	if err := writeImmutable(filepath.Join(root, "missing", "object"), []byte("x")); err == nil {
@@ -774,10 +774,10 @@ func TestPublicRecoveryAndPromotionErrorPaths(t *testing.T) {
 	// an earlier checkpoint object.
 	immutableRoot := t.TempDir()
 	s := Snapshot{ID: "same", Identity: id}
-	if err := save(immutableRoot, s); err != nil {
+	if err := save(immutableRoot, &s); err != nil {
 		t.Fatal(err)
 	}
-	if err := save(immutableRoot, s); err == nil {
+	if err := save(immutableRoot, &s); err == nil {
 		t.Fatal("rewrote immutable snapshot")
 	}
 }
