@@ -7,8 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.5] - 2026-09-09
+
+The release where deja stopped reading the harness's own text as the person's
+words. Two dozen parsers were checked against real stores and every one of them
+was quoting something back that nobody typed — an environment block, a skill
+body, a plan approval, an editor's summary of a thread, deja's own recall coming
+round again. The same pass gave the work records the harnesses already had:
+what a tool ran, what it returned, which file an edit touched. Wiring is the
+other half: a config now names a launcher instead of a build, only the installed
+binary repairs it, and a settings file that had collected eight deja hooks per
+event collapses back to one.
+
 ### Added
-- After the install proof, once per index, deja says where it lives — one line with the repository address; a package or plugin install that printed no proof gets the same line in its first week note, and never again. (#3159)
+- Continue: its sessions are indexed — the twenty-fourth harness — and `deja install continue` writes the MCP server, the shared skill and a slash command. (#3149, #3151)
+- Crush: its history is read and recall is wired into it. (#3158)
+- prime-agent: the MCP server, an extension, the skill and a command. (#3125)
+- Claude Code: a subagent run is indexed as its task and its answer, cc-mirror variants and headless transcripts are read, and the store keeps working under its new name. (#3141, #3146)
+- OpenClaw: what a reset or a delete left behind is still searchable, the digest moved to the phase hook that fires once a turn, and a compaction forgets what it threw away. (#3123, #3142)
+- Roo Code: `deja resume` reopens CLI tasks, and Roo stops asking before every recall. (#3130)
+- `deja files --json`: the ranked rows a caller had to parse out of padded columns. (#3106)
+- Recall excerpts carry the session's last word on the query, and say when the session came back to it after the quoted line. (#3140, #3150)
+- `deja stats` counts the replies that used a recall and did not say so — the gap between memory served and memory credited. (#3144)
+- Install says where deja lives and where the docs and the issue tracker are, once per index rather than on every run; a package or plugin install that printed no proof gets the same line in its first week note. (#3143, #3159, #3160)
+- Hooks run through `~/.config/deja/bin/deja-hook`, a launcher that resolves the binary when the hook fires: `DEJA_BIN`, the path the install ran from, the `PATH`, then the usual install locations. An upgrade that moves deja rewrites one file instead of twenty-eight. MCP entries keep the binary path — the client spawns those without a shell — and Windows keeps it too, because a `.cmd` cannot be exec'd like a shebang script. (#3426)
+- `deja doctor` counts deja's entries per event, reports a session served the same injection twice inside a second, and says when the launcher has no deja to run. (#3424, #3428, #3434)
+
+### Changed
+- Index format version 35: a store re-reads its sources once, so the parser fixes below reach histories that were already indexed. (#3290)
+- `--limit` binds the ranked and error tiers, not only the exact one: `--limit 3` on a phrase returned fifty sessions. (#3348)
+- The per-prompt hook reads the dedupe file once per prompt instead of four times. (#3380)
+- VS Code Copilot Chat sessions are found by asking VS Code for its session directories instead of walking the whole `User` folder. (#3169)
+- The pre-tool hook says the outcome or nothing: a count and a date is the pointer the code beside it argues against, spent on the one line the hook gets. (#3431)
+- A short question has to have matched what it is about, not the working word beside it — the ranking now carries which of the question's naming words each session matched. Cross-paired false fires 7 of 51 to 5, with no other bench arm moving. (#3431)
+- A match that covers a session outranks one that brushes a marathon. (#3431)
+- "Most re-used" counts what an agent asked for. A per-prompt push is deja serving a session, not evidence it mattered, and it was 60–70% of that number. (#3431)
+- The install report names every file a target wrote: nineteen targets wrote the CLI skill and none said so, and kimi, omp, cline, dsh, goose, openclaw and grok each wrote a second file it never mentioned. (#3431)
+- The credit line hands the agent the sentence to write instead of asking it to decide whether to write one. (#3431)
+- The reading and indexing phases move per file and count messages as they land, and the sidecar builders are a phase rather than eight silent seconds. (#3374, #3376, #3416)
+
+### Fixed
+- Claude Code: a record Claude Code wrote itself — `isMeta`, the hook's own line, a compaction summary — is not the person talking. (#3268, #3334, #3163, #3178)
+- Copilot CLI: a skill the host injects is the host's, not the person's words, and a command that exited non-zero says so. (#3306, #3371)
+- Roo Code and Cline: the `environment_details` block is not the person's words, and a task's tool calls, results and command output are indexed as its commands, files and tool output. (#3256, #3270, #3296, #3331)
+- Zed: the editor's summary of a mentioned thread is not what the person said, what a tool returned is indexed, a thread's own order is its clock so two identical turns both survive, and the block takes the file's line ending. (#3292, #3332, #3335, #3338, #3232)
+- Antigravity: approving a plan is the IDE's record, and an edit through `replace_file_content` leaves a files record and an edit record. (#3280, #3327)
+- opencode: a part flagged synthetic is the harness's, a subagent run knows the session that spawned it, a session is named by opencode's own title unless that says less than its first line, and a switched-off MCP entry does not count as wired. (#3194, #3300, #3302, #3316)
+- Gemini and Qwen: `toolCalls`, the `functionResponse` turn and a `tool_result` record are the work, indexed like the others — error included. (#3282, #3294)
+- Grok: a `tool_call`'s `rawInput` is the command and the file it worked on, and the sources row counts the database beside the JSONL. (#3227, #3240, #3286)
+- aider: the banner, a multi-line output block and a logged slash command are not the assistant or the person speaking, and a flow list under `read:` is a list. (#3207, #3229, #3249, #3312)
+- Kimi Code: only what the person wrote is a user turn. (#3201, #3235)
+- Cursor: a turn is dated by the stamp Cursor wrote into it, and the hook's `conversation_id` is the session — so recall is not repeated on every prompt. (#3288, #3352)
+- Continue: a placeholder title, or the first line again, is no title. (#3275)
+- Hermes: `HERMES_HOME` moves install, parse and doctor with it; a session belongs to the directory it was recorded in and is titled by the question rather than the greeting; the memory provider loads on the build it finds. (#3206, #3242, #3250, #3252, #3258, #3273, #3341, #3391)
+- The per-prompt hook stands down on the host's own turns, answers the same question once an hour rather than once per tick, and reads the question before the paste above it — including under an `attached_files` block. (#3164, #3184, #3337, #3350)
+- A compaction forgets every key the session filed memory under, so what it threw away can come back. (#3308, #3354)
+- `deja doctor`: the rows say when a transcript went unread for cline, OpenClaw and Antigravity; the gemini row counts its own chats rather than another harness's store; Codex caches, Kimi's `state.json`, Continue's session list and Copilot's `vscode.metadata.json` are files deja reads, not files it missed; a store with one locked root is reported as partly readable; and the advice names the target that adds the hook. (#3298, #3304, #3310, #3314, #3318, #3320, #3322, #3363, #3378, #3398, #3400, #3408)
+- Install and uninstall: a build that is not the installed deja leaves the wiring alone, Claude Code's writer collapses its own repeated entries, `--all` says where the hooks are, a run that changes nothing still names the files it wrote, no snapshot is taken of a file the same run created, a snapshot holding only deja's own block is deja's to remove, a JSONC config with trailing commas is JSONC, and the vscode and roo installs name every host they write. (#3230, #3234, #3237, #3246, #3342, #3394, #3423, #3424, #3425)
+- Install and uninstall, per harness: grok names `config.toml` and `user-settings.json` with the hooks; gemini-auto names the extension and the switch it leaves on; goose stops deleting the reader's own `.goosehints` and names the hooks plugin it removes; openclaw gives its hook switch back; the DeepSeek uninstall leaves a layer dsh can load; prime keeps the comments in its settings; qwen reports the hooks it rewired. (#3186, #3198, #3205, #3209, #3221, #3224, #3226, #3238, #3244, #3253, #3272, #3389, #3127)
+- Uninstall keeps a directory the reader already had: the prune could only test "nothing else is in it". (#3430)
+- The index does not record a store it could not read as read, so a locked sqlite store is parsed again on the next pass instead of being called up to date. (#3177, #3191, #3430)
+- A search no longer waits on the tail of a session being written: past eight megabytes of new bytes the append is treated as rewrite-grade and the answer comes from the snapshot. (#3430)
+- `deja forget` takes the cached session-start digests with the sessions. (#3413)
+- `deja fix`: the ignore rule reaches the sightings, an unconfirmed remedy from an excluded tree is withheld, and `--json` and the MCP mode name the file that changed next. (#3260, #3262, #3404, #3418)
+- `deja friction`: the go module, sqlite and linker walls read as errors, two failures that share a URL no longer print as one row twice, and a missing table is the server's line. (#3375, #3393, #3402, #3419)
+- `deja files` answers a quoted topic the same as the same words unquoted. (#3410)
+- The refusals say what to do: `--limit` names what `last` and `blame` take instead, and a question that starts with a dash is told about the separator. (#3396, #3406)
+- The install report and the site count twenty-five harnesses, and the MCP harness filter names the registry rather than nine harnesses from 2026. (#3347, #3364, #3383, #3387)
+- Windows: a workspace path folds into the project key the way a POSIX one does, and two fixtures that pasted a filesystem path into JSON stopped failing the leg they were written for. (#3218, #3427)
 
 ## [0.19.4] - 2026-09-07
 
