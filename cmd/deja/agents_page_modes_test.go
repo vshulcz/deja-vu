@@ -34,7 +34,7 @@ func TestTheAgentsPageNamesEveryMCPMode(t *testing.T) {
 	if said == nil {
 		t.Fatal("the page no longer says how many capabilities there are")
 	}
-	spelled := map[string]int{"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9}
+	spelled := map[string]int{"four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "fourteen": 14, "sixteen": 16}
 	got, ok := spelled[string(said[1])]
 	if !ok {
 		got, _ = strconv.Atoi(string(said[1]))

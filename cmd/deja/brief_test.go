@@ -115,8 +115,18 @@ func TestBriefReplacesAQuietWeekWithTheSpanItHolds(t *testing.T) {
 	if err := runBrief(dir, &out); err != nil {
 		t.Fatal(err)
 	}
+	// The brief renders the span in the reader's local timezone. Derive the
+	// expected endpoints from the same servable overview it describes; a fixed
+	// UTC date made this assertion fail west of Greenwich despite the correct
+	// span being rendered.
+	overview, err := index.OverviewServable(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	got := out.String()
-	if !strings.Contains(got, "covering") || !strings.Contains(got, "Apr 11 2026") {
+	if !strings.Contains(got, "covering") ||
+		!strings.Contains(got, overview.Oldest.Local().Format("Jan 2 2006")) ||
+		!strings.Contains(got, overview.Newest.Local().Format("Jan 2 2006")) {
 		t.Fatalf("want the span the index holds:\n%s", got)
 	}
 	for _, unwanted := range []string{"today      0", "this week  0"} {

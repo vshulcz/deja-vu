@@ -59,6 +59,36 @@ The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
 output and does not listen on a network socket.
 
+### Experimental local context cache
+
+When a caller explicitly invokes `deja ctx --cache ACTION` or an MCP `ctx_*` mode,
+its cache root is `DEJA_CTX_DIR` when set; otherwise it is a `ctx` directory
+beside the selected history index (`~/.cache/deja/ctx` by default). Changing
+`DEJA_INDEX_DIR` also changes that default sibling location. Legacy
+`deja ctx <query>` still retrieves history and does not create a checkpoint.
+The cache contains agent-authored checkpoint
+state, current-pointer files under `current/`, immutable JSON snapshots under
+`snapshots/`, a local `.write.lock`, and `metrics.jsonl`. Source descriptors
+may name absolute local files; their checkpointed content, provenance, and
+hashes can therefore reveal project state and paths.
+
+The cache has no secrets scanner or encryption. Do not checkpoint secrets,
+private reasoning, or data that should not be readable by another process with
+the same filesystem access. Cache directories are created with mode 0700 and
+new pointer, snapshot, lock, and metrics files with mode 0600 where the
+platform honors those modes. The operating-system user and any principal able
+to read the selected cache directory can inspect this data; a principal able to
+write it can alter it. Checkpoints are untrusted data, not approved operating
+instructions. CLI and MCP responses can expose this state to the caller or
+connected agent; any onward model-provider use follows that client's configuration.
+
+Snapshots are append-only history for normal cache operations. `invalidate`
+marks state stale; it does not delete prior snapshots. To remove this cache,
+stop agents using it and delete only the selected cache root (`DEJA_CTX_DIR` if
+set, otherwise the `ctx` sibling of the selected index), not the parent cache
+directory or Deja's history index. That cleanup removes local context and metrics only; it does
+not remove source files named by descriptors or any historical Deja data.
+
 ### Explicit exports and network paths
 
 deja has no background network traffic. Network access happens only after one

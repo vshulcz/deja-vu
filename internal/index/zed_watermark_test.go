@@ -57,13 +57,20 @@ func zedThread(t *testing.T, db, id, updated string, texts []string) {
     id text primary key, summary text not null, updated_at text not null,
     data_type text not null, data blob not null, parent_id text,
     folder_paths text, folder_paths_order text, created_at text);
-` + fmt.Sprintf("insert or replace into threads (id,summary,updated_at,data_type,data,folder_paths) values (%q,'pool timeouts',%q,'zstd',x'%s','[\"/work/app\"]');",
-		id, updated, hex.EncodeToString(out.Bytes()))
+` + fmt.Sprintf("insert or replace into threads (id,summary,updated_at,data_type,data,folder_paths) values (%s,'pool timeouts',%s,'zstd',x'%s','[\"/work/app\"]');",
+		sqliteLiteral(id), sqliteLiteral(updated), hex.EncodeToString(out.Bytes()))
 	c := exec.Command("sqlite3", db)
 	c.Stdin = strings.NewReader(stmts)
 	if o, err := c.CombinedOutput(); err != nil {
 		t.Fatalf("sqlite3 seed: %v %s", err, o)
 	}
+}
+
+// sqliteLiteral uses SQL string literals, not Go's %q double-quoted strings.
+// SQLite historically accepted double-quoted strings in some builds, but that
+// compatibility is optional and strict builds parse them as identifiers.
+func sqliteLiteral(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
 func zedHits(t *testing.T, dir, marker string) int {

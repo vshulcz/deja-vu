@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/ctxcache"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -286,33 +287,42 @@ func harnessFilterDescription() string {
 func dejaTool() map[string]any {
 	return map[string]any{
 		"name": "deja",
-		"description": "This user's own past coding sessions, across every AI tool they use (Claude Code, Codex, Cursor, opencode, aider, gemini and others). " +
+		"description": "This user's own past coding sessions across AI tools. " +
 			"Not general knowledge and not library docs — only what happened on this machine. Pick a mode:\n" +
-			"- recall: search past sessions. The moment the user implies work already happened (\"didn't we fix this?\", \"what was that error\", \"what did we decide about X\"), and always before debugging an error or re-implementing something. An exact error string, function name or path is the strongest query; a question in your own words works too.\n" +
-			"- context: the full story of the single best-matching session — problem, decisions, outcome — when a recall hit is not enough.\n" +
+			"- recall: search past sessions when the user implies work already happened, and always before debugging an error or re-implementing something. An exact error string, function name or path is the strongest query.\n" +
+			"- context: the best-matching session's problem, decisions and outcome when a recall hit is not enough.\n" +
 			"- blame: why a file is the way it is, before you edit, refactor or delete it. Session history, not git authorship.\n" +
 			"- fix: you just hit an error. What this machine ran, or changed, after that same error before. Pass the failing output verbatim.\n" +
-			"- how: the real command with the real flags this user runs for a thing — build, test, deploy — instead of a guessed one.\n" +
-			"- remember: store one durable decision so a later session can recall it. Only after something is settled.\n" +
-			"A bracketed marker on a result is the user's own later judgement on that session; act on what it says. " +
-			"When a result genuinely helps, tell the user in one short line at the start of your reply: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
+			"- how: this user's actual command and flags for a build, test or deployment.\n" +
+			"- remember: store one settled, durable decision for later sessions.\n" +
+			"ctx_*: experimental, opt-in local checkpoints; only when explicitly requested. History recall never requires a checkpoint. " +
+			"A bracketed marker is the user's later judgement on a session; act on it. When a result helps, tell the user in one short line: \"déjà vu: <what> — <how used> (deja:<id>)\". Say nothing about recalls that did not help.",
 		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}, "description": "Which capability to use."},
-				"query":   map[string]any{"type": "string", "description": "recall and context: an exact token — error string, function name, flag — or the question in your own words."},
-				"path":    map[string]any{"type": "string", "description": "blame: absolute, relative, or bare filename."},
-				"error":   map[string]any{"type": "string", "description": "fix: the failing output, verbatim. Multi-line pastes are fine."},
-				"what":    map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
-				"text":    map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
-				"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
-				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
-				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
-				"since":   map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
-				"limit":   map[string]any{"type": "number", "description": "Max results."},
-				"offset":  map[string]any{"type": "number", "description": "recall: skip this many ranked matches, to page without re-ranking."},
-				"all":     map[string]any{"type": "boolean", "description": "blame: every project, not just this one."},
+				"mode":               map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember", "ctx_resume", "ctx_status", "ctx_refresh", "ctx_checkpoint", "ctx_diff", "ctx_lookup", "ctx_explain", "ctx_invalidate", "ctx_history", "ctx_promote"}, "description": "Capability. ctx_* modes are experimental, opt-in local working-context operations."},
+				"query":              map[string]any{"type": "string", "description": "recall and context: an exact token — error string, function name, flag — or the question in your own words."},
+				"path":               map[string]any{"type": "string", "description": "blame: absolute, relative, or bare filename."},
+				"error":              map[string]any{"type": "string", "description": "fix: the failing output, verbatim. Multi-line pastes are fine."},
+				"what":               map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
+				"text":               map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
+				"tags":               map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
+				"harness":            map[string]any{"type": "string", "description": harnessFilterDescription()},
+				"project":            map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
+				"since":              map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
+				"limit":              map[string]any{"type": "number", "description": "Max results."},
+				"offset":             map[string]any{"type": "number", "description": "recall: skip this many ranked matches, to page without re-ranking."},
+				"all":                map[string]any{"type": "boolean", "description": "blame: every project, not just this one."},
+				"workspace":          map[string]any{"type": "string"},
+				"task_id":            map[string]any{"type": "string"},
+				"token_budget":       map[string]any{"type": "integer", "minimum": 1},
+				"component_versions": map[string]any{"type": "object", "additionalProperties": map[string]any{"type": "string"}},
+				"state":              map[string]any{"type": "object"},
+				"item_id":            map[string]any{"type": "string"},
+				"layer":              map[string]any{"type": "string"},
+				"source":             map[string]any{"type": "string"},
+				"to":                 map[string]any{"type": "string", "enum": []string{"permanent", "project", "task", "ephemeral"}},
 			},
 			"required": []string{"mode"},
 		},
@@ -323,17 +333,131 @@ func dejaTool() map[string]any {
 // names are the same strings, which is why a client with them wired keeps
 // working.
 var dispatcherModes = map[string]string{
-	"recall":   "recall",
-	"search":   "recall",
-	"context":  "recall_context",
-	"digest":   "recall_context",
-	"blame":    "blame",
-	"fix":      "fix",
-	"how":      "how",
-	"remember": "remember",
+	"recall":         "recall",
+	"search":         "recall",
+	"context":        "recall_context",
+	"digest":         "recall_context",
+	"blame":          "blame",
+	"fix":            "fix",
+	"how":            "how",
+	"remember":       "remember",
+	"ctx_resume":     "ctx_resume",
+	"ctx_status":     "ctx_status",
+	"ctx_refresh":    "ctx_refresh",
+	"ctx_checkpoint": "ctx_checkpoint",
+	"ctx_diff":       "ctx_diff",
+	"ctx_lookup":     "ctx_lookup",
+	"ctx_explain":    "ctx_explain",
+	"ctx_invalidate": "ctx_invalidate",
+	"ctx_history":    "ctx_history",
+	"ctx_promote":    "ctx_promote",
+}
+
+func callCtxMCP(indexDir, name string, raw json.RawMessage) (string, error) {
+	var a struct {
+		Workspace         string            `json:"workspace"`
+		TaskID            string            `json:"task_id"`
+		TokenBudget       json.RawMessage   `json:"token_budget"`
+		ComponentVersions map[string]string `json:"component_versions"`
+		State             json.RawMessage   `json:"state"`
+		Query             string            `json:"query"`
+		ItemID            string            `json:"item_id"`
+		Layer             string            `json:"layer"`
+		Source            string            `json:"source"`
+		To                string            `json:"to"`
+	}
+	if err := decodeToolArgs(name, raw, &a); err != nil {
+		return "", err
+	}
+	if name == "ctx_lookup" {
+		if strings.TrimSpace(a.Query) == "" {
+			return "", fmt.Errorf("query required")
+		}
+		ctxcache.RecordLookup(ctxcache.Root(indexDir))
+		return callMCPTool(indexDir, "recall_context", raw)
+	}
+	id, err := ctxcache.ResolveIdentityWithVersions(a.Workspace, a.TaskID, a.ComponentVersions)
+	if err != nil {
+		return "", err
+	}
+	root := ctxcache.Root(indexDir)
+	encode := func(v any) (string, error) { b, e := json.MarshalIndent(v, "", "  "); return string(b), e }
+	switch name {
+	case "ctx_resume":
+		budget, e := ctxMCPBudget(a.TokenBudget)
+		if e != nil {
+			return "", e
+		}
+		r, e := ctxcache.Resume(root, id, budget)
+		if e != nil {
+			return "", e
+		}
+		b, e := ctxcache.EncodeResume(r)
+		return string(b), e
+	case "ctx_status":
+		return encodeResult(ctxcache.Inspect(root, id))
+	case "ctx_refresh":
+		return encodeResult(ctxcache.RefreshDetailed(root, id))
+	case "ctx_checkpoint":
+		if len(a.State) == 0 || string(a.State) == "null" {
+			return "", fmt.Errorf("state required")
+		}
+		if len(a.State) > maxCtxCheckpointBytes {
+			return "", fmt.Errorf("checkpoint exceeds %d bytes", maxCtxCheckpointBytes)
+		}
+		state, err := ctxcache.DecodeState(a.State)
+		if err != nil {
+			return "", fmt.Errorf("decode checkpoint state: %w", err)
+		}
+		return encodeResult(ctxcache.Checkpoint(root, id, state))
+	case "ctx_diff":
+		h, e := ctxcache.History(root, id)
+		if e != nil {
+			return "", e
+		}
+		if len(h) < 2 {
+			return "", fmt.Errorf("ctx_diff needs at least two snapshots")
+		}
+		return encode(ctxcache.Diff(h[1], h[0]))
+	case "ctx_explain":
+		if strings.TrimSpace(a.ItemID) == "" {
+			return "", fmt.Errorf("item_id required")
+		}
+		return encodeResult(ctxcache.Explain(root, id, a.ItemID))
+	case "ctx_invalidate":
+		if a.Layer != "" && a.Source != "" {
+			return "", fmt.Errorf("use either layer or source")
+		}
+		if a.Source != "" {
+			a.Layer = "source:" + a.Source
+		}
+		if e := ctxcache.Invalidate(root, id, a.Layer); e != nil {
+			return "", e
+		}
+		return encode(map[string]any{"invalidated": valueOr(a.Layer, "all")})
+	case "ctx_history":
+		return encodeResult(ctxcache.History(root, id))
+	case "ctx_promote":
+		if a.ItemID == "" || a.To == "" {
+			return "", fmt.Errorf("ctx_promote needs item_id and to")
+		}
+		return encodeResult(ctxcache.Promote(root, id, a.ItemID, a.To))
+	}
+	return "", fmt.Errorf("unknown context operation %q", name)
+}
+
+func encodeResult[T any](v T, err error) (string, error) {
+	if err != nil {
+		return "", err
+	}
+	b, e := json.MarshalIndent(v, "", "  ")
+	return string(b), e
 }
 
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
+	if strings.HasPrefix(name, "deja_ctx_") {
+		name = strings.TrimPrefix(name, "deja_")
+	}
 	if name == "deja" {
 		var a struct {
 			Mode string `json:"mode"`
@@ -346,11 +470,13 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if !ok {
 			// Named, not guessed at: a model that invents a mode gets the list
 			// rather than an empty answer it will read as "no history".
-			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
+			return "", fmt.Errorf("unknown deja mode %q", a.Mode)
 		}
 		return callMCPTool(dir, target, raw)
 	}
 	switch name {
+	case "ctx_resume", "ctx_status", "ctx_refresh", "ctx_checkpoint", "ctx_diff", "ctx_lookup", "ctx_explain", "ctx_invalidate", "ctx_history", "ctx_promote":
+		return callCtxMCP(dir, name, raw)
 	case "recall":
 		var a struct {
 			Query   string    `json:"query"`

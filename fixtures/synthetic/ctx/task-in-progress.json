@@ -1,0 +1,17 @@
+{
+  "objective": "Deliver the synthetic cache task",
+  "status": "in_progress",
+  "confirmed": [
+    {"id": "fact-local", "text": "All fixture data is local.", "source": "file://synthetic/acceptance.md"}
+  ],
+  "implemented": [
+    {"id": "implementation-cache", "text": "Snapshot persistence exists.", "source": "git://synthetic/cache.go"}
+  ],
+  "failing": [
+    {"id": "failure-freshness", "text": "Dirty-to-dirty transitions need validation.", "source": "file://synthetic/test-results.json"}
+  ],
+  "tests": {"passing": ["snapshot-roundtrip"], "failing": ["dirty-to-dirty"]},
+  "next_actions": [
+    {"id": "action-validate", "text": "Run the freshness fixture.", "source": "file://synthetic/acceptance.md"}
+  ]
+}

@@ -184,6 +184,40 @@ $ deja "jwt refresh token"
 | `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. |
 | `deja friction` | Errors that hit three or more separate sessions, with the harnesses named. |
 
+**Experimental local context**
+
+`ctx` is an explicit, local opt-in cache for an agent or person that chooses to
+use it. It does not change Deja's default history/recall workflow, install a
+hook, or ask an agent to resume or checkpoint automatically. These
+subcommands read and write `~/.cache/deja/ctx` (or `DEJA_CTX_DIR`) and do not
+search historical sessions unless `lookup` is explicitly requested:
+
+| Command | What it does |
+| --- | --- |
+| `deja ctx --cache resume [--workspace PATH] [--task ID] [--budget TOKENS]` | Return the newest bounded snapshot and say whether it is a hit, miss, or stale. |
+| `deja ctx --cache checkpoint [--workspace PATH] [--task ID]` | Read structured durable state as JSON from stdin; private reasoning should not be included. |
+| `deja ctx --cache status` / `deja ctx --cache refresh` | Explain component freshness or incrementally reconcile changed identity, Git, and task metadata. |
+| `deja ctx --cache diff` / `deja ctx --cache history` | Inspect immutable snapshot history and working-state changes. |
+| `deja ctx --cache explain --item ID` | Show why a checkpoint item is active and where it came from. |
+| `deja ctx --cache promote --item ID --to project\|task\|permanent\|ephemeral` | Change an item's retention layer without rewriting its provenance. |
+| `deja ctx --cache invalidate [--layer NAME] [--source ALIAS]` | Mark all context or one component/source stale. |
+| `deja ctx --cache lookup --query TEXT` | Explicitly cross into historical retrieval for omitted evidence or a required gap. |
+
+Checkpoint JSON accepts `objective`, `status`, `project`, `confirmed`,
+`implemented`, `failing`, `unknown`, `decisions`, `tests`, `next_actions`,
+session notes, evidence, explicit `gaps`, and conflicts.
+Every item carries a stable `id`, concise `text`, and provenance `source`.
+`deja ctx --cache status` also reports local resume hit/miss, refresh,
+checkpoint, lookup, and gap counters. Git HEAD, branch, and dirty-worktree changes are tracked
+independently; refresh records a required validation gap instead of pretending
+that cached task conclusions were automatically re-proven.
+
+Use `deja ctx --cache resume` or the `deja` MCP tool with a `ctx_*` mode only when the
+caller explicitly requests the cache workflow. The cache stores agent-authored
+structured state and never turns it into standing instructions. See the
+[context-cache reference](docs/ctx-cache.md) for storage, freshness, and
+retention limits.
+
 <details>
 <summary>Using what it finds, and moving it between machines</summary>
 
@@ -217,14 +251,16 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, so
 this is only needed to configure an agent by hand. The six older tool names
 (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
-anything already wired to them.
+anything already wired to them. Experimental `ctx_*` modes are available only
+when a client explicitly invokes them; they are not installed as a startup or
+checkpoint routine.
 
 <details>
 <summary>Arguments and return shapes</summary>
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?` | Depends on the mode, below. |
+| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?`, `workspace?`, `task_id?`, `token_budget?`, `component_versions?`, `state?`, `item_id?`, `layer?`, `source?`, `to?` | Depends on the mode, below. |
 
 | Mode | Arguments it reads | Returns |
 | --- | --- | --- |

@@ -878,6 +878,11 @@ func cmdCtx(dir string, rest []string) error {
 		return idPrefixNeeded(dir, "ctx needs a query or an id-prefix",
 			"ctx needs query or id-prefix (see `deja last`)")
 	}
+	// Cache actions require an explicit flag so words such as "resume" and
+	// "history" retain their meaning as legacy history queries.
+	if rest[0] == "--cache" {
+		return runCtxCache(dir, rest[1:], os.Stdin, os.Stdout)
+	}
 	// ctx takes no flags, and --json/--harness/--project/--since all exist on
 	// neighbouring commands — so reaching for one here is the obvious mistake.
 	// Folding it into the query answered "no session matches", which is a
@@ -3706,6 +3711,10 @@ Usage:
   deja statusline
   deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
   deja remember "text" [--project name] [--tag name]
+  deja ctx --cache resume|status|refresh|history [--workspace path] [--task id] [--budget tokens] [--versions json]
+  deja ctx --cache checkpoint [--workspace path] [--task id] [--state json]
+  deja ctx --cache diff | explain --item id | invalidate --layer name [--source name] | lookup --query text
+  deja ctx --cache promote --item id --to permanent|project|task|ephemeral
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp
   deja version

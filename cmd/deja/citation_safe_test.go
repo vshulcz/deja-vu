@@ -42,7 +42,10 @@ func TestRepeatLeadStripsDisplayControls(t *testing.T) {
 			t.Fatalf("opener carried a control rune %U: %q", r, opener)
 		}
 	}
-	if !strings.Contains(opener, "deja:8f2c19ab77d") || !strings.Contains(opener, "(claude, Jan 2") || !strings.Contains(opener, "'quoted'") {
+	// Citation dates are deliberately local (the surrounding user sees local
+	// dates too). This safety test must assert provenance, not a UTC calendar
+	// day that shifts for readers west of Greenwich.
+	if !strings.Contains(opener, "deja:8f2c19ab77d") || !strings.Contains(opener, "(claude") || !strings.Contains(opener, "'quoted'") {
 		t.Fatalf("opener lost its provenance or kept a quote that closes the line: %q", opener)
 	}
 }

@@ -1,0 +1,12 @@
+{
+  "objective": "Deliver the synthetic cache task",
+  "status": "validated",
+  "confirmed": [
+    {"id": "fact-local", "text": "All fixture data is local.", "source": "file://synthetic/acceptance.md"},
+    {"id": "fact-freshness", "text": "The freshness fixture passed.", "source": "file://synthetic/test-results.json"}
+  ],
+  "implemented": [
+    {"id": "implementation-cache", "text": "Snapshot persistence exists.", "source": "git://synthetic/cache.go"}
+  ],
+  "tests": {"passing": ["snapshot-roundtrip", "dirty-to-dirty"], "failing": []}
+}
