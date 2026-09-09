@@ -309,6 +309,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				info = append(info, fmt.Sprintf("%-*s  %s", nameW, "", d.note))
 			}
 		}
+		// --all writes the MCP entries and nothing else, which is the flag's
+		// job and not what its name suggests: someone repairing a machine
+		// reaches for "all", gets the servers rewired, and the hooks — the
+		// half that carries recall without being asked — are left exactly as
+		// they were (#3422).
+		if targetArgs[0] == "--all" {
+			info = append(info, "", "hooks are not in this list — `deja install --auto` writes those too")
+		}
 		mood := moodReady
 		if hint := installIndexHint(dir); hint != "" {
 			info = append(info, "", hint)
