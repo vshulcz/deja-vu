@@ -627,8 +627,8 @@ func notesSum(path string) ([32]byte, bool) {
 // notesFresh reports whether the memo still describes the file, and takes the
 // lock's word for it — callers hold the lock.
 func notesFresh(path string, size int64, mod time.Time, ok bool) bool {
-	if !(ok && notesMemo.stamped && notesMemo.path == path &&
-		notesMemo.size == size && notesMemo.mod.Equal(mod)) {
+	if !ok || !notesMemo.stamped || notesMemo.path != path ||
+		notesMemo.size != size || !notesMemo.mod.Equal(mod) {
 		return false
 	}
 	if time.Since(mod) > notesFreshWindow {
