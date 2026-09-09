@@ -170,9 +170,17 @@ func RecordServedSnapshot(indexDir, kind, digest string, sessions int, raw int64
 // checked against a later rule by recognising project names inside its own
 // prose, which fails as soon as the sessions behind it leave the index (#2324).
 func RecordServedFrom(indexDir, kind, digest string, sessions int, raw int64, ids, projects []string, policyName string) {
+	RecordServedFromInto(indexDir, kind, digest, "", sessions, raw, ids, projects, policyName)
+}
+
+// RecordServedFromInto is RecordServedFrom for a caller that knows who it
+// answered. The hooks have recorded a receiver since #1494 and MCP recorded
+// none, so nothing an agent pulled itself could be paired with what it did
+// next — the half of the evidence that says whether a recall was any use.
+func RecordServedFromInto(indexDir, kind, digest, into string, sessions int, raw int64, ids, projects []string, policyName string) {
 	at := time.Now().UTC()
-	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, "", at)
-	snapshotWriteIntoAt(indexDir, kind, digest, "", sessions, policyName, nil, projects, at)
+	recordFullAt(indexDir, kind, len(digest), sessions, sessions == 0, raw, ids, into, at)
+	snapshotWriteIntoAt(indexDir, kind, digest, into, sessions, policyName, nil, projects, at)
 }
 
 // RecordDigestPolicySessions is RecordDigestPolicyInto plus the ids of the

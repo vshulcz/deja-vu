@@ -82,6 +82,7 @@ func batchReply(elems []json.RawMessage) (json.RawMessage, bool) {
 const mcpMaxFrame = 10 * 1024 * 1024
 
 func serveMCP(dir string, r io.Reader, w io.Writer) error {
+	mcpConn.Store(newMCPConn())
 	br := bufio.NewReaderSize(r, 64*1024)
 	enc := json.NewEncoder(w)
 	for {
@@ -379,7 +380,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if err == nil {
 			text = frameRecall(text) + env
 			deliverEnv()
-			usage.RecordServedFrom(dir, usage.KindRecall, text, sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "recall_context":
@@ -413,7 +414,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			}
 			text = frameRecall(fitContextDigest(text, a.Query, contextMCPBudget-recallFrameOverhead-len(lead)))
 			text = lead + text
-			usage.RecordServedFrom(dir, usage.KindContext, text, sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedFromInto(dir, usage.KindContext, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "blame":
@@ -456,7 +457,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// than either — whole sessions rather than budgeted snippets. Not
 			// recording it left `deja log` understating what the agent was
 			// given (#682).
-			usage.RecordServedSnapshot(dir, usage.KindBlame, text, hits, 0, nil, policy.Load().Describe(policy.ActivationMCP))
+			usage.RecordServedFromInto(dir, usage.KindBlame, text, mcpConnID(), hits, 0, nil, nil, policy.Load().Describe(policy.ActivationMCP))
 		}
 		return text, err
 	case "fix":
@@ -649,7 +650,7 @@ func recordedMCPAnswer(dir, kind string, answer func() (string, int, error)) (st
 		// found nothing, so the log said "(empty result)" over an answer that
 		// served a command from two sessions — the opposite of what happened,
 		// on the surface this recording exists to make honest (#2858).
-		usage.RecordServedSnapshot(dir, kind, text, found, 0, nil, policy.Load().Describe(policy.ActivationMCP))
+		usage.RecordServedFromInto(dir, kind, text, mcpConnID(), found, 0, nil, nil, policy.Load().Describe(policy.ActivationMCP))
 	}
 	return text, err
 }

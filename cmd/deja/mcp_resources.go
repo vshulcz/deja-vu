@@ -135,7 +135,7 @@ func mcpResourceRead(dir, uri string) (any, int, string) {
 	text := note + frameRecall(b.String())
 	// It also left no trace: a whole session reached the agent and `deja log`
 	// stayed empty — the gap #682 closed for blame.
-	usage.RecordServedFrom(dir, usage.KindResource, text, 1, rawSize([]model.Session{s}), []string{s.ID}, projectsOf(s), policy.Load().Describe(policy.ActivationMCP))
+	usage.RecordServedFromInto(dir, usage.KindResource, text, mcpConnID(), 1, rawSize([]model.Session{s}), []string{s.ID}, projectsOf(s), policy.Load().Describe(policy.ActivationMCP))
 	return map[string]any{"contents": []map[string]any{{
 		"uri":      uri,
 		"mimeType": "text/markdown",
