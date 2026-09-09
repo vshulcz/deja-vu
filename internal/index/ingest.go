@@ -1826,6 +1826,38 @@ func harnessPreamble(text string) bool {
 			return true
 		}
 	}
+	return compactionSummary(t)
+}
+
+// compactionSummary reports the summary a harness writes when it compacts a
+// conversation and hands the rest back to itself.
+//
+// The preamble that introduced it — "This session is being continued…" — is
+// stripped as an injected line before anything reads the turn, so what is left
+// starts at the summary and no longer looks like the harness's. 23 of the last
+// 800 sessions on a real store were named after it: "Summary: 1. Primary
+// Request and Intent: …" reached `deja last`, the recall block and the
+// repeated-question counter as if a person had typed it.
+//
+// Matched on the template rather than on the word: someone writing "Summary: we
+// moved the retry budget" is naming their own session, and the headings below
+// are the ones a compaction writes.
+func compactionSummary(t string) bool {
+	if !strings.HasPrefix(strings.ToLower(t), "summary:") {
+		return false
+	}
+	head := t
+	if len(head) > 600 {
+		head = head[:600]
+	}
+	for _, heading := range []string{
+		"Primary Request", "Key Technical Concepts", "Files and Code Sections",
+		"Pending Tasks", "Current Work",
+	} {
+		if strings.Contains(head, heading) {
+			return true
+		}
+	}
 	return false
 }
 
