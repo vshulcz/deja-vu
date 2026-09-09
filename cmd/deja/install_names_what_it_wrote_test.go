@@ -50,6 +50,12 @@ func dejasOwnBookkeeping(path string) bool {
 		return true
 	case base == "wiring.json", base == "notes.jsonl":
 		return true
+	case base == "deja-hook", base == "deja-hook.cmd":
+		// The launcher the hook entries name (#3422). It lives beside
+		// wiring.json under deja's own directory and is deja's plumbing rather
+		// than a file in the harness's configuration, which is what the report
+		// is a list of.
+		return true
 	}
 	return strings.Contains(path, string(filepath.Separator)+".cache"+string(filepath.Separator)) ||
 		strings.Contains(path, "index.db")
