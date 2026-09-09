@@ -538,6 +538,14 @@ func coverageCounts(all, identifying map[uint32]int, identifyingTerms int) map[u
 	return identifying
 }
 
+// marathonShare is how much a session's score is lifted by the match covering
+// it rather than brushing it. Swept on the prompt and recall benches: at 0.4
+// and below the marathon still takes the top place on two of the four
+// specific-vs-marathon cases, at 0.5 it takes none, and from there to 3.0
+// nothing else moves — no arm of the prompt bench and no recall number
+// (#3214).
+const marathonShare = 0.5
+
 // subjectShare is how much of the question's subject a session has to reach:
 // the rarest naming word the question holds, halved. Measured by sweeping the
 // whole prompt bench — at 0.5 and 0.6 the cross-paired arm loses a false fire
@@ -1364,6 +1372,19 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// Coverage: distinct informative terms beat repetition.
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
+		}
+		// How much of the session the match is. A marathon that brushes the
+		// question across hundreds of turns and a short session where the
+		// matching turns are most of what it holds scored alike, and on ten
+		// questions phrased from real PR titles the marathon took the top
+		// place twice (#3214). Counted in messages, which is the unit the
+		// match is already measured in.
+		if n := inProject[ord].Counted; n > 0 {
+			share := float64(len(perMessage[ord])) / float64(n)
+			if share > 1 {
+				share = 1
+			}
+			sc *= 1 + marathonShare*share
 		}
 		// Did this session match what the question is about, rather than the
 		// working word beside it. The subject is the question's rarest naming
