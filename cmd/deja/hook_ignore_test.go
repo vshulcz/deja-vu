@@ -50,22 +50,24 @@ func TestTheCommandHookObeysTheIgnoreRule(t *testing.T) {
 	}
 }
 
-// A command run where recall may go keeps its line.
+// A command run where recall may go keeps its line — and the line is the
+// outcome, since #3415 dropped the bare count.
 func TestTheCommandHookStillSpeaksForAKeptProject(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	for _, id := range []string{"k1", "k2"} {
 		writeClaudeFixture(t, filepath.Join(root, "-w-keep", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","cwd":"/w/keep","timestamp":"2026-07-01T10:00:00Z","message":{"role":"user","content":"deploy the thing"}}`,
+			`{"type":"user","sessionId":"` + id + `","cwd":"/w/keep","timestamp":"2026-07-01T10:00:00Z","message":{"role":"user","content":"the apply keeps failing on the state lock"}}`,
 			`{"type":"assistant","sessionId":"` + id + `","cwd":"/w/keep","timestamp":"2026-07-01T10:01:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"terraform apply -auto-approve"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/w/keep","timestamp":"2026-07-01T10:02:00Z","message":{"role":"assistant","content":"the apply has to take the state lock first: the CI run holds it for another minute."}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	out := commandHookLine(os.Getenv("DEJA_INDEX_DIR"), "/w/keep", "terraform apply -auto-approve")
-	if !strings.Contains(out, "has run that command") {
+	if !strings.Contains(out, "has run that command") || !strings.Contains(out, "last time:") {
 		t.Fatalf("the hook went quiet about a command it may speak of:\n%s", out)
 	}
 }

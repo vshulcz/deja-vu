@@ -22,24 +22,32 @@ func toolHookRun(t *testing.T, payload string) string {
 	return out.String()
 }
 
+// commandRunWithAnOutcome seeds sessions that ran a command and say how it
+// went — which is the only kind the hook speaks for since #3415.
+func commandRunWithAnOutcome(t *testing.T, cmd string, ids ...string) {
+	t.Helper()
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	for _, id := range ids {
+		writeClaudeFixture(t, filepath.Join(root, "-work-app", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the suite keeps failing on the shared fixture"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"` + cmd + `"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:06:00Z","message":{"role":"assistant","content":"the suite has to run with -p 1: the shared fixture cannot take parallel packages."}}`,
+		})
+	}
+}
+
 // The hook fires on every action an agent takes, so its default is silence and
-// its ceiling is one short line. A command this machine has run before earns
-// that line; anything else does not.
+// its ceiling is one short line. A command this machine has run before, and
+// knows the outcome of, earns that line; anything else does not.
 func TestToolHookSpeaksOnlyForACommandWithAHistory(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
-	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for _, id := range []string{"a", "b"} {
-		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"run the suite"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./... -count=1"}}]}}`,
-		})
-	}
+	commandRunWithAnOutcome(t, "go test ./... -count=1", "a", "b")
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 
-	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"go test ./... -count=1"},"session_id":"now"}`)
+	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"go test ./... -count=1"},"session_id":"now","cwd":"/work/app"}`)
 	if out == "" {
 		t.Fatal("a command run in two sessions produced no line")
 	}
@@ -59,7 +67,7 @@ func TestToolHookSpeaksOnlyForACommandWithAHistory(t *testing.T) {
 
 	// A command with no history at all is silence, not a "nothing found" line:
 	// this is paid once per action.
-	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"terraform apply -auto-approve"},"session_id":"now"}`); got != "" {
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"terraform apply -auto-approve"},"session_id":"now","cwd":"/work/app"}`); got != "" {
 		t.Errorf("spoke about a command it has never seen: %q", got)
 	}
 	// And an editor action on a file nothing has touched stays silent too.
@@ -397,29 +405,30 @@ func TestToolHookSkipsInspectionAndDedupes(t *testing.T) {
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	for _, id := range []string{"a", "b", "c"} {
-		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"go"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"git status --short"}}]}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"make deploy-prod REGION=eu"}}]}}`,
+		writeClaudeFixture(t, filepath.Join(root, "-work-app", id+".jsonl"), id, []string{
+			`{"type":"user","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"the deploy needs the region set"}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"git status --short"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:07Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"make deploy-prod REGION=eu"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","timestamp":"2026-01-02T03:04:08Z","message":{"role":"assistant","content":"the deploy has to run with REGION=eu: the eu bucket is the only one the role can write."}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	// git status ran in 3 sessions but is inspection — silent.
-	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status --short"},"session_id":"agent1"}`); got != "" {
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git status --short"},"session_id":"agent1","cwd":"/work/app"}`); got != "" {
 		t.Errorf("an inspection command produced a line: %q", got)
 	}
 	// A real deploy command speaks once...
-	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1"}`); got == "" {
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1","cwd":"/work/app"}`); got == "" {
 		t.Fatal("a command with real history stayed silent")
 	}
 	// ...but not a second time in the same agent session.
-	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1"}`); got != "" {
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent1","cwd":"/work/app"}`); got != "" {
 		t.Errorf("the same line was re-injected to the same session: %q", got)
 	}
 	// A different agent session still hears it.
-	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent2"}`); got == "" {
+	if got := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agent2","cwd":"/work/app"}`); got == "" {
 		t.Error("a fresh agent session was wrongly deduped")
 	}
 }
@@ -448,18 +457,12 @@ func TestToolHookRecordsTheInjection(t *testing.T) {
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)
-	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for _, id := range []string{"a", "b"} {
-		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"go"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"make deploy-prod REGION=eu"}}]}}`,
-		})
-	}
+	commandRunWithAnOutcome(t, "make deploy-prod REGION=eu", "a", "b")
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	before := usage.Totals(dir).Injections
-	payload := `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agentX"}`
+	payload := `{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"make deploy-prod REGION=eu"},"session_id":"agentX","cwd":"/work/app"}`
 	toolHookRun(t, payload)
 	if got := usage.Totals(dir).Injections; got != before+1 {
 		t.Fatalf("injection not recorded: before=%d after=%d", before, got)

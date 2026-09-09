@@ -166,18 +166,12 @@ func TestGrokSpawnCarriesMemoryIntoTheSubagent(t *testing.T) {
 func TestGrokToolPayloadNamesTheCommand(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
-	root := os.Getenv("DEJA_CLAUDE_ROOT")
-	for _, id := range []string{"a", "b"} {
-		writeClaudeFixture(t, filepath.Join(root, "p", id+".jsonl"), id, []string{
-			`{"type":"user","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"run the suite"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./... -count=1"}}]}}`,
-		})
-	}
+	commandRunWithAnOutcome(t, "go test ./... -count=1", "a", "b")
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}
 	out := toolHookRun(t, `{"hookEventName":"pre_tool_use","toolName":"run_terminal_command",`+
-		`"toolInput":{"command":"go test ./... -count=1","description":"suite"},"sessionId":"grok-3"}`)
+		`"toolInput":{"command":"go test ./... -count=1","description":"suite"},"sessionId":"grok-3","cwd":"/work/app"}`)
 	if out == "" {
 		t.Fatal("a command run in two sessions produced no line from grok's payload")
 	}

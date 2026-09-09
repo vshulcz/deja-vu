@@ -401,7 +401,12 @@ func commandHookLine(dir, cwd, cmd string) string {
 	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
 		return head + " — last time: " + d
 	}
-	return head + "."
+	// And with neither, nothing. The head alone is a count and a date — "run
+	// in 5 sessions, last 2026-05-21" — which is the pointer this comment
+	// argues against, spent on the one line the hook gets. Measured on a real
+	// store: of ten command shapes, two carried an outcome and two printed the
+	// bare count; the count is what goes (#3415).
+	return ""
 }
 
 // promotedCommandDecision is the decision this project promoted about the
