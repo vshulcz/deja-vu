@@ -88,6 +88,7 @@ func installCrushMCP(exe string, uninstall bool) (installResult, error) {
 // written leaves the target reported as refused with half its wiring in the
 // file (#2745, the shape qwen-auto is ordered against).
 func installCrushAuto(exe string, uninstall bool) (installResult, error) {
+	exe = hookExeFor(exe, uninstall)
 	path := crushConfigPath()
 	old, err := readConfig(path)
 	if err != nil {

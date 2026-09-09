@@ -79,10 +79,19 @@ func TestTheGooseHookWiresTheBinaryItWasGiven(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), want) {
-		t.Errorf("the hook does not run the binary it was given:\n%s", b)
+	if !strings.Contains(string(b), hookExeInConfigs(want)) {
+		t.Errorf("the hook does not run what an install writes:\n%s", b)
 	}
-	if self, err := os.Executable(); err == nil && strings.Contains(string(b), self) {
-		t.Errorf("the hook wired the running process instead:\n%s", b)
+	// What the hook reaches: the config names the launcher, and the launcher
+	// resolves the binary the caller named (#3422).
+	reaches := string(b)
+	if p := dejaLauncherPath(); p != "" {
+		reaches = readFile(t, p)
+	}
+	if !strings.Contains(reaches, want) {
+		t.Errorf("the hook cannot reach the binary it was given:\n%s", reaches)
+	}
+	if self, err := os.Executable(); err == nil && strings.Contains(reaches, self) {
+		t.Errorf("the hook wired the running process instead:\n%s", reaches)
 	}
 }

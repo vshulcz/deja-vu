@@ -334,6 +334,7 @@ func gooseHookPath() string {
 }
 
 func writeGooseHook(exe string) (string, error) {
+	exe = hookCommandExe(exe)
 	body, err := json.MarshalIndent(map[string]any{
 		"hooks": map[string]any{
 			"SessionStart": []any{map[string]any{
