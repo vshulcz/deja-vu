@@ -28,9 +28,13 @@ jobs:
     # what turns a slow run into a cancellation that prints no test output.
     # 30 was the cap while the windows leg took 26m; on 2026-08-19 it reached
     # 29m30s and died with no output, so the margin is gone rather than the run
-    # being unlucky. 45 keeps a real hang bounded — the go -timeout below still
-    # kills one with a stack long before this.
-    timeout-minutes: 45
+    # being unlucky. On 2026-09-09 two runs of the same commit came in at 12m10s
+    # and past 45m — the step that ran over is `go test`, whose own 12m timeout
+    # covers running tests and not compiling them, so a cold cache on a slow
+    # runner spends the difference in the compiler. 60 keeps a real hang
+    # bounded — the go -timeout below still kills one with a stack long before
+    # this — and stops a slow runner reading as a failure.
+    timeout-minutes: 60
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
       # minutes for a job the others finish in two, and it varies by a third
