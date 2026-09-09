@@ -143,7 +143,10 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
-	usage.RecordResult(dir, usage.KindTool, len(payload), 1, false)
+	// The receiving session too: this is the repair delivered at the failure,
+	// the surface with the best evidence behind it, and it was the one that
+	// could not be followed (#1494 gave the per-prompt hook the same field).
+	usage.RecordServedInto(dir, usage.KindTool, len(payload), 1, input.SessionID)
 	if plain {
 		fmt.Fprint(stdout, payload)
 		return nil

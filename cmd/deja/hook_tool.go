@@ -175,7 +175,13 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// Record the injection so deja's most frequent surface is not invisible to
 	// stats and the receipt. Deduped above, so this counts a distinct fact
 	// served, not every action.
-	usage.RecordResult(dir, usage.KindTool, len(out), 1, false)
+	//
+	// With the agent session it went to, the way the per-prompt hook has since
+	// #1494. Without it this surface could be counted and never followed:
+	// measured on this machine, 492 point-of-action injections and not one that
+	// could be paired with what the agent did next — which is the pairing any
+	// judgement about whether the line helped has to start from.
+	usage.RecordServedInto(dir, usage.KindTool, len(out), 1, input.SessionID)
 	switch shape {
 	case hookToolPlain:
 		fmt.Fprint(stdout, out)
