@@ -74,7 +74,7 @@ func TestInstallBackupAndNewConfigOwnerOnly(t *testing.T) {
 // The narration protocol must be present on every agent-facing surface, and
 // must carry the only-when-it-helped guard so it cannot become spam.
 func TestNarrationProtocolOnAllSurfaces(t *testing.T) {
-	if !strings.Contains(guidanceBody, "déjà vu:") || !strings.Contains(guidanceBody, "Never credit recalls that did not help") {
+	if !strings.Contains(guidanceBody, "déjà vu:") || !strings.Contains(guidanceBody, "did not help") {
 		t.Fatal("guidance missing narration protocol")
 	}
 	for _, m := range []string{"initialize", "tools/list"} {

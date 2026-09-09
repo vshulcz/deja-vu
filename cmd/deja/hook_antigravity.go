@@ -118,4 +118,4 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	return nil
 }
 
-const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. If recalled history genuinely helps the task, say so in one short line at the start of your reply: déjà vu: <what was recalled> — <how you reused it> (deja:<session id>); otherwise do not mention it.\n"
+const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"

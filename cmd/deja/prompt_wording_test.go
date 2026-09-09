@@ -30,10 +30,18 @@ func TestModelFacingTextHasNoStrayIdentifiers(t *testing.T) {
 			t.Errorf("%s: model-facing text contains the identifier %q: %s", name, "digest.Short", excerpt(text, "digest.Short"))
 		}
 	}
-	// The wording these strings were meant to carry.
+	// The wording these strings were meant to carry: one line, and only when
+	// the recall helped. The exact phrasing moved in #3079 — the old one was
+	// followed on 143 of 6,650 injections — so the check is on the two
+	// properties rather than on one sentence.
 	for _, name := range []string{"mcp tools/list", "hook-prompt lead", "hook-context lead", "antigravity lead", "skill guidance"} {
-		if !strings.Contains(texts[name], "in one short line") {
-			t.Errorf("%s: missing the %q instruction", name, "in one short line")
+		text := texts[name]
+		if !strings.Contains(text, "one short line") && !strings.Contains(text, "one line") {
+			t.Errorf("%s: does not ask for one line", name)
+		}
+		if !strings.Contains(text, "did not help") && !strings.Contains(text, "none helps") &&
+			!strings.Contains(text, "ignore silently") {
+			t.Errorf("%s: does not say to stay quiet when the recall did not help", name)
 		}
 	}
 }
