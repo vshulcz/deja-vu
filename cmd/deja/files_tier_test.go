@@ -25,7 +25,7 @@ func TestFilesAnswersTheSameQuotedOrNot(t *testing.T) {
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	writeClaudeFixture(t, filepath.Join(root, "-w-api", "p1.jsonl"), "p1", []string{
 		`{"type":"user","sessionId":"p1","cwd":"/w/api","timestamp":"2026-07-01T10:00:00Z","message":{"role":"user","content":"the zonkobuffer drops the last attempt of the retry loop"}}`,
-		`{"type":"assistant","sessionId":"p1","cwd":"/w/api","timestamp":"2026-07-01T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + filepath.Join(repo, "retry.go") + `","old_string":"a","new_string":"b"}}]}}`,
+		`{"type":"assistant","sessionId":"p1","cwd":"/w/api","timestamp":"2026-07-01T10:02:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + jsonEscaped(t, filepath.Join(repo, "retry.go")) + `","old_string":"a","new_string":"b"}}]}}`,
 	})
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)

@@ -33,7 +33,7 @@ func TestCursorConversationIDIsTheSession(t *testing.T) {
 	ask := func(conversation string) string {
 		t.Helper()
 		var out bytes.Buffer
-		in := strings.NewReader(`{"conversation_id":"` + conversation + `","prompt":"do we need pgbouncer here","workspace_roots":["` + cwd + `"]}`)
+		in := strings.NewReader(`{"conversation_id":"` + conversation + `","prompt":"do we need pgbouncer here","workspace_roots":["` + jsonEscaped(t, cwd) + `"]}`)
 		if err := runHookPromptMode(index.DefaultDir(), in, &out, true); err != nil {
 			t.Fatal(err)
 		}
