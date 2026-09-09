@@ -270,7 +270,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if input.SessionID != "" {
 		skip[input.SessionID] = true
 	}
-	ranked, matched, strong, idfOf, err := index.ProjectRelevantSkipping(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates, skip)
+	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNaming(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates, skip)
 	// The rule every other surface applies: a promoted note goes in front of
 	// the transcript it was distilled from. This hook ranks sessions and never
 	// builds a search.Hit, so it had no note-over-source rule at all and the
@@ -317,7 +317,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// shards — and those copies take the ranking's window with them, so the
 	// answer to the question can sit outside it (#1556).
 	crowdedOut := 0
-	pick := func(ranked []model.Session, matched, strong []int) {
+	pick := func(ranked []model.Session, matched, strong, naming []int) {
 		for i, s := range ranked {
 			// Every other injection path asks the policy first; this one is a
 			// per-prompt injection like any other, and imported projects reach
@@ -333,7 +333,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			// hook pays its cost on every message the user sends. Measured on
 			// cross-paired prompts whose answer is absent, the old bar injected on
 			// 94% of them; half of those rested on one ordinary word.
-			if !search.RecallWorthShowing(terms, matched[i], strong[i], idfOf) {
+			named := -1
+			if i < len(naming) {
+				named = naming[i]
+			}
+			if !search.RecallWorthShowingNaming(terms, matched[i], strong[i], named, idfOf) {
 				continue
 			}
 			// A word rare enough to identify something is a real match on its own —
@@ -405,16 +409,16 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			}
 		}
 	}
-	pick(ranked, matched, strong)
+	pick(ranked, matched, strong, naming)
 	// One slot left and duplicates took the window: ask for a wider one. The
 	// second pass costs a ranking read and happens only when the store said
 	// the same thing several times, which is exactly when the answer is
 	// further down than the window reached.
 	if len(ss) < 2 && crowdedOut > 0 {
-		wider, wmatched, wstrong, _, werr := index.ProjectRelevantSkipping(
+		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNaming(
 			dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates*widerWindow, skip)
 		if werr == nil {
-			pick(wider, wmatched, wstrong)
+			pick(wider, wmatched, wstrong, wnaming)
 		}
 	}
 	if len(ss) == 0 {

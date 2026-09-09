@@ -30,6 +30,22 @@ import (
 // today; using it is the next rule's decision, and it will now land in every
 // instrument at once.
 func RecallWorthShowing(terms []string, matched, strong int, known map[string]float64) bool {
+	return RecallWorthShowingNaming(terms, matched, strong, -1, known)
+}
+
+// RecallWorthShowingNaming is the same bar with one more fact: how many of the
+// question's naming words this session actually matched.
+//
+// The question naming something was enough on its own, and for a question of
+// three terms or fewer the store was not consulted at all — "a short question
+// is all subject". So `decide saltmarsh` asked where saltmarsh has never been
+// said still fired, on `decide`. Measured on the cross-paired arm, where every
+// fire is a false one: 6 of 47, four of them that shape.
+//
+// naming < 0 means the caller has no such count — the bridged retry ranks on
+// neighbouring terms, so counting the question's own words there would be a
+// claim about a query that was not asked — and the old rule stands.
+func RecallWorthShowingNaming(terms []string, matched, strong, naming int, known map[string]float64) bool {
 	_ = strong // see the note above: taken so the instruments cannot drift
 	if matched < 1 {
 		return false
@@ -40,6 +56,9 @@ func RecallWorthShowing(terms []string, matched, strong int, known map[string]fl
 	// the corpus, the pair answers 11 of 12 real questions with no false fire,
 	// where the session-only rule answers 7 and fires on 2 controls.
 	if HasIdentifierTermKnown(terms, known) {
+		if naming >= 0 && HasIdentifierTerm(terms) {
+			return naming >= 1
+		}
 		return true
 	}
 	return matched >= 2

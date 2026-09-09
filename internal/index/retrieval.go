@@ -20,6 +20,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/query"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -537,6 +538,14 @@ func coverageCounts(all, identifying map[uint32]int, identifyingTerms int) map[u
 	return identifying
 }
 
+// subjectShare is how much of the question's subject a session has to reach:
+// the rarest naming word the question holds, halved. Measured by sweeping the
+// whole prompt bench — at 0.5 and 0.6 the cross-paired arm loses a false fire
+// and no other arm moves; at 0.9 it loses two more and takes nine of twenty
+// rewordings, four of five Russian questions and eighteen pasted-preamble
+// questions with it (#3351).
+const subjectShare = 0.5
+
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
 // term a few long sessions happen to repeat, which reorders the top of the
@@ -593,6 +602,17 @@ func ProjectRelevant(dir string, projects, terms []string, n int) ([]model.Sessi
 // the 26 it ranks — every one read from disk in full first, only to be dropped
 // on its id.
 func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip map[string]bool) ([]model.Session, []int, []int, map[string]float64, error) {
+	out, matched, strong, _, idf, err := ProjectRelevantNaming(dir, projects, terms, n, skip)
+	return out, matched, strong, idf, err
+}
+
+// ProjectRelevantNaming is ProjectRelevantSkipping plus, per session, how many
+// of the question's naming words it matched. The gate needs that to tell a
+// session that matched the subject from one that matched the verb beside it,
+// which rarity cannot answer in a small store (#3351). It is nil when the
+// bridged retry answered instead: that path ranks on neighbouring terms, so a
+// count of the question's own words would be a claim about the wrong query.
+func ProjectRelevantNaming(dir string, projects, terms []string, n int, skip map[string]bool) ([]model.Session, []int, []int, []int, map[string]float64, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -601,31 +621,36 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 	// rebuild — which every user hits on an index-format upgrade.
 	unlock, ok, err := tryLockDir(dir)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	if ok {
 		defer unlock()
 	}
 	m, err := readManifestCached(dir)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
-	metas, matched, strong, idf, rerr := relevantMetasMatched(dir, m, projects, terms, n, skip)
+	var keep func(SessionMeta) bool
+	if len(skip) > 0 {
+		keep = func(meta SessionMeta) bool { return !skip[meta.ID] }
+	}
+	rank, rerr := relevantMetasCounts(dir, m, projects, terms, n, keep)
 	if rerr != nil {
 		// A corrupt or unreadable bucket. The hook never rebuilds, so surface
 		// it rather than inject a silently short-ranked déjà vu; the caller
 		// stays quiet on an error.
-		return nil, nil, nil, nil, rerr
+		return nil, nil, nil, nil, nil, rerr
 	}
+	metas, matched, strong, naming, idf := rank.metas, rank.informative, rank.strong, rank.naming, rank.idf
 	if bm, bmatched, bstrong, bidf, ok := bridgedRetry(dir, m, projects, terms, n, skip, strong, idf); ok {
-		metas, matched, strong, idf = bm, bmatched, bstrong, bidf
+		metas, matched, strong, idf, naming = bm, bmatched, bstrong, bidf, nil
 	}
 	if len(metas) == 0 {
-		return nil, nil, nil, nil, nil
+		return nil, nil, nil, nil, nil, nil
 	}
 	out, err := sessionsServable(dir, metas, query.Options{})
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	// Paired by identity, not by position. The counts belong to the ranking,
 	// which works on metas; the sessions come back from sessionsServable, which
@@ -633,7 +658,10 @@ func ProjectRelevantSkipping(dir string, projects, terms []string, n int, skip m
 	// caller reads the three positionally, so a single drop had the per-prompt
 	// hook judging each session by its neighbour's terms (#2546).
 	matched, strong = countsFor(out, metas, matched, strong)
-	return out, matched, strong, idf, nil
+	if naming != nil {
+		naming, _ = countsFor(out, metas, naming, naming)
+	}
+	return out, matched, strong, naming, idf, nil
 }
 
 // countsFor re-pairs the per-session counts with the sessions that survived
@@ -800,6 +828,10 @@ type relevanceRanking struct {
 	// that clear the idf floor, that it holds at all, and that are rare enough
 	// to identify something on their own.
 	informative, any, strong []int
+	// naming counts the question's naming words a session actually matched,
+	// judged by shape. Rarity cannot answer that in a small store, so the gate
+	// had nothing to distinguish the subject from the verb beside it (#3351).
+	naming []int
 	// termsKnown is how many of the query's terms the corpus contains at all,
 	// and total how many sessions the ranking scored before n truncated it.
 	termsKnown, total int
@@ -817,7 +849,11 @@ type relevanceScored struct {
 	matched int
 	any     int
 	strong  int
-	focus   float64
+	// naming is how many of the question's naming words this session matched,
+	// judged by shape. The gate needs it to tell a match on the subject from a
+	// match on the verb beside it (#3351).
+	naming int
+	focus  float64
 }
 
 // rrfK damps how much a top place is worth against the ranking's tail. Sixty is
@@ -1015,6 +1051,29 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// query has been read rather than term by term.
 	identifyingTerms := 0
 	matchedIdentifying := map[uint32]int{}
+	// The rarest term this session matched, against the rarest the question
+	// holds. A short question skips the store check entirely — "a short
+	// question is all subject" — so `decide saltmarsh` asked where saltmarsh
+	// has never been said fired on `decide`, and nothing downstream could tell
+	// the subject from the verb beside it (#3351).
+	bestMatched := map[uint32]float64{}
+	queryBest := 0.0
+	// noteQuerySubject raises that mark for a word that names something. df is
+	// counted over the whole store, before the project scope drops the term, so
+	// a subject that lives somewhere else still counts as the subject — which
+	// is the case this exists for.
+	noteQuerySubject := func(term string, sessions int) {
+		// A word this store has never seen says nothing about what the
+		// question is about here: counting it set a mark no session could
+		// reach, and the recall went silent whenever a question carried one
+		// unseen word — which is most questions.
+		if sessions <= 0 || !search.HasIdentifierTerm([]string{term}) {
+			return
+		}
+		if r := rankIDF(len(m.Sessions), sessions); r > queryBest {
+			queryBest = r
+		}
+	}
 	strongTerms := map[uint32]int{}
 	anyTerms := map[uint32]int{}
 	// perMessage tracks how many distinct terms hit each message (record
@@ -1120,6 +1179,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				}
 			}
 			if len(hit) == 0 {
+				noteQuerySubject(term, len(df))
 				continue
 			}
 			minDF, minSess = countDF(df), len(df)
@@ -1175,6 +1235,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 					offs = keyOffs
 				}
 				if len(hit) == 0 {
+					noteQuerySubject(term, len(df))
 					missed = true
 					break
 				}
@@ -1228,6 +1289,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// Rare enough to identify something on its own: either well past the
 		// ordinary bar, or living in a single session of the whole corpus.
 		strong := idf >= dejaVuStrongIDFFloor || minSess <= 1
+		// The question's own high-water mark: its rarest word is what it is
+		// about, whether or not any session here holds it (#3351).
+		noteQuerySubject(term, minSess)
 		for ord := range hit {
 			mm := perMessage[ord]
 			if mm == nil {
@@ -1259,6 +1323,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 			if identifying {
 				matchedIdentifying[ord]++
+			}
+			if rank > bestMatched[ord] {
+				bestMatched[ord] = rank
 			}
 			if strong {
 				strongTerms[ord]++
@@ -1298,7 +1365,18 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
 		}
-		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], focus[ord]})
+		// Did this session match what the question is about, rather than the
+		// working word beside it. The subject is the question's rarest naming
+		// word, read over the whole store so one that lives in another project
+		// still counts; a session that matched only commoner words matched
+		// around it. Half the mark, not all of it: a rephrasing reaches the
+		// subject through a neighbouring word, and demanding the exact one cost
+		// the reworded arm nine of twenty (#3351).
+		named := 0
+		if queryBest <= 0 || bestMatched[ord] >= queryBest*subjectShare {
+			named = 1
+		}
+		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], named, focus[ord]})
 	}
 	if len(ranked) == 0 {
 		return relevanceRanking{termsKnown: termsKnown}, readErr
@@ -1325,17 +1403,20 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	matched := make([]int, 0, len(ranked))
 	anyMatched := make([]int, 0, len(ranked))
 	strong := make([]int, 0, len(ranked))
+	naming := make([]int, 0, len(ranked))
 	for _, r := range ranked {
 		metas = append(metas, r.meta)
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
 		strong = append(strong, r.strong)
+		naming = append(naming, r.naming)
 	}
 	return relevanceRanking{
 		metas:       metas,
 		informative: matched,
 		any:         anyMatched,
 		strong:      strong,
+		naming:      naming,
 		termsKnown:  termsKnown,
 		total:       matchedTotal,
 		idf:         idfOf,
