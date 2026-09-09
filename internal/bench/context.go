@@ -20,6 +20,10 @@ const (
 	// At three every arm scored 1.00 whatever the digest did, which is what
 	// made the coverage column unable to move (#2931, #2933).
 	ContextPriorCount = 7
+	// contextFactEvery spreads the three facts over the prior sessions instead
+	// of filing them in the first three: with ContextPriorCount at 7 they land
+	// in the first, fourth and seventh (#2931).
+	contextFactEvery = 3
 )
 
 type ContextChain struct {
@@ -76,10 +80,14 @@ func GenerateContext(seed int64) ContextCorpus {
 			// name the chain was never retrieved, so raising it changed
 			// nothing either (#2933).
 			text := fmt.Sprintf("%s routine update, nothing settled here", id)
+			fact := -1
 			if chain.Negative {
 				text = "routine update with no prior fact"
-			} else if j < len(chain.Facts) {
-				text = chain.Facts[j]
+			} else if j%contextFactEvery == 0 && j/contextFactEvery < len(chain.Facts) {
+				// Spread across the chain rather than filed in its first
+				// sessions, so reaching all three means choosing between
+				// sessions rather than reading the newest few.
+				fact = j / contextFactEvery
 			}
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
 			msgs := []model.Message{{Role: "user", Text: text, Time: t}}
@@ -89,6 +97,14 @@ func GenerateContext(seed int64) ContextCorpus {
 					model.Message{Role: "user", Text: fillerText(rng, "ran the reproduction again and pasted the output"), Time: t.Add(time.Duration(2*k+2) * time.Minute)},
 					model.Message{Role: "assistant", Text: fillerText(rng, "walked through the trace and adjusted the patch"), Time: t.Add(time.Duration(2*k+3) * time.Minute)},
 				)
+			}
+			// The fact is what the session settled, so it sits at the end
+			// rather than opening it. Opening every session with it meant both
+			// surfaces reached all three facts whatever they chose, which is
+			// why coverage stayed at 1.00 with half the arm deleted (#2931).
+			if fact >= 0 {
+				msgs = append(msgs, model.Message{Role: "assistant", Text: chain.Facts[fact],
+					Time: t.Add(time.Duration(2*fillerBlocks+4) * time.Minute)})
 			}
 			msgs = append(msgs, model.Message{Role: "assistant", Text: "Recorded the decision and verified the rollout.", Time: t.Add(time.Hour)})
 			chain.Sessions = append(chain.Sessions, model.Session{
