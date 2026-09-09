@@ -331,6 +331,13 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// and reaches the ones that matter (#2924). It is also the more useful of
 	// the two: knowing a command has been run says nothing about whether to
 	// run it now.
+	// Before either: a program that is not here. It is the most certain thing
+	// deja can say about a command that has not run yet, and the session-start
+	// block that says it is measurably not heard — nine of the ten sessions
+	// told about a missing command ran it anyway.
+	if line := missingProgramLine(dir, cmd); line != "" {
+		return line
+	}
 	if line := commandFailureLine(dir, cmd); line != "" {
 		return line
 	}
