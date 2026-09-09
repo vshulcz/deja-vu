@@ -427,7 +427,81 @@ func copilotChatSession(path string, state map[string]any) ([]model.Session, err
 	if len(s.Messages) == 0 {
 		return nil, nil
 	}
+	appendChatEditedFiles(&s, path, id)
 	return []model.Session{s}, nil
+}
+
+// appendChatEditedFiles adds the files this chat edited, from the state VS Code
+// keeps beside the transcript:
+//
+//	workspaceStorage/<ws>/chatEditingSessions/<session id>/state.json
+//
+// The transcript names a path only when the text does, so a chat that edited
+// eleven files left one `files` record. Measured on this machine: 48 of those
+// state files, and while `recentSnapshot.workingSet` is empty in every one of
+// them, their entries carry 145 resources between them (#3381).
+func appendChatEditedFiles(s *model.Session, path, id string) {
+	if !IndexToolPaths() || id == "" {
+		return
+	}
+	ws := filepath.Dir(filepath.Dir(path))
+	b, err := os.ReadFile(filepath.Join(ws, "chatEditingSessions", id, "state.json"))
+	if err != nil {
+		return
+	}
+	var state struct {
+		RecentSnapshot struct {
+			WorkingSet []struct {
+				Resource any `json:"resource"`
+			} `json:"workingSet"`
+			Entries []struct {
+				Resource any `json:"resource"`
+			} `json:"entries"`
+		} `json:"recentSnapshot"`
+	}
+	if json.Unmarshal(b, &state) != nil {
+		return
+	}
+	seen := map[string]bool{}
+	var paths []string
+	add := func(res any) {
+		p := chatResourcePath(res)
+		if p == "" || seen[p] {
+			return
+		}
+		seen[p] = true
+		paths = append(paths, p)
+	}
+	for _, e := range state.RecentSnapshot.WorkingSet {
+		add(e.Resource)
+	}
+	for _, e := range state.RecentSnapshot.Entries {
+		add(e.Resource)
+	}
+	if len(paths) == 0 {
+		return
+	}
+	at := s.Messages[len(s.Messages)-1].Time
+	s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(paths, "\n"), Time: at})
+}
+
+// chatResourcePath reads the path out of a VS Code URI, which the state file
+// writes either as an object with `path` or as the string form of one.
+func chatResourcePath(res any) string {
+	switch v := res.(type) {
+	case string:
+		if i := strings.Index(v, "://"); i >= 0 {
+			v = v[i+3:]
+			if j := strings.IndexByte(v, '/'); j >= 0 {
+				v = v[j:]
+			}
+		}
+		return strings.TrimSpace(v)
+	case map[string]any:
+		p, _ := v["path"].(string)
+		return strings.TrimSpace(p)
+	}
+	return ""
 }
 
 func copilotChatTitle(state map[string]any) string {
