@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.19.5] - 2026-09-09
+## [0.19.5] - 2026-09-10
 
 The release where deja stopped reading the harness's own text as the person's
 words. Two dozen parsers were checked against real stores and every one of them
@@ -34,7 +34,7 @@ event collapses back to one.
 - `deja doctor` counts deja's entries per event, reports a session served the same injection twice inside a second, and says when the launcher has no deja to run. (#3424, #3428, #3434)
 
 ### Changed
-- Index format version 35: a store re-reads its sources once, so the parser fixes below reach histories that were already indexed. (#3290)
+- Index format version 35: a store re-reads its sources once, so the parser fixes below reach histories that were already indexed — titles included, which is how the sessions named by a compaction summary get their names back. (#3290, #3439)
 - `--limit` binds the ranked and error tiers, not only the exact one: `--limit 3` on a phrase returned fifty sessions. (#3348)
 - The per-prompt hook reads the dedupe file once per prompt instead of four times. (#3380)
 - VS Code Copilot Chat sessions are found by asking VS Code for its session directories instead of walking the whole `User` folder. (#3169)
@@ -45,8 +45,12 @@ event collapses back to one.
 - The install report names every file a target wrote: nineteen targets wrote the CLI skill and none said so, and kimi, omp, cline, dsh, goose, openclaw and grok each wrote a second file it never mentioned. (#3431)
 - The credit line hands the agent the sentence to write instead of asking it to decide whether to write one. (#3431)
 - The reading and indexing phases move per file and count messages as they land, and the sidecar builders are a phase rather than eight silent seconds. (#3374, #3376, #3416)
+- Every injection records the session it went to, the point-of-action hooks and the MCP tools included: 492 tool-time injections and 577 answers an agent asked for carried no receiver, so nothing deja said could be paired with what the agent did next. (#3440, #3442)
 
 ### Fixed
+- A compaction summary does not name a session: the preamble introducing it is stripped before anything reads the turn, so the summary read as the first thing a person said and 23 of the last 800 sessions on a real store were called "Summary: 1. Primary Request and Intent…". (#3439)
+- The per-prompt hook stands down on a background job finishing: the notification block was dropped and the host's own paragraph above it was answered as a question. (#3442)
+- A note rewritten to the same length is seen: size and modification time cannot tell an accepted decision from a rejected one on a coarse clock, so a young stamp is confirmed by content. (#3439)
 - Claude Code: a record Claude Code wrote itself — `isMeta`, the hook's own line, a compaction summary — is not the person talking. (#3268, #3334, #3163, #3178)
 - Copilot CLI: a skill the host injects is the host's, not the person's words, and a command that exited non-zero says so. (#3306, #3371)
 - Roo Code and Cline: the `environment_details` block is not the person's words, and a task's tool calls, results and command output are indexed as its commands, files and tool output. (#3256, #3270, #3296, #3331)
