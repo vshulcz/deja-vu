@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -1640,10 +1641,46 @@ func lastShellToken(s string) string {
 	return f[len(f)-1]
 }
 
+// dejaWrittenExes are the binary paths deja has written into configs, read
+// once per process. A build under another name is deja's own when the record
+// says deja installed from that path — the name test below cannot know it, and
+// without this an install from such a build stacked a second entry beside the
+// first (#3421).
+var (
+	writtenExesOnce sync.Once
+	writtenExes     map[string]bool
+)
+
+func dejaWrittenExes() map[string]bool {
+	writtenExesOnce.Do(func() {
+		st := readWiringState()
+		writtenExes = make(map[string]bool, len(st.Exes)+1)
+		for _, p := range append(append([]string(nil), st.Exes...), st.Exe) {
+			if p != "" {
+				writtenExes[p] = true
+			}
+		}
+	})
+	return writtenExes
+}
+
+// forgetWrittenExes drops the cached record so a test — or a process that has
+// just installed — reads it again.
+func forgetWrittenExes() {
+	writtenExesOnce = sync.Once{}
+	writtenExes = nil
+}
+
 // isDejaBinaryToken reports whether a token names the deja binary, quoted or
 // not, under any directory, on either platform's separator.
 func isDejaBinaryToken(tok string) bool {
 	tok = strings.Trim(strings.TrimSpace(tok), `"'`)
+	// A path deja itself installed from is deja's own entry whatever the file
+	// was called — checked on the whole path, before the name is taken out of
+	// it (#3421).
+	if dejaWrittenExes()[tok] {
+		return true
+	}
 	// Both separators whatever this build was compiled for, because configs
 	// travel between machines, and folded because a filesystem that does not
 	// care about case still runs /opt/Deja (#2713).

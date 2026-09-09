@@ -51,6 +51,44 @@ type wiringState struct {
 	// a `go install` over a manual download — and left every config pointing
 	// at a path that no longer exists (#773).
 	Exe string `json:"exe,omitempty"`
+	// Exes are the binary paths deja has written into configs, newest last.
+	// An entry is recognised as deja's own by the command it runs, and that
+	// test used to accept only a file named `deja` — so an install from a
+	// build under another name did not see the old entry as ours and stacked
+	// a second one beside it (#3421). The record is what makes the answer
+	// certain rather than a guess about names.
+	Exes []string `json:"exes,omitempty"`
+}
+
+// wiringExeHistory bounds the remembered paths. Ten covers a machine that
+// reinstalls often; beyond that the oldest is dropped.
+const wiringExeHistory = 10
+
+// fileExists reports whether a path is on disk. Used where the answer decides
+// whether something is a move or a stranger.
+func fileExists(p string) bool {
+	if p == "" {
+		return false
+	}
+	_, err := os.Stat(p)
+	return err == nil
+}
+
+// rememberWrittenExe adds a path to the record's history, newest last, without
+// repeating one it already holds.
+func rememberWrittenExe(st *wiringState, exe string) {
+	if exe == "" {
+		return
+	}
+	for _, p := range st.Exes {
+		if p == exe {
+			return
+		}
+	}
+	st.Exes = append(st.Exes, exe)
+	if len(st.Exes) > wiringExeHistory {
+		st.Exes = st.Exes[len(st.Exes)-wiringExeHistory:]
+	}
 }
 
 func wiringStatePath() string {
@@ -155,7 +193,11 @@ func recordWiring(targets []string, uninstall bool) {
 		blocks = nil
 	}
 	sort.Strings(blocks)
-	st = wiringState{Version: version, Targets: kept, Created: created, Snapshots: snapshots, Blocks: blocks, Exe: exe, Home: homeDir()}
+	exes := append([]string(nil), st.Exes...)
+	next := wiringState{Version: version, Targets: kept, Created: created, Snapshots: snapshots,
+		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir()}
+	rememberWrittenExe(&next, exe)
+	st = next
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
 		return
@@ -240,6 +282,15 @@ func refreshWiringAfterUpgrade() []string {
 	// of those rewrote every config on the machine to a path that stops
 	// existing, and the reader found out when recall went quiet (#2684).
 	if exeIsTemporary(exe) {
+		return nil
+	}
+	// And not a binary that simply is not the installed one. A temp directory
+	// is the obvious case of that and was the only one guarded, so a build in
+	// a checkout, a home directory or an agent's scratch adopted every config
+	// on its first run — one machine ended with eight entries per event, each
+	// naming a different build and all of them firing (#3421). The honest
+	// "deja moved" case is the recorded binary no longer being there.
+	if st.Exe != "" && st.Exe != exe && fileExists(st.Exe) {
 		return nil
 	}
 	// Only the home the targets were written under: this repairs, it does not
