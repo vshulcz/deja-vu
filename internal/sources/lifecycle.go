@@ -46,6 +46,7 @@ func PromotedLifecycles() map[string]Lifecycle {
 	if statOK {
 		if !notesFresh(path, size, mod, statOK) {
 			notesMemo.path, notesMemo.size, notesMemo.mod = path, size, mod
+			notesMemo.sum, _ = notesSum(path)
 			notesMemo.stamped, notesMemo.notes = true, nil
 		}
 		notesMemo.states = out
