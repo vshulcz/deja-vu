@@ -1288,7 +1288,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			// the rule; the other half is the record, because an empty folder
 			// the reader already had is theirs and used to go with the
 			// uninstall (#3239).
-			if dir := filepath.Dir(path); isRealDir(dir) && wiringCreatedDir(dir) {
+			if dir := filepath.Dir(path); isRealDir(dir) && dirWiringCreated(dir) {
 				_ = os.Remove(dir)
 			}
 			if snapshotTaken(path) {

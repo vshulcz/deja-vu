@@ -429,6 +429,16 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	}
 	if !removedAny && canAppendIncremental(changed, m.Files) {
 		mark("decide append")
+		// An append is cheap until it isn't. A live session that has been
+		// writing all day — a Grok `updates.jsonl` in the tens of megabytes —
+		// is appendable, so every search sat through its tail before
+		// answering, including questions about last month's history in another
+		// harness (#3021). Past the cap it is handed to the detached warmup
+		// like rewrite-grade work: the answer comes from the snapshot with the
+		// "as it was" line, and the tail lands before the next question.
+		if tail := appendTailBytes(changed, m.Files); tail > inlineAppendMax {
+			return true, nil
+		}
 		err := updateIndex(dir, o.Harness, "", want, false, progress)
 		mark("append")
 		return false, err
@@ -3206,6 +3216,25 @@ var (
 	resumableKinds     map[string]bool
 	resumableKindsOnce sync.Once
 )
+
+// inlineAppendMax is how many new bytes a search will read before answering.
+// Eight megabytes is about a second of parsing on the machine #3021 was
+// measured on, and larger than any ordinary turn: the sessions that pass it
+// are the ones being written while the question is asked. A variable so a test
+// can put the boundary where its fixtures are.
+var inlineAppendMax int64 = 8 << 20
+
+// appendTailBytes is how much has been added to the files an append would
+// read, which is what the reader waits on.
+func appendTailBytes(changed map[string]FileState, old map[string]FileState) int64 {
+	var n int64
+	for p, f := range changed {
+		if of, ok := old[p]; ok && f.Size > of.Size {
+			n += f.Size - of.Size
+		}
+	}
+	return n
+}
 
 func canAppendIncremental(changed map[string]FileState, old map[string]FileState) bool {
 	if len(changed) == 0 {

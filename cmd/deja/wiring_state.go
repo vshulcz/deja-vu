@@ -401,17 +401,17 @@ func canonicalSnapshotPath(bak string) string {
 	return filepath.Join(dir, filepath.Base(bak))
 }
 
-// wiringCreated reports that deja created this config rather than finding it.
-// wiringCreatedDir reports that deja had to make this directory to write a
+// dirWiringCreated reports that deja had to make this directory to write a
 // config into it. Asked before the prune on the way out: an empty directory
 // the reader already had is theirs (#3239).
-func wiringCreatedDir(dir string) bool {
+func dirWiringCreated(dir string) bool {
 	if slices.Contains(createdDirsByThisRun, dir) {
 		return true
 	}
 	return slices.Contains(readWiringState().Dirs, dir)
 }
 
+// wiringCreated reports that deja created this config rather than finding it.
 func wiringCreated(path string) bool {
 	for _, p := range readWiringState().Created {
 		if p == path {
