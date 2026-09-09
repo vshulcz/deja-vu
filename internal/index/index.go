@@ -146,7 +146,16 @@ import (
 // summary read as the first thing a person said and 23 of the last 800 sessions
 // on a real store were named by it (#3439). Titles are written at ingest, so
 // those 23 keep their names until the re-read this bump already forces.
-const version = 35
+// 36 re-mines the fix pairs. The miner asked two things of a candidate — does
+// the remedy name what the error named, did another session do the same thing —
+// and both are about words, so it missed the commonest repair there is: the
+// failing command, corrected. Counted over 2,953 failed commands, 16% are
+// followed by the same program with most of the same words and no failure,
+// against the 112 confirmed pairs the word rules mine from the same corpus.
+// Pairs are a sidecar written at build time, so an existing store keeps the
+// ones it has until the bump forces the re-read (#3445 carries the other half:
+// the errors those pairs answer).
+const version = 36
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

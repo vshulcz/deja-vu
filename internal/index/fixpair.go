@@ -74,6 +74,11 @@ type FixPair struct {
 	// Command, never beside it: an edit is evidence of what was changed, not
 	// something a reader can run.
 	Edit string `json:",omitempty"`
+	// Repaired marks the remedy as the failing command corrected — same
+	// program, most of the same words. That is evidence on its own, and of a
+	// different kind than the word rules: the pair is not a command that
+	// happened to follow the error, it is the command that caused it, working.
+	Repaired bool `json:",omitempty"`
 	// Candidate marks a sighting that is not a pair yet: the remedy named
 	// nothing the error named, and no other session has done the same thing
 	// after the same error. Evidence of the second kind accumulates across
@@ -109,7 +114,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	}
 	var out []FixPair
 	for _, p := range all {
-		if sharesTerm(p.Error, p.Command) || repeats[fixKey(p)] >= 2 {
+		if p.Repaired || sharesTerm(p.Error, p.Command) || repeats[fixKey(p)] >= 2 {
 			out = append(out, p)
 			continue
 		}
@@ -312,6 +317,22 @@ func outputFailed(ms []model.Message, cmd int) bool {
 	return false
 }
 
+// commandBefore is the command whose output the error at i came out of: the
+// nearest command record above it, with nothing but its own output in between.
+// A session that printed an error without running anything — a build step the
+// harness ran itself — has none, and gets "".
+func commandBefore(ms []model.Message, i int) string {
+	for k := i - 1; k >= 0 && k >= i-fixOutputWindow; k-- {
+		if ms[k].Role == roleCommand {
+			return strings.TrimSpace(firstLineOf(ms[k].Text))
+		}
+		if ms[k].Role != roleToolOutput {
+			return ""
+		}
+	}
+	return ""
+}
+
 // fixPairsIn mines one session.
 func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 	var out []FixPair
@@ -324,6 +345,9 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		if !ok {
 			continue
 		}
+		// The command that produced this error, for the remedy that is that
+		// same command corrected.
+		failedCmd := commandBefore(ms, i)
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""
@@ -368,7 +392,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			// construction when the command greps for the symbol the compiler
 			// complained about, so the table filled with the step an agent
 			// takes between hitting an error and solving it.
-			if investigationCommand(cmd) {
+			//
+			// Unless the command is the failing one corrected. Then what it
+			// does is beside the point: the agent wanted to run exactly this,
+			// the shell would not let it, and the corrected line is the whole
+			// remedy. The wall this was found on is zsh refusing
+			// `--include=*.go` — a grep, rejected here as investigation, and
+			// one of the most repeated walls on the machine that mined it.
+			repaired := repairedVariant(failedCmd, cmd)
+			if !repaired && investigationCommand(cmd) {
 				continue
 			}
 			// A command that names a scratch file is not a remedy anyone can
@@ -380,7 +412,8 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if namesAnEphemeralPath(cmd) {
 				continue
 			}
-			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
+			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key,
+				When: ms[j].Time, Project: project, Repaired: repaired})
 			paired = true
 			break
 		}
@@ -495,7 +528,7 @@ func mergeFixPairs(kept, fresh []FixPair) []FixPair {
 		// An edit is never self-evident the way a command that names what the
 		// error named is: the error names a test, the remedy names a file, and
 		// nothing ties them but a second session doing the same thing.
-		selfEvident := p.Edit == "" && sharesTerm(p.Error, p.Command)
+		selfEvident := p.Edit == "" && (p.Repaired || sharesTerm(p.Error, p.Command))
 		if selfEvident || repeats[k]+seen[k] >= 2 {
 			p.Candidate = false
 			kept = append(kept, p)
