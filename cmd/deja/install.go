@@ -1720,7 +1720,10 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 	}
 	entries, _ := hooks[event].([]any)
 	var out []any
-	found := false
+	// A line the reader built around deja's hook already runs it, and it is not
+	// ours to touch — so the collapse below has to know about it before it
+	// reaches its own entry, whichever order the file happens to keep them in.
+	found := !uninstall && eventWrapsDejaHook(entries, cmd)
 	for _, entryAny := range entries {
 		entry, _ := entryAny.(map[string]any)
 		if entry == nil {
@@ -1759,6 +1762,15 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 			}
 			if kind == hookDejas {
 				if uninstall {
+					removed = true
+					continue
+				}
+				// A file that already collected several of ours converges here:
+				// the first line becomes this binary's and the rest go, rather
+				// than being rewritten into byte-identical copies that each
+				// fire on every prompt (#3421). Same as qwen's writer (#2745)
+				// and cursor's (#2691); this one was the last that stacked.
+				if found {
 					removed = true
 					continue
 				}
@@ -1805,6 +1817,28 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		delete(root, "hooks")
 	}
 	return root
+}
+
+// eventWrapsDejaHook reports whether any entry for this event runs deja's hook
+// inside a command deja did not write.
+func eventWrapsDejaHook(entries []any, cmd string) bool {
+	for _, entryAny := range entries {
+		entry, _ := entryAny.(map[string]any)
+		if entry == nil {
+			continue
+		}
+		hs, _ := entry["hooks"].([]any)
+		for _, hAny := range hs {
+			h, _ := hAny.(map[string]any)
+			if h == nil || h["type"] != "command" {
+				continue
+			}
+			if hookCommandKindOf(h["command"], cmd) == hookWrapsDejas {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // adoptMatcher brings an entry deja already owns up to the matcher this build

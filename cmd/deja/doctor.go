@@ -249,6 +249,9 @@ func doctorHooks(w io.Writer) {
 		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
 			len(claudeHookWiring)-len(missing), len(claudeHookWiring), strings.Join(missing, ", "))
 	}
+	if note := doctorHookRepeats(hooks, claudeHookWiring, "claude-auto"); note != "" {
+		fmt.Fprintf(w, "  %-12s %s\n", "", note)
+	}
 	// Only when something here is actually wired: the note is about the binary
 	// those entries name, and a file with no deja in it names none.
 	if note := hookExeNote(path, "claude-auto"); note != "" && len(missing) < len(claudeHookWiring) {
@@ -318,15 +321,18 @@ func doctorCodexHook(w io.Writer) {
 	}
 	// Trusted is not the same as complete: the entry codex approved may be one
 	// written before the other events existed.
+	var hooks map[string]any
+	if b, rerr := os.ReadFile(hooksPath); rerr == nil {
+		var root map[string]any
+		if json.Unmarshal(b, &root) == nil {
+			hooks, _ = root["hooks"].(map[string]any)
+		}
+	}
 	var missing []string
 	if status == "wired" {
-		var root map[string]any
-		if b, rerr := os.ReadFile(hooksPath); rerr == nil && json.Unmarshal(b, &root) == nil {
-			hooks, _ := root["hooks"].(map[string]any)
-			for _, h := range codexHookWiring {
-				if !hookEventWired(hooks, h.Event, h.Sub) {
-					missing = append(missing, h.Event)
-				}
+		for _, h := range codexHookWiring {
+			if !hookEventWired(hooks, h.Event, h.Sub) {
+				missing = append(missing, h.Event)
 			}
 		}
 		if len(missing) > 0 {
@@ -343,6 +349,9 @@ func doctorCodexHook(w io.Writer) {
 	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
+	}
+	if note := doctorHookRepeats(hooks, codexHookWiring, "codex-auto"); note != "" {
+		line += fmt.Sprintf("\n  %-12s %s", "", note)
 	}
 	fmt.Fprintln(w, line)
 }
