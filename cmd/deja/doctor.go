@@ -258,6 +258,11 @@ func doctorHooks(w io.Writer) {
 	if note := hookExeNote(path, "claude-auto"); note != "" && len(missing) < len(claudeHookWiring) {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
+	// The entries name the launcher now, and the launcher is always there —
+	// what can be gone is everything it resolves to (#3422).
+	if note := doctorLauncherNote(path, "claude-auto"); note != "" {
+		fmt.Fprintf(w, "  %-12s %s\n", "", note)
+	}
 }
 
 // doctorWiringExe reports configs that name a binary which is no longer there.

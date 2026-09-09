@@ -132,6 +132,9 @@ func doctorAutoRecall(w io.Writer) {
 			if exe := hookExeNote(path, a.name+"-auto"); a.marker != "" && exe != "" {
 				fmt.Fprintf(w, "  %-12s %s\n", "", exe)
 			}
+			if note := doctorLauncherNote(path, a.name+"-auto"); a.marker != "" && note != "" {
+				fmt.Fprintf(w, "  %-12s %s\n", "", note)
+			}
 		}
 	}
 }
