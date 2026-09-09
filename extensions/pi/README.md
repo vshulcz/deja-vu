@@ -21,7 +21,7 @@ The deja binary comes with the package; a deja you installed yourself
 `deja install pi-auto` wires pi too, and is the shorter path if you have the
 CLI: it adds deja's MCP server and writes an extension of its own. When that
 extension is present this package stands down, so having both never injects
-twice.
+twice — and the same for omp, whose extension the installer writes elsewhere.
 
 omp loads `pi.extensions` manifests and emits the same `before_agent_start`
 event, so `pi install`'s omp counterpart picks this package up as well.
@@ -33,6 +33,12 @@ event, so `pi install`'s omp counterpart picks this package up as well.
 - **Every prompt** (`before_agent_start`): the prompt is matched against the
   index and, when a past session answers it, that session goes to the model
   with the prompt. Silence is the common case.
+- **After a failed command** (`tool_result`): the repair this machine used the
+  last time that error came up goes in beside the error, in the same turn.
+- **Before an edit** (`tool_result` on a read): what earlier sessions decided
+  about the file the agent just opened.
+- **After a compaction** (`session_compact`): the list of what this session was
+  already shown is cleared, so the recall it lost can come back.
 - **`/deja <query>`**: search the history by hand.
 
 ## Which binary

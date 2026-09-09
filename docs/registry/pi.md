@@ -69,7 +69,7 @@ The `id` field from the session header line is used as the session ID. The UUID 
 
 ## Package
 
-`pi install npm:@vshulcz/pi-deja` installs the recall extension as a pi package (`pi-package` keyword, `pi.extensions`); it stands down when `deja install pi-auto` already wrote `~/.pi/agent/extensions/deja.ts`.
+`pi install npm:@vshulcz/pi-deja` installs the recall extension as a pi package (`pi-package` keyword, `pi.extensions`); it wires the same four handlers the installer writes — session start, prompt, `tool_result` and `session_compact` — and stands down when `deja install pi-auto` already wrote `~/.pi/agent/extensions/deja.ts`, or when the omp counterpart is in place.
 
 ## MCP
 
