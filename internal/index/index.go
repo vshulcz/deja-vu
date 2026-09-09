@@ -146,7 +146,17 @@ import (
 // summary read as the first thing a person said and 23 of the last 800 sessions
 // on a real store were named by it (#3439). Titles are written at ingest, so
 // those 23 keep their names until the re-read this bump already forces.
-// 36 re-mines the fix pairs. The miner asked two things of a candidate — does
+// 36 is about what happens when something goes wrong, in two halves.
+//
+// The first is what counts as a wall at all. A shell's position marker is
+// itself the error signal, and timeouts, the harness's own tool errors and the
+// rest of the Python traceback tails join the phrase list (#3445). A session's
+// friction hashes are written into the manifest at ingest — the same shape as
+// 31 — so `deja friction` reads the records and sees the difference while the
+// hook at the failure and the environment block read the manifest and stay
+// silent. The bump is what ends that.
+//
+// The second re-mines the fix pairs. The miner asked two things of a candidate — does
 // the remedy name what the error named, did another session do the same thing —
 // and both are about words, so it missed the commonest repair there is: the
 // failing command, corrected. Counted over 2,953 failed commands, 16% are
