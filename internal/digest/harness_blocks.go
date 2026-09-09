@@ -45,6 +45,39 @@ var orphanCloseRe = func() *regexp.Regexp {
 	return regexp.MustCompile(`(?im)^[ \t]*</\s*(?:` + strings.Join(alts, "|") + `)\s*>[ \t]*$`)
 }()
 
+// hostPreambleBannerRE is the line a host prints above a turn it hands the
+// prompt hook to say the turn is not the user — Claude Code's
+// "[SYSTEM NOTIFICATION - NOT USER INPUT]" over a finished background job.
+// Stripping the block under it was not enough: the paragraph between the banner
+// and the block is the host too, and the hook read "no human input has been
+// received since the last genuine user message" as a question and answered it
+// out of the store, on `received`, `since` and `last`.
+var hostPreambleBannerRE = regexp.MustCompile(`(?i)^[ \t]*\[[^\]\n]*not\s+(?:a\s+)?user\s+input[^\]\n]*\][ \t]*$`)
+
+// stripHostPreamble drops the banner and the paragraph under it, ending at the
+// first blank line. What follows a blank line is left alone: someone who pastes
+// a notification to ask about it keeps their question, the choice #3168 made
+// for a hook's own status bar.
+func stripHostPreamble(text string) string {
+	lines := strings.Split(text, "\n")
+	kept := lines[:0]
+	inPreamble := false
+	for _, l := range lines {
+		if hostPreambleBannerRE.MatchString(l) {
+			inPreamble = true
+			continue
+		}
+		if inPreamble {
+			if strings.TrimSpace(l) == "" {
+				inPreamble = false
+			}
+			continue
+		}
+		kept = append(kept, l)
+	}
+	return strings.Join(kept, "\n")
+}
+
 var harnessBlockRe = func() *regexp.Regexp {
 	alts := make([]string, 0, len(harnessBlockTags))
 	for _, t := range harnessBlockTags {
@@ -116,8 +149,12 @@ func StripClosedHarnessBlocks(text string) string {
 // envelopes are removed: the person's words, or "" when the turn was the host
 // alone. A task notification delivered as a user turn once made the prompt
 // hook say "you have been here" about another notification, with the
-// envelope's field names as the identifying terms (#3156).
+// envelope's field names as the identifying terms (#3156) — and once the block
+// was gone, about the host's own paragraph above it.
 func StripHarnessBlocks(prompt string) string {
+	if strings.Contains(prompt, "[") {
+		prompt = stripHostPreamble(prompt)
+	}
 	if strings.Contains(prompt, "<") {
 		prompt = harnessBlockRe.ReplaceAllString(prompt, "")
 		prompt = orphanCloseRe.ReplaceAllString(prompt, "")

@@ -140,6 +140,12 @@ import (
 // of that reaches an existing store without a re-read, and the repo's
 // precedent for a content-changing parser fix is exactly this: #2875 for
 // goose, #1383 for the greeting rule, #2905 for the Thai bigrams.
+//
+// The same bump carries the compaction summary that titled a session: the
+// preamble introducing it is stripped before anything reads the turn, so the
+// summary read as the first thing a person said and 23 of the last 800 sessions
+// on a real store were named by it (#3439). Titles are written at ingest, so
+// those 23 keep their names until the re-read this bump already forces.
 const version = 35
 const maxIndexedText = 64 * 1024
 
