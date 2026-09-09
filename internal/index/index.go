@@ -186,9 +186,14 @@ type HarnessCount struct {
 // BuildSummary describes the most recent (re)build in this process; the CLI
 // uses it to greet a first-ever index with a summary instead of silence.
 type BuildSummary struct {
-	Initial    bool
-	Sessions   int
-	Messages   int
+	Initial  bool
+	Sessions int
+	Messages int
+	// Dropped is how many parsed messages did not reach the index: deja's own
+	// recall blocks, stripped before anything counts them, and turns that hold
+	// nothing else. The two counts a build prints disagreed by exactly this and
+	// nothing said why (#3386).
+	Dropped    int
 	Harnesses  int
 	PerHarness []HarnessCount
 }

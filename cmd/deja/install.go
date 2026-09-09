@@ -363,6 +363,20 @@ func keptSnapshotsLine(touched []string) string {
 		len(paths), pluralS(len(paths)), where)
 }
 
+// indexBuiltLine is what an install says about the store it just built. The
+// harness lines above it count what the parser read; this counts what reached
+// the index, and the two disagree by deja's own recall blocks — stripped
+// before anything counts them. Both numbers are true and they answer different
+// questions, so the difference is named rather than left to be noticed (#3386).
+func indexBuiltLine(b index.BuildSummary) string {
+	line := fmt.Sprintf("index: built (%d session%s, %d message%s",
+		b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
+	if b.Dropped > 0 {
+		line += fmt.Sprintf(" — %d of deja's own blocks not indexed", b.Dropped)
+	}
+	return line + ")\n"
+}
+
 func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 	built := false
 	detected := 0
@@ -383,15 +397,13 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 	}
 	if !summary {
 		if built {
-			b := index.LastBuild
-			fmt.Fprintf(os.Stderr, "index: built (%d session%s, %d message%s)\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
+			fmt.Fprint(os.Stderr, indexBuiltLine(index.LastBuild))
 		}
 		return
 	}
 	fmt.Fprintf(os.Stderr, "installed: %d MCP, %d hooks, %d guidance files\n", mcp, hooks, guidance)
 	if built {
-		b := index.LastBuild
-		fmt.Fprintf(os.Stderr, "index: built (%d session%s, %d message%s)\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
+		fmt.Fprint(os.Stderr, indexBuiltLine(index.LastBuild))
 	} else if !index.HasManifest(dir) && detected > 0 {
 		fmt.Fprintln(os.Stderr, "next: run `deja index` to finish building memory")
 	} else if n := deniedStoreCount(); !index.HasManifest(dir) && n > 0 {

@@ -30,6 +30,10 @@ import (
 func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session) {
 	counts := map[string]*HarnessCount{}
 	order := []string{}
+	parsed := 0
+	for _, s := range ss {
+		parsed += len(s.Messages)
+	}
 	for _, s := range ss {
 		c := counts[s.Harness]
 		if c == nil {
@@ -45,7 +49,8 @@ func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session
 	for _, name := range order {
 		per = append(per, *counts[name])
 	}
-	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages, Harnesses: len(order), PerHarness: per}
+	LastBuild = BuildSummary{Initial: initial, Sessions: sessions, Messages: messages,
+		Dropped: parsed - messages, Harnesses: len(order), PerHarness: per}
 }
 
 // IngestHealth returns the per-harness ingestion health persisted by the
