@@ -215,3 +215,11 @@ unchanged.
 modification. Backups and newly created configs are written owner-only
 (0600) because these files can carry MCP server credentials; the mode of an
 existing live config is preserved on update.
+
+On non-Windows hosts install also writes `~/.config/deja/bin/deja-hook`, a
+shell script the hook entries name so an upgrade that moves the binary does not
+have to rewrite every config. It is 0755 in a directory the user owns, and it
+runs the first executable it finds among `DEJA_BIN`, the path the install ran
+from, the `PATH`, and the usual install locations — so anything that can write
+those can already run code as that user. It is removed when the last target is
+uninstalled.
