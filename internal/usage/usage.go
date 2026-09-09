@@ -710,13 +710,14 @@ func rememberOldest(p string, oldest time.Time, size int64) {
 func WornSessions(indexDir string) map[string]int {
 	out := map[string]int{}
 	for _, e := range read(Path(indexDir)) {
-		// Agent recalls and the user's own déjà vu moments both count. They
-		// mean different things — one is an agent pulling a session, the other
-		// is the user returning to the same ground — and both say the session
-		// keeps mattering. The bounded boost is what keeps this from becoming
-		// a feedback loop: a session that ranks higher gets surfaced more,
-		// which would compound without the ceiling in wornBoost.
-		if e.Kind != KindRecall && e.Kind != KindContext && e.Kind != KindDejaVu {
+		// Only what was asked for. A `dejavu` event is deja pushing a session
+		// into a prompt because the wording matched, not an agent reaching for
+		// it — and it was 60–70% of the count, so the receipt's "most re-used"
+		// named whichever session shared vocabulary with the project, and the
+		// same number fed wornBoost, which surfaced it more (#3173). The
+		// ceiling in wornBoost bounded that loop; it did not make the number
+		// mean what the word says.
+		if e.Kind != KindRecall && e.Kind != KindContext && e.Kind != KindBlame {
 			continue
 		}
 		for _, id := range e.SessionIDs {
