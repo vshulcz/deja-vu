@@ -33,7 +33,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.19.4"
+    "@vshulcz/deja-vu": "^0.19.5"
   },
   "pi": {
     "extensions": ["./index.ts"],
