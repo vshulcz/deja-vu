@@ -36,6 +36,12 @@ type wiringState struct {
 	// Knowing which files deja made is what lets the same rule apply to them
 	// without ever removing a config the reader already had (#2583).
 	Created []string `json:"created,omitempty"`
+	// Dirs are the directories deja had to create to write a config into. The
+	// prune on the way out states the rule "when deja made it and nothing else
+	// is in it" and could only test the second half, so an empty folder the
+	// reader already had — a host's `User` directory, say — went with the
+	// uninstall (#3239).
+	Dirs []string `json:"dirs,omitempty"`
 	// Snapshots are the .bak files deja wrote itself. Ownership of a snapshot
 	// cannot be read out of its bytes — a reader's own config that merely says
 	// the word matches every marker list — so the uninstall that deletes one
@@ -172,6 +178,16 @@ func recordWiring(targets []string, uninstall bool) {
 		created = nil
 	}
 	sort.Strings(created)
+	dirs := append([]string(nil), st.Dirs...)
+	for _, p := range createdDirsByThisRun {
+		if !slices.Contains(dirs, p) {
+			dirs = append(dirs, p)
+		}
+	}
+	if len(kept) == 0 {
+		dirs = nil
+	}
+	sort.Strings(dirs)
 	snapshots := append([]string(nil), st.Snapshots...)
 	for _, p := range snapshotsByThisRun {
 		if !slices.Contains(snapshots, p) {
@@ -194,7 +210,7 @@ func recordWiring(targets []string, uninstall bool) {
 	}
 	sort.Strings(blocks)
 	exes := append([]string(nil), st.Exes...)
-	next := wiringState{Version: version, Targets: kept, Created: created, Snapshots: snapshots,
+	next := wiringState{Version: version, Targets: kept, Created: created, Dirs: dirs, Snapshots: snapshots,
 		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir()}
 	rememberWrittenExe(&next, exe)
 	st = next
@@ -386,6 +402,16 @@ func canonicalSnapshotPath(bak string) string {
 }
 
 // wiringCreated reports that deja created this config rather than finding it.
+// wiringCreatedDir reports that deja had to make this directory to write a
+// config into it. Asked before the prune on the way out: an empty directory
+// the reader already had is theirs (#3239).
+func wiringCreatedDir(dir string) bool {
+	if slices.Contains(createdDirsByThisRun, dir) {
+		return true
+	}
+	return slices.Contains(readWiringState().Dirs, dir)
+}
+
 func wiringCreated(path string) bool {
 	for _, p := range readWiringState().Created {
 		if p == path {

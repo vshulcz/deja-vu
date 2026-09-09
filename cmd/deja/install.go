@@ -1169,6 +1169,11 @@ func matchLineEndings(old, next []byte) []byte {
 	return b.Bytes()
 }
 
+// createdDirsByThisRun collects the directories this process had to make. The
+// record outlives the run, because the uninstall that prunes them is a
+// different one (#3239).
+var createdDirsByThisRun []string
+
 // createdByThisRun collects the configs this process created, so the record can
 // keep them and a later uninstall can take back a file that turns out to hold
 // nothing but empty containers (#2583).
@@ -1279,9 +1284,11 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 				return "", err
 			}
 			// The directory too, when deja made it and nothing else is in it.
-			// os.Remove fails on a directory that is not empty, which is the
-			// condition wanted (same rule as pruneGuidanceDirs).
-			if dir := filepath.Dir(path); isRealDir(dir) {
+			// os.Remove fails on a directory that is not empty, which is half
+			// the rule; the other half is the record, because an empty folder
+			// the reader already had is theirs and used to go with the
+			// uninstall (#3239).
+			if dir := filepath.Dir(path); isRealDir(dir) && wiringCreatedDir(dir) {
 				_ = os.Remove(dir)
 			}
 			if snapshotTaken(path) {
@@ -1293,7 +1300,11 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) && !removingWiring {
 		createdByThisRun = append(createdByThisRun, path)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if !removingWiring && !isRealDir(dir) {
+		createdDirsByThisRun = append(createdDirsByThisRun, dir)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	// Config files are very often symlinks into a dotfiles repository. Writing
