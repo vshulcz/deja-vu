@@ -13,6 +13,17 @@ export function installerExtensionPath(home) {
   return join(home || "", ".pi", "agent", "extensions", "deja.ts")
 }
 
+// installerExtensionPaths are every place `deja install` writes an extension
+// this package would duplicate. omp runs the same package and the installer
+// writes it under ~/.omp/agent/extensions/deja/index.js, so checking pi's path
+// alone left both running side by side (#3180).
+export function installerExtensionPaths(home) {
+  return [
+    installerExtensionPath(home),
+    join(home || "", ".omp", "agent", "extensions", "deja", "index.js"),
+  ]
+}
+
 // contextText pulls the recall out of whatever hook-context printed. deja
 // answers in the Claude Code hook shape; older builds and `--plain` print
 // bare text, so both are accepted.
