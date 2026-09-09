@@ -375,6 +375,7 @@ func isFriction(l string) bool {
 		// sentence someone writes about roles.
 		"duplicate key value", "deadlock detected", "access denied for",
 		"failed to connect to", "cannot import name", "symbol(s) not found",
+		"undefined symbol:", "undefined reference to",
 		"failed to push some refs", "acquiring the state lock",
 		"no space left on device",
 	} {
