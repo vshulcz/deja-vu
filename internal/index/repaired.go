@@ -63,18 +63,42 @@ var navigationCommands = map[string]bool{
 }
 
 // commandTokens splits a command into the words a comparison can be made on.
-func commandTokens(cmd string) []string { return strings.Fields(cmd) }
+//
+// The shell prompt some harnesses store with the command goes first. Left in,
+// it is the program of every command ever recorded: `$` equals `$`, so the
+// same-program test below passed for any two lines and the navigation guard
+// guarded nothing — measured on a real store, 21 of the 163 repaired pairs
+// served ran a different program (`go test` answered by `rm`, `git` by `go`)
+// and three more were `cd` somewhere else.
+func commandTokens(cmd string) []string {
+	f := strings.Fields(cmd)
+	if len(f) > 0 && f[0] == "$" {
+		return f[1:]
+	}
+	return f
+}
 
 // commandProgram is what the command runs, without the path it was found at
 // and without the environment assignments and wrappers in front of it.
 func commandProgram(tokens []string) string {
-	for _, t := range tokens {
+	for i := 0; i < len(tokens); i++ {
+		t := tokens[i]
 		if strings.Contains(t, "=") {
 			continue
 		}
 		switch t {
 		case "sudo", "env", "time", "nohup", "exec", "command":
 			continue
+		case "timeout", "gtimeout", "stdbuf", "nice":
+			// The wrapper takes a duration before the command it runs, and
+			// `timeout 90 ssh …` runs ssh — dropping a wrapper the shell cannot
+			// find is the repair for the wall this machine hits most, so both
+			// sides have to name the program that does the work. With no
+			// duration after it the wrapper is the program itself.
+			if i+1 < len(tokens) && isDurationToken(tokens[i+1]) {
+				i++
+				continue
+			}
 		}
 		if i := strings.LastIndex(t, "/"); i >= 0 {
 			t = t[i+1:]
@@ -82,6 +106,21 @@ func commandProgram(tokens []string) string {
 		return t
 	}
 	return ""
+}
+
+// isDurationToken reports whether the token is a plain duration — the argument
+// `timeout` and its kin take before the command they run.
+func isDurationToken(t string) bool {
+	t = strings.TrimRight(t, "smhd")
+	if t == "" {
+		return false
+	}
+	for _, r := range t {
+		if (r < '0' || r > '9') && r != '.' {
+			return false
+		}
+	}
+	return true
 }
 
 // tokenOverlap is how much of the two commands is the same words, counted as

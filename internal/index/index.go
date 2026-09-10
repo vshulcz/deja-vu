@@ -176,6 +176,13 @@ import (
 // 107 of those 360 answers share no word with the error they answer — they are
 // not a command about the error, they are the command that caused it, working —
 // and shown alone they read as an unrelated line to trust.
+//
+// Storing it showed the rule that mines them comparing the wrong thing. The
+// commands carry the shell prompt a harness stored with them, so `$` was the
+// program of both sides, the same-program test passed for any two lines and the
+// navigation guard guarded nothing: 36 of 163 such answers were a different
+// program or `cd` elsewhere. The wrapper the shell could not find is now
+// transparent too, so `timeout 12 launchctl …` is repaired by `launchctl …`.
 const version = 37
 const maxIndexedText = 64 * 1024
 
