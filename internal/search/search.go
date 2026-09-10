@@ -1575,7 +1575,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		keep := carries || m.Role == "user" || (m.Role == "assistant" && prevKept)
 		prevKept = keep
 		return keep, hits
-	})
+	}, func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
 	if written > 0 {
 		return
 	}
@@ -1584,7 +1584,86 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil })
+	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil },
+		func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
+}
+
+// compactionSummaryLineCap and compactionSummaryByteCap bound what a compaction
+// summary contributes to a context window.
+const (
+	compactionSummaryLineCap = 8
+	compactionSummaryByteCap = 700
+)
+
+// compactionSummaryLead says what was cut and why, so the lines below are not
+// read as the whole turn.
+const compactionSummaryLead = "[compaction summary of an earlier part of this session — the matching lines only]"
+
+// clipCompactionSummary reduces a compaction summary to the lines that carry
+// the query, or returns "" for a turn that is not one.
+//
+// A summary is the longest message a session ever holds and it names everything
+// the session did, so it matches almost any question and then fills the window
+// on its own. Measured over eight questions an agent would ask, on a real
+// store: three answers came back carrying one, and it was 95% of each of them —
+// 44% of every byte `recall_context` served. None of it answered the question.
+func clipCompactionSummary(text string, parts []string) string {
+	if !digest.IsCompactionSummary(text) {
+		return ""
+	}
+	// Nothing was asked, so nothing can be matched: `deja ctx <id>` and the MCP
+	// resource read a session with no query, and there the summary is the best
+	// account of it there is.
+	if len(parts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(compactionSummaryLead)
+	lines := 0
+	for _, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || contextPartHits(line, parts) == nil {
+			continue
+		}
+		carries := false
+		for _, h := range contextPartHits(line, parts) {
+			if h > 0 {
+				carries = true
+				break
+			}
+		}
+		if !carries {
+			continue
+		}
+		b.WriteString("\n")
+		b.WriteString(line)
+		lines++
+		if lines >= compactionSummaryLineCap || b.Len() >= compactionSummaryByteCap {
+			break
+		}
+	}
+	if lines == 0 {
+		// It matched as a whole and no single line does — a query whose words
+		// are spread through it. Name the subject and stop: the summary is
+		// there, and it is not what was asked about.
+		return compactionSummaryLead + "\n" + firstLines(text, 2)
+	}
+	return b.String()
+}
+
+// firstLines is the first n non-empty lines, for naming what a clipped turn was
+// about.
+func firstLines(text string, n int) string {
+	var out []string
+	for _, raw := range strings.Split(text, "\n") {
+		if line := strings.TrimSpace(raw); line != "" {
+			out = append(out, line)
+			if len(out) == n {
+				break
+			}
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // contextQueryParts is what the digest weighs a turn against: the query's terms
@@ -1719,7 +1798,7 @@ func renderContextTurns(turns []contextTurn) []string {
 	return out
 }
 
-func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, hits []int)) int {
+func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, hits []int), clip func(m model.Message) string) int {
 	// A digest is what someone pipes into a prompt, so it carries the
 	// conversation. The work records — tool output, the files a turn touched, the
 	// commands it ran, the spans it replaced — are indexed and searchable by role
@@ -1755,7 +1834,13 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if len(hits) > parts {
 			parts = len(hits)
 		}
-		kept = append(kept, contextTurn{role: m.Role, raw: m.Text, hits: hits})
+		raw := m.Text
+		if clip != nil {
+			if short := clip(m); short != "" {
+				raw = short
+			}
+		}
+		kept = append(kept, contextTurn{role: m.Role, raw: raw, hits: hits})
 	}
 	weights := contextTurnWeights(kept, parts)
 	rendered := renderContextTurns(kept)
