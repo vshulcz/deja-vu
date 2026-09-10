@@ -67,7 +67,7 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			if text == "" || IsAgentArtifact(text) {
 				continue
 			}
-			if CarriesDecision(text) && !aboutToExplain(text) {
+			if worthAsDecision(text) {
 				r.Decision = firstSentences(text, 1)
 			}
 		case sources.RoleEdit, sources.RoleFiles:
@@ -156,6 +156,33 @@ func aboutToExplain(text string) bool {
 	}
 	return false
 }
+
+// worthAsDecision reports whether a line is something the session settled.
+//
+// Read across 32 projects on a real store, what the weaker rule let through was:
+// "Imported from Claude session <id>", which is deja's own marker on a synced
+// session; "Затащил." — merged it, one word; and a pasted design document whose
+// first line is a markdown heading. Each carried a decision marker and none is a
+// decision.
+func worthAsDecision(text string) bool {
+	if !CarriesDecision(text) || aboutToExplain(text) {
+		return false
+	}
+	if strings.HasPrefix(text, "Imported from ") {
+		return false
+	}
+	// A heading or a bullet opens a document, not a sentence somebody said.
+	if strings.HasPrefix(text, "#") || strings.HasPrefix(text, "- ") ||
+		strings.HasPrefix(text, "* ") || strings.HasPrefix(text, "|") {
+		return false
+	}
+	// Long enough to mean something on its own, read cold, weeks later.
+	return utf8.RuneCountInString(firstSentences(text, 1)) >= decisionMinRunes
+}
+
+// decisionMinRunes is the bar for a decision worth repeating back. "Затащил."
+// clears every marker test and says nothing a week later.
+const decisionMinRunes = 20
 
 // newestFirst keeps the last few distinct paths in the order they were last
 // touched, newest first — which is the order an agent picking the work back up
