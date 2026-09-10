@@ -146,7 +146,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	// The receiving session too: this is the repair delivered at the failure,
 	// the surface with the best evidence behind it, and it was the one that
 	// could not be followed (#1494 gave the per-prompt hook the same field).
-	usage.RecordServedInto(dir, usage.KindTool, len(payload), 1, input.SessionID)
+	// The text too, for the reason the pre-tool hook keeps it: a fix pair
+	// delivered at a failure is the one injection worth reading back.
+	usage.RecordDigestInto(dir, usage.KindTool, payload, input.SessionID, 1, 0, nil)
 	if plain {
 		fmt.Fprint(stdout, payload)
 		return nil

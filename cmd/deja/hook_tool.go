@@ -203,7 +203,13 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// measured on this machine, 492 point-of-action injections and not one that
 	// could be paired with what the agent did next — which is the pairing any
 	// judgement about whether the line helped has to start from.
-	usage.RecordServedInto(dir, usage.KindTool, len(out), 1, input.SessionID)
+	// The text, not only the count. The injections file holds a snapshot for
+	// every session-start and per-prompt block and held none for this surface:
+	// 507 point-of-action injections on a real machine and not one whose content
+	// could be read back. So what deja says at the moment with the best evidence
+	// behind it could not be audited, replayed, or compared against what the
+	// agent did next — and `deja log --last` had nothing to print for it.
+	usage.RecordDigestInto(dir, usage.KindTool, out, input.SessionID, 1, 0, nil)
 	switch shape {
 	case hookToolPlain:
 		fmt.Fprint(stdout, out)
