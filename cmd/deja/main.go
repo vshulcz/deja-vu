@@ -2982,7 +2982,7 @@ func printSources(dir string) {
 		files          func() []string
 		load           func() []model.Session
 	}{
-		{"claude", sources.ClaudeRoot(), []string{sources.ClaudeRoot()}, sources.ClaudeFiles, sources.LoadClaude},
+		{"claude", strings.Join(sources.ClaudeRoots(), string(os.PathListSeparator)), sources.ClaudeRoots(), sources.ClaudeFiles, sources.LoadClaude},
 		{"codex", strings.Join(sources.CodexRoots(), string(os.PathListSeparator)), sources.CodexRoots(), sources.CodexFiles, sources.LoadCodex},
 		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.GeminiChatFiles, sources.LoadGemini},
 		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorReadFiles, sources.LoadCursor},

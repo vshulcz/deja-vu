@@ -30,6 +30,13 @@ func ClaudeRoot() string {
 	return EnvPath("DEJA_CLAUDE_ROOT", filepath.Join(ClaudeConfigDir(), claudeProjectsDirName()))
 }
 
+// XcodeClaudeRoot is the transcript store used by Xcode-hosted Claude
+// sessions. Xcode gives its bundled Claude agent a separate config directory,
+// but the files under projects use the ordinary Claude Code JSONL format.
+func XcodeClaudeRoot() string {
+	return EnvPath("DEJA_XCODE_CLAUDE_ROOT", filepath.Join(Home(), "Library", "Developer", "Xcode", "CodingAssistant", "ClaudeAgentConfig", claudeProjectsDirName()))
+}
+
 // claudeProjectsDirName is what Claude Code calls the directory it keeps
 // transcripts in. CLAUDE_CODE_PROJECT_DIR_NAME is documented and renames it;
 // deja hard-coded "projects" and read nothing on a machine that set it (#2996).
@@ -46,6 +53,8 @@ func claudeProjectsDirName() string {
 //   - <config>/<projects>, the ordinary store;
 //   - <config>/transcripts, a sibling where headless and SDK-driven clients
 //     write bare transcripts;
+//   - ~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/<projects>,
+//     the store written by Xcode-hosted Claude sessions;
 //   - ~/.cc-mirror/<variant>/.claude/<projects>, the isolated variants
 //     cc-mirror runs — a session run through one reached nothing before.
 //
@@ -59,9 +68,21 @@ func ClaudeRoots() []string {
 	cfg := ClaudeConfigDir()
 	roots := []string{filepath.Join(cfg, claudeProjectsDirName())}
 	roots = append(roots, filepath.Join(cfg, "transcripts"))
+	roots = append(roots, XcodeClaudeRoot())
 	roots = append(roots, ccMirrorRoots()...)
 	var out []string
 	for _, r := range roots {
+		r = filepath.Clean(r)
+		duplicate := false
+		for _, existing := range out {
+			if existing == r {
+				duplicate = true
+				break
+			}
+		}
+		if duplicate {
+			continue
+		}
 		if fi, err := os.Stat(r); err == nil && fi.IsDir() {
 			out = append(out, r)
 		}

@@ -421,7 +421,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 	aiderPaths = append(aiderPaths, filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS"))...)
 	cursorFiles := append(sources.CursorTranscripts(), sources.CursorDBs()...)
 	return []doctorStoreCheck{
-		{"claude", []string{sources.ClaudeRoot()}, sources.ClaudeFiles(), sources.ParseClaudeFile},
+		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles(), sources.ParseClaudeFile},
 		{"codex", sources.CodexRoots(), sources.CodexFiles(), parseDoctorCodex},
 		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), doctorProbeOpencode},
 		{"aider", aiderPaths, sources.AiderFiles(), sources.ParseAiderFile},
