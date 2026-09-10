@@ -500,8 +500,28 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if seen[blockFingerprint(body)] {
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
+	// And the same sentence twice under another session's id is the same
+	// wallpaper: the fingerprint above covers the block, whose header carries
+	// the id and the date, so a fork or a subagent transcript of the same work
+	// passes it every time. Measured on a real store over eight near-identical
+	// nudges: nine sessions cited, fifteen quoted lines, eleven of them
+	// distinct, and the worst line four times under four ids.
+	filtered, freshQuotes, anyFresh := withoutSeenQuotes(seen, body)
+	switch {
+	case anyFresh:
+		body = filtered
+	case !strings.HasPrefix(input.SessionID, spawnReaderPrefix):
+		// Every quote was delivered to this reader already, so the block is the
+		// same injection wearing another session's header.
+		return emitNudgeOnly(stdout, plain, nudge)
+	}
+	// A spawned agent is a new reader even when the parent has heard it all: the
+	// key it recalls under is the parent plus the instructions, which exists to
+	// stop a re-spawn of the same agent repeating itself — not to send the
+	// second one in blind. Handing it what the parent saw is the whole point.
 	out := frameRecall(body)
 	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
+	rememberInjectedIDs(dir, input.SessionID, freshQuotes...)
 	// Stamped, because the question is answered again once the window passes,
 	// where a block fingerprint holds for the life of the session.
 	rememberInjectedIDsFor(dir, input.SessionID, "", []string{askKey(terms)})
