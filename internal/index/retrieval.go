@@ -9,8 +9,11 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -3926,6 +3929,55 @@ func intersectPostingMaps(sets []map[int64]posting) []posting {
 	return out
 }
 
+// tokenHitCap bounds the buffer one token is built in. tokens flushes a token
+// once it passes 64 bytes, so nothing longer than that plus one rune is ever
+// held here.
+const tokenHitCap = 64 + utf8.UTFMax
+
+// tokenHits reports which of the wanted tokens a text contains.
+//
+// It tokenises exactly as tokens does — same fold, same rune classes, same
+// two-byte minimum and same flush past 64 bytes — and then throws the token
+// away instead of collecting it. The ranker asks whether a message carries any
+// of a query's five or ten words, and building the message's whole token set to
+// answer that was 25% of the CPU a recall answer spent: 4000 turns of each of
+// fifty sessions, a map and a sort per turn.
+func tokenHits(s string, want map[string]bool) map[string]bool {
+	if len(want) == 0 {
+		return nil
+	}
+	s = nfcfold.Compose(s)
+	var hit map[string]bool
+	var buf [tokenHitCap]byte
+	n := 0
+	flush := func() {
+		if n >= 2 {
+			// The compiler does not allocate for a map lookup keyed by a
+			// converted byte slice, which is the point of the buffer.
+			if want[string(buf[:n])] {
+				if hit == nil {
+					hit = make(map[string]bool, len(want))
+				}
+				hit[string(buf[:n])] = true
+			}
+		}
+		n = 0
+	}
+	for _, r := range strings.ToLower(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' ||
+			(n > 0 && isMark(r)) {
+			n += utf8.EncodeRune(buf[n:], r)
+			if n > 64 {
+				flush()
+			}
+		} else {
+			flush()
+		}
+	}
+	flush()
+	return hit
+}
+
 func tokens(s string) []string {
 	// Fold NFD to NFC so an accented word keys the same whether it was typed or
 	// stored decomposed. A combining mark is category Mn, not a letter, so the
@@ -4415,23 +4467,67 @@ const bestMessageTurns = 4000
 // session spreads the same words over many. Reciprocal rank fusion keeps both
 // votes; stable on ties, so the pool's order survives where messages cannot
 // separate sessions.
+
+// parallelForRanked runs fn over 0..n-1 on one goroutine per core, once there is
+// enough work to pay for handing it out.
+func parallelForRanked(n int, fn func(i int)) {
+	workers := rerankWorkers()
+	if workers > n {
+		workers = n
+	}
+	if workers < 2 || n < 4 {
+		for i := range n {
+			fn(i)
+		}
+		return
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				fn(i)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// rerankWorkers is a variable so a test can force the single-core path and
+// compare the two orders.
+var rerankWorkers = defaultRerankWorkers
+
+func defaultRerankWorkers() int { return runtime.NumCPU() }
+
 func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]float64) []model.Session {
 	forms := make([][]string, len(terms))
+	wanted := map[string]bool{}
 	for i, t := range terms {
 		t = strings.ToLower(t)
 		forms[i] = append([]string{t}, stemMatchForms(t)...)
+		for _, f := range forms[i] {
+			wanted[f] = true
+		}
 	}
 	best := make([]float64, len(ss))
-	for i, s := range ss {
+	// Per session and independent, and lowercasing every message of every
+	// ranked session is where a recall answer spends its time: 1.6 s of 2.4 s
+	// on a real store, profiled. Spread across cores; each session's score is
+	// computed exactly as before, so the ranking is unchanged.
+	parallelForRanked(len(ss), func(i int) {
+		s := ss[i]
 		msgs := s.Messages
 		if len(msgs) > bestMessageTurns {
 			msgs = msgs[:bestMessageTurns]
 		}
 		for _, msg := range msgs {
-			toks := map[string]bool{}
-			for _, tk := range tokens(strings.ToLower(msg.Text)) {
-				toks[tk] = true
-			}
+			toks := tokenHits(msg.Text, wanted)
 			score := 0.0
 			for ti, t := range terms {
 				hit := false
@@ -4456,7 +4552,7 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 				best[i] = score
 			}
 		}
-	}
+	})
 	// Fuse rather than replace: the pool's own order is session-level IDF
 	// overlap, which wins on a small haystack; the best-message score wins on
 	// a large pile. Reciprocal rank fusion keeps both votes.

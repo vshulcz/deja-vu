@@ -474,6 +474,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			tail += "\n" + nudge
 		}
 		lead := promptHookLead
+		// After the first block of a session the two explanatory sentences are
+		// words the agent has already read, and the third repeats the line this
+		// block ends with. Measured on a real store: a session receives a median
+		// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
+		// so 22 of those blocks carried 6.6 KB of the same sentences.
+		if blockAlreadySentThisSession(dir, input.SessionID) {
+			lead = promptHookLeadShort
+		}
 		// A repeat of the question itself is a different claim than a session
 		// about the subject, and a stronger one: the agent does not have to
 		// decide whether the history is relevant, only whether the answer
@@ -1521,6 +1529,27 @@ func sessionIDs(ss []model.Session) []string {
 // sentence (#2370). The match is on wording, and the lead now says so and asks
 // for the one check that catches it.
 const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
+
+// promptHookLeadShort is the lead every block after the first one carries: the
+// caveat that still applies each time, without the sentences the session has
+// already been told and without the citation instruction the block ends with
+// anyway.
+const promptHookLeadShort = "deja matched on wording, not meaning — check the session fits before acting on it.\n"
+
+// blockAlreadySentThisSession reports whether this agent session has had a
+// per-prompt block before. The seen list is written after every block that goes
+// out, keyed by the session, so its own rows are the record of that.
+func blockAlreadySentThisSession(dir, sid string) bool {
+	if sid == "" {
+		return false
+	}
+	return len(recentlyInjected(dir, sid, leadWindow)) > 0
+}
+
+// leadWindow is how far back the check reads. Longer than the injection
+// cooldown on purpose: this asks whether the session was ever told, not whether
+// a particular memory is on cooldown.
+const leadWindow = 500
 
 // digestBudget is how much room the block gets. A match resting on a single
 // rare word is a weaker claim than one resting on two, and it is where most of

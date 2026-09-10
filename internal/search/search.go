@@ -2517,8 +2517,14 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 	if weight == nil {
 		weight = termWeights(ss, terms)
 	}
-	hits := make([]Hit, 0, len(ss))
-	for rank, s := range ss {
+	hits := make([]Hit, len(ss))
+	// One session's score is read from that session alone, and lowercasing its
+	// messages is where the time goes: profiled on a real store, a recall
+	// answer spent 2.4 s in it and in the ranker's own copy of the same loop.
+	// Spread across cores the way the context renderer already is (#1790) —
+	// the work per session is unchanged, so the answer is identical.
+	parallelForSessions(len(ss), func(rank int) {
+		s := ss[rank]
 		hit := Hit{Session: s, Tier: TierRelevance}
 		// Snippet the messages where the most query terms MEET, not the first
 		// message that contains any one of them. The passage that answers a
@@ -2583,10 +2589,48 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			hit.Snippets = append(hit.Snippets, snippet(s.Messages[best[i].idx].Text, best[i].center, nil))
 		}
 		hit.Score = float64(len(ss) - rank)
-		hits = append(hits, hit)
-	}
+		hits[rank] = hit
+	})
 	return liftedNotes(hits)
 }
+
+// parallelForSessions runs fn over 0..n-1, on one goroutine per core once there
+// is enough work to pay for them. The bound is the same shape renderContextTurns
+// uses: a handful of items is faster on one core than it is to hand out.
+func parallelForSessions(n int, fn func(i int)) {
+	workers := relevanceWorkers()
+	if workers > n {
+		workers = n
+	}
+	if workers < 2 || n < 4 {
+		for i := range n {
+			fn(i)
+		}
+		return
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				fn(i)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// relevanceWorkers is a variable so a test can force the single-core path and
+// compare the two orders.
+var relevanceWorkers = defaultRelevanceWorkers
+
+func defaultRelevanceWorkers() int { return runtime.NumCPU() }
 
 // SafeText neutralises what a terminal acts on rather than prints. Transcript
 // text arrives verbatim from a harness, and after `deja sync import` from
