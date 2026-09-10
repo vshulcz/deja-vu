@@ -613,14 +613,25 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// under the previous phase's last percentage, so the bar sat still through
 	// it (#3372).
 	reportPhase("mining fixes and commands", 4)
-	buildCooccur(tmp, ss)
-	reportAdvance(1)
-	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
-	reportAdvance(1)
-	buildCommands(tmp, ss)
-	reportAdvance(1)
-	buildCommandFails(tmp, ss)
-	reportAdvance(1)
+	// Four passes over the same sessions, each writing its own file and reading
+	// nothing the others write, so they run together rather than one after the
+	// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
+	// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
+	var sidecars sync.WaitGroup
+	for _, build := range []func(){
+		func() { buildCooccur(tmp, ss) },
+		func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
+		func() { buildCommands(tmp, ss) },
+		func() { buildCommandFails(tmp, ss) },
+	} {
+		sidecars.Add(1)
+		go func() {
+			defer sidecars.Done()
+			build()
+			reportAdvance(1)
+		}()
+	}
+	sidecars.Wait()
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err

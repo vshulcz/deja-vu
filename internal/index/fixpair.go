@@ -101,9 +101,18 @@ func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
 // sidecar here, failures are swallowed: this is an extra, never a reason to
 // fail an index build.
 func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string) {
+	// Mining is per session and reads nothing shared, and it was 9.4 s of a
+	// 51 s build on a real store — the longest of the four sidecars, with the
+	// rest of the machine idle. Collected per session and flattened in session
+	// order, so what lands on file does not depend on which worker finished
+	// first.
+	perSession := make([][]FixPair, len(ss))
+	parallelForRanked(len(ss), func(i int) {
+		perSession[i] = fixPairsIn(ss[i].Messages, keyOf(ss[i]), ss[i].Project)
+	})
 	var all []FixPair
-	for _, s := range ss {
-		all = append(all, fixPairsIn(s.Messages, keyOf(s), s.Project)...)
+	for _, pairs := range perSession {
+		all = append(all, pairs...)
 	}
 	if len(all) == 0 {
 		return
