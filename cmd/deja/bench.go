@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -326,11 +327,30 @@ func benchmarkTempDir() (string, error) {
 		return "", err
 	}
 	parent := filepath.Join(workingDir, ".deja-bench")
+	if err := benchCorpusVisible(parent); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return "", err
 	}
 	sweepStaleBenchRuns(parent, time.Now())
 	return os.MkdirTemp(parent, "run-")
+}
+
+// benchCorpusVisible refuses to measure a corpus deja cannot see.
+//
+// The corpus is written under the working directory, and the ignore rule is a
+// property of paths rather than of configuration — so a bench run from a
+// directory the rule covers indexes its corpus and then finds none of it. Every
+// arm reads zero, which is indistinguishable from a surface that has stopped
+// working: `deja bench prompt` printed 0 of 13 real questions from a tree under
+// `~/.claude/jobs/`, and 13 of 13 from a directory beside it.
+func benchCorpusVisible(parent string) error {
+	pol := policy.Load()
+	if !pol.Ignored(parent, "") {
+		return nil
+	}
+	return fmt.Errorf("bench: the corpus would sit in %s, which deja's ignore rule hides, so every arm would read zero — run the bench from a directory the rule does not cover", parent)
 }
 
 // sweepStaleBenchRuns removes what interrupted runs left behind.
