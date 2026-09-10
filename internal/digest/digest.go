@@ -642,7 +642,12 @@ func IsAgentArtifact(text string) bool {
 
 // compactionOutlineRE is the numbered outline the summary opens with; a person
 // asking "Summary: what is the Primary Request and Intent here?" has no "1.".
-var compactionOutlineRE = regexp.MustCompile(`^Summary:\s*1\.\s*Primary Request and Intent`)
+//
+// The heading arrives emphasised as often as not — `1. **Primary Request and
+// Intent:**` — and without that the block was read as something a person wrote.
+// Found where it does the most damage: `promote` was keeping "asked: Summary: 1.
+// **Primary Request and Intent:** …" as the decision a session reached.
+var compactionOutlineRE = regexp.MustCompile(`^Summary:\s*1\.\s*[*_]{0,2}\s*Primary Request and Intent`)
 
 // IsCompactionSummary reports whether a message is the block a harness writes
 // as the first user turn after a compaction — Claude Code's "Summary: 1.
