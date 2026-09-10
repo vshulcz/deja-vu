@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -128,8 +129,10 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // to 154 different files, which is a line on every edit saying the same thing.
 // What repeats is the decision, not the sentence built around it.
 func dedupeFact(line string) string {
-	if i := strings.Index(line, standingLabel); i >= 0 {
-		return line[i:]
+	for _, label := range []string{standingLabel, decisionLabel, endedLabel} {
+		if i := strings.Index(line, label); i >= 0 {
+			return line[i:]
+		}
 	}
 	return line
 }
@@ -614,7 +617,7 @@ func fileHookLine(dir, cwd, path string) string {
 			return head + standingLabel + d
 		}
 		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
-			return head + " — prior decision: " + d
+			return head + decisionLabelFor(path, d) + d
 		}
 		return ""
 	}
@@ -638,9 +641,9 @@ func fileHookLine(dir, cwd, path string) string {
 		// is as often "changed the renderer (5)" as it is a decision, and the
 		// same marker list the digest uses can tell them apart.
 		if digest.CarriesDecision(d) {
-			return head + " — prior decision: " + d
+			return head + decisionLabelFor(path, d) + d
 		}
-		return head + " — last session on it ended: " + d
+		return head + endedLabel + d
 	}
 	return fileHookBlameOffer(head, name)
 }
@@ -651,6 +654,56 @@ func fileHookLine(dir, cwd, path string) string {
 // terminal and a metacharacter changes what the command does (#2768).
 func fileHookBlameOffer(head, name string) string {
 	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, pasteSafe(name))
+}
+
+// decisionLabelFor says what the line is about to hand over: a decision about
+// this file, or the closing words of a session that worked on it.
+//
+// The distinction is not cosmetic. Read from a real store, of the 63 lines that
+// called something "prior decision" about a file, *none* mentioned the file or
+// the package it sits in — they were the last decision-shaped sentence of a
+// session that happened to touch it. One incident diagnosis was offered as the
+// prior decision about five different `main.go` files, and an answer to a
+// question about Zed's wiring as the decision about three different SKILL.md.
+// A decision earns the word by being about the file; otherwise it is reported
+// for what it is, which is what the weaker label has always said.
+func decisionLabelFor(path, text string) string {
+	if mentionsFile(path, text) {
+		return decisionLabel
+	}
+	return endedLabel
+}
+
+const (
+	decisionLabel = " — prior decision: "
+	endedLabel    = " — last session on it ended: "
+)
+
+// mentionsFile reports whether the text names the file or the directory it sits
+// in. Stems count: a decision about `render.go` says "renderer", and one about
+// `notes.jsonl` says "notes".
+func mentionsFile(path, text string) bool {
+	low := strings.ToLower(text)
+	base := strings.ToLower(filepath.Base(path))
+	if i := strings.LastIndex(base, "."); i > 0 {
+		base = base[:i]
+	}
+	parts := strings.FieldsFunc(base, func(r rune) bool { return r == '_' || r == '-' || r == '.' })
+	parts = append(parts, strings.ToLower(filepath.Base(filepath.Dir(path))))
+	for _, w := range parts {
+		if len(w) < 4 {
+			continue
+		}
+		if strings.Contains(low, w) {
+			return true
+		}
+		// The plural or the agent noun: notes -> note, render -> renderer is
+		// already covered by the containment above.
+		if strings.HasSuffix(w, "s") && strings.Contains(low, strings.TrimSuffix(w, "s")) {
+			return true
+		}
+	}
+	return false
 }
 
 // standingLabel introduces a promoted note, and says what it is.
