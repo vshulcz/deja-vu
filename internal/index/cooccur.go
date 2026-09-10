@@ -51,25 +51,36 @@ func buildCooccur(tmp string, ss []model.Session) {
 		toks = append(toks, t)
 		return v
 	}
-	var df []int
-	perSession := make([][]uint32, 0, len(ss))
-	seen := map[uint32]bool{}
-	for _, s := range ss {
-		clear(seen)
-		for _, m := range s.Messages {
+	// Tokenising every message of every session is what this pass costs — 6.0 s
+	// of a build on a real store, and the only single-threaded thing left in
+	// the sidecar phase. Each session's distinct tokens are collected in
+	// parallel and interned afterwards in session order, so the ids, the
+	// document frequencies and everything downstream are what one core
+	// produced.
+	uniquePerSession := make([][]string, len(ss))
+	parallelForRanked(len(ss), func(i int) {
+		seen := make(map[string]bool, 256)
+		var out []string
+		for _, m := range ss[i].Messages {
 			for _, tok := range tokens(m.Text) {
 				if len(tok) < 4 || query.IsStopWord(tok) {
 					continue
 				}
-				v := id(tok)
-				if seen[v] {
+				if seen[tok] {
 					continue
 				}
-				seen[v] = true
+				seen[tok] = true
+				out = append(out, tok)
 			}
 		}
-		list := make([]uint32, 0, len(seen))
-		for v := range seen {
+		uniquePerSession[i] = out
+	})
+	var df []int
+	perSession := make([][]uint32, 0, len(ss))
+	for _, unique := range uniquePerSession {
+		list := make([]uint32, 0, len(unique))
+		for _, tok := range unique {
+			v := id(tok)
 			list = append(list, v)
 			for len(df) <= int(v) {
 				df = append(df, 0)
