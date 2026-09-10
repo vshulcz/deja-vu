@@ -328,6 +328,50 @@ func CrossBase(p string) string {
 	return p
 }
 
+// CrossDirBase is the file name with the directory above it — `handlers/service.go`
+// — which is what tells two files of the same name apart. Empty directory when
+// the path has none.
+func CrossDirBase(p string) string {
+	base := CrossBase(p)
+	rest := strings.TrimSuffix(p, base)
+	rest = strings.TrimRight(rest, `/\`)
+	dir := CrossBase(rest)
+	if dir == "" || dir == rest && !strings.ContainsAny(p, `/\`) {
+		return base
+	}
+	return dir + "/" + base
+}
+
+// SameFile reports whether a stored path and the one being asked about are the
+// same file.
+//
+// Paths are stored as the session saw them — absolute in one harness, relative
+// in another — so the comparison cannot be on the path as written. It used to
+// be on the file name alone, and one name in five on a real store then pooled
+// several real files: 439 of 2169, worst `00-scroll-00.png` in 289 places,
+// `service.go` in 7 packages and `kustomization.yaml` in 9 environments. The
+// line before an edit reported that mixed history as the file's own.
+//
+// The directory above the file separates 238 of those 439 and survives both
+// spellings, since every spelling of one file shares its last two segments. A
+// path stored without a directory — some harnesses record only the name — still
+// matches on the name, because that is all it has.
+func SameFile(stored, want string) bool {
+	if stored == want {
+		return true
+	}
+	sb, wb := CrossBase(stored), CrossBase(want)
+	if sb != wb {
+		return false
+	}
+	sd, wd := CrossDirBase(stored), CrossDirBase(want)
+	if sd == sb || wd == wb {
+		// One of them is a bare name: the name is the whole of what it knows.
+		return true
+	}
+	return sd == wd
+}
+
 // hasSecondLine reports whether the command carries a non-empty line after the
 // first — a compound the stored single-line invocations cannot vouch for.
 func hasSecondLine(cmd string) bool {
@@ -350,10 +394,7 @@ func FileSessions(dir, path string) []SessionMeta {
 	var out []SessionMeta
 	for _, meta := range m.Sessions {
 		for _, t := range meta.Touched {
-			// Paths are stored as the session saw them — absolute in one
-			// harness, relative in another — so the comparison is on the file
-			// name, with the full path accepted as written.
-			if t == path || CrossBase(t) == base {
+			if SameFile(t, path) {
 				out = append(out, meta)
 				break
 			}

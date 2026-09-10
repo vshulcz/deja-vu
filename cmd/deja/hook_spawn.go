@@ -110,6 +110,11 @@ func spawnPrompt(in map[string]json.RawMessage) (string, string) {
 	return "", ""
 }
 
+// spawnReaderPrefix marks the synthetic reader a spawn recalls under. The
+// per-quote dedupe reads it: a spawned agent starts with nothing, so what the
+// parent has already been shown is exactly what it needs.
+const spawnReaderPrefix = "task:"
+
 // spawnRecall runs the per-prompt hook over the spawned agent's instructions and
 // returns the block it would have injected, or "" for the silence that is the
 // usual answer.
@@ -120,11 +125,6 @@ func spawnPrompt(in map[string]json.RawMessage) (string, string) {
 // and that a fleet of ten agents spawned together all count as one reader.
 // Keyed on the parent plus the instructions instead, so re-spawning the same
 // agent twice is the repeat that gets suppressed.
-// spawnReaderPrefix marks the synthetic reader a spawn recalls under. The
-// per-quote dedupe reads it: a spawned agent starts with nothing, so what the
-// parent has already been shown is exactly what it needs.
-const spawnReaderPrefix = "task:"
-
 func spawnRecall(dir, sid, cwd, text string) string {
 	payload, err := json.Marshal(struct {
 		Prompt    string `json:"prompt"`
