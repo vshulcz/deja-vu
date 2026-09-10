@@ -679,6 +679,44 @@ func ReadFixes(dir string) []FixPair {
 	return out
 }
 
+// fixSignaturesFor is the set of error signatures the text asks about.
+//
+// Ordinarily every line is hashed the way it was at ingest. The fallback is for
+// a line deja stored and could not read back: the shell-position rule (#3445)
+// recognises `zsh:1: no matches found: …` and stores the normalised line
+// without the marker, so the stored line is not friction on its own — and 106
+// of the 1,310 error lines on a real store are that shape. `deja fix` then
+// answered "nothing recorded for that line" and suggested, as the closest it
+// held, the very line it had just been given.
+func fixSignaturesFor(dir, text string) map[uint64]bool {
+	sigs := map[uint64]bool{}
+	for _, raw := range strings.Split(text, "\n") {
+		if line, ok := FrictionLine(raw); ok {
+			sigs[frictionHash(line)] = true
+		}
+	}
+	if len(sigs) > 0 {
+		return sigs
+	}
+	// Exact lines only, and only after nothing hashed: this is deja recognising
+	// its own wording, not a search for something like it.
+	want := map[string]bool{}
+	for _, raw := range strings.Split(text, "\n") {
+		if l := strings.ToLower(strings.TrimSpace(raw)); l != "" {
+			want[l] = true
+		}
+	}
+	if len(want) == 0 {
+		return sigs
+	}
+	for _, p := range ReadFixes(dir) {
+		if want[strings.ToLower(strings.TrimSpace(p.Error))] {
+			sigs[p.Sig] = true
+		}
+	}
+	return sigs
+}
+
 // FixesFor returns the commands that followed this error before, newest first.
 // The text can be a whole pasted stack trace: every line is tried, so the
 // caller does not have to know which one carries the signature. allow, when
@@ -688,12 +726,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if limit <= 0 {
 		limit = 3
 	}
-	sigs := map[uint64]bool{}
-	for _, raw := range strings.Split(text, "\n") {
-		if line, ok := FrictionLine(raw); ok {
-			sigs[frictionHash(line)] = true
-		}
-	}
+	sigs := fixSignaturesFor(dir, text)
 	if len(sigs) == 0 {
 		return nil
 	}
@@ -770,12 +803,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 // it worked. The command that says "nothing ran after that error" asks first,
 // so it does not deny holding what it is holding (#2282).
 func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
-	sigs := map[uint64]bool{}
-	for _, raw := range strings.Split(text, "\n") {
-		if line, ok := FrictionLine(raw); ok {
-			sigs[frictionHash(line)] = true
-		}
-	}
+	sigs := fixSignaturesFor(dir, text)
 	if len(sigs) == 0 {
 		return false
 	}
