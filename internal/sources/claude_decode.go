@@ -54,13 +54,23 @@ type claudeMessage struct {
 }
 
 func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseClaudeTypedWithScanner(path, func(fn func([]byte)) error {
+		return scanJSONLBytes(path, offset, fn)
+	})
+}
+
+// parseClaudeTypedWithScanner keeps normalization independent from where a
+// bounded caller obtained its records. The normal file parser above remains
+// the sole owner of filesystem I/O; compaction supplies its already-read
+// memory slice so no unredacted temporary transcript reaches disk.
+func parseClaudeTypedWithScanner(path string, scan func(func([]byte)) error) ([]model.Session, error) {
 	s := model.Session{
 		Harness: "claude",
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Project: claudeProjectName(claudeProjectDir(path)),
 		Path:    path,
 	}
-	err := scanJSONLBytes(path, offset, func(line []byte) {
+	err := scan(func(line []byte) {
 		var v claudeLine
 		if json.Unmarshal(line, &v) != nil {
 			diagMalformedLine(path)

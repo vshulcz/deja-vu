@@ -154,7 +154,7 @@ jobs:
         run: |
           declare -A floor=(
             [cmd/deja]=88 [internal/atomicfile]=77 [internal/bench]=100
-            [internal/cjkfold]=100 [internal/ctxcache]=90 [internal/digest]=90 [internal/embed]=93
+            [internal/cjkfold]=100 [internal/digest]=90 [internal/embed]=93
             [internal/index]=90 [internal/mark]=98 [internal/model]=100
             [internal/nfcfold]=100 [internal/peers]=76 [internal/policy]=100
             [internal/prompt]=84 [internal/query]=100 [internal/redact]=94

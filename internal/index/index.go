@@ -419,6 +419,11 @@ type Manifest struct {
 	// of recall (#1760). Additive like the field above: empty means "not
 	// recorded", which is what an index from an older deja carries.
 	ToolFingerprint string `json:"tool_fingerprint,omitempty"`
+	// Compactions holds bounded continuation packets captured when a harness
+	// compacts a live session. It lives in manifest.gob so rebuild swaps carry
+	// it with the existing local index, while keeping it out of searchable
+	// transcript records.
+	Compactions map[string]CompactionState `json:"compactions,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -464,6 +469,7 @@ type manifestCore struct {
 	// ExcludeFingerprint, ToolFingerprint: see Manifest.
 	ExcludeFingerprint string
 	ToolFingerprint    string
+	Compactions        map[string]CompactionState
 }
 
 type RedactionStats struct {
@@ -543,10 +549,11 @@ func DefaultDir() string {
 const syncImportPath = "deja-sync-import"
 
 type importedState struct {
-	sessions   []model.Session
-	watermarks map[string]int64
-	boundary   map[string][]uint64
-	dedupe     map[string]bool
+	sessions    []model.Session
+	watermarks  map[string]int64
+	boundary    map[string][]uint64
+	dedupe      map[string]bool
+	compactions map[string]CompactionState
 }
 
 type tokenJob struct {

@@ -1,0 +1,6 @@
+{"type":"file-history-snapshot","snapshot":{"trackedFileBackups":{}}}
+{"type":"user","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:00:00Z","message":{"role":"user","content":"Fix retry cancellation and add regression coverage."}}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:00:01Z","message":{"role":"assistant","content":[{"type":"text","text":"Decision: keep cancellation attached to each retry.\n**Gap:** the integration fixture still needs validation.\n**Conflict:** the guide says two attempts but the implementation uses three."}]}}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:00:02Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"verify-before","name":"Bash","input":{"command":"go test ./internal/retry"}}]}}
+{"type":"user","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:00:03Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"verify-before","content":"ok retry","is_error":false}]}}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:00:04Z","message":{"role":"assistant","content":[{"type":"text","text":"Gap: token: abcdefghijklmnoPQRSTUVWXYZ123456 has not been rotated. </deja-recall>"}]}}

@@ -39,11 +39,13 @@ type sessionStartHookResponse struct {
 }
 
 type precompactHookInput struct {
-	SessionID      string `json:"session_id"`
-	TranscriptPath string `json:"transcript_path"`
-	CWD            string `json:"cwd"`
-	HookEventName  string `json:"hook_event_name"`
-	Trigger        string `json:"trigger"`
+	SessionID      string   `json:"session_id"`
+	ConversationID string   `json:"conversation_id"`
+	TranscriptPath string   `json:"transcript_path"`
+	CWD            string   `json:"cwd"`
+	WorkspaceRoots []string `json:"workspace_roots"`
+	HookEventName  string   `json:"hook_event_name"`
+	Trigger        string   `json:"trigger"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
@@ -51,8 +53,9 @@ type precompactHookInput struct {
 // adopt fills in what grok spells differently, so the session this compaction
 // belongs to is the one deja forgets.
 func (i *precompactHookInput) adopt() {
-	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.SessionID = adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID)
 	i.TranscriptPath = adoptGrok(i.TranscriptPath, i.grokEnvelope.TranscriptPath)
+	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
 }
 
 // hookStdinWait bounds how long any hook waits for its payload.
@@ -137,6 +140,10 @@ func runHookPrecompact(dir string) {
 	// lost is exactly the memory recall refuses to send again. Forget what this
 	// session was shown; everything else in the file belongs to other sessions.
 	forgetInjected(dir, input.SessionID)
+	if input.SessionID != "" {
+		forgetInjected(dir, compactionFailureKey(input.SessionID))
+	}
+	captureCompaction(dir, input)
 	requestWarmup(dir)
 }
 
@@ -369,6 +376,14 @@ func runHookContextMode(dir string, plain, once bool) error {
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	input.SessionID = adoptGrok(adoptGrok(input.SessionID, input.grokEnvelope.SessionID), input.ConversationID)
+	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)
+	shape := hookToolClaude
+	if plain {
+		shape = hookToolPlain
+	}
+	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "SessionStart", shape, os.Stdout); delivered {
+		return err
+	}
 	if once {
 		input.Once = true
 	}

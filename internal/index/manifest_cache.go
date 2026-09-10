@@ -55,6 +55,18 @@ func readManifestCached(dir string) (Manifest, error) {
 	return m, nil
 }
 
+// invalidateManifestCache drops this process's shared manifest snapshot after
+// a core-only write. Compaction packets deliberately update manifest.gob
+// without touching sessions.gob; a subsequent index writer must not reuse an
+// in-memory Manifest from before that atomic replacement.
+func invalidateManifestCache(dir string) {
+	manifestCache.mu.Lock()
+	defer manifestCache.mu.Unlock()
+	if manifestCache.dir == dir {
+		manifestCache.ok = false
+	}
+}
+
 // The token catalog is every distinct token in the corpus — 180k strings on a
 // real store. The stem and fuzzy tiers each build it, so a single query that
 // falls through the ladder built it twice, ~63 ms of pure duplication.

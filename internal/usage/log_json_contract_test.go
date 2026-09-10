@@ -47,6 +47,13 @@ func TestLogJSONShapesAreStable(t *testing.T) {
 		// this its row is identical to one from a host that sent nothing
 		// (#2161).
 		"unreadable": true,
+		// Compaction fields are additive and optional. They join a captured
+		// raw transcript baseline to the first later edit without putting a
+		// second state store beside the existing usage log.
+		"compaction_session": true, "compaction_workspace": true,
+		"compaction_revision": true, "tool_calls": true,
+		"actions_before_edit": true, "measured": true,
+		"compaction_error": true,
 	})
 	// "into" is additive and optional: it names the agent session an injection
 	// went to, which the log never recorded. Without it the only measure of

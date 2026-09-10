@@ -482,6 +482,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	evicted.Store(0)
 	lastIngestFiles = len(files)
 	parsedThisPass(files)
+	// Capture before publishNewestFirst can atomically replace the live index
+	// with a partial build. These packets are not derived index sidecars: they
+	// are durable continuation state and must survive every replacement.
+	compactions := compactionsForRebuild(dir, dead)
 	initialBuild := !HasManifest(dir)
 	writtenMessages := 0
 	imported := importedSessions(dir)
@@ -514,6 +518,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
+		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
@@ -975,6 +980,7 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 	ss := sources.FilterSessions(filterTombstoned(loadProgress("", progress)))
 	forgetUnreadStores(files)
 	imported := importedSessions(dir)
+	imported.compactions = compactionsForRebuild(dir, readTombstones())
 	ss = append(ss, imported.sessions...)
 	ss = filterTombstoned(ss)
 	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
@@ -1058,7 +1064,7 @@ const (
 )
 
 func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileState, scope string) error {
-	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{})
+	return writeSessionsWithSync(tmp, dir, ss, files, scope, importedState{compactions: compactionsForRebuild(dir, readTombstones())})
 }
 
 func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
@@ -1077,6 +1083,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	parsedThisPass(files)
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
+		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	recPath := filepath.Join(tmp, "records.bin")
@@ -2994,6 +3001,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
+		Compactions: cloneCompactions(old.Compactions),
 		// Kept from the old index: this build reuses records written under
 		// those patterns, so claiming today's set would be a lie the reader
 		// cannot check.

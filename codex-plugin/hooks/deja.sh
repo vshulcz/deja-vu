@@ -34,7 +34,7 @@ find_deja() {
 HOOKS="${CODEX_HOME:-$HOME/.codex}/hooks.json"
 # The installer records an absolute path to the binary, so match the
 # subcommand rather than a bare `deja hook-`.
-if [ -f "$HOOKS" ] && grep -qE 'deja[^"]*hook-(context|prompt|precompact)' "$HOOKS" 2>/dev/null; then
+if [ -f "$HOOKS" ] && grep -qE 'deja[^"]*hook-(context|prompt|precompact|tool)' "$HOOKS" 2>/dev/null; then
 	cat >/dev/null 2>&1 || true
 	exit 0
 fi

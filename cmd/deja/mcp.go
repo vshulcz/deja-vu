@@ -16,7 +16,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/vshulcz/deja-vu/internal/ctxcache"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -285,7 +284,7 @@ func harnessFilterDescription() string {
 // The old names still answer for a client that has them wired; they are not
 // listed, so they cost nothing per session.
 func dejaTool() map[string]any {
-	tool := map[string]any{
+	return map[string]any{
 		"name": "deja",
 		"description": "This user's own past coding sessions, across every AI tool they use (Claude Code, Codex, Cursor, opencode, aider, gemini and others). " +
 			"Not general knowledge and not library docs — only what happened on this machine. Pick a mode:\n" +
@@ -318,153 +317,23 @@ func dejaTool() map[string]any {
 			"required": []string{"mode"},
 		},
 	}
-	// Advertising the experimental cache is a separate, explicit choice. Keep
-	// the default history tool and its session-wide schema cost unchanged.
-	if os.Getenv("DEJA_CTX_MCP") == "1" {
-		addCtxToolSchema(tool)
-	}
-	return tool
 }
 
 // dispatcherModes maps a mode onto the call that implements it. The old tool
 // names are the same strings, which is why a client with them wired keeps
 // working.
 var dispatcherModes = map[string]string{
-	"recall":         "recall",
-	"search":         "recall",
-	"context":        "recall_context",
-	"digest":         "recall_context",
-	"blame":          "blame",
-	"fix":            "fix",
-	"how":            "how",
-	"remember":       "remember",
-	"ctx_resume":     "ctx_resume",
-	"ctx_status":     "ctx_status",
-	"ctx_refresh":    "ctx_refresh",
-	"ctx_checkpoint": "ctx_checkpoint",
-	"ctx_diff":       "ctx_diff",
-	"ctx_lookup":     "ctx_lookup",
-	"ctx_explain":    "ctx_explain",
-	"ctx_invalidate": "ctx_invalidate",
-	"ctx_history":    "ctx_history",
-	"ctx_promote":    "ctx_promote",
-	"ctx_prune":      "ctx_prune",
-}
-
-func callCtxMCP(indexDir, name string, raw json.RawMessage) (string, error) {
-	var a struct {
-		Workspace         string            `json:"workspace"`
-		TaskID            string            `json:"task_id"`
-		TokenBudget       json.RawMessage   `json:"token_budget"`
-		ComponentVersions map[string]string `json:"component_versions"`
-		State             json.RawMessage   `json:"state"`
-		Query             string            `json:"query"`
-		ItemID            string            `json:"item_id"`
-		Layer             string            `json:"layer"`
-		Source            string            `json:"source"`
-		To                string            `json:"to"`
-		Keep              json.RawMessage   `json:"keep"`
-	}
-	if err := decodeToolArgs(name, raw, &a); err != nil {
-		return "", err
-	}
-	if name == "ctx_lookup" {
-		if strings.TrimSpace(a.Query) == "" {
-			return "", fmt.Errorf("query required")
-		}
-		ctxcache.RecordLookup(ctxcache.Root(indexDir))
-		return callMCPTool(indexDir, "recall_context", raw)
-	}
-	id, err := ctxcache.ResolveIdentityWithVersions(a.Workspace, a.TaskID, a.ComponentVersions)
-	if err != nil {
-		return "", err
-	}
-	root := ctxcache.Root(indexDir)
-	encode := func(v any) (string, error) { b, e := json.MarshalIndent(v, "", "  "); return string(b), e }
-	switch name {
-	case "ctx_resume":
-		budget, e := ctxMCPBudget(a.TokenBudget)
-		if e != nil {
-			return "", e
-		}
-		r, e := ctxcache.Resume(root, id, budget)
-		if e != nil {
-			return "", e
-		}
-		b, e := ctxcache.EncodeResume(r)
-		return string(b), e
-	case "ctx_status":
-		return encodeResult(ctxcache.Inspect(root, id))
-	case "ctx_refresh":
-		return encodeResult(ctxcache.RefreshDetailed(root, id))
-	case "ctx_checkpoint":
-		if len(a.State) == 0 || string(a.State) == "null" {
-			return "", fmt.Errorf("state required")
-		}
-		if len(a.State) > maxCtxCheckpointBytes {
-			return "", fmt.Errorf("checkpoint exceeds %d bytes", maxCtxCheckpointBytes)
-		}
-		state, err := ctxcache.DecodeState(a.State)
-		if err != nil {
-			return "", fmt.Errorf("decode checkpoint state: %w", err)
-		}
-		return encodeResult(ctxcache.Checkpoint(root, id, state))
-	case "ctx_diff":
-		h, e := ctxcache.History(root, id)
-		if e != nil {
-			return "", e
-		}
-		if len(h) < 2 {
-			return "", fmt.Errorf("ctx_diff needs at least two snapshots")
-		}
-		return encode(ctxcache.Diff(h[1], h[0]))
-	case "ctx_explain":
-		if strings.TrimSpace(a.ItemID) == "" {
-			return "", fmt.Errorf("item_id required")
-		}
-		return encodeResult(ctxcache.Explain(root, id, a.ItemID))
-	case "ctx_invalidate":
-		if a.Layer != "" && a.Source != "" {
-			return "", fmt.Errorf("use either layer or source")
-		}
-		if a.Source != "" {
-			a.Layer = "source:" + a.Source
-		}
-		if e := ctxcache.Invalidate(root, id, a.Layer); e != nil {
-			return "", e
-		}
-		return encode(map[string]any{"invalidated": valueOr(a.Layer, "all")})
-	case "ctx_history":
-		return encodeResult(ctxcache.History(root, id))
-	case "ctx_prune":
-		keep := ctxcache.DefaultHistoryLimit
-		if len(a.Keep) > 0 {
-			if err := json.Unmarshal(a.Keep, &keep); err != nil || strings.TrimSpace(string(a.Keep)) == "null" || keep < 1 {
-				return "", fmt.Errorf("keep needs a positive integer")
-			}
-		}
-		return encodeResult(ctxcache.Prune(root, id, keep))
-	case "ctx_promote":
-		if a.ItemID == "" || a.To == "" {
-			return "", fmt.Errorf("ctx_promote needs item_id and to")
-		}
-		return encodeResult(ctxcache.Promote(root, id, a.ItemID, a.To))
-	}
-	return "", fmt.Errorf("unknown context operation %q", name)
-}
-
-func encodeResult[T any](v T, err error) (string, error) {
-	if err != nil {
-		return "", err
-	}
-	b, e := json.MarshalIndent(v, "", "  ")
-	return string(b), e
+	"recall":   "recall",
+	"search":   "recall",
+	"context":  "recall_context",
+	"digest":   "recall_context",
+	"blame":    "blame",
+	"fix":      "fix",
+	"how":      "how",
+	"remember": "remember",
 }
 
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
-	if strings.HasPrefix(name, "deja_ctx_") {
-		name = strings.TrimPrefix(name, "deja_")
-	}
 	if name == "deja" {
 		var a struct {
 			Mode string `json:"mode"`
@@ -477,13 +346,11 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if !ok {
 			// Named, not guessed at: a model that invents a mode gets the list
 			// rather than an empty answer it will read as "no history".
-			return "", fmt.Errorf("unknown deja mode %q", a.Mode)
+			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
 		}
 		return callMCPTool(dir, target, raw)
 	}
 	switch name {
-	case "ctx_resume", "ctx_status", "ctx_refresh", "ctx_checkpoint", "ctx_diff", "ctx_lookup", "ctx_explain", "ctx_invalidate", "ctx_history", "ctx_promote", "ctx_prune":
-		return callCtxMCP(dir, name, raw)
 	case "recall":
 		var a struct {
 			Query   string    `json:"query"`

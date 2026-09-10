@@ -1,0 +1,4 @@
+{"type":"system","subtype":"compact_boundary","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:01:00Z"}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:01:01Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"read-after","name":"Read","input":{"file_path":"retry.go"}}]}}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:01:02Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"search-after","name":"Grep","input":{"pattern":"retry"}}]}}
+{"type":"assistant","sessionId":"compaction-fixture","cwd":"WORKSPACE","timestamp":"2026-09-10T10:01:03Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"edit-after","name":"Edit","input":{"file_path":"retry.go","old_string":"old","new_string":"new"}}]}}

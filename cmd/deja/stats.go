@@ -374,6 +374,15 @@ func printStats(w io.Writer, r stats.Report) {
 	if r.Recall.DejaVuMoments > 0 {
 		fmt.Fprintf(w, "  Déjà vu          %d prompt%s your own history already answered\n", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))
 	}
+	if c := r.Recall.Compaction; c != nil {
+		if c.Measured > 0 {
+			fmt.Fprintf(w, "  After compaction %d first edit%s · median %g raw actions before edit · p75 %d\n",
+				c.Measured, pluralS(c.Measured), c.MedianActions, c.P75Actions)
+		}
+		if c.Pending > 0 || c.Unmeasured > 0 {
+			fmt.Fprintf(w, "  Compact samples   %d pending · %d unmeasured\n", c.Pending, c.Unmeasured)
+		}
+	}
 	if r.AgentCredits > 0 {
 		fmt.Fprintf(w, "  Credited aloud   agents said \"déjà vu\" %d time%s (%d this week)\n", r.AgentCredits, pluralS(r.AgentCredits), r.WeekCredits)
 	}

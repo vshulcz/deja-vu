@@ -114,7 +114,7 @@ func TestBundledSkillsMatchInstaller(t *testing.T) {
 func TestCodexPluginHooks(t *testing.T) {
 	var file struct {
 		Hooks map[string][]struct {
-			Matcher string `json:"matcher"`
+			Matcher *string `json:"matcher"`
 			Hooks   []struct {
 				Type    string `json:"type"`
 				Command string `json:"command"`
@@ -125,22 +125,39 @@ func TestCodexPluginHooks(t *testing.T) {
 	if err := json.Unmarshal(repoFile(t, "codex-plugin/hooks/hooks.json"), &file); err != nil {
 		t.Fatalf("hooks.json: %v", err)
 	}
-	want := map[string]string{
-		"SessionStart":     "hook-context",
-		"UserPromptSubmit": "hook-prompt",
-		"PreCompact":       "hook-precompact",
+	want := map[string]struct {
+		sub, matcher string
+		omitMatcher  bool
+	}{
+		// Codex fires SessionStart with source "compact" after compaction. The
+		// documented every-source form has no matcher, matching codex-auto.
+		"SessionStart":     {sub: "hook-context", omitMatcher: true},
+		"UserPromptSubmit": {sub: "hook-prompt", omitMatcher: true},
+		"PreToolUse":       {sub: "hook-tool", matcher: "Bash|apply_patch"},
+		"PreCompact":       {sub: "hook-precompact", matcher: "manual|auto"},
 	}
-	for event, sub := range want {
+	for event, want := range want {
 		groups, ok := file.Hooks[event]
 		if !ok || len(groups) == 0 || len(groups[0].Hooks) == 0 {
 			t.Fatalf("no %s hook in the plugin", event)
 		}
 		cmd := groups[0].Hooks[0].Command
-		if !strings.HasPrefix(cmd, "${PLUGIN_ROOT}/hooks/deja.sh ") || !strings.HasSuffix(cmd, sub) {
-			t.Fatalf("%s runs %q, not the plugin's own script with %s", event, cmd, sub)
+		if !strings.HasPrefix(cmd, "${PLUGIN_ROOT}/hooks/deja.sh ") || !strings.HasSuffix(cmd, want.sub) {
+			t.Fatalf("%s runs %q, not the plugin's own script with %s", event, cmd, want.sub)
 		}
 		if groups[0].Hooks[0].Type != "command" || groups[0].Hooks[0].Timeout <= 0 {
 			t.Fatalf("%s entry is not a command with a timeout: %+v", event, groups[0].Hooks[0])
+		}
+		if want.omitMatcher {
+			if groups[0].Matcher != nil {
+				t.Fatalf("%s matcher = %q, want omitted", event, *groups[0].Matcher)
+			}
+		} else if groups[0].Matcher == nil || *groups[0].Matcher != want.matcher {
+			got := ""
+			if groups[0].Matcher != nil {
+				got = *groups[0].Matcher
+			}
+			t.Fatalf("%s matcher = %q, want %q", event, got, want.matcher)
 		}
 	}
 
@@ -180,7 +197,7 @@ func TestCodexPluginStandsDownForTheInstaller(t *testing.T) {
 	if !strings.Contains(script, "CODEX_HOME") {
 		t.Fatal("the script does not honour CODEX_HOME, so a relocated Codex home hides the installer's wiring")
 	}
-	pattern := regexp.MustCompile(`deja[^"]*hook-(context|prompt|precompact)`)
+	pattern := regexp.MustCompile(`deja[^"]*hook-(context|prompt|precompact|tool)`)
 	written, err := json.Marshal(map[string]any{"command": "/opt/homebrew/bin/deja hook-context"})
 	if err != nil {
 		t.Fatal(err)

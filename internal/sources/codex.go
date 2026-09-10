@@ -138,13 +138,22 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			}
 		}
 	}
+	return parseCodexRolloutWithScanner(s, func(fn func(map[string]any)) error {
+		return scanJSONLFromOffset(path, offset, fn)
+	})
+}
+
+// parseCodexRolloutWithScanner normalizes a rollout supplied by the ordinary
+// file scanner or by a bounded in-memory capture. Keeping the latter in memory
+// avoids writing raw transcript content to a temporary file on compaction.
+func parseCodexRolloutWithScanner(s model.Session, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	// A command and its exit code arrive in separate records joined by call_id,
 	// so the command line is annotated after the fact — the same shape opencode
 	// gets for free from a column.
 	calls := map[string]int{}
 	cwd := ""
 	var events []model.Message
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	err := scan(func(m map[string]any) {
 		t := parseTimeAny(m["timestamp"])
 		s.Touch(t)
 		payload, _ := m["payload"].(map[string]any)

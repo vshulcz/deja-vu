@@ -170,6 +170,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if recallIsOff() {
 		return nil
 	}
+	shape := hookToolClaude
+	if plain {
+		shape = hookToolPlain
+	}
+	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "UserPromptSubmit", shape, stdout); delivered {
+		return err
+	}
 	// The failure the user just reported is worth capturing whether or not
 	// this prompt also earns a recall, so it is decided before the gates that
 	// silence the recall path.

@@ -55,6 +55,16 @@ const (
 	// distinct fact served, not every action. Leaving it out made deja's most
 	// frequent injection surface invisible to stats and the receipt.
 	KindTool = "tool"
+	// KindCompactionCapture marks the point at which a host is about to discard
+	// a session's working context. It stores the transcript action count at
+	// that instant, so the first later edit can report how much work the agent
+	// repeated before it edited again.
+	KindCompactionCapture = "compaction_capture"
+	// KindCompactionRecovery closes a compaction interval at its first edit.
+	// A recovery can be unmeasured when the host could not produce a complete
+	// transcript action count; it is still recorded so stats do not turn a
+	// missing observation into a successful zero.
+	KindCompactionRecovery = "compaction_recovery"
 )
 
 // servedKinds are the events that hand an agent memory it asked for: the two
@@ -126,6 +136,25 @@ type Event struct {
 	// that fails on one field keeps the ones it read, so `into` can be there
 	// beside it.
 	Unreadable bool `json:"unreadable,omitempty"`
+	// CompactionSession, CompactionWorkspace and CompactionRevision identify a
+	// compaction interval. They are deliberately separate from Into: Into is
+	// the session that received an injection, while these identify a local
+	// transcript measurement that may not have received one.
+	CompactionSession   string `json:"compaction_session,omitempty"`
+	CompactionWorkspace string `json:"compaction_workspace,omitempty"`
+	CompactionRevision  string `json:"compaction_revision,omitempty"`
+	// ToolCalls is the raw transcript tool-call count when compaction began.
+	// It is meaningful only on KindCompactionCapture; zero is a valid baseline.
+	ToolCalls int `json:"tool_calls,omitempty"`
+	// ActionsBeforeEdit is the number of raw tool calls after compaction and
+	// before the first later edit. It is meaningful only on
+	// KindCompactionRecovery; zero is a measured result, not an omitted value.
+	ActionsBeforeEdit int `json:"actions_before_edit,omitempty"`
+	// Measured says the event's count came from a complete, supported
+	// transcript. False together with CompactionError is an explicit
+	// unmeasured interval, never a zero-valued success.
+	Measured        bool   `json:"measured,omitempty"`
+	CompactionError string `json:"compaction_error,omitempty"`
 }
 
 type Summary struct {
@@ -147,6 +176,10 @@ type Summary struct {
 	// as a lifetime total and then falls by orders of magnitude when that
 	// happens (#763).
 	Since time.Time `json:"-"`
+	// Compaction is populated only when this retained usage log has recorded a
+	// compaction interval. Its action counts are local observations, not a
+	// product-wide benchmark.
+	Compaction *CompactionSummary `json:"compaction,omitempty"`
 }
 
 // MarshalJSON writes Since only when there is one. `omitempty` does nothing to
@@ -251,6 +284,13 @@ func recordFullAt(indexDir, kind string, bytes, sessions int, empty bool, raw in
 // recordFullAtUnread is recordFullAt for an injection whose receiver was in a
 // payload deja could not decode (#2161).
 func recordFullAtUnread(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string, into string, at time.Time, unreadable bool) {
+	recordEvent(indexDir, Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into, Unreadable: unreadable})
+}
+
+// recordEvent appends an already-shaped usage event. All callers share this
+// path so measurement rows receive the same permissions, rotation and
+// partial-line recovery as recalled-memory rows.
+func recordEvent(indexDir string, event Event) {
 	p := Path(indexDir)
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 		return
@@ -271,7 +311,7 @@ func recordFullAtUnread(indexDir, kind string, bytes, sessions int, empty bool, 
 		return
 	}
 	defer func() { _ = f.Close() }()
-	b, err := json.Marshal(Event{Time: at, Kind: kind, Bytes: bytes, Sessions: sessions, Empty: empty, RawBytes: raw, SessionIDs: ids, Into: into, Unreadable: unreadable})
+	b, err := json.Marshal(event)
 	if err != nil {
 		return
 	}
@@ -457,7 +497,11 @@ func Totals(indexDir string) Summary {
 	var out Summary
 	empty := 0
 	for _, e := range read(Path(indexDir)) {
-		if out.Since.IsZero() || (!e.Time.IsZero() && e.Time.Before(out.Since)) {
+		// Measurement rows do not hand memory to an agent. Keep the recall
+		// window stable when they arrive before the first recall, rather than
+		// making an unchanged "Recalls served since …" claim look older.
+		if e.Kind != KindCompactionCapture && e.Kind != KindCompactionRecovery &&
+			(out.Since.IsZero() || (!e.Time.IsZero() && e.Time.Before(out.Since))) {
 			out.Since = e.Time
 		}
 		switch {
@@ -483,6 +527,7 @@ func Totals(indexDir string) Summary {
 	if out.Recalls > 0 {
 		out.EmptyResultRate = float64(empty) / float64(out.Recalls)
 	}
+	out.Compaction = CompactionRecoverySummary(indexDir)
 	return out
 }
 
@@ -772,7 +817,10 @@ func Impact(indexDir string) ImpactReport {
 	var r ImpactReport
 	worn := map[string]int{}
 	for _, e := range read(Path(indexDir)) {
-		if r.Since.IsZero() || e.Time.Before(r.Since) {
+		// See Totals: compaction measurements are not served context, so they
+		// cannot extend the period an impact report claims to cover.
+		if e.Kind != KindCompactionCapture && e.Kind != KindCompactionRecovery &&
+			(r.Since.IsZero() || e.Time.Before(r.Since)) {
 			r.Since = e.Time
 		}
 		switch {

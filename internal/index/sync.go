@@ -840,6 +840,7 @@ func initEmptyIndex(dir string) error {
 	// older deja wrote this", and a store skipped for a missing CLI would then
 	// never be re-read once it was installed (#1760).
 	m := Manifest{Version: version, Files: map[string]FileState{}, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), ExportWatermarks: map[string]int64{}, ImportedRecords: map[string]bool{},
+		Compactions:        compactionsForRebuild(dir, readTombstones()),
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
 		ToolFingerprint:    mergedToolFingerprint(priorToolFingerprint(dir))}
 	return writeManifest(dir, m)

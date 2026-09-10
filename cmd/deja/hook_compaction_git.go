@@ -1,7 +1,8 @@
-package ctxcache
+package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"hash"
@@ -11,6 +12,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 const (
@@ -28,15 +32,10 @@ const (
 // untracked entry (because of a limit, an I/O error, a special file, or a
 // concurrent change); callers must not use such a value as a fresh hit.
 //
-// A directory that is not a Git worktree is a supported workspace. It has a
-// stable complete digest rather than being labelled partial merely because Git
-// has nothing to inspect.
-func boundedWorktreeDigest(root string) string {
+// The caller first verifies that root is a Git worktree. The shared deadline
+// bounds all Git subprocesses together, including a very large tracked diff.
+func boundedWorktreeDigest(ctx context.Context, root string) string {
 	h := sha256.New()
-	if !isGitWorktree(root) {
-		hashWorktreeField(h, "non-git-workspace")
-		return hex.EncodeToString(h.Sum(nil))
-	}
 
 	partial := false
 	for _, command := range [][]string{
@@ -45,11 +44,11 @@ func boundedWorktreeDigest(root string) string {
 		{"diff", "--cached", "--no-ext-diff", "--binary"},
 	} {
 		hashWorktreeField(h, strings.Join(command, "\x00"))
-		if !hashGitStream(h, root, command...) {
+		if !hashGitStream(ctx, h, root, command...) {
 			partial = true
 		}
 	}
-	if hashUntrackedStream(h, root) {
+	if hashUntrackedStream(ctx, h, root) {
 		partial = true
 	}
 
@@ -60,14 +59,33 @@ func boundedWorktreeDigest(root string) string {
 	return digest
 }
 
-func isGitWorktree(root string) bool {
-	cmd := exec.Command("git", "-C", root, "rev-parse", "--is-inside-work-tree")
-	out, err := cmd.Output()
-	return err == nil && strings.TrimSpace(string(out)) == "true"
+func compactionFreshness(root string) model.RepositoryFreshness {
+	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+	defer cancel()
+	f := model.RepositoryFreshness{CheckedAt: time.Now().UTC()}
+	gitValue := func(args ...string) (string, error) {
+		out, err := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...).Output()
+		return strings.TrimSpace(string(out)), err
+	}
+	inside, err := gitValue("rev-parse", "--is-inside-work-tree")
+	if err != nil || inside != "true" {
+		f.Error = "Repository freshness unavailable; validate the workspace before reusing conclusions."
+		return f
+	}
+	f.Head, err = gitValue("rev-parse", "--verify", "HEAD")
+	if err != nil {
+		f.Error = "Repository HEAD unavailable; validate the workspace before reusing conclusions."
+	}
+	f.Branch, _ = gitValue("symbolic-ref", "--short", "-q", "HEAD")
+	f.WorktreeState = boundedWorktreeDigest(ctx, root)
+	if strings.HasPrefix(f.WorktreeState, "partial:") {
+		f.Error = "Repository fingerprint is partial; validate files and tests before reusing conclusions."
+	}
+	return f
 }
 
-func hashGitStream(h io.Writer, root string, args ...string) bool {
-	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+func hashGitStream(ctx context.Context, h io.Writer, root string, args ...string) bool {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return false
@@ -81,8 +99,8 @@ func hashGitStream(h io.Writer, root string, args ...string) bool {
 }
 
 // hashUntrackedStream returns true when the resulting fingerprint is partial.
-func hashUntrackedStream(h hash.Hash, root string) bool {
-	cmd := exec.Command("git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z")
+func hashUntrackedStream(ctx context.Context, h hash.Hash, root string) bool {
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return true
@@ -197,7 +215,7 @@ func sameFingerprintFile(first, second os.FileInfo) bool {
 }
 
 func safeGitRelativePath(name string) bool {
-	if name == "" || filepath.IsAbs(name) {
+	if name == "" || filepath.IsAbs(name) || strings.Contains(name, "\\") {
 		return false
 	}
 	for _, component := range strings.Split(name, "/") {

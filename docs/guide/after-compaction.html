@@ -117,7 +117,8 @@
 <h2>Getting it back</h2>
 <p>Two moments matter, and they are different.</p>
 <h3>During the session</h3>
-<p>Index before the window collapses. Claude Code exposes a <code>PreCompact</code> hook that fires just before summarising, which is exactly when the full transcript is still complete and still the current session's. <code>deja install --auto</code> wires that hook, so the session that is about to be summarised is searchable a moment later — including the parts the summary is about to drop.</p>
+<p><code>deja install --auto</code> wires the pre-compaction hook for Claude Code and Codex. When the host supplies a supported transcript, deja automatically saves the objective, conclusions, recorded tests, explicit gaps and conflicts, and their sources in the existing local index. The next hook returns a bounded recovery packet to that same session and workspace. Repository changes are flagged for validation. The agent does not need to write a checkpoint.</p>
+<p><code>deja stats</code> reports the raw tool calls before the first edit after compaction, with incomplete observations kept separate. See the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md">compaction reference</a> for capture limits and privacy controls.</p>
 <h3>Afterwards</h3>
 <p>Ask for the specific thing rather than the story:</p>
 <pre>deja how "go test"          # the invocation this project actually uses, with its flags

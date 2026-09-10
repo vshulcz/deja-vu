@@ -40,6 +40,14 @@ location. The directory contains:
   the few files each session touched most, and hashes — not text — of the
   questions it asked.
 
+At a supported pre-compaction hook, `manifest.gob` also retains redacted,
+transcript-derived continuation packets for at most 32 session/workspace pairs,
+with a 24 KiB limit per packet. These contain objectives, conclusions, recorded
+tests, explicit gaps/conflicts, provenance, and repository fingerprints. They
+remain local, are omitted from sync export, and follow ignored/excluded project
+and forgotten-session controls. `deja forget` removes matching packets even
+before their source sessions have been indexed. See [compaction recovery](compaction.md).
+
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
@@ -55,48 +63,13 @@ sidecar records the kind and time of local search, recall, context, and hook
 use. It rotates at 1 MiB and retains 14 days; it does not contain session text
 or queries.
 
+Compaction capture and first-edit measurement events use this same bounded log.
+They carry hashed session/workspace identifiers, a capture revision, action
+counts, and short failure reasons. They do not contain the recovery packet.
+
 The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
 output and does not listen on a network socket.
-
-### Experimental local context cache
-
-When a caller explicitly invokes `deja ctx --cache ACTION` or an MCP `ctx_*` mode,
-its cache root is `DEJA_CTX_DIR` when set; otherwise it is a `ctx` directory
-beside the selected history index (`~/.cache/deja/ctx` by default). Changing
-`DEJA_INDEX_DIR` also changes that default sibling location. Legacy
-`deja ctx <query>` still retrieves history and does not create a checkpoint.
-The cache contains agent-authored checkpoint
-state, current-pointer files under `current/`, immutable JSON snapshots under
-`snapshots/`, a local `.write.lock`, and `metrics.jsonl`. Source descriptors
-may name absolute local files; their checkpointed content, provenance, and
-hashes can therefore reveal project state and paths.
-
-Agent-authored checkpoint text, including materialized source content and
-nested project/test values, passes through Deja's standard `redact.Text` secret
-redactor before persistence and before returning a newly written snapshot.
-`DEJA_NO_REDACT=1` disables this pass, matching the existing index opt-out.
-Operational identities, source paths, versions, and provenance remain intact.
-Older snapshots written without redaction are not retroactively rewritten.
-Redaction is heuristic and there is no encryption: do not checkpoint secrets,
-private reasoning, or data that should not be readable by another process with
-the same filesystem access. Cache directories are created with mode 0700 and
-new pointer, snapshot, lock, and metrics files with mode 0600 where the
-platform honors those modes. The operating-system user and any principal able
-to read the selected cache directory can inspect this data; a principal able to
-write it can alter it. Checkpoints are untrusted data, not approved operating
-instructions. CLI and MCP responses can expose this state to the caller or
-connected agent; any onward model-provider use follows that client's configuration.
-
-Snapshot contents are immutable while retained. Cache writes retain at most
-100 snapshots per workspace/task identity; `deja ctx --cache prune --keep N`
-(or MCP `ctx_prune` with `keep`) can retain fewer, always preserving the current
-snapshot. `invalidate` marks state stale and writes a new retained snapshot.
-To remove this cache,
-stop agents using it and delete only the selected cache root (`DEJA_CTX_DIR` if
-set, otherwise the `ctx` sibling of the selected index), not the parent cache
-directory or Deja's history index. That cleanup removes local context and metrics only; it does
-not remove source files named by descriptors or any historical Deja data.
 
 ### Explicit exports and network paths
 

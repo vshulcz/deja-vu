@@ -66,8 +66,11 @@ type toolHookInput struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
 	} `json:"tool_input"`
-	SessionID string `json:"session_id"`
-	CWD       string `json:"cwd"`
+	SessionID      string `json:"session_id"`
+	ConversationID string `json:"conversation_id"`
+	TranscriptPath string `json:"transcript_path"`
+	ToolUseID      string `json:"tool_use_id"`
+	CWD            string `json:"cwd"`
 	// Cursor leaves cwd empty and names the project here instead.
 	WorkspaceRoots []string `json:"workspace_roots"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
@@ -78,7 +81,8 @@ type toolHookInput struct {
 // command this hook cannot tell a spawn from an edit, and has nothing to look
 // the action up by.
 func (i *toolHookInput) adopt() {
-	i.SessionID = adoptGrok(i.SessionID, i.grokEnvelope.SessionID)
+	i.SessionID = adoptGrok(adoptGrok(i.SessionID, i.grokEnvelope.SessionID), i.ConversationID)
+	i.TranscriptPath = adoptGrok(i.TranscriptPath, i.grokEnvelope.TranscriptPath)
 	i.WorkspaceRoots = adoptGrokRoots(i.WorkspaceRoots, i.WorkspaceRoot)
 	i.ToolName = adoptGrok(i.ToolName, i.grokEnvelope.ToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
@@ -125,6 +129,10 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// from its own indexed sessions injected here (#2701).
 	if recallIsOff() {
 		return nil
+	}
+	measureCompactionRecovery(dir, input)
+	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "PreToolUse", shape, stdout); delivered {
+		return err
 	}
 
 	// Spawning an agent is the one action whose reply has to reach someone

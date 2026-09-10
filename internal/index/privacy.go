@@ -400,8 +400,13 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	}
 	defer unlock()
 	m, err := readManifest(dir)
+	compactionOnly := false
 	if err != nil {
-		return ForgetResult{}, err
+		var ok bool
+		if m, ok = compactionOnlyManifest(dir); !ok {
+			return ForgetResult{}, err
+		}
+		compactionOnly = true
 	}
 	dead := readTombstones()
 	var added []string
@@ -417,6 +422,14 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			if meta.ID == o.Session {
 				exact = o.Session
 				break
+			}
+		}
+		if exact == "" {
+			for _, state := range m.Compactions {
+				if state.SessionID == o.Session {
+					exact = o.Session
+					break
+				}
 			}
 		}
 	}
@@ -436,6 +449,27 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 				result.Promoted++
 			}
 		}
+		if !dead[key] {
+			result.Tombstones++
+			if !o.DryRun {
+				added = append(added, key)
+			}
+		}
+		if !o.DryRun {
+			dead[key] = true
+		}
+	}
+	// A compaction packet is retained transcript-derived state, not a
+	// searchable SessionMeta row. It still answers to the same privacy
+	// selectors: otherwise a session that compacted before its transcript was
+	// indexed could survive `deja forget` in manifest.gob.
+	for _, key := range removeMatchingCompactions(&Manifest{Compactions: cloneCompactions(m.Compactions)}, o, exact) {
+		if matched[key] {
+			continue
+		}
+		matched[key] = true
+		result.Sessions++
+		result.Keys = append(result.Keys, key)
 		if !dead[key] {
 			result.Tombstones++
 			if !o.DryRun {
@@ -494,6 +528,30 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	// moment earlier; unforget, which removes keys, still rewrites in full.
 	if err := appendTombstones(added); err != nil {
 		return result, err
+	}
+	// Persist the removal before the rebuild. The rebuild intentionally carries
+	// compactions through an index swap, so leaving the packet in the old core
+	// would faithfully resurrect the state this command just removed.
+	if removed := removeMatchingCompactions(&m, o, exact); len(removed) > 0 {
+		if err := writeManifestOnly(dir, m); err != nil {
+			return result, err
+		}
+		invalidateManifestCache(dir)
+	}
+	if compactionOnly {
+		// This path has no rebuild to recreate the index-local mirror below.
+		// The mirror must be durable before returning: losing the global config
+		// copy between this first forget and the first index build must still
+		// keep the transcript from being indexed again.
+		keys := make([]string, 0, len(dead))
+		for key := range dead {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		if err := writeTombstoneMirrorAt(dir, keys); err != nil {
+			return result, err
+		}
+		return result, nil
 	}
 	if err := rebuildWithTombstones(dir, "", "", currentFiles(""), nil, dead); err != nil {
 		return result, err

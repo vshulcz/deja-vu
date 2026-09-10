@@ -258,7 +258,15 @@ the end returns an empty `messages` array and a `returned` count of zero.
     "injected_bytes": 12288,
     "raw_bytes": 524288,
     "empty_result_rate": 0.1,
-    "since": "2026-06-20T09:00:00Z"
+    "since": "2026-06-20T09:00:00Z",
+    "compaction": {
+      "captures": 5,
+      "measured": 3,
+      "pending": 1,
+      "unmeasured": 1,
+      "median_actions": 2,
+      "p75_actions": 4
+    }
   },
   "week_recalls": 2,
   "week_bytes": 4096,
@@ -283,9 +291,17 @@ session *about* deja quotes ids in prose; read the two together as the size of
 the question rather than as an answer.
 
 Inside `recall`, `raw_bytes` is the size of the source transcripts the served
-digests distilled and `since` is the oldest event still in the usage log; both
+digests distilled and `since` is the oldest non-compaction-measurement event still in the usage log; both
 are omitted when zero, so a store with no recall history yet shows neither.
 
+`recall.compaction` is present when the retained usage log contains compaction
+observations. `captures` counts observed capture intervals, `measured` counts
+complete first-edit measurements, `pending` counts intervals awaiting an edit,
+and `unmeasured` counts unavailable or incomplete evidence. `median_actions`
+and `p75_actions` summarize raw transcript tool calls before the first explicit
+edit, excluding that edit. Read these two values only when `measured` is positive;
+zero with no samples does not mean an instant recovery. A new compaction in the
+same session/workspace supersedes an interval still awaiting its first edit.
 
 `week_recalls`, `week_bytes`, `week_injected`, `week_agent_credits` and
 `week_used_not_credited` cover
@@ -727,6 +743,14 @@ script polls, and `null` raises where an empty list iterates zero times.
 `blame`, `how` and `fix` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
 memory offered unasked; `resource` is a read of `deja://session/…`; `remember`
 writes rather than serves; `search` and `handoff` are the reader's own commands.
+`compaction_capture` and `compaction_recovery` measure recovery, with zero
+delivered bytes. They add `compaction_session` and `compaction_workspace`
+(hashed identifiers), `compaction_revision`, `tool_calls` (capture baseline),
+`actions_before_edit` (recovery count), `measured`, and `compaction_error`
+(a short failure code). A true `measured` with an omitted zero-valued
+`actions_before_edit` means no tool calls preceded the edit; false means the
+interval must not be used as a sample. These events do not increment recall or
+injection counters, and their timestamps do not start the recall window.
 A kind this list does not name may still appear: another version of deja may
 have written it, and the log keeps what it was given.
 
