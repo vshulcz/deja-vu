@@ -716,6 +716,12 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		}
 		fmt.Fprintf(&fb, "%s%s\n  %s: %s\n", recallListingLine(p.Error), when, ran,
 			commandListingLine(p.Command))
+		// What makes a repaired remedy the answer is the command before it, so
+		// the surface that hands it over shows both — otherwise the agent is
+		// asked to trust a long line that names nothing of its error.
+		if p.Failed != "" {
+			fmt.Fprintf(&fb, "  after this failed: %s\n", commandListingLine(p.Failed))
+		}
 	}
 	// Framed like `how` (#2844) and for a sharper reason: this hands an agent a
 	// command at the moment it has just hit an error, which is the moment it is

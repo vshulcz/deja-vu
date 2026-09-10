@@ -79,6 +79,12 @@ type FixPair struct {
 	// different kind than the word rules: the pair is not a command that
 	// happened to follow the error, it is the command that caused it, working.
 	Repaired bool `json:",omitempty"`
+	// Failed is the command that produced the error, stored for a repaired
+	// remedy so the reader can see what the correction was. Without it the
+	// remedy reads as an unrelated line: 107 of the 360 pairs served on a real
+	// store name nothing the error names, because they are not a command about
+	// the error, they are the command that caused it, working.
+	Failed string `json:",omitempty"`
 	// Candidate marks a sighting that is not a pair yet: the remedy named
 	// nothing the error named, and no other session has done the same thing
 	// after the same error. Evidence of the second kind accumulates across
@@ -444,8 +450,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if namesAnEphemeralPath(cmd) {
 				continue
 			}
+			// The failing command travels with the remedy that corrects it, and
+			// only then: it is there to explain the remedy, and the same bound
+			// the remedy has applies — a pasted script is not something to show.
+			failed := ""
+			if repaired && len(failedCmd) <= fixCommandMax {
+				failed = failedCmd
+			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key,
-				When: ms[j].Time, Project: project, Repaired: repaired})
+				When: ms[j].Time, Project: project, Repaired: repaired, Failed: failed})
 			paired = true
 			break
 		}
@@ -633,6 +646,9 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 		}
 		if c, counts := redact.Text(p.Command); len(counts) > 0 {
 			p.Command, dirty = c, true
+		}
+		if f, counts := redact.Text(p.Failed); len(counts) > 0 {
+			p.Failed, dirty = f, true
 		}
 		kept = append(kept, p)
 	}

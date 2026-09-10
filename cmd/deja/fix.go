@@ -127,6 +127,11 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintln(stdout, "deja: no session on this machine ran a command after that error")
 		return nil
 	}
+	return printFixPairs(stdout, pairs)
+}
+
+// printFixPairs writes the pairs in the prose form, one remedy per pair.
+func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {
 	for _, p := range pairs {
 		when := ""
 		if !p.When.IsZero() {
@@ -151,6 +156,14 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			ran = "ran next, unconfirmed"
 		}
 		fmt.Fprintf(stdout, "  %s: %s\n", ran, search.SafeCommand(p.Command))
+		// A repaired remedy is the failing command corrected, and on its own it
+		// reads as an unrelated line — 107 of the 360 pairs served on a real
+		// store share no word with the error they answer, because what ties
+		// them is the command before, not the words. Shown, the reader sees the
+		// correction instead of a long command to trust.
+		if p.Failed != "" {
+			fmt.Fprintf(stdout, "  after this failed: %s\n", search.SafeCommand(p.Failed))
+		}
 	}
 	return nil
 }
@@ -202,6 +215,10 @@ type fixRowJSON struct {
 	// omitted when the remedy was a command. It reached the prose only, and a
 	// script read an empty command (#3261).
 	Edit string `json:"edit,omitempty"`
+	// Failed is the command that produced the error, present when the remedy
+	// is that command corrected. The prose shows it as "after this failed",
+	// and a script wanting to apply the correction needs the same two halves.
+	Failed string `json:"failed,omitempty"`
 	// Candidate is the half-evidence flag the prose renders as "ran next,
 	// unconfirmed": one session ran this after the error and nothing has
 	// confirmed it worked. A caller acting on a fix needs to know which it has.
@@ -218,6 +235,7 @@ func writeFixJSON(stdout io.Writer, pairs []index.FixPair) error {
 			Error:     search.SafeLine(p.Error),
 			Command:   search.SafeCommand(p.Command),
 			Edit:      search.SafePath(p.Edit),
+			Failed:    search.SafeCommand(p.Failed),
 			Candidate: p.Candidate,
 		}
 		if !p.When.IsZero() {

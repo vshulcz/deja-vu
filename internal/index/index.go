@@ -171,6 +171,11 @@ import (
 // real store 11 of the 360 pairs served answered a named test failure with
 // `gh pr merge 2532`, `git checkout -q -b work477` or `git status`. They are
 // sightings again, and the pairs already on file only re-mine on this bump.
+//
+// The same bump stores the failing command beside the remedy that corrects it.
+// 107 of those 360 answers share no word with the error they answer — they are
+// not a command about the error, they are the command that caused it, working —
+// and shown alone they read as an unrelated line to trust.
 const version = 37
 const maxIndexedText = 64 * 1024
 

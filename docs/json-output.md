@@ -550,6 +550,22 @@ when the remedy was a command.
 }
 ```
 
+A row carries `failed` when the remedy is the command that produced the error,
+corrected — a missing `timeout` dropped, a flag the shell refused rewritten. That
+remedy usually shares no word with the error, since what ties them is the command
+before it, so the prose shows both and prints the second as *"after this
+failed"*. `failed` is omitted for every other remedy.
+
+```json
+{
+  "error": "no matches found: --include=*.go",
+  "command": "grep -rn \"deja\" --include=\\*.go .",
+  "failed": "grep -rn \"deja\" --include=*.go .",
+  "candidate": false,
+  "when": "2026-08-29T18:02:44Z"
+}
+```
+
 As with `friction`, an empty result keeps the envelope and returns `fixes: []`.
 The prose path distinguishes "held but unconfirmed", "nothing recorded for that
 line" and "no session ran a command after that error" in three different
