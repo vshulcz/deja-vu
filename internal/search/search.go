@@ -2264,8 +2264,46 @@ func isRegexSpace(c byte) bool {
 	return false
 }
 
+// creditOpeners are how deja asks an agent to credit a recall it used. The
+// sentence reports what an earlier session said, so quoted back as an excerpt it
+// is deja citing itself through the agent's mouth.
+var creditOpeners = []string{"déjà vu:", "deja vu:", "deja-vu recalled:", "deja recalled:"}
+
+// withoutOwnCredit removes that sentence and leaves the rest of the paragraph.
+// It runs mid-text rather than per line because the credit is written into the
+// middle of a reply: "No files changed. No benchmarks run. deja-vu recalled: …".
+func withoutOwnCredit(text string) string {
+	low := strings.ToLower(text)
+	for _, opener := range creditOpeners {
+		for {
+			i := strings.Index(low, opener)
+			if i < 0 {
+				break
+			}
+			end := len(text)
+			// To the end of the sentence, or the line, whichever comes first.
+			if j := strings.IndexAny(text[i:], "\n"); j >= 0 {
+				end = i + j
+			}
+			if j := strings.Index(text[i:], ". "); j >= 0 && i+j < end {
+				end = i + j + 1
+			}
+			text = strings.TrimSpace(text[:i]) + " " + strings.TrimSpace(text[end:])
+			low = strings.ToLower(text)
+		}
+	}
+	return strings.TrimSpace(text)
+}
+
 func proseForSnippet(s string) string {
 	s = redact.SafeForDisplay(s)
+	// Neither the harness nor deja is a witness. An excerpt is offered as
+	// something someone said about the subject, and measured over twelve
+	// queries an agent would plausibly ask — 77 quoted lines — 6% were a
+	// `<teammate-message …>` envelope and 6% were deja's own credit sentence
+	// coming back as evidence. Both are stripped where they sit, so a message
+	// that carries a person's words around them keeps the words.
+	s = withoutOwnCredit(digest.StripClosedHarnessBlocks(s))
 	var keep []string
 	for _, line := range strings.Split(s, "\n") {
 		line = strings.TrimSpace(line)
