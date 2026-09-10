@@ -2983,7 +2983,7 @@ func printSources(dir string) {
 		load           func() []model.Session
 	}{
 		{"claude", sources.ClaudeRoot(), []string{sources.ClaudeRoot()}, sources.ClaudeFiles, sources.LoadClaude},
-		{"codex", sources.CodexRoot(), []string{sources.CodexRoot()}, sources.CodexFiles, sources.LoadCodex},
+		{"codex", strings.Join(sources.CodexRoots(), string(os.PathListSeparator)), sources.CodexRoots(), sources.CodexFiles, sources.LoadCodex},
 		{"gemini", sources.GeminiRoot(), []string{filepath.Join(sources.GeminiRoot(), "tmp")}, sources.GeminiChatFiles, sources.LoadGemini},
 		{"cursor", strings.Join([]string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, string(os.PathListSeparator)), []string{sources.CursorUserRoot(), sources.CursorCLIRoot()}, cursorReadFiles, sources.LoadCursor},
 		{"antigravity", antigravityLocation, antigravityRoots, sources.AntigravityTranscripts, sources.LoadAntigravity},

@@ -787,8 +787,13 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFilesSkipping("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles(),
 		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
-	codexRoot := sources.CodexRoot()
-	printFilesBeside("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles(), sources.CodexSidecarFiles()...)
+	codexRoots := sources.CodexRoots()
+	codexLocation := strings.Join(codexRoots, string(os.PathListSeparator))
+	codexPresent := false
+	for _, root := range codexRoots {
+		codexPresent = codexPresent || doctorExists(root)
+	}
+	printFilesBesideIn("codex", codexLocation, codexRoots, false, codexPresent, sources.CodexFiles(), sources.CodexSidecarFiles()...)
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))

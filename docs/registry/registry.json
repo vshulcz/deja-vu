@@ -152,14 +152,16 @@
       "store_paths": [
         "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl",
         "${CODEX_HOME:-~/.codex}/history.jsonl",
-        "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
+        "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl",
+        "${HOME}/Library/Developer/Xcode/CodingAssistant/codex/sessions/**/rollout-*.jsonl",
+        "${DEJA_XCODE_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
       ],
       "format_kind": "jsonl-rollout-and-history",
       "fixture_paths": [
         "fixtures/registry/codex/rollout-2026-07-17T09-00-00-registry-codex.jsonl"
       ],
       "parser_source": "internal/sources/codex.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-10",
       "display_name": "Codex CLI",
       "capabilities": {
         "mcp": true,

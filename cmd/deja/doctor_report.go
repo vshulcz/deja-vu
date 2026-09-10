@@ -422,7 +422,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 	cursorFiles := append(sources.CursorTranscripts(), sources.CursorDBs()...)
 	return []doctorStoreCheck{
 		{"claude", []string{sources.ClaudeRoot()}, sources.ClaudeFiles(), sources.ParseClaudeFile},
-		{"codex", []string{sources.CodexRoot()}, sources.CodexFiles(), parseDoctorCodex},
+		{"codex", sources.CodexRoots(), sources.CodexFiles(), parseDoctorCodex},
 		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), doctorProbeOpencode},
 		{"aider", aiderPaths, sources.AiderFiles(), sources.ParseAiderFile},
 		{"gemini", []string{sources.GeminiRoot()}, sources.GeminiChatFiles(), sources.ParseGeminiFile},

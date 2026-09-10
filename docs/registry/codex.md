@@ -2,7 +2,7 @@
 
 ## Store and files
 
-Codex stores state under `${CODEX_HOME:-~/.codex}`. deja's read-only override is `DEJA_CODEX_ROOT`. Rollouts are `sessions/YYYY/MM/DD/rollout-*.jsonl`; a separate `history.jsonl` contains prompt history.
+Codex CLI stores state under `${CODEX_HOME:-~/.codex}`. Xcode-hosted Codex sessions use `${HOME}/Library/Developer/Xcode/CodingAssistant/codex`. deja keeps both stores under the single `codex` harness: `DEJA_CODEX_ROOT` relocates the CLI store and `DEJA_XCODE_CODEX_ROOT` relocates the Xcode store. Rollouts are `sessions/YYYY/MM/DD/rollout-*.jsonl`; `history.jsonl` belongs to the CLI store and contains prompt history.
 
 ## Rollout records
 
@@ -32,4 +32,4 @@ History entries map to one-message sessions with role `user` and project `histor
 - `history.jsonl` duplicates user prompts but lacks assistant responses and project metadata.
 - Older records use `payload.message`; current records generally use structured `payload.content`.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-10
