@@ -1039,6 +1039,14 @@ func endsWord(text string) bool {
 // шардирование" promoted a session about something else entirely.
 func CarriesDecisionExcept(text string, asked []string) bool {
 	low := strings.ToLower(text)
+	// deja asks an agent to credit a recall it used — "déjà vu: … — reusing
+	// it" — and that sentence reports what a past session decided, so every
+	// decision marker in the quoted line fires on it. Found at the file line:
+	// `doctor_auto.go … prior decision: deja-vu recalled:` — deja quoting
+	// itself quoting a session, offered as the decision about a file.
+	if quotesDeja(low) {
+		return false
+	}
 	for _, p := range planAfterMarker {
 		// A plan may still report an outcome elsewhere in the line, so this
 		// blanks the plan wording rather than disqualifying the whole line.
@@ -1057,6 +1065,22 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 			}
 		}
 		if !skip {
+			return true
+		}
+	}
+	return false
+}
+
+// quotesDeja reports whether the line is an agent repeating what deja said.
+// The credit line deja asks for is the common case; the block headers are what
+// a pasted injection looks like.
+func quotesDeja(low string) bool {
+	for _, p := range []string{
+		"déjà vu:", "deja vu:", "deja-vu recalled", "deja recalled",
+		"recalled from this machine", "recalled history from prior sessions",
+		"<deja-recall", "deja found sessions",
+	} {
+		if strings.Contains(low, p) {
 			return true
 		}
 	}

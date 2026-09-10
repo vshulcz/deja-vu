@@ -57,6 +57,11 @@ const (
 	// toolHookMinFileSessions is when a file's history stops being noise. A
 	// file two sessions touched is ordinary work; five is a place with a past.
 	toolHookMinFileSessions = 5
+	// toolHookMinFileSessionsWithDecision is the same bar for a line that
+	// carries a decision rather than a count. One session is the session that
+	// made the decision and has nobody to tell it to; two is the first time it
+	// is worth repeating.
+	toolHookMinFileSessionsWithDecision = 2
 )
 
 type toolHookInput struct {
@@ -568,7 +573,7 @@ func fileHookLine(dir, cwd, path string) string {
 			last = meta.Updated
 		}
 	}
-	if sessions < toolHookMinFileSessions {
+	if sessions < toolHookMinFileSessionsWithDecision {
 		return ""
 	}
 	when := ""
@@ -580,6 +585,25 @@ func fileHookLine(dir, cwd, path string) string {
 	// speaking to the agent (#1863).
 	name := search.SafePath(baseName(path))
 	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
+	// Below the bar for a count, the line still stands if it carries a decision.
+	//
+	// The two are not the same claim. "Worked on in three sessions" is a number
+	// an agent can do nothing with, which is why the bar is five. A decision is
+	// the thing the same measurement showed an agent acts on — and a file two or
+	// three sessions argued over has one as often as a file with a long past.
+	// Counted from the manifest of a real store across every harness: in the
+	// projects worked in more than one session, 39-62% of files have been
+	// touched twice, against 13-36% five times, so the bar was hiding most of
+	// the channel behind a number nobody needed.
+	if sessions < toolHookMinFileSessions {
+		if d := promotedDecisionFor(inScope); d != "" {
+			return head + " — prior decision: " + d
+		}
+		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
+			return head + " — prior decision: " + d
+		}
+		return ""
+	}
 	// The measured difference between a nudge that changes what an agent does
 	// and one it ignores is whether it carries the decision or only points at
 	// it: a line that said "deja blame X has the history" drove no reuse, while
