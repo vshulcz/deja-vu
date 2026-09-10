@@ -802,6 +802,13 @@ Returns a JSON array of blame hits (same stability rules as exact search):
 ]
 ```
 
+Each row also carries the session's `touched` list, bounded to the three files
+it worked on most. The manifest holds up to forty, and serving all of them spent
+3186 of an 8044-byte answer on files the question did not ask about — and the
+answer is trimmed by dropping whole sessions to fit its budget, so those bytes
+cost history. Over six real paths the same budget went from 20 sessions and
+9.9 KB of quoted text to 38 sessions and 15.7 KB.
+
 `specificity` says whether the session wrote the file as a path or as a bare
 name. It orders the list ahead of `score`, so a session that spelled the path
 out comes before one that only mentioned the filename. It is deliberately

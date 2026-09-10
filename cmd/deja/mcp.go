@@ -850,6 +850,27 @@ func mustMarshalBlameNote(note string) []byte {
 	return b
 }
 
+// blameTouchedCap bounds the files a blame row names beside the one asked about.
+//
+// The manifest holds up to forty per session, ordered by how often the session
+// touched them, and the whole list was served: measured on a real store, that
+// was 3186 of an 8044-byte answer — 40% of the second most-called tool's
+// payload — about files the question did not ask about. Three is what the
+// documented field says it is, "the few files this session worked on most", and
+// the head of that list is the most-touched ones. A co-change line was weighed
+// instead and dropped: over eight real paths the recurring neighbour appeared
+// in one session of one.
+const blameTouchedCap = 3
+
+// fewestTouched keeps the head of the touched list, which is its most-touched
+// end.
+func fewestTouched(paths []string) []string {
+	if len(paths) <= blameTouchedCap {
+		return paths
+	}
+	return paths[:blameTouchedCap]
+}
+
 func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []byte {
 	out := make([]any, 0, len(hits)+3)
 	// What every other door says before handing an agent transcript text: the
@@ -873,7 +894,8 @@ func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []by
 			Session: blameSessionJSON{
 				ID: h.Session.ID, Harness: h.Session.Harness, Project: h.Session.Project,
 				Path: h.Session.Path, Title: search.SafeNoteTitle(h.Session.Title),
-				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
+				Started: h.Session.Started, Updated: h.Session.Updated,
+				Touched: fewestTouched(h.Session.Touched),
 			},
 			Title: search.SafeNoteTitle(h.Session.Title), Count: h.Count, Score: h.Score,
 			Specificity: h.Specificity,
