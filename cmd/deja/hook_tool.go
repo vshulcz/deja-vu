@@ -120,6 +120,20 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	return runHookToolMode(dir, stdin, stdout, hookToolClaude)
 }
 
+// dedupeFact is what makes two injections the same thing said twice.
+//
+// The line was deduped whole, and the head of a file line names the file — so a
+// decision that holds across the project came out as a new fact for every file
+// edited in a session. Read from a real store: one accepted note was attached
+// to 154 different files, which is a line on every edit saying the same thing.
+// What repeats is the decision, not the sentence built around it.
+func dedupeFact(line string) string {
+	if i := strings.Index(line, standingLabel); i >= 0 {
+		return line[i:]
+	}
+	return line
+}
+
 func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookToolShape) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
@@ -168,9 +182,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		return nil
 	}
 	// A PreToolUse hook fires on every action, so the same fact must not be
-	// re-injected turn after turn. Dedupe per agent session on the line itself,
-	// the way hook-plan and hook-prompt dedupe what they inject.
-	token := "tool:" + shortHash(line)
+	// re-injected turn after turn. Dedupe per agent session on the fact, the
+	// way hook-plan and hook-prompt dedupe what they inject.
+	token := "tool:" + shortHash(dedupeFact(line))
 	if alreadyInjected(dir, input.SessionID)[token] {
 		return nil
 	}
