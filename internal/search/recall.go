@@ -111,6 +111,11 @@ func AutoRecallDigestShowing(ss []model.Session, budget int, terms []string, ask
 	return strings.TrimSpace(b.String()), shown
 }
 
+// settledProbeBudget is how much of a session the ordering reads to ask whether
+// it concluded anything. The same budget the block itself renders with, so the
+// question is about the lines that would be shown.
+const settledProbeBudget = 400
+
 // BuildAutoRecall applies the session-start recall policy while constructing
 // the digest. Unknown modes use the safe policy.
 func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
@@ -125,6 +130,19 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 		o.Now = time.Now()
 	}
 	candidates := append([]model.Session(nil), ss...)
+	// A session that settled something beats one that did not, whatever their
+	// dates. Measured on the context benchmark: the block served six sessions
+	// newest-first, four of them carrying "routine update, nothing settled
+	// here", and the session holding how the error was fixed never got a slot —
+	// a third of the corpus's facts, present in the per-hit digest and missing
+	// from the block an agent is handed at session start. The per-prompt hook
+	// has led with the concluding session since #1475; this is the same rule on
+	// the other surface.
+	settled := make(map[string]bool, len(candidates))
+	for _, c := range candidates {
+		lines := digest.Conclusions(c, settledProbeBudget, 1)
+		settled[c.Harness+":"+c.ID] = len(lines) > 0 && digest.CarriesDecision(lines[0])
+	}
 	sort.SliceStable(candidates, func(i, j int) bool {
 		ti := o.TaskScores[candidates[i].Harness+":"+candidates[i].ID]
 		tj := o.TaskScores[candidates[j].Harness+":"+candidates[j].ID]
@@ -136,6 +154,11 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 			if iNew != jNew {
 				return iNew
 			}
+		}
+		iSet := settled[candidates[i].Harness+":"+candidates[i].ID]
+		jSet := settled[candidates[j].Harness+":"+candidates[j].ID]
+		if iSet != jSet {
+			return iSet
 		}
 		iRecent := !candidates[i].Updated.Before(o.Now.AddDate(0, 0, -90))
 		jRecent := !candidates[j].Updated.Before(o.Now.AddDate(0, 0, -90))

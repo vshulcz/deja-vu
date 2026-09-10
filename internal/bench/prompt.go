@@ -339,6 +339,12 @@ func promptShapeChain(rng *rand.Rand, i int, kind string, topic promptTopic, sta
 	return chain
 }
 
+// PromptPriorCount is how many prior sessions each prompt chain holds. It was
+// the context corpus's constant, so raising that one to make the block's
+// coverage column movable silently doubled this corpus and moved a negative
+// control with it.
+const PromptPriorCount = 7
+
 // GeneratePrompt builds one chain per topic: three prior sessions carrying the
 // fact under working noise, and no task session — the question comes from the
 // caller, the way a prompt does.
@@ -358,7 +364,7 @@ func GeneratePrompt(seed int64) PromptCorpus {
 			Question:   topic.question,
 			Paraphrase: topic.paraphrase,
 		}
-		for j := 0; j < ContextPriorCount; j++ {
+		for j := 0; j < PromptPriorCount; j++ {
 			t := base.Add(time.Duration(i*10+j) * time.Minute)
 			msgs := []model.Message{{Role: "user", Text: fmt.Sprintf("we decided %s", topic.fact), Time: t}}
 			for k := 0; k < 4+rng.Intn(6); k++ {

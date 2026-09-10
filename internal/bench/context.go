@@ -15,15 +15,18 @@ import (
 const (
 	ContextChainCount    = 30
 	ContextNegativeCount = 5
-	// Seven, not three: with one fact per session and the rest naming the
-	// chain without settling anything, the block has to choose what to quote.
-	// At three every arm scored 1.00 whatever the digest did, which is what
-	// made the coverage column unable to move (#2931, #2933).
-	ContextPriorCount = 7
-	// contextFactEvery spreads the three facts over the prior sessions instead
-	// of filing them in the first three: with ContextPriorCount at 7 they land
-	// in the first, fourth and seventh (#2931).
-	contextFactEvery = 3
+	// Fourteen priors and eight facts, the facts in the oldest eight sessions
+	// and the six newest settling nothing. Two properties the column needs: a
+	// block that reads the newest sessions finds nothing, and a block that
+	// prefers the sessions which settled something still cannot carry all eight
+	// within its budget — so the coverage can move in both directions and
+	// saturation is out of reach. At seven priors and three facts it reached two
+	// by recency and the third by choosing well, and once the choosing was
+	// fixed every arm scored 1.00 with nowhere left for a regression to show
+	// (#2931, #2933).
+	ContextPriorCount = 14
+	// contextFactEvery spreads the facts one per session over the oldest eight.
+	contextFactEvery = 1
 )
 
 type ContextChain struct {
@@ -58,6 +61,11 @@ func GenerateContext(seed int64) ContextCorpus {
 				fmt.Sprintf("%s fact: error fixed by replacing stale etag reuse with generation checks", id),
 				fmt.Sprintf("%s fact: option chosen was bounded refresh with jitter because retries must spread load", id),
 				fmt.Sprintf("%s fact: config value settled at context_ttl=%dm", id, 10+i%7),
+				fmt.Sprintf("%s fact: we decided the retry budget stops at three attempts", id),
+				fmt.Sprintf("%s fact: the scheduler stays single-writer, so the failover drains first", id),
+				fmt.Sprintf("%s fact: agreed to key the cache on generation rather than on mtime", id),
+				fmt.Sprintf("%s fact: settled that the nightly compaction runs after the export", id),
+				fmt.Sprintf("%s fact: chose to drop the second index instead of widening the first", id),
 			}
 			chain.Task = fmt.Sprintf("Handle %s using the prior error, chosen option, and settled context_ttl value.", id)
 			chain.Terms = []string{id}
