@@ -597,7 +597,7 @@ func fileHookLine(dir, cwd, path string) string {
 	// the channel behind a number nobody needed.
 	if sessions < toolHookMinFileSessions {
 		if d := promotedDecisionFor(inScope); d != "" {
-			return head + " — prior decision: " + d
+			return head + standingLabel + d
 		}
 		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
 			return head + " — prior decision: " + d
@@ -616,7 +616,7 @@ func fileHookLine(dir, cwd, path string) string {
 	// and calling filler a decision spends exactly that credibility (#2526).
 	// The command line has said the weaker "last time:" all along.
 	if d := promotedDecisionFor(inScope); d != "" {
-		return head + " — prior decision: " + d
+		return head + standingLabel + d
 	}
 	if d := fileDecisionLine(dir, inScope); d != "" {
 		// A scanned line is called a decision only when it reads as one. The
@@ -638,6 +638,17 @@ func fileHookLine(dir, cwd, path string) string {
 func fileHookBlameOffer(head, name string) string {
 	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, pasteSafe(name))
 }
+
+// standingLabel introduces a promoted note, and says what it is.
+//
+// A note is promoted by the user in a session, not against a file, so it is
+// reached here through "a session that worked on this file said it" — which is
+// not the same as "this was decided about this file". Read on a real store, the
+// one accepted note on the machine arrived in front of `main.go` as "prior
+// decision", where it is a rule about the repository description. The note is
+// worth carrying and the ordering behind it was measured (#2495); what it must
+// not do is claim to be about the file the agent is holding.
+const standingLabel = " — standing decision in this project: "
 
 // fileDecisionLine returns the single most relevant prior decision recorded
 // about this file, or "" if none can be extracted. It reads the newest in-scope
