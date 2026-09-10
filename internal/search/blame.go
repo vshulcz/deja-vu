@@ -216,7 +216,36 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	// many times, so scoring alone put the transcript above its own note on
 	// every blame (#2829).
 	liftNotesBy(hits, func(h BlameHit) model.Session { return h.Session })
+	dropRepeatedSnippets(hits)
 	return hits
+}
+
+// dropRepeatedSnippets removes a quote the answer has already shown.
+//
+// A fork, a resumed session and a subagent run each carry the transcript they
+// were forked from, so one piece of evidence arrives under several ids and the
+// answer says it several times. Read from a real store: `deja blame
+// internal/search/search.go` quoted the same two lines under four different
+// sessions, all four forks of one, and those eight lines were most of the
+// answer.
+//
+// Ordering is untouched — the sessions still rank as they did, and a session
+// left with nothing new to show keeps its row, because "this session worked on
+// the file too" is the other half of what blame answers.
+func dropRepeatedSnippets(hits []BlameHit) {
+	seen := map[string]bool{}
+	for i := range hits {
+		kept := hits[i].Snippets[:0]
+		for _, sn := range hits[i].Snippets {
+			key := strings.Join(strings.Fields(sn), " ")
+			if key == "" || seen[key] {
+				continue
+			}
+			seen[key] = true
+			kept = append(kept, sn)
+		}
+		hits[i].Snippets = kept
+	}
 }
 
 // namedAPath reports whether the session wrote the file as a path rather than

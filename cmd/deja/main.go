@@ -264,6 +264,7 @@ var commands = map[string]command{
 	},
 	"hook-context":    cmdHookContext,
 	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
+	"wip":             func(dir string, args []string) error { return runWIP(dir, args, os.Stdout) },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
 	"view":            runView,
 	"install":         func(dir string, rest []string) error { return runInstall(dir, rest, false) },
@@ -3670,6 +3671,7 @@ Usage:
   deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
   deja share <id-prefix>
   deja resume <id-prefix> [--exec]
+  deja wip [--json]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
   deja hook-context [--plain] [--once]  (session start: the project digest, once per session)

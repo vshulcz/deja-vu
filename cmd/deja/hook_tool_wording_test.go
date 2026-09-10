@@ -59,7 +59,12 @@ func TestAScannedConclusionIsNotCalledADecision(t *testing.T) {
 	}
 }
 
-// A promoted decision keeps the word, since that is what it is.
+// A promoted decision keeps the word, since that is what it is — and says
+// where it holds. A note is promoted in a session, not against a file, so it
+// reaches this line through "a session that worked on this file said it", which
+// is not "this was decided about this file". On a real store the one accepted
+// note arrived in front of `main.go` reading as that file's decision, where it
+// is a rule about the repository description.
 func TestAPromotedDecisionKeepsTheWord(t *testing.T) {
 	dir := editStore(t)
 	if _, err := captureRunStderr(t, "promote", "f5", "--state", "accepted",
@@ -68,7 +73,7 @@ func TestAPromotedDecisionKeepsTheWord(t *testing.T) {
 	}
 
 	line := fileHookLine(dir, "/work/app", "/work/app/render.go")
-	if !strings.Contains(line, "prior decision: the renderer never re-wraps") {
-		t.Errorf("a promoted decision is no longer named as one:\n  %s", line)
+	if !strings.Contains(line, "decision in this project: the renderer never re-wraps") {
+		t.Errorf("a promoted decision is no longer named as one, or claims the file:\n  %s", line)
 	}
 }

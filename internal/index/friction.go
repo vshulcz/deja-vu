@@ -68,8 +68,49 @@ func FrictionSignature(l string) (string, uint64, bool) {
 // FrictionLine reports whether a line of tool output names something specific
 // that went wrong, and returns it in the form two sessions can be compared on.
 func FrictionLine(l string) (string, bool) {
+	shell := shellErrorPrefix(l)
 	l = normalizeFriction(l)
+	// A shell only prints its position marker in front of something it could
+	// not do, so the marker is the signal and what follows may be short. This
+	// machine's transcripts hold 89 sightings of `(eval):1: == not found` —
+	// zsh's answer to `[ "$a" == "$b" ]` — and every one was dropped for
+	// length before any phrase was consulted, so `deja friction`, `deja fix`
+	// and the hook at the failure all had nothing to say about a wall the
+	// agent walked into every few days for months.
+	if shell && utf8.RuneCountInString(l) >= shellErrorMin &&
+		utf8.RuneCountInString(l) <= frictionLineMax &&
+		!looksLikeSource(l) && !isDejaOwnReport(l) {
+		return l, true
+	}
 	return l, isFriction(l)
+}
+
+// shellErrorMin is how much has to be left of a shell's complaint for it to be
+// worth remembering. `== not found` is twelve characters; a bare `killed` is
+// not a wall anyone recognises.
+const shellErrorMin = 8
+
+// shellErrorPrefix reports whether the line opens with a shell's position
+// marker — `zsh:1:`, `(eval):2:`, `sh:12:`. normalizeFriction strips it so the
+// same complaint from two shells counts once; this asks whether it was there.
+func shellErrorPrefix(l string) bool {
+	l = strings.TrimSpace(l)
+	first := strings.Index(l, ":")
+	if first <= 0 || first > 16 {
+		return false
+	}
+	switch strings.ToLower(l[:first]) {
+	case "zsh", "bash", "sh", "dash", "ksh", "fish", "(eval)", "(anon)":
+	default:
+		return false
+	}
+	rest := l[first+1:]
+	second := strings.Index(rest, ": ")
+	if second <= 0 {
+		return false
+	}
+	_, err := strconv.Atoi(rest[:second])
+	return err == nil
 }
 
 // normalizeFriction strips the shell's position prefix so the same missing
@@ -259,6 +300,65 @@ var dejaFixReport = regexp.MustCompile(` · \d{4}-\d{2}-\d{2}$`)
 
 var leadingTimestamp = regexp.MustCompile(`^\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\]?\s+`)
 
+// looksLikeSource reports whether the line is code that talks about an error
+// rather than an error. Tool output carries source as often as it carries
+// results — a `cat` of a script, a diff, a heredoc — and an
+// `echo "App not found: $APP"` inside a deploy script reached second place the
+// first time this was measured.
+//
+// A bare double quote used to stand for most of this and cost more than it
+// caught: tools quote the thing they could not find — `relation "orders" does
+// not exist`, `pull access denied for "acme/api"` — so the same psql failure
+// was friction without its quotes and invisible with them (#2431). What is left
+// is the punctuation source puts around a quote — an assignment, a call, a
+// struct field, a code span — none of which appears in what a tool prints:
+// 130 of the 192 lines of this repo's own source that read as friction (#2436).
+func looksLikeSource(l string) bool {
+	for _, source := range []string{"echo ", "printf ", "$(", "=~", "print("} {
+		if strings.Contains(l, source) {
+			return true
+		}
+	}
+	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
+		return true
+	}
+	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
+		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
+		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
+		strings.HasPrefix(l, "`") {
+		return true
+	}
+	// A comment about an error is source too, and the wider marker list in
+	// #729 made these reachable: `// panic: this is a comment about panics`
+	// became the top wall on a store of shell snippets.
+	for _, comment := range []string{"//", "#", "/*", "*", "--"} {
+		// normalizeFriction has already trimmed the line.
+		if strings.HasPrefix(l, comment) {
+			return true
+		}
+	}
+	return false
+}
+
+// isDejaOwnReport reports whether the line is something deja printed. Its own
+// output is tool output in the next session, and every line of it contains an
+// error by construction, so without this running the command slowly teaches
+// deja about itself.
+//
+// `deja friction` writes a count and the error; `deja fix` writes the error
+// with the date of the session it came from and the command underneath. Both
+// came back as a fresh sighting of the error they were quoting, and the command
+// `fix` printed became a candidate remedy for it — found on a real store as the
+// pair `command not found: python · 2026-05-18`.
+func isDejaOwnReport(l string) bool {
+	if i := strings.Index(l, " sessions  "); i > 0 {
+		if _, err := strconv.Atoi(strings.TrimSpace(l[:i])); err == nil {
+			return true
+		}
+	}
+	return dejaFixReport.MatchString(l) || strings.HasPrefix(l, "ran next: ")
+}
+
 // isFriction keeps the error shapes that name something specific. The generic
 // ones carry no information — every Python failure prints `Traceback (most
 // recent call last):`, and clustering those put an empty line at the top of
@@ -290,62 +390,10 @@ func isFriction(l string) bool {
 	// `Cannot find module ./config` was kept (#2432). Nothing is needed in its
 	// place — a line with only a generic opening matches no phrase below and
 	// falls through to false, which is where it belonged.
-	// Tool output carries source as often as it carries results — a `cat` of a
-	// script, a diff, a heredoc. An `echo "App not found: $APP"` inside a
-	// deploy script reached second place on the first run: it is a line about
-	// an error, not an error.
-	for _, source := range []string{"echo ", "printf ", "$(", "=~", "print("} {
-		if strings.Contains(l, source) {
-			return false
-		}
-	}
-	// A bare double quote used to be on that list, and it cost more than it
-	// caught: tools quote the thing they could not find — `relation "orders"
-	// does not exist`, `repository "…" not found`, `pull access denied for
-	// "acme/api"` — so the same psql failure was friction without its quotes
-	// and invisible with them (#2431). What the quote was there to reject is
-	// still rejected by the markers above and by the two shapes below: a line
-	// that opens with a quoted string, and a JSON pair, which is what a
-	// payload printed into tool output looks like.
-	if strings.HasPrefix(l, "\"") || strings.Contains(l, "\": \"") {
+	if looksLikeSource(l) {
 		return false
 	}
-	// Source that carries an error string is a line about an error, not one.
-	// A bare quote used to stand for this and cost far more than it caught
-	// (#2430): what is left is the punctuation source puts around the quote —
-	// an assignment, a call, a struct field, a code span — none of which
-	// appears in the output a tool prints. Measured over this repo: 130 of the
-	// 192 lines of its own docs and source that read as friction (#2436).
-	if strings.Contains(l, `("`) || strings.Contains(l, `, "`) ||
-		strings.Contains(l, `:= "`) || strings.Contains(l, `= "`) ||
-		strings.Contains(l, `: "`) && strings.HasSuffix(l, `"},`) ||
-		strings.HasPrefix(l, "`") {
-		return false
-	}
-	// A comment about an error is source too, and the wider marker list in
-	// #729 made these reachable: `// panic: this is a comment about panics`
-	// became the top wall on a store of shell snippets.
-	for _, comment := range []string{"//", "#", "/*", "*", "--"} {
-		// normalizeFriction has already trimmed the line.
-		if strings.HasPrefix(l, comment) {
-			return false
-		}
-	}
-	// deja's own report is tool output in the next session, and every line of
-	// it contains an error by construction. Drop the report shape so running
-	// the command does not slowly teach it about itself.
-	if i := strings.Index(l, " sessions  "); i > 0 {
-		if _, err := strconv.Atoi(strings.TrimSpace(l[:i])); err == nil {
-			return false
-		}
-	}
-	// `deja fix` prints the error it answers with the date beside it, and the
-	// command underneath. Both come back as tool output in the next session:
-	// the first is read as a fresh sighting of the error it is quoting, so
-	// asking deja about an error taught deja that the error happened again,
-	// and the command it printed became a candidate remedy for it. Found on a
-	// real store as the pair `command not found: python · 2026-05-18`.
-	if dejaFixReport.MatchString(l) || strings.HasPrefix(l, "ran next: ") {
+	if isDejaOwnReport(l) {
 		return false
 	}
 	// The list was nine phrases about things not being found or permitted, and
@@ -384,6 +432,28 @@ func isFriction(l string) bool {
 		// "no such file or directory" was already here; its sibling was not
 		// (#3373).
 		"go.mod file not found", "does not contain main module",
+		// The walls an agent hits that none of the above reached, counted over
+		// 102,735 commands and 2,951 failures in this machine's transcripts.
+		//
+		// A command that ran out of time is the commonest of them — 144
+		// sightings — and the wording is the harness's, not a server's, so
+		// "connection timed out" above never covered it. What memory has to
+		// say about it is worth the line: the same command timed out here
+		// before, and either it wants a longer budget or it wants the
+		// background.
+		"timed out after",
+		// The harness refusing the agent's own call: a file edited without
+		// being read again, an argument the tool would not take, a tool that
+		// is off in this session. 32 sightings, and every one is the agent's
+		// own mistake rather than the machine's, which is the kind a memory
+		// can actually stop.
+		"tool_use_error", "inputvalidationerror",
+		"has been modified since read", "no such tool available",
+		// The tail of a Python traceback names the failure; only four of these
+		// were listed and the rest fell through. 30 sightings of the JSON one
+		// alone.
+		"jsondecodeerror", "valueerror:", "runtimeerror:", "oserror:",
+		"filenotfounderror:", "importerror:", "unicodedecodeerror:",
 	} {
 		if strings.Contains(low, p) {
 			return true

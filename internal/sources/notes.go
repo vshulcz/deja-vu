@@ -3,6 +3,7 @@ package sources
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -571,22 +572,28 @@ type PromotedNote struct {
 // Keyed on size and modification time, so a promotion made in one MCP call is
 // visible in the next; the manifest is remembered the same way.
 //
-// What that key cannot see: a hand edit that changes no byte count — swapping
-// `accepted` for `rejected` is the same eight characters — on a filesystem
-// whose modification times are whole seconds, read again by the same
-// long-lived process inside that second. Every write deja makes is an append,
-// so this needs a person editing the file by hand at exactly that moment; the
-// next read after that second sees it.
+// Size and time alone cannot see a rewrite that changes no byte count —
+// swapping `accepted` for `rejected` is the same eight characters — on a
+// filesystem whose modification times are coarse, read again inside that tick.
+// It is not only a hand edit: the windows leg of CI hit it on every run. So a
+// stamp younger than the clock's own resolution is confirmed by hashing the
+// file, which is a read of a few kilobytes against the parse it saves.
 var notesMemo struct {
 	sync.Mutex
 	path    string
 	size    int64
 	mod     time.Time
+	sum     [32]byte
 	notes   []PromotedNote
 	states  map[string]Lifecycle
 	parses  int
 	stamped bool
 }
+
+// notesFreshWindow is how young a modification time has to be before the stamp
+// stops being evidence on its own. Two seconds covers a filesystem that records
+// whole seconds and a write that lands just after the memo was taken.
+const notesFreshWindow = 2 * time.Second
 
 // notesParses counts the parses that actually read the file, for the test that
 // pins the memo.
@@ -607,11 +614,28 @@ func notesStamp(path string) (int64, time.Time, bool) {
 	return fi.Size(), fi.ModTime(), true
 }
 
+// notesSum is the file's content, hashed. Read only inside the window where the
+// stamp cannot be trusted, and never on the hot path of an unchanged file.
+func notesSum(path string) ([32]byte, bool) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return [32]byte{}, false
+	}
+	return sha256.Sum256(b), true
+}
+
 // notesFresh reports whether the memo still describes the file, and takes the
 // lock's word for it — callers hold the lock.
 func notesFresh(path string, size int64, mod time.Time, ok bool) bool {
-	return ok && notesMemo.stamped && notesMemo.path == path &&
-		notesMemo.size == size && notesMemo.mod.Equal(mod)
+	if !ok || !notesMemo.stamped || notesMemo.path != path ||
+		notesMemo.size != size || !notesMemo.mod.Equal(mod) {
+		return false
+	}
+	if time.Since(mod) > notesFreshWindow {
+		return true
+	}
+	sum, read := notesSum(path)
+	return read && sum == notesMemo.sum
 }
 
 // LoadPromotedNotes returns the latest state per promoted source session.
@@ -634,6 +658,7 @@ func LoadPromotedNotes() []PromotedNote {
 	if statOK {
 		if !notesFresh(path, size, mod, statOK) {
 			notesMemo.path, notesMemo.size, notesMemo.mod = path, size, mod
+			notesMemo.sum, _ = notesSum(path)
 			notesMemo.stamped, notesMemo.states = true, nil
 		}
 		// The memo keeps its own array for the same reason the read above

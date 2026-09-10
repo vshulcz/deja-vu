@@ -140,7 +140,50 @@ import (
 // of that reaches an existing store without a re-read, and the repo's
 // precedent for a content-changing parser fix is exactly this: #2875 for
 // goose, #1383 for the greeting rule, #2905 for the Thai bigrams.
-const version = 35
+//
+// The same bump carries the compaction summary that titled a session: the
+// preamble introducing it is stripped before anything reads the turn, so the
+// summary read as the first thing a person said and 23 of the last 800 sessions
+// on a real store were named by it (#3439). Titles are written at ingest, so
+// those 23 keep their names until the re-read this bump already forces.
+// 36 is about what happens when something goes wrong, in two halves.
+//
+// The first is what counts as a wall at all. A shell's position marker is
+// itself the error signal, and timeouts, the harness's own tool errors and the
+// rest of the Python traceback tails join the phrase list (#3445). A session's
+// friction hashes are written into the manifest at ingest — the same shape as
+// 31 — so `deja friction` reads the records and sees the difference while the
+// hook at the failure and the environment block read the manifest and stay
+// silent. The bump is what ends that.
+//
+// The second re-mines the fix pairs. The miner asked two things of a candidate — does
+// the remedy name what the error named, did another session do the same thing —
+// and both are about words, so it missed the commonest repair there is: the
+// failing command, corrected. Counted over 2,953 failed commands, 16% are
+// followed by the same program with most of the same words and no failure,
+// against the 112 confirmed pairs the word rules mine from the same corpus.
+// Pairs are a sidecar written at build time, so an existing store keeps the
+// ones it has until the bump forces the re-read (#3445 carries the other half:
+// the errors those pairs answer).
+// 37 narrows what a second sighting proves. A red test is repaired by an edit,
+// so a bare command that followed one is the session moving on, and the same
+// routine runs the same way every day — which was enough to promote it. On a
+// real store 11 of the 360 pairs served answered a named test failure with
+// `gh pr merge 2532`, `git checkout -q -b work477` or `git status`. They are
+// sightings again, and the pairs already on file only re-mine on this bump.
+//
+// The same bump stores the failing command beside the remedy that corrects it.
+// 107 of those 360 answers share no word with the error they answer — they are
+// not a command about the error, they are the command that caused it, working —
+// and shown alone they read as an unrelated line to trust.
+//
+// Storing it showed the rule that mines them comparing the wrong thing. The
+// commands carry the shell prompt a harness stored with them, so `$` was the
+// program of both sides, the same-program test passed for any two lines and the
+// navigation guard guarded nothing: 36 of 163 such answers were a different
+// program or `cd` elsewhere. The wrapper the shell could not find is now
+// transparent too, so `timeout 12 launchctl …` is repaired by `launchctl …`.
+const version = 37
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

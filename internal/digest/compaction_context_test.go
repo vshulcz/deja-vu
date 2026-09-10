@@ -69,6 +69,53 @@ func TestExtractCompactionContextFallsBackToHarnessCompactionIntent(t *testing.T
 	}
 }
 
+func TestExtractCompactionContextFallsBackToEmphasizedHarnessIntent(t *testing.T) {
+	summary := "Summary:\n1. **Primary Request and Intent:**\n  Repair the decoder and keep the fixture.\n2. Key Technical Concepts:\n  - irrelevant\n"
+	s := model.Session{ID: "s", Harness: "claude", Messages: []model.Message{
+		{Role: "user", Text: summary},
+		{Role: "user", Text: "continue"},
+	}}
+	c := ExtractCompactionContext(s, ExtractOptions{})
+	if !strings.Contains(c.Objective.Text, "Repair the decoder") {
+		t.Fatalf("emphasized summary intent was lost: %#v", c.Objective)
+	}
+	if strings.Contains(c.Objective.Text, "Key Technical Concepts") {
+		t.Fatalf("emphasized summary was not bounded to intent: %#v", c.Objective)
+	}
+}
+
+func TestCompactionIntentStaysAlignedWithSummaryRecognition(t *testing.T) {
+	for _, tc := range []struct {
+		name, summary, want string
+	}{
+		{
+			name:    "inline plain heading",
+			summary: "Summary: 1. Primary Request and Intent: Repair the inline decoder.\n2. Key Technical Concepts:\n  ignored\n",
+			want:    "Repair the inline decoder.",
+		},
+		{
+			name:    "multiline heading",
+			summary: "Summary:\n1. Primary Request and Intent:\n  Repair the multiline decoder.\n2. Key Technical Concepts:\n  ignored\n",
+			want:    "Repair the multiline decoder.",
+		},
+		{
+			name:    "underscored heading",
+			summary: "Summary:\n1. __Primary Request and Intent:__\n  Repair the underscored decoder.\n2. Key Technical Concepts:\n  ignored\n",
+			want:    "Repair the underscored decoder.",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !IsCompactionSummary(tc.summary) {
+				t.Fatalf("summary was not recognised: %q", tc.summary)
+			}
+			got := compactionIntent(tc.summary)
+			if !strings.Contains(got, tc.want) || strings.Contains(got, "Key Technical Concepts") || strings.Contains(got, "__") || strings.Contains(got, "**") {
+				t.Fatalf("intent = %q, want %q only", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestCompactionContextRedactsAtExtractionAndStorageBoundary(t *testing.T) {
 	secret := "abcdefghijklmnoPQRSTUVWXYZ123456"
 	s := model.Session{ID: "s", Harness: "codex", Messages: []model.Message{

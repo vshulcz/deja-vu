@@ -74,6 +74,17 @@ type FixPair struct {
 	// Command, never beside it: an edit is evidence of what was changed, not
 	// something a reader can run.
 	Edit string `json:",omitempty"`
+	// Repaired marks the remedy as the failing command corrected — same
+	// program, most of the same words. That is evidence on its own, and of a
+	// different kind than the word rules: the pair is not a command that
+	// happened to follow the error, it is the command that caused it, working.
+	Repaired bool `json:",omitempty"`
+	// Failed is the command that produced the error, stored for a repaired
+	// remedy so the reader can see what the correction was. Without it the
+	// remedy reads as an unrelated line: 107 of the 360 pairs served on a real
+	// store name nothing the error names, because they are not a command about
+	// the error, they are the command that caused it, working.
+	Failed string `json:",omitempty"`
 	// Candidate marks a sighting that is not a pair yet: the remedy named
 	// nothing the error named, and no other session has done the same thing
 	// after the same error. Evidence of the second kind accumulates across
@@ -109,7 +120,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	}
 	var out []FixPair
 	for _, p := range all {
-		if sharesTerm(p.Error, p.Command) || repeats[fixKey(p)] >= 2 {
+		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[fixKey(p)] >= 2) {
 			out = append(out, p)
 			continue
 		}
@@ -158,6 +169,38 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 		}
 	}
 	_ = writeGob(fixesPath(tmp), kept)
+}
+
+// selfEvidentPair reports whether a remedy stands on what it is rather than on
+// having happened before. An edit is never self-evident the way a command that
+// names what the error named is: the error names a test, the remedy names a
+// file, and nothing ties them but a second session doing the same thing.
+func selfEvidentPair(p FixPair) bool {
+	if p.Edit != "" {
+		return false
+	}
+	return p.Repaired || sharesTerm(p.Error, p.Command)
+}
+
+// repetitionConfirms reports whether a second sighting is evidence for this
+// remedy at all.
+//
+// A failing test is repaired by editing the code, so a bare command that
+// followed one is the session moving on, and on a machine where the same
+// routine runs every day it moves on the same way twice. Read off a real store:
+// of the 360 pairs `deja fix` serves, 69 rest on repetition alone; the 48 edits
+// among them mostly name the file the failing test lives in, and of the 21
+// commands eleven answer a red test with `gh pr merge 2532`,
+// `git checkout -q -b work477` or `git status`.
+//
+// Only that shape is refused. `brew services start postgresql` after
+// `psql: connection refused` is a command nothing but a second session ties to
+// the error, and it is still the answer.
+func repetitionConfirms(p FixPair) bool {
+	if p.Edit != "" {
+		return true
+	}
+	return !namedTestFailure(p.Error)
 }
 
 // fixKey identifies one remedy for one error, so the same pair arriving from
@@ -312,6 +355,22 @@ func outputFailed(ms []model.Message, cmd int) bool {
 	return false
 }
 
+// commandBefore is the command whose output the error at i came out of: the
+// nearest command record above it, with nothing but its own output in between.
+// A session that printed an error without running anything — a build step the
+// harness ran itself — has none, and gets "".
+func commandBefore(ms []model.Message, i int) string {
+	for k := i - 1; k >= 0 && k >= i-fixOutputWindow; k-- {
+		if ms[k].Role == roleCommand {
+			return strings.TrimSpace(firstLineOf(ms[k].Text))
+		}
+		if ms[k].Role != roleToolOutput {
+			return ""
+		}
+	}
+	return ""
+}
+
 // fixPairsIn mines one session.
 func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 	var out []FixPair
@@ -324,6 +383,9 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		if !ok {
 			continue
 		}
+		// The command that produced this error, for the remedy that is that
+		// same command corrected.
+		failedCmd := commandBefore(ms, i)
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""
@@ -368,7 +430,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			// construction when the command greps for the symbol the compiler
 			// complained about, so the table filled with the step an agent
 			// takes between hitting an error and solving it.
-			if investigationCommand(cmd) {
+			//
+			// Unless the command is the failing one corrected. Then what it
+			// does is beside the point: the agent wanted to run exactly this,
+			// the shell would not let it, and the corrected line is the whole
+			// remedy. The wall this was found on is zsh refusing
+			// `--include=*.go` — a grep, rejected here as investigation, and
+			// one of the most repeated walls on the machine that mined it.
+			repaired := repairedVariant(failedCmd, cmd)
+			if !repaired && investigationCommand(cmd) {
 				continue
 			}
 			// A command that names a scratch file is not a remedy anyone can
@@ -380,7 +450,15 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			if namesAnEphemeralPath(cmd) {
 				continue
 			}
-			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key, When: ms[j].Time, Project: project})
+			// The failing command travels with the remedy that corrects it, and
+			// only then: it is there to explain the remedy, and the same bound
+			// the remedy has applies — a pasted script is not something to show.
+			failed := ""
+			if repaired && len(failedCmd) <= fixCommandMax {
+				failed = failedCmd
+			}
+			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key,
+				When: ms[j].Time, Project: project, Repaired: repaired, Failed: failed})
 			paired = true
 			break
 		}
@@ -492,11 +570,7 @@ func mergeFixPairs(kept, fresh []FixPair) []FixPair {
 	promoted := map[string]bool{}
 	for _, p := range fresh {
 		k := fixKey(p)
-		// An edit is never self-evident the way a command that names what the
-		// error named is: the error names a test, the remedy names a file, and
-		// nothing ties them but a second session doing the same thing.
-		selfEvident := p.Edit == "" && sharesTerm(p.Error, p.Command)
-		if selfEvident || repeats[k]+seen[k] >= 2 {
+		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[k]+seen[k] >= 2) {
 			p.Candidate = false
 			kept = append(kept, p)
 			promoted[k] = true
@@ -573,6 +647,9 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 		if c, counts := redact.Text(p.Command); len(counts) > 0 {
 			p.Command, dirty = c, true
 		}
+		if f, counts := redact.Text(p.Failed); len(counts) > 0 {
+			p.Failed, dirty = f, true
+		}
 		kept = append(kept, p)
 	}
 	var fresh []FixPair
@@ -602,6 +679,44 @@ func ReadFixes(dir string) []FixPair {
 	return out
 }
 
+// fixSignaturesFor is the set of error signatures the text asks about.
+//
+// Ordinarily every line is hashed the way it was at ingest. The fallback is for
+// a line deja stored and could not read back: the shell-position rule (#3445)
+// recognises `zsh:1: no matches found: …` and stores the normalised line
+// without the marker, so the stored line is not friction on its own — and 106
+// of the 1,310 error lines on a real store are that shape. `deja fix` then
+// answered "nothing recorded for that line" and suggested, as the closest it
+// held, the very line it had just been given.
+func fixSignaturesFor(dir, text string) map[uint64]bool {
+	sigs := map[uint64]bool{}
+	for _, raw := range strings.Split(text, "\n") {
+		if line, ok := FrictionLine(raw); ok {
+			sigs[frictionHash(line)] = true
+		}
+	}
+	if len(sigs) > 0 {
+		return sigs
+	}
+	// Exact lines only, and only after nothing hashed: this is deja recognising
+	// its own wording, not a search for something like it.
+	want := map[string]bool{}
+	for _, raw := range strings.Split(text, "\n") {
+		if l := strings.ToLower(strings.TrimSpace(raw)); l != "" {
+			want[l] = true
+		}
+	}
+	if len(want) == 0 {
+		return sigs
+	}
+	for _, p := range ReadFixes(dir) {
+		if want[strings.ToLower(strings.TrimSpace(p.Error))] {
+			sigs[p.Sig] = true
+		}
+	}
+	return sigs
+}
+
 // FixesFor returns the commands that followed this error before, newest first.
 // The text can be a whole pasted stack trace: every line is tried, so the
 // caller does not have to know which one carries the signature. allow, when
@@ -611,12 +726,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 	if limit <= 0 {
 		limit = 3
 	}
-	sigs := map[uint64]bool{}
-	for _, raw := range strings.Split(text, "\n") {
-		if line, ok := FrictionLine(raw); ok {
-			sigs[frictionHash(line)] = true
-		}
-	}
+	sigs := fixSignaturesFor(dir, text)
 	if len(sigs) == 0 {
 		return nil
 	}
@@ -693,12 +803,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 // it worked. The command that says "nothing ran after that error" asks first,
 // so it does not deny holding what it is holding (#2282).
 func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
-	sigs := map[uint64]bool{}
-	for _, raw := range strings.Split(text, "\n") {
-		if line, ok := FrictionLine(raw); ok {
-			sigs[frictionHash(line)] = true
-		}
-	}
+	sigs := fixSignaturesFor(dir, text)
 	if len(sigs) == 0 {
 		return false
 	}

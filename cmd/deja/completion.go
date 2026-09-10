@@ -54,7 +54,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]-}"
     action="${COMP_WORDS[2]-}"
 
-    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup"
+    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip"
     local harnesses="%HARNESSES%"
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
@@ -198,6 +198,7 @@ _deja() {
     'sources:list discovered stores'
     'stats:print usage statistics'
     'view:browse your memory in one local HTML page'
+    'wip:what the last session in this project was doing'
     'statusline:print status bar data'
     'sync:move memory between machines'
     'uninstall:remove deja agent wiring'
@@ -288,7 +289,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup'
+complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
@@ -369,7 +370,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
         'files', 'fix', 'forget', 'friction', 'handoff', 'help', 'how',
         'index', 'install', 'last', 'log', 'mcp', 'promote', 'remember',
         'restore', 'resume', 'search', 'share', 'show', 'sources', 'stats',
-        'statusline', 'sync', 'uninstall', 'update', 'version', 'view', 'warmup'
+        'statusline', 'sync', 'uninstall', 'update', 'version', 'view', 'warmup', 'wip'
     )
     $harnesses = @('%HARNESSES%' -split ' ' | Where-Object { $_ })
     $installTargets = @('%INSTALL_TARGETS%' -split ' ' | Where-Object { $_ }) + @('--all', '--auto')

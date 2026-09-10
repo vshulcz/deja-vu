@@ -577,7 +577,16 @@ func copilotChatAppendRequest(s *model.Session, req map[string]any) {
 	t := parseTimeAny(req["timestamp"])
 	if user := copilotChatUserText(req["message"]); strings.TrimSpace(user) != "" {
 		s.Touch(t)
-		s.Messages = append(s.Messages, model.Message{Role: "user", Text: user, Time: t})
+		system, _ := req["isSystemInitiated"].(bool)
+		confirmation, _ := req["confirmation"].(string)
+		// Some turns VS Code raises itself: a background terminal completion
+		// carries the terminal's output as the message, and a confirmation
+		// carries the button's own label. The turn happened, so it still
+		// times the session and its work is still recorded, but nobody typed
+		// the text and recall must not quote it back as though someone had.
+		if !system && strings.TrimSpace(confirmation) == "" {
+			s.Messages = append(s.Messages, model.Message{Role: "user", Text: user, Time: t})
+		}
 	}
 	at := parseTimeAny(req["responseTimestamp"])
 	if at.IsZero() {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,6 +58,11 @@ const (
 	// toolHookMinFileSessions is when a file's history stops being noise. A
 	// file two sessions touched is ordinary work; five is a place with a past.
 	toolHookMinFileSessions = 5
+	// toolHookMinFileSessionsWithDecision is the same bar for a line that
+	// carries a decision rather than a count. One session is the session that
+	// made the decision and has nobody to tell it to; two is the first time it
+	// is worth repeating.
+	toolHookMinFileSessionsWithDecision = 2
 )
 
 type toolHookInput struct {
@@ -119,6 +125,22 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 	return runHookToolMode(dir, stdin, stdout, hookToolClaude)
 }
 
+// dedupeFact is what makes two injections the same thing said twice.
+//
+// The line was deduped whole, and the head of a file line names the file — so a
+// decision that holds across the project came out as a new fact for every file
+// edited in a session. Read from a real store: one accepted note was attached
+// to 154 different files, which is a line on every edit saying the same thing.
+// What repeats is the decision, not the sentence built around it.
+func dedupeFact(line string) string {
+	for _, label := range []string{standingLabel, decisionLabel, endedLabel} {
+		if i := strings.Index(line, label); i >= 0 {
+			return line[i:]
+		}
+	}
+	return line
+}
+
 func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookToolShape) error {
 	raw := readHookPayload(stdin, hookStdinWait)
 	var input toolHookInput
@@ -171,9 +193,9 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		return nil
 	}
 	// A PreToolUse hook fires on every action, so the same fact must not be
-	// re-injected turn after turn. Dedupe per agent session on the line itself,
-	// the way hook-plan and hook-prompt dedupe what they inject.
-	token := "tool:" + shortHash(line)
+	// re-injected turn after turn. Dedupe per agent session on the fact, the
+	// way hook-plan and hook-prompt dedupe what they inject.
+	token := "tool:" + shortHash(dedupeFact(line))
 	if alreadyInjected(dir, input.SessionID)[token] {
 		return nil
 	}
@@ -183,7 +205,19 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// Record the injection so deja's most frequent surface is not invisible to
 	// stats and the receipt. Deduped above, so this counts a distinct fact
 	// served, not every action.
-	usage.RecordResult(dir, usage.KindTool, len(out), 1, false)
+	//
+	// With the agent session it went to, the way the per-prompt hook has since
+	// #1494. Without it this surface could be counted and never followed:
+	// measured on this machine, 492 point-of-action injections and not one that
+	// could be paired with what the agent did next — which is the pairing any
+	// judgement about whether the line helped has to start from.
+	// The text, not only the count. The injections file holds a snapshot for
+	// every session-start and per-prompt block and held none for this surface:
+	// 507 point-of-action injections on a real machine and not one whose content
+	// could be read back. So what deja says at the moment with the best evidence
+	// behind it could not be audited, replayed, or compared against what the
+	// agent did next — and `deja log --last` had nothing to print for it.
+	usage.RecordDigestInto(dir, usage.KindTool, out, input.SessionID, 1, 0, nil)
 	switch shape {
 	case hookToolPlain:
 		fmt.Fprint(stdout, out)
@@ -333,6 +367,13 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// and reaches the ones that matter (#2924). It is also the more useful of
 	// the two: knowing a command has been run says nothing about whether to
 	// run it now.
+	// Before either: a program that is not here. It is the most certain thing
+	// deja can say about a command that has not run yet, and the session-start
+	// block that says it is measurably not heard — nine of the ten sessions
+	// told about a missing command ran it anyway.
+	if line := missingProgramLine(dir, cmd); line != "" {
+		return line
+	}
 	if line := commandFailureLine(dir, cmd); line != "" {
 		return line
 	}
@@ -563,7 +604,7 @@ func fileHookLine(dir, cwd, path string) string {
 			last = meta.Updated
 		}
 	}
-	if sessions < toolHookMinFileSessions {
+	if sessions < toolHookMinFileSessionsWithDecision {
 		return ""
 	}
 	when := ""
@@ -575,6 +616,25 @@ func fileHookLine(dir, cwd, path string) string {
 	// speaking to the agent (#1863).
 	name := search.SafePath(baseName(path))
 	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
+	// Below the bar for a count, the line still stands if it carries a decision.
+	//
+	// The two are not the same claim. "Worked on in three sessions" is a number
+	// an agent can do nothing with, which is why the bar is five. A decision is
+	// the thing the same measurement showed an agent acts on — and a file two or
+	// three sessions argued over has one as often as a file with a long past.
+	// Counted from the manifest of a real store across every harness: in the
+	// projects worked in more than one session, 39-62% of files have been
+	// touched twice, against 13-36% five times, so the bar was hiding most of
+	// the channel behind a number nobody needed.
+	if sessions < toolHookMinFileSessions {
+		if d := promotedDecisionFor(inScope); d != "" {
+			return head + standingLabel + d
+		}
+		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
+			return head + decisionLabelFor(path, d) + d
+		}
+		return ""
+	}
 	// The measured difference between a nudge that changes what an agent does
 	// and one it ignores is whether it carries the decision or only points at
 	// it: a line that said "deja blame X has the history" drove no reuse, while
@@ -587,7 +647,7 @@ func fileHookLine(dir, cwd, path string) string {
 	// and calling filler a decision spends exactly that credibility (#2526).
 	// The command line has said the weaker "last time:" all along.
 	if d := promotedDecisionFor(inScope); d != "" {
-		return head + " — prior decision: " + d
+		return head + standingLabel + d
 	}
 	if d := fileDecisionLine(dir, inScope); d != "" {
 		// A scanned line is called a decision only when it reads as one. The
@@ -595,9 +655,9 @@ func fileHookLine(dir, cwd, path string) string {
 		// is as often "changed the renderer (5)" as it is a decision, and the
 		// same marker list the digest uses can tell them apart.
 		if digest.CarriesDecision(d) {
-			return head + " — prior decision: " + d
+			return head + decisionLabelFor(path, d) + d
 		}
-		return head + " — last session on it ended: " + d
+		return head + endedLabel + d
 	}
 	return fileHookBlameOffer(head, name)
 }
@@ -609,6 +669,67 @@ func fileHookLine(dir, cwd, path string) string {
 func fileHookBlameOffer(head, name string) string {
 	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, pasteSafe(name))
 }
+
+// decisionLabelFor says what the line is about to hand over: a decision about
+// this file, or the closing words of a session that worked on it.
+//
+// The distinction is not cosmetic. Read from a real store, of the 63 lines that
+// called something "prior decision" about a file, *none* mentioned the file or
+// the package it sits in — they were the last decision-shaped sentence of a
+// session that happened to touch it. One incident diagnosis was offered as the
+// prior decision about five different `main.go` files, and an answer to a
+// question about Zed's wiring as the decision about three different SKILL.md.
+// A decision earns the word by being about the file; otherwise it is reported
+// for what it is, which is what the weaker label has always said.
+func decisionLabelFor(path, text string) string {
+	if mentionsFile(path, text) {
+		return decisionLabel
+	}
+	return endedLabel
+}
+
+const (
+	decisionLabel = " — prior decision: "
+	endedLabel    = " — last session on it ended: "
+)
+
+// mentionsFile reports whether the text names the file or the directory it sits
+// in. Stems count: a decision about `render.go` says "renderer", and one about
+// `notes.jsonl` says "notes".
+func mentionsFile(path, text string) bool {
+	low := strings.ToLower(text)
+	base := strings.ToLower(filepath.Base(path))
+	if i := strings.LastIndex(base, "."); i > 0 {
+		base = base[:i]
+	}
+	parts := strings.FieldsFunc(base, func(r rune) bool { return r == '_' || r == '-' || r == '.' })
+	parts = append(parts, strings.ToLower(filepath.Base(filepath.Dir(path))))
+	for _, w := range parts {
+		if len(w) < 4 {
+			continue
+		}
+		if strings.Contains(low, w) {
+			return true
+		}
+		// The plural or the agent noun: notes -> note, render -> renderer is
+		// already covered by the containment above.
+		if strings.HasSuffix(w, "s") && strings.Contains(low, strings.TrimSuffix(w, "s")) {
+			return true
+		}
+	}
+	return false
+}
+
+// standingLabel introduces a promoted note, and says what it is.
+//
+// A note is promoted by the user in a session, not against a file, so it is
+// reached here through "a session that worked on this file said it" — which is
+// not the same as "this was decided about this file". Read on a real store, the
+// one accepted note on the machine arrived in front of `main.go` as "prior
+// decision", where it is a rule about the repository description. The note is
+// worth carrying and the ordering behind it was measured (#2495); what it must
+// not do is claim to be about the file the agent is holding.
+const standingLabel = " — standing decision in this project: "
 
 // fileDecisionLine returns the single most relevant prior decision recorded
 // about this file, or "" if none can be extracted. It reads the newest in-scope

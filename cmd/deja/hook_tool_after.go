@@ -143,7 +143,12 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
-	usage.RecordResult(dir, usage.KindTool, len(payload), 1, false)
+	// The receiving session too: this is the repair delivered at the failure,
+	// the surface with the best evidence behind it, and it was the one that
+	// could not be followed (#1494 gave the per-prompt hook the same field).
+	// The text too, for the reason the pre-tool hook keeps it: a fix pair
+	// delivered at a failure is the one injection worth reading back.
+	usage.RecordDigestInto(dir, usage.KindTool, payload, input.SessionID, 1, 0, nil)
 	if plain {
 		fmt.Fprint(stdout, payload)
 		return nil
@@ -501,6 +506,14 @@ func fixLine(p index.FixPair, sessions int) string {
 	if p.Candidate {
 		return "deja: this error came up" + how + " " + where + " before" + when +
 			" — one session ran this after it, and nothing confirms it worked: " + cmd
+	}
+	// A repaired remedy is not "what followed it", it is the command the reader
+	// has just run, corrected — and this is the one surface where they already
+	// know what they ran, so the line names the relationship and not the command
+	// twice. Of the 360 pairs served on a real store, 107 name nothing their
+	// error names for exactly this reason.
+	if p.Failed != "" {
+		return "deja: this error came up" + how + " " + where + " before" + when + " — the same command worked as: " + cmd
 	}
 	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }

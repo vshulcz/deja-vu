@@ -263,6 +263,14 @@ func RecordResultRaw(indexDir, kind string, bytes, sessions int, empty bool, raw
 	recordFull(indexDir, kind, bytes, sessions, empty, raw, nil)
 }
 
+// RecordServedInto records one injection and the agent session that received
+// it. The kinds that carry a digest have had this since #1494; the
+// point-of-action hooks recorded the event without a receiver, so nothing could
+// be paired with what the agent did next.
+func RecordServedInto(indexDir, kind string, bytes, sessions int, into string) {
+	recordFullAt(indexDir, kind, bytes, sessions, sessions == 0, 0, nil, into, time.Now().UTC())
+}
+
 // RecordServedSessions is RecordResultRaw plus the ids of the sessions the
 // digest contained.
 func RecordServedSessions(indexDir, kind string, bytes, sessions int, empty bool, raw int64, ids []string) {

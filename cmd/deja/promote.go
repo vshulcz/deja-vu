@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -259,7 +260,12 @@ func distillSession(s model.Session) string {
 	var ask, answer string
 	for _, m := range s.Messages {
 		t := strings.TrimSpace(m.Text)
-		if t == "" {
+		if t == "" || digest.IsAgentArtifact(t) {
+			// What the harness wrote is not what was asked. Read from a real
+			// store, this is what promote would have kept: "asked: Summary: 1.
+			// **Primary Request and Intent:** …" — a compaction summary, and
+			// "asked: прочитай <file> целиком и начинай" — an instruction to go
+			// read something. Neither is a decision anyone wants back.
 			continue
 		}
 		if ask == "" && m.Role == "user" {
@@ -267,6 +273,16 @@ func distillSession(s model.Session) string {
 		}
 		if m.Role == "assistant" {
 			answer = t
+		}
+	}
+	// The outcome is the decision if the session reached one. The last
+	// assistant message is where the session stopped, which on a long one is
+	// whatever was in hand at the time — and a note is kept to be read back
+	// much later, by which point only a decision still means anything. This is
+	// the same extraction the file line uses at the point of action.
+	if cs := digest.Conclusions(s, promoteDecisionBudget, 1); len(cs) > 0 {
+		if d := strings.TrimSpace(cs[0]); d != "" && digest.CarriesDecision(d) {
+			answer = d
 		}
 	}
 	parts := make([]string, 0, 2)
@@ -281,6 +297,11 @@ func distillSession(s model.Session) string {
 	}
 	return strings.Join(parts, " · ")
 }
+
+// promoteDecisionBudget is how much of a session's conclusions to read for the
+// one line a note keeps. The note itself is trimmed to 300 runes below, so this
+// only has to be wide enough for the scan to reach a whole sentence.
+const promoteDecisionBudget = 600
 
 func trimRunes(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")
