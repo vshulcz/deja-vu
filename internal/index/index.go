@@ -183,7 +183,13 @@ import (
 // navigation guard guarded nothing: 36 of 163 such answers were a different
 // program or `cd` elsewhere. The wrapper the shell could not find is now
 // transparent too, so `timeout 12 launchctl …` is repaired by `launchctl …`.
-const version = 37
+// 38 moves a record's role out of its compressed body. Scanning for one kind
+// of record — every command in the store, which is what `deja how` asks —
+// inflated all 280,000 records to read the 20,000 it wanted, and 53% of that
+// command's time was flate. The role is interned beside the session key now, so
+// the scan reads a prefix and skips the rest. Records are the store itself, so
+// the layout change is what forces this bump.
+const version = 38
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
