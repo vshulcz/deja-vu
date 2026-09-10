@@ -567,6 +567,29 @@ var agentArtifactMarkers = []string{
 	`{"type":`,
 }
 
+// isReviewVerdict reports whether the text is a review agent's report rather
+// than something concluded about the work.
+//
+// These read as decisions to every rule here — they are full of "approved",
+// "fixed", "findings" — and they are about one diff on one day, which makes them
+// the worst thing to carry forward. Read from the lines deja would have served
+// before an edit on a real store: `README.md — last session on it ended:
+// VERDICT: APPROVED ISSUES: - None.`, `index.tsx — No findings.`, and worst,
+// `config.go — prior decision: Deploy: NO-DEPLOY until at least findings 1 and 2
+// are fixed.` — a hold from a review of something else entirely, handed to an
+// agent months later as the standing position on that file.
+func isReviewVerdict(trimmed string) bool {
+	if strings.Contains(trimmed, "REQUIRED_FIXES:") || strings.Contains(trimmed, "NO-DEPLOY") {
+		return true
+	}
+	for _, p := range []string{"VERDICT:", "Findings:", "No findings", "Deploy:"} {
+		if strings.HasPrefix(trimmed, p) {
+			return true
+		}
+	}
+	return false
+}
+
 func IsAgentArtifact(text string) bool {
 	for _, m := range agentArtifactMarkers {
 		if strings.Contains(text, m) {
@@ -579,7 +602,7 @@ func IsAgentArtifact(text string) bool {
 		return true
 	}
 	trimmed := strings.TrimSpace(text)
-	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) {
+	if IsCompactionSummary(trimmed) || IsHookStatusLine(trimmed) || isReviewVerdict(trimmed) {
 		return true
 	}
 	// Harness preambles injected as user turns: <environment_context>,
