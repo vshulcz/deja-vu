@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -64,10 +65,26 @@ func compactEvidence(dir, sessionID, cwd string) string {
 			}
 			return []string{text}
 		}, search.SafeLine)
-	if len(files) == 0 && len(commands) == 0 {
+	// What it was doing, above what it touched.
+	//
+	// The lists below are the specifics a summary drops, which is what #543
+	// measured. What they do not say is the task and what the session had
+	// settled — and a session after a compaction spends a median of 28 actions
+	// before its next edit against 10 from a cold start, over 86 compactions on
+	// a real machine, working exactly that out. Both are in the transcript:
+	// counted over those 96 compactions, the task is there in 94% of them and a
+	// decision in 94%.
+	handover := digest.ResumeFrom(s, index.LooksLikeError)
+	if len(files) == 0 && len(commands) == 0 && handover.Asked == "" && handover.Decision == "" {
 		return ""
 	}
 	var b strings.Builder
+	if handover.Asked != "" {
+		fmt.Fprintf(&b, "This session was working on: %s\n", search.SafeLine(handover.Asked))
+	}
+	if handover.Decision != "" {
+		fmt.Fprintf(&b, "and had settled: %s\n", search.SafeLine(handover.Decision))
+	}
 	b.WriteString("What this session did before the compaction, from deja's index — " +
 		"a summary keeps conclusions and drops the specifics they rest on:\n")
 	if len(files) > 0 {
