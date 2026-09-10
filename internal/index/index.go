@@ -165,7 +165,13 @@ import (
 // Pairs are a sidecar written at build time, so an existing store keeps the
 // ones it has until the bump forces the re-read (#3445 carries the other half:
 // the errors those pairs answer).
-const version = 36
+// 37 narrows what a second sighting proves. A red test is repaired by an edit,
+// so a bare command that followed one is the session moving on, and the same
+// routine runs the same way every day — which was enough to promote it. On a
+// real store 11 of the 360 pairs served answered a named test failure with
+// `gh pr merge 2532`, `git checkout -q -b work477` or `git status`. They are
+// sightings again, and the pairs already on file only re-mine on this bump.
+const version = 37
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message

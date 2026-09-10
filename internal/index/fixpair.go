@@ -114,7 +114,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	}
 	var out []FixPair
 	for _, p := range all {
-		if p.Repaired || sharesTerm(p.Error, p.Command) || repeats[fixKey(p)] >= 2 {
+		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[fixKey(p)] >= 2) {
 			out = append(out, p)
 			continue
 		}
@@ -163,6 +163,38 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 		}
 	}
 	_ = writeGob(fixesPath(tmp), kept)
+}
+
+// selfEvidentPair reports whether a remedy stands on what it is rather than on
+// having happened before. An edit is never self-evident the way a command that
+// names what the error named is: the error names a test, the remedy names a
+// file, and nothing ties them but a second session doing the same thing.
+func selfEvidentPair(p FixPair) bool {
+	if p.Edit != "" {
+		return false
+	}
+	return p.Repaired || sharesTerm(p.Error, p.Command)
+}
+
+// repetitionConfirms reports whether a second sighting is evidence for this
+// remedy at all.
+//
+// A failing test is repaired by editing the code, so a bare command that
+// followed one is the session moving on, and on a machine where the same
+// routine runs every day it moves on the same way twice. Read off a real store:
+// of the 360 pairs `deja fix` serves, 69 rest on repetition alone; the 48 edits
+// among them mostly name the file the failing test lives in, and of the 21
+// commands eleven answer a red test with `gh pr merge 2532`,
+// `git checkout -q -b work477` or `git status`.
+//
+// Only that shape is refused. `brew services start postgresql` after
+// `psql: connection refused` is a command nothing but a second session ties to
+// the error, and it is still the answer.
+func repetitionConfirms(p FixPair) bool {
+	if p.Edit != "" {
+		return true
+	}
+	return !namedTestFailure(p.Error)
 }
 
 // fixKey identifies one remedy for one error, so the same pair arriving from
@@ -525,11 +557,7 @@ func mergeFixPairs(kept, fresh []FixPair) []FixPair {
 	promoted := map[string]bool{}
 	for _, p := range fresh {
 		k := fixKey(p)
-		// An edit is never self-evident the way a command that names what the
-		// error named is: the error names a test, the remedy names a file, and
-		// nothing ties them but a second session doing the same thing.
-		selfEvident := p.Edit == "" && (p.Repaired || sharesTerm(p.Error, p.Command))
-		if selfEvident || repeats[k]+seen[k] >= 2 {
+		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[k]+seen[k] >= 2) {
 			p.Candidate = false
 			kept = append(kept, p)
 			promoted[k] = true
