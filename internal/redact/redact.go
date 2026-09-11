@@ -2,6 +2,7 @@ package redact
 
 import (
 	"math"
+	"sync/atomic"
 
 	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
@@ -101,7 +102,12 @@ func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
 // chatter it cost 289µs, which was the single largest item in index-time
 // redaction.
 func kvAssignmentNearby(lower string) bool {
-	for _, hint := range kvHints {
+	return kvAssignmentNearbyHints(lower, kvHints)
+}
+
+// kvAssignmentNearbyHints is kvAssignmentNearby for one pattern's own words.
+func kvAssignmentNearbyHints(lower string, hints []string) bool {
+	for _, hint := range hints {
 		for at := 0; ; {
 			i := strings.Index(lower[at:], hint)
 			if i < 0 {
@@ -156,6 +162,24 @@ var kvHints = []string{
 	"key", "secret", "token", "passw", "authorization",
 	"пароль", "парол", "токен", "секрет", "ключ",
 	"contraseña", "senha", "mot de passe", "passwort",
+	"密码", "密碼", "パスワード", "비밀번호",
+}
+
+// intlPatternRuns counts how often the international pattern is actually run.
+// The gate below cannot be checked by what comes back — text the pattern cannot
+// match reads the same whether it ran or not — and the whole point of the gate
+// is that it does not run, so the count is what a test can hold on to.
+var intlPatternRuns atomic.Int64
+
+// kvIntlHints are the words genericKVIntlRE itself is written from. It was
+// gated on the whole list above, so an English transcript that says "token"
+// ran a case-insensitive alternation of Cyrillic, Chinese, Japanese and Korean
+// words over every message — measured over 6.1 MB of real transcript text,
+// 2227 ms of the 4523 ms redaction spends, and the pattern cannot match a byte
+// of it.
+var kvIntlHints = []string{
+	"пароль", "парол", "токен", "секрет", "ключ",
+	"contraseña", "senha", "passwort",
 	"密码", "密碼", "パスワード", "비밀번호",
 }
 
@@ -227,6 +251,9 @@ func Text(s string) (string, Counts) {
 		s = replaceSubmatch(s, envKeyRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
+	}
+	if kvAssignmentNearbyHints(lower, kvIntlHints) {
+		intlPatternRuns.Add(1)
 		s = replaceSubmatch(s, genericKVIntlRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})

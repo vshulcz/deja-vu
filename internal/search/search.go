@@ -995,6 +995,41 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
+// AbandonmentWorthSaying reports whether the give-up mark tells a reader
+// something about this hit. Exported because the MCP recall answer words the
+// same mark ("[this session abandoned one approach partway …]") and was asking
+// the same question with no rule behind it: over sixteen recall calls on a real
+// store it printed the mark 32 times in 16 answers, two per page.
+//
+// GaveUp is a property of the whole session: one line anywhere saying something
+// was dropped marks all of it. On a short session that is useful — "one path
+// here was abandoned, check the excerpts for which" names a real thing to look
+// for. On a marathon it is certain and therefore empty: measured over twelve
+// real queries, the mark sat on 23 of 60 hits, and the sessions carrying it were
+// this machine's longest — 4.2 million words, 3.1 million, 2.0 million. Of
+// course something was dropped somewhere in four million words.
+//
+// The same reasoning the rest of this file applies to a haystack: the claim has
+// to be about something the reader can act on. So the mark stands on a session
+// small enough to scan and goes on one where "somewhere in here" names no place.
+//
+// Size is the whole test on purpose. The sharper rule — does a give-up line sit
+// in the excerpts this hit shows — needs the phrase list that recognises one,
+// and that list lives in internal/index, which cannot be imported here.
+// Re-spelling it in this package is the mistake #3473 just fixed in the line
+// above: two recognisers for one idea, and the narrower one wins by accident.
+// A session with no recorded length keeps the mark: an unknown is not a
+// marathon.
+func AbandonmentWorthSaying(h Hit) bool {
+	return h.Session.Words == 0 || h.Session.Words <= abandonmentScannableWords
+}
+
+// abandonmentScannableWords is how long a session can be before "somewhere in
+// here" stops being a place. Thirty thousand words is a long working session and
+// still a thing a reader can search; this machine's marathons are two orders
+// above it.
+const abandonmentScannableWords = 30000
+
 // lifecycleSummary words a hit's recorded state for a person. It says what
 // happened rather than naming the state: "superseded" is our vocabulary, not
 // the reader's.
@@ -1304,7 +1339,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// wording is deliberately mild: a session that tried one thing, dropped
 		// it and found another is the most useful kind, so this flags an
 		// abandoned approach inside it, not the whole session as a dead end.
-		if h.Session.GaveUp && h.Lifecycle == "" {
+		if h.Session.GaveUp && h.Lifecycle == "" && AbandonmentWorthSaying(h) {
 			note := "  mentions backing an approach out — one path here was abandoned"
 			if color {
 				note = cDim + note + cReset
@@ -1378,8 +1413,22 @@ func fitLine(s string, width int) string {
 		return s
 	}
 	// One column short of the width, for the ellipsis.
-	return strings.TrimRight(termwidth.Cut(s, width-1), " ") + "…"
+	cut := strings.TrimRight(termwidth.Cut(s, width-1), " ")
+	// And back to the end of a word, the same reason the excerpt window snaps
+	// its own edges: over sixteen real searches rendered at 120 columns, 118 of
+	// the 150 lines this cut shortened (79%) ended inside a word —
+	// "kube-prometheus-stack-prome…". The walk is short so a line of unbroken
+	// path or code keeps the columns instead.
+	if at := strings.LastIndexAny(cut, " \t"); at > 0 && utf8.RuneCountInString(cut[at:]) <= lineSnapRunes {
+		cut = strings.TrimRight(cut[:at], " \t")
+	}
+	return cut + "…"
 }
+
+// lineSnapRunes is how much of the last word may be given up to end the line on
+// a whole one. A word longer than this is a path or an identifier, where the
+// prefix is worth more than the tidy edge.
+const lineSnapRunes = 14
 
 func tierLabel(h Hit) string {
 	if h.Tier == "" || h.Tier == TierExact {
@@ -1575,7 +1624,7 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		keep := carries || m.Role == "user" || (m.Role == "assistant" && prevKept)
 		prevKept = keep
 		return keep, hits
-	})
+	}, func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
 	if written > 0 {
 		return
 	}
@@ -1584,7 +1633,86 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 	if qlow != "" {
 		fmt.Fprintf(w, "\nNo single message contains the full query; showing the session's opening exchange.\n")
 	}
-	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil })
+	printContextChunks(w, s, budget, func(m model.Message) (bool, []int) { return true, nil },
+		func(m model.Message) string { return clipCompactionSummary(m.Text, parts) })
+}
+
+// compactionSummaryLineCap and compactionSummaryByteCap bound what a compaction
+// summary contributes to a context window.
+const (
+	compactionSummaryLineCap = 8
+	compactionSummaryByteCap = 700
+)
+
+// compactionSummaryLead says what was cut and why, so the lines below are not
+// read as the whole turn.
+const compactionSummaryLead = "[compaction summary of an earlier part of this session — the matching lines only]"
+
+// clipCompactionSummary reduces a compaction summary to the lines that carry
+// the query, or returns "" for a turn that is not one.
+//
+// A summary is the longest message a session ever holds and it names everything
+// the session did, so it matches almost any question and then fills the window
+// on its own. Measured over eight questions an agent would ask, on a real
+// store: three answers came back carrying one, and it was 95% of each of them —
+// 44% of every byte `recall_context` served. None of it answered the question.
+func clipCompactionSummary(text string, parts []string) string {
+	if !digest.IsCompactionSummary(text) {
+		return ""
+	}
+	// Nothing was asked, so nothing can be matched: `deja ctx <id>` and the MCP
+	// resource read a session with no query, and there the summary is the best
+	// account of it there is.
+	if len(parts) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString(compactionSummaryLead)
+	lines := 0
+	for _, raw := range strings.Split(text, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || contextPartHits(line, parts) == nil {
+			continue
+		}
+		carries := false
+		for _, h := range contextPartHits(line, parts) {
+			if h > 0 {
+				carries = true
+				break
+			}
+		}
+		if !carries {
+			continue
+		}
+		b.WriteString("\n")
+		b.WriteString(line)
+		lines++
+		if lines >= compactionSummaryLineCap || b.Len() >= compactionSummaryByteCap {
+			break
+		}
+	}
+	if lines == 0 {
+		// It matched as a whole and no single line does — a query whose words
+		// are spread through it. Name the subject and stop: the summary is
+		// there, and it is not what was asked about.
+		return compactionSummaryLead + "\n" + firstLines(text, 2)
+	}
+	return b.String()
+}
+
+// firstLines is the first n non-empty lines, for naming what a clipped turn was
+// about.
+func firstLines(text string, n int) string {
+	var out []string
+	for _, raw := range strings.Split(text, "\n") {
+		if line := strings.TrimSpace(raw); line != "" {
+			out = append(out, line)
+			if len(out) == n {
+				break
+			}
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // contextQueryParts is what the digest weighs a turn against: the query's terms
@@ -1719,7 +1847,7 @@ func renderContextTurns(turns []contextTurn) []string {
 	return out
 }
 
-func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, hits []int)) int {
+func printContextChunks(w io.Writer, s model.Session, budget int, include func(m model.Message) (ok bool, hits []int), clip func(m model.Message) string) int {
 	// A digest is what someone pipes into a prompt, so it carries the
 	// conversation. The work records — tool output, the files a turn touched, the
 	// commands it ran, the spans it replaced — are indexed and searchable by role
@@ -1755,7 +1883,13 @@ func printContextChunks(w io.Writer, s model.Session, budget int, include func(m
 		if len(hits) > parts {
 			parts = len(hits)
 		}
-		kept = append(kept, contextTurn{role: m.Role, raw: m.Text, hits: hits})
+		raw := m.Text
+		if clip != nil {
+			if short := clip(m); short != "" {
+				raw = short
+			}
+		}
+		kept = append(kept, contextTurn{role: m.Role, raw: raw, hits: hits})
 	}
 	weights := contextTurnWeights(kept, parts)
 	rendered := renderContextTurns(kept)
@@ -1902,6 +2036,7 @@ func snippet(s, q string, re *regexp.Regexp) string {
 			start = 0
 		}
 	}
+	start, end = snapToWords(r, start, end, idx)
 	out := strings.TrimSpace(string(r[start:end]))
 	out = strings.Trim(out, " ,.;:-\n\t")
 	if start > 0 {
@@ -1911,6 +2046,86 @@ func snippet(s, q string, re *regexp.Regexp) string {
 		out += " …"
 	}
 	return out
+}
+
+// snapToWords moves a window's edges off the middle of a word, and onto the
+// start of a sentence when one is within reach.
+//
+// The window is a fixed 100 runes before the match, which on a long line lands
+// wherever it lands: over 400 real messages the cut opened inside a word in 35%
+// of the excerpts and closed inside one in 62% — "… tigravity doctor rows report
+// correctly", "… ads from disk per invocation". The first words of an excerpt are
+// what a reader uses to decide whether to read the rest, and a fragment spends
+// them on nothing. With the snap that is 2% and 30%, and the share of excerpts
+// that open on a capital — the cheap sign of a sentence start — goes from 6% to
+// 38%.
+//
+// Moving the left edge forward shortens the excerpt, so the same number of runes
+// is given back at the other end. The match is the floor for both edges: a snap
+// never crosses it, which is what keeps a window that was clamped against the
+// end of the message from sliding off its own match.
+func snapToWords(r []rune, start, end, match int) (int, int) {
+	if start > 0 {
+		limit := start + sentenceSnapRunes
+		if limit > match {
+			limit = match
+		}
+		moved := start
+		// A sentence start is worth more than a word start, so look for one
+		// first across the whole budget.
+		for i := start; i < limit && i+1 < len(r); i++ {
+			if isSentenceEnd(r[i]) && isSpace(r[i+1]) {
+				moved = i + 2
+				break
+			}
+		}
+		if moved == start {
+			wordLimit := start + headWordSnapRunes
+			if wordLimit > limit {
+				wordLimit = limit
+			}
+			for i := start; i < wordLimit; i++ {
+				if isSpace(r[i]) {
+					moved = i + 1
+					break
+				}
+			}
+		}
+		if given := moved - start; given > 0 {
+			start = moved
+			if end += given; end > len(r) {
+				end = len(r)
+			}
+		}
+	}
+	if end < len(r) {
+		floor := end - tailWordSnapRunes
+		if floor < match+1 {
+			floor = match + 1
+		}
+		for i := end; i > floor; i-- {
+			if isSpace(r[i-1]) {
+				end = i - 1
+				break
+			}
+		}
+	}
+	return start, end
+}
+
+// How far an edge may move to find a boundary. A sentence is worth walking
+// further for; past a short word's length the excerpt loses more than the
+// ragged edge costs.
+const (
+	sentenceSnapRunes = 80
+	headWordSnapRunes = 40
+	tailWordSnapRunes = 20
+)
+
+func isSpace(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }
+
+func isSentenceEnd(r rune) bool {
+	return r == '.' || r == '!' || r == '?' || r == '。' || r == '！' || r == '？'
 }
 
 // densestMention is where in low the query is discussed rather than mentioned:
@@ -2432,8 +2647,14 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 	if weight == nil {
 		weight = termWeights(ss, terms)
 	}
-	hits := make([]Hit, 0, len(ss))
-	for rank, s := range ss {
+	hits := make([]Hit, len(ss))
+	// One session's score is read from that session alone, and lowercasing its
+	// messages is where the time goes: profiled on a real store, a recall
+	// answer spent 2.4 s in it and in the ranker's own copy of the same loop.
+	// Spread across cores the way the context renderer already is (#1790) —
+	// the work per session is unchanged, so the answer is identical.
+	parallelForSessions(len(ss), func(rank int) {
+		s := ss[rank]
 		hit := Hit{Session: s, Tier: TierRelevance}
 		// Snippet the messages where the most query terms MEET, not the first
 		// message that contains any one of them. The passage that answers a
@@ -2498,10 +2719,48 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			hit.Snippets = append(hit.Snippets, snippet(s.Messages[best[i].idx].Text, best[i].center, nil))
 		}
 		hit.Score = float64(len(ss) - rank)
-		hits = append(hits, hit)
-	}
+		hits[rank] = hit
+	})
 	return liftedNotes(hits)
 }
+
+// parallelForSessions runs fn over 0..n-1, on one goroutine per core once there
+// is enough work to pay for them. The bound is the same shape renderContextTurns
+// uses: a handful of items is faster on one core than it is to hand out.
+func parallelForSessions(n int, fn func(i int)) {
+	workers := relevanceWorkers()
+	if workers > n {
+		workers = n
+	}
+	if workers < 2 || n < 4 {
+		for i := range n {
+			fn(i)
+		}
+		return
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				fn(i)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// relevanceWorkers is a variable so a test can force the single-core path and
+// compare the two orders.
+var relevanceWorkers = defaultRelevanceWorkers
+
+func defaultRelevanceWorkers() int { return runtime.NumCPU() }
 
 // SafeText neutralises what a terminal acts on rather than prints. Transcript
 // text arrives verbatim from a harness, and after `deja sync import` from

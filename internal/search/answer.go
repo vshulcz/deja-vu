@@ -1,6 +1,7 @@
 package search
 
 import (
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"strings"
 	"unicode/utf8"
 
@@ -18,21 +19,33 @@ import (
 // returns only the messages that matched, so the reply does not exist in memory
 // at scoring time and has to be read back from the index.
 func AnswerAfter(messages []model.Message, i int) string {
+	// A reply that records an outcome wins over an earlier one that does not.
+	// DecisionText never comes back empty for a reply with words in it — it
+	// falls through to the opening — so taking the first non-empty answer
+	// returned whatever the agent said first, and what it says first is usually
+	// what it is about to do: "Проверяю, что экспортер теперь перестал
+	// ретраить" was attached as the answer while the reply under it held
+	// "Причина найдена: бэкофф считался от нуля". The same mistake #3470 fixed
+	// where a plan led a block, on the line an agent reads as the answer.
+	first := ""
 	for j := i + 1; j < len(messages) && j <= i+3; j++ {
 		m := messages[j]
 		if m.Role == "user" {
-			// The user spoke again before any answer; there is no reply to
-			// attach, and reaching further would attach someone else's.
-			return ""
+			// The user spoke again; there is no further reply to attach, and
+			// reaching past them would attach someone else's.
+			break
 		}
 		if m.Role != "assistant" {
 			continue
 		}
-		if text := DecisionText(m.Text); text != "" {
+		if text, ok := decisionSentence(m.Text); ok {
 			return text
 		}
+		if first == "" {
+			first = DecisionText(m.Text)
+		}
 	}
-	return ""
+	return first
 }
 
 // decisionPhrases mark the sentence a reader actually wants. They are the
@@ -43,6 +56,32 @@ var decisionPhrases = []string{
 	"decision:", "fixed by", "fixed it by", "the fix", "root cause",
 	"turned out", "traced it to", "instead of", "the cause was",
 	"resolved by", "worked around", "we set", "we added",
+}
+
+// carriesDecisionSentence is the shared recogniser, applied to one sentence.
+//
+// decisionPhrases below is English and was the whole test, while the blocks deja
+// injects have used digest.CarriesDecision — both languages, and the
+// plan-versus-outcome rules — since the store turned out to be Russian-dominant
+// (#2734). So the one structured thing a recall answer adds, the "→ " line under
+// a hit, was picked by the narrower of the two recognisers deja owns. Counted
+// over 1265 distinct assistant lines on a real store: the phrase list marks 34,
+// the shared recogniser 60, and 59 of those are lines the list never sees —
+// "Причина в конфиге: …", "состояние стало пустым".
+//
+// The phrase list stays as a second opinion: it holds shapes the shared rule
+// deliberately leaves out ("we pinned", "we set", "we added"), and on the same
+// sample it alone marks 33 lines.
+func carriesDecisionSentence(low string) bool {
+	if digest.CarriesDecision(low) {
+		return true
+	}
+	for _, phrase := range decisionPhrases {
+		if strings.Contains(low, phrase) {
+			return true
+		}
+	}
+	return false
 }
 
 // decisionText picks the sentence that records the outcome, falling back to the
@@ -58,20 +97,41 @@ func DecisionText(text string) string {
 	for i, s := range sentences {
 		low[i] = strings.ToLower(s)
 	}
+	if out, ok := decisionSentence(text); ok {
+		return out
+	}
+	return clip(text)
+}
+
+// decisionSentence is the sentence of a reply that records an outcome, and
+// whether there is one at all. DecisionText answers with the reply's opening
+// when there is none, which is a reasonable thing to show and a useless thing
+// to decide on — every caller that has to choose between replies needs the
+// second return value.
+func decisionSentence(text string) (string, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "", false
+	}
+	sentences := splitSentences(text)
+	low := make([]string, len(sentences))
+	for i, s := range sentences {
+		low[i] = strings.ToLower(s)
+	}
 	for i, s := range low {
-		for _, phrase := range decisionPhrases {
-			if strings.Contains(s, phrase) {
+		if carriesDecisionSentence(s) {
+			{
 				out := sentences[i]
 				// A decision often needs the sentence after it to make sense
 				// ("We pinned pgx to 5.4.3. Revisit when 1.24 ships.").
 				if i+1 < len(sentences) && len(out)+len(sentences[i+1]) < answerCap {
 					out += " " + sentences[i+1]
 				}
-				return clip(out)
+				return clip(out), true
 			}
 		}
 	}
-	return clip(text)
+	return "", false
 }
 
 const answerCap = 260

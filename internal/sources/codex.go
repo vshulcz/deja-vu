@@ -26,9 +26,40 @@ func CodexRoot() string {
 	return EnvPath("DEJA_CODEX_ROOT", CodexHome())
 }
 
+// XcodeCodexRoot is the Codex store used by Xcode-hosted coding sessions.
+// Xcode writes rollout files under the same sessions layout as the Codex CLI,
+// but keeps the store beside its other CodingAssistant state.
+func XcodeCodexRoot() string {
+	return EnvPath("DEJA_XCODE_CODEX_ROOT", filepath.Join(Home(), "Library", "Developer", "Xcode", "CodingAssistant", "codex"))
+}
+
+// CodexRoots returns the stores whose rollout files belong to the codex
+// harness. The primary root remains first so existing ordering and history
+// semantics remain stable. Equal configured roots are read once.
+func CodexRoots() []string {
+	var roots []string
+	for _, root := range []string{CodexRoot(), XcodeCodexRoot()} {
+		root = filepath.Clean(root)
+		seen := false
+		for _, existing := range roots {
+			if existing == root {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			roots = append(roots, root)
+		}
+	}
+	return roots
+}
+
 func LoadCodex() []model.Session {
-	root := CodexRoot()
-	files := walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)
+	roots := CodexRoots()
+	var files []string
+	for _, root := range roots {
+		files = append(files, walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)...)
+	}
 	ss := parseFiles(files, ParseCodexRollout)
 	// history.jsonl repeats the prompts of sessions whose rollout deja has
 	// already read, with a coarser timestamp — so the ingest de-duplicator,
@@ -39,7 +70,7 @@ func LoadCodex() []model.Session {
 	for _, s := range ss {
 		seen[s.ID] = true
 	}
-	if hist, _ := ParseCodexHistory(filepath.Join(root, "history.jsonl")); len(hist) > 0 {
+	if hist, _ := ParseCodexHistory(filepath.Join(CodexRoot(), "history.jsonl")); len(hist) > 0 {
 		for _, h := range hist {
 			if !seen[h.ID] {
 				ss = append(ss, h)
@@ -59,9 +90,18 @@ func codexRolloutWanted(p string) bool {
 // on a store with 35 (#3321). Anything else, a rollout in the wrong place
 // included, stays unaccounted for, which is what the row is for.
 func CodexSidecarFiles() []string {
-	root := CodexRoot()
+	var out []string
+	for _, root := range CodexRoots() {
+		out = append(out, codexSidecarFiles(root)...)
+	}
+	return out
+}
+
+func codexSidecarFiles(root string) []string {
 	return walkFiles(root, func(p string) bool {
-		if codexRolloutWanted(p) {
+		// A rollout outside sessions is unknown content and must remain visible
+		// to doctor as unrecognised rather than being silently classified away.
+		if codexRolloutWanted(p) && underCodexRoot(p, filepath.Join(root, "sessions")) {
 			return false
 		}
 		rel, err := filepath.Rel(root, p)
@@ -92,12 +132,37 @@ func CodexSidecarFiles() []string {
 // CodexFiles lists the rollout transcripts (plus history.jsonl when present)
 // without parsing them — a cheap count for diagnostics.
 func CodexFiles() []string {
-	root := CodexRoot()
-	files := walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)
-	if hist := filepath.Join(root, "history.jsonl"); fileExists(hist) {
+	var files []string
+	for _, root := range CodexRoots() {
+		files = append(files, walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)...)
+	}
+	if hist := filepath.Join(CodexRoot(), "history.jsonl"); fileExists(hist) {
 		files = append(files, hist)
 	}
 	return files
+}
+
+func underCodexRoot(path, root string) bool {
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ""
+}
+
+func underAnyCodexRoot(path string) bool {
+	for _, root := range CodexRoots() {
+		if underCodexRoot(path, root) {
+			return true
+		}
+	}
+	return false
+}
+
+func underAnyCodexSessionsRoot(path string) bool {
+	for _, root := range CodexRoots() {
+		if underCodexRoot(path, filepath.Join(root, "sessions")) {
+			return true
+		}
+	}
+	return false
 }
 
 func ParseCodexHistory(path string) ([]model.Session, error) {

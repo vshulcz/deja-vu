@@ -100,6 +100,8 @@
       "store_paths": [
         "${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
         "${CLAUDE_CONFIG_DIR:-~/.claude}/transcripts/**/*.jsonl",
+        "${HOME}/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
+        "${DEJA_XCODE_CLAUDE_ROOT}/**/*.jsonl",
         "${DEJA_CC_MIRROR_ROOT:-~/.cc-mirror}/*/.claude/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
         "${DEJA_CLAUDE_ROOT}/**/*.jsonl"
       ],
@@ -108,7 +110,7 @@
         "fixtures/registry/claude-code/session.jsonl"
       ],
       "parser_source": "internal/sources/claude.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-10",
       "display_name": "Claude Code",
       "capabilities": {
         "mcp": true,
@@ -152,14 +154,16 @@
       "store_paths": [
         "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl",
         "${CODEX_HOME:-~/.codex}/history.jsonl",
-        "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
+        "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl",
+        "${HOME}/Library/Developer/Xcode/CodingAssistant/codex/sessions/**/rollout-*.jsonl",
+        "${DEJA_XCODE_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
       ],
       "format_kind": "jsonl-rollout-and-history",
       "fixture_paths": [
         "fixtures/registry/codex/rollout-2026-07-17T09-00-00-registry-codex.jsonl"
       ],
       "parser_source": "internal/sources/codex.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-10",
       "display_name": "Codex CLI",
       "capabilities": {
         "mcp": true,

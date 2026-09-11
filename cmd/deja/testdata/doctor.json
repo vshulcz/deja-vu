@@ -14,7 +14,8 @@
       "name": "codex",
       "state": "missing",
       "paths": [
-        "<tmp>/codex"
+        "<tmp>/codex",
+        "<tmp>/xcode-codex"
       ],
       "files": 0,
       "indexed_sessions": 0

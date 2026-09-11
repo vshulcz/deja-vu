@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // Codex has no Read or Edit tool: it reads files with shell commands and makes
@@ -345,6 +347,132 @@ func TestCodexHistorySkipsSessionsThatHaveARollout(t *testing.T) {
 	// A session with no rollout is the only reason to read history at all.
 	if byID["orphan"] != 1 {
 		t.Fatalf("orphan history entry lost: %v", byID)
+	}
+}
+
+func TestCodexReadsCLIAndXcodeRootsAsOneHarness(t *testing.T) {
+	home := t.TempDir()
+	cli := filepath.Join(home, "cli-codex")
+	xcode := filepath.Join(home, "xcode-codex")
+	writeRollout := func(root, id, cwd string) string {
+		dir := filepath.Join(root, "sessions", "2026", "09", "10")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "rollout-"+id+".jsonl")
+		body := `{"timestamp":"2026-09-10T10:00:00Z","type":"session_meta","payload":{"id":"` + id + `","cwd":"` + cwd + `"}}
+{"timestamp":"2026-09-10T10:01:00Z","payload":{"role":"user","content":"` + id + `"}}
+`
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	cliPath := writeRollout(cli, "cli-id", "/projects/cli")
+	xcodePath := writeRollout(xcode, "xcode-id", "/projects/xcode")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("DEJA_CODEX_ROOT", cli)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", xcode)
+
+	got := LoadCodex()
+	if len(got) != 2 || got[0].Harness != "codex" || got[1].Harness != "codex" {
+		t.Fatalf("LoadCodex=%#v, want both roots as codex sessions", got)
+	}
+	byPath := map[string]model.Session{}
+	for _, session := range got {
+		byPath[session.Path] = session
+	}
+	if byPath[cliPath].ID != "cli-id" || byPath[xcodePath].ID != "xcode-id" || byPath[xcodePath].Project != "xcode" {
+		t.Fatalf("sessions by path=%#v", byPath)
+	}
+	if len(CodexFiles()) != 2 {
+		t.Fatalf("CodexFiles=%v, want both rollout files", CodexFiles())
+	}
+	if k := KindForPath(xcodePath); k != "codex" {
+		t.Fatalf("KindForPath(Xcode)=%q, want codex", k)
+	}
+	if k, ok := KindForPathKind(xcodePath); !ok || k.ParseFrom == nil {
+		t.Fatalf("KindForPathKind(Xcode)=%#v, want incremental parser", k)
+	}
+}
+
+func TestCodexEqualRootsDoNotDuplicateAndAbsentXcodeIsEmpty(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", root+string(filepath.Separator)+".")
+	if got := CodexRoots(); len(got) != 1 || got[0] != filepath.Clean(root) {
+		t.Fatalf("CodexRoots=%v, want one cleaned root", got)
+	}
+	if got := CodexFiles(); len(got) != 0 {
+		t.Fatalf("CodexFiles absent=%v, want empty", got)
+	}
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(t.TempDir(), "missing-xcode"))
+	if got := CodexFiles(); len(got) != 0 {
+		t.Fatalf("CodexFiles with absent Xcode root=%v, want empty", got)
+	}
+}
+
+func TestCodexRegistryMatchingIsPathBoundarySafe(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", filepath.Join(t.TempDir(), "xcode"))
+	valid := filepath.Join(root, "sessions", "2026", "rollout-valid.jsonl")
+	for _, path := range []string{valid, filepath.Join(root+"-sibling", "sessions", "2026", "rollout-wrong.jsonl")} {
+		want := path == valid
+		if got := KindForPath(path); (got == "codex") != want {
+			t.Fatalf("KindForPath(%q)=%q, want codex=%v", path, got, want)
+		}
+	}
+	historySibling := root + "-sibling/history.jsonl"
+	if got := KindForPath(historySibling); got == "codex-history" {
+		t.Fatalf("KindForPath(%q) matched history outside root", historySibling)
+	}
+}
+
+func TestCodexSidecarsAreRootAwareAndLeaveUnknownRolloutsVisible(t *testing.T) {
+	home := t.TempDir()
+	cli := filepath.Join(home, "cli")
+	xcode := filepath.Join(home, "xcode")
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CODEX_ROOT", cli)
+	t.Setenv("DEJA_XCODE_CODEX_ROOT", xcode)
+	paths := []string{
+		filepath.Join(cli, "version.json"),
+		filepath.Join(xcode, "version.json"),
+		filepath.Join(xcode, "models_cache.json"),
+		filepath.Join(xcode, "plugins", "state.json"),
+		filepath.Join(xcode, "cache", "assistant.json"),
+		filepath.Join(xcode, "restored", "rollout-unknown.jsonl"),
+	}
+	for _, path := range paths {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("{}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := CodexSidecarFiles()
+	seen := make(map[string]bool, len(got))
+	for _, path := range got {
+		seen[path] = true
+	}
+	for _, path := range paths[:5] {
+		if !seen[path] {
+			t.Errorf("known sidecar %q was not classified", path)
+		}
+	}
+	if seen[paths[5]] {
+		t.Errorf("unknown rollout %q was classified as a sidecar", paths[5])
 	}
 }
 

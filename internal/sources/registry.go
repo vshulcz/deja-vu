@@ -88,14 +88,14 @@ func Registry() []Harness {
 			Kinds: []FileKind{
 				{
 					Name:      "codex-history",
-					Match:     func(p string) bool { return hasBase(p, "history.jsonl") && strings.HasPrefix(p, CodexRoot()) },
+					Match:     func(p string) bool { return hasBase(p, "history.jsonl") && underCodexRoot(p, CodexRoot()) },
 					Parse:     fullParse(ParseCodexHistory),
 					ParseFrom: offsetParse(ParseCodexHistoryFromOffset),
 				},
 				{
 					Name: "codex",
 					Match: func(p string) bool {
-						return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-") && strings.HasPrefix(p, filepath.Join(CodexRoot(), "sessions"))
+						return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-") && underAnyCodexRoot(p) && underAnyCodexSessionsRoot(p)
 					},
 					Parse:     fullParse(ParseCodexRollout),
 					ParseFrom: offsetParse(ParseCodexRolloutFromOffset),

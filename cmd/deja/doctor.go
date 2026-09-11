@@ -731,11 +731,17 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// The count comes from the same filter the parser uses, so a store whose
 	// layout differs slightly loses those files from every number deja prints
 	// — the one thing `doctor` exists to rule out (#701).
-	// printFilesSkipping is printFiles for a harness that declines some of its
-	// own files by a rule, so the two can be told apart in the row.
-	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
+	// printFilesSkippingIn is printFiles for a harness that has more than one
+	// transcript root and declines some of its own files by a rule.
+	printFilesSkippingIn := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool) {
 		detail := doctorCount(len(seen), "file")
-		unread, byRule := unplacedFiles(path, seen, skipped)
+		unread := 0
+		byRule := 0
+		for _, root := range roots {
+			u, b := unplacedFiles(root, seen, skipped)
+			unread += u
+			byRule += b
+		}
 		if byRule > 0 {
 			// The variable named the way it was read as the cause of the
 			// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
@@ -750,7 +756,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
-		printRow(name, path, present, detail)
+		printRow(name, loc, present, detail)
+	}
+	// printFilesSkipping is its one-root form.
+	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
+		printFilesSkippingIn(name, path, []string{path}, present, seen, skipped)
 	}
 	printFiles := func(name, path string, present bool, seen []string) {
 		printFilesSkipping(name, path, present, seen, nil)
@@ -783,12 +793,22 @@ func doctorHarnesses(w io.Writer, dir string) {
 		printFilesBesideIn(name, path, []string{path}, false, present, seen, beside...)
 	}
 
-	claudeRoot := sources.ClaudeRoot()
-	printFilesSkipping("claude", claudeRoot, doctorExists(claudeRoot), sources.ClaudeFiles(),
+	claudeRoots := sources.ClaudeRoots()
+	claudeLocation := strings.Join(claudeRoots, string(os.PathListSeparator))
+	claudePresent := false
+	for _, root := range claudeRoots {
+		claudePresent = claudePresent || doctorExists(root)
+	}
+	printFilesSkippingIn("claude", claudeLocation, claudeRoots, claudePresent, sources.ClaudeFiles(),
 		func(p string) bool { return !sources.ClaudeFileWanted(p) })
 
-	codexRoot := sources.CodexRoot()
-	printFilesBeside("codex", codexRoot, doctorExists(codexRoot), sources.CodexFiles(), sources.CodexSidecarFiles()...)
+	codexRoots := sources.CodexRoots()
+	codexLocation := strings.Join(codexRoots, string(os.PathListSeparator))
+	codexPresent := false
+	for _, root := range codexRoots {
+		codexPresent = codexPresent || doctorExists(root)
+	}
+	printFilesBesideIn("codex", codexLocation, codexRoots, false, codexPresent, sources.CodexFiles(), sources.CodexSidecarFiles()...)
 
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))

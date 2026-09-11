@@ -23,7 +23,7 @@ func writeClaudeTranscript(t *testing.T, dir, name, said string) string {
 // cc-mirror runs isolated Claude Code variants, each with its own home under
 // ~/.cc-mirror/<variant>/.claude. A session run through a variant reached
 // nothing: deja read one directory and that was not it (#2996).
-func TestClaudeReadsCCMirrorVariantsAndTranscripts(t *testing.T) {
+func TestClaudeReadsXcodeCCMirrorVariantsAndTranscripts(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
@@ -33,6 +33,7 @@ func TestClaudeReadsCCMirrorVariantsAndTranscripts(t *testing.T) {
 	main := writeClaudeTranscript(t, filepath.Join(home, ".claude", "projects", "-work-app"), "main-1", "the ordinary store")
 	// A sibling of projects/, where headless and SDK-driven clients write.
 	headless := writeClaudeTranscript(t, filepath.Join(home, ".claude", "transcripts"), "headless-1", "an SDK run")
+	xcode := writeClaudeTranscript(t, filepath.Join(home, "Library", "Developer", "Xcode", "CodingAssistant", "ClaudeAgentConfig", "projects", "-work-app"), "xcode-1", "an Xcode run")
 	variant := writeClaudeTranscript(t, filepath.Join(home, ".cc-mirror", "work", ".claude", "projects", "-work-app"), "variant-1", "a cc-mirror variant")
 
 	files := ClaudeFiles()
@@ -40,20 +41,35 @@ func TestClaudeReadsCCMirrorVariantsAndTranscripts(t *testing.T) {
 	for _, f := range files {
 		found[f] = true
 	}
-	for _, want := range []string{main, headless, variant} {
+	for _, want := range []string{main, headless, xcode, variant} {
 		if !found[want] {
 			t.Fatalf("%s is not offered to the index:\n%#v", want, files)
 		}
 	}
 	// And the registry has to call them Claude's, or the ingester holds a file
 	// no parser claims: the match was a prefix test against the single root.
-	for _, want := range []string{main, headless, variant} {
+	for _, want := range []string{main, headless, xcode, variant} {
 		if !UnderClaudeRoot(want) {
 			t.Fatalf("%s is not under a claude root", want)
 		}
 		if kind := KindForPath(want); kind != "claude" {
 			t.Fatalf("%s is attributed to %q, not claude", want, kind)
 		}
+	}
+}
+
+func TestClaudeDoesNotReadAnXcodeRootTwice(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_CLAUDE_ROOT", "")
+	xcodeConfig := filepath.Join(home, "Library", "Developer", "Xcode", "CodingAssistant", "ClaudeAgentConfig")
+	t.Setenv("CLAUDE_CONFIG_DIR", xcodeConfig)
+	transcript := writeClaudeTranscript(t, filepath.Join(xcodeConfig, "projects", "-work-app"), "xcode-1", "one Xcode run")
+
+	files := ClaudeFiles()
+	if len(files) != 1 || files[0] != transcript {
+		t.Fatalf("Xcode config was read more than once: %#v", files)
 	}
 }
 

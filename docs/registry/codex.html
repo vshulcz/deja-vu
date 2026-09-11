@@ -38,7 +38,7 @@
 <article>
 <h1>Codex CLI session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Codex stores state under <code>${CODEX_HOME:-~/.codex}</code>. deja&#39;s read-only override is <code>DEJA_CODEX_ROOT</code>. Rollouts are <code>sessions/YYYY/MM/DD/rollout-*.jsonl</code>; a separate <code>history.jsonl</code> contains prompt history.</p>
+<p>Codex CLI stores state under <code>${CODEX_HOME:-~/.codex}</code>. Xcode-hosted Codex sessions use <code>${HOME}/Library/Developer/Xcode/CodingAssistant/codex</code>. deja keeps both stores under the single <code>codex</code> harness: <code>DEJA_CODEX_ROOT</code> relocates the CLI store and <code>DEJA_XCODE_CODEX_ROOT</code> relocates the Xcode store. Rollouts are <code>sessions/YYYY/MM/DD/rollout-*.jsonl</code>; <code>history.jsonl</code> belongs to the CLI store and contains prompt history.</p>
 <h2 id="rollout-records">Rollout records</h2>
 <p>A rollout begins with session metadata and then event records. The parser reads <code>payload.role</code>, <code>payload.content</code>, and the older <code>payload.message</code> fallback.</p>
 <pre><code class="language-json">{&#34;timestamp&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;type&#34;:&#34;session_meta&#34;,&#34;payload&#34;:{&#34;session_id&#34;:&#34;session-7&#34;,&#34;cwd&#34;:&#34;/work/api&#34;}}
@@ -55,7 +55,7 @@
 <li><code>history.jsonl</code> duplicates user prompts but lacks assistant responses and project metadata.</li>
 <li>Older records use <code>payload.message</code>; current records generally use structured <code>payload.content</code>.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-17</p>
+<p><strong>Last verified:</strong> 2026-09-10</p>
 
 <hr>
 <p>deja reads this format and twenty-four others, and turns what it finds into memory your

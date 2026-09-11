@@ -216,6 +216,65 @@ func eachRecordUntil(path string, t *recordTables, fn func(Record) bool) error {
 	}
 }
 
+// recordRoleIn reads only what a record's prefix says: whose session it is and
+// what kind of record it is. Nothing is inflated, which is the point.
+func recordRoleIn(b []byte, t *recordTables) (key, role string, ok bool) {
+	kid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return "", "", false
+	}
+	b = b[n:]
+	_, n = binary.Uvarint(b)
+	if n <= 0 {
+		return "", "", false
+	}
+	b = b[n:]
+	rid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return "", "", false
+	}
+	return t.lookup(kid), t.lookup(rid), true
+}
+
+// eachRecordInRoles streams the records whose role is wanted, reading the
+// prefix of every record and the body of only those. Same order and same
+// records as filtering after a full decode, at a fraction of the work.
+func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
+	f, err := openIndexFile(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(f, 1024*1024)
+	var hdr [4]byte
+	buf := make([]byte, 0, 64*1024)
+	for {
+		if _, err := io.ReadFull(r, hdr[:]); err != nil {
+			return nil
+		}
+		size := binary.LittleEndian.Uint32(hdr[:])
+		if size > maxRecordSize {
+			return fmt.Errorf("%w: record length %d exceeds cap", errCorruptIndex, size)
+		}
+		if cap(buf) < int(size) {
+			buf = make([]byte, size)
+		}
+		payload := buf[:size]
+		if _, err := io.ReadFull(r, payload); err != nil {
+			return nil
+		}
+		_, role, ok := recordRoleIn(payload, t)
+		if !ok || !want[role] {
+			continue
+		}
+		rec, err := decodeRecord(payload, t)
+		if err != nil {
+			return err
+		}
+		fn(rec)
+	}
+}
+
 func eachRecord(path string, t *recordTables, fn func(Record)) error {
 	f, err := openIndexFile(path)
 	if err != nil {
@@ -433,14 +492,19 @@ var inflateReaders = sync.Pool{New: func() any { return flate.NewReader(nil) }}
 // payload so a walk can peek the key and skip the record without inflating
 // anything — that path never touches a compressed byte.
 func encodeRecord(r Record, t *recordTables) []byte {
-	body := make([]byte, 0, len(r.Role)+len(r.Text)+24)
-	body = appendField(body, r.Role)
+	body := make([]byte, 0, len(r.Text)+24)
 	body = binary.LittleEndian.AppendUint64(body, uint64(recordNanos(r.Time)))
 	body = appendField(body, r.Text)
 
 	b := make([]byte, 0, len(body)+16)
 	b = binary.AppendUvarint(b, t.intern(r.Key))
 	b = binary.AppendUvarint(b, t.intern(r.SourcePath))
+	// The role sits outside the compressed body so a scan for one kind of
+	// record can skip the rest without inflating them. It used to be the first
+	// field inside the body, which made "every command in the store" — what
+	// `deja how` asks — decompress all 280,000 records to read 20,000 of them:
+	// 53% of that command's time was flate.
+	b = binary.AppendUvarint(b, t.intern(r.Role))
 	if len(body) < compressFloor {
 		return append(append(b, recordRaw), body...)
 	}
@@ -479,8 +543,14 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 		return rec, io.ErrUnexpectedEOF
 	}
 	b = b[n:]
+	rid, n := binary.Uvarint(b)
+	if n <= 0 {
+		return rec, io.ErrUnexpectedEOF
+	}
+	b = b[n:]
 	rec.Key = t.lookup(kid)
 	rec.SourcePath = t.lookup(pid)
+	rec.Role = t.lookup(rid)
 	if len(b) < 1 {
 		return rec, io.ErrUnexpectedEOF
 	}
@@ -500,9 +570,6 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 		b = body
 	} else if flag != recordRaw {
 		return rec, fmt.Errorf("%w: unknown record encoding %d", errCorruptIndex, flag)
-	}
-	if rec.Role, b, ok = consumeField(b); !ok {
-		return rec, io.ErrUnexpectedEOF
 	}
 	if len(b) < 8 {
 		return rec, io.ErrUnexpectedEOF
@@ -1291,14 +1358,12 @@ func eachRecordOfRoles(dir string, roles map[string]bool, fn func(SessionMeta, R
 		dir = DefaultDir()
 	}
 	return walkRecordsStable(dir, func(m Manifest) error {
-		return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-			if !roles[r.Role] {
-				return
-			}
-			if meta, ok := m.Sessions[r.Key]; ok {
-				fn(meta, r)
-			}
-		})
+		return eachRecordInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m), roles,
+			func(r Record) {
+				if meta, ok := m.Sessions[r.Key]; ok {
+					fn(meta, r)
+				}
+			})
 	})
 }
 
@@ -1311,14 +1376,12 @@ func EachRecordOfRole(dir, role string, fn func(SessionMeta, Record)) error {
 		dir = DefaultDir()
 	}
 	return walkRecordsStable(dir, func(m Manifest) error {
-		return eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-			if r.Role != role {
-				return
-			}
-			if meta, ok := m.Sessions[r.Key]; ok {
-				fn(meta, r)
-			}
-		})
+		return eachRecordInRoles(filepath.Join(dir, "records.bin"), tablesFromManifest(m),
+			map[string]bool{role: true}, func(r Record) {
+				if meta, ok := m.Sessions[r.Key]; ok {
+					fn(meta, r)
+				}
+			})
 	})
 }
 

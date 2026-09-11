@@ -564,11 +564,15 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	}
 	buf = binary.AppendUvarint(buf, rtbl.intern("src"))
 	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+		t.Fatalf("decode missing role err=%v", err)
+	}
+	buf = binary.AppendUvarint(buf, rtbl.intern("role"))
+	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
 		t.Fatalf("decode missing encoding flag err=%v", err)
 	}
 	buf = append(buf, recordRaw)
-	buf = appendField(buf, "role")
-	if rec, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) || rec.Key != "k" || rec.SourcePath != "src" {
+	if rec, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) ||
+		rec.Key != "k" || rec.SourcePath != "src" || rec.Role != "role" {
 		t.Fatalf("decode missing time rec=%#v err=%v", rec, err)
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(time.Now().UnixNano()))
@@ -854,14 +858,15 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 	for _, data := range [][]byte{
 		{0x80},
 		{1, 1},
-		{1, 1, recordRaw},
+		{1, 1, 1},
+		{1, 1, 1, recordRaw},
 	} {
 		if _, err := decodeRecord(data, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
 			t.Fatalf("decodeRecord(%v) err=%v", data, err)
 		}
 	}
 	// An encoding byte the reader does not know is corruption, not EOF.
-	if _, err := decodeRecord([]byte{1, 1, 9}, newRecordTables()); !IsCorrupt(err) {
+	if _, err := decodeRecord([]byte{1, 1, 1, 9}, newRecordTables()); !IsCorrupt(err) {
 		t.Fatalf("unknown encoding flag err=%v, want a corruption error", err)
 	}
 	recPath := filepath.Join(tmp, "records.bin")

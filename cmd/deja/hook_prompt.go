@@ -481,6 +481,14 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			tail += "\n" + nudge
 		}
 		lead := promptHookLead
+		// After the first block of a session the two explanatory sentences are
+		// words the agent has already read, and the third repeats the line this
+		// block ends with. Measured on a real store: a session receives a median
+		// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
+		// so 22 of those blocks carried 6.6 KB of the same sentences.
+		if blockAlreadySentThisSession(dir, input.SessionID) {
+			lead = promptHookLeadShort
+		}
 		// A repeat of the question itself is a different claim than a session
 		// about the subject, and a stronger one: the agent does not have to
 		// decide whether the history is relevant, only whether the answer
@@ -1529,6 +1537,27 @@ func sessionIDs(ss []model.Session) []string {
 // for the one check that catches it.
 const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
 
+// promptHookLeadShort is the lead every block after the first one carries: the
+// caveat that still applies each time, without the sentences the session has
+// already been told and without the citation instruction the block ends with
+// anyway.
+const promptHookLeadShort = "deja matched on wording, not meaning — check the session fits before acting on it.\n"
+
+// blockAlreadySentThisSession reports whether this agent session has had a
+// per-prompt block before. The seen list is written after every block that goes
+// out, keyed by the session, so its own rows are the record of that.
+func blockAlreadySentThisSession(dir, sid string) bool {
+	if sid == "" {
+		return false
+	}
+	return len(recentlyInjected(dir, sid, leadWindow)) > 0
+}
+
+// leadWindow is how far back the check reads. Longer than the injection
+// cooldown on purpose: this asks whether the session was ever told, not whether
+// a particular memory is on cooldown.
+const leadWindow = 500
+
 // digestBudget is how much room the block gets. A match resting on a single
 // rare word is a weaker claim than one resting on two, and it is where most of
 // the injections on unrelated prompts come from: measured on cross-paired
@@ -1554,10 +1583,24 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 		return ""
 	}
 	s := ss[0]
-	topic := dejaVuTopic(s)
+	// With the terms, which is the whole point of the line: the pointer's only
+	// content is the topic it names, because the agent has to turn that into a
+	// recall call. Called without them, dejaVuTopic falls through to the
+	// session's title — and on the one firing measured against a real store
+	// that answered "how is the block" with `"делай задачи в next.md"`, a title
+	// from a session that merely mentions the subject somewhere. The spoken
+	// déjà vu line has passed its terms since it was written (#2734); this
+	// path did not, so the cheaper payload was also the wronger one.
+	topic := dejaVuTopic(s, terms...)
 	if topic == "" {
 		topic = strings.Join(terms, " ")
 	}
+	// Bounded the way the spoken opener bounds the same kind of line. The
+	// matched line is a whole user turn, which on this store reaches a thousand
+	// characters — and the pointer exists because it is cheap: 290 bytes became
+	// 1234 with the line unclipped, which is a digest's price for a pointer's
+	// content.
+	topic = clipTopic(topic)
 	when := "earlier"
 	if !s.Updated.IsZero() {
 		when = search.RelativeDate(s.Updated)
@@ -1568,6 +1611,29 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	}
 	return fmt.Sprintf("deja: this project has history on %q from %s%s — call recall with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
+}
+
+// pointerTopicRunes is how much of the matched line the pointer names. Sixty is
+// what the spoken opener uses for the same job, and the agent only needs enough
+// to write a recall call.
+const pointerTopicRunes = 60
+
+// clipTopic bounds a topic to one readable clause, ending at a word where it
+// can. Cutting mid-word leaves a fragment nobody can search for, which is the
+// one thing this line is for.
+func clipTopic(topic string) string {
+	topic = strings.Join(strings.Fields(topic), " ")
+	r := []rune(topic)
+	if len(r) <= pointerTopicRunes {
+		return topic
+	}
+	cut := string(r[:pointerTopicRunes])
+	// Back up to the last space when one is near, so the reader gets whole
+	// words; a long unbroken token keeps the hard cut.
+	if i := strings.LastIndexByte(cut, ' '); i > len(cut)-20 && i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,;:—-") + "…"
 }
 
 // hookseenPrefixed reports whether a key already carries one of the prefixes

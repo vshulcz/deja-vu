@@ -850,6 +850,27 @@ func mustMarshalBlameNote(note string) []byte {
 	return b
 }
 
+// blameTouchedCap bounds the files a blame row names beside the one asked about.
+//
+// The manifest holds up to forty per session, ordered by how often the session
+// touched them, and the whole list was served: measured on a real store, that
+// was 3186 of an 8044-byte answer — 40% of the second most-called tool's
+// payload — about files the question did not ask about. Three is what the
+// documented field says it is, "the few files this session worked on most", and
+// the head of that list is the most-touched ones. A co-change line was weighed
+// instead and dropped: over eight real paths the recurring neighbour appeared
+// in one session of one.
+const blameTouchedCap = 3
+
+// fewestTouched keeps the head of the touched list, which is its most-touched
+// end.
+func fewestTouched(paths []string) []string {
+	if len(paths) <= blameTouchedCap {
+		return paths
+	}
+	return paths[:blameTouchedCap]
+}
+
 func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []byte {
 	out := make([]any, 0, len(hits)+3)
 	// What every other door says before handing an agent transcript text: the
@@ -873,7 +894,8 @@ func mustMarshalBlame(hits []search.BlameHit, omitted int, refreshing bool) []by
 			Session: blameSessionJSON{
 				ID: h.Session.ID, Harness: h.Session.Harness, Project: h.Session.Project,
 				Path: h.Session.Path, Title: search.SafeNoteTitle(h.Session.Title),
-				Started: h.Session.Started, Updated: h.Session.Updated, Touched: h.Session.Touched,
+				Started: h.Session.Started, Updated: h.Session.Updated,
+				Touched: fewestTouched(h.Session.Touched),
 			},
 			Title: search.SafeNoteTitle(h.Session.Title), Count: h.Count, Score: h.Score,
 			Specificity: h.Specificity,
@@ -929,6 +951,92 @@ func attachAnswers(dir string, hits []search.Hit) {
 			break
 		}
 	}
+}
+
+// conclusionsAboutIt keeps the conclusions that have something to do with what
+// was asked.
+//
+// "what this session concluded" is read off the whole session, and a session
+// that ran for days concluded things about everything it touched. Measured on
+// sixteen recall calls against a real store, 42% of the conclusion lines served
+// shared no word with the query or with the excerpts they sat under — and a long
+// session served the same three lines to a question about blame rows, one about
+// the MCP dispatcher and one about a connection pool, because those were simply
+// the newest things it had concluded.
+//
+// Excerpt words count as well as query words, which is what keeps a conclusion
+// worded nothing like the question — the case the list exists for (#1011): "the
+// backoff counted from zero" stays under an excerpt that says backoff.
+func conclusionsAboutIt(cs []string, q string, snippets []string) ([]string, bool) {
+	about := contentWords(q)
+	for _, sn := range snippets {
+		for w := range contentWords(sn) {
+			about[w] = true
+		}
+	}
+	if len(about) == 0 {
+		// Nothing to judge against: a query of common words alone, which the
+		// ranking answered on its own terms.
+		return cs, true
+	}
+	kept := make([]string, 0, len(cs))
+	for _, c := range cs {
+		if sharesAWord(contentWords(c), about) {
+			kept = append(kept, c)
+		}
+	}
+	if len(kept) == 0 && len(cs) > 0 {
+		// One line rather than none. A session that matched on words this gate
+		// cannot see — a query in one language against a transcript in another,
+		// which this store is full of — still concluded something, and a
+		// conclusion nobody asked for is a memory that can still turn out to be
+		// the one. Three of them is wallpaper; one is an offer.
+		//
+		// And it is offered as one: the second return is false, so the line
+		// above it does not call it a conclusion about the question. On sixteen
+		// recall calls against a real store this is what four of the answers
+		// show, and an agent reads the label as the claim.
+		return cs[:1], false
+	}
+	return kept, true
+}
+
+// sharesAWord is word overlap that holds for identifiers: `ManifestBuiltAt`
+// lowercases to one token, so a question about the manifest shares nothing with
+// it on equality alone, and the conclusion that named it was dropped for a query
+// plainly about it.
+func sharesAWord(words, about map[string]bool) bool {
+	for w := range words {
+		if about[w] {
+			return true
+		}
+		for a := range about {
+			if len(a) >= 5 && strings.Contains(w, a) {
+				return true
+			}
+			if len(w) >= 5 && strings.Contains(a, w) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// conclusionGateSlack is how many extra conclusions to ask for, so the list can
+// still show three after the gate above has dropped the ones about other work.
+const conclusionGateSlack = 3
+
+// contentWords are the words of a text that carry its subject: long enough to
+// mean something and not a word every session holds.
+func contentWords(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, tok := range query.Tokens(s) {
+		if utf8.RuneCountInString(tok) < 4 || query.IsStopWord(tok) {
+			continue
+		}
+		out[tok] = true
+	}
+	return out
 }
 
 // shownAnswers counts the excerpts that are answer lines rather than matched
@@ -1305,7 +1413,10 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// approach inside was abandoned, not that the whole session is a dead
 		// end: the tried-then-fixed session is the most useful one, and the
 		// excerpts show which path was dropped.
-		if h.Session.GaveUp && h.Lifecycle == "" {
+		// And only where "somewhere in this session" is a place the agent can
+		// look: the same rule the search screen got in #3474, from the same
+		// function so the two cannot drift.
+		if h.Session.GaveUp && h.Lifecycle == "" && search.AbandonmentWorthSaying(h) {
 			fmt.Fprintln(&hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
 		}
 		// Sync keeps both copies when a session id is on two machines, and
@@ -1371,12 +1482,24 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// Ask for as many extra as there are answer lines above: the
 				// drop below can take any of them, and asking for a fixed one
 				// more still showed two where three were available.
-				want := 3 + shownAnswers(h.Snippets)
-				if cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets); len(cs) > 0 {
+				// Three more than the list can show: the gate below drops the
+				// ones about something else, and asking for exactly three
+				// showed one where three were available.
+				want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
+				cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets)
+				cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
+				if len(cs) > 0 {
 					if len(cs) > 3 {
 						cs = cs[:3]
 					}
-					fmt.Fprintln(&hb, "  what this session concluded:")
+					label := "  what this session concluded:"
+					if !aboutIt {
+						// Nothing it concluded is about the question, and this
+						// is the newest thing it settled instead. Said plainly,
+						// because the label is what an agent reads as the claim.
+						label = "  what this session concluded, about its own work:"
+					}
+					fmt.Fprintln(&hb, label)
 					for _, c := range cs {
 						fmt.Fprintf(&hb, "  → %s\n", recallListingLine(c))
 					}
@@ -1385,7 +1508,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// them an agent that has just learned "we solved this before"
 				// still has to search the tree for where — and that search
 				// costs far more context than naming the paths here does.
-				if paths := recallTouchedLine(dir, h.Session); paths != "" {
+				if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
 					fmt.Fprintf(&hb, "  files it touched: %s\n", paths)
 				}
 			}
@@ -1956,6 +2079,16 @@ func buildingNowForAgent(dir string) string {
 			return rebuildRefusedForAgent(dir)
 		}
 		requestWarmup(dir)
+		// A stale content version is not an unreadable store. When the layout is
+		// the one this build writes, answer from the snapshot and let the
+		// detached rebuild catch up — the same choice #1733 made for a refresh,
+		// for the same reason: measured on this machine, 8 of the 56 recalls an
+		// agent actually made landed in this sentence, and an agent does not ask
+		// again, it concludes there is no history. Of the last four upgrades,
+		// three changed only what deja derives from a transcript.
+		if !index.Damaged(dir) && index.ReadableSnapshot(dir) {
+			return ""
+		}
 		return "deja is rebuilding its index for this version of deja. Recall comes online shortly; ask again then."
 	}
 	// Nothing indexed yet and nothing building: this is a first run, and

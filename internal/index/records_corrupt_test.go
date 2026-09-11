@@ -64,8 +64,12 @@ func TestFirstMatchSurfacesCorruption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// [size][keyID][pathID][roleID][flag]: past the three interned ids is the
+	// encoding byte, and an unknown one is corruption.
 	off := 4
 	_, k := binary.Uvarint(b[off:])
+	off += k
+	_, k = binary.Uvarint(b[off:])
 	off += k
 	_, k = binary.Uvarint(b[off:])
 	off += k
@@ -101,8 +105,12 @@ func TestEachRecordAtSurfacesCorruption(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Flip the first record's encoding flag (after the two leading varints).
+	// [size][keyID][pathID][roleID][flag]: past the three interned ids is the
+	// encoding byte, and an unknown one is corruption.
 	off := 4
 	_, k := binary.Uvarint(b[off:])
+	off += k
+	_, k = binary.Uvarint(b[off:])
 	off += k
 	_, k = binary.Uvarint(b[off:])
 	off += k

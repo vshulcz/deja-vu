@@ -55,7 +55,7 @@ func TestRecallNamesTheFilesUnderTheBestHit(t *testing.T) {
 		"/w/app/internal/queue/backoff.go",
 		"/w/app/internal/queue/jitter.go",
 	)
-	got := recallTouchedLine(dir, s)
+	got := recallTouchedLine(dir, s, nil)
 	if got == "" {
 		t.Fatal("no line for a session that edited three files")
 	}
@@ -107,7 +107,7 @@ func TestRecallCountsTheFilesItDidNotName(t *testing.T) {
 		t.Fatalf("the store kept %d paths, at or under the line's cap of %d: there is no overflow to check, so the fixture needs more paths or the manifest cap moved",
 			held, recallTouchedFiles)
 	}
-	got := recallTouchedLine(dir, s)
+	got := recallTouchedLine(dir, s, nil)
 	if got == "" {
 		t.Fatal("no line for a session that edited seven files")
 	}
@@ -138,7 +138,7 @@ func TestRecallCountsTheFilesItDidNotName(t *testing.T) {
 // inventing one would name a directory none of them are in.
 func TestRecallLeavesUnrelatedPathsWhole(t *testing.T) {
 	dir, s := touchedLineStore(t, "/one/alpha.go", "/two/beta.go")
-	got := recallTouchedLine(dir, s)
+	got := recallTouchedLine(dir, s, nil)
 	if got == "" {
 		t.Fatal("no line for a session that edited two files")
 	}

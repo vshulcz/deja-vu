@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -89,7 +91,15 @@ const recallTouchedFiles = 4
 // recallTouchedLine renders the files the session worked on, from the manifest
 // rather than the hit (a hit carries only matching messages). Empty when the
 // session touched nothing recorded — a conversation with no file work.
-func recallTouchedLine(dir string, s model.Session) string {
+//
+// The files the question is about come first. The manifest keeps Touched sorted
+// by path, so a session that worked on many files named the same four — the ones
+// whose paths sort first — to every question that reached it: measured over
+// sixteen recall calls on a real store, 1 of the 10 lines served held any word of
+// the question, and one session answered four unrelated questions with the same
+// three paths. The line exists so an agent that has just learned "this was
+// solved here" knows where to look, and alphabetical order does not know that.
+func recallTouchedLine(dir string, s model.Session, terms []string) string {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
 		return ""
@@ -98,7 +108,7 @@ func recallTouchedLine(dir string, s model.Session) string {
 		if m.ID != s.ID || len(m.Touched) == 0 {
 			continue
 		}
-		paths := m.Touched
+		paths := pathsAboutIt(m.Touched, terms)
 		extra := 0
 		if len(paths) > recallTouchedFiles {
 			extra = len(paths) - recallTouchedFiles
@@ -108,11 +118,13 @@ func recallTouchedLine(dir string, s model.Session) string {
 		// under one repo repeat its absolute prefix four times, which is most
 		// of the line's cost and none of its meaning. Relative paths are also
 		// what the agent will type next.
-		root := commonDirPrefix(paths)
+		root := majorityDirPrefix(paths)
 		shown := paths
 		if root != "" {
 			shown = make([]string, len(paths))
 			for i, p := range paths {
+				// A path outside the root keeps its own: the root is named for
+				// the ones under it, not claimed over all of them.
 				shown[i] = strings.TrimPrefix(p, root)
 			}
 		}
@@ -126,6 +138,77 @@ func recallTouchedLine(dir string, s model.Session) string {
 		return search.SafeLine(out)
 	}
 	return ""
+}
+
+// pathsAboutIt puts the paths a question names ahead of the rest, keeping both
+// groups in the order the manifest recorded them so nothing else about the line
+// moves.
+func pathsAboutIt(paths, terms []string) []string {
+	if len(terms) == 0 || len(paths) < 2 {
+		return paths
+	}
+	var want []string
+	for _, t := range terms {
+		t = strings.ToLower(t)
+		// Two letters name nothing in a path; "go" and "md" would put every
+		// file first.
+		if utf8.RuneCountInString(t) >= 4 && !query.IsStopWord(t) {
+			want = append(want, t)
+		}
+	}
+	if len(want) == 0 {
+		return paths
+	}
+	named := make([]string, 0, len(paths))
+	rest := make([]string, 0, len(paths))
+	for _, p := range paths {
+		low := strings.ToLower(p)
+		hit := false
+		for _, t := range want {
+			if strings.Contains(low, t) {
+				hit = true
+				break
+			}
+		}
+		if hit {
+			named = append(named, p)
+		} else {
+			rest = append(rest, p)
+		}
+	}
+	return append(named, rest...)
+}
+
+// majorityDirPrefix is commonDirPrefix for a real session: the directory most of
+// these paths share, even when one of them sits somewhere else entirely.
+//
+// Requiring every path to share it made one outlier cost the whole line: a
+// session that edited three files in one repo and ran one script in /private/tmp
+// printed four absolute paths — 255 bytes where 90 say the same thing, on a line
+// whose whole job is to be short. Measured across sixteen recall calls on a real
+// store, four of the ten lines served were absolute for this reason.
+//
+// Majority, not "all but one": a line of four paths from four different trees has
+// no root to name, and saying one would be a claim about paths that are not under
+// it.
+func majorityDirPrefix(paths []string) string {
+	if root := commonDirPrefix(paths); root != "" {
+		return root
+	}
+	if len(paths) < 3 {
+		return ""
+	}
+	best := ""
+	for i := range paths {
+		// Leave one out and ask the same question of the rest.
+		rest := make([]string, 0, len(paths)-1)
+		rest = append(rest, paths[:i]...)
+		rest = append(rest, paths[i+1:]...)
+		if root := commonDirPrefix(rest); len(root) > len(best) {
+			best = root
+		}
+	}
+	return best
 }
 
 // commonDirPrefix returns the longest directory prefix every path shares,

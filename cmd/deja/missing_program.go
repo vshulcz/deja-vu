@@ -46,11 +46,89 @@ func missingProgramLine(dir, cmd string) string {
 			continue
 		}
 		if n := index.FrictionSessions(dir, sig, allow); n >= missingProgramMinSessions {
-			return fmt.Sprintf("%s is not on this machine — %s ran into that.",
+			line := fmt.Sprintf("%s is not on this machine — %s ran into that.",
 				prog, toolSessionCount(n))
+			return line + missingProgramRemedy(dir, prog, allow)
 		}
 	}
 	return ""
+}
+
+// missingProgramRemedy adds what this machine did instead, when what it did was
+// simply to leave the program out.
+//
+// The line above states a fact and recommends nothing, and the note on this file
+// says what that is worth: of the ten sessions told at session start that
+// `timeout` was missing, nine ran it anyway. The store knows more than the fact.
+// Both pairs recorded for `timeout` on this machine are the same command with
+// the wrapper taken out — `timeout 12 launchctl kickstart …` followed by
+// `launchctl kickstart …` — which is a remedy an agent can apply without reading
+// another project's command line.
+//
+// Only that shape. A pair whose remedy is a different program ("use python3") is
+// a claim about this machine's toolchain that one recorded run does not support,
+// and a pair whose remedy is a diagnostic (`docker info | grep …`, which is what
+// the store holds for docker) is not a remedy at all.
+func missingProgramRemedy(dir, prog string, allow func(project string) bool) string {
+	for _, p := range index.FixesFor(dir, "command not found: "+prog, 4, allow) {
+		if sameCommandWithout(p.Failed, p.Command, prog) {
+			return " The same command ran without it."
+		}
+	}
+	return ""
+}
+
+// sameCommandWithout reports whether worked is failed with the program — and the
+// argument a wrapper takes, like `timeout 90` — removed and nothing else
+// changed.
+func sameCommandWithout(failed, worked, prog string) bool {
+	if failed == "" || worked == "" {
+		return false
+	}
+	var kept []string
+	dropNext := false
+	found := false
+	for _, f := range strings.Fields(strings.TrimPrefix(strings.TrimSpace(failed), "$ ")) {
+		if dropNext {
+			dropNext = false
+			// A wrapper's first argument is its own — `timeout 90` — and the
+			// next token after the program is dropped with it only when it is
+			// not part of the work.
+			if isWrapperArgument(f) {
+				continue
+			}
+		}
+		if f == prog {
+			found = true
+			dropNext = true
+			continue
+		}
+		kept = append(kept, f)
+	}
+	if !found {
+		return false
+	}
+	return strings.Join(kept, " ") == strings.Join(strings.Fields(strings.TrimPrefix(strings.TrimSpace(worked), "$ ")), " ")
+}
+
+// isWrapperArgument reports whether a token is the kind of argument a wrapper
+// takes rather than part of the command it wraps: a duration, a signal, a
+// number.
+func isWrapperArgument(tok string) bool {
+	if tok == "" || strings.HasPrefix(tok, "-") {
+		return false
+	}
+	for i, r := range tok {
+		if r >= '0' && r <= '9' {
+			continue
+		}
+		// A trailing unit is part of a duration: 90s, 2m, 1h.
+		if i > 0 && (r == 's' || r == 'm' || r == 'h' || r == '.') && i == len(tok)-1 {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // commandPrograms lists what a command line invokes: the first word of each

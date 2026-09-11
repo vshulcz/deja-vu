@@ -613,10 +613,16 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Marathon, nil)
 	finishPromptArm(&report.Fresh, nil)
 	finishPromptArm(&report.Bucket, nil)
-	// Asked against the project that holds every one of its words.
+	// Asked against the project that holds every one of its words, and asked
+	// through the hook rather than through the bar alone: the hook has gates the
+	// bar does not — whether anyone spoke the subject, whether the block was
+	// already delivered — and an arm that stops before them cannot see a change
+	// to them. Measured both ways on this corpus the two agree (3 of 3 fire, and
+	// 2 of 3 on the absent subjects below), so this costs nothing today and
+	// stops the arm reporting a bar the product does not apply alone.
 	for _, q := range offTopicQuestions() {
 		report.OffTopic.Cases++
-		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
+		if fired, _ := hookEndToEndAs(indexDir, bench.PromptHaystackProject, q, "", "", "zz-offtopic"); fired {
 			report.OffTopic.Fired++
 			report.OffTopic.FalseFires++
 		}
@@ -628,7 +634,7 @@ func measurePrompt(seed int64) (promptReport, error) {
 	finishPromptArm(&report.Tied, nil)
 	for _, q := range absentSubjectQuestions() {
 		report.AbsentSubject.Cases++
-		if fired, _ := promptBenchProbe(indexDir, bench.PromptHaystackProject, "no-such-chain", prompt.Terms(q)); fired {
+		if fired, _ := hookEndToEndAs(indexDir, bench.PromptHaystackProject, q, "", "", "zz-absent"); fired {
 			report.AbsentSubject.Fired++
 			report.AbsentSubject.FalseFires++
 		}

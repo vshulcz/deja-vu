@@ -516,7 +516,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// incremental build carries the old stamp forward: it keeps records it
 	// wrote under the previous patterns, which is why `deja index` has to ask
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -618,14 +618,25 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// under the previous phase's last percentage, so the bar sat still through
 	// it (#3372).
 	reportPhase("mining fixes and commands", 4)
-	buildCooccur(tmp, ss)
-	reportAdvance(1)
-	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
-	reportAdvance(1)
-	buildCommands(tmp, ss)
-	reportAdvance(1)
-	buildCommandFails(tmp, ss)
-	reportAdvance(1)
+	// Four passes over the same sessions, each writing its own file and reading
+	// nothing the others write, so they run together rather than one after the
+	// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
+	// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
+	var sidecars sync.WaitGroup
+	for _, build := range []func(){
+		func() { buildCooccur(tmp, ss) },
+		func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
+		func() { buildCommands(tmp, ss) },
+		func() { buildCommandFails(tmp, ss) },
+	} {
+		sidecars.Add(1)
+		go func() {
+			defer sidecars.Done()
+			build()
+			reportAdvance(1)
+		}()
+	}
+	sidecars.Wait()
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
 		return err
@@ -1081,7 +1092,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	parsedThisPass(files)
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -3030,7 +3041,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// keyed on it — the embedding sidecar — that the file it measured was still
 	// there (#1357). Only appendIncremental, which appends in place, may keep a
 	// generation.
-	m := Manifest{Version: version, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(),
+	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
 		Compactions: cloneCompactions(old.Compactions),
@@ -3372,6 +3383,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	}
 	m := old
 	m.Version = version
+	m.Format = onDiskFormat
 	m.Scope = scope
 	m.BuiltAt = time.Now()
 	m.Files = files

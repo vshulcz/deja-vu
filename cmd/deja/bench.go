@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/embed"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -23,6 +24,13 @@ type benchMetric struct {
 	// every query returns exactly five hits, so recall@5 says only whether the
 	// session came back at all and recall@10 cannot differ from it — reversing
 	// the ranking left both at 1.00 (#2933).
+	//
+	// They only started moving once each query named one session: while five
+	// queries shared a string and five sessions shared a text, a perfect ranker
+	// scored 0.20 and 0.457, which is what this printed for a long time. With
+	// the subject plus the occasion naming one session, all four columns sit at
+	// 1.00 and the bench is a regression gate: the test asserts the top, so a
+	// ranking change that moves one answer off first place fails CI.
 	RecallAt1             float64 `json:"recall_at_1"`
 	MRR                   float64 `json:"mrr"`
 	RecallAt5             float64 `json:"recall_at_5"`
@@ -326,11 +334,30 @@ func benchmarkTempDir() (string, error) {
 		return "", err
 	}
 	parent := filepath.Join(workingDir, ".deja-bench")
+	if err := benchCorpusVisible(parent); err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(parent, 0o700); err != nil {
 		return "", err
 	}
 	sweepStaleBenchRuns(parent, time.Now())
 	return os.MkdirTemp(parent, "run-")
+}
+
+// benchCorpusVisible refuses to measure a corpus deja cannot see.
+//
+// The corpus is written under the working directory, and the ignore rule is a
+// property of paths rather than of configuration — so a bench run from a
+// directory the rule covers indexes its corpus and then finds none of it. Every
+// arm reads zero, which is indistinguishable from a surface that has stopped
+// working: `deja bench prompt` printed 0 of 13 real questions from a tree under
+// `~/.claude/jobs/`, and 13 of 13 from a directory beside it.
+func benchCorpusVisible(parent string) error {
+	pol := policy.Load()
+	if !pol.Ignored(parent, "") {
+		return nil
+	}
+	return fmt.Errorf("bench: the corpus would sit in %s, which deja's ignore rule hides, so every arm would read zero — run the bench from a directory the rule does not cover", parent)
 }
 
 // sweepStaleBenchRuns removes what interrupted runs left behind.
