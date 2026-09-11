@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -211,11 +212,35 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	return model.ContextFact{}
 }
 
+// trivialContinuation reports whether a user turn is a way of saying "carry on"
+// rather than the task being resumed.
+//
+// The list it held was English and exact, so a reader who types "продолжай" —
+// the commonest turn on the machine this was measured on — became the packet's
+// objective, which is the first line a resuming agent reads. nudgeWords covers
+// the same idea in the languages a real store holds.
+//
+// Only the nudge words themselves, not worthAsAsk: that helper also applies a
+// minimum length, which is right for picking a handover ask and wrong here —
+// "Repair the parser." is eighteen runes and is the task.
 func trivialContinuation(text string) bool {
-	text = strings.ToLower(strings.Trim(strings.Join(strings.Fields(text), " "), " .,!?:;"))
-	switch text {
-	case "yes", "y", "ok", "okay", "thanks", "continue", "go on", "proceed", "please continue", "continue please":
+	text = strings.TrimSpace(strings.Join(strings.Fields(text), " "))
+	if text == "" {
 		return true
+	}
+	low := strings.ToLower(strings.Trim(text, " .,!?:;"))
+	switch low {
+	case "y", "proceed", "please continue", "continue please":
+		return true
+	}
+	for _, nudge := range nudgeWords {
+		if low == nudge {
+			return true
+		}
+		// "давай дальше", "ok go on": a nudge and a word or two, nothing else.
+		if strings.HasPrefix(low, nudge+" ") && utf8.RuneCountInString(low) < askMinRunes+10 {
+			return true
+		}
 	}
 	return false
 }
