@@ -331,7 +331,7 @@ func applyPatchFiles(patch string) []string {
 // That rule exists so deja cannot endorse a command it half recognises; a
 // warning cannot endorse anything, and its cost when wrong is a line the
 // reader ignores.
-func commandFailureLine(dir, cmd string) string {
+func commandFailureLine(dir, cwd, cmd string) string {
 	pol := policy.Load()
 	fail, ok := index.CommandFailedBefore(dir, cmd, func(project string) bool {
 		return pol.Allows(policy.ActivationAuto, project)
@@ -339,8 +339,33 @@ func commandFailureLine(dir, cmd string) string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("Last time this machine ran %s it ended with: %s (in %s)",
-		search.SafeCommand(fail.Head), search.SafeLine(fail.Line), toolSessionCount(fail.Sessions))
+	// Where it happened, when that is not here. The line is keyed on the shape
+	// of the command, and the shape travels: `go test ./...` is every Go
+	// checkout on the machine. In a directory deja has never seen, 2 of 15
+	// ordinary build and test commands drew a warning and both were another
+	// repository's own failure — a named test, a ten-minute timeout — read as
+	// if this project's suite were broken. The fix pair says "in <project>" for
+	// the same reason (#2363); this said "this machine" and stopped there.
+	where := ""
+	if project := strings.TrimSpace(search.SafeLine(fail.Project)); project != "" && !hookProjectIs(cwd, fail.Project) {
+		where = " in " + project
+	}
+	return fmt.Sprintf("Last time this machine ran %s%s it ended with: %s (in %s)",
+		search.SafeCommand(fail.Head), where, search.SafeLine(fail.Line), toolSessionCount(fail.Sessions))
+}
+
+// hookProjectIs reports whether a recorded project is the one the agent is
+// working in, by the same names the rest of the hook ranks with.
+func hookProjectIs(cwd, project string) bool {
+	if project == "" {
+		return false
+	}
+	for _, name := range digest.ProjectNameCandidates(cwd) {
+		if strings.EqualFold(name, project) {
+			return true
+		}
+	}
+	return false
 }
 
 func commandHookLine(dir, cwd, cmd string) string {
@@ -366,7 +391,7 @@ func commandHookLine(dir, cwd, cmd string) string {
 	if line := missingProgramLine(dir, cmd); line != "" {
 		return line
 	}
-	if line := commandFailureLine(dir, cmd); line != "" {
+	if line := commandFailureLine(dir, cwd, cmd); line != "" {
 		return line
 	}
 	use, ok := index.CommandHistory(dir, cmd)
