@@ -995,6 +995,38 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
+// abandonmentWorthSaying reports whether the give-up mark tells a reader
+// something about this hit.
+//
+// GaveUp is a property of the whole session: one line anywhere saying something
+// was dropped marks all of it. On a short session that is useful — "one path
+// here was abandoned, check the excerpts for which" names a real thing to look
+// for. On a marathon it is certain and therefore empty: measured over twelve
+// real queries, the mark sat on 23 of 60 hits, and the sessions carrying it were
+// this machine's longest — 4.2 million words, 3.1 million, 2.0 million. Of
+// course something was dropped somewhere in four million words.
+//
+// The same reasoning the rest of this file applies to a haystack: the claim has
+// to be about something the reader can act on. So the mark stands on a session
+// small enough to scan and goes on one where "somewhere in here" names no place.
+//
+// Size is the whole test on purpose. The sharper rule — does a give-up line sit
+// in the excerpts this hit shows — needs the phrase list that recognises one,
+// and that list lives in internal/index, which cannot be imported here.
+// Re-spelling it in this package is the mistake #3473 just fixed in the line
+// above: two recognisers for one idea, and the narrower one wins by accident.
+// A session with no recorded length keeps the mark: an unknown is not a
+// marathon.
+func abandonmentWorthSaying(h Hit) bool {
+	return h.Session.Words == 0 || h.Session.Words <= abandonmentScannableWords
+}
+
+// abandonmentScannableWords is how long a session can be before "somewhere in
+// here" stops being a place. Thirty thousand words is a long working session and
+// still a thing a reader can search; this machine's marathons are two orders
+// above it.
+const abandonmentScannableWords = 30000
+
 // lifecycleSummary words a hit's recorded state for a person. It says what
 // happened rather than naming the state: "superseded" is our vocabulary, not
 // the reader's.
@@ -1304,7 +1336,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// wording is deliberately mild: a session that tried one thing, dropped
 		// it and found another is the most useful kind, so this flags an
 		// abandoned approach inside it, not the whole session as a dead end.
-		if h.Session.GaveUp && h.Lifecycle == "" {
+		if h.Session.GaveUp && h.Lifecycle == "" && abandonmentWorthSaying(h) {
 			note := "  mentions backing an approach out — one path here was abandoned"
 			if color {
 				note = cDim + note + cReset
