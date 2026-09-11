@@ -55,6 +55,7 @@ open. Rebuilds take 30s instead of 51, a recall answer 0.9s instead of 2.3, and
 - An announcement of intent is not a decision: 13% of the lines read as decisions were plans, and a block leading with one reads as having no decision at all. (#3470)
 - The weak-match pointer names what was asked about instead of the session's title, where "how is the block" came back as an unrelated task note. (#3471)
 - The mark for an abandoned approach is dropped on sessions too long to scan — 23 of 60 search hits and 32 marks across sixteen recall answers were on million-word sessions. (#3474, #3478)
+- A quoted excerpt is what someone said, not what the harness or deja said: over twelve queries, 6% of 77 quoted lines were a teammate-message envelope and 6% deja's own credit sentence coming round again. (#3457)
 - A compaction summary does not fill `recall_context`: it names everything a session did, so it matched any question and was 95% of three of eight answers, 44% of the bytes served. (#3459)
 - The command warning names the project the failure happened in, so a command shape that travels between checkouts stops reporting another repository's test failure as this one's. (#3486)
 - VS Code Copilot Chat: a turn the editor raised itself is not the person's words. A background-completion notification carried a command's stdout under the user role, and a confirmation click was indexed as a typed sentence; the turn still times the session and its work records are unchanged. (#3452)
