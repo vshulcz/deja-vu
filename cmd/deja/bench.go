@@ -24,6 +24,10 @@ type benchMetric struct {
 	// every query returns exactly five hits, so recall@5 says only whether the
 	// session came back at all and recall@10 cannot differ from it — reversing
 	// the ranking left both at 1.00 (#2933).
+	//
+	// They only started moving once each query named one session: while five
+	// queries shared a string and five sessions shared a text, a perfect ranker
+	// scored 0.20 and 0.457, which is what this printed for a long time.
 	RecallAt1             float64 `json:"recall_at_1"`
 	MRR                   float64 `json:"mrr"`
 	RecallAt5             float64 `json:"recall_at_5"`

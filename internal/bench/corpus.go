@@ -64,6 +64,16 @@ func Generate(seed int64) Corpus {
 		project := fmt.Sprintf("project-%02d", i%25)
 		text := fmt.Sprintf("routine %s session %d recorded a harmless status update", t.name, i)
 		if i < QueryCount {
+			// One query, one session. The topic used to come from i%10 and the
+			// variant from i%5, which makes the variant a function of the topic:
+			// all five gold sessions of a topic got the same text, and the five
+			// queries built from them were the same string with five different
+			// "correct" answers. A perfect ranker scored recall@1 0.20 and MRR
+			// 0.457 — (1 + 1/2 + 1/3 + 1/4 + 1/5)/5 to three places, which is
+			// what the bench reported — so the headline ranking numbers measured
+			// the tie and could not move. Ten topics and five variants make fifty
+			// distinct pairs.
+			t = topics[i/5]
 			variant := i % 5
 			switch variant {
 			case 0:
