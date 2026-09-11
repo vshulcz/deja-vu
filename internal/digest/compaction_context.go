@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
@@ -228,21 +227,52 @@ func trivialContinuation(text string) bool {
 	if text == "" {
 		return true
 	}
+	// Punctuation between the words too: "thanks, continue" and "ага, давай" are
+	// the same turn as without the comma.
 	low := strings.ToLower(strings.Trim(text, " .,!?:;"))
-	switch low {
-	case "y", "proceed", "please continue", "continue please":
-		return true
-	}
-	for _, nudge := range nudgeWords {
-		if low == nudge {
-			return true
+	low = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		switch r {
+		case ',', ';', '.', '!', '?', ':':
+			return ' '
 		}
-		// "давай дальше", "ok go on": a nudge and a word or two, nothing else.
-		if strings.HasPrefix(low, nudge+" ") && utf8.RuneCountInString(low) < askMinRunes+10 {
-			return true
+		return r
+	}, low)), " ")
+	// "ok go on", "да давай дальше": nudges all the way down, and nothing else.
+	// Bounding by length instead let a new instruction through as a nudge — and
+	// "давай <do X>" is how an instruction is usually given on this store:
+	// measured against this rule, "давай починим экспортер", "ok cap the retries
+	// at three", "continue with the parser fix", "yes revert it" and "go fix the
+	// pool" all read as "carry on", so the packet kept naming the task the reader
+	// had just replaced.
+	return onlyNudges(low)
+}
+
+// continuationWords are the nudge words plus the ways of saying only "carry on"
+// that the handover picker has no use for: `nudgeWords` is shared with it, and
+// these belong to this rule alone.
+var continuationWords = append(append([]string{}, nudgeWords...),
+	"y", "proceed", "please", "please continue", "continue please", "please do it")
+
+// onlyNudges reports whether the turn is made of nudge words and nothing else.
+// Longest match first, so "давай дальше" is one nudge rather than "давай" plus a
+// word it does not know.
+func onlyNudges(low string) bool {
+	for low != "" {
+		best := ""
+		for _, nudge := range continuationWords {
+			if len(nudge) <= len(best) {
+				continue
+			}
+			if low == nudge || strings.HasPrefix(low, nudge+" ") {
+				best = nudge
+			}
 		}
+		if best == "" {
+			return false
+		}
+		low = strings.TrimSpace(strings.TrimPrefix(low, best))
 	}
-	return false
+	return true
 }
 
 func contextRef(s model.Session, m model.Message) model.ContextRef {
@@ -467,10 +497,16 @@ func boundCompactionContext(c model.CompactionContext) model.CompactionContext {
 		}
 		c.Truncated = true
 		switch {
-		case len(c.Conclusions) > 0:
-			c.Conclusions = c.Conclusions[1:]
+		// The command list goes before the conclusions. A resuming agent can
+		// re-run a command; it cannot re-derive what the last session settled,
+		// and that is the whole reason the packet exists. Measured on the local
+		// model with a packet over its budget: conclusions-first answered the
+		// question 3 of 3 times against 1 of 3 when the command list was kept
+		// and the conclusions were the first thing dropped.
 		case len(c.Tests) > 0:
 			c.Tests = c.Tests[1:]
+		case len(c.Conclusions) > 0:
+			c.Conclusions = c.Conclusions[1:]
 		case len(c.Gaps) > 1:
 			c.Gaps = c.Gaps[:len(c.Gaps)-1]
 		case len(c.Conflicts) > 1:
@@ -524,8 +560,14 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 	}
 	addOpenSection(&b, &omittedAny, limit, "Explicit gaps", c.Gaps)
 	addOpenSection(&b, &omittedAny, limit, "Explicit conflicts", c.Conflicts)
-	addTestSection(&b, &omittedAny, limit, c.Tests)
+	// Conclusions before the command list, for the reason boundCompactionContext
+	// drops the list first: the render budget cuts from the bottom, so whatever
+	// is printed last is what a tight packet loses.
+	// Conclusions before the command list, for the reason boundCompactionContext
+	// drops the list first: the render budget cuts from the bottom, so whatever
+	// is printed last is what a tight packet loses.
 	addFactSection(&b, &omittedAny, limit, "Assistant-reported conclusions", c.Conclusions)
+	addTestSection(&b, &omittedAny, limit, c.Tests)
 	if omittedAny && b.Len()+len(omitted) <= byteBudget {
 		b.WriteString(omitted)
 	}
