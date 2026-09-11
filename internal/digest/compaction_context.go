@@ -655,30 +655,49 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 	return out
 }
 
+// renderFreshness says whether the conclusions below still describe this
+// checkout, in the words a resuming agent can act on.
+//
+// It used to print the fingerprints: `head=<40 hex>, branch=master,
+// worktree=<64 hex>, checked=<stamp>` — 150 bytes of a 1.4 KB packet, and the
+// worktree hash is deja's own digest of the tree, which nothing outside deja can
+// do anything with. What the agent needs is the verdict the recovery path has
+// already worked out: unchanged, or changed and here is the commit it was
+// captured at, which is enough for a diff.
+//
+// The error case also read as "Repository freshness unavailable: Repository
+// changed since compaction." — the recovery path puts its verdict in the same
+// field, so the prefix contradicted it.
 func renderFreshness(f model.RepositoryFreshness) string {
 	if strings.HasPrefix(f.WorktreeState, "partial:") {
 		return "Repository fingerprint is partial; validate files and tests before reusing conclusions.\n"
 	}
 	if f.Error != "" {
-		return "Repository freshness unavailable: " + f.Error + "\n"
+		line := f.Error
+		if !strings.HasPrefix(strings.ToLower(line), "repository") {
+			line = "Repository freshness unavailable: " + line
+		}
+		if head := shortHead(f.Head); head != "" {
+			line += " Captured at " + head + "."
+		}
+		return line + "\n"
 	}
-	var parts []string
-	if f.Head != "" {
-		parts = append(parts, "head="+f.Head)
-	}
-	if f.Branch != "" {
-		parts = append(parts, "branch="+f.Branch)
-	}
-	if f.WorktreeState != "" {
-		parts = append(parts, "worktree="+f.WorktreeState)
-	}
-	if !f.CheckedAt.IsZero() {
-		parts = append(parts, "checked="+f.CheckedAt.UTC().Format(time.RFC3339))
-	}
-	if len(parts) == 0 {
+	if f.Head == "" && f.Branch == "" {
 		return "Repository freshness unavailable: hook did not record it.\n"
 	}
-	return "Repository freshness: " + strings.Join(parts, ", ") + "\n"
+	line := "Repository unchanged since capture"
+	if f.Branch != "" {
+		line += " (branch " + f.Branch + ")"
+	}
+	return line + ".\n"
+}
+
+// shortHead is a commit an agent can pass to git, without the rest of the hash.
+func shortHead(head string) string {
+	if len(head) < 12 {
+		return head
+	}
+	return head[:12]
 }
 
 func addOpenSection(b *strings.Builder, omitted *bool, limit int, title string, items []model.ContextOpenItem) {

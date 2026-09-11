@@ -301,7 +301,9 @@ func TestRenderCompactionContextRendersEveryEvidenceClassWithProvenance(t *testi
 	}
 	got := RenderCompactionContext(c, 4096)
 	for _, want := range []string{
-		"Repository freshness: head=abc, branch=main, worktree=clean-digest",
+		// The verdict rather than the fingerprints: the worktree hash is deja's
+		// own digest and nothing outside deja can use it.
+		"Repository unchanged since capture (branch main).",
 		"Objective", "Explicit gaps", "Explicit conflicts", "Recorded verification commands", "Assistant-reported conclusions",
 		"[passed]", "[codex:session-abcdef/assistant @2026-09-10T12:00:00Z]",
 	} {
