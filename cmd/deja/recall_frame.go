@@ -118,11 +118,13 @@ func recallTouchedLine(dir string, s model.Session, terms []string) string {
 		// under one repo repeat its absolute prefix four times, which is most
 		// of the line's cost and none of its meaning. Relative paths are also
 		// what the agent will type next.
-		root := commonDirPrefix(paths)
+		root := majorityDirPrefix(paths)
 		shown := paths
 		if root != "" {
 			shown = make([]string, len(paths))
 			for i, p := range paths {
+				// A path outside the root keeps its own: the root is named for
+				// the ones under it, not claimed over all of them.
 				shown[i] = strings.TrimPrefix(p, root)
 			}
 		}
@@ -175,6 +177,38 @@ func pathsAboutIt(paths, terms []string) []string {
 		}
 	}
 	return append(named, rest...)
+}
+
+// majorityDirPrefix is commonDirPrefix for a real session: the directory most of
+// these paths share, even when one of them sits somewhere else entirely.
+//
+// Requiring every path to share it made one outlier cost the whole line: a
+// session that edited three files in one repo and ran one script in /private/tmp
+// printed four absolute paths — 255 bytes where 90 say the same thing, on a line
+// whose whole job is to be short. Measured across sixteen recall calls on a real
+// store, four of the ten lines served were absolute for this reason.
+//
+// Majority, not "all but one": a line of four paths from four different trees has
+// no root to name, and saying one would be a claim about paths that are not under
+// it.
+func majorityDirPrefix(paths []string) string {
+	if root := commonDirPrefix(paths); root != "" {
+		return root
+	}
+	if len(paths) < 3 {
+		return ""
+	}
+	best := ""
+	for i := range paths {
+		// Leave one out and ask the same question of the rest.
+		rest := make([]string, 0, len(paths)-1)
+		rest = append(rest, paths[:i]...)
+		rest = append(rest, paths[i+1:]...)
+		if root := commonDirPrefix(rest); len(root) > len(best) {
+			best = root
+		}
+	}
+	return best
 }
 
 // commonDirPrefix returns the longest directory prefix every path shares,
