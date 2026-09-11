@@ -110,12 +110,17 @@ func TestTheFreedSlotIsFilled(t *testing.T) {
 	turns := []struct{ role, text string }{
 		// The matched question comes last, so its answer is also the newest
 		// conclusion — which is the case where the repeat costs a slot.
+		//
+		// Every turn is about the retry queue: the list only carries what the
+		// question is about, so a session whose other conclusions were about
+		// other work would show one line here for that reason rather than this
+		// one.
 		{"user", "the timeouts"},
-		{"assistant", "TIMEOUTS: the read timeout stays at thirty seconds for now."},
+		{"assistant", "TIMEOUTS: the retry queue read timeout stays at thirty seconds for now."},
 		{"user", "the pool"},
-		{"assistant", "POOL: capped the connection pool at sixteen per worker."},
+		{"assistant", "POOL: capped the retry queue workers at sixteen each."},
 		{"user", "the alerts"},
-		{"assistant", "ALERTS: page only on the second consecutive failure."},
+		{"assistant", "ALERTS: page only on the second consecutive retry queue failure."},
 		{"user", "what did we decide about the retry queue backoff in the end"},
 		{"assistant", "ANSWER: we settled on full jitter with three attempts, then give up."},
 	}
