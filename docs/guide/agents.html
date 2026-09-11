@@ -109,7 +109,7 @@
 <tr><td><code>remember</code></td><td>Store a durable decision so a future session can recall it. Redacted and indexed like any other source.</td></tr>
 </tbody></table>
 <h2>Auto-recall</h2>
-<p><code>deja install --auto</code> wires recall into the moments an agent works, not only when it thinks to ask. Where a harness supports each hook, memory arrives on its own at four points:</p>
+<p><code>deja install --auto</code> wires recall into the moments an agent works, not only when it thinks to ask. Where a harness supports each hook, memory arrives on its own at five points:</p>
 <ul>
 <li><b>At session start</b> — relevant project memory before you type, ranked by the files your repo is touching, and led by the decisions you promoted <em>accepted</em> for this project, so the agent follows what was settled instead of re-deciding it. Read-only, capped at 2&nbsp;KB, framed as untrusted historical data so it never acts as an instruction.</li>
 <li><b>On each prompt</b> — deja searches your history for what the prompt is actually about, and when it matches work already answered says so out loud: <code>deja-vu: you have been here</code>. Wired wherever the harness hands a hook the prompt: Claude Code, Codex, Cursor, Gemini CLI, Qwen, Kimi, Cline, OpenClaw, pi, omp, DeepSeek Harness, Grok Build, and Goose under <code>deja goose</code>. The rest get the session-start half only, which is memory chosen before you typed.</li>
