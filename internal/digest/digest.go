@@ -1075,6 +1075,9 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 	if quotesDeja(low) {
 		return false
 	}
+	if announcesItself(low) {
+		return false
+	}
 	for _, p := range planAfterMarker {
 		// A plan may still report an outcome elsewhere in the line, so this
 		// blanks the plan wording rather than disqualifying the whole line.
@@ -1093,6 +1096,37 @@ func CarriesDecisionExcept(text string, asked []string) bool {
 			}
 		}
 		if !skip {
+			return true
+		}
+	}
+	return false
+}
+
+// planOpeners are how a line announces what is about to happen rather than
+// reporting what came of it. planAfterMarker handles the same idea mid-sentence
+// ("готово. теперь давай"); this is its sibling for the opening clause, where
+// the marker the decision rule fires on sits inside the thing being planned:
+// "Проверяю, что видео теперь играет" fires on "теперь", "I'll look at the git
+// history for the Gemini extension to find the fix" on "the fix".
+//
+// Counted over 985 distinct assistant opening lines from a real store, 54 were
+// read as decisions and 7 of those — 13% — were announcements of intent. None of
+// the seven also reported an outcome, which is why the opener disqualifies the
+// line rather than being blanked out of it.
+var planOpeners = []string{
+	"i'll ", "i will ", "i'm going to", "i am going to", "let me ", "let's ",
+	"going to ", "about to ",
+	"ищу", "проверяю", "смотрю", "читаю", "реализую", "добавляю", "пишу ",
+	"делаю", "начинаю", "перемеряю", "спавню", "запускаю", "собираю", "сейчас ",
+}
+
+// announcesItself reports whether the line opens by saying what the speaker is
+// about to do. Only at the opening: a plan mentioned later in a line that
+// reports an outcome is what planAfterMarker is for.
+func announcesItself(low string) bool {
+	trimmed := strings.TrimLeft(low, "*#->•· \t")
+	for _, opener := range planOpeners {
+		if strings.HasPrefix(trimmed, opener) {
 			return true
 		}
 	}
