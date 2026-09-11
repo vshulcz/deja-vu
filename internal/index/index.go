@@ -190,6 +190,21 @@ import (
 // the scan reads a prefix and skips the rest. Records are the store itself, so
 // the layout change is what forces this bump.
 const version = 38
+
+// onDiskFormat is how the store is laid out on disk — the record encoding, the
+// bucket encoding, the manifest's own shape. It moves only when a reader of an
+// older store would mis-read it, which is rarer than version: of the last four
+// bumps, 35, 36 and 37 changed what deja derives from a transcript and left
+// every byte's meaning alone, and only 38 moved a field.
+//
+// The distinction is what a reader needs during the rebuild a bump forces. A
+// store whose content rules are stale still answers correctly under the old
+// rules; a store whose layout this build cannot read answers nothing. Measured
+// on a real machine: 8 of 56 recalls an agent actually made came back with
+// "deja is rebuilding its index for this version — ask again then", and an
+// agent does not ask again (#1733 says so about the refresh case). Three of the
+// last four upgrades could have kept answering.
+const onDiskFormat = 2
 const maxIndexedText = 64 * 1024
 
 // maxRecordSize bounds a single serialized record. A record is one message
@@ -414,7 +429,11 @@ const askedQuestionCap = 8
 const askedMaxRunes = 240
 
 type Manifest struct {
-	Version          int                    `json:"version"`
+	Version int `json:"version"`
+	// Format is the on-disk layout this store was written with. Absent on a
+	// store written before the field existed, which reads as unknown: a reader
+	// that cannot tell declines rather than guessing.
+	Format           int                    `json:"format,omitempty"`
 	Files            map[string]FileState   `json:"files"`
 	Sessions         map[string]SessionMeta `json:"sessions"`
 	BuiltAt          time.Time              `json:"built_at"`
@@ -495,7 +514,10 @@ type FileIngest struct {
 }
 
 type manifestCore struct {
-	Version          int
+	Version int
+	// Format: see Manifest. Written since onDiskFormat existed; absent on an
+	// older store, which reads as zero and means "cannot say".
+	Format           int
 	Files            map[string]FileState
 	BuiltAt          time.Time
 	Generation       string

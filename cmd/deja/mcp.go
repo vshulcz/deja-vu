@@ -1978,6 +1978,16 @@ func buildingNowForAgent(dir string) string {
 			return rebuildRefusedForAgent(dir)
 		}
 		requestWarmup(dir)
+		// A stale content version is not an unreadable store. When the layout is
+		// the one this build writes, answer from the snapshot and let the
+		// detached rebuild catch up — the same choice #1733 made for a refresh,
+		// for the same reason: measured on this machine, 8 of the 56 recalls an
+		// agent actually made landed in this sentence, and an agent does not ask
+		// again, it concludes there is no history. Of the last four upgrades,
+		// three changed only what deja derives from a transcript.
+		if !index.Damaged(dir) && index.ReadableSnapshot(dir) {
+			return ""
+		}
 		return "deja is rebuilding its index for this version of deja. Recall comes online shortly; ask again then."
 	}
 	// Nothing indexed yet and nothing building: this is a first run, and
