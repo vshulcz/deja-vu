@@ -22,7 +22,7 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.6%</b> on LoCoMo &middot; <b>millisecond</b> lookups over 5&nbsp;GB of history<br>
+<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7%</b> on LoCoMo &middot; <b>millisecond</b> lookups over 5&nbsp;GB of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -411,7 +411,7 @@ transcripts:
 
 | Measurement | Result |
 | --- | --- |
-| Lookup, in process | **~0.7 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~25 ms on the LongMemEval-S haystacks |
+| Lookup, in process | **~0.7 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
 | `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
 | Freshness check alone | ~50 ms when nothing changed |
 | Index size | 200 MB, ~10% of corpus |

@@ -129,7 +129,7 @@ deja bench recall     # 100 queries, half Russian; CI fails if recall drops</pre
 <p>That last one is a design decision rather than an optimisation. A memory that always says something teaches you to skip whatever it says, and then you are paying for a block nobody reads.</p>
 
 <h2>The other cost, which is not tokens</h2>
-<p>Latency. A lookup is a lexical query against a local index — a median of about 0.7 ms in process, around 25 ms on the LongMemEval-S haystacks. A hook pays process start and a freshness check across the stores on top, tens of milliseconds on a multi-gigabyte corpus. Nothing in that path waits on a model, which is the reason the numbers are in milliseconds rather than seconds.</p>
+<p>Latency. A lookup is a lexical query against a local index — a median of about 0.7 ms in process, around 19 ms on the LongMemEval-S haystacks. A hook pays process start and a freshness check across the stores on top, tens of milliseconds on a multi-gigabyte corpus. Nothing in that path waits on a model, which is the reason the numbers are in milliseconds rather than seconds.</p>
 
 <h2>Why "just summarise it" is a different trade</h2>
 <p>Compaction is the built-in answer to a full window, and it keeps the wrong half: over 43 real compactions it retained 77% of the decisions and 0.2% of the commands that had been run. It is cheap and lossy in exactly the places that cost you time later — see <a href="after-compaction.html">what compaction drops</a>. On Claude Code and Codex deja reads the transcript as the compaction starts and hands the dropped half back once, in 4 KB. Retrieval is the opposite trade: nothing is thrown away, and you pay a few hundred tokens for the part you need at the moment you need it.</p>

@@ -65,7 +65,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 
 ## Evidence
 
-- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S, 69.6% on LoCoMo, both harnesses in the repository
+- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S, 69.7% on LoCoMo, both harnesses in the repository
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem and agentmemory
 - [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the twenty-five agents stores its sessions, with fixtures
 - [Privacy](https://vshulcz.github.io/deja-vu/guide/privacy.html): what is read, what is redacted, what never leaves

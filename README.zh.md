@@ -17,7 +17,7 @@
 <p align="center"><b>其他记忆工具都从空白开始，往后记录。deja 一开始就是满的。</b></p>
 
 <p align="center">
-LongMemEval-S 上 <b>85.3% hit@1</b> &middot; LoCoMo 上 <b>69.6%</b> &middot; 5&nbsp;GB 历史上的查询在<b>毫秒</b>级<br>
+LongMemEval-S 上 <b>85.3% hit@1</b> &middot; LoCoMo 上 <b>69.7%</b> &middot; 5&nbsp;GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>两套评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
 </p>
@@ -42,7 +42,7 @@ deja install --auto
 
 也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。
 
-opencode、DeepSeek Harness、Zed、Kimi Code 和 Codex CLI 也有各自生态里的包，习惯在那边装扩展的人
+opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI 和 Grok Build 也有各自生态里的包，习惯在那边装扩展的人
 可以直接用：
 
 ```sh
@@ -51,9 +51,10 @@ dsh plugin --profile web add dsh-deja
 # Zed：扩展面板里搜 deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI：codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
+# Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 ```
 
-`deja install --auto` 已经把这五个接好了，两条路走哪条都够。两边都装也没问题：包会看
+`deja install --auto` 已经把这六个接好了，两条路走哪条都够。两边都装也没问题：包会看
 `deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
 [`extensions/`](extensions)。
 
@@ -216,7 +217,7 @@ deja bench prompt     # 逐条提示的钩子在什么时候开口，又在什�
 
 | 指标 | 结果 |
 | --- | --- |
-| 进程内查询 | 中位数 **~0.7 ms**，LongMemEval-S 干草堆上约 25 ms |
+| 进程内查询 | 中位数 **~0.7 ms**，LongMemEval-S 干草堆上约 19 ms |
 | `deja <查询词>` 端到端 | 该仓库上中位数约 0.2 s：进程启动、对所有存储做新鲜度检查、排序、打印 |
 | 仅新鲜度检查 | 没有变化时约 50 ms |
 | 索引大小 | 200 MB，约为语料的 10% |
