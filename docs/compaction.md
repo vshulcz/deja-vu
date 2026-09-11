@@ -2,18 +2,24 @@
 
 With auto-recall installed, `hook-precompact` reads the current Claude Code or
 Codex JSONL transcript before the host compacts it. It extracts the user's
-objective, assistant conclusions, recorded verification commands, and explicitly
-stated gaps or conflicts. Each item identifies its source session, harness,
-role, and recorded timestamp. No checkpoint command or model call is required.
+objective, assistant conclusions, recorded verification commands, and what a turn
+says is still open or in conflict. An open item is recognised by its shape — the
+line opens with the label, in either language ("Gap: …", "Осталось: …", "Still
+open: …") — so a sentence that merely contains the word is not mistaken for one.
+Each item identifies its source session, harness, role, and recorded timestamp. No checkpoint command or model call is required.
 
 The next session-start, prompt, or tool hook for that same session and workspace
 returns a recovery packet once. Its 4 KiB limit includes the untrusted-history
 frame. The packet labels assistant conclusions as reported claims. A recorded
-verification command is marked passed or failed only when its transcript record
-contains an explicit exit status; otherwise its outcome is unknown. Repository
-HEAD, branch, and working-tree fingerprints are compared at recovery. Changed,
-partial, or unavailable fingerprints require validation instead of presenting
-old conclusions as current.
+verification command is marked passed or failed from the harness's own exit
+status when the transcript carries one, and otherwise from the output recorded
+after it, by the same rule `deja friction` uses to decide whether a line is a
+failure; a command whose output was not recorded stays unknown. Repository HEAD,
+branch, and working-tree fingerprints are compared at recovery, and the packet
+states the verdict — unchanged, or changed with the commit it was captured at —
+rather than the fingerprints themselves. Changed, partial, or unavailable
+fingerprints require validation instead of presenting old conclusions as
+current.
 
 ## Storage and limits
 
