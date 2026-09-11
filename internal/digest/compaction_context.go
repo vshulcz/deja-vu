@@ -66,8 +66,14 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 			if IsAgentArtifact(m.Text) {
 				continue
 			}
+			// The open items are taken out of the text the conclusion is built
+			// from: one turn often states both — "Fixed and the suite is green.
+			// Осталось: сбросить счётчик …" — and the packet printed that
+			// sentence twice, once as a gap and once inside the conclusion, out
+			// of a budget that drops items to fit.
+			open := explicitOpenItems(m.Text, ref)
 			if CarriesDecision(m.Text) {
-				text := contextProse(m.Text, contextFactBytes)
+				text := contextProse(withoutOpenLines(m.Text, open), contextFactBytes)
 				if text != "" && !hasFact(c.Conclusions, text) {
 					if len(c.Conclusions) == opts.MaxItems {
 						c.Truncated = true
@@ -76,7 +82,7 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 					}
 				}
 			}
-			for _, item := range explicitOpenItems(m.Text, ref) {
+			for _, item := range open {
 				if item.Kind == "gap" {
 					if len(c.Gaps) == opts.MaxItems {
 						c.Truncated = true
@@ -307,6 +313,26 @@ type classifiedOpenItem struct {
 	Kind string
 }
 
+// withoutOpenLines is the message without the lines that became open items, so a
+// turn that states a conclusion and what is left over is charged once for each.
+func withoutOpenLines(text string, open []classifiedOpenItem) string {
+	if len(open) == 0 {
+		return text
+	}
+	drop := make(map[string]bool, len(open))
+	for _, item := range open {
+		drop[item.Text] = true
+	}
+	var kept []string
+	for _, line := range strings.Split(text, "\n") {
+		if drop[contextProse(line, contextFactBytes)] {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
+}
+
 func explicitOpenItems(text string, ref model.ContextRef) []classifiedOpenItem {
 	var out []classifiedOpenItem
 	for _, line := range strings.Split(text, "\n") {
@@ -317,9 +343,9 @@ func explicitOpenItems(text string, ref model.ContextRef) []classifiedOpenItem {
 		low := strings.ToLower(line)
 		kind := ""
 		switch {
-		case hasLabel(low, "gap"), hasLabel(low, "unverified"), hasLabel(low, "missing"), hasLabel(low, "blocked"):
+		case hasAnyLabel(low, gapLabels):
 			kind = "gap"
-		case hasLabel(low, "conflict"), hasLabel(low, "disagreement"), hasLabel(low, "contradiction"):
+		case hasAnyLabel(low, conflictLabels):
 			kind = "conflict"
 		}
 		if kind != "" {
@@ -329,9 +355,53 @@ func explicitOpenItems(text string, ref model.ContextRef) []classifiedOpenItem {
 	return out
 }
 
+// gapLabels are the ways a turn says what is still to be done, at the start of
+// the line where the shape is unambiguous.
+//
+// The list was gap/unverified/missing/blocked, and nobody writes those: measured
+// over 72137 assistant lines on a real store, that shape appeared once. The words
+// below, in the same line-initial shape, appear 28 times and every one of the
+// fourteen sampled was genuinely an open item ("Осталось: **страница сравнения**
+// …", "Что осталось: две дальние формулировки"). The shape is what keeps this
+// precise — "осталось" in the middle of a sentence is usually "12 of 17 jobs are
+// left", which is not an open item at all.
+var gapLabels = []string{
+	"gap", "unverified", "missing", "blocked",
+	"still open", "open question", "open questions", "open item", "open items",
+	"what's left", "whats left", "left to do", "not done", "not verified", "todo",
+	"осталось", "что осталось", "остаётся", "остается", "остался",
+	"открытый вопрос", "открытые вопросы", "не сделал", "чего не сделал",
+	"не доделал", "не проверено",
+}
+
+var conflictLabels = []string{"conflict", "disagreement", "contradiction", "конфликт", "противоречие"}
+
+func hasAnyLabel(line string, labels []string) bool {
+	for _, label := range labels {
+		if hasLabel(line, label) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLabel reports whether the line opens with this label. The dash forms are
+// how the same thing is written in prose — "**Открытый вопрос — OpenClaw плагин
+// …**" — and the bold markers are stripped rather than spelled into every label.
 func hasLabel(line, label string) bool {
-	line = strings.TrimLeft(line, "-* \t")
-	return strings.HasPrefix(line, label+":") || strings.HasPrefix(line, label+"**:")
+	line = strings.TrimLeft(line, "-*#> \t")
+	line = strings.TrimPrefix(line, "**")
+	if !strings.HasPrefix(line, label) {
+		return false
+	}
+	rest := strings.TrimPrefix(strings.TrimPrefix(line, label), "**")
+	rest = strings.TrimLeft(rest, " ")
+	for _, sep := range []string{":", "—", "-", "–"} {
+		if strings.HasPrefix(rest, sep) {
+			return true
+		}
+	}
+	return false
 }
 
 func hasFact(facts []model.ContextFact, text string) bool {

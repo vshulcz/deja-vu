@@ -5,10 +5,12 @@ import (
 	"io"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
@@ -75,6 +77,7 @@ func captureCompaction(dir string, input precompactHookInput) {
 		return
 	}
 	data := digest.ExtractCompactionContext(transcript.Session, digest.ExtractOptions{})
+	withCommandOutcomes(&data, transcript.Session)
 	data.Truncated = data.Truncated || transcript.Truncated
 	data.Freshness = compactionFreshness(workspace)
 	saved, err := index.PutCompaction(dir, index.CompactionState{
@@ -96,6 +99,80 @@ func captureCompaction(dir string, input precompactHookInput) {
 		}
 		usage.RecordCompactionCapture(dir, capture)
 	}
+}
+
+// withCommandOutcomes says how each recorded command went.
+//
+// The packet's own rule reads an exit marker out of the command text, which is
+// what codex and opencode append and Claude does not: on a transcript where the
+// suite failed and then passed, both commands arrived as "[recorded]", so a
+// resuming agent could not tell whether the work was green when it was
+// interrupted — which is the first thing it needs to know.
+//
+// The output is already in the transcript, one record after the command. Whether
+// that output is a failure is a question the store answers in one place
+// (index.FrictionLine, the same rule behind `deja friction` and the fix pairs),
+// and digest cannot import index — so the pairing happens here, where both are
+// in reach, rather than as a second copy of the recogniser (the drift #3473 was
+// about).
+//
+// Newest wins: a command that failed and was then re-run green keeps the green
+// outcome, because the packet carries one entry per command and the state at
+// capture is what a resuming agent is owed.
+func withCommandOutcomes(data *model.CompactionContext, s model.Session) {
+	if len(data.Tests) == 0 {
+		return
+	}
+	outcome := map[string]string{}
+	pending := ""
+	for _, m := range s.Messages {
+		switch m.Role {
+		case sources.RoleCommand:
+			pending = compactionCommandKey(m.Text)
+		case sources.RoleToolOutput:
+			if pending == "" {
+				continue
+			}
+			if _, friction := index.FrictionLine(firstFrictionLine(m.Text)); friction {
+				outcome[pending] = "failed"
+			} else {
+				outcome[pending] = "passed"
+			}
+			pending = ""
+		}
+	}
+	for i := range data.Tests {
+		if got, ok := outcome[compactionCommandKey(data.Tests[i].Command)]; ok && data.Tests[i].Outcome == "recorded" {
+			data.Tests[i].Outcome = got
+		}
+	}
+}
+
+// compactionCommandKey matches a command in the packet to the same command in the
+// transcript: the packet's copy is trimmed and may carry the prompt marker a
+// harness stored it with.
+func compactionCommandKey(cmd string) string {
+	cmd = strings.TrimSpace(cmd)
+	cmd = strings.TrimPrefix(cmd, "$ ")
+	if i := strings.Index(cmd, "  → exit "); i > 0 {
+		cmd = cmd[:i]
+	}
+	return strings.Join(strings.Fields(cmd), " ")
+}
+
+// firstFrictionLine is the line of a command's output that names a failure, if
+// any: a failing run says so on one line and prints many.
+func firstFrictionLine(out string) string {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if _, friction := index.FrictionLine(line); friction {
+			return line
+		}
+	}
+	return ""
 }
 
 func compactionRecovery(dir, sessionID, cwd string) (index.CompactionState, string) {
