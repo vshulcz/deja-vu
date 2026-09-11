@@ -953,6 +953,87 @@ func attachAnswers(dir string, hits []search.Hit) {
 	}
 }
 
+// conclusionsAboutIt keeps the conclusions that have something to do with what
+// was asked.
+//
+// "what this session concluded" is read off the whole session, and a session
+// that ran for days concluded things about everything it touched. Measured on
+// sixteen recall calls against a real store, 42% of the conclusion lines served
+// shared no word with the query or with the excerpts they sat under — and a long
+// session served the same three lines to a question about blame rows, one about
+// the MCP dispatcher and one about a connection pool, because those were simply
+// the newest things it had concluded.
+//
+// Excerpt words count as well as query words, which is what keeps a conclusion
+// worded nothing like the question — the case the list exists for (#1011): "the
+// backoff counted from zero" stays under an excerpt that says backoff.
+func conclusionsAboutIt(cs []string, q string, snippets []string) []string {
+	about := contentWords(q)
+	for _, sn := range snippets {
+		for w := range contentWords(sn) {
+			about[w] = true
+		}
+	}
+	if len(about) == 0 {
+		// Nothing to judge against: a query of common words alone, which the
+		// ranking answered on its own terms.
+		return cs
+	}
+	kept := make([]string, 0, len(cs))
+	for _, c := range cs {
+		if sharesAWord(contentWords(c), about) {
+			kept = append(kept, c)
+		}
+	}
+	if len(kept) == 0 && len(cs) > 0 {
+		// One line rather than none. A session that matched on words this gate
+		// cannot see — a query in one language against a transcript in another,
+		// which this store is full of — still concluded something, and a
+		// conclusion nobody asked for is a memory that can still turn out to be
+		// the one. Three of them is wallpaper; one is an offer.
+		return cs[:1]
+	}
+	return kept
+}
+
+// sharesAWord is word overlap that holds for identifiers: `ManifestBuiltAt`
+// lowercases to one token, so a question about the manifest shares nothing with
+// it on equality alone, and the conclusion that named it was dropped for a query
+// plainly about it.
+func sharesAWord(words, about map[string]bool) bool {
+	for w := range words {
+		if about[w] {
+			return true
+		}
+		for a := range about {
+			if len(a) >= 5 && strings.Contains(w, a) {
+				return true
+			}
+			if len(w) >= 5 && strings.Contains(a, w) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// conclusionGateSlack is how many extra conclusions to ask for, so the list can
+// still show three after the gate above has dropped the ones about other work.
+const conclusionGateSlack = 3
+
+// contentWords are the words of a text that carry its subject: long enough to
+// mean something and not a word every session holds.
+func contentWords(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, tok := range query.Tokens(s) {
+		if utf8.RuneCountInString(tok) < 4 || query.IsStopWord(tok) {
+			continue
+		}
+		out[tok] = true
+	}
+	return out
+}
+
 // shownAnswers counts the excerpts that are answer lines rather than matched
 // text, which is how many conclusions the drop below can take.
 func shownAnswers(snippets []string) int {
@@ -1393,8 +1474,12 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// Ask for as many extra as there are answer lines above: the
 				// drop below can take any of them, and asking for a fixed one
 				// more still showed two where three were available.
-				want := 3 + shownAnswers(h.Snippets)
-				if cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets); len(cs) > 0 {
+				// Three more than the list can show: the gate below drops the
+				// ones about something else, and asking for exactly three
+				// showed one where three were available.
+				want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
+				cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets)
+				if cs = conclusionsAboutIt(cs, q, h.Snippets); len(cs) > 0 {
 					if len(cs) > 3 {
 						cs = cs[:3]
 					}
