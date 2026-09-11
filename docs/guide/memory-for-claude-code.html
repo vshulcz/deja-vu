@@ -117,7 +117,7 @@ claude plugin install deja-vu@deja-vu</pre>
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 
 <h2>What the hook actually changes</h2>
-<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. <a href="after-compaction.html">After compaction</a> covers the other half — the moment a long session is summarised and the details go.</p>
+<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. Claude Code also hands a hook the transcript before it compacts, which is the one seam that makes the working context recoverable: deja keeps the task, the files and each command with whether it passed, and gives them back once after the summary lands. <a href="after-compaction.html">After compaction</a> covers that half.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — twenty-five of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>

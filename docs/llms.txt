@@ -2,7 +2,7 @@
 
 > Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and nineteen more agents wrote on this machine — including the months before it was installed — and answers from them over MCP or the command line. BM25 over the transcripts: no model, no embeddings, nothing leaves the machine.
 
-Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, and after a command fails. Credentials are stripped as the index is built.
+Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, after a command fails, and on the way back from a compaction, where deja keeps the task, files and commands the summary drops. Credentials are stripped as the index is built.
 
 Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh`, or `brew install deja-vu`), followed by `deja install --auto` to wire the agents found on the machine.
 
@@ -24,7 +24,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
 - [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
-- [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped
+- [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
 - [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes when the diff cannot say what was tried
 - [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
 - [Across machines](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html): sync between machines with no server
@@ -76,3 +76,4 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Security model](https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md)
 - [Installing deja for an agent](https://github.com/vshulcz/deja-vu/blob/main/llms-install.md): the install page written for an agent doing it on a user's behalf
 - [JSON output](https://github.com/vshulcz/deja-vu/blob/main/docs/json-output.md): the shape of every `--json` result
+- [Compaction recovery](https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md): what is captured before a compaction, what is handed back, and the limits

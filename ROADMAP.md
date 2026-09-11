@@ -11,8 +11,18 @@ the place to discuss design.
   whether it matched a word. That is measured three ways — the prompt benchmark
   on a corpus large enough for rarity to mean something, LongMemEval end to end,
   and a replay of real prompts against a frozen index — and every change ships
-  with the before and after. The next piece is the same treatment for the block
-  a tool call gets, where the reader is an agent about to run something.
+  with the before and after. The block a tool call gets has had the same
+  treatment now, read off a real store rather than a fixture: what is left there
+  is the failure path, where a pair exists for 21% of the failures an agent
+  actually hits and the rest are the harness's own refusals, which deja has no
+  lever on yet.
+- **What a read costs.** One search allocates 701 MB and 57% of it is candidate
+  message text copied out of the file to be scored, while the postings already
+  carry the offsets of the records that matched. Reading only what is scored, and
+  reading it without copying, are the two directions; both touch the hot path, so
+  each wants its latency, peak-RSS and bench numbers before and after. The map
+  with today's measurements is in
+  [#3491](https://github.com/vshulcz/deja-vu/issues/3491).
 - **Windows correctness.** The Windows leg runs on `main`, on the weekly canary
   and on any pull request labelled `windows` rather than on every commit, so the
   gap between "green on Linux and macOS" and "correct on Windows" has to be
@@ -24,6 +34,15 @@ the place to discuss design.
 
 ## Next
 
+- **Compaction recovery past two hosts.** Claude Code and Codex hand a hook the
+  transcript before they shorten it, which is what makes the capture possible.
+  Every other harness that compacts keeps the summary to itself, so the packet
+  stops at those two until a host exposes the same seam — and each one that does
+  is work the day it lands.
+- **The plan, before it is executed.** `deja check` answers a plan with what this
+  machine already knows about it, and `hook-plan` delivers the same thing at
+  `ExitPlanMode`. No installer wires it yet: the measurement that would justify
+  it — does an agent change a plan it is about to run — has not been made.
 - **Deepen curation past a single boost.** Reuse is a global signal today: a
   session pulled for one query is lifted for every query. A per-query signal —
   recording what a recall was for, not only that it happened — would let reuse be

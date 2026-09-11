@@ -846,3 +846,36 @@ with it. A consumer reading its presence as "this was withdrawn" wants
 `lifecycle != "accepted"`.
 
 The MCP `blame` tool returns the same array shape.
+
+## `deja wip --json`
+
+What the last session in this directory was doing, derived from that session's
+own transcript:
+
+```json
+{
+  "schema_version": 2,
+  "session": "ses_fb76fff…",
+  "harness": "opencode",
+  "asked": "the orders worker is exhausting its database connections under load",
+  "decision": "bound every orders-worker query with a context, the leaked ones hold connections",
+  "files": ["internal/worker/orders.go"],
+  "command": "go test ./internal/worker/...",
+  "command_failed": true,
+  "lines": ["working on: …", "settled: …"]
+}
+```
+
+Every field but `schema_version` is omitted when the transcript does not carry
+it, so a reader has to treat all of them as optional: a session that asked
+something and settled nothing has `asked` and no `decision`. `files` is the five
+most recent the session touched, newest first — a compaction on a real machine
+had a median of 38 edited files behind it, so this is a ranking rather than a
+list. `command` is the last one it ran and
+`command_failed` says whether that one failed. `lines` is the same content as
+the text output, one line per fact, in the order the human-readable form prints
+them — a caller that wants to inject the block verbatim reads `lines` and does
+not have to re-assemble it.
+
+Nothing is stored and nothing is asked of the agent; `deja wip` reads the
+transcript each time it runs.

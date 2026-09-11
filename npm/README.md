@@ -8,7 +8,7 @@
 <p align="center"><strong>Your agent is about to re-debug something you fixed in March — in a different agent.</strong></p>
 
 Every memory tool starts empty and records forward. **deja starts full.** It
-indexes the sessions all 24 of your coding agents already wrote to disk — months
+indexes the sessions all 25 of your coding agents already wrote to disk — months
 of history from before you installed it — and serves them back over MCP, in
 whichever agent asks.
 

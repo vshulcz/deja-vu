@@ -116,7 +116,7 @@
 <pre>$ deja log
 2026-08-24 12:11  dejavu   895 B · 2 sessions
 2026-08-24 10:50  hook     2.2 KB · 3 sessions</pre>
-<p><code>deja log --last</code> prints the exact digest most recently served, so "what did it actually see" is a question with an answer rather than an inference. Where a trust policy is in force, the receipt names the rule that allowed the injection.</p>
+<p><code>deja log --last</code> prints the exact digest most recently served, so "what did it actually see" is a question with an answer rather than an inference. That includes the lines injected at the moment of action — before an edit, before a command, after one failed — which used to be counted but not kept, so the surface with the best evidence behind it was the one that could not be read back. Where a trust policy is in force, the receipt names the rule that allowed the injection.</p>
 
 <h2>What this is not</h2>
 <p>It is not a compliance trail. The records are whatever the harness wrote and whatever survived redaction — nothing here proves an agent did not do something, and a harness that logs sparsely leaves gaps that no index can fill. <a href="../registry/README.html">The format registry</a> documents, per harness, what is recorded and what deja could not verify, including the gaps.</p>

@@ -344,7 +344,7 @@ footer a:hover{color:var(--ph-hi)}
 
 <div class="proof reveal">
   <div><b data-count="85.3" data-dp="1">0<i>%</i></b><span class="lab">hit@1 · LongMemEval-S</span></div>
-  <div><b data-count="0.4" data-dp="1">0<i>ms</i></b><span class="lab">median lookup, <code>deja bench recall</code></span></div>
+  <div><b data-count="0.7" data-dp="1">0<i>ms</i></b><span class="lab">median lookup, <code>deja bench recall</code></span></div>
   <div><b>0</b><span class="lab">models, keys or cloud accounts</span></div>
 </div>
 
@@ -393,11 +393,12 @@ footer a:hover{color:var(--ph-hi)}
       <p>Every coding agent writes its sessions to disk. deja parses those stores in place —
         nothing is copied, nothing is uploaded.</p></div>
     <div class="step"><span class="n">02</span><h3>It builds a local index</h3>
-      <p>Credentials are stripped on the way in. About ten seconds for a few gigabytes,
-        and the index is 2% of the corpus.</p></div>
+      <p>Credentials are stripped on the way in. Tens of seconds for a couple of gigabytes,
+        and the index is about a tenth of the corpus.</p></div>
     <div class="step"><span class="n">03</span><h3>Your agents recall from it</h3>
-      <p>An MCP tool every agent can call, and a session-start hook where the agent
-        supports one, so it already knows.</p></div>
+      <p>An MCP tool every agent can call, and hooks where the agent has them: at session
+        start, before a file is edited or a command runs, after one fails, and on the way
+        back from a compaction.</p></div>
   </div>
 </section>
 

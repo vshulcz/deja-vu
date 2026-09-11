@@ -124,7 +124,7 @@ deja: no session on this machine ran a command after that error</pre>
 <h2>Doing it without being asked</h2>
 <p>Neither command helps if you have to remember to run it, and the moment you would remember is after you have already lost the twenty minutes. So the same lookup runs from hooks, where the harness supports them:</p>
 <ul>
-<li><b>Before a command runs</b> — the invocation this project actually uses, with the flags it was run with, instead of a plausible guess.</li>
+<li><b>Before a command runs</b> — the invocation this project actually uses, with the flags it was run with, instead of a plausible guess. If the command needs a program this machine does not have, that is said before it runs, together with the same command that ran without it.</li>
 <li><b>After one fails</b> — what followed that same error here before. This is the pair an agent never thinks to ask for, because from inside the session there is nothing to ask about.</li>
 <li><b>Before a file is edited</b> — what earlier sessions decided about that file, including a decision that was tried and reverted.</li>
 </ul>

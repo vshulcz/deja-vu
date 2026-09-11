@@ -119,6 +119,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <h2>Why this matters more in Codex than most</h2>
 <p>Codex sessions are short and many — a day's work is spread over a dozen rollout files rather than one long thread. That makes the thing you settled on Tuesday hard to find by scrolling and easy to find by search. <a href="find-a-session.html">Finding a session</a> is the command side of that.</p>
+<p>Codex is also one of the two harnesses that hand a hook the transcript before a compaction, so the working context is recoverable here: deja keeps the task, the files and each command with whether it passed, and hands them back once in the next turn after the summary. See <a href="after-compaction.html">after compaction</a>.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — twenty-five of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>

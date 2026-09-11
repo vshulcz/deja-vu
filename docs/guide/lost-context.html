@@ -102,16 +102,18 @@
 <p>It happens mid-task, not between tasks: the window is cleared, the CLI is restarted, a session is resumed and comes back empty, the tab is closed by something that is not you. The agent is now confidently a stranger to work you did an hour ago.</p>
 
 <h2>The context is not gone, the pointer to it is</h2>
-<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty-three formats, one per tool</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
+<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty-five formats, one per tool</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
 
 <h2>Getting it back into the session you are in</h2>
-<pre>deja "the thing you were doing"</pre>
+<pre>deja wip
+deja "the thing you were doing"</pre>
+<p><code>deja wip</code> answers the first question a stranded session has — what was I doing — from the last session's own transcript in this directory: the task, what it settled, the files in flight, the last command and whether it failed. Nothing was stored for it; it is derived each time.</p>
 <p>Search runs over every agent's history on the machine, so it does not matter which tool held the lost context — or whether that tool still exists. <code>deja ctx &lt;query&gt;</code> gives the single best-matching session as a digest rather than a wall of transcript, which is what you want to paste back into a fresh window.</p>
-<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — nineteen of the twenty-three do.</p>
+<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — twenty of the twenty-five do.</p>
 
 <h2>Not losing it the next time</h2>
 <pre>deja install --auto</pre>
-<p>After this the recovery is not a thing you have to think of. Recall arrives at session start, so a fresh window opens already knowing the project's recent decisions; and on each prompt, so a question about old work is answered from the transcript instead of from a guess. A cleared window costs a paragraph of context rather than an afternoon.</p>
+<p>After this the recovery is not a thing you have to think of. Recall arrives at session start, so a fresh window opens already knowing the project's recent decisions; on each prompt, so a question about old work is answered from the transcript instead of from a guess; and on Claude Code and Codex the working context is captured as a compaction starts and handed back once afterwards. A cleared window costs a paragraph of context rather than an afternoon.</p>
 
 <h2>What it cannot do</h2>
 <p>Anything the agent never wrote down is not recoverable, and deja does not pretend otherwise: it indexes the files, it does not reconstruct what was in the model's head. Sessions that were never flushed to disk before the crash — some tools write on turn boundaries, not on every token — lose their last turn. That last turn is usually the one you remember anyway.</p>

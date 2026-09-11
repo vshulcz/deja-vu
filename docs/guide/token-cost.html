@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"What memory costs in tokens","description":"What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.","url":"https://vshulcz.github.io/deja-vu/guide/token-cost.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://vshulcz.github.io/deja-vu/guide/token-cost.html"},"isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"What memory costs","item":"https://vshulcz.github.io/deja-vu/guide/token-cost.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does adding memory to a coding agent cost a lot of tokens?","acceptedAnswer":{"@type":"Answer","text":"It depends on whether memory retrieves or replays. On a seeded benchmark of thirty task chains, reaching the same working context cost a median of 286 tokens by recall, 16,919 by replaying matched sessions and 57,489 by grepping the raw logs, at the same fact coverage."}},{"@type":"Question","name":"How do I stop a memory layer from filling the context window?","acceptedAnswer":{"@type":"Answer","text":"Cap what it may inject and let it say nothing when the history has no answer. deja caps a per-prompt injection at 1,536 bytes and an MCP recall at about 4 KB, and injects nothing on chains where no earlier fact is relevant."}},{"@type":"Question","name":"Does recall slow the agent down?","acceptedAnswer":{"@type":"Answer","text":"The lookup is a lexical query against a local index: a median of about 0.4 ms in process. A hook adds process start and a freshness check over the stores, tens of milliseconds on a multi-gigabyte corpus. Nothing waits on a model."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does adding memory to a coding agent cost a lot of tokens?","acceptedAnswer":{"@type":"Answer","text":"It depends on whether memory retrieves or replays. On a seeded benchmark of thirty task chains, reaching the same working context cost a median of 1,096 tokens by recall, 80,547 by replaying matched sessions and 273,238 by grepping the raw logs, at the same fact coverage."}},{"@type":"Question","name":"How do I stop a memory layer from filling the context window?","acceptedAnswer":{"@type":"Answer","text":"Cap what it may inject and let it say nothing when the history has no answer. deja caps a per-prompt injection at 1,536 bytes and an MCP recall at about 4 KB, and injects nothing on chains where no earlier fact is relevant."}},{"@type":"Question","name":"Does recall slow the agent down?","acceptedAnswer":{"@type":"Answer","text":"The lookup is a lexical query against a local index: a median of about 0.7 ms in process. A hook adds process start and a freshness check over the stores, tens of milliseconds on a multi-gigabyte corpus. Nothing waits on a model."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -106,16 +106,16 @@
 <table>
 <thead><tr><th>Approach</th><th>Median tokens</th><th>Median coverage</th><th>Tokens on the negative controls</th></tr></thead>
 <tbody>
-<tr><td>recall</td><td><b>286</b></td><td>1.00</td><td>0</td></tr>
-<tr><td>replay the matched sessions</td><td>16,919</td><td>1.00</td><td>14,920</td></tr>
-<tr><td>grep the raw logs</td><td>57,489</td><td>1.00</td><td>0</td></tr>
+<tr><td>recall</td><td><b>1,096</b></td><td>1.00</td><td>0</td></tr>
+<tr><td>replay the matched sessions</td><td>80,547</td><td>1.00</td><td>78,145</td></tr>
+<tr><td>grep the raw logs</td><td>273,238</td><td>1.00</td><td>0</td></tr>
 <tr><td>no memory at all</td><td>0</td><td>0.00</td><td>0</td></tr>
 </tbody>
 </table>
-<p>Same fact coverage for about 200× fewer tokens than grepping and about 60× fewer than replaying. The last column is the one people skip: on chains where no earlier fact is relevant, replay still spends about fifteen thousand tokens saying nothing useful, and recall spends zero.</p>
+<p>Same fact coverage for about 250× fewer tokens than grepping and about 70× fewer than replaying. The last column is the one people skip: on chains where no earlier fact is relevant, replay still spends nearly eighty thousand tokens saying nothing useful, and recall spends zero.</p>
 <p>Run it yourself — the corpus generator and the relevance labels are ordinary Go in the repository, and the arms are seeded:</p>
 <pre>deja bench context    # 30 seeded chains plus five negative controls
-deja bench recall     # ranking regression floor, CI fails if recall drops</pre>
+deja bench recall     # 100 queries, half Russian; CI fails if recall drops</pre>
 <p>Audit what "relevant" means before trusting any number here, ours included. A benchmark that defines its own success is a benchmark that always passes.</p>
 
 <h2>The caps that keep it bounded</h2>
@@ -123,15 +123,16 @@ deja bench recall     # ranking regression floor, CI fails if recall drops</pre>
 <ul>
 <li><b>Per-prompt recall:</b> 1,536 bytes. That is the block a hook adds when what you just typed matches earlier work.</li>
 <li><b>An MCP recall:</b> about 4 KB per call, dense text rather than whole sessions.</li>
+<li><b>The packet after a compaction:</b> 4 KB, once per compaction, and only on the harnesses that hand deja the transcript before they shorten it.</li>
 <li><b>Nothing at all,</b> which is the common case at any injection point. The block appears when the history answers and is absent otherwise.</li>
 </ul>
 <p>That last one is a design decision rather than an optimisation. A memory that always says something teaches you to skip whatever it says, and then you are paying for a block nobody reads.</p>
 
 <h2>The other cost, which is not tokens</h2>
-<p>Latency. A lookup is a lexical query against a local index — a median of about 0.4 ms in process, around 25 ms on the LongMemEval-S haystacks. A hook pays process start and a freshness check across the stores on top, tens of milliseconds on a multi-gigabyte corpus. Nothing in that path waits on a model, which is the reason the numbers are in milliseconds rather than seconds.</p>
+<p>Latency. A lookup is a lexical query against a local index — a median of about 0.7 ms in process, around 25 ms on the LongMemEval-S haystacks. A hook pays process start and a freshness check across the stores on top, tens of milliseconds on a multi-gigabyte corpus. Nothing in that path waits on a model, which is the reason the numbers are in milliseconds rather than seconds.</p>
 
 <h2>Why "just summarise it" is a different trade</h2>
-<p>Compaction is the built-in answer to a full window, and it keeps the wrong half: over 43 real compactions it retained 77% of the decisions and 0.2% of the commands that had been run. It is cheap and lossy in exactly the places that cost you time later — see <a href="after-compaction.html">what compaction drops</a>. Retrieval is the opposite trade: nothing is thrown away, and you pay a few hundred tokens for the part you need at the moment you need it.</p>
+<p>Compaction is the built-in answer to a full window, and it keeps the wrong half: over 43 real compactions it retained 77% of the decisions and 0.2% of the commands that had been run. It is cheap and lossy in exactly the places that cost you time later — see <a href="after-compaction.html">what compaction drops</a>. On Claude Code and Codex deja reads the transcript as the compaction starts and hands the dropped half back once, in 4 KB. Retrieval is the opposite trade: nothing is thrown away, and you pay a few hundred tokens for the part you need at the moment you need it.</p>
 
 <h2>What this does not claim</h2>
 <p>Recall does not reduce your token bill on its own — it replaces a large, vague context with a small, specific one, and whether that lowers spend depends on what you were doing instead. If the honest alternative was pasting nothing and re-solving the problem, the comparison is with your afternoon rather than with your invoice.</p>

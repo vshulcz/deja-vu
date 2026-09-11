@@ -116,8 +116,8 @@ to local files, and deja turns those files into one memory layer all of them rea
 | --- | --- |
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
 | **Cross-agent recall** | The MCP `recall` tool answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
-| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8%. |
-| **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision or that command's working invocation, from a `PreToolUse` hook. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
+| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8% — and on Claude Code and Codex it captures the task, the files and the commands as the compaction starts, then returns them once in the next session. |
+| **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision, that command's working invocation, or the program this machine does not have. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
 
 <details>
@@ -178,6 +178,7 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <query>` | Search every history. Multi-word is AND and quoted phrases require contiguous text; a query with no exact match then tries word forms and close spellings, which is where a substring reaches its word (`code` finds `opencode`). |
 | `deja` | With an index and a terminal: today's sessions, recalls served, a question you asked in more than one session, and a wall your agents keep hitting. |
+| `deja wip` | What the last session in this directory was doing: the task, what it settled, the files in flight, the last command and whether it failed — derived from the transcript, not from a note someone remembered to write. |
 | `deja blame <path>` | Which sessions discussed a file, what was decided, and why. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
@@ -239,13 +240,15 @@ anything already wired to them.
 
 ## Supported harnesses
 
-With auto-recall installed, Claude Code and Codex compaction hooks automatically
-save a bounded continuation packet in the existing local index. The next hook
-restores the objective, conclusions, recorded tests, explicit gaps/conflicts,
-and provenance for the same session and workspace. Repository changes are
-flagged for validation. `deja stats` measures raw tool calls before the first
-edit after compaction. See [automatic compaction recovery](docs/compaction.md)
-for supported inputs, privacy controls, and limits.
+With auto-recall installed, Claude Code and Codex hand deja the transcript as a
+compaction starts, and it keeps what the summary is about to drop: the task, the
+conclusions, the files, the commands with what each one did, and what was left
+open. The next hook for the same session and workspace gives it back once, inside
+a 4 KB budget, with a line saying whether the repository moved since. `deja stats`
+counts the tool calls before the first edit after a compaction, which is the
+number this is measured against. See [automatic compaction
+recovery](docs/compaction.md) for what is read, what is stored and where the
+limits are.
 
 <!-- matrix:start -->
 aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Roo Code &middot; Zed.
@@ -367,9 +370,10 @@ With Ollama or LM Studio, embedding stays local and needs no key.
 ## Proof
 
 ```sh
-deja bench recall     # ranking regression floor, CI fails if recall drops
+deja bench recall     # ranking floor: 100 queries, half Russian, CI fails if recall drops
 deja bench context    # 30 seeded task chains plus five negative controls
 deja bench block      # does the answer survive into what deja hands over
+deja bench prompt     # what the per-prompt hook fires on, and what it fires on wrongly
 ```
 
 `bench block` asks the question the other three cannot: with the right session in
@@ -391,26 +395,26 @@ context. With the default seed:
 
 | Arm | Median tokens | Median coverage | Negative-control tokens |
 | --- | ---: | ---: | ---: |
-| deja-recall | 286 | 1.00 | 0 |
-| full-history | 16,919 | 1.00 | 14,920 |
-| naive-grep | 57,489 | 1.00 | 0 |
+| deja-recall | 1,096 | 1.00 | 0 |
+| full-history | 80,547 | 1.00 | 78,145 |
+| naive-grep | 273,238 | 1.00 | 0 |
 | cold | 0 | 0.00 | 0 |
 
-Same fact coverage as grepping the raw logs for about 200x fewer tokens, and about 60x
+Same fact coverage as grepping the raw logs for about 250x fewer tokens, and about 70x
 fewer than replaying the matched sessions in full, while injecting nothing on the chains
 where no prior fact is relevant. The corpus generator and the relevance labels are
 ordinary reviewed Go. Audit what "relevant" means before trusting any figure, ours
 included.
 
-Measured on a real store of 1,551 sessions and 143k messages — 5.2 GB across nine
-harnesses:
+Measured on a real store of 2,419 sessions and 179k messages, 1.9 GB of
+transcripts:
 
 | Measurement | Result |
 | --- | --- |
-| Lookup, in process | **~0.4 ms** median (`deja bench recall`), ~25 ms on the LongMemEval-S haystacks |
+| Lookup, in process | **~0.7 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~25 ms on the LongMemEval-S haystacks |
 | `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
-| Freshness check alone | ~30 ms when nothing changed |
-| Index size | 160 MB, ~3% of corpus |
+| Freshness check alone | ~50 ms when nothing changed |
+| Index size | 200 MB, ~10% of corpus |
 
 The index is incremental. When a session file grows, only that file is re-read.
 
@@ -434,7 +438,7 @@ is not secret detection: a shape it does not know can pass through. See the
 [security model](docs/SECURITY-MODEL.md#redaction).
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
-~0.4 ms median, and nothing waits on a model. A hook adds the process start and a
+~0.7 ms median, and nothing waits on a model. A hook adds the process start and a
 freshness check over your stores on top of that — tens of milliseconds on a store of
 a few gigabytes.
 

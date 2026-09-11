@@ -42,8 +42,9 @@ location. The directory contains:
 
 At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
-with a 24 KiB limit per packet. These contain objectives, conclusions, recorded
-tests, explicit gaps/conflicts, provenance, and repository fingerprints. They
+with a 24 KiB limit per packet. These contain objectives, conclusions, the
+commands a session ran with whether each passed or failed, explicit
+gaps/conflicts, provenance, and repository fingerprints. They
 remain local, are omitted from sync export, and follow ignored/excluded project
 and forgotten-session controls. `deja forget` removes matching packets even
 before their source sessions have been indexed. See [compaction recovery](compaction.md).

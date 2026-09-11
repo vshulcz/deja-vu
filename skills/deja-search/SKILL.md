@@ -29,6 +29,7 @@ This skill drives the `deja` binary through the shell. If the deja MCP tools (re
 - `deja fix "<pasted error>"`: the commands that followed that same error before, in sessions where it did not come back. Paste the failing output verbatim.
 - `deja how <what>`: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
 - `deja remember "<text>"`: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code.
+- `deja wip`: what the last session in this directory was doing — the task, what it settled, the files in flight, the last command and whether it failed. Ask it when you have lost the thread of your own work, after a compaction or on a fresh session in a repository you were just in.
 
 Useful flags on search: `--harness`, `--project`, `--since 30d`, `--role user|assistant|tool|files|command|edit`, `--session <id>`, `--limit 1-100`, `--all`, `--re` for a regular expression.
 

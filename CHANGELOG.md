@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-09-12
+
+The release where every line deja gives an agent was read off a real store
+rather than a fixture, and the same question asked of each one: is this about
+what was asked. The answers were bad. 42% of the conclusions in a recall answer
+were about work the query never mentioned; of 63 lines calling something a
+file's prior decision, none named the file or its package; a third of excerpts
+opened inside a word and nearly two thirds closed inside one; the mark for an
+abandoned approach sat on million-word sessions where something was dropped
+somewhere by definition. The other half of the release is the compaction. A
+summary keeps the conclusions and drops the task, the files and the commands
+they rest on, which costs a median of 28 actions before the next edit against 10
+from a cold start — deja now captures the working context as the compaction
+starts and hands it back once, with what each command did and what was left
+open. Rebuilds take 30s instead of 51, a recall answer 0.9s instead of 2.3, and
+`deja how` 96ms instead of 286.
+
+### Added
+- Working context survives a compaction. The pre-compact hook stores the task, the decision, the files, the commands and what is left open; the next session-start, prompt or tool call gets it back once, within a 4 KB budget, with the commands marked passed or failed and a line saying whether the repository moved since. (#3436, #3490)
+- `deja wip`: what the last session in this directory was doing, derived from the transcript rather than from a note someone remembered to write. (#3454)
+- A program this machine does not have is named before the command runs, with the same command that ran without the wrapper beside it — nine of the ten sessions told about a missing command at session start ran it anyway. (#3449, #3487, #3488)
+- Xcode Coding Assistant sessions are indexed under the provider that ran them, Claude Code or Codex. (#3467)
+- `deja friction` recognises the walls an agent actually hits: a shell's position marker is itself the error signal, and timeouts, the harness's own tool errors and the Python traceback tails join the phrase list. (#3446)
+- The point-of-action hooks record the text they injected, so what deja said before an edit or a command can be read back and audited. 507 injections on a real machine carried none of it. (#3455)
+- The recall benchmark asks in Russian too: 100 queries, half Cyrillic, one session per query, with recall@1 pinned at 1.00 as the regression gate. (#3481, #3482, #3483)
+
+### Changed
+- Index format version 38, on-disk layout 2. A record's role moved out of its compressed body, which is the layout change; 36 and 37 changed what deja derives from a transcript and left every byte's meaning alone. (#3446, #3458, #3464)
+- A store whose content rules are stale still answers, instead of telling the agent to ask again later. 8 of 56 recalls an agent really made on a real machine came back during a rebuild, and an agent does not ask again; three of the last four bumps changed no layout. (#3472)
+- A rebuild takes 30s instead of 51: the four sidecar passes run together, fix mining and the neighbour map run per session on all cores, and the multilingual redaction alternation only runs on text holding its own words. (#3462, #3463, #3465)
+- A recall answer takes 0.9s instead of 2.3 and repeats 219 fewer bytes: ranking and hit-building run on all cores, the ranker stops building every message's token set to test five words, and the block explains itself once per session. (#3461)
+- `deja how` takes 96ms instead of 286ms on a 2,721-session store, because scanning for one kind of record no longer inflates all 280,000 of them. (#3464)
+- The session-start block leads with what was settled instead of with the newest sessions: it served six, four of which had settled nothing. Context-bench coverage 0.00 to 0.50. (#3468)
+- The recall answer line picks the session's outcome, not its first reply, and reads decisions in either language — 59 of 60 decision lines on a Russian store went unseen. (#3473)
+- The conclusions a recall answer lists are the ones about the query; an unrelated conclusion is offered as such rather than under a label claiming it answered the question. (#3476, #3484)
+- The files line names the files the question is about and keeps them relative to the repository, where one stray `/private/tmp` path used to make all four absolute. Ten real lines: 2258 bytes to 1808, and words of the question present in 4 lines instead of 1. (#3479, #3480)
+- A `deja blame` row names a few touched files instead of forty, and quotes a piece of evidence once across forks of the same session. Six real paths went from 20 sessions to 38 at the same byte cost. (#3456, #3469)
+- Excerpts and the width cut end on whole words: of 400 real messages, 35% of excerpts opened inside a word and 62% closed inside one, now 2% and 30%; lines shortened to the terminal width split the last word in 56% of cases, now 11%. (#3475, #3477)
+- `deja fix` answers a failing test with an edit's worth of evidence, not a command that merely followed it, and a repaired remedy carries the failing command it corrects. The repair rule compares programs instead of the shell prompt a harness stored, so a missing `timeout` wrapper is transparent. (#3458)
+- The prompt and recall benchmarks refuse to measure a corpus an ignore rule hides, rather than printing zeros: run from a tree under `~/.claude/jobs` the prompt bench read 0 of 13 questions and 13 of 13 beside it. (#3460)
+- The off-topic benchmark arms ask through the hook, so a gate at the hook level is measured by them. (#3485)
+
+### Fixed
+- The pre-tool block no longer claims a file has a prior decision when the line is about something else: none of 63 such lines on a real store named the file or its package, a review agent's hold on another change was offered months later as that file's position, a promoted note about the repository description arrived in front of `main.go`, and one incident diagnosis was offered for five different `main.go` — two files of one name are two files now, where one name in five pooled several real paths. (#3451)
+- A standing decision is one fact rather than one line per file, and a sentence already seen is not news under another session's id: replaying a real session's 2,805 edits, the agent received 17 lines where 3 were distinct. (#3451)
+- An announcement of intent is not a decision: 13% of the lines read as decisions were plans, and a block leading with one reads as having no decision at all. (#3470)
+- The weak-match pointer names what was asked about instead of the session's title, where "how is the block" came back as an unrelated task note. (#3471)
+- The mark for an abandoned approach is dropped on sessions too long to scan — 23 of 60 search hits and 32 marks across sixteen recall answers were on million-word sessions. (#3474, #3478)
+- A compaction summary does not fill `recall_context`: it names everything a session did, so it matched any question and was 95% of three of eight answers, 44% of the bytes served. (#3459)
+- The command warning names the project the failure happened in, so a command shape that travels between checkouts stops reporting another repository's test failure as this one's. (#3486)
+- VS Code Copilot Chat: a turn the editor raised itself is not the person's words. A background-completion notification carried a command's stdout under the user role, and a confirmation click was indexed as a typed sentence; the turn still times the session and its work records are unchanged. (#3452)
+
 ## [0.19.5] - 2026-09-10
 
 The release where deja stopped reading the harness's own text as the person's
@@ -1200,7 +1252,9 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.19.4...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/vshulcz/deja-vu/compare/v0.19.5...v0.20.0
+[0.19.5]: https://github.com/vshulcz/deja-vu/compare/v0.19.4...v0.19.5
 [0.19.4]: https://github.com/vshulcz/deja-vu/compare/v0.19.3...v0.19.4
 [0.19.3]: https://github.com/vshulcz/deja-vu/compare/v0.19.2...v0.19.3
 [0.19.2]: https://github.com/vshulcz/deja-vu/compare/v0.19.1...v0.19.2

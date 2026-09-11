@@ -6,7 +6,11 @@ objective, assistant conclusions, recorded verification commands, and what a tur
 says is still open or in conflict. An open item is recognised by its shape — the
 line opens with the label, in either language ("Gap: …", "Осталось: …", "Still
 open: …") — so a sentence that merely contains the word is not mistaken for one.
-Each item identifies its source session, harness, role, and recorded timestamp. No checkpoint command or model call is required.
+A turn that only tells the agent to carry on ("continue", "продолжай") is skipped
+when looking for the objective, but a turn that carries an instruction is the
+objective even when it opens with one of those words. Each item identifies its
+source session, harness, role, and recorded timestamp. No checkpoint command or
+model call is required.
 
 The next session-start, prompt, or tool hook for that same session and workspace
 returns a recovery packet once. Its 4 KiB limit includes the untrusted-history

@@ -47,7 +47,7 @@ Default path: `~/.cache/deja/index.db`.
 
 Files:
 
-- `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp.
+- `records.bin`: length-prefixed records. Each record stores session key, source path, role, text, and timestamp. The session key, path and role are interned ids in the record's prefix, outside the body, so a scan for one kind of record reads the prefix and skips the rest; bodies of 8 KiB and up are deflated, smaller ones are not, because the read side pays more for a lower floor than the index saves.
 - `buckets/*.bin`: token bucket files. A token maps to compact postings: record offset, session ordinal, and one bit marking the posting as a work record.
 - `manifest.gob` / `sessions.gob`: index version, source file state, redaction counters, sync export watermarks, imported-record dedupe keys, session metadata (including ordinals, the files a session touched most, and hashes of the questions it asked), build time, and search scope.
 
@@ -136,7 +136,7 @@ The name a machine calls itself is not the alias you type at it, and an imported
 `EnsureForSearch` compares the current file set with `manifest.gob`:
 
 - fresh manifest: do nothing;
-- version or scope mismatch: rebuild;
+- version or scope mismatch: rebuild. Two versions are tracked: the content version, which moves when deja derives something new from a transcript, and the on-disk format, which moves only when an older layout would be mis-read. A store whose content version is stale is re-read but keeps answering from what it has; only a format mismatch makes search say it cannot answer yet;
 - append-only JSONL/opencode changes: append new records and update touched buckets;
 - removed files or non-append changes: rewrite the index while preserving unchanged records and replacing changed sessions.
 
@@ -154,7 +154,7 @@ tools and the CLI take that path — a rewrite of a gigabyte of records and
 buckets is not a cost a query can pay — while `deja index` and
 `deja search --rebuild` still do the work in front of you.
 
-Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers.
+Cold rebuild does all parsing first, then writes `records.bin`, buckets, and manifest from one goroutine. That keeps the on-disk index coherent and avoids concurrent writers. The four sidecars derived afterwards — the co-occurrence map, fix pairs, the recurring-command table and the failures — each write their own file and read nothing the others write, so they run together, and fix mining and the co-occurrence map also run per session across cores. That is most of the difference between a 51s and a 30s rebuild on a real store.
 
 ## MCP server design
 
@@ -198,10 +198,11 @@ cannot be exec'd the way a shebang script can.
 
 `deja hook-context` is intentionally hidden from normal help. It first checks for a pending compaction recovery packet, which can exist before the first index build. For ordinary project recall, it derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code).
 
-`--auto` wires three more hooks with the same best-effort contract. The ordinary recall paths use a warm index; compaction capture reads the current transcript and stores a bounded packet without building the search index:
+`--auto` wires four more hooks with the same best-effort contract. The ordinary recall paths use a warm index; compaction capture reads the current transcript and stores a bounded packet without building the search index:
 
 - **`hook-prompt`** (`UserPromptSubmit`) searches the index for the prompt's content and injects a small digest, or the `you have been here` line on a déjà-vu match. What it searches on is the ask — the last line ending in `?`, or the last line carrying a word — read before the rest of the prompt, so a pasted repo listing or stack trace above the question does not spend the six-term budget. The same question from the same reader is answered once an hour: the per-session cooldowns count sessions shown, so an identical prompt on a timer used to walk one session further down the ranking on every tick. A spawned agent is exempt, because a fleet is many readers behind one id.
 - **`hook-tool`** (`PreToolUse`, matched to the editing/command tools) reads the tool payload — a `Bash` command or an `Edit`/`Write`/`apply_patch` target — and injects one line naming that file's or command's prior decision. Deliberately thin: it fires once per action, so it dedupes per agent session and carries at most one decision. How much history it waits for depends on what it has to say — a bare count of sessions needs five before it is worth a line, while a decision stands from the second session, because a count is a number an agent can do nothing with. A program this machine has never had is named from two sightings, and a promoted note says it is the project's standing decision rather than this file's. `--plain` prints the block without the hook envelope, for hosts that take a string back from a handler rather than reading a hook's stdout; pi and omp use it, and they send a lowercase `read` because neither has a seam that runs before an edit.
+- **`hook-tool-after`** (`PostToolUse`, matched to the command tools) answers a failed command with the pair already on file: the error seen before and what followed it without failing. Two lines at most, 420 bytes, deduped per agent session, and silent unless the store holds a pair for that error. What counts as a failure comes from the harness's exit status where it reports one, and otherwise from the recorded output, by the same rule `deja friction` uses.
 - **`hook-precompact`** (`PreCompact`, Claude Code and Codex) captures bounded structured state from the current transcript in the existing index manifest before compaction. The next hook for the same session and workspace returns a recovery packet once, capped at 4 KiB including its trust frame. It records objectives, conclusions, verification commands, explicit gaps/conflicts, provenance, and repository freshness without requiring an agent checkpoint. Capture never waits for a full index rebuild. See [automatic compaction recovery](compaction.md) for limits, privacy controls, and the raw-actions-to-first-edit metric.
 
 ## Ranking

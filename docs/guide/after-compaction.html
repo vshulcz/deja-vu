@@ -117,14 +117,15 @@
 <h2>Getting it back</h2>
 <p>Two moments matter, and they are different.</p>
 <h3>During the session</h3>
-<p><code>deja install --auto</code> wires the pre-compaction hook for Claude Code and Codex. When the host supplies a supported transcript, deja automatically saves the objective, conclusions, recorded tests, explicit gaps and conflicts, and their sources in the existing local index. The next hook returns a bounded recovery packet to that same session and workspace. Repository changes are flagged for validation. The agent does not need to write a checkpoint.</p>
+<p><code>deja install --auto</code> wires the pre-compaction hook for Claude Code and Codex. When the host supplies a supported transcript, deja reads it as the compaction starts and keeps what the summary is about to drop: the task, the conclusions, the files, the commands — each marked <code>[passed]</code> or <code>[failed]</code> from the harness's own exit status or the output recorded after it — and what a turn said was still open, recognised by the label a line opens with in either language. The next hook for that same session and workspace hands it back once, inside 4 KB. A last line says whether the repository moved: unchanged, with the branch, or changed since the commit it was captured at, which is the difference between a conclusion you can still act on and one that needs re-checking. The agent does not need to write a checkpoint.</p>
 <p><code>deja stats</code> reports the raw tool calls before the first edit after compaction, with incomplete observations kept separate. See the <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md">compaction reference</a> for capture limits and privacy controls.</p>
 <h3>Afterwards</h3>
 <p>Ask for the specific thing rather than the story:</p>
-<pre>deja how "go test"          # the invocation this project actually uses, with its flags
+<pre>deja wip                    # what the last session here was doing: task, files, last command
+deja how "go test"          # the invocation this project actually uses, with its flags
 deja fix "pq: too many connections"   # what was run after this error, where it stayed fixed
 deja blame internal/index/ingest.go   # which sessions discussed this file, and what they decided</pre>
-<p>Those three questions map onto exactly what a summary drops: commands, failures and file-level decisions. With recall wired in, the agent asks them itself — before it runs a command, after one fails, and when a prompt matches earlier work.</p>
+<p>Those questions map onto exactly what a summary drops: the task in flight, commands, failures and file-level decisions. With recall wired in, the agent asks them itself — before it runs a command, after one fails, and when a prompt matches earlier work.</p>
 
 <h2>What this does not fix</h2>
 <p>Compaction is not a defect to be switched off. The window is finite, summarising is the right response, and a memory layer does not change that — it stops the summary from being the only copy. If the harness never wrote the session to disk, none of this applies, and the answer really is gone.</p>
