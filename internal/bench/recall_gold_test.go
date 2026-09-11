@@ -1,6 +1,9 @@
 package bench
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // A query the corpus answers five times over is a tie, not a ranking question.
 //
@@ -43,4 +46,54 @@ func TestEachBenchQueryNamesOneSession(t *testing.T) {
 			}
 		}
 	}
+}
+
+// And one session, not five, holds the words the query asks with. The subject
+// alone sat in four of a topic's five texts, so the exact-phrase query matched
+// all four and the label named one: recall@1 could not pass 0.74 however the
+// ranker behaved. The occasion in the query is what makes the answer singular.
+func TestOneSessionHoldsEachQuerysWords(t *testing.T) {
+	c := Generate(Seed)
+	for _, q := range c.Queries {
+		want := queryWords(q.Text)
+		var holders []string
+		for _, s := range c.Sessions {
+			if len(s.Messages) == 0 {
+				continue
+			}
+			if holdsAll(s.Messages[0].Text, want) {
+				holders = append(holders, s.ID)
+			}
+		}
+		if len(holders) != 1 {
+			t.Errorf("%q is carried by %d sessions (%v); the metric credits one", q.Text, len(holders), holders)
+			continue
+		}
+		if holders[0] != q.Relevant[0] {
+			t.Errorf("%q is carried by %s but credited to %s", q.Text, holders[0], q.Relevant[0])
+		}
+	}
+}
+
+// queryWords are the words a query has to be found by, with the quoting and the
+// punctuation a phrase query carries taken off.
+func queryWords(text string) []string {
+	var out []string
+	for _, w := range strings.Fields(strings.ToLower(text)) {
+		w = strings.Trim(w, `"'.,;:`)
+		if len(w) > 2 {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+func holdsAll(text string, words []string) bool {
+	low := strings.ToLower(text)
+	for _, w := range words {
+		if !strings.Contains(low, w) {
+			return false
+		}
+	}
+	return true
 }

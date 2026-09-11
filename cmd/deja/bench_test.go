@@ -46,17 +46,21 @@ func TestBenchRecallJSONAndIsolation(t *testing.T) {
 	if len(report.CorpusHash) != 64 || report.Sessions != 500 || report.Queries != 50 || report.Lexical.RecallAt5 < 0.85 || report.Lexical.RecallAt10 < report.Lexical.RecallAt5 || report.Lexical.MedianMS < 0 || report.HybridStatus == "" {
 		t.Fatalf("unexpected benchmark report: %#v", report)
 	}
-	// The columns that can see the order. Every query on this corpus returns
-	// exactly five hits, so recall@5 answers "did it come back" and recall@10
-	// cannot differ from it — a ranking that put every answer last scored the
-	// same 1.00 (#2933). recall@1 and MRR are what move: they must be reported,
-	// and they must be below the saturated column, or the bench is measuring
-	// presence again under new names.
-	if report.Lexical.MRR <= 0 || report.Lexical.MRR >= report.Lexical.RecallAt5 {
-		t.Errorf("MRR %.3f says nothing recall@5 %.2f does not", report.Lexical.MRR, report.Lexical.RecallAt5)
+	// The columns that see the order, pinned at the top rather than at a
+	// fraction. Each of the fifty queries names one session and that session is
+	// the only one carrying its words (#3481 and the occasions after it), so the
+	// ranker putting every answer first is the pass mark: a drop here is a
+	// ranking regression and nothing else.
+	//
+	// These used to be asserted below recall@5, which was right while they were
+	// capped by ties — recall@1 could not exceed 0.20 and MRR 0.457 whatever the
+	// ranker did, and the bench printed exactly those two numbers. The cap was
+	// the thing that made them look like measurements.
+	if report.Lexical.RecallAt1 < 1 {
+		t.Errorf("recall@1 %.2f: a query whose one answer is the only session that says it was not ranked first", report.Lexical.RecallAt1)
 	}
-	if report.Lexical.RecallAt1 <= 0 || report.Lexical.RecallAt1 >= report.Lexical.RecallAt5 {
-		t.Errorf("recall@1 %.2f says nothing recall@5 %.2f does not", report.Lexical.RecallAt1, report.Lexical.RecallAt5)
+	if report.Lexical.MRR < 1 {
+		t.Errorf("MRR %.3f: the answer was not first for every query", report.Lexical.MRR)
 	}
 	entries, err := os.ReadDir(outside)
 	if err != nil {

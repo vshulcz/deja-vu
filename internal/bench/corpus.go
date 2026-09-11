@@ -75,17 +75,25 @@ func Generate(seed int64) Corpus {
 			// distinct pairs.
 			t = topics[i/5]
 			variant := i % 5
+			// The occasion, which is what tells one session about a subject from
+			// the next four. Without it the topic's phrase sat in four of the
+			// five texts — "cache invalidation" is in the exact session, the
+			// typo's correction, the quoted one and the code review — so the
+			// exact-phrase query had five legitimate matches and the label named
+			// one of them. That capped recall@1 at 0.74 after #3481 removed the
+			// coarser tie, and the cap was invisible in the number.
+			occasion := occasions[variant]
 			switch variant {
 			case 0:
-				text = fmt.Sprintf("decision: investigate %s; code reference %s", t.exact, t.code)
+				text = fmt.Sprintf("decision: investigate %s %s; code reference %s", t.exact, occasion, t.code)
 			case 1:
-				text = fmt.Sprintf("error log: %s; decision: %s", t.exact, t.rephrased)
+				text = fmt.Sprintf("error log: %s %s; decision: %s", t.exact, occasion, t.rephrased)
 			case 2:
-				text = fmt.Sprintf("error log mentions %s; the correct term is %s", t.typo, t.exact)
+				text = fmt.Sprintf("error log mentions %s %s; the correct term is %s", t.typo, occasion, t.exact)
 			case 3:
-				text = fmt.Sprintf("decision recorded for %q in %s", t.phrase, t.code)
+				text = fmt.Sprintf("decision recorded for %q %s in %s", t.phrase, occasion, t.code)
 			case 4:
-				text = fmt.Sprintf("code review for %s found the %s behavior", t.code, t.exact)
+				text = fmt.Sprintf("code review for %s %s found the %s behavior", t.code, occasion, t.exact)
 			}
 			queries = append(queries, Query{Text: queryText(t, variant), Relevant: []string{id}})
 		}
@@ -108,17 +116,26 @@ func Generate(seed int64) Corpus {
 	return Corpus{Sessions: sessions, Queries: queries, Hash: hex.EncodeToString(h[:])}
 }
 
+// occasions are what a person adds when they actually ask: not "connection pool
+// exhausted" but "connection pool exhausted under load". One per variant, shared
+// across topics, so every query still competes with nine sessions that name the
+// same occasion and ten that name the same subject.
+var occasions = [5]string{
+	"on cold start", "after a deploy", "under load",
+	"in the nightly job", "on replica lag",
+}
+
 func queryText(t topic, variant int) string {
 	switch variant {
 	case 0:
-		return t.exact
+		return t.exact + " " + occasions[0]
 	case 1:
-		return t.rephrased
+		return t.rephrased + " " + occasions[1]
 	case 2:
-		return t.typo
+		return t.typo + " " + occasions[2]
 	case 3:
-		return fmt.Sprintf("%q", t.phrase)
+		return fmt.Sprintf("%q %s", t.phrase, occasions[3])
 	default:
-		return t.code
+		return t.code + " " + occasions[4]
 	}
 }

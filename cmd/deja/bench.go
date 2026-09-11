@@ -27,7 +27,10 @@ type benchMetric struct {
 	//
 	// They only started moving once each query named one session: while five
 	// queries shared a string and five sessions shared a text, a perfect ranker
-	// scored 0.20 and 0.457, which is what this printed for a long time.
+	// scored 0.20 and 0.457, which is what this printed for a long time. With
+	// the subject plus the occasion naming one session, all four columns sit at
+	// 1.00 and the bench is a regression gate: the test asserts the top, so a
+	// ranking change that moves one answer off first place fails CI.
 	RecallAt1             float64 `json:"recall_at_1"`
 	MRR                   float64 `json:"mrr"`
 	RecallAt5             float64 `json:"recall_at_5"`
