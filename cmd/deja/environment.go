@@ -179,6 +179,9 @@ func environmentBlockFrom(dir, activation string) (string, []string) {
 		if fix := environmentRemedy(dir, w.Text, activation); fix != "" {
 			fmt.Fprintf(&b, "  what followed it: `%s`\n", fix)
 			knownRemedy = true
+		} else if note := environmentWrapperNote(dir, w.Text, activation); note != "" {
+			fmt.Fprintf(&b, "  %s\n", note)
+			knownRemedy = true
 		}
 	}
 	// Without this line the block reads as trivia. With it the model has
@@ -272,6 +275,48 @@ func environmentRemedy(dir, wall string, activation string) string {
 		return ""
 	}
 	return safeForStatusline(cmd, environmentMax)
+}
+
+// environmentWrapperNote is the remedy for a missing program, worded rather than
+// quoted.
+//
+// The most frequent wall on this machine — `command not found: timeout`, 34
+// sessions — had no remedy line at all, because the pairs recorded for it are
+// long commands from other work (`ssh -o ConnectTimeout=10 mini-ts 'cd … && …'`)
+// and environmentRemedy drops anything past the block's width. What those pairs
+// have in common is short enough to say: the same command ran with the wrapper
+// taken out. #3487 gave the pre-tool line that sentence; this is the same fact
+// at session start, where the note on missing_program.go says nine of ten
+// sessions told about a missing program ran it anyway.
+func environmentWrapperNote(dir, wall string, activation string) string {
+	prog, ok := missingProgramFromWall(wall)
+	if !ok {
+		return ""
+	}
+	pol := policy.Load()
+	for _, p := range index.FixesFor(dir, wall, 4, func(project string) bool {
+		return pol.Allows(activation, project)
+	}) {
+		if sameCommandWithout(p.Failed, p.Command, prog) {
+			return "what worked: the same command without `" + prog + "`"
+		}
+	}
+	return ""
+}
+
+// missingProgramFromWall reads the program out of a shell's own refusal, which
+// every shell words the same way at the end: "command not found: timeout".
+func missingProgramFromWall(wall string) (string, bool) {
+	const marker = "command not found: "
+	i := strings.LastIndex(wall, marker)
+	if i < 0 {
+		return "", false
+	}
+	prog := strings.TrimSpace(wall[i+len(marker):])
+	if prog == "" || strings.ContainsAny(prog, " \t/`'\"") {
+		return "", false
+	}
+	return prog, true
 }
 
 // environmentSpent is per process, which is what makes "once" countable on
