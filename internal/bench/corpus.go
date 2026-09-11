@@ -15,7 +15,9 @@ const Seed int64 = 1
 
 const (
 	SessionCount = 500
-	QueryCount   = 50
+	// Five variants for each topic in the table, which is what makes every
+	// query name one session (#3481).
+	QueryCount = 100
 )
 
 type Query struct {
@@ -36,6 +38,10 @@ type topic struct {
 	typo      string
 	phrase    string
 	code      string
+	// ru marks a topic written the way this store is mostly written. The
+	// occasions a query names are in the topic's own language; a question that
+	// mixes two is nobody's question.
+	ru bool
 }
 
 var topics = []topic{
@@ -49,6 +55,21 @@ var topics = []topic{
 	{name: "locking", exact: "file lock contention", rephrased: "writers waited on the same lock", typo: "contetion", phrase: "file lock contention", code: "internal/lock.go"},
 	{name: "redaction", exact: "credential redaction", rephrased: "secrets are removed before indexing", typo: "redacton", phrase: "credential redaction", code: "security/redact.go"},
 	{name: "recovery", exact: "crash recovery replay", rephrased: "rebuilding after an interrupted write", typo: "replai", phrase: "crash recovery replay", code: "index/recover.go"},
+	// The other half of the corpus, because the ranking it gates is used mostly
+	// on stores that read like this one: #2734 found the store Russian-dominant
+	// and changed the decision recogniser for it, while this bench stayed
+	// English — so a ranking regression on Cyrillic passed every column at 1.00.
+	// Invented subjects, not this machine's.
+	{name: "кэш", exact: "инвалидация кэша", rephrased: "сброс устаревших записей кэша", typo: "инвалидацяи", phrase: "инвалидация кэша", code: "store/cache.go", ru: true},
+	{name: "миграция", exact: "идемпотентная миграция", rephrased: "повторяемое обновление схемы", typo: "идемпотнетная", phrase: "идемпотентная миграция", code: "store/migrate.go", ru: true},
+	{name: "пул", exact: "пул соединений исчерпан", rephrased: "клиенты базы закончились", typo: "исчерапн", phrase: "пул соединений исчерпан", code: "store/pool.go", ru: true},
+	{name: "токен", exact: "ротация refresh-токена", rephrased: "обновление доступа после ротации", typo: "ротацяи", phrase: "ротация refresh-токена", code: "auth/refresh.go", ru: true},
+	{name: "очередь", exact: "повторная доставка задачи", rephrased: "воркер получил одну задачу дважды", typo: "достаква", phrase: "повторная доставка задачи", code: "queue/worker.go", ru: true},
+	{name: "парсер", exact: "ошибка на границе записи", rephrased: "декодер перешёл границу записи", typo: "граинце", phrase: "ошибка на границе записи", code: "parse/record.go", ru: true},
+	{name: "таймаут", exact: "превышен дедлайн запроса", rephrased: "апстрим не ответил в срок", typo: "дедлйан", phrase: "превышен дедлайн запроса", code: "net/deadline.go", ru: true},
+	{name: "блокировка", exact: "конкуренция за файловую блокировку", rephrased: "писатели ждали одну блокировку", typo: "конкуренцяи", phrase: "конкуренция за файловую блокировку", code: "lock/file.go", ru: true},
+	{name: "редакция", exact: "вырезание секретов", rephrased: "секреты убираются до индексации", typo: "вырезаине", phrase: "вырезание секретов", code: "redact/secrets.go", ru: true},
+	{name: "восстановление", exact: "проигрывание журнала после сбоя", rephrased: "пересборка после прерванной записи", typo: "проигрывнаие", phrase: "проигрывание журнала после сбоя", code: "recover/replay.go", ru: true},
 }
 
 // Generate is the benchmark fixture. Every value, including timestamps and
@@ -82,7 +103,7 @@ func Generate(seed int64) Corpus {
 			// exact-phrase query had five legitimate matches and the label named
 			// one of them. That capped recall@1 at 0.74 after #3481 removed the
 			// coarser tie, and the cap was invisible in the number.
-			occasion := occasions[variant]
+			occasion := occasionsFor(t)[variant]
 			switch variant {
 			case 0:
 				text = fmt.Sprintf("decision: investigate %s %s; code reference %s", t.exact, occasion, t.code)
@@ -125,17 +146,30 @@ var occasions = [5]string{
 	"in the nightly job", "on replica lag",
 }
 
+// ruOccasions are the same five, for the half of the table written in Russian.
+var ruOccasions = [5]string{
+	"на холодном старте", "после деплоя", "под нагрузкой",
+	"в ночном прогоне", "на лаге реплики",
+}
+
+func occasionsFor(t topic) [5]string {
+	if t.ru {
+		return ruOccasions
+	}
+	return occasions
+}
+
 func queryText(t topic, variant int) string {
 	switch variant {
 	case 0:
-		return t.exact + " " + occasions[0]
+		return t.exact + " " + occasionsFor(t)[0]
 	case 1:
-		return t.rephrased + " " + occasions[1]
+		return t.rephrased + " " + occasionsFor(t)[1]
 	case 2:
-		return t.typo + " " + occasions[2]
+		return t.typo + " " + occasionsFor(t)[2]
 	case 3:
-		return fmt.Sprintf("%q %s", t.phrase, occasions[3])
+		return fmt.Sprintf("%q %s", t.phrase, occasionsFor(t)[3])
 	default:
-		return t.code + " " + occasions[4]
+		return t.code + " " + occasionsFor(t)[4]
 	}
 }

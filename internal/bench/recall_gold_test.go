@@ -97,3 +97,38 @@ func holdsAll(text string, words []string) bool {
 	}
 	return true
 }
+
+// The ranking this corpus gates is used mostly on stores that do not read like
+// the first half of the topic table. #2734 found the store Russian-dominant and
+// changed the decision recogniser for it; the bench stayed English, so a
+// regression on Cyrillic passed every column at 1.00. Both halves ask, and each
+// asks in its own language — a query that mixes two is nobody's question.
+func TestTheRecallCorpusAsksInBothLanguages(t *testing.T) {
+	c := Generate(Seed)
+	cyrillic := func(s string) bool {
+		for _, r := range s {
+			if r >= 0x400 && r <= 0x4FF {
+				return true
+			}
+		}
+		return false
+	}
+	ru, en := 0, 0
+	for _, q := range c.Queries {
+		if cyrillic(q.Text) {
+			ru++
+			// The occasion travels with the subject: "под нагрузкой", never
+			// "under load" after three Russian words.
+			for _, word := range []string{"under load", "after a deploy", "on cold start", "nightly job", "replica lag"} {
+				if strings.Contains(q.Text, word) {
+					t.Errorf("%q asks in two languages at once", q.Text)
+				}
+			}
+			continue
+		}
+		en++
+	}
+	if ru < QueryCount/4 || en < QueryCount/4 {
+		t.Errorf("the corpus asks %d queries in Russian and %d in English; both halves have to be there", ru, en)
+	}
+}

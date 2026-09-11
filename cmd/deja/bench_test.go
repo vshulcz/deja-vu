@@ -43,7 +43,7 @@ func TestBenchRecallJSONAndIsolation(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &report); err != nil {
 		t.Fatalf("invalid benchmark JSON %q: %v", out, err)
 	}
-	if len(report.CorpusHash) != 64 || report.Sessions != 500 || report.Queries != 50 || report.Lexical.RecallAt5 < 0.85 || report.Lexical.RecallAt10 < report.Lexical.RecallAt5 || report.Lexical.MedianMS < 0 || report.HybridStatus == "" {
+	if len(report.CorpusHash) != 64 || report.Sessions != bench.SessionCount || report.Queries != bench.QueryCount || report.Lexical.RecallAt5 < 0.85 || report.Lexical.RecallAt10 < report.Lexical.RecallAt5 || report.Lexical.MedianMS < 0 || report.HybridStatus == "" {
 		t.Fatalf("unexpected benchmark report: %#v", report)
 	}
 	// The columns that see the order, pinned at the top rather than at a
