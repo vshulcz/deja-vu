@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -89,7 +91,15 @@ const recallTouchedFiles = 4
 // recallTouchedLine renders the files the session worked on, from the manifest
 // rather than the hit (a hit carries only matching messages). Empty when the
 // session touched nothing recorded — a conversation with no file work.
-func recallTouchedLine(dir string, s model.Session) string {
+//
+// The files the question is about come first. The manifest keeps Touched sorted
+// by path, so a session that worked on many files named the same four — the ones
+// whose paths sort first — to every question that reached it: measured over
+// sixteen recall calls on a real store, 1 of the 10 lines served held any word of
+// the question, and one session answered four unrelated questions with the same
+// three paths. The line exists so an agent that has just learned "this was
+// solved here" knows where to look, and alphabetical order does not know that.
+func recallTouchedLine(dir string, s model.Session, terms []string) string {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
 		return ""
@@ -98,7 +108,7 @@ func recallTouchedLine(dir string, s model.Session) string {
 		if m.ID != s.ID || len(m.Touched) == 0 {
 			continue
 		}
-		paths := m.Touched
+		paths := pathsAboutIt(m.Touched, terms)
 		extra := 0
 		if len(paths) > recallTouchedFiles {
 			extra = len(paths) - recallTouchedFiles
@@ -126,6 +136,45 @@ func recallTouchedLine(dir string, s model.Session) string {
 		return search.SafeLine(out)
 	}
 	return ""
+}
+
+// pathsAboutIt puts the paths a question names ahead of the rest, keeping both
+// groups in the order the manifest recorded them so nothing else about the line
+// moves.
+func pathsAboutIt(paths, terms []string) []string {
+	if len(terms) == 0 || len(paths) < 2 {
+		return paths
+	}
+	var want []string
+	for _, t := range terms {
+		t = strings.ToLower(t)
+		// Two letters name nothing in a path; "go" and "md" would put every
+		// file first.
+		if utf8.RuneCountInString(t) >= 4 && !query.IsStopWord(t) {
+			want = append(want, t)
+		}
+	}
+	if len(want) == 0 {
+		return paths
+	}
+	named := make([]string, 0, len(paths))
+	rest := make([]string, 0, len(paths))
+	for _, p := range paths {
+		low := strings.ToLower(p)
+		hit := false
+		for _, t := range want {
+			if strings.Contains(low, t) {
+				hit = true
+				break
+			}
+		}
+		if hit {
+			named = append(named, p)
+		} else {
+			rest = append(rest, p)
+		}
+	}
+	return append(named, rest...)
 }
 
 // commonDirPrefix returns the longest directory prefix every path shares,

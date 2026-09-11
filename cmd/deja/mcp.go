@@ -1495,7 +1495,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// them an agent that has just learned "we solved this before"
 				// still has to search the tree for where — and that search
 				// costs far more context than naming the paths here does.
-				if paths := recallTouchedLine(dir, h.Session); paths != "" {
+				if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
 					fmt.Fprintf(&hb, "  files it touched: %s\n", paths)
 				}
 			}
