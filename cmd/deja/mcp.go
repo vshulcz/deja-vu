@@ -1327,7 +1327,10 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// approach inside was abandoned, not that the whole session is a dead
 		// end: the tried-then-fixed session is the most useful one, and the
 		// excerpts show which path was dropped.
-		if h.Session.GaveUp && h.Lifecycle == "" {
+		// And only where "somewhere in this session" is a place the agent can
+		// look: the same rule the search screen got in #3474, from the same
+		// function so the two cannot drift.
+		if h.Session.GaveUp && h.Lifecycle == "" && search.AbandonmentWorthSaying(h) {
 			fmt.Fprintln(&hb, "[this session abandoned one approach partway — check the excerpts for which, the rest may still hold]")
 		}
 		// Sync keeps both copies when a session id is on two machines, and

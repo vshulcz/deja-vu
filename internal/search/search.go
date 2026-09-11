@@ -995,8 +995,11 @@ func proximityBoost(window, queryTokenCount int) float64 {
 	return boost
 }
 
-// abandonmentWorthSaying reports whether the give-up mark tells a reader
-// something about this hit.
+// AbandonmentWorthSaying reports whether the give-up mark tells a reader
+// something about this hit. Exported because the MCP recall answer words the
+// same mark ("[this session abandoned one approach partway …]") and was asking
+// the same question with no rule behind it: over sixteen recall calls on a real
+// store it printed the mark 32 times in 16 answers, two per page.
 //
 // GaveUp is a property of the whole session: one line anywhere saying something
 // was dropped marks all of it. On a short session that is useful — "one path
@@ -1017,7 +1020,7 @@ func proximityBoost(window, queryTokenCount int) float64 {
 // above: two recognisers for one idea, and the narrower one wins by accident.
 // A session with no recorded length keeps the mark: an unknown is not a
 // marathon.
-func abandonmentWorthSaying(h Hit) bool {
+func AbandonmentWorthSaying(h Hit) bool {
 	return h.Session.Words == 0 || h.Session.Words <= abandonmentScannableWords
 }
 
@@ -1336,7 +1339,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// wording is deliberately mild: a session that tried one thing, dropped
 		// it and found another is the most useful kind, so this flags an
 		// abandoned approach inside it, not the whole session as a dead end.
-		if h.Session.GaveUp && h.Lifecycle == "" && abandonmentWorthSaying(h) {
+		if h.Session.GaveUp && h.Lifecycle == "" && AbandonmentWorthSaying(h) {
 			note := "  mentions backing an approach out — one path here was abandoned"
 			if color {
 				note = cDim + note + cReset
