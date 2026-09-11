@@ -50,14 +50,21 @@ func TestRebuildOnATerminalSaysWhatItIndexed(t *testing.T) {
 		}
 		stderr := os.Stderr
 		os.Stderr = w
+		// Drained concurrently: a windows pipe buffers a few KB and a rebuild
+		// reports per file and per harness.
+		done := make(chan string, 1)
+		go func() {
+			b, _ := io.ReadAll(r)
+			done <- string(b)
+		}()
 		err = cmdIndex(dir, []string{"--rebuild"})
 		os.Stderr = stderr
 		_ = w.Close()
-		out, _ := io.ReadAll(r)
+		out := <-done
 		if err != nil {
 			t.Fatal(err)
 		}
-		return string(out)
+		return out
 	}
 
 	got := run(t)

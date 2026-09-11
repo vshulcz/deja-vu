@@ -301,11 +301,17 @@ func TestPrintInstallProofListsDistinctProjects(t *testing.T) {
 	old := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
+	// Drained concurrently: a windows pipe buffers a few KB and this report
+	// grows with what the install wrote.
+	done := make(chan string, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- string(b)
+	}()
 	printInstallProof(index.DefaultDir())
 	_ = w.Close()
 	os.Stderr = old
-	b, _ := io.ReadAll(r)
-	out := string(b)
+	out := <-done
 	if !strings.Contains(out, "deja already knows this machine:") ||
 		!strings.Contains(out, "tmp/beta") || !strings.Contains(out, "gamma") {
 		t.Fatalf("proof output = %q", out)

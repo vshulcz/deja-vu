@@ -95,18 +95,12 @@ func TestPrintSourcesAntigravityFallback(t *testing.T) {
 	hermeticEnv(t)
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", "")
 
-	oldStdout := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	os.Stdout = w
-	printSources(index.DefaultDir())
-	_ = w.Close()
-	os.Stdout = oldStdout
-	b, _ := io.ReadAll(r)
-	if !strings.Contains(string(b), "antigravity*") {
-		t.Fatalf("printSources fallback output = %q", string(b))
+	// Drained concurrently, because the source table prints one block per
+	// harness and outgrew a windows pipe's buffer: the sequential read after
+	// the call deadlocked the whole package at 25 harnesses.
+	out := captureStdout(t, func() { printSources(index.DefaultDir()) })
+	if !strings.Contains(out, "antigravity*") {
+		t.Fatalf("printSources fallback output = %q", out)
 	}
 }
 
