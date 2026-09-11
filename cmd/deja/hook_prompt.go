@@ -1576,10 +1576,24 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 		return ""
 	}
 	s := ss[0]
-	topic := dejaVuTopic(s)
+	// With the terms, which is the whole point of the line: the pointer's only
+	// content is the topic it names, because the agent has to turn that into a
+	// recall call. Called without them, dejaVuTopic falls through to the
+	// session's title — and on the one firing measured against a real store
+	// that answered "how is the block" with `"делай задачи в next.md"`, a title
+	// from a session that merely mentions the subject somewhere. The spoken
+	// déjà vu line has passed its terms since it was written (#2734); this
+	// path did not, so the cheaper payload was also the wronger one.
+	topic := dejaVuTopic(s, terms...)
 	if topic == "" {
 		topic = strings.Join(terms, " ")
 	}
+	// Bounded the way the spoken opener bounds the same kind of line. The
+	// matched line is a whole user turn, which on this store reaches a thousand
+	// characters — and the pointer exists because it is cheap: 290 bytes became
+	// 1234 with the line unclipped, which is a digest's price for a pointer's
+	// content.
+	topic = clipTopic(topic)
 	when := "earlier"
 	if !s.Updated.IsZero() {
 		when = search.RelativeDate(s.Updated)
@@ -1590,6 +1604,29 @@ func weakRecallPointer(ss []model.Session, terms []string) string {
 	}
 	return fmt.Sprintf("deja: this project has history on %q from %s%s — call recall with a specific token if it matters here.\n",
 		search.SafeLine(topic), when, more)
+}
+
+// pointerTopicRunes is how much of the matched line the pointer names. Sixty is
+// what the spoken opener uses for the same job, and the agent only needs enough
+// to write a recall call.
+const pointerTopicRunes = 60
+
+// clipTopic bounds a topic to one readable clause, ending at a word where it
+// can. Cutting mid-word leaves a fragment nobody can search for, which is the
+// one thing this line is for.
+func clipTopic(topic string) string {
+	topic = strings.Join(strings.Fields(topic), " ")
+	r := []rune(topic)
+	if len(r) <= pointerTopicRunes {
+		return topic
+	}
+	cut := string(r[:pointerTopicRunes])
+	// Back up to the last space when one is near, so the reader gets whole
+	// words; a long unbroken token keeps the hard cut.
+	if i := strings.LastIndexByte(cut, ' '); i > len(cut)-20 && i > 0 {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,;:—-") + "…"
 }
 
 // hookseenPrefixed reports whether a key already carries one of the prefixes
