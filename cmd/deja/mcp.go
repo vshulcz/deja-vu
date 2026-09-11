@@ -967,7 +967,7 @@ func attachAnswers(dir string, hits []search.Hit) {
 // Excerpt words count as well as query words, which is what keeps a conclusion
 // worded nothing like the question — the case the list exists for (#1011): "the
 // backoff counted from zero" stays under an excerpt that says backoff.
-func conclusionsAboutIt(cs []string, q string, snippets []string) []string {
+func conclusionsAboutIt(cs []string, q string, snippets []string) ([]string, bool) {
 	about := contentWords(q)
 	for _, sn := range snippets {
 		for w := range contentWords(sn) {
@@ -977,7 +977,7 @@ func conclusionsAboutIt(cs []string, q string, snippets []string) []string {
 	if len(about) == 0 {
 		// Nothing to judge against: a query of common words alone, which the
 		// ranking answered on its own terms.
-		return cs
+		return cs, true
 	}
 	kept := make([]string, 0, len(cs))
 	for _, c := range cs {
@@ -991,9 +991,14 @@ func conclusionsAboutIt(cs []string, q string, snippets []string) []string {
 		// which this store is full of — still concluded something, and a
 		// conclusion nobody asked for is a memory that can still turn out to be
 		// the one. Three of them is wallpaper; one is an offer.
-		return cs[:1]
+		//
+		// And it is offered as one: the second return is false, so the line
+		// above it does not call it a conclusion about the question. On sixteen
+		// recall calls against a real store this is what four of the answers
+		// show, and an agent reads the label as the claim.
+		return cs[:1], false
 	}
-	return kept
+	return kept, true
 }
 
 // sharesAWord is word overlap that holds for identifiers: `ManifestBuiltAt`
@@ -1482,11 +1487,19 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// showed one where three were available.
 				want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
 				cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets)
-				if cs = conclusionsAboutIt(cs, q, h.Snippets); len(cs) > 0 {
+				cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
+				if len(cs) > 0 {
 					if len(cs) > 3 {
 						cs = cs[:3]
 					}
-					fmt.Fprintln(&hb, "  what this session concluded:")
+					label := "  what this session concluded:"
+					if !aboutIt {
+						// Nothing it concluded is about the question, and this
+						// is the newest thing it settled instead. Said plainly,
+						// because the label is what an agent reads as the claim.
+						label = "  what this session concluded, about its own work:"
+					}
+					fmt.Fprintln(&hb, label)
 					for _, c := range cs {
 						fmt.Fprintf(&hb, "  → %s\n", recallListingLine(c))
 					}
