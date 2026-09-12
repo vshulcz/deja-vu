@@ -438,8 +438,7 @@ func copilotChatSession(path string, state map[string]any) ([]model.Session, err
 //
 // The transcript names a path only when the text does, so a chat that edited
 // eleven files left one `files` record. Measured on this machine: 48 of those
-// state files, and while `recentSnapshot.workingSet` is empty in every one of
-// them, their entries carry 145 resources between them (#3381).
+// state files, whose entries carry 145 resources between them (#3381).
 func appendChatEditedFiles(s *model.Session, path, id string) {
 	if !IndexToolPaths() || id == "" {
 		return
@@ -451,9 +450,6 @@ func appendChatEditedFiles(s *model.Session, path, id string) {
 	}
 	var state struct {
 		RecentSnapshot struct {
-			WorkingSet []struct {
-				Resource any `json:"resource"`
-			} `json:"workingSet"`
 			Entries []struct {
 				Resource any `json:"resource"`
 			} `json:"entries"`
@@ -472,9 +468,6 @@ func appendChatEditedFiles(s *model.Session, path, id string) {
 		seen[p] = true
 		paths = append(paths, p)
 	}
-	for _, e := range state.RecentSnapshot.WorkingSet {
-		add(e.Resource)
-	}
 	for _, e := range state.RecentSnapshot.Entries {
 		add(e.Resource)
 	}
@@ -485,23 +478,32 @@ func appendChatEditedFiles(s *model.Session, path, id string) {
 	s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(paths, "\n"), Time: at})
 }
 
-// chatResourcePath reads the path out of a VS Code URI, which the state file
-// writes either as an object with `path` or as the string form of one.
+// chatResourcePath reads the path out of a VS Code URI. The state file writes
+// a percent-encoded URI string, decoded exactly once here, or an object whose
+// path is already decoded and is not decoded again.
 func chatResourcePath(res any) string {
+	var p string
 	switch v := res.(type) {
 	case string:
-		if i := strings.Index(v, "://"); i >= 0 {
-			v = v[i+3:]
-			if j := strings.IndexByte(v, '/'); j >= 0 {
-				v = v[j:]
+		if strings.Contains(v, "://") {
+			u, err := url.Parse(v)
+			if err != nil || u.Scheme == "" {
+				return ""
 			}
+			p = u.Path
+			if u.Scheme == "file" && u.Host != "" {
+				p = "//" + u.Host + u.Path
+			}
+		} else {
+			p = v
 		}
-		return strings.TrimSpace(v)
 	case map[string]any:
-		p, _ := v["path"].(string)
-		return strings.TrimSpace(p)
+		p, _ = v["path"].(string)
 	}
-	return ""
+	if strings.ContainsAny(p, "\n\r") {
+		return ""
+	}
+	return strings.TrimSpace(p)
 }
 
 func copilotChatTitle(state map[string]any) string {

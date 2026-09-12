@@ -85,3 +85,120 @@ func TestACopilotChatWithoutEditStateIsUnchanged(t *testing.T) {
 		}
 	}
 }
+
+const copilotChatEditedFilesTestID = "bbbbbbbb-0000-4000-8000-bbbbbbbbbbbb"
+
+func copilotChatEditedFilesText(t *testing.T, state string) string {
+	t.Helper()
+	ws := filepath.Join(t.TempDir(), "workspaceStorage", "abc123")
+	chats := filepath.Join(ws, "chatSessions")
+	if err := os.MkdirAll(chats, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	transcript := `{"version":3,"sessionId":"` + copilotChatEditedFilesTestID +
+		`","creationDate":1767225600000,"requests":[{"message":{"text":"edit the files"},` +
+		`"response":[{"value":"done"}]}]}`
+	path := filepath.Join(chats, copilotChatEditedFilesTestID+".json")
+	if err := os.WriteFile(path, []byte(transcript), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	edits := filepath.Join(ws, "chatEditingSessions", copilotChatEditedFilesTestID)
+	if err := os.MkdirAll(edits, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(edits, "state.json"), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ss, err := ParseCopilotChatFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 {
+		t.Fatalf("sessions = %d, want the one transcript", len(ss))
+	}
+	var records []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleFiles {
+			records = append(records, m.Text)
+		}
+	}
+	if len(records) == 0 {
+		return ""
+	}
+	if len(records) != 1 {
+		t.Fatalf("files records = %d, want one: %q", len(records), records)
+	}
+	return records[0]
+}
+
+// VS Code writes string resources with URI.toString(), which percent-encodes
+// their paths, while UriComponents paths are already decoded.
+func TestACopilotChatDecodesThePercentEncodedResource(t *testing.T) {
+	state := `{"version":2,"sessionId":"` + copilotChatEditedFilesTestID +
+		`","recentSnapshot":{"entries":[` +
+		`{"resource":"file:///c%3A/Users/me/my%20app/main.go"},` +
+		`{"resource":{"scheme":"file","path":"/c:/Users/me/my app/other.go"}}]}}`
+	files := copilotChatEditedFilesText(t, state)
+
+	for _, want := range []string{
+		"/c:/Users/me/my app/main.go",
+		"/c:/Users/me/my app/other.go",
+	} {
+		if !strings.Contains(files, want) {
+			t.Errorf("the decoded files record does not name %s: %q", want, files)
+		}
+	}
+	for _, escaped := range []string{"%3A", "%20"} {
+		if strings.Contains(files, escaped) {
+			t.Errorf("the files record kept %s instead of decoding it: %q", escaped, files)
+		}
+	}
+}
+
+// VS Code's older snapshot stored workingSet as ResourceMapDTO pairs, while
+// its reader still took the edited files only from entries.
+func TestACopilotChatReadsTheOlderWorkingSetShape(t *testing.T) {
+	state := `{"version":1,"sessionId":"` + copilotChatEditedFilesTestID +
+		`","recentSnapshot":{"requestId":"r1",` +
+		`"workingSet":[["file:///work/app/a.go",{"state":0}]],` +
+		`"entries":[{"resource":"file:///work/app/b.go"}]}}`
+	files := copilotChatEditedFilesText(t, state)
+
+	if !strings.Contains(files, "/work/app/b.go") {
+		t.Errorf("the files record does not name the snapshot entry: %q", files)
+	}
+	if strings.Contains(files, "/work/app/a.go") {
+		t.Errorf("the files record misattributes a working-set key as edited: %q", files)
+	}
+}
+
+// The sidecar can carry an encoded newline inside one URI, while RoleFiles
+// uses literal newlines to separate resources.
+func TestACopilotChatDropsAResourceThatDecodesToANewline(t *testing.T) {
+	state := `{"version":2,"sessionId":"` + copilotChatEditedFilesTestID +
+		`","recentSnapshot":{"entries":[` +
+		`{"resource":"file:///work/app/x%0Ay.go"},` +
+		`{"resource":"file:///work/app/trailing.go%0A"},` +
+		`{"resource":"file:///work/app/cr.go%0D"},` +
+		`{"resource":"file:///work/app/ok.go"}]}}`
+	files := copilotChatEditedFilesText(t, state)
+	lines := strings.Split(files, "\n")
+
+	if len(lines) != 1 || lines[0] != "/work/app/ok.go" {
+		t.Fatalf("files lines = %q, want only /work/app/ok.go", lines)
+	}
+}
+
+// URI.toString() keeps a file URI's server in the authority rather than in
+// the decoded path.
+func TestACopilotChatKeepsAUNCResourceAuthority(t *testing.T) {
+	state := `{"version":2,"sessionId":"` + copilotChatEditedFilesTestID +
+		`","recentSnapshot":{"entries":[` +
+		`{"resource":"file://server/share/proj/f.go"}]}}`
+	files := copilotChatEditedFilesText(t, state)
+
+	if files != "//server/share/proj/f.go" {
+		t.Fatalf("files = %q, want //server/share/proj/f.go", files)
+	}
+}
