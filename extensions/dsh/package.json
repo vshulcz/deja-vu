@@ -50,7 +50,7 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.19.5"
+    "@vshulcz/deja-vu": "^0.20.0"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
