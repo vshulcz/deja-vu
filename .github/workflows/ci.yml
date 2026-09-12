@@ -31,10 +31,16 @@ jobs:
     # being unlucky. On 2026-09-09 two runs of the same commit came in at 12m10s
     # and past 45m — the step that ran over is `go test`, whose own 12m timeout
     # covers running tests and not compiling them, so a cold cache on a slow
-    # runner spends the difference in the compiler. 60 keeps a real hang
-    # bounded — the go -timeout below still kills one with a stack long before
-    # this — and stops a slow runner reading as a failure.
-    timeout-minutes: 60
+    # runner spends the difference in the compiler. 60 went the same way on
+    # 2026-09-12: the leg cancelled at 1h2m53s on main having passed at 49m18s
+    # and 57m2s on the two pull requests before it. Where that time goes,
+    # measured on the passing run: the test step is 48m27s, of which 13m is the
+    # tests themselves (cmd/deja 612s, internal/index 124s, every other package
+    # under 40s) and 35m is compiling and linking test binaries. Caching the
+    # build and excluding it from Defender were both measured and neither helped
+    # (#1229). So the cap is 90 — a real hang is still bounded by the go
+    # -timeout below, which kills one with a stack long before this.
+    timeout-minutes: 90
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
       # minutes for a job the others finish in two, and it varies by a third
