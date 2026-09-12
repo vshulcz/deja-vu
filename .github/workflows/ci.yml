@@ -98,7 +98,14 @@ jobs:
       # race is caught on the linux and macOS legs above. Windows is in this
       # matrix for paths, file locking and case rules, and plain `go test`
       # exercises every one of those.
-      - run: go test -timeout 12m ./...
+      #
+      # The windows timeout is 25m rather than 12m because 12m stopped being a
+      # hang detector and started cutting honest work: run 34663347144 killed
+      # cmd/deja at 720.087s with the test it had just entered at 0s, so nothing
+      # was stuck — the package simply needs more than twelve minutes on a slow
+      # runner now. The job's own 60m cap is what bounds a real hang, and the go
+      # timeout still dies with every goroutine's stack well inside it.
+      - run: go test -timeout 25m ./...
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
       - run: go build ./cmd/deja
