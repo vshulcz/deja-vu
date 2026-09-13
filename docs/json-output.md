@@ -352,6 +352,19 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
       "path": "/home/user/.claude.json"
     }
   ],
+  "auto_recall": [
+    {
+      "name": "opencode",
+      "state": "wired",
+      "path": "/home/user/.config/opencode/plugins/deja.js"
+    },
+    {
+      "name": "cursor",
+      "state": "wired",
+      "path": "/home/user/.cursor/hooks.json",
+      "binary_missing": true
+    }
+  ],
   "sqlite3": {"state": "ok"},
   "git": {"state": "ok"},
   "version": {
@@ -426,6 +439,13 @@ permission walk was cut short or blocked carries `partial` or `unchecked`.
 `missing`: sqlite3 reads the opencode, Cursor, grok, hermes, goose and zed
 stores, and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
+
+`auto_recall` is the other half of an install: the files that make memory arrive
+without anyone asking, one row per harness deja can wire. `state` is `wired`,
+`stale` (the file is there and nothing in it calls deja, which is how a dead
+integration looks), `missing`, or `plugin` (the harness carries its own).
+`binary_missing` marks a row whose entries name a deja binary that is no longer
+there — what an upgrade leaves behind, with every hook exiting 127.
 
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a

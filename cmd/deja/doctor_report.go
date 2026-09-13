@@ -58,6 +58,18 @@ type doctorComponent struct {
 	Path  string `json:"path,omitempty"`
 }
 
+// doctorAutoStatus is one auto-recall wiring, in the same four states the text
+// report prints: wired, stale (the file is there and nothing in it calls deja),
+// missing, and plugin (the harness carries its own). BinaryMissing is the state
+// an upgrade leaves — the entry is there, wired, and names a path that no
+// longer exists, so every hook exits 127 and nothing else says so.
+type doctorAutoStatus struct {
+	Name          string `json:"name"`
+	State         string `json:"state"`
+	Path          string `json:"path,omitempty"`
+	BinaryMissing bool   `json:"binary_missing,omitempty"`
+}
+
 // doctorIndexReport is the index component. It carries stale_stores, which
 // docs/json-output.md documents and which the sqlite3 component has no meaning
 // for — sharing one struct put the field in both. omitempty is deliberately
@@ -88,7 +100,14 @@ type doctorReport struct {
 	Stores        []doctorStore     `json:"stores"`
 	Index         doctorIndexReport `json:"index"`
 	MCP           []doctorMCPStatus `json:"mcp"`
-	SQLite3       doctorComponent   `json:"sqlite3"`
+	// AutoRecall is the other half of an install and the half that fails
+	// silently: an MCP server is a tool the agent may call, these files are
+	// what make memory arrive without anyone asking. The text report has named
+	// their state since the rows existed, and a script reading this JSON could
+	// see a missing sqlite3 but not a hook that runs a binary which is gone —
+	// the state an upgrade leaves behind, where every hook exits 127.
+	AutoRecall []doctorAutoStatus `json:"auto_recall"`
+	SQLite3    doctorComponent    `json:"sqlite3"`
 	// Git is the other tool the text report names, and what it is needed for
 	// degrades in silence: changed-file notes, worktree names, the task signal.
 	// A machine checking this install could see a missing sqlite3 and not a
@@ -308,6 +327,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.Ingest = index.IngestHealth(dir)
 	report.IngestFiles = index.IngestFilesReport(dir)
 	report.MCP = collectDoctorMCP()
+	report.AutoRecall = collectDoctorAutoRecall()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
@@ -723,6 +743,19 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 		}
 	}
 	return result
+}
+
+// collectDoctorAutoRecall reads the same files and asks the same questions as
+// the rows doctorAutoRecall prints, so the two surfaces cannot disagree about
+// whether an install is live.
+func collectDoctorAutoRecall() []doctorAutoStatus {
+	wirings := autoWirings()
+	out := make([]doctorAutoStatus, 0, len(wirings))
+	for _, a := range wirings {
+		state, dead := autoWiringState(a)
+		out = append(out, doctorAutoStatus{Name: a.name, State: state, Path: a.path(), BinaryMissing: dead})
+	}
+	return out
 }
 
 func collectDoctorMCP() []doctorMCPStatus {
