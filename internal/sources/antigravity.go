@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -261,7 +262,7 @@ func antigravityRemovedLines(text string) string {
 // writes them as file:// URIs, sometimes in backticks.
 func antigravityPath(text string) string {
 	if m := antigravityEditSentence.FindStringSubmatch(text); m != nil {
-		return strings.TrimPrefix(strings.Trim(m[1], "`"), "file://")
+		return decodeURIPath(strings.TrimPrefix(strings.Trim(m[1], "`"), "file://"))
 	}
 	for _, label := range []string{"File Path:", "Created file", "Edited file", "Modified file"} {
 		v := antigravityField(text, label)
@@ -273,10 +274,38 @@ func antigravityPath(text string) string {
 			v = v[:i]
 		}
 		if p, ok := strings.CutPrefix(v, "file://"); ok {
-			return strings.Trim(p, "`")
+			return decodeURIPath(strings.Trim(p, "`"))
 		}
 	}
 	return ""
+}
+
+// decodeURIPath undoes the percent-encoding a file:// URI carries. The scheme
+// is stripped textually above, which leaves `%20` where a space was — the same
+// shape that put `/c%3A/Users/me/my%20app/main.go` into a Copilot Chat files
+// record until #3498 parsed the URI instead of slicing it.
+//
+// Nothing on this machine exercises it: of 329 file:// URIs in its Antigravity
+// transcripts, none is encoded, because no path here has a space in it. That is
+// the blind spot #3505 is about, so the decode goes in on the writer's shape
+// rather than on what one laptop happens to hold.
+//
+// A path that is not valid escaping — a literal `%` in a filename — is left as
+// it is, because there the escape was never an escape.
+func decodeURIPath(p string) string {
+	if !strings.Contains(p, "%") {
+		return p
+	}
+	decoded, err := url.PathUnescape(p)
+	if err != nil {
+		return p
+	}
+	// A decoded newline would split one path into two lines of a files record,
+	// which is the guard copilotChatRefPath already has.
+	if strings.ContainsAny(decoded, "\n\r") {
+		return p
+	}
+	return decoded
 }
 
 // antigravityBody drops the timestamps every step opens with. Keeping them
