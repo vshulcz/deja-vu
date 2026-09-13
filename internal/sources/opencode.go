@@ -104,6 +104,13 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		// user" — carries this flag; 338 of them indexed as the person's words
 		// on one store (#3299).
 		`json_extract(p.data,'$.synthetic') as synthetic,` +
+		// A part opencode does not feed to the model at all. A compression
+		// plugin's status line carries it — `▣ DCP | -100.3K removed, +9K
+		// summary — Compression #1` — and those are filed under the user role,
+		// so 376 of them on one store were indexed as the person's words. The
+		// flag is exact there: every ignored part on that store is one of these
+		// banners, and none of the 4,420 real user parts carries it (#3515).
+		`json_extract(p.data,'$.ignored') as ignored,` +
 		`json_extract(p.data,'$.state.input.filePath') as path,` +
 		`json_extract(p.data,'$.state.input.command') as cmd,` +
 		`json_extract(p.data,'$.state.input.patchText') as patch,` +
@@ -201,7 +208,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		}
 		role := str(r["role"])
 		txt := str(r["text"])
-		if opencodeSynthetic(r["synthetic"]) {
+		if opencodeSynthetic(r["synthetic"]) || opencodeSynthetic(r["ignored"]) {
 			continue
 		}
 		// A read call carries no text, only the file it opened. Recorded under
@@ -400,8 +407,10 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	return ParseOpencodeDBWhere(db, " and s.id='"+sqlEscape(id)+"'", 0)
 }
 
-// opencodeSynthetic reads the part's synthetic flag off the sqlite3 -json row:
-// true comes back as 1, json.Number or bool depending on the shape.
+// opencodeSynthetic reads either of opencode's two "this is not the
+// conversation" flags off a sqlite3 -json row — `synthetic` for text opencode
+// wrote under the user role, `ignored` for a part it never sends — across the
+// shapes that come back: 1, a json.Number, or a bool.
 func opencodeSynthetic(v any) bool {
 	switch x := v.(type) {
 	case bool:
