@@ -1,0 +1,61 @@
+name: Windows label
+
+# The windows leg is opt-in per pull request because the runner is ten times
+# slower, and that trade has a hole in it: the change that broke it last was a
+# parser gaining two store paths (#3467), which grew a printed table past a
+# windows pipe's buffer and deadlocked the suite on main. Nobody labels a change
+# like that `windows`, because it does not look like one.
+#
+# So the label is applied by what the branch touches rather than by whether
+# someone thought of it. Labelling fires CI again, and since #3506 that second
+# run no longer cancels the first.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: windows-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Label by what it touches
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Add the label when the paths ask for it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+          case ",${LABELS}," in
+            *,windows,*) echo "already labelled"; exit 0 ;;
+          esac
+          files=$(gh pr diff "$PR" --repo "$REPO" --name-only)
+          # What has actually broken this leg: the store paths a parser reads
+          # (they end up in printed tables and in path handling), the generated
+          # registry pages beside them, anything about the filesystem or the
+          # index layout, and the workflow that runs the leg.
+          want=$(printf '%s\n' "$files" | grep -E \
+            -e '^internal/sources/' \
+            -e '^internal/index/' \
+            -e '^docs/registry/' \
+            -e '^\.github/workflows/ci\.yml$' \
+            -e '^cmd/deja/(doctor|install|sources|files|restore)' \
+            || true)
+          if [ -z "$want" ]; then
+            echo "nothing here has broken the windows leg before"
+            exit 0
+          fi
+          echo "$want" | while IFS= read -r f; do echo "  $f"; done
+          gh pr edit "$PR" --repo "$REPO" --add-label windows
+          gh pr comment "$PR" --repo "$REPO" --body "Labelled \`windows\`: this branch touches paths that have broken that leg before, and it is skipped on unlabelled pull requests. It runs from here, and the label can be removed if it is noise."
