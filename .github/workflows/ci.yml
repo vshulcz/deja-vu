@@ -17,8 +17,18 @@ permissions:
   contents: read
 
 concurrency:
+  # Only a new push cancels the run before it. A pull request opened with a
+  # label fires `opened` and `labeled` in the same second, and cancelling one of
+  # those leaves a cancelled check run on the commit beside the successful one:
+  # branch protection reads both and refuses the merge of a green pull request,
+  # which is what #3504 sat on. A superseded push is still worth cancelling —
+  # that is the case this is for.
+  #
+  # The distinction lives here and not in the group: keying the group on the
+  # event action instead made the workflow fail to start at all, with no job and
+  # no log (run 34748731350).
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 
 jobs:
   test:
