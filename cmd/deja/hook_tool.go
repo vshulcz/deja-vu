@@ -470,7 +470,7 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// so the scan never ran and the count printed alone. Whether the promoted
 	// session ran the command is a fact rather than a ranking (#2516).
 	if d := promotedCommandDecision(dir, cwd, cmd); d != "" {
-		return head + " — last time: " + d
+		return head + commandDecisionLabel(cmd, d) + d
 	}
 	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
 		return head + " — last time: " + d
@@ -481,6 +481,54 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// store: of ten command shapes, two carried an outcome and two printed the
 	// bare count; the count is what goes (#3415).
 	return ""
+}
+
+// commandDecisionLabel is the file side's rule, on the command: a promoted note
+// is reached here through "a session that ran this command said it", which is
+// not the same as "this is what happened last time you ran it".
+//
+// Read from a real store: `npm root -g` came back as "This machine has run that
+// command in 2 sessions, last 2026-08-21 — last time: Описание репозитория
+// переписано словами задачи…", which is the one accepted note on this machine
+// and a rule about the repository description. Three runs, the same line every
+// time. The note is worth carrying — a standing decision is what an agent
+// should follow — and what it must not do is claim to be the outcome of a
+// command it has nothing to do with (#3001, the shape #3451 fixed for files).
+func commandDecisionLabel(cmd, text string) string {
+	if mentionsCommand(cmd, text) {
+		return " — last time: "
+	}
+	return standingLabel
+}
+
+// mentionsCommand reports whether the text names what the command invokes. The
+// programs, not every word: a note that says "npm" is plausibly about `npm root
+// -g`, and one that shares the word "the" with it is not.
+func mentionsCommand(cmd, text string) bool {
+	low := strings.ToLower(text)
+	for _, prog := range commandPrograms(cmd) {
+		prog = strings.ToLower(prog)
+		if len(prog) < 3 {
+			continue
+		}
+		if strings.Contains(low, prog) {
+			return true
+		}
+	}
+	// The subcommand carries the meaning for a multiplexer — `git rebase`,
+	// `deja index`, `npm run build` — so a note naming it is about this command
+	// even when it never spells the program out.
+	fields := strings.Fields(cmd)
+	for i := 1; i < len(fields) && i < 4; i++ {
+		w := strings.ToLower(strings.Trim(fields[i], "-"))
+		if len(w) < 4 || strings.ContainsAny(w, "/$\"'`(){}<>=") {
+			continue
+		}
+		if strings.Contains(low, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // promotedCommandDecision is the decision this project promoted about the
