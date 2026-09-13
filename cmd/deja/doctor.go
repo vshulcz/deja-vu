@@ -1687,8 +1687,15 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	// so since #696 and the listing since #2105; this is where a reader looks
 	// when a store reads wrong (#2106).
 	if idx.SessionsAhead > 0 {
+		// pluralThatThose fits "— that one is at the top of this list", the
+		// sentence `deja last` and `deja log` print. Spliced here it read
+		// "leads with that one is".
+		lead := "it"
+		if idx.SessionsAhead > 1 {
+			lead = "one of them"
+		}
 		fmt.Fprintf(w, "  clock    %s stamped later than this machine's clock — `deja last` leads with %s\n",
-			doctorCount(idx.SessionsAhead, "session"), pluralThatThose(idx.SessionsAhead))
+			doctorCount(idx.SessionsAhead, "session"), lead)
 	}
 	// What the last sync did with this machine's own rules: records that were
 	// dropped because they belong to sessions forgotten here are invisible
