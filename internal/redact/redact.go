@@ -87,6 +87,24 @@ var (
 	// Password is greedy so a password containing '@' (user:p@ss@host) splits on
 	// the last '@' and is redacted whole, not just up to the first '@'.
 	connURLRE = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]*):([^\s]+)@([^\s]+)`) // scheme://[user]:pass@host
+	// A credential handed to a program as an argument. Nothing above reaches
+	// these: `sshpass -p hunter2` has no key word beside the value, and
+	// `curl -u admin:hunter2` is a pair connURLRE only sees inside a URL.
+	// Measured on twelve planted shapes — ten were redacted at ingest and
+	// these two reached `deja show`, `deja recall` and `deja sync export` in
+	// the clear.
+	//
+	// Each pattern names the command or the flag, so the value's own shape
+	// does not have to carry the decision: a password is short, punctuated and
+	// indistinguishable from a word, which is why the length floors here are
+	// well under the 16 the key-value patterns need.
+	sshpassRE = regexp.MustCompile(`(?i)\bsshpass\b[^\n]{0,64}?-p[ =]?['"]?([^\s'"]{3,})`)
+	// Both halves of `-u user:pass`. `docker run -u 1000:1000` is a uid and a
+	// gid in the same shape, so an all-numeric pair is left alone below.
+	userPairRE = regexp.MustCompile(`(?i)(?:^|\s)(?:-u|--user)[ =]['"]?([^\s:'"]{1,64}):([^\s'"]{3,})`)
+	// `mysql -pSecret` attaches the value to the flag, which is the one form
+	// that cannot be confused with ssh's `-p <port>`.
+	mysqlPassRE = regexp.MustCompile(`(?i)\b(?:mysql|mysqladmin|mysqldump|mariadb)\b[^\n]{0,120}?\s-p([^\s'"-]\S{2,})`)
 )
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
@@ -258,6 +276,18 @@ func Text(s string) (string, Counts) {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
 	}
+	if strings.Contains(lower, "sshpass") {
+		s = replaceGroup(s, sshpassRE, 1, "command-password", counts, nil)
+	}
+	if strings.Contains(lower, "-u ") || strings.Contains(lower, "-u=") || strings.Contains(lower, "--user") {
+		s = replaceGroup(s, userPairRE, 2, "command-password", counts, func(m []string) bool {
+			// A uid:gid pair, not a login.
+			return allDigits(m[1]) && allDigits(m[2])
+		})
+	}
+	if strings.Contains(lower, "mysql") || strings.Contains(lower, "mariadb") {
+		s = replaceGroup(s, mysqlPassRE, 1, "command-password", counts, nil)
+	}
 	if containsAnyFold(s, providerHints) {
 		s = replaceProvider(s, counts)
 	}
@@ -283,6 +313,63 @@ func replaceSubmatch(s string, re *regexp.Regexp, kind string, counts Counts, re
 	})
 	counts.Add(kind, n)
 	return out
+}
+
+// replaceGroup redacts one capture group of every match and leaves the rest of
+// it readable: what makes an argument credential recognisable is the command
+// and the flag beside it, and hiding those would cost the recall the line
+// exists for. skip, when it returns true, leaves a match alone and counts
+// nothing — an over-count here would drift the same way #1569 did.
+//
+// A value that is a shell reference (`-p "$DEPLOY_PASS"`) is not a secret and
+// is left as written.
+func replaceGroup(s string, re *regexp.Regexp, group int, kind string, counts Counts, skip func([]string) bool) string {
+	matches := re.FindAllStringSubmatchIndex(s, -1)
+	if len(matches) == 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	at, n := 0, 0
+	for _, m := range matches {
+		lo, hi := m[2*group], m[2*group+1]
+		if lo < 0 || lo < at {
+			continue
+		}
+		groups := make([]string, len(m)/2)
+		for i := range groups {
+			if m[2*i] >= 0 {
+				groups[i] = s[m[2*i]:m[2*i+1]]
+			}
+		}
+		if strings.HasPrefix(groups[group], "$") || (skip != nil && skip(groups)) {
+			continue
+		}
+		b.WriteString(s[at:lo])
+		b.WriteString("[redacted:" + kind + "]")
+		at = hi
+		n++
+	}
+	if n == 0 {
+		return s
+	}
+	b.WriteString(s[at:])
+	counts.Add(kind, n)
+	return b.String()
+}
+
+// allDigits reports whether every byte is a decimal digit, which is how a
+// uid:gid pair is told from a login.
+func allDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func replaceProvider(s string, counts Counts) string {
