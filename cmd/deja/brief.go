@@ -344,6 +344,12 @@ func runBrief(dir string, w io.Writer) error {
 			fmt.Fprintf(w, "try        %sdeja %q%s\n", bold, q, reset)
 		}
 	}
+	// Last, and only when it has something to say: a machine whose hooks point
+	// at a binary that is gone gets no memory at all, and the surfaces that
+	// would report that are the hooks themselves (#3502).
+	if note := deadHookNotice(dir); note != "" {
+		fmt.Fprintf(w, "%shooks      %s%s\n", bold, note, reset)
+	}
 	fmt.Fprintf(w, "%smore       deja log · deja stats · deja help%s\n", dim, reset)
 	return nil
 }
