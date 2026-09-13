@@ -53,7 +53,14 @@ var (
 	// their own pattern. A Russian speaker writing "пароль: …" had the secret
 	// stored in the clear because every pattern here was English-only.
 	genericKVIntlRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
-	bearerRE        = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	// The same key words with a few of their own between the word and the
+	// colon. "пароль от стейджа: …" is how the line is actually written, and
+	// genericKVIntlRE needs the delimiter to follow the word directly. The
+	// value class is unchanged — 16 or more ASCII characters — so a sentence
+	// that merely mentions a token ("токен лежит в файле: строка 12") still
+	// matches nothing.
+	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\n:=]{1,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	bearerRE              = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
 	// with password "S3cr3tP@ssw0rd!"` — and genericKVRE cannot reach it:
@@ -105,6 +112,21 @@ var (
 	// `mysql -pSecret` attaches the value to the flag, which is the one form
 	// that cannot be confused with ssh's `-p <port>`.
 	mysqlPassRE = regexp.MustCompile(`(?i)\b(?:mysql|mysqladmin|mysqldump|mariadb)\b[^\n]{0,120}?\s-p([^\s'"-]\S{2,})`)
+	// `docker login -p …`, `az login -p …`, `redis-cli -a …`. The command gate
+	// is what keeps `-p` apart from a port: ssh, scp and `docker run -p` all
+	// spell one the same way, and a numeric value is left alone below.
+	loginPassRE = regexp.MustCompile(`(?i)\b(?:login|redis-cli|ftp|smbclient)\b[^\n]{0,120}?\s(?:-p|-a|--password|--with-token)[ =<]{1,6}['"]?([^\s'"]{3,})`)
+	// A .netrc line: `machine api.example.com login deploy password hunter2`.
+	// The value follows the key word with no delimiter at all, so every
+	// key-value pattern here missed it, and `password` on its own is the
+	// opening of far more prose than credentials — "password authentication
+	// failed" — which is why the machine or login word before it is required.
+	netrcRE = regexp.MustCompile(`(?i)\b(?:machine|login)\s+\S+[^\n]{0,120}?\b(?:password|passwd)\s+([^\s'"]{3,})`)
+	// A cookie header. Its value is a credential whole, and "session" is too
+	// ordinary a word to put in the key-value list — deja's own commands are
+	// full of `--session <id>`, and redacting those would cost the recall they
+	// exist for. The header is what makes this one unambiguous.
+	cookieRE = regexp.MustCompile(`(?i)\b(?:set-)?cookie:[ \t]*([^\n]{8,400})`)
 )
 
 func Disabled() bool { return os.Getenv("DEJA_NO_REDACT") == "1" }
@@ -276,6 +298,13 @@ func Text(s string) (string, Counts) {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
 		})
 	}
+	// Its own gate: the adjacency one cannot see a delimiter that is a few
+	// words away, which is the whole point of this pattern.
+	if strings.ContainsAny(s, ":=") && containsAnyFold(s, kvIntlHints) {
+		s = replaceSubmatch(s, genericKVIntlFillerRE, "credential", counts, func(m []string) string {
+			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+		})
+	}
 	if strings.Contains(lower, "sshpass") {
 		s = replaceGroup(s, sshpassRE, 1, "command-password", counts, nil)
 	}
@@ -287,6 +316,21 @@ func Text(s string) (string, Counts) {
 	}
 	if strings.Contains(lower, "mysql") || strings.Contains(lower, "mariadb") {
 		s = replaceGroup(s, mysqlPassRE, 1, "command-password", counts, nil)
+	}
+	if strings.Contains(lower, "login") || strings.Contains(lower, "redis-cli") ||
+		strings.Contains(lower, "ftp") || strings.Contains(lower, "smbclient") {
+		s = replaceGroup(s, loginPassRE, 1, "command-password", counts, func(m []string) bool {
+			// A port, or a host:port — `-p` means that far more often than it
+			// means a password.
+			return allDigits(strings.TrimLeft(m[1], "0123456789:"))
+		})
+	}
+	if (strings.Contains(lower, "password") || strings.Contains(lower, "passwd")) &&
+		(strings.Contains(lower, "machine ") || strings.Contains(lower, "login ")) {
+		s = replaceGroup(s, netrcRE, 1, "password", counts, nil)
+	}
+	if strings.Contains(lower, "cookie:") {
+		s = replaceGroup(s, cookieRE, 1, "cookie", counts, nil)
 	}
 	if containsAnyFold(s, providerHints) {
 		s = replaceProvider(s, counts)

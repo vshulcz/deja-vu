@@ -22,6 +22,13 @@ func TestACredentialPassedAsAnArgumentIsRedacted(t *testing.T) {
 		{"curl basic", `curl -u admin:ZZexampleBASICpass https://api.example.com`, "ZZexampleBASICpass", "admin"},
 		{"long user flag", `curl --user admin:ZZexampleBASICpass https://api.example.com`, "ZZexampleBASICpass", "admin"},
 		{"mysql attached", `mysql -h db.example.com -uroot -pZZexampleMYSQLpass app`, "ZZexampleMYSQLpass", "mysql"},
+		{"docker login", `docker login -u deploy -p ZZexampleDOCKERpass registry.example.com`, "ZZexampleDOCKERpass", "docker login"},
+		{"az login", `az login -u ci@example.com -p ZZexampleAZUREpass`, "ZZexampleAZUREpass", "az login"},
+		{"redis", `redis-cli -h cache.example.com -a ZZexampleREDISpass ping`, "ZZexampleREDISpass", "redis-cli"},
+		{"gh with-token", `gh auth login --with-token <<< ZZexampleGHtokenvalue01`, "ZZexampleGHtokenvalue01", "gh auth login"},
+		{"netrc line", `machine api.example.com login deploy password ZZexampleNETRCpass`, "ZZexampleNETRCpass", "api.example.com"},
+		{"cookie header", `Cookie: session=ZZexampleSESSIONcookievalue0001`, "ZZexampleSESSIONcookievalue0001", "Cookie"},
+		{"russian with filler", `пароль от стейджа: ZZexampleRUpassword01`, "ZZexampleRUpassword01", "пароль"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out, counts := Text(tc.in)
@@ -46,6 +53,11 @@ func TestArgumentRedactionLeavesTheseAlone(t *testing.T) {
 		{"ssh port", `ssh -p 2222 deploy@host.example.com`},
 		{"git push upstream", `git push -u origin feature/retry-budget`},
 		{"a user with no password", `curl -u admin https://api.example.com`},
+		{"docker run publishing a port", `docker run -p 8080:80 nginx`},
+		{"a login failure in prose", `password authentication failed for user deploy`},
+		{"a port after a login command", `ssh -p 2222 deploy@host && docker login registry.example.com`},
+		{"a russian sentence about a token", `токен лежит в файле: строка 12`},
+		{"a cookie name with no value", `the Cookie header was missing`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			out, _ := Text(tc.in)
