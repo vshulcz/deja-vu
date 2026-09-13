@@ -691,6 +691,101 @@ func importedSessions(dir string) importedState {
 	return out
 }
 
+// detectRenamedFiles pairs a path that has gone with a path that has appeared
+// holding the same bytes. Both sides carry a prefix fingerprint already — the
+// scan computes one for every .jsonl it has not seen before — so the match is
+// on content, not on a name or a timestamp: same size, same last-complete-line
+// offset, same sample, same harness.
+//
+// A wrong pairing would attach one conversation's history to another file, so
+// the conditions are deliberately narrow, and a row with no fingerprint (a
+// store built before the sample existed) is left alone.
+func detectRenamedFiles(oldFiles, files map[string]FileState) map[string]string {
+	gone := map[string]FileState{}
+	for _, p := range sortedKeys(oldFiles) {
+		if p == syncImportPath {
+			continue
+		}
+		of := oldFiles[p]
+		if of.PrefixSample == 0 || of.SafeSize == 0 {
+			continue
+		}
+		if _, still := files[p]; still {
+			continue
+		}
+		if _, err := os.Lstat(p); err == nil {
+			continue // there after all, just not in this pass's set
+		}
+		gone[p] = of
+	}
+	if len(gone) == 0 {
+		return nil
+	}
+	out := map[string]string{}
+	taken := map[string]bool{}
+	for _, np := range sortedKeys(files) {
+		if _, seen := oldFiles[np]; seen {
+			continue
+		}
+		nf := files[np]
+		if nf.PrefixSample == 0 || nf.SafeSize == 0 {
+			continue
+		}
+		for _, op := range sortedKeys(gone) {
+			if taken[op] {
+				continue
+			}
+			of := gone[op]
+			if of.Size != nf.Size || of.SafeSize != nf.SafeSize || of.PrefixSample != nf.PrefixSample {
+				continue
+			}
+			if harnessForPath(op) != harnessForPath(np) {
+				continue
+			}
+			out[np] = op
+			taken[op] = true
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// applyRenamedFiles moves a manifest from the old names to the new ones. The
+// records themselves do not move: their source path is interned, so one entry
+// in that table is every record's path at once.
+func applyRenamedFiles(m *Manifest, renamed map[string]string) {
+	for _, np := range sortedKeys(renamed) {
+		op := renamed[np]
+		of, ok := m.Files[op]
+		if !ok {
+			continue
+		}
+		of.Path = np
+		m.Files[np] = of
+		delete(m.Files, op)
+		for key, meta := range m.Sessions {
+			if meta.Path == op {
+				meta.Path = np
+				m.Sessions[key] = meta
+			}
+		}
+		for i, str := range m.RecordStrings {
+			if str == op {
+				m.RecordStrings[i] = np
+			}
+		}
+		if m.IngestFiles != nil {
+			if fi, ok := m.IngestFiles[op]; ok {
+				m.IngestFiles[np] = fi
+				delete(m.IngestFiles, op)
+			}
+		}
+	}
+}
+
 // deriveImportedNoteState recovers the state of an imported promoted note from
 // the note text. #984 started recording that state on the manifest row without
 // bumping the index format, so a store that imported a batch before it holds a
@@ -2823,6 +2918,21 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	old, err := readManifest(dir)
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
+	}
+	// A transcript under a new name is not a new transcript. Settled before the
+	// diff below, so the file is neither read again nor left behind as a row
+	// pointing at a path that is gone: twenty renames of one 4 KB log left the
+	// store holding twenty-one copies of it and twenty dead rows, with search
+	// answering once and nothing on any screen saying so (#3546).
+	if err == nil && !force {
+		if pairs := detectRenamedFiles(old.Files, files); len(pairs) > 0 {
+			applyRenamedFiles(&old, pairs)
+			// Failing to record it costs the duplicate this exists to avoid,
+			// not correctness: the pass below then treats the file as new.
+			if werr := writeManifest(dir, old); werr == nil && progress != nil {
+				fmt.Fprintf(progress, "deja: %d transcript%s renamed — the index followed the new name\n", len(pairs), pluralS(len(pairs)))
+			}
+		}
 	}
 	if force || err != nil || old.Version != version || old.Scope != scope {
 		if progress != nil {
