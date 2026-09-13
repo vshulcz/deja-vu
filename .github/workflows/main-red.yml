@@ -1,0 +1,53 @@
+name: Main is red
+
+# Two pull requests can each be green and still break main together: the
+# staleoverlap guard asks for a rebase only when both touched the same file, and
+# on 2026-09-09 #3426 and #3431 touched different ones. Merged, the suite failed
+# — and the ten minutes it took to find that out were luck, because someone
+# happened to run the suite on merged main (#3433).
+#
+# So the red is said out loud, in the one place nobody has to remember to look.
+# This does not prevent the collision; it ends the part where nobody knows.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: main-red
+  cancel-in-progress: false
+
+jobs:
+  say:
+    name: Say so
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      # One issue, reopened and commented rather than a new one per run: a red
+      # main that stays red for three merges is one problem, and three issues
+      # about it are three places to look.
+      - name: File or update the alarm
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          set -euo pipefail
+          body="main CI failed on \`${SHA}\` — [the run](${RUN_URL})."$'\n\n'"Merged: ${TITLE}"$'\n\n'"Two pull requests that are each green can still fail together (#3433). Whatever this is, main is the branch everything else branches from, so it comes before the next merge."
+          existing=$(gh issue list --repo "$REPO" --state open --label main-red \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+            echo "commented on #$existing"
+          else
+            gh issue create --repo "$REPO" --label main-red \
+              --title "main is red" --body "$body"
+          fi
