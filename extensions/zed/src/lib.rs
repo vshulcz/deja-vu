@@ -35,7 +35,8 @@ struct DejaExtension {
 impl DejaExtension {
     /// The binary Zed should run: the configured one if the user named it,
     /// then the copy this extension downloaded earlier, and only then a fresh
-    /// download of the current release.
+    /// download of the current release. An already-installed deja is reachable
+    /// only through the `binary` setting — see the note in this function.
     fn binary_path(&mut self, project: &Project) -> Result<String> {
         let settings = ContextServerSettings::for_project("deja-context-server", project)
             .ok()
@@ -51,10 +52,21 @@ impl DejaExtension {
             return Ok(path);
         }
 
-        // An installed deja is the one the user keeps current with `deja
-        // update` or their package manager, so it wins over anything this
-        // extension downloaded. A context server cannot ask the worktree for
-        // $PATH, hence the well-known locations.
+        // An installed deja would be the one the user keeps current with `deja
+        // update` or their package manager, and it used to be described here as
+        // winning over anything this extension downloaded. It does not: an
+        // extension runs as wasm, and the paths below are outside anything the
+        // host preopens for it, so the stat fails whatever is on disk.
+        //
+        // Measured on the same target the extension is built for
+        // (`wasm32-wasip1`): with no preopened directories every candidate
+        // comes back `NotFound` (WASI errno 44) while a run with the filesystem
+        // preopened finds both an 11 MB `/opt/homebrew/bin/deja` and an 18 MB
+        // `~/.local/bin/deja` (#3392). The call stays because it costs one
+        // failed stat and starts working the day a host grants access; what is
+        // gone is the claim that it is how an installed deja gets used. The
+        // mechanism that reaches the host is the `binary` setting, and the
+        // install instructions say so.
         if let Some(path) = installed_binary() {
             self.cached_binary_path = Some(path.clone());
             return Ok(path);

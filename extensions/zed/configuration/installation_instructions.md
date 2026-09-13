@@ -3,10 +3,12 @@ Claude Code, Codex, Cursor, opencode and more — and answers from them over MCP
 including sessions from before it was installed. No LLM, no embeddings, nothing
 leaves the machine.
 
-If deja is already installed — the install script, Homebrew, `go install` — the
-extension uses that binary, and you keep it current the way you always did.
-Otherwise the first start downloads a release build into the extension's own
-directory, about 12 MB. On a slow connection that download
+If deja is already installed — the install script, Homebrew, `go install` — name
+it under `binary` below and the extension runs that one, which you keep current
+the way you always did. It cannot find it on its own: a Zed extension runs
+sandboxed, and a path like `/opt/homebrew/bin/deja` is not reachable from inside
+that sandbox whatever is on disk. Without the setting the first start downloads a
+release build into the extension's own directory, about 12 MB. On a slow connection that download
 can outlast the sixty seconds Zed allows a context server to answer, and the
 server is reported as timed out; starting it again uses the downloaded copy and
 connects immediately.

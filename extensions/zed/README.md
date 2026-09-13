@@ -20,8 +20,9 @@ including work from before deja was installed.
 ## Install
 
 Install the extension from Zed's extension list. On first use it downloads a
-release build of the `deja` binary into its own directory; if you already have
-one, point at it:
+release build of the `deja` binary into its own directory — it cannot use a deja
+you already have unless you name it, because an extension runs sandboxed and the
+usual install paths are not reachable from inside it:
 
 `deja install --auto` reaches Zed too, and writes the server into
 `settings.json` directly — the shorter path when you have the CLI. Both use the
