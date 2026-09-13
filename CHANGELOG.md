@@ -11,11 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507)
 
 ### Changed
+- `deja doctor --json` carries the auto-recall rows, not only the MCP ones: a script could see a missing sqlite3 and not a hook running a binary that is gone. (#3540)
+- An upgrade says why it is re-reading every source. Every other reason for a full pass names itself; a version difference printed the line a first install prints while doing the longest piece of work deja does on a large store. (#3500)
 - Index format version 39: dsh names its logs `session.v3.jsonl` now, and a store that already holds the older names re-reads its sources once so the new ones join it without `deja index --rebuild`. (#3508)
 - A new transcript is appended to the index instead of rewriting it. Every new conversation is a new file, and the path that refused an unseen one cost 4.76s against 0.28s on a 171 MB index, growing with the store rather than with the file. (#3503)
 - The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
 
 ### Fixed
+- `deja log` says when a compaction capture stored nothing and why. The journal had recorded the reason since the capture was written; the screen printed the same line for a packet that was kept and one that never happened. (#3531)
+- A bad numeric MCP argument names the number rather than the argument object: `{"limit":"five"}` answered "arguments must be an object", which is the half of the call that was right. (#3533)
+- `doctor`'s clock row reads as a sentence — it borrowed the pronoun `deja last` uses, which carries its own verb. (#3527)
 - DeepSeek Harness: the v3 session logs are read by discovery and by the incremental index, where matching only one of the two left a new log unsearchable until the next rebuild. (#3508)
 - DeepSeek Harness: the auto-recall plugin asks about the session's workspace rather than the directory dsh was launched from, and the generated plugins load under a home directory whose `package.json` declares CommonJS. (#3509)
 - VS Code Copilot Chat: an edited file's URI is percent-decoded, and the older snapshot shape no longer fails to parse — a path with a space landed in the files record encoded, and a v1 working set dropped the record entirely. (#3498)

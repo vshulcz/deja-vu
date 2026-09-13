@@ -99,6 +99,13 @@ type Hit struct {
 	Lifecycle     string `json:"lifecycle,omitempty"`
 	LifecycleNote string `json:"lifecycle_note,omitempty"`
 	LifecycleAt   string `json:"lifecycle_at,omitempty"`
+	// snipTexts are the passages this hit would quote, chosen during scoring
+	// and rendered only if the hit survives the cap. Rendering them in the
+	// scoring loop made a search cost the same at --limit 1 and --limit 100:
+	// 806 ms either way on a 31 MB store, with the quoting a third of the
+	// 127.8 MB one query allocated (#3544). The strings are the record text
+	// already in memory, so holding them costs a header apiece.
+	snipTexts []string
 }
 
 const (
@@ -353,7 +360,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			if i == 2 && lastIdx >= 0 && snipCands[lastIdx].at > snipCands[0].at && snipCands[lastIdx].at > snipCands[1].at {
 				pick = lastIdx
 			}
-			doc.hit.Snippets = append(doc.hit.Snippets, snippet(snipCands[pick].text, o.Query, re))
+			doc.hit.snipTexts = append(doc.hit.snipTexts, snipCands[pick].text)
 			if snipCands[pick].at > shown {
 				shown = snipCands[pick].at
 			}
@@ -390,8 +397,40 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		avgLength = float64(corpusLength) / float64(corpusDocuments)
 	}
 	hits := scoreBM25(documents, df, corpusDocuments, avgLength, len(qtoks), o.RecallWorn)
+	// markEarlierAttempts reads the quoted text of the top 50, so those are
+	// rendered here; everything below them waits for the cap.
+	renderSnippets(hits, o, earlierAttemptWindow)
 	markEarlierAttempts(hits)
 	return hits, nil
+}
+
+// renderSnippets quotes the hits that survived the cap, and only those.
+//
+// Choosing the passages is part of scoring — a session is ranked partly on how
+// tightly its words come together — but turning a passage into the few hundred
+// runes a reader sees is not: it splits the text, scans it and allocates, and
+// doing that for every session that matched a word made a search cost the same
+// at --limit 1 and --limit 100 (#3544).
+func renderSnippets(hits []Hit, o Options, n int) {
+	var re *regexp.Regexp
+	if o.Regex {
+		// Already compiled once in runScored, and a hit only reaches here if
+		// that compile succeeded, so a failure now is not reportable and not
+		// possible: fall back to the plain highlighter.
+		re, _ = regexp.Compile("(?i)" + o.Query)
+	}
+	if n < 0 || n > len(hits) {
+		n = len(hits)
+	}
+	for i := 0; i < n; i++ {
+		if len(hits[i].snipTexts) == 0 {
+			continue
+		}
+		for _, text := range hits[i].snipTexts {
+			hits[i].Snippets = append(hits[i].Snippets, snippet(text, o.Query, re))
+		}
+		hits[i].snipTexts = nil
+	}
 }
 
 // Run returns the capped result the CLI and the MCP tools have always
@@ -423,6 +462,7 @@ func RunDetailed(ss []model.Session, o Options) (Results, error) {
 	}
 	r := Results{Hits: hits, Total: len(hits), Tier: setTier(o)}
 	r.Hits, r.Capped = CapHits(hits, o.Limit, o.All)
+	renderSnippets(r.Hits, o, -1)
 	return r, nil
 }
 
@@ -465,14 +505,18 @@ func setTier(o Options) string {
 // notesHarness is the pseudo-harness deja files its own notes under.
 const notesHarness = "deja"
 
+// earlierAttemptWindow bounds the comparison below: how many ranked hits are
+// checked against each other, and so how many have to be quoted first.
+const earlierAttemptWindow = 50
+
 // markEarlierAttempts flags hits that look like older passes over the same
 // problem: same project, heavy overlap in what matched, and a newer session
 // above some margin. The old session stays in the results — history is the
 // product — but agents and readers see which one the project moved on to.
 func markEarlierAttempts(hits []Hit) {
 	n := len(hits)
-	if n > 50 {
-		n = 50
+	if n > earlierAttemptWindow {
+		n = earlierAttemptWindow
 	}
 	sets := make([]map[string]bool, n)
 	for i := 0; i < n; i++ {

@@ -354,6 +354,103 @@
       "path": "<tmp>/home/.config/zed/settings.json"
     }
   ],
+  "auto_recall": [
+    {
+      "name": "opencode",
+      "state": "missing",
+      "path": "<tmp>/home/.config/opencode/plugins/deja.js"
+    },
+    {
+      "name": "cursor",
+      "state": "missing",
+      "path": "<tmp>/home/.cursor/hooks.json"
+    },
+    {
+      "name": "gemini",
+      "state": "missing",
+      "path": "<tmp>/home/.gemini/extensions/deja/hooks/hooks.json"
+    },
+    {
+      "name": "qwen",
+      "state": "missing",
+      "path": "<tmp>/home/.qwen/settings.json"
+    },
+    {
+      "name": "kimi",
+      "state": "missing",
+      "path": "<tmp>/home/.kimi-code/config.toml"
+    },
+    {
+      "name": "antigravity",
+      "state": "missing",
+      "path": "<tmp>/home/.gemini/config/plugins/deja/hooks.json"
+    },
+    {
+      "name": "pi",
+      "state": "missing",
+      "path": "<tmp>/home/.pi/agent/extensions/deja.ts"
+    },
+    {
+      "name": "hermes",
+      "state": "missing",
+      "path": "<tmp>/home/.hermes/plugins/deja/__init__.py"
+    },
+    {
+      "name": "openclaw",
+      "state": "missing",
+      "path": "<tmp>/home/.openclaw/hooks/deja-recall/handler.js"
+    },
+    {
+      "name": "cline",
+      "state": "missing",
+      "path": "<tmp>/home/.cline/plugins/deja/index.js"
+    },
+    {
+      "name": "omp",
+      "state": "missing",
+      "path": "<tmp>/home/.omp/agent/extensions/deja/index.js"
+    },
+    {
+      "name": "amp",
+      "state": "missing",
+      "path": "<tmp>/home/.config/amp/plugins/deja.ts"
+    },
+    {
+      "name": "prime",
+      "state": "missing",
+      "path": "<tmp>/home/.prime/agent/extensions/deja.ts"
+    },
+    {
+      "name": "deepseek",
+      "state": "missing",
+      "path": "<tmp>/home/.dsh/plugins/deja/auto.js"
+    },
+    {
+      "name": "goose",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/plugins/deja/hooks/hooks.json"
+    },
+    {
+      "name": "crush",
+      "state": "missing",
+      "path": "<tmp>/home/.config/crush/crush.json"
+    },
+    {
+      "name": "grok",
+      "state": "missing",
+      "path": "<tmp>/home/.grok/hooks/deja.json"
+    },
+    {
+      "name": "aider",
+      "state": "missing",
+      "path": "<tmp>/home/.config/deja/aider-context.md"
+    },
+    {
+      "name": "roo",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    }
+  ],
   "sqlite3": {
     "state": "missing"
   },
