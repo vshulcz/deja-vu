@@ -67,6 +67,11 @@ func parseTimeAny(v any) time.Time {
 			"2006-01-02T15:04",
 			"2006-01-02 15:04:05Z07:00",
 			"2006-01-02 15:04:05",
+			// A date with no time at all. The whole stamp was lost to the zero
+			// time, so the session sorted as "-", never appeared in `deja last`
+			// and was outside every `--since` window — for the sake of a clock
+			// reading nobody has.
+			"2006-01-02",
 		} {
 			if t, err := time.Parse(layout, x); err == nil {
 				return t
