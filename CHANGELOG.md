@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507)
+
+### Changed
+- Index format version 39: dsh names its logs `session.v3.jsonl` now, and a store that already holds the older names re-reads its sources once so the new ones join it without `deja index --rebuild`. (#3508)
+- A new transcript is appended to the index instead of rewriting it. Every new conversation is a new file, and the path that refused an unseen one cost 4.76s against 0.28s on a 171 MB index, growing with the store rather than with the file. (#3503)
+- The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
+
+### Fixed
+- DeepSeek Harness: the v3 session logs are read by discovery and by the incremental index, where matching only one of the two left a new log unsearchable until the next rebuild. (#3508)
+- DeepSeek Harness: the auto-recall plugin asks about the session's workspace rather than the directory dsh was launched from, and the generated plugins load under a home directory whose `package.json` declares CommonJS. (#3509)
+- VS Code Copilot Chat: an edited file's URI is percent-decoded, and the older snapshot shape no longer fails to parse — a path with a space landed in the files record encoded, and a v1 working set dropped the record entirely. (#3498)
+- `deja doctor` names a hook binary that is gone under every row state, not only a healthy one, and a bare `deja` says it once a day: after a package upgrade every entry points at the old path and the hooks exit 127. (#3510, #3511)
+- Zed: the extension cannot reach an installed deja from inside the wasm sandbox, so the install instructions say to name it with the `binary` setting instead of promising it is found. (#3513)
+
 ## [0.20.0] - 2026-09-12
 
 The release where every line deja gives an agent was read off a real store

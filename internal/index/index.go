@@ -189,7 +189,15 @@ import (
 // command's time was flate. The role is interned beside the session key now, so
 // the scan reads a prefix and skips the rest. Records are the store itself, so
 // the layout change is what forces this bump.
-const version = 38
+//
+// 39 is the DeepSeek Harness rename. dsh writes its logs as `session.v3.jsonl`
+// now, deja matched only the older names, and #3508 taught both the discovery
+// walk and the incremental kind to accept them. Without a bump that fix reaches
+// nothing already on disk: the walk finds the new files, the manifest says the
+// store is current, and a machine with thirteen sessions keeps answering from
+// the four whose old-named logs are still there — which is what the report on
+// that pull request described, with `--rebuild` as the only way out.
+const version = 39
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
