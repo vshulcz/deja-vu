@@ -8,16 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507)
+- `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a renamed one, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507, #3546)
 
 ### Changed
 - `deja doctor --json` carries the auto-recall rows, not only the MCP ones: a script could see a missing sqlite3 and not a hook running a binary that is gone. (#3540)
 - An upgrade says why it is re-reading every source. Every other reason for a full pass names itself; a version difference printed the line a first install prints while doing the longest piece of work deja does on a large store. (#3500)
 - Index format version 39: dsh names its logs `session.v3.jsonl` now, and a store that already holds the older names re-reads its sources once so the new ones join it without `deja index --rebuild`. (#3508)
 - A new transcript is appended to the index instead of rewriting it. Every new conversation is a new file, and the path that refused an unseen one cost 4.76s against 0.28s on a 171 MB index, growing with the store rather than with the file. (#3503)
+- A search quotes the hits it serves rather than every session that matched, so its cost follows what was asked for: on a store where every session matches, 806 ms and 127.8 MB against 745 ms and 88.9 MB. (#3544)
 - The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
 
 ### Fixed
+- A renamed transcript is not indexed again. Twenty renames of one 4 KB log left twenty-one copies in `records.bin` and twenty rows pointing at paths that were gone; search answered once, so nothing on any screen said the store was twenty times its content. (#3546)
 - `deja log` says when a compaction capture stored nothing and why. The journal had recorded the reason since the capture was written; the screen printed the same line for a packet that was kept and one that never happened. (#3531)
 - A bad numeric MCP argument names the number rather than the argument object: `{"limit":"five"}` answered "arguments must be an object", which is the half of the call that was right. (#3533)
 - `doctor`'s clock row reads as a sentence — it borrowed the pronoun `deja last` uses, which carries its own verb. (#3527)
