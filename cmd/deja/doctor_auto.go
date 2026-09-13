@@ -92,6 +92,32 @@ func nothingWired() bool {
 	return true
 }
 
+// autoWiringState is the state one auto-recall row is in, decided once for the
+// report and the JSON both: two surfaces reading one file and disagreeing is
+// the shape this repository keeps paying for. binaryMissing is the state an
+// upgrade leaves — the entry is wired and names a path that no longer exists,
+// so every hook exits 127.
+func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
+	path := a.path()
+	b, err := os.ReadFile(path)
+	switch {
+	case a.name == "kimi" && kimiPluginInstalled() && (err != nil || !strings.Contains(string(b), a.marker)):
+		state = "plugin"
+	case err != nil:
+		state = "missing"
+	case a.marker != "" && !strings.Contains(string(b), a.marker):
+		state = "stale"
+	default:
+		state = "wired"
+	}
+	// Only the files that run the binary: aider's is a digest of past sessions
+	// and roo's is guidance, and either may quote a path for reasons of its own.
+	if a.marker != "" && dejaHookCommandMissing(path) != "" {
+		binaryMissing = true
+	}
+	return state, binaryMissing
+}
+
 // doctorAutoRecall prints one line per harness. "stale" is the interesting
 // state: the file is there, so an install looks done, but nothing in it calls
 // deja any more — which is exactly how a silently dead integration looks.

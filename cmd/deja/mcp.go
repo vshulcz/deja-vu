@@ -232,7 +232,21 @@ func decodeToolArgs(tool string, raw json.RawMessage, into any) error {
 	if errors.As(err, &typeErr) && typeErr.Field != "" {
 		return fmt.Errorf("%s: %q must be %s", tool, strings.TrimPrefix(typeErr.Field, "."), jsonTypeName(typeErr.Type.Kind()))
 	}
+	// A field's own decoder failing is not a malformed argument object, and
+	// saying "arguments must be an object" about `{"limit":"five"}` sent the
+	// agent to rewrite the one part of the call that was right. mcpNumber's
+	// message names what it wanted; carry it rather than replacing it.
+	if isJSONObject(raw) {
+		return fmt.Errorf("%s: %v", tool, err)
+	}
 	return fmt.Errorf("%s: arguments must be an object", tool)
+}
+
+// isJSONObject reports whether the arguments really are a JSON object, so the
+// two failures above can be told apart.
+func isJSONObject(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] == '{' && json.Valid(trimmed)
 }
 
 // jsonTypeName names a Go kind the way the tool schema does, so the message

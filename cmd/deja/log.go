@@ -109,7 +109,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			// a host that sent nothing at all (#2161).
 			into = " · into: unknown (the host sent a payload deja could not read)"
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, mark)
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, compactionFailureNote(e), mark)
 	}
 	if total > len(events) {
 		// Nobody typed the 20 — it is the default above — and this is the
@@ -130,6 +130,43 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			n, pluralS(n), pluralThatThose(n), pluralThoseOnes(n))
 	}
 	return nil
+}
+
+// compactionFailureNote says what a compaction event stored nothing for. The
+// journal has recorded the reason since the capture was written — the event
+// carries `compaction_error` and no `measured` flag — and the screen printed
+// the same `compaction_capture 0 B` for a stored packet and for one that never
+// happened, so the one surface a person reads said a lost continuation packet
+// was fine.
+func compactionFailureNote(e usage.Event) string {
+	if e.Kind != usage.KindCompactionCapture && e.Kind != usage.KindCompactionRecovery {
+		return ""
+	}
+	if e.CompactionError == "" {
+		return ""
+	}
+	return "  (stored nothing: " + compactionErrorWords(e.CompactionError) + ")"
+}
+
+// compactionErrorWords turns the recorded token into the sentence a reader can
+// act on, and falls through to the token itself so a reason added later is
+// still legible here.
+func compactionErrorWords(token string) string {
+	switch token {
+	case "transcript_unavailable":
+		return "the host named a transcript deja could not read"
+	case "incomplete_transcript":
+		return "the transcript ended mid-turn"
+	case "transcript_rewritten":
+		return "the transcript was rewritten while deja read it"
+	case "boundary_unavailable":
+		return "deja could not tell where the previous packet ended"
+	case "missing_identity":
+		return "the host sent no session id"
+	case "invalid_baseline", "invalid_action_count":
+		return "the host's action count was not usable"
+	}
+	return token
 }
 
 // pluralThoseOnes is the pronoun for the tail of that sentence, so it never
