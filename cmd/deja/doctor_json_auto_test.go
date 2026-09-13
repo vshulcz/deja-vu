@@ -64,8 +64,12 @@ func TestDoctorJSONCarriesTheAutoRecallRows(t *testing.T) {
 		t.Errorf("with a plugin that calls nothing, opencode reads %q, want stale", got.State)
 	}
 
-	// A plugin whose binary is gone: wired, and dead.
-	dead := "const DEJA = \"/nowhere/deja\";\nawait spawn(DEJA, [\"hook-context\"]);\n"
+	// A plugin whose binary is gone: wired, and dead. The path has to be
+	// absolute on the platform running the test — `/nowhere/deja` is not one on
+	// windows, and the check that reads these files skips anything relative,
+	// because a relative path resolves against wherever the reader is standing.
+	gone := filepath.Join(home, "nowhere", "deja")
+	dead := "const DEJA = \"" + filepath.ToSlash(gone) + "\";\nawait spawn(DEJA, [\"hook-context\"]);\n"
 	if err := os.WriteFile(plugin, []byte(dead), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -80,12 +84,17 @@ func TestDoctorJSONCarriesTheAutoRecallRows(t *testing.T) {
 		t.Errorf("row path = %q, want %q", got.Path, plugin)
 	}
 
-	// And one calling a binary that exists is not reported dead.
-	here, err := os.Executable()
-	if err != nil {
+	// And one calling a binary that is there is not reported dead. A real file
+	// named the way deja names itself, because the check only looks at paths
+	// that end in its own name — the test binary does not.
+	bin := filepath.Join(home, "bin", "deja")
+	if err := os.MkdirAll(filepath.Dir(bin), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	live := "const DEJA = \"" + here + "\";\nawait spawn(DEJA, [\"hook-context\"]);\n"
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	live := "const DEJA = \"" + filepath.ToSlash(bin) + "\";\nawait spawn(DEJA, [\"hook-context\"]);\n"
 	if err := os.WriteFile(plugin, []byte(live), 0o644); err != nil {
 		t.Fatal(err)
 	}
