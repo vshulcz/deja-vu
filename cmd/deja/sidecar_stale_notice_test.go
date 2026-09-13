@@ -78,9 +78,11 @@ func TestAStaleSidecarIsNamedOnTheSearchPath(t *testing.T) {
 		t.Fatalf("a usable sidecar was announced: %q", quiet)
 	}
 
-	// One more session, and the offsets the vectors point at are gone.
-	line2 := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"bbb","cwd":"/proj"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "b.jsonl"), []byte(line2), 0o644); err != nil {
+	// The transcript rewritten under the index, and the offsets the vectors
+	// point at are gone. A new file would be appended since #3500, which leaves
+	// them all valid.
+	rewound := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"aaa","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := index.Ensure(dir, "", false, nil); err != nil {

@@ -88,10 +88,12 @@ func TestSyncExportNamesTheIndexWhenTheRebuildIsDenied(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A session the index has never seen, and no room to write the new index:
-	// the rebuild swaps directories inside the parent.
-	later := `{"type":"user","message":{"role":"user","content":"the topping lift block is seized"},"timestamp":"2026-07-02T10:00:00Z","sessionId":"s2","cwd":"/proj"}`
-	if err := os.WriteFile(filepath.Join(store, "s2.jsonl"), []byte(later+"\n"), 0o644); err != nil {
+	// A transcript rewritten under the index, and no room to write the new one:
+	// the rebuild swaps directories inside the parent. A file that only appeared
+	// or grew is appended inside the index directory since #3500, which the
+	// parent's mode still allows — a rewind is what forces the swap.
+	rewound := `{"type":"user","message":{"role":"user","content":"the topping lift block is seized"},"timestamp":"2026-07-02T10:00:00Z","sessionId":"s1","cwd":"/proj"}`
+	if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(rewound+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	parent := filepath.Dir(idx)

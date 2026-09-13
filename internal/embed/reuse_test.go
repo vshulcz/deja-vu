@@ -66,9 +66,9 @@ func embedStore(t *testing.T) (dir string, addSession func(id string)) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	// Growing a session already in the index is the common event and the only
-	// one that appends in place; a brand-new session rebuilds records.bin, where
-	// no offset can be trusted afterwards.
+	// Growing a session already in the index appends in place, and since #3500
+	// so does a brand-new transcript: what moves every offset is a rebuild, or
+	// a rewind that sends the pass down the replacement path.
 	return dir, func(id string) {
 		f, err := os.OpenFile(filepath.Join(root, "project", "a.jsonl"), os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
@@ -134,10 +134,11 @@ func TestSameLayout(t *testing.T) {
 	}
 }
 
-// The other side of the rule, end to end: a new session rebuilds records.bin,
-// so no offset survives and every vector has to be made again. Cheap would be
-// wrong here.
-func TestEmbedIndexRebuildsEverythingAfterANewSession(t *testing.T) {
+// A brand-new transcript is appended too, since #3500: the records already on
+// file do not move, so their vectors still point at them and only the new
+// message is embedded. This is the expensive case going cheap — before that
+// change every new conversation made every vector again.
+func TestEmbedIndexOnlyEmbedsANewSessionsOwnRecords(t *testing.T) {
 	var embedded atomic.Int64
 	client := countingClient(t, &embedded)
 	dir, _ := embedStore(t)
@@ -156,7 +157,36 @@ func TestEmbedIndexRebuildsEverythingAfterANewSession(t *testing.T) {
 	if _, err := EmbedIndex(dir, client, nil); err != nil {
 		t.Fatal(err)
 	}
-	if again := embedded.Load(); again != 6 {
-		t.Errorf("a rebuild re-embedded %d records, want all 6 — offsets moved", again)
+	if again := embedded.Load(); again != 1 {
+		t.Errorf("a new transcript re-embedded %d records, want only its own 1", again)
+	}
+}
+
+// The other side of the rule, end to end: a rebuild moves every record, so no
+// offset survives and every vector has to be made again. Cheap would be wrong
+// here.
+func TestEmbedIndexRebuildsEverythingAfterARebuild(t *testing.T) {
+	var embedded atomic.Int64
+	client := countingClient(t, &embedded)
+	dir, _ := embedStore(t)
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	// Rewritten rather than grown: a rewind cannot be appended onto, so the
+	// pass replaces records.bin and every offset with it.
+	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	embedded.Store(0)
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	if again := embedded.Load(); again < 2 {
+		t.Errorf("a replaced records.bin re-embedded %d records, want every one of them", again)
 	}
 }

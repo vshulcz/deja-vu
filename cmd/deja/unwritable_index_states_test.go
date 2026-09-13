@@ -38,8 +38,12 @@ func TestAnUnwritableIndexReadsTheSameEverywhere(t *testing.T) {
 	}
 
 	// A store that changed after the build, and no way to write the result.
-	newer := `{"type":"user","message":{"role":"user","content":"a session added after the parent was locked"},"timestamp":"2026-08-04T12:00:00Z","sessionId":"new","cwd":"/proj"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "new.jsonl"), []byte(newer), 0o644); err != nil {
+	// Rewritten rather than grown: since #3500 a file appearing or growing is
+	// appended inside the index directory, which the parent's mode still
+	// allows. A rewind is what needs the replacement path, and the replacement
+	// path is what needs a temp directory beside the index.
+	rewound := `{"type":"user","message":{"role":"user","content":"the ticker window, rewritten after the parent was locked"},"timestamp":"2026-08-04T12:00:00Z","sessionId":"loc","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "loc.jsonl"), []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Chmod(parent, 0o500); err != nil {

@@ -3285,7 +3285,14 @@ var inlineAppendMax int64 = 8 << 20
 func appendTailBytes(changed map[string]FileState, old map[string]FileState) int64 {
 	var n int64
 	for p, f := range changed {
-		if of, ok := old[p]; ok && f.Size > of.Size {
+		of, ok := old[p]
+		if !ok {
+			// A file deja has not read before is new from its first byte, and
+			// the append path reads all of it.
+			n += f.Size
+			continue
+		}
+		if f.Size > of.Size {
 			n += f.Size - of.Size
 		}
 	}
@@ -3298,7 +3305,20 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 	}
 	for p, f := range changed {
 		of, ok := old[p]
-		if !ok || f.Size <= of.Size {
+		if !ok {
+			// A transcript deja has never read is new from its first byte, which
+			// is what this path writes: parse from offset zero, every session in
+			// it new, old records untouched. Refusing it sent every new
+			// conversation — each one is a new file — down the replacement path,
+			// which rewrites and re-tokenizes the whole store: 4.76s against
+			// 0.30s on a 171 MB index, and growing with the store rather than
+			// with the file (#3500).
+			if !appendableKind(harnessForPath(p)) {
+				return false
+			}
+			continue
+		}
+		if f.Size <= of.Size {
 			return false
 		}
 		// A prior pass that indexed no complete line (a torn first line, or a lone
@@ -3365,6 +3385,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	}
 	defer func() { _ = rw.Close() }()
 	buckets := bucketPostings{}
+	// Every session this pass read, for the sidecars at the end.
+	var appended []model.Session
 	loadBucket := func(tok string) (map[string][]posting, error) {
 		b := bucket(tok)
 		if data, ok := buckets[b]; ok {
@@ -3412,6 +3434,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		// text, so the same session got different signatures depending on which
 		// path had touched it last.
 		preRedactSessions(&m, ss)
+		// Kept for the sidecars below, after redaction so a pair cannot carry a
+		// credential the records do not.
+		appended = append(appended, ss...)
 		filesTouched++
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
@@ -3424,6 +3449,18 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 			if s.Updated.After(meta.Updated) {
 				meta.Updated = s.Updated
+			}
+			// A rename reaches this path as a new file holding a session deja
+			// already has, and the path it has is the one that went away. The
+			// replacement path asks the removed set; here that set is empty by
+			// definition — the file that vanished was kept back as still
+			// searchable — so ask the filesystem instead. A recorded path that
+			// is not there cannot own the row, and without this the row kept
+			// the dead path and was marked as sharing its id with it (#1086).
+			if meta.Path != "" && s.Path != "" && meta.Path != s.Path {
+				if _, err := os.Lstat(meta.Path); err != nil {
+					meta.Path = ""
+				}
 			}
 			owns, collided := attributeSession(meta, s)
 			if collided {
@@ -3514,7 +3551,36 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if err := writeManifest(dir, m); err != nil {
 		return filesTouched, messages, unreadable, err
 	}
+	// The sidecars, from what this pass read and from the records already on
+	// file. The replacement path does the same three things after it carries
+	// them over; this path used to do none of them, which was survivable while
+	// it only ever saw a tail and is not once a new conversation comes through
+	// here (#3500). No `replaced` set: nothing was re-read, so every pair
+	// already on file is still earned — the new ones merge in beside them, and
+	// a candidate on file is what a second sighting needs to be promoted.
+	mergeFixes(dir, dir, appended, map[string]bool{})
+	// The two command tables are mined from every record the index holds, which
+	// is a scan of records.bin — 2.9s of an 8.6s pass on a 191 MB store. Nothing
+	// this pass added can change them unless it added a command or the output of
+	// one, and most appends are speech, so ask first.
+	if carriesWork(appended) {
+		buildCommandsFromIndex(dir)
+		buildCommandFailsFromIndex(dir)
+	}
 	return filesTouched, messages, unreadable, nil
+}
+
+// carriesWork reports whether any of these sessions holds a command or the
+// output of one, which is all the two command tables are mined from.
+func carriesWork(ss []model.Session) bool {
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			if m.Role == sources.RoleCommand || m.Role == sources.RoleToolOutput {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func sameFile(a, b FileState) bool {

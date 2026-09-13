@@ -53,10 +53,12 @@ func TestDoctorReportsNoCoverageForASidecarSearchRefuses(t *testing.T) {
 		t.Fatal("no coverage before a rebuild, so the test measures nothing")
 	}
 
-	// A second session rebuilds records.bin, so no offset in the sidecar means
-	// what it did and search refuses it.
-	line2 := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"bbb","cwd":"/proj"}` + "\n"
-	if err := os.WriteFile(filepath.Join(store, "b.jsonl"), []byte(line2), 0o644); err != nil {
+	// A transcript rewritten under the index replaces records.bin, so no offset
+	// in the sidecar means what it did and search refuses it. Rewound rather
+	// than added: since #3500 a new transcript is appended, and an append leaves
+	// every offset where it was.
+	rewound := `{"type":"user","message":{"role":"user","content":"the cache eviction wiped sessions"},"timestamp":"2026-08-03T10:00:00Z","sessionId":"aaa","cwd":"/proj"}` + "\n"
+	if err := os.WriteFile(filepath.Join(store, "a.jsonl"), []byte(rewound), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if err := index.Ensure(dir, "", false, nil); err != nil {
