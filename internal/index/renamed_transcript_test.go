@@ -158,3 +158,40 @@ func TestRenameDetectionIsNarrow(t *testing.T) {
 		t.Errorf("pairing = %v, want /new/a.jsonl from /gone/a.jsonl", got)
 	}
 }
+
+// A resumed session arrives under a new name with a turn appended. The
+// fingerprint covers the bytes deja had already read, so the pairing still
+// holds and only the tail is parsed.
+func TestARenamedTranscriptThatGrewReadsOnlyItsTail(t *testing.T) {
+	dir, path := seedOneTranscript(t, "s1.jsonl", "the zorblax pool deadlocked")
+	before := recordsSize(t, dir)
+	renamed := filepath.Join(filepath.Dir(path), "s1-resumed.jsonl")
+	if err := os.Rename(path, renamed); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.OpenFile(renamed, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(`{"type":"assistant","sessionId":"s1","timestamp":"2026-06-02T03:05:05Z","message":{"role":"assistant","content":"quuxbar was the fix"}}` + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	var log bytes.Buffer
+	if err := Ensure(dir, "claude", false, &log); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(log.String(), "renamed") {
+		t.Errorf("a renamed file that grew was not recognised:\n%s", log.String())
+	}
+	if ss, _ := Search(dir, search.Options{Query: "zorblax"}); len(ss) != 1 {
+		t.Errorf("the first turn answers %d times, want 1", len(ss))
+	}
+	if ss, _ := Search(dir, search.Options{Query: "quuxbar"}); len(ss) != 1 {
+		t.Errorf("the appended turn answers %d times, want 1", len(ss))
+	}
+	// The tail, not the whole file: the growth is one short turn.
+	if grew := recordsSize(t, dir) - before; grew > before {
+		t.Errorf("records.bin grew by %d bytes for a one-turn append to a %d byte store", grew, before)
+	}
+}

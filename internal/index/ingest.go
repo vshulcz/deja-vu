@@ -736,10 +736,17 @@ func detectRenamedFiles(oldFiles, files map[string]FileState) map[string]string 
 				continue
 			}
 			of := gone[op]
-			if of.Size != nf.Size || of.SafeSize != nf.SafeSize || of.PrefixSample != nf.PrefixSample {
+			if harnessForPath(op) != harnessForPath(np) {
 				continue
 			}
-			if harnessForPath(op) != harnessForPath(np) {
+			same := of.Size == nf.Size && of.SafeSize == nf.SafeSize && of.PrefixSample == nf.PrefixSample
+			// The same file renamed and written to since — a resumed session
+			// under a new name. The fingerprint covers the bytes deja had read,
+			// so it still answers whether this is that file; the row it carries
+			// then makes the pass read the tail rather than the whole log.
+			grown := !same && nf.Size > of.Size && nf.SafeSize >= of.SafeSize &&
+				filePrefixSample(np, of.SafeSize) == of.PrefixSample
+			if !same && !grown {
 				continue
 			}
 			out[np] = op
