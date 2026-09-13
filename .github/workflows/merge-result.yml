@@ -1,0 +1,106 @@
+name: Merge result
+
+# Every check runs against the branch. Two branches can each be green and break
+# main together — #3426 and #3431 touched different files, so the staleoverlap
+# guard stayed quiet, and merged they left main red (#3433). What would have
+# caught it is running the suite against the merge result, which nothing did.
+#
+# So after each push to main, every open pull request is merged into it here and
+# the suite runs on that. Ubuntu only and without -race: this is about the
+# collision, not about the platforms, and the windows leg is fifty minutes it
+# would spend proving what the pull request's own run already proved.
+#
+# On failure the pull request is told, because the failure belongs to it: main
+# is green by definition at this point, and the branch is the half that has to
+# move.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: merge-result
+  cancel-in-progress: true
+
+jobs:
+  which:
+    name: Open pull requests
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      numbers: ${{ steps.list.outputs.numbers }}
+    steps:
+      - id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Drafts are excluded: a draft is a branch someone is still writing,
+          # and telling them it does not merge cleanly with a main from ten
+          # minutes ago is noise. Capped at the eight most recently updated —
+          # each entry costs a suite run, and a repository with forty open
+          # branches would spend an hour of runner time per merge.
+          numbers=$(gh pr list --repo "$REPO" --state open --draft=false \
+            --limit 8 --json number --jq '[.[].number]')
+          echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
+          echo "checking: $numbers"
+
+  suite:
+    name: Suite on main + #${{ matrix.pr }}
+    needs: which
+    if: needs.which.outputs.numbers != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.which.outputs.numbers) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The commit-trailer test reads the last sixty messages, and the merge
+          # below needs both histories.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25.x'
+      - name: Merge the pull request into main
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ matrix.pr }}
+        run: |
+          set -euo pipefail
+          git config user.name "ci"
+          git config user.email "ci@localhost"
+          git fetch --no-tags origin "pull/${PR}/head:pr-${PR}"
+          # A conflict is not this workflow's business: GitHub already says so
+          # on the pull request, and the suite has nothing to run on.
+          if ! git merge --no-edit "pr-${PR}"; then
+            echo "conflicts=true" >> "$GITHUB_OUTPUT"
+            git merge --abort || true
+          fi
+      - name: The suite, on what the merge produced
+        if: steps.merge.outputs.conflicts != 'true'
+        run: go test -timeout 25m ./...
+      - name: Tell the pull request
+        if: failure() && steps.merge.outputs.conflicts != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ matrix.pr }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$PR" --repo "$REPO" --body "main moved to \`${SHA}\` and the suite fails when this branch is merged into it — [the run](${RUN_URL}).
+
+          Both sides are green on their own, which is the shape #3433 is about: rebase on main and the failure will be visible on this pull request's own checks."
