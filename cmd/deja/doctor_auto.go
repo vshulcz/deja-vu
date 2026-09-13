@@ -126,15 +126,24 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — `deja install %s-auto`)\n", a.name, "stale", reportPath(path), a.marker, a.name)
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
-			// Only the rows that run the binary. aider's file is a digest of
-			// past sessions and roo's is guidance — neither executes anything,
-			// and both can quote a path for reasons of their own.
-			if exe := hookExeNote(path, a.name+"-auto"); a.marker != "" && exe != "" {
-				fmt.Fprintf(w, "  %-12s %s\n", "", exe)
-			}
-			if note := doctorLauncherNote(path, a.name+"-auto"); a.marker != "" && note != "" {
-				fmt.Fprintf(w, "  %-12s %s\n", "", note)
-			}
+		}
+		// Under the row whatever the row said. A machine that upgraded is most
+		// often stale rather than wired — the entries were written by the
+		// version before — and saying this only under a healthy row left the
+		// rows most likely to be pointing at a binary that is gone saying
+		// nothing about it (#3502).
+		//
+		// Only the rows that run the binary. aider's file is a digest of past
+		// sessions and roo's is guidance — neither executes anything, and both
+		// can quote a path for reasons of their own.
+		if a.marker == "" {
+			continue
+		}
+		if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
+			fmt.Fprintf(w, "  %-12s %s\n", "", exe)
+		}
+		if note := doctorLauncherNote(path, a.name+"-auto"); note != "" {
+			fmt.Fprintf(w, "  %-12s %s\n", "", note)
 		}
 	}
 }

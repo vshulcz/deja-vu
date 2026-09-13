@@ -359,6 +359,12 @@ func doctorCodexHook(w io.Writer) {
 	if note := doctorHookRepeats(hooks, codexHookWiring, "codex-auto"); note != "" {
 		line += fmt.Sprintf("\n  %-12s %s", "", note)
 	}
+	// Whatever codex thinks of the entry, it can still name a binary that is
+	// gone — and an untrusted row said only that codex had not been shown it,
+	// which is the state an upgraded machine sits in (#3502).
+	if exe := hookExeNote(hooksPath, "codex-auto"); exe != "" {
+		line += fmt.Sprintf("\n  %-12s %s", "", exe)
+	}
 	fmt.Fprintln(w, line)
 }
 
