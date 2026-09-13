@@ -55,7 +55,14 @@ func TestTwoBuildsNeverPublishHalfAStatus(t *testing.T) {
 			}
 		}
 	}()
-	time.Sleep(300 * time.Millisecond)
+	// Run until the reader has actually read something, not for a fixed slice
+	// of time: on a loaded runner 300 ms passed with the reader never scheduled,
+	// and the test failed saying it proved nothing — which was true, and about
+	// the runner rather than the writers.
+	deadline := time.Now().Add(10 * time.Second)
+	for atomic.LoadInt64(&reads) < 50 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
 	stop.Store(true)
 	wg.Wait()
 	if reads == 0 {
