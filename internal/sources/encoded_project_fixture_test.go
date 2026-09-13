@@ -28,6 +28,21 @@ func encodedFixtureSuffix(t *testing.T) string {
 	return "fx" + hex.EncodeToString(b[:])
 }
 
+// encodeProjectPath spells a path the way a harness stores it as a directory
+// name. On unix that is every separator replaced by a dash. On windows the
+// drive colon goes the same way — `C:\Users\me\app` is stored `C--Users-me-app`
+// — and a fixture that replaced separators only left `C:-Users-…`, which
+// resolveEncodedPath cannot resolve and the decoder then read through its dash
+// fallback. The test below asserts the resolving branch, so on windows it was
+// asserting the wrong one, and main went red there.
+func encodeProjectPath(path string) string {
+	encoded := strings.ReplaceAll(path, string(filepath.Separator), "-")
+	if vol := filepath.VolumeName(path); strings.HasSuffix(vol, ":") {
+		encoded = strings.Replace(encoded, vol, strings.TrimSuffix(vol, ":")+"-", 1)
+	}
+	return encoded
+}
+
 // The other side of the same rule, pinned on a directory the test owns rather
 // than on the absence of one: an encoded name that does resolve keeps the
 // hyphen the encoding lost.
@@ -42,7 +57,7 @@ func TestAnEncodedProjectThatResolvesKeepsItsHyphen(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	encoded := strings.ReplaceAll(project, string(filepath.Separator), "-")
+	encoded := encodeProjectPath(project)
 	if got := decodeProjectBase(encoded); got != filepath.Base(real)+"/deja-vu" {
 		t.Errorf("decodeProjectBase(%q) = %q, want the hyphen kept under %q",
 			encoded, got, filepath.Base(real))
