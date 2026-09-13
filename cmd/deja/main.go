@@ -478,7 +478,13 @@ func cmdIndex(dir string, rest []string) error {
 		return ensureError(dir, err)
 	}
 	clearWarmupSentinel()
-	if fresh, n := index.UpToDate(dir, ""); progress.n == 0 {
+	// Inside the branch, not in its initializer: Go runs an `if` initializer
+	// before it tests the condition, so the freshness walk — every registered
+	// store, every candidate statted, the longest part of this command on a slow
+	// volume — ran on every `deja index` and its answer was thrown away whenever
+	// progress had already said what happened (#3500).
+	if progress.n == 0 {
+		fresh, n := index.UpToDate(dir, "")
 		fmt.Fprintln(os.Stderr, indexQuietOutcome(fresh, n))
 	}
 	// Two transcripts can carry the same harness:id — two files with the same
