@@ -35,6 +35,9 @@ func main() {
 	index.LockWaitNotice = func() {
 		fmt.Fprintln(os.Stderr, "deja: another deja is building the index — waiting for it to finish")
 	}
+	// A detached warmup is index work nobody asked for at a moment somebody is
+	// working, so it takes less than a foreground run would (#3500).
+	takeWarmupBudget()
 	stopProfiling := startProfiling()
 	if err := run(os.Args[1:]); err != nil {
 		stopProfiling()
