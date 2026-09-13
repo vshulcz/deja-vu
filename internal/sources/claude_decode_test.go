@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -173,11 +174,28 @@ func TestTypedClaudeParserMatchesOnTheRealCorpus(t *testing.T) {
 	if len(files) > 40 {
 		files = files[:40]
 	}
+	// Each file is snapshotted before it is parsed twice. The store is live:
+	// an agent writing while the suite runs appends between the two parses, and
+	// the comparison then fails on a timestamp that moved rather than on a
+	// parser that disagrees — which is exactly what happened here, with the two
+	// reads of one transcript 23 seconds apart.
+	snap := t.TempDir()
 	start := time.Now()
-	for _, p := range files {
-		want, _ := parseClaudeGenericFromOffset(p, 0)
-		got, _ := parseClaudeTypedFromOffset(p, 0)
+	compared := 0
+	for i, p := range files {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		frozen := filepath.Join(snap, fmt.Sprintf("%d.jsonl", i))
+		if err := os.WriteFile(frozen, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		want, _ := parseClaudeGenericFromOffset(frozen, 0)
+		got, _ := parseClaudeTypedFromOffset(frozen, 0)
 		sameSessions(t, want, got, filepath.Base(p))
+		compared++
+		_ = os.Remove(frozen)
 	}
-	t.Logf("compared %d real transcripts in %s", len(files), time.Since(start).Round(time.Millisecond))
+	t.Logf("compared %d real transcripts in %s", compared, time.Since(start).Round(time.Millisecond))
 }
