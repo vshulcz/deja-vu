@@ -21,9 +21,10 @@ import (
 // conversation survived two months and twenty releases before a contributor
 // measured it (#3500).
 //
-// Four classes, because they are the four things that happen to a store:
+// Five classes, because they are the five things that happen to a store:
 // nothing changed, a turn was appended to a transcript, a transcript appeared,
-// a transcript was rewritten. The first three must not rewrite `records.bin` —
+// a transcript changed its name, a transcript was rewritten. The first four
+// must not rewrite `records.bin` —
 // that is the property the cost rests on, and it is reported per class rather
 // than assumed, since wall time on a shared runner says little and "the bytes
 // that were there are still there" says everything.
@@ -113,6 +114,12 @@ func measureIngest(seed int64) (ingestReport, error) {
 	}
 	target := sessions[0]
 	existing := filepath.Join(claudeRoot, target.Project, target.ID+".jsonl")
+	// The rename class needs a transcript of its own: acting on the one the
+	// append and rewrite classes use would measure them against a moving file.
+	renameTarget := existing
+	if len(sessions) > 1 {
+		renameTarget = filepath.Join(claudeRoot, sessions[1].Project, sessions[1].ID+".jsonl")
+	}
 
 	report := ingestReport{CorpusHash: corpus.Hash, Seed: seed, Sessions: len(store)}
 	for _, class := range []struct {
@@ -131,6 +138,12 @@ func measureIngest(seed int64) (ingestReport, error) {
 					Text: "a conversation that was not on disk when the index was built",
 				}},
 			}})
+		}},
+		// Renaming is its own class: a harness that writes a resumed session
+		// under a new name used to cost a second copy of the whole log (#3546),
+		// and the only place that shows is the size of the store.
+		{"renamed transcript", func() error {
+			return os.Rename(renameTarget, renameTarget+".renamed")
 		}},
 		{"rewritten transcript", func() error {
 			return os.WriteFile(existing, []byte(""), 0o600)
@@ -229,7 +242,7 @@ func printIngestReport(w io.Writer, r ingestReport) {
 		fmt.Fprintf(w, "%-22s %9.1fms %10.1fMB %9.1fKB %s\n",
 			c.name(), c.WallMS, c.RecordsMB, c.AddedKB, rewrote)
 	}
-	fmt.Fprintln(w, "Only a rewritten transcript should rewrite the store; the other three cost what they added.")
+	fmt.Fprintln(w, "Only a rewritten transcript should rewrite the store; the other four cost what they added.")
 }
 
 // name keeps the printed column stable when a class name is empty, which only

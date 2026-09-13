@@ -17,8 +17,8 @@ func TestBenchIngestOnlyARewriteRewritesTheStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Classes) != 4 {
-		t.Fatalf("measured %d update classes, want the four a store sees: %#v", len(report.Classes), report.Classes)
+	if len(report.Classes) != 5 {
+		t.Fatalf("measured %d update classes, want the five a store sees: %#v", len(report.Classes), report.Classes)
 	}
 	for _, c := range report.Classes {
 		rewriteExpected := strings.HasPrefix(c.Name, "rewritten")
@@ -31,5 +31,14 @@ func TestBenchIngestOnlyARewriteRewritesTheStore(t *testing.T) {
 	}
 	if added := report.Classes[2].AddedKB; added <= 0 {
 		t.Errorf("a new transcript added %.2f KB of records, so it was not indexed", added)
+	}
+	// A rename adds nothing: the bytes are already on file under the old name,
+	// and re-reading them was what #3546 fixed.
+	renamed := report.Classes[3]
+	if renamed.Name != "renamed transcript" {
+		t.Fatalf("class 3 is %q, want the rename", renamed.Name)
+	}
+	if renamed.AddedKB != 0 {
+		t.Errorf("a rename added %.2f KB of records, so the file was read again", renamed.AddedKB)
 	}
 }
