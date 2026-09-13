@@ -12,12 +12,18 @@ func TestParsePiFile(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_PI_ROOT", filepath.Join(root, "pi-sessions"))
-	project := filepath.Join(root, "pi-sessions", "--tmp-deja-vu--")
+	// The encoded name carries a suffix nobody can have on disk. The decoder
+	// resolves an encoded project against the filesystem, so a fixture naming
+	// `/tmp/deja-vu` asserts the dash fallback only on a machine that happens
+	// not to have that directory — and a contributor who did failed this test
+	// twice on unmodified main (#3512).
+	unique := encodedFixtureSuffix(t)
+	project := filepath.Join(root, "pi-sessions", "--tmp-deja-vu-"+unique+"--")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(project, "2026-01-02T03-04-05-000Z_abc-123.jsonl")
-	data := `{"type":"session","version":3,"id":"abc-123","timestamp":"2026-01-02T03:04:05Z","cwd":"/tmp/deja-vu"}
+	data := `{"type":"session","version":3,"id":"abc-123","timestamp":"2026-01-02T03:04:05Z","cwd":"/tmp/deja-vu-fixture"}
 {"type":"model_change","id":"m1","parentId":null,"timestamp":"2026-01-02T03:04:06Z","provider":"anthropic","modelId":"claude-sonnet-4"}
 {"type":"message","id":"u1","parentId":"m1","timestamp":"2026-01-02T03:04:10Z","message":{"role":"user","content":[{"type":"text","text":"what is pi?"}],"timestamp":1767337450000}}
 {"type":"message","id":"a1","parentId":"u1","timestamp":"2026-01-02T03:04:15Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Let me think..."},{"type":"text","text":"pi is a coding agent"}],"api":"anthropic","model":"claude-sonnet-4","usage":{"input":10,"output":20},"stopReason":"endTurn","timestamp":1767337455000}}
@@ -41,8 +47,8 @@ func TestParsePiFile(t *testing.T) {
 	if s.ID != "abc-123" {
 		t.Fatalf("id = %q, want abc-123", s.ID)
 	}
-	if s.Project != "deja/vu" {
-		t.Fatalf("project = %q, want deja/vu", s.Project)
+	if want := "vu/" + unique; s.Project != want {
+		t.Fatalf("project = %q, want %q", s.Project, want)
 	}
 	if len(s.Messages) != 4 {
 		t.Fatalf("want 4 messages (user + 2 assistant + tool output), got %d: %#v", len(s.Messages), s.Messages)

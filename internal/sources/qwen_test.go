@@ -11,7 +11,11 @@ func TestParseQwenFile(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
 	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(root, "qwen"))
-	project := filepath.Join(root, "qwen", "projects", "-tmp-deja-vu", "chats")
+	// A suffix nobody can have on disk: the decoder resolves an encoded project
+	// against the filesystem, so `-tmp-deja-vu` tested the dash fallback only on
+	// a machine without `/tmp/deja-vu` (#3512).
+	unique := encodedFixtureSuffix(t)
+	project := filepath.Join(root, "qwen", "projects", "-tmp-deja-vu-"+unique, "chats")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +32,7 @@ func TestParseQwenFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].Project != "deja/vu" || len(ss[0].Messages) != 3 {
+	if len(ss) != 1 || ss[0].Project != "vu/"+unique || len(ss[0].Messages) != 3 {
 		t.Fatalf("parsed sessions = %#v", ss)
 	}
 	if ss[0].Messages[0].Text != "first\n question" || ss[0].Messages[1].Text != "surface\n answer" || ss[0].Messages[2].Role != "assistant" {
