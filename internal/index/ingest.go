@@ -2826,6 +2826,15 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	if force || err != nil || old.Version != version || old.Scope != scope {
 		if progress != nil {
+			// A store built by an earlier release re-reads its sources whole,
+			// which on a large one is the longest deja ever makes anyone wait
+			// — and it said only "indexing sessions", the same line a first
+			// install prints. Every other reason for a full pass names itself:
+			// damage says it is damage, a changed exclude list says so, and
+			// `--rebuild` was asked for (#3500).
+			if err == nil && !force && old.Version != version && old.Version != 0 {
+				fmt.Fprintf(progress, "deja: this build reads a newer index than the one on disk (%d, was %d) — re-reading your sources once\n", version, old.Version)
+			}
 			if !hasProgressSink() {
 				fmt.Fprintf(progress, "deja: indexing sessions into %s ...\n", displayPath(dir))
 			}
