@@ -484,6 +484,21 @@ func claudeEditSpans(raw json.RawMessage) []string {
 	return out
 }
 
+// RoleSummary marks a harness's own digest of a conversation it compacted away.
+//
+// opencode writes one on the message — `summary: true`, with `mode` and `agent`
+// both `compaction` — and deja indexed it as ordinary assistant speech: 1,906 of
+// them across 23 sessions on one store, 3.97 MB of 20.24 MB of everything
+// indexed in those sessions, 19.6%, and 42% in the worst one. Measured over 60
+// real questions, none of them ever won a quoted line — so the cost was the read
+// budget rather than the answers, and a fifth of the text those sessions offered
+// to a per-session bound was speech nobody said (#3384).
+//
+// Kept rather than dropped: the summary is the only record of the half that was
+// compacted away, and it is findable by asking for it. What goes is the claim
+// that the agent said it.
+const RoleSummary = "summary"
+
 // RoleCommand marks a command that ran. Tool *output* has always been indexed —
 // Claude files it under the user role, which is why the index holds megabytes of
 // test output — but the invocation that produced it was dropped, so output sat

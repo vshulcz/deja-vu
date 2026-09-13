@@ -61,6 +61,7 @@ Beyond `user`, `assistant` and `developer`, records carry what the agent did:
 | `files` | the paths a turn opened or edited |
 | `command` | a shell command worth keeping — an allowlist of build, test, VCS and deployment tooling, single-line only |
 | `edit` | a span an edit replaced: the path on the first line, the exact removed bytes after it. Only the path earns postings, since nothing searches the body |
+| `summary` | a harness's own digest of a conversation it compacted away. Kept, because it is the only record of the turns that went, and not filed as speech: on one store 1,906 of them were 19.6% of everything indexed in the sessions that had them, and none of them ever won a quoted line for a real question |
 
 These are indexed and searchable by `--role`, and served in ordinary results only when asked for by role: a path that happens to contain the words of a question is not an answer to it. The postings carry a bit for them so the per-session read bound can spend its budget on speech first.
 

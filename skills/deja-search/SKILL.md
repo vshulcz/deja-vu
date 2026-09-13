@@ -31,7 +31,7 @@ This skill drives the `deja` binary through the shell. If the deja MCP tools (re
 - `deja remember "<text>"`: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code.
 - `deja wip`: what the last session in this directory was doing — the task, what it settled, the files in flight, the last command and whether it failed. Ask it when you have lost the thread of your own work, after a compaction or on a fresh session in a repository you were just in.
 
-Useful flags on search: `--harness`, `--project`, `--since 30d`, `--role user|assistant|tool|files|command|edit`, `--session <id>`, `--limit 1-100`, `--all`, `--re` for a regular expression.
+Useful flags on search: `--harness`, `--project`, `--since 30d`, `--role user|assistant|tool|files|command|edit|summary`, `--session <id>`, `--limit 1-100`, `--all`, `--re` for a regular expression.
 
 ## Reading a result
 

@@ -197,7 +197,17 @@ import (
 // store is current, and a machine with thirteen sessions keeps answering from
 // the four whose old-named logs are still there — which is what the report on
 // that pull request described, with `--rebuild` as the only way out.
-const version = 39
+//
+// 40 files a harness's compaction summary under its own role. opencode marks
+// one on the message — `summary: true` — and deja read it as the agent talking:
+// 1,906 of them across 23 sessions on a real store, 3.97 MB of the 20.24 MB
+// indexed in those sessions, 19.6%, and 42% of the worst one. Over 60 real
+// questions none of them ever won a quoted line, so what they cost is the read
+// bound: a fifth of the text those sessions offer it is a machine's summary of
+// speech rather than the speech. The bump is what re-files the ones already
+// indexed; without it they stay assistant speech until something else forces a
+// re-read (#3384).
+const version = 40
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

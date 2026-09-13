@@ -111,6 +111,10 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		// flag is exact there: every ignored part on that store is one of these
 		// banners, and none of the 4,420 real user parts carries it (#3515).
 		`json_extract(p.data,'$.ignored') as ignored,` +
+		// opencode's own digest of the turns it compacted away, marked on the
+		// message rather than the part. Indexed under RoleSummary: searchable,
+		// and not the agent talking (#3384).
+		`json_extract(m.data,'$.summary') as summary,` +
 		`json_extract(p.data,'$.state.input.filePath') as path,` +
 		`json_extract(p.data,'$.state.input.command') as cmd,` +
 		`json_extract(p.data,'$.state.input.patchText') as patch,` +
@@ -208,6 +212,12 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		}
 		role := str(r["role"])
 		txt := str(r["text"])
+		if opencodeSynthetic(r["summary"]) {
+			// The summary is the only record of the half that was compacted
+			// away, so it is kept — under its own role, where an ordinary
+			// question does not reach it and `--role summary` does.
+			role = RoleSummary
+		}
 		if opencodeSynthetic(r["synthetic"]) || opencodeSynthetic(r["ignored"]) {
 			continue
 		}

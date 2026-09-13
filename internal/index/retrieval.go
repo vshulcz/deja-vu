@@ -2538,12 +2538,19 @@ const roleToolOutput = "tool-output"
 // roleEdit mirrors sources.RoleEdit.
 const roleEdit = "edit"
 
+// roleSummary is a harness's digest of what it compacted away. Not speech, and
+// not work either — but it belongs on this side of the line for the same reason
+// the others do: a per-session read bound has to spend its budget on what
+// someone said before it spends it on a machine's summary of that (#3384).
+const roleSummary = "summary"
+
 // isToolRole says whether a record holds the work rather than the talk about
 // it. Tool records are bulk-repetitive by nature — the same command, the same
 // paths, session after session — so a query that matches one matches hundreds,
 // and the per-session bound has to spend its budget on speech first.
 func isToolRole(role string) bool {
-	return role == roleFiles || role == roleCommand || role == roleToolOutput || role == roleEdit
+	return role == roleFiles || role == roleCommand || role == roleToolOutput ||
+		role == roleEdit || role == roleSummary
 }
 
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {

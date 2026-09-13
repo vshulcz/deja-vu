@@ -2050,7 +2050,7 @@ func checkHarness(name *string) error {
 // both reach tool records, so both must be accepted.
 var knownRoles = []string{
 	"user", "assistant", "tool", sources.RoleToolOutput,
-	sources.RoleFiles, sources.RoleCommand, sources.RoleEdit,
+	sources.RoleFiles, sources.RoleCommand, sources.RoleEdit, sources.RoleSummary,
 }
 
 // checkRole rejects a --role value that is not a known role. Like an unknown
@@ -3699,7 +3699,7 @@ Usage:
   deja sync                       (exchange with every machine deja knows, both ways)
   deja sync ssh <host> [--pull] [--both] [--full]
   deja sync forget <host>
-  deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit]
+  deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit|summary]
   deja sources
   deja completion <bash|zsh|fish|powershell>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]

@@ -230,6 +230,14 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			if o.Role != "" && !roleMatches(m.Role, o.Role) {
 				continue
 			}
+			// A harness's summary of what it compacted away answers a question
+			// only when the question asked for it. Left in the ordinary pool it
+			// is a paraphrase of the conversation competing with the
+			// conversation — and on one store those summaries were a fifth of
+			// everything indexed in the sessions that had them (#3384).
+			if o.Role == "" && m.Role == roleSummary {
+				continue
+			}
 			// The transcript's own record of a call to deja is not something
 			// anyone said, and a question matches the log of that question
 			// being asked (#2067). Removed from matching only; the line stays
@@ -1068,6 +1076,11 @@ const decisionBoost = 2.0
 // roleToolOutput mirrors sources.RoleToolOutput; this package sits below it.
 const roleToolOutput = "tool-output"
 
+// roleSummary is a harness's digest of a conversation it compacted away. Kept
+// in the index — it is the only record of the turns that went — and served only
+// when a caller asks for it by role (#3384).
+const roleSummary = "summary"
+
 // decidesSomething reports whether a session contains an answer rather than a
 // conversation about one. It looks only at non-user turns: a user writing "we
 // should just pin it" is a proposal, and the same words from the side that did
@@ -1538,7 +1551,7 @@ func roleMatches(stored, want string) bool {
 // what was said. Mirrors index.isToolRole, which cannot be imported here.
 func isWorkRecord(role string) bool {
 	switch role {
-	case roleToolOutput, "files", "command", "edit":
+	case roleToolOutput, "files", "command", "edit", "summary":
 		return true
 	}
 	return false
