@@ -207,7 +207,16 @@ import (
 // speech rather than the speech. The bump is what re-files the ones already
 // indexed; without it they stay assistant speech until something else forces a
 // re-read (#3384).
-const version = 40
+//
+// 41 applies the argument-credential patterns to text already indexed. Eight of
+// twenty-four planted secret shapes were stored in the clear — a password given
+// to a program as a flag, a .netrc line, a Cookie header — and redaction runs at
+// ingest, so #3535 reaches nothing already on disk without a bump: the fix would
+// hold for the next conversation and leave every earlier one quotable, including
+// through `deja sync export`, which sends records to another machine. Every
+// earlier redaction fix shipped without one, which is why this bump is worth its
+// re-read.
+const version = 41
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
