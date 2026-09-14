@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - A full rebuild keeps the sessions whose transcripts the client deleted. Claude Code cleans up after 30 days and the incremental pass held them, but a rebuild — what an index-version bump, a changed exclude list and a damaged index all run — wrote the store from the sources alone: 6 of 8 sessions gone on a measured store. `deja forget` still drops one for good. (#3529)
+- The first question after an upgrade is answered from the index that is there while the sources are re-read behind it, the way a stale index is already handled. A content-version bump made it wait for the whole pass — 13m54s on a 520 MB store, where the agent that asked gave up after a minute. A layout this build cannot read, and text written before the redaction that masks it, still rebuild first. (#3552)
 - The opencode reader tests the compaction flag by type instead of reading the value behind it: current opencode keeps an object of file diffs under the same key, which came to 247 MB of query output against 132 MB for the same 78,690 rows on a 3.4 GB store. (#3556)
 - `deja index` no longer stalls on a store holding long tool output. Rows from a SQLite-backed harness are built by `json_object` rather than by the sqlite3 shell's `-json` mode, which is quadratic in the characters it escapes: 4 MB of quote-heavy text took it 412s against 0.04s, and a 520 MB opencode store took over ten minutes where it now takes three seconds. (#3553)
 

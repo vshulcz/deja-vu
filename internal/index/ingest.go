@@ -404,10 +404,19 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	mark("manifest")
 	want := currentFilesReusing("", priorFiles(m, err))
 	mark("walk stores")
-	if err != nil || m.Version != version || m.Scope != "" || !recordsIntact(dir, m) {
+	if err != nil || m.Scope != "" || !recordsIntact(dir, m) || mustRebuildBeforeAnswering(m, version) {
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
 		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	if m.Version != version {
+		// A content-version bump that this build can still read: the store
+		// answers under the old rules while the re-read runs behind it, the
+		// way staleness is already handled. Blocking on it is what made the
+		// first question after an upgrade wait for the whole pass — 13m54s on
+		// a 520 MB store, and an agent that waited a minute gave up on the
+		// tool (#3552).
+		return true, nil
 	}
 	if notesZoneDrifted(m) {
 		// Regrouping the day buckets is a full rebuild; hand it to the
@@ -451,6 +460,29 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 	// Caller detaches the rebuild (it owns the executable path).
 	mark("hand to warmup")
 	return true, nil
+}
+
+// redactionFloor is the last content version whose bump was about what may be
+// shown rather than about what deja derives. A store below it must not be
+// quoted while it is re-read: version 41 masks the argument-credential shapes
+// already on disk, where eight of twenty-four planted secrets were stored in
+// the clear and redaction runs at ingest (#3535).
+//
+// It rises when, and only when, a bump is about what must not be shown. A bump
+// about what deja derives — a role filed better, a title read from a different
+// field — leaves the older answers correct, and there are three of those for
+// every one of these.
+const redactionFloor = 41
+
+// mustRebuildBeforeAnswering reports whether an index has to be rebuilt before
+// it may answer anything at all, rather than answering under its own older
+// rules while the rebuild runs behind it.
+//
+// Two reasons, and only two: a layout this build cannot read answers nothing —
+// that is what onDiskFormat is for — and text written before deja knew how to
+// redact something must not be quoted while it is being re-read.
+func mustRebuildBeforeAnswering(m Manifest, build int) bool {
+	return m.Format != onDiskFormat || m.Version < redactionFloor || m.Version > build
 }
 
 // searchTrace returns a stage marker that prints when DEJA_TRACE=1, and costs a
@@ -3131,7 +3163,12 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			}
 		}
 	}
-	if force || err != nil || old.Version != version || old.Scope != scope {
+	// The format is checked beside the version because the two answer different
+	// questions: a store whose content rules are stale still reads, a store
+	// whose layout this build cannot read does not. Every format bump so far
+	// carried a version bump with it, so this has never fired — and that is the
+	// assumption it stops the next one from depending on.
+	if force || err != nil || old.Version != version || old.Format != onDiskFormat || old.Scope != scope {
 		if progress != nil {
 			// A store built by an earlier release re-reads its sources whole,
 			// which on a large one is the longest deja ever makes anyone wait
