@@ -3711,7 +3711,7 @@ Usage:
   deja warmup
   deja index [--rebuild]
   deja embed
-  deja bench recall|context|prompt|block|ingest [--json] [--seed n]
+  deja bench recall|context|prompt|block|ingest|read [--json] [--seed n]
   deja brief         (the screen a bare deja prints on a terminal)
   deja log [n] [--last] [--json]
   deja statusline

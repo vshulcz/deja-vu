@@ -375,6 +375,7 @@ deja bench context    # 30 seeded task chains plus five negative controls
 deja bench block      # does the answer survive into what deja hands over
 deja bench prompt     # what the per-prompt hook fires on, and what it fires on wrongly
 deja bench ingest     # what an update costs: unchanged, a turn, a new transcript, a rename, a rewrite
+deja bench read       # what it costs to read a database-backed store, and what one long value does to it
 ```
 
 `bench block` asks the question the other three cannot: with the right session in
