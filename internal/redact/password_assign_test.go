@@ -17,6 +17,8 @@ func TestAPasswordAssignedWithAnEqualsSignIsMaskedAtAnyLength(t *testing.T) {
 		{"kubectl create secret generic s --from-literal=password=K8sPass2026x", "K8sPass2026x"},
 		{"DATABASE_PASSWORD=DotenvPass2026", "DotenvPass2026"},
 		{"PGPASSWORD=Pg2026x psql -h db", "Pg2026x"},
+		{"DB_PASS=ExportPass2026", "ExportPass2026"},
+		{"export APP_PASS=Short12", "Short12"},
 	} {
 		got, counts := Text(tc.line)
 		if strings.Contains(got, tc.secret) {
@@ -40,6 +42,20 @@ func TestAColonKeepsItsOlderReading(t *testing.T) {
 	} {
 		if got, _ := Text(line); got != line {
 			t.Errorf("a near miss was redacted: %q -> %q", line, got)
+		}
+	}
+}
+
+// `pass` lives inside other words, and the separator before it is what keeps
+// this rule out of them.
+func TestAWordEndingInPassIsNotAPassword(t *testing.T) {
+	for _, line := range []string{
+		"bypass=strict",
+		"compass=north-facing",
+		"surpass=previous-record",
+	} {
+		if got, _ := Text(line); got != line {
+			t.Errorf("a word was read as a password: %q -> %q", line, got)
 		}
 	}
 }

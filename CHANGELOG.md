@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
 
 ### Fixed
-- A password assigned with `=` is masked at the length people actually choose: a JDBC URL, a query string, `--from-literal=password=` and a dotenv line all kept theirs in the clear under sixteen characters. A colon keeps its older reading. (#3588)
+- A password assigned with `=` is masked at the length people actually choose, including the `DB_PASS=` spelling: a JDBC URL, a query string, `--from-literal=password=` and a dotenv line all kept theirs in the clear under sixteen characters. A colon keeps its older reading. (#3588)
 - A secret whose value is not ASCII is redacted. Every key-value pattern ended in `[A-Za-z0-9/+=._-]{16,}`, so `пароль: БазаПароль2026` and `password: 非常に長いパスワード2026` were stored in the clear whatever the key word — the key words were widened to those languages and the value class was not. Index format version 43 masks what is already stored. (#3587)
 - A search over a store deja cannot open says so instead of advising the index that just ran. The sentence for a permission wall sat inside the branch for a machine with no history at all, and a store whose files are visible counts as history — so it was unreachable in the case it was written for. (#3585)
 - `deja doctor` says what an ignore rule actually hides, and names one that matches nothing. A rule is matched against the project name and the transcript's path, so the natural thing to write — the directory's absolute path — was inert while the row reported it as in force. (#3584)

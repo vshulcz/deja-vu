@@ -173,10 +173,18 @@ func TestRedactionGapFixes(t *testing.T) {
 }
 
 func TestEntropyAssignmentRedacted(t *testing.T) {
-	in := `DB_PASS=V9rT2xK8mQ4nW7jL5hP3sD1f`
+	// A key that says nothing about its value, so this measures the entropy
+	// pass rather than the key-word rules: `DB_PASS=` is a credential by name
+	// now and is caught before entropy is consulted (#3588).
+	in := `BUILD_TAG=V9rT2xK8mQ4nW7jL5hP3sD1f`
 	out, counts := Text(in)
-	if !strings.Contains(out, "DB_PASS=[redacted:entropy]") || counts["entropy"] != 1 {
+	if !strings.Contains(out, "BUILD_TAG=[redacted:entropy]") || counts["entropy"] != 1 {
 		t.Fatalf("assignment entropy missed: %q %v", out, counts)
+	}
+	// And the same value under a key that does say so, caught by the name.
+	named, namedCounts := Text(`DB_PASS=V9rT2xK8mQ4nW7jL5hP3sD1f`)
+	if !strings.Contains(named, "DB_PASS=[redacted:credential]") || namedCounts["credential"] != 1 {
+		t.Fatalf("a named credential missed: %q %v", named, namedCounts)
 	}
 	in2 := `"private_key": "MIIEvQ2xK8mQ4nW7jL5hP3sD1fV9rT+ab/CDef=="`
 	out2, counts2 := Text(in2)
