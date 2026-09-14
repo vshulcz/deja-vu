@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a renamed one, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507, #3546)
 
 ### Fixed
+- The opencode reader tests the compaction flag by type instead of reading the value behind it: current opencode keeps an object of file diffs under the same key, which came to 247 MB of query output against 132 MB for the same 78,690 rows on a 3.4 GB store. (#3556)
 - `deja index` no longer stalls on a store holding long tool output. Rows from a SQLite-backed harness are built by `json_object` rather than by the sqlite3 shell's `-json` mode, which is quadratic in the characters it escapes: 4 MB of quote-heavy text took it 412s against 0.04s, and a 520 MB opencode store took over ten minutes where it now takes three seconds. (#3553)
 
 ### Changed

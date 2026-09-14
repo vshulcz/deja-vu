@@ -119,7 +119,18 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		// opencode's own digest of the turns it compacted away, marked on the
 		// message rather than the part. Indexed under RoleSummary: searchable,
 		// and not the agent talking (#3384).
-		`'summary',json_extract(m.data,'$.summary'),` +
+		//
+		// The type, not the value. Current opencode writes an object of file
+		// diffs under the same key — 5,018 of them on a 3.4 GB store, 107 MB
+		// summed over the rows this projection ships, and one value of 15.3 MB
+		// on another store. None of it can make a truthiness test pass, so all
+		// of it was read, piped and parsed to decide nothing (#3556). `true`
+		// and a non-zero integer still read as set; a text "1" or "true"
+		// survives the truncation, and longer text was never truthy.
+		`'summary',case json_type(m.data,'$.summary') ` +
+		`when 'true' then 1 ` +
+		`when 'integer' then json_extract(m.data,'$.summary') ` +
+		`when 'text' then substr(json_extract(m.data,'$.summary'),1,8) end,` +
 		`'path',json_extract(p.data,'$.state.input.filePath'),` +
 		`'cmd',json_extract(p.data,'$.state.input.command'),` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
