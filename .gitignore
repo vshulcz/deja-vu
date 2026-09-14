@@ -33,6 +33,7 @@ deja-stats.svg
 # them, seven packages with no line at all, and three lines for packages that no
 # longer existed — while the comment above it said one line per package.
 /blockcarry
+/commandgate
 /corpusprobe
 /day0bench
 /decisionbench
