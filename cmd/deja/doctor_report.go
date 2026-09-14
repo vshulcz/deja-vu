@@ -578,6 +578,14 @@ func parseDoctorHermes(path string) ([]model.Session, error) {
 
 func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	store := doctorStore{Name: check.name, State: "missing", Paths: check.paths, Files: len(check.files)}
+	// A store the reader has excluded is answered before anything is read. The
+	// row said `needs-sqlite3` or `needs-zstd` for a harness they may never
+	// want read, which names a package to install for a problem they do not
+	// have, and the exclude file had no way to say so (#3499).
+	if sources.HarnessExcluded(check.name) {
+		store.State = "excluded"
+		return store, time.Time{}
+	}
 	// A store with more than one root can be half-readable, and this loop
 	// returns on the first refusal — the walk below has said so since #816
 	// while this said the whole harness was denied (#3407).

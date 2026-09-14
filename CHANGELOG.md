@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- A store can be excluded, not just a project: a line prefixed `harness:` in `~/.config/deja/exclude`, or `DEJA_EXCLUDE_HARNESSES`. deja then neither walks it nor asks for the tool that would read it, and `deja doctor` reports it as `excluded` instead of naming a package to install — which is what it did for a harness the reader may never want read. (#3499)
 - `deja bench read`: what it costs to read a database-backed store, and what one long escape-heavy value does to it. Every other benchmark runs against an already-indexed corpus, which is how a reader that took 2,287s on a 6.16 MB value stayed invisible while all of them held flat. (#3552)
 - A store that is slow to read says which one it is and that it is still moving, every thirty seconds, and its read time lands on its line. A pass over a 520 MB store gave thirteen minutes of one static line and no way to tell a slow read from a stuck one; the slowest store on a 3.4 GB corpus reads in 10s, so nothing says anything on an ordinary run. (#3555)
 - `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a renamed one, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507, #3546)

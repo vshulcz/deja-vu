@@ -1032,8 +1032,15 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	reg := sources.Registry()
 	results := make([]loaded, len(reg))
 	var wg sync.WaitGroup
+	skipStore := sources.ExcludedHarnesses()
 	for i, hr := range reg {
 		if h != "" && h != hr.Name {
+			continue
+		}
+		// A store the reader has asked deja not to read is not walked at all.
+		// Without this the only way to stop `needs-sqlite3` advice for a
+		// harness they do not use was to install the package (#3499).
+		if skipStore[hr.Name] {
 			continue
 		}
 		wg.Add(1)
