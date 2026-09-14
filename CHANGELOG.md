@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a renamed one, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507, #3546)
 
 ### Changed
+- CI gates what an update costs, per class of change. `deja bench ingest` has reported it since #3507 and nothing in the build looked, which is the gap that let a path re-tokenise the whole store on every new session for two months and twenty releases (#3500). The gate is the shape rather than the clock: only a rewritten transcript may make the pass replace the records already on file, and every other class has to stay cheaper than that one. Verified by putting #3500's shape back — the check fails on it. (#3505)
 - `deja doctor --json` carries the auto-recall rows, not only the MCP ones: a script could see a missing sqlite3 and not a hook running a binary that is gone. (#3540)
 - An upgrade says why it is re-reading every source. Every other reason for a full pass names itself; a version difference printed the line a first install prints while doing the longest piece of work deja does on a large store. (#3500)
 - Index format version 41 applies the new redaction to text already stored. Redaction runs at ingest, so every earlier fix to it reached only the next conversation; a store re-reads its sources once. (#3535)
