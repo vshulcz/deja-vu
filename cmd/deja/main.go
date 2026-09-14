@@ -3168,6 +3168,18 @@ func printSources(dir string) {
 		}
 		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
+	// The two rows below are written by hand rather than driven by the table
+	// above, and the exclusion has to reach them too: the store #3499 named is
+	// one of them, and an excluded opencode kept being opened and kept printing
+	// the sqlite3 error the exclusion exists to silence.
+	excludedRow := func(name, location string) bool {
+		if !skipStore[name] {
+			return false
+		}
+		fmt.Printf("%s\t%s\texcluded — `harness:%s` is in %s\n",
+			name, location, name, sources.ExcludePath())
+		return true
+	}
 	aiderFiles := sources.AiderFiles()
 	var aiderSize int64
 	aiderRedactions := 0
@@ -3177,8 +3189,13 @@ func printSources(dir string) {
 		}
 		aiderRedactions += redactions[p]
 	}
-	rawAiderSessions := sources.LoadAider()
-	aiderSessions := sources.FilterSessions(rawAiderSessions)
+	aiderLocationForSkip := filepath.Join(sources.Home(), ".aider.chat.history.md")
+	skipAider := excludedRow("aider", aiderLocationForSkip)
+	var rawAiderSessions, aiderSessions []model.Session
+	if !skipAider {
+		rawAiderSessions = sources.LoadAider()
+		aiderSessions = sources.FilterSessions(rawAiderSessions)
+	}
 	aiderMessages := 0
 	for _, s := range aiderSessions {
 		aiderMessages += len(s.Messages)
@@ -3194,7 +3211,12 @@ func printSources(dir string) {
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
-	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	if !skipAider {
+		fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	}
+	if excludedRow("opencode", sources.OpencodeDB()) {
+		return
+	}
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
