@@ -11,10 +11,18 @@ import (
 )
 
 const (
-	// lockWait is how long a sync waits for another one to finish writing the
-	// list. The file is small and written once per exchange, so a wait this
-	// long only happens when something is wrong.
-	lockWait = 2 * time.Second
+	// lockWait bounds the wait for a lock nobody is going to release — a
+	// directory where the create keeps failing for a reason that is not
+	// contention, which is the only way past the staleness rule below. Past it
+	// the write runs unlocked, which is what deja did before locking existed.
+	//
+	// It used to be two seconds, and the write ran unlocked after them: on a
+	// box slow enough for sixteen writers not to drain in two seconds, that
+	// dropped two of them from the list — the lost update the lock exists to
+	// prevent (#3558). A lock held by a live writer is released in
+	// milliseconds and one left by a dead process goes stale in lockStale, so
+	// waiting past either of those buys nothing.
+	lockWait = lockStale + 5*time.Second
 	// lockStale is when a lock is treated as left behind by a process that
 	// died. Nothing holds this lock across a network call — it is taken around
 	// a read, an edit and a write of one small file.
@@ -84,7 +92,9 @@ func withLock(fn func() error) error {
 		if time.Now().After(deadline) {
 			// Better a write that races than a sync that refuses to record what
 			// it just did: the exchange has already happened by the time this
-			// runs.
+			// runs. Reached only when the lock file can be neither created nor
+			// taken over — a lock younger than lockStale is waited out above,
+			// and an older one is removed.
 			return fn()
 		}
 		time.Sleep(lockPoll)
