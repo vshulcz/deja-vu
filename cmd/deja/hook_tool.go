@@ -188,15 +188,21 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		requestWarmup(dir)
 		return nil
 	}
-	line := toolHookLine(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), input)
-	if line == "" {
-		return nil
-	}
 	// A PreToolUse hook fires on every action, so the same fact must not be
 	// re-injected turn after turn. Dedupe per agent session on the fact, the
 	// way hook-plan and hook-prompt dedupe what they inject.
+	//
+	// The walk is told what has already gone out rather than being filtered
+	// after the fact: it returns one line, and dropping that line used to end
+	// the call, so a repeated fact took the line behind it with it (#3603).
+	injected := alreadyInjected(dir, input.SessionID)
+	used := func(line string) bool { return injected["tool:"+shortHash(dedupeFact(line))] }
+	line := toolHookLineSkipping(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), input, used)
+	if line == "" {
+		return nil
+	}
 	token := "tool:" + shortHash(dedupeFact(line))
-	if alreadyInjected(dir, input.SessionID)[token] {
+	if injected[token] {
 		return nil
 	}
 	rememberInjectedIDs(dir, input.SessionID, token)
@@ -252,14 +258,22 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 // the tool that runs a command, and a file's history only before the file is
 // changed — Read, Glob and NotebookRead carry a file_path too, and a hook wired
 // with a wide matcher would otherwise fire on every one of them.
+// toolHookLine is the line for an action when nothing has been said yet.
 func toolHookLine(dir, cwd string, input toolHookInput) string {
+	return toolHookLineSkipping(dir, cwd, input, func(string) bool { return false })
+}
+
+// toolHookLineSkipping is the same choice, told which lines this agent session
+// has already been given, so a repeated fact yields to the next one rather than
+// ending the call (#3603).
+func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string) bool) string {
 	// The names are each harness's own. A harness that calls its shell
 	// run_terminal_command rather than Bash was matched by the wiring — grok
 	// maps the Claude names onto its own — and then dropped here, so the hook
 	// fired on every action it took and had nothing to say about any of them.
 	if isCommandTool(input.ToolName) {
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
-			return commandHookLine(dir, cwd, cmd)
+			return commandHookLineSkipping(dir, cwd, cmd, used)
 		}
 		return ""
 	}
@@ -376,7 +390,25 @@ func hookProjectIs(cwd, project string) bool {
 	return false
 }
 
+// commandHookLine is the line for a command when nothing has been said yet.
 func commandHookLine(dir, cwd, cmd string) string {
+	return commandHookLineSkipping(dir, cwd, cmd, func(string) bool { return false })
+}
+
+// commandHookLineSkipping is the same walk, told which lines the agent has
+// already been given this session.
+//
+// The producers are ordered by certainty and that order is right. What was
+// wrong is what happened when the first one repeated itself: the caller hashed
+// the single line it got back, found the fact already injected, and returned —
+// without ever asking the next producer. So one program that is missing, named
+// once, silenced the surface for every later command that mentioned it.
+//
+// Measured on a real store over the 91 command/project pairs its own history
+// says an agent runs: the missing-program sentence was the answer 51 times, 34
+// of those had a decision waiting behind it, and across one agent session the
+// hook said three lines in ninety-one actions (#3603).
+func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
 	// these are the top of the table (git status --short in 116 sessions), and
@@ -396,11 +428,27 @@ func commandHookLine(dir, cwd, cmd string) string {
 	// deja can say about a command that has not run yet, and the session-start
 	// block that says it is measurably not heard — nine of the ten sessions
 	// told about a missing command ran it anyway.
+	// Retried, but only among the cheap producers. Both of these are a sidecar
+	// lookup; the two below rank and then load whole sessions, and reaching
+	// them on every action costs 133 ms median against 21 ms — which would be
+	// every action, since the median session runs a command it has not run
+	// before 100% of the time. That is the 172 ms #3001 filed as the problem,
+	// so a walk that has already skipped something stops before paying it.
+	skipped := false
 	if line := missingProgramLine(dir, cmd); line != "" {
-		return line
+		if !used(line) {
+			return line
+		}
+		skipped = true
 	}
 	if line := commandFailureLine(dir, cwd, cmd); line != "" {
-		return line
+		if !used(line) {
+			return line
+		}
+		skipped = true
+	}
+	if skipped {
+		return ""
 	}
 	use, ok := index.CommandHistory(dir, cmd)
 	if !ok {
