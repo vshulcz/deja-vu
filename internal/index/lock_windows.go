@@ -25,6 +25,11 @@ var (
 
 func lockDir(dir string) (func(), error) {
 	lockPath := dir + ".lock"
+	// Before anything is created beside it: the swap would park a file at
+	// this path as <dir>.old and then delete it.
+	if err := checkIndexPath(dir); err != nil {
+		return nil, err
+	}
 	// Tighten pre-existing indexes created before the 0700 default.
 	_ = os.Chmod(dir, 0o700)
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
@@ -88,6 +93,11 @@ func unlockFileEx(h syscall.Handle, reserved, low, high uint32, ol *syscall.Over
 // LOCKFILE_FAIL_IMMEDIATELY.
 func tryLockDir(dir string) (func(), bool, error) {
 	lockPath := dir + ".lock"
+	// Same refusal as lockDir: a reader that decides to build would delete a
+	// file somebody had at this path.
+	if err := checkIndexPath(dir); err != nil {
+		return nil, false, err
+	}
 	_ = os.Chmod(dir, 0o700)
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
 		if errors.Is(err, fs.ErrPermission) {

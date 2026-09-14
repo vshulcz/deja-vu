@@ -218,49 +218,34 @@ func doctorHooks(w io.Writer) {
 	// the most to check.
 	defer doctorAutoRecall(w)
 	defer doctorCodexHook(w)
-	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
-	b, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", reportPath(path))
+	st := claudeHookWiringState()
+	if st.absent {
+		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", reportPath(st.path))
 		return
 	}
-	var root map[string]any
-	if json.Unmarshal(b, &root) != nil {
-		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", reportPath(path))
+	if st.state == "unreadable" {
+		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", reportPath(st.path))
 		return
 	}
-	hooks, _ := root["hooks"].(map[string]any)
-	var missing []string
-	for _, h := range claudeHookWiring {
-		if !hookEventWired(hooks, h.Event, h.Sub) {
-			missing = append(missing, h.Event)
-		}
-	}
-	status := "wired"
-	if len(missing) == len(claudeHookWiring) {
-		status = "missing"
-	} else if len(missing) > 0 {
-		status = "out of date"
-	}
-	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", status, reportPath(path))
-	if len(missing) > 0 && len(missing) < len(claudeHookWiring) {
+	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", st.state, reportPath(st.path))
+	if len(st.missing) > 0 && len(st.missing) < len(claudeHookWiring) {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
 		// lacks everything added since.
 		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
-			len(claudeHookWiring)-len(missing), len(claudeHookWiring), strings.Join(missing, ", "))
+			len(claudeHookWiring)-len(st.missing), len(claudeHookWiring), strings.Join(st.missing, ", "))
 	}
-	if note := doctorHookRepeats(hooks, claudeHookWiring, "claude-auto"); note != "" {
+	if note := doctorHookRepeats(st.hooks, claudeHookWiring, "claude-auto"); note != "" {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
 	// Only when something here is actually wired: the note is about the binary
 	// those entries name, and a file with no deja in it names none.
-	if note := hookExeNote(path, "claude-auto"); note != "" && len(missing) < len(claudeHookWiring) {
+	if note := hookExeNote(st.path, "claude-auto"); note != "" && len(st.missing) < len(claudeHookWiring) {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
 	// The entries name the launcher now, and the launcher is always there —
 	// what can be gone is everything it resolves to (#3422).
-	if note := doctorLauncherNote(path, "claude-auto"); note != "" {
+	if note := doctorLauncherNote(st.path, "claude-auto"); note != "" {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
 }
@@ -288,12 +273,13 @@ func doctorWiringExe(w io.Writer) {
 // hooks behind its own trust store: hooks.json can be perfectly wired while
 // codex keeps the hook disabled — memory then silently never arrives.
 func doctorCodexHook(w io.Writer) {
-	hooksPath := filepath.Join(sources.CodexHome(), "hooks.json")
-	if _, err := os.Stat(hooksPath); err != nil {
+	st := codexHookWiringState()
+	hooksPath, status, missing, hooks := st.path, st.state, st.missing, st.hooks
+	if st.absent {
 		// The plugin ships the same hooks under its own root, and codex trusts
 		// those the same way. Nothing was installed here, and nothing is
 		// missing either.
-		if codexPluginInstalled() {
+		if status == "plugin" {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (the Codex plugin carries the hooks; codex asks once to trust them)\n",
 				"codex-hook", "plugin", hooksPath)
 			return
@@ -301,49 +287,10 @@ func doctorCodexHook(w io.Writer) {
 		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", reportPath(hooksPath))
 		return
 	}
-	cfgPath := filepath.Join(sources.CodexHome(), "config.toml")
-	cfg, err := os.ReadFile(cfgPath)
-	if err != nil {
-		// Codex's trust store is its config. Without it there is nothing to
-		// read, and guessing either way is worse than saying so.
+	if st.trustUnknown {
 		fmt.Fprintf(w, "  %-12s %-11s %s  (cannot read %s, so whether codex trusts the hook is unknown)\n",
-			"codex-hook", "wired", hooksPath, cfgPath)
+			"codex-hook", "wired", hooksPath, filepath.Join(sources.CodexHome(), "config.toml"))
 		return
-	}
-	// Untrusted until the config says otherwise. An entry that codex has never
-	// been shown is the state where it silently runs nothing: measured on codex
-	// 0.142.4, a home with hooks.json and no trust entry produced no hook at
-	// all under `codex exec`, and the same run with
-	// --dangerously-bypass-hook-trust ran it. That state used to read "wired".
-	status := "untrusted"
-	if section := codexHookTrustSection(string(cfg)); section != "" {
-		off, on := strings.Index(section, "enabled = false"), strings.Index(section, "enabled = true")
-		switch {
-		case off >= 0 && (on == -1 || on > off):
-			status = "disabled"
-		case strings.Contains(section, "trusted_hash = \"sha256:"):
-			status = "wired"
-		}
-	}
-	// Trusted is not the same as complete: the entry codex approved may be one
-	// written before the other events existed.
-	var hooks map[string]any
-	if b, rerr := os.ReadFile(hooksPath); rerr == nil {
-		var root map[string]any
-		if json.Unmarshal(b, &root) == nil {
-			hooks, _ = root["hooks"].(map[string]any)
-		}
-	}
-	var missing []string
-	if status == "wired" {
-		for _, h := range codexHookWiring {
-			if !hookEventWired(hooks, h.Event, h.Sub) {
-				missing = append(missing, h.Event)
-			}
-		}
-		if len(missing) > 0 {
-			status = "out of date"
-		}
 	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
 	if len(missing) > 0 {
@@ -1613,7 +1560,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
-	if idx.State == "missing" {
+	if idx.State == "missing" || idx.State == "path-is-a-file" {
 		// A build already running is not a missing index, and "run `deja
 		// warmup`" tells the reader to start what is under way — doctor is
 		// the command people run when memory looks absent, so this is the
@@ -1628,6 +1575,13 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// (#925).
 		if warmupJustRequested(dir) {
 			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online when it finishes")
+			return
+		}
+		// A file where the directory belongs: a build refuses rather than
+		// deleting it, so "run `deja warmup`" would send the reader to a
+		// command that will not run either (#3610).
+		if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+			fmt.Fprintf(w, "  status   not built — %s is a file, not a directory; move it aside, or point DEJA_INDEX_DIR at a directory\n", reportPath(dir))
 			return
 		}
 		// An index whose disk was unplugged is not a missing index, and

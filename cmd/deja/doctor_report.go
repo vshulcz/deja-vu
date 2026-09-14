@@ -727,6 +727,12 @@ func newestDoctorFile(files []string) (string, time.Time) {
 func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 	result := doctorIndexReport{State: "missing", Path: dir}
 	if !index.HasManifest(dir) {
+		// A file where the directory belongs reads as "never built" on both
+		// surfaces, and the fix is not the one `missing` implies: a build
+		// refuses to run here rather than deleting what is there (#3610).
+		if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+			result.State = "path-is-a-file"
+		}
 		return result
 	}
 	result.State = "ok"
@@ -781,7 +787,14 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 // whether an install is live.
 func collectDoctorAutoRecall() []doctorAutoStatus {
 	wirings := autoWirings()
-	out := make([]doctorAutoStatus, 0, len(wirings))
+	out := make([]doctorAutoStatus, 0, len(wirings)+2)
+	// Claude Code and codex predate the table and print their own text lines,
+	// and so were the two rows this section did not have — the harness most
+	// people run, missing from the machine-readable half of the one report that
+	// says whether a hook still works (#3502, #3510).
+	for _, st := range []hookWiringState{claudeHookWiringState(), codexHookWiringState()} {
+		out = append(out, doctorAutoStatus{Name: st.name, State: st.state, Path: st.path, BinaryMissing: st.dead})
+	}
 	for _, a := range wirings {
 		state, dead := autoWiringState(a)
 		out = append(out, doctorAutoStatus{Name: a.name, State: state, Path: a.path(), BinaryMissing: dead})

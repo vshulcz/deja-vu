@@ -356,6 +356,16 @@
   ],
   "auto_recall": [
     {
+      "name": "claude-code",
+      "state": "missing",
+      "path": "<tmp>/home/.claude/settings.json"
+    },
+    {
+      "name": "codex-hook",
+      "state": "missing",
+      "path": "<tmp>/home/.codex/hooks.json"
+    },
+    {
       "name": "opencode",
       "state": "missing",
       "path": "<tmp>/home/.config/opencode/plugins/deja.js"

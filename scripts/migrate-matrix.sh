@@ -49,11 +49,16 @@ esac
 
 fetch() { # version -> prints a path, or nothing
 	v=$1
-	bin="$cache/deja-$v"
+	# One directory per release and the file called deja, because an install
+	# writes the path it was run from into the config: named deja-v0.19.4, the
+	# check that reads a hook for a binary that is gone skips it, and the
+	# dead-hook column read healthy for every release that writes a path.
+	bin="$cache/$v/deja"
 	if [ -x "$bin" ]; then
 		echo "$bin"
 		return
 	fi
+	mkdir -p "$cache/$v"
 	tmp=$(mktemp -d)
 	if (cd "$tmp" && gh release download "$v" --repo vshulcz/deja-vu \
 		--pattern "deja-vu_*_${os}_${arch}.tar.gz" >/dev/null 2>&1) &&
@@ -86,7 +91,28 @@ print(",".join(ids) or "none")
 }
 
 rows=$(mktemp)
-printf '%-9s %-12s %-13s %-26s %s\n' version built-with after-upgrade upgrade-said deleted-transcript
+# wiring_state is what this build says about the claude-code auto-recall entry:
+# wired, stale, missing, or dead when the entry names a binary that is gone. The
+# suite has a test for the wiring deja writes today and none for the one a user
+# already has, which is how every hook being dead after an upgrade reported as
+# healthy (#3502, #3505).
+wiring_state() { # binary
+	"$1" doctor --json --offline 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    print("unreadable"); raise SystemExit
+for row in d.get("auto_recall", []):
+    if row.get("name") != "claude-code":
+        continue
+    print("dead" if row.get("binary_missing") else row.get("state", "?"))
+    raise SystemExit
+print("absent")
+'
+}
+
+printf '%-9s %-12s %-13s %-26s %-19s %-11s %s\n' version built-with after-upgrade upgrade-said deleted-transcript old-wiring dead-hook
 # The list is a space-separated string on purpose, so it can be overridden from
 # the environment; splitting it is the point.
 # shellcheck disable=SC2086
@@ -124,11 +150,34 @@ JSON
 	# (#2970) drops the session on its own pass, so there is nothing for the
 	# upgrade to carry and nothing for it to report.
 	held=$(exact "$old" alpha2)
+	# The config shape this release wrote, read by the build under test. The
+	# -auto target is the one that writes hooks; the plain one writes the MCP
+	# entry, which is a different file and a different row.
+	"$old" install claude-auto --no-index >/dev/null 2>&1
 	said=$("$new" index 2>&1 | grep -oE "re-reading your sources|cannot read those records|index is up to date" | paste -sd+ -)
 	after=$(exact "$new" alpha3)
 	kept=$(exact "$new" alpha2)
-	printf '%-9s %-12s %-13s %-26s %s\n' "$v" "$built" "$after" "${said:-(nothing)}" "$kept"
-	printf '%s\t%s\t%s\t%s\t%s\n' "$v" "$after" "${said:-(nothing)}" "$kept" "$held" >>"$rows"
+	wiring=$(wiring_state "$new")
+	# And the same config once what its entries name is gone — a versioned
+	# install directory an upgrade replaced. Silence here is the bug: every
+	# hook exits 127 and nothing but this row says so (#3502).
+	#
+	# Both files, because which one the entries name depends on the release:
+	# before #3422 an install wrote the binary's own path, after it the
+	# launcher. PATH is emptied for the read so a deja installed on the machine
+	# running this cannot answer for the one that was taken away.
+	launcher=$XDG_CONFIG_HOME/deja/bin/deja-hook
+	mv "$old" "$old.gone"
+	if [ -e "$launcher" ]; then
+		mv "$launcher" "$launcher.gone"
+	fi
+	dead=$(PATH=/usr/bin:/bin DEJA_BIN='' wiring_state "$new")
+	mv "$old.gone" "$old"
+	if [ -e "$launcher.gone" ]; then
+		mv "$launcher.gone" "$launcher"
+	fi
+	printf '%-9s %-12s %-13s %-26s %-19s %-11s %s\n' "$v" "$built" "$after" "${said:-(nothing)}" "$kept" "$wiring" "$dead"
+	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$v" "$after" "${said:-(nothing)}" "$kept" "$held" "$wiring" "$dead" >>"$rows"
 	rm -rf "$home"
 done
 
@@ -162,7 +211,16 @@ if not rows:
     raise SystemExit(1)
 
 bad = []
-for version, after, said, kept, held in rows:
+for version, after, said, kept, held, wiring, dead in rows:
+    # An older config shape has to read as wiring, not as nothing: a shape this
+    # build cannot parse reports the same way an uninstalled machine does, and
+    # the reader is then told to install what they already have.
+    if wiring in ("missing", "absent", "unreadable", "?"):
+        bad.append(f"{version}: the wiring this release wrote reads as {wiring!r} to this build")
+    # And once the binary that entry names is gone, it has to say so. Every
+    # hook exits 127 in that state and nothing else reports it (#3502).
+    if dead != "dead":
+        bad.append(f"{version}: the entry named a binary that is gone and this build called it {dead!r}")
     if after in ("none", "-", ""):
         bad.append(f"{version}: the store stopped answering after the upgrade")
     lost = kept in ("none", "-", "")

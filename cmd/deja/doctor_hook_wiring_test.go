@@ -19,6 +19,14 @@ func writeClaudeSettings(t *testing.T, events ...string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeClaudeSettingsNaming(t, exe, events...)
+}
+
+// writeClaudeSettingsNaming is the same fixture with the binary named, for the
+// state an upgrade leaves behind: entries that are perfectly wired and run a
+// deja that is no longer on disk.
+func writeClaudeSettingsNaming(t *testing.T, exe string, events ...string) {
+	t.Helper()
 	var entries []string
 	for _, e := range events {
 		// The path goes in as JSON writes it: a Windows exe carries

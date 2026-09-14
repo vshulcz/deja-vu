@@ -371,8 +371,15 @@ func TestMainHelpersFallbackAndSourcesBranches(t *testing.T) {
 	if got := pathSize(dir); got != 3 {
 		t.Fatalf("symlink pathSize = %d", got)
 	}
-	if out, err := captureRun(t, "warmup"); err != nil || out != "" {
+	// A file where the index directory belongs is refused rather than deleted
+	// (#3610), and warmup is where someone asks for the build — so it says so
+	// instead of exiting quietly on a path no build can use.
+	out, err := captureRun(t, "warmup")
+	if err == nil || !strings.Contains(err.Error(), "is a file, not a directory") {
 		t.Fatalf("warmup with bad index out=%q err=%v", out, err)
+	}
+	if out != "" {
+		t.Fatalf("warmup with bad index printed %q", out)
 	}
 }
 
