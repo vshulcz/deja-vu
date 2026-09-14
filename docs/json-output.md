@@ -428,8 +428,10 @@ endpoint. `index.path` points at the index
 directory; `index.db` is that directory's name, not a file. `index.state` is
 `missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
 written, so `deja index` cannot fix it), `damaged` (records or postings are
-gone; the next search rebuilds it) or `rereading` (the store is readable but
-answers nothing until the sources are re-read). An index that is not what this
+gone; the next search rebuilds it), `rereading` (the store is readable but
+answers nothing until the sources are re-read) or `path-is-a-file` (a regular
+file sits where the directory belongs, so no build will run there — deja
+refuses rather than deleting it). An index that is not what this
 build writes also carries `index.format`: `unreadable` (a layout this build
 cannot read), `withheld` (text written before deja learned to mask something it
 now masks), `older-rules` (readable, answering, re-deriving behind the answer)

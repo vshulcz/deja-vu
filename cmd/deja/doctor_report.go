@@ -719,6 +719,12 @@ func newestDoctorFile(files []string) (string, time.Time) {
 func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 	result := doctorIndexReport{State: "missing", Path: dir}
 	if !index.HasManifest(dir) {
+		// A file where the directory belongs reads as "never built" on both
+		// surfaces, and the fix is not the one `missing` implies: a build
+		// refuses to run here rather than deleting what is there (#3610).
+		if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+			result.State = "path-is-a-file"
+		}
 		return result
 	}
 	result.State = "ok"

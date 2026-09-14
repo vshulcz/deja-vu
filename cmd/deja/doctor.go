@@ -1552,7 +1552,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	// A precise non-claim: users deciding what to trust deserve to read the
 	// boundary in the tool itself, not only in the security docs.
 	fmt.Fprintln(w, "  security plaintext on disk — protected by file permissions only, no encryption or access control")
-	if idx.State == "missing" {
+	if idx.State == "missing" || idx.State == "path-is-a-file" {
 		// A build already running is not a missing index, and "run `deja
 		// warmup`" tells the reader to start what is under way — doctor is
 		// the command people run when memory looks absent, so this is the
@@ -1567,6 +1567,13 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// (#925).
 		if warmupJustRequested(dir) {
 			fmt.Fprintln(w, "  status   building now — started moments ago, recall comes online when it finishes")
+			return
+		}
+		// A file where the directory belongs: a build refuses rather than
+		// deleting it, so "run `deja warmup`" would send the reader to a
+		// command that will not run either (#3610).
+		if fi, err := os.Stat(dir); err == nil && !fi.IsDir() {
+			fmt.Fprintf(w, "  status   not built — %s is a file, not a directory; move it aside, or point DEJA_INDEX_DIR at a directory\n", reportPath(dir))
 			return
 		}
 		// An index whose disk was unplugged is not a missing index, and
