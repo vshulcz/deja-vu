@@ -20,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -1911,9 +1912,49 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), Settled: sessionSettled(s),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
 		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
+}
+
+// sessionSettled is what this session concluded, taken from its tail.
+//
+// The same extraction the point-of-action hook used to do per action, moved to
+// where the session is already in hand. Measured on a real store: doing it at
+// the moment of the action cost 133 ms a call against 21 ms when the hook said
+// nothing, because it had to rank candidates and then load whole sessions to
+// ask which had run the command — and almost every action asks about a command
+// the session has not run before, so nothing was ever warm (#3001, #3605).
+//
+// The tail and the budget are the hook's own, so the text is the text it would
+// have produced. Empty when the session settled nothing, which is the same
+// answer the hook gave then.
+func sessionSettled(s model.Session) string {
+	const tail, budget = 150, 200
+	// Only a session that ran a command can ever be asked: the command table
+	// names the session, and nothing else reads this field. Extracting for the
+	// rest cost 21s of a 51s rebuild on a 2.0 GB corpus for an answer no caller
+	// could reach.
+	ran := false
+	for _, m := range s.Messages {
+		if m.Role == roleCommand {
+			ran = true
+			break
+		}
+	}
+	if !ran {
+		return ""
+	}
+	if len(s.Messages) > tail {
+		cp := s
+		cp.Messages = s.Messages[len(s.Messages)-tail:]
+		s = cp
+	}
+	cs := digest.Conclusions(s, budget, 1)
+	if len(cs) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(cs[0])
 }
 
 // extendDerived folds messages appended to an already-indexed session into the
