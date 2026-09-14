@@ -63,8 +63,8 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows.
-	q := `select json_object('id',s.id,'cwd',s.cwd_last,'title',s.title,` +
-		`'role',m.role,'body',m.message_json,'at',m.created_at) ` +
+	q := `select json_object('id',cast(s.id as text),'cwd',cast(s.cwd_last as text),'title',cast(s.title as text),` +
+		`'role',cast(m.role as text),'body',cast(m.message_json as text),'at',cast(m.created_at as text)) ` +
 		`from sessions s join messages m on m.session_id=s.id` +
 		` where m.role in ('user','assistant')` + where +
 		` order by s.id,m.seq`

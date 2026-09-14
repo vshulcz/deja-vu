@@ -360,9 +360,9 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	// json_object, one object per row, rather than the sqlite3 shell's -json
 	// formatter: that one is quadratic in the number of characters it escapes,
 	// and a message blob is mostly quotes and backslashes. See opencode.go.
-	q := `select json_object('id',s.id,'working_dir',s.working_dir,` +
-		`'description',s.description,'created_at',s.created_at,'updated_at',s.updated_at,` +
-		`'role',m.role,'content_json',m.content_json,` +
+	q := `select json_object('id',cast(s.id as text),'working_dir',cast(s.working_dir as text),` +
+		`'description',cast(s.description as text),'created_at',s.created_at,'updated_at',s.updated_at,` +
+		`'role',cast(m.role as text),'content_json',cast(m.content_json as text),` +
 		`'created_timestamp',m.created_timestamp) ` +
 		`from sessions s join messages m on m.session_id=s.id ` +
 		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +

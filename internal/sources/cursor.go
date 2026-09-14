@@ -196,7 +196,7 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	// stamp skipped every turn written after it — and the next pass, carrying a
 	// later watermark, excluded the bubble on its own stamp too, which loses
 	// the turn for good (#2159).
-	bubbles, err := cursorQuery(db, `select json_object('key',key,`+
+	bubbles, err := cursorQuery(db, `select json_object('key',cast(key as text),`+
 		`'type',json_extract(value,'$.type'),`+
 		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),`+
 		`'ts',json_extract(value,'$.timestamp'),`+
@@ -222,7 +222,7 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 				" or key in (" + keys + "))"
 		}
 	}
-	composers, err := cursorQuery(db, `select json_object('key',key,`+
+	composers, err := cursorQuery(db, `select json_object('key',cast(key as text),`+
 		`'cid',json_extract(value,'$.composerId'),`+
 		`'name',json_extract(value,'$.name'),`+
 		`'created',json_extract(value,'$.createdAt'),`+

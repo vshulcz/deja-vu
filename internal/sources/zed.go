@@ -134,10 +134,12 @@ func ParseZedDB(db string) ([]model.Session, error) {
 const (
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows.
-	zedFullCols = `json_object('id',id,'summary',summary,'updated_at',updated_at,` +
-		`'created_at',created_at,'folder_paths',folder_paths,'data_type',data_type,'data',hex(data))`
-	zedBaseCols = `json_object('id',id,'summary',summary,'updated_at',updated_at,` +
-		`'created_at',null,'folder_paths',null,'data_type',data_type,'data',hex(data))`
+	zedFullCols = `json_object('id',cast(id as text),'summary',cast(summary as text),` +
+		`'updated_at',cast(updated_at as text),'created_at',cast(created_at as text),` +
+		`'folder_paths',cast(folder_paths as text),'data_type',cast(data_type as text),'data',hex(data))`
+	zedBaseCols = `json_object('id',cast(id as text),'summary',cast(summary as text),` +
+		`'updated_at',cast(updated_at as text),'created_at',null,'folder_paths',null,` +
+		`'data_type',cast(data_type as text),'data',hex(data))`
 )
 
 type zedRow struct {

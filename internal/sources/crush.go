@@ -126,9 +126,9 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. A parts column is stored JSON.
-	q := "select json_object('session_id',s.id,'title',s.title," +
-		"'parent_session_id',coalesce(s.parent_session_id,''),'updated_at',s.updated_at," +
-		"'id',m.id,'role',m.role,'parts',m.parts,'created_at',m.created_at) " +
+	q := "select json_object('session_id',cast(s.id as text),'title',cast(s.title as text)," +
+		"'parent_session_id',cast(coalesce(s.parent_session_id,'') as text),'updated_at',s.updated_at," +
+		"'id',cast(m.id as text),'role',cast(m.role as text),'parts',cast(m.parts as text),'created_at',m.created_at) " +
 		"from sessions s join messages m on m.session_id = s.id" + where + " order by s.id, m.created_at"
 	rows, err := crushRows(db, q)
 	if err != nil {

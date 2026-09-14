@@ -72,7 +72,7 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. An event_json is nothing but quotes
 	// and backslashes.
-	q := `select json_object('session_id',e.session_id,'event_json',e.event_json) ` +
+	q := `select json_object('session_id',cast(e.session_id as text),'event_json',cast(e.event_json as text)) ` +
 		`from transcript_events e` + where + ` order by e.session_id, e.seq`
 	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
 	// Rows stream through the decoder rather than landing in one buffer: a

@@ -119,8 +119,8 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	// content is null for tool-call rows; those carry no prose worth indexing.
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows.
-	q := `select json_object('session_id',session_id,'role',role,` +
-		`'content',content,'timestamp',timestamp) from messages ` +
+	q := `select json_object('session_id',cast(session_id as text),'role',cast(role as text),` +
+		`'content',cast(content as text),'timestamp',timestamp) from messages ` +
 		`where role in ('user','assistant') and content is not null and content <> ''` + where +
 		` order by session_id,timestamp,id`
 	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)

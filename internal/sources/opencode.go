@@ -100,7 +100,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	// sqlite3 shell's -json mode, which is quadratic in what it escapes and
 	// turned tool output into a hang — see sqliteRows.
 	q := `select json_object(` +
-		`'id',s.id,'directory',s.directory,` +
+		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
 		`'role',json_extract(m.data,'$.role'),` +
 		`'text',json_extract(p.data,'$.text'),` +
