@@ -196,11 +196,11 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	// stamp skipped every turn written after it — and the next pass, carrying a
 	// later watermark, excluded the bubble on its own stamp too, which loses
 	// the turn for good (#2159).
-	bubbles, err := cursorQuery(db, `select key,`+
-		`json_extract(value,'$.type') as type,`+
-		`coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')) as text,`+
-		`json_extract(value,'$.timestamp') as ts,`+
-		`json_extract(value,'$.workspaceProjectDir') as wsdir `+
+	bubbles, err := cursorQuery(db, `select json_object('key',key,`+
+		`'type',json_extract(value,'$.type'),`+
+		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),`+
+		`'ts',json_extract(value,'$.timestamp'),`+
+		`'wsdir',json_extract(value,'$.workspaceProjectDir')) `+
 		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`+bubbleWhere)
 	if err != nil {
 		return nil, err
@@ -222,11 +222,11 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 				" or key in (" + keys + "))"
 		}
 	}
-	composers, err := cursorQuery(db, `select key,`+
-		`json_extract(value,'$.composerId') as cid,`+
-		`json_extract(value,'$.name') as name,`+
-		`json_extract(value,'$.createdAt') as created,`+
-		`json_extract(value,'$.lastUpdatedAt') as updated `+
+	composers, err := cursorQuery(db, `select json_object('key',key,`+
+		`'cid',json_extract(value,'$.composerId'),`+
+		`'name',json_extract(value,'$.name'),`+
+		`'created',json_extract(value,'$.createdAt'),`+
+		`'updated',json_extract(value,'$.lastUpdatedAt')) `+
 		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`+composerWhere)
 	if err != nil {
 		return nil, err
@@ -284,7 +284,9 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 }
 
 func cursorQuery(db, q string) ([]map[string]any, error) {
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows. A bubble's text is a chat turn.
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
 	b, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("cursor sqlite: %w", err)
@@ -295,8 +297,12 @@ func cursorQuery(db, q string) ([]map[string]any, error) {
 	var rows []map[string]any
 	dec := json.NewDecoder(strings.NewReader(string(b)))
 	dec.UseNumber()
-	if err := dec.Decode(&rows); err != nil {
-		return nil, err
+	for dec.More() {
+		var r map[string]any
+		if err := dec.Decode(&r); err != nil {
+			return nil, err
+		}
+		rows = append(rows, r)
 	}
 	return rows, nil
 }

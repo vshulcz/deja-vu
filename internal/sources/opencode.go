@@ -96,41 +96,46 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 	// Narrow projection: shipping full m.data/p.data JSON blobs through the
 	// sqlite3 pipe on multi-GB stores takes minutes; extracting just the
 	// needed scalars keeps the dump to tens of MB and seconds.
-	q := `select s.id,s.directory,s.time_created,s.time_updated,` +
-		`json_extract(m.data,'$.role') as role,` +
-		`json_extract(p.data,'$.text') as text,` +
+	// The row is assembled by SQLite's own json_object rather than by the
+	// sqlite3 shell's -json mode, which is quadratic in what it escapes and
+	// turned tool output into a hang — see sqliteRows.
+	q := `select json_object(` +
+		`'id',s.id,'directory',s.directory,` +
+		`'time_created',s.time_created,'time_updated',s.time_updated,` +
+		`'role',json_extract(m.data,'$.role'),` +
+		`'text',json_extract(p.data,'$.text'),` +
 		// The text opencode wrote itself under the user role — "Continue if
 		// you have next steps…", "The following tool was executed by the
 		// user" — carries this flag; 338 of them indexed as the person's words
 		// on one store (#3299).
-		`json_extract(p.data,'$.synthetic') as synthetic,` +
+		`'synthetic',json_extract(p.data,'$.synthetic'),` +
 		// A part opencode does not feed to the model at all. A compression
 		// plugin's status line carries it — `▣ DCP | -100.3K removed, +9K
 		// summary — Compression #1` — and those are filed under the user role,
 		// so 376 of them on one store were indexed as the person's words. The
 		// flag is exact there: every ignored part on that store is one of these
 		// banners, and none of the 4,420 real user parts carries it (#3515).
-		`json_extract(p.data,'$.ignored') as ignored,` +
+		`'ignored',json_extract(p.data,'$.ignored'),` +
 		// opencode's own digest of the turns it compacted away, marked on the
 		// message rather than the part. Indexed under RoleSummary: searchable,
 		// and not the agent talking (#3384).
-		`json_extract(m.data,'$.summary') as summary,` +
-		`json_extract(p.data,'$.state.input.filePath') as path,` +
-		`json_extract(p.data,'$.state.input.command') as cmd,` +
-		`json_extract(p.data,'$.state.input.patchText') as patch,` +
+		`'summary',json_extract(m.data,'$.summary'),` +
+		`'path',json_extract(p.data,'$.state.input.filePath'),` +
+		`'cmd',json_extract(p.data,'$.state.input.command'),` +
+		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
 		// The output of a bash call and its exit status. Only bash: `read`
 		// output is 119 MB of file contents on this store against 49 MB of
 		// command output, and #547 measured file bodies as the weakest slice
 		// deja could index. What a command printed is where the errors live.
-		`case when json_extract(p.data,'$.tool')='bash' ` +
-		`then json_extract(p.data,'$.state.output') end as out,` +
-		`json_extract(p.data,'$.state.metadata.exit') as exit,` +
-		`json_extract(p.data,'$.time.start') as pt,` +
-		`json_extract(m.data,'$.time.created') as mt,` +
+		`'out',case when json_extract(p.data,'$.tool')='bash' ` +
+		`then json_extract(p.data,'$.state.output') end,` +
+		`'exit',json_extract(p.data,'$.state.metadata.exit'),` +
+		`'pt',json_extract(p.data,'$.time.start'),` +
+		`'mt',json_extract(m.data,'$.time.created'),` +
 		// The row's own column, which is what the since clause filters on. A
 		// store that fills it and leaves the blob's time out handed back
 		// messages dated to the year zero (#2086).
-		`m.time_created as mc ` +
+		`'mc',m.time_created) ` +
 		`from session s join message m on m.session_id=s.id join part p on p.message_id=m.id ` +
 		// The type test is written twice on purpose. json_extract on its own
 		// parses every blob in the table — parts average ~12 KB and are mostly
@@ -157,49 +162,25 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
 	// What sqlite3 says when it refuses, not merely that it did. "exit status
 	// 1" is what a person was asked to report, and it names neither a renamed
 	// column nor a locked database nor a file that is not a database (#1642).
 	var whyNot bytes.Buffer
 	cmd.Stderr = &whyNot
-	stdout, err := cmd.StdoutPipe()
+	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(stdout)
-	dec.UseNumber()
-	tok, err := dec.Token()
-	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// No stdout means two very different things: a query that matched
-			// nothing, or one sqlite3 refused to run because the harness
-			// changed its schema. Reporting the second as "no sessions" makes
-			// a whole harness disappear from recall while doctor still calls
-			// the store healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
-					withStderr(waitErr, &whyNot))
-			}
-			return nil, nil
-		}
-		return nil, err
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("bad sqlite json")
 	}
 	by := map[string]*model.Session{}
+	rows := 0
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
 			_ = cmd.Wait()
-			return nil, err
+			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
+		rows++
 		id, _ := r["id"].(string)
 		if id == "" {
 			continue
@@ -284,12 +265,24 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 	}
-	if _, err := dec.Token(); err != nil {
+	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
 		return nil, err
 	}
 	if err := cmd.Wait(); err != nil {
+		if rows == 0 {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
+				withStderr(err, &whyNot))
+		}
 		return nil, err
+	}
+	if rows == 0 {
+		return nil, nil
 	}
 	var out []model.Session
 	for _, s := range by {
@@ -326,17 +319,18 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 // have one. The column arrived with subagents; a query that fails is a store
 // without it, and nothing is stamped.
 func opencodeParents(db string) map[string]string {
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
-		`select id, parent_id from session where parent_id is not null and parent_id <> ''`)
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
+		`select json_object('id',id,'parent_id',parent_id) from session `+
+			`where parent_id is not null and parent_id <> ''`)
 	b, err := cmd.Output()
 	if err != nil || len(b) == 0 {
 		return nil
 	}
-	var rows []struct {
+	rows, err := sqliteObjects[struct {
 		ID     string `json:"id"`
 		Parent string `json:"parent_id"`
-	}
-	if json.Unmarshal(b, &rows) != nil {
+	}](b)
+	if err != nil {
 		return nil
 	}
 	m := make(map[string]string, len(rows))
@@ -438,17 +432,18 @@ func opencodeSynthetic(v any) bool {
 // opencodeTitles maps a session id to the name opencode gave it, for the names
 // worth having. A store without the column stamps nothing.
 func opencodeTitles(db string) map[string]string {
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000",
-		`select id, title from session where title is not null and title <> ''`)
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
+		`select json_object('id',id,'title',title) from session `+
+			`where title is not null and title <> ''`)
 	b, err := cmd.Output()
 	if err != nil || len(b) == 0 {
 		return nil
 	}
-	var rows []struct {
+	rows, err := sqliteObjects[struct {
 		ID    string `json:"id"`
 		Title string `json:"title"`
-	}
-	if json.Unmarshal(b, &rows) != nil {
+	}](b)
+	if err != nil {
 		return nil
 	}
 	out := make(map[string]string, len(rows))

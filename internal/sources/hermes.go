@@ -117,38 +117,16 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		return nil, nil
 	}
 	// content is null for tool-call rows; those carry no prose worth indexing.
-	q := `select session_id,role,content,timestamp from messages ` +
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows.
+	q := `select json_object('session_id',session_id,'role',role,` +
+		`'content',content,'timestamp',timestamp) from messages ` +
 		`where role in ('user','assistant') and content is not null and content <> ''` + where +
 		` order by session_id,timestamp,id`
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	stdout, err := cmd.StdoutPipe()
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(stdout)
-	dec.UseNumber()
-	tok, err := dec.Token()
-	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// No stdout means two very different things: a query that matched
-			// nothing, or one sqlite3 refused to run because the harness
-			// changed its schema. Reporting the second as "no sessions" makes
-			// a whole harness disappear from recall while doctor still calls
-			// the store healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("hermes: query failed, the store schema may have changed: %w", waitErr)
-			}
-			return nil, nil
-		}
-		return nil, err
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("bad sqlite json")
 	}
 	out, err := decodeHermesArray(dec, hermesProfile(db), db)
 	if err != nil {
@@ -156,6 +134,14 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		return nil, err
 	}
 	if err := cmd.Wait(); err != nil {
+		if len(out) == 0 {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			return nil, fmt.Errorf("hermes: query failed, the store schema may have changed: %w", err)
+		}
 		return nil, err
 	}
 	cwds := hermesSessionCwds(db)
@@ -167,10 +153,11 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	return out, nil
 }
 
-// decodeHermesArray reads a json array of {session_id,role,content,timestamp}
-// rows — the same shape sqlite3 -json and Postgres json_agg produce — into
-// sessions. dec is positioned just past the opening '['; it is left just past
-// the closing ']'. project and path stamp every session.
+// decodeHermesArray reads {session_id,role,content,timestamp} rows into
+// sessions, either as a json array — Postgres json_agg, with dec positioned
+// just past the opening '[' and left just past the closing ']' — or as the
+// bare stream of objects the sqlite3 reader produces. project and path stamp
+// every session.
 func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session, error) {
 	by := map[string]*model.Session{}
 	var order []string
@@ -198,7 +185,7 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: str(r["role"]), Text: txt, Time: t})
 	}
-	if _, err := dec.Token(); err != nil {
+	if _, err := dec.Token(); err != nil && err != io.EOF {
 		return nil, err
 	}
 	out := make([]model.Session, 0, len(order))
@@ -253,16 +240,16 @@ func nonEmptyFile(p string) bool {
 // was about (#3257). Best effort: a store from before the table, or a row with
 // no cwd, keeps the profile.
 func hermesSessionCwds(db string) map[string]string {
-	q := `select id,cwd from sessions where cwd is not null and cwd <> ''`
-	out, err := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q).Output()
+	q := `select json_object('id',id,'cwd',cwd) from sessions where cwd is not null and cwd <> ''`
+	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q).Output()
 	if err != nil {
 		return nil
 	}
-	var rows []struct {
+	rows, err := sqliteObjects[struct {
 		ID  string `json:"id"`
 		Cwd string `json:"cwd"`
-	}
-	if json.Unmarshal(out, &rows) != nil {
+	}](out)
+	if err != nil {
 		return nil
 	}
 	cwds := make(map[string]string, len(rows))

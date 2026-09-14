@@ -132,8 +132,12 @@ func ParseZedDB(db string) ([]model.Session, error) {
 // statements Zed runs at startup, so a store written by an older Zed that a
 // newer one has never opened still has only the original five columns.
 const (
-	zedFullCols = `id,summary,updated_at,created_at,folder_paths,data_type,hex(data) as data`
-	zedBaseCols = `id,summary,updated_at,null as created_at,null as folder_paths,data_type,hex(data) as data`
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows.
+	zedFullCols = `json_object('id',id,'summary',summary,'updated_at',updated_at,` +
+		`'created_at',created_at,'folder_paths',folder_paths,'data_type',data_type,'data',hex(data))`
+	zedBaseCols = `json_object('id',id,'summary',summary,'updated_at',updated_at,` +
+		`'created_at',null,'folder_paths',null,'data_type',data_type,'data',hex(data))`
 )
 
 type zedRow struct {
@@ -196,41 +200,18 @@ func zedSinceWhere(t time.Time) string {
 
 func zedRows(db, cols, where string) ([]zedRow, error) {
 	q := "select " + cols + " from threads" + where + " order by updated_at"
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	stdout, err := cmd.StdoutPipe()
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(stdout)
-	tok, err := dec.Token()
-	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// Empty stdout means either a query that matched nothing or one
-			// sqlite3 refused to run. Reporting the second as "no sessions"
-			// makes a harness disappear from recall while doctor still calls
-			// the store healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("zed: query failed, the store schema may have changed: %w", waitErr)
-			}
-			return nil, nil
-		}
-		return nil, err
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("zed: bad sqlite json")
-	}
-	// An answer that stops before its closing bracket is a query that was cut
-	// short, and the exit status is the only thing that says so: a real sqlite3
-	// dying mid-stream returns one. So a stream that simply ends is read as the
-	// rows it did deliver, and a non-zero exit is the error. Which of the two
-	// steps below notices the missing bytes depends on the toolchain — Go 1.25
-	// ended the loop and reported io.EOF from the closing token, Go 1.27 stays
-	// in the loop and fails the decode — so neither decides on its own.
+	// An answer that stops mid-object is a query that was cut short, and the
+	// exit status is the only thing that says so: a real sqlite3 dying
+	// mid-stream returns one. So a stream that simply ends is read as the rows
+	// it did deliver, and a non-zero exit is the error. Which of the two steps
+	// below notices the missing bytes depends on the toolchain — Go 1.25 ended
+	// the loop and reported io.EOF from the closing token, Go 1.27 stays in the
+	// loop and fails the decode — so neither decides on its own.
 	var rows []zedRow
 	var cut error
 	for dec.More() {
@@ -247,13 +228,23 @@ func zedRows(db, cols, where string) ([]zedRow, error) {
 		}
 	}
 	if err := cmd.Wait(); err != nil {
+		if len(rows) == 0 {
+			// Empty stdout means either a query that matched nothing or one
+			// sqlite3 refused to run. Reporting the second as "no sessions"
+			// makes a harness disappear from recall while doctor still calls
+			// the store healthy.
+			return nil, fmt.Errorf("zed: query failed, the store schema may have changed: %w", err)
+		}
 		return nil, err
 	}
 	// Anything that is not a truncation — output that was never JSON, a row
 	// whose shape is wrong — still fails: the store is then unreadable rather
-	// than short.
+	// than short. Half an object is a truncation whatever came before it; a
+	// syntax error is one only after a whole row has arrived, since with no
+	// row behind it the answer was never rows to begin with.
 	var syntax *json.SyntaxError
-	if cut != nil && !errors.As(cut, &syntax) && !errors.Is(cut, io.ErrUnexpectedEOF) {
+	truncated := errors.Is(cut, io.ErrUnexpectedEOF) || (errors.As(cut, &syntax) && len(rows) > 0)
+	if cut != nil && !truncated {
 		return nil, cut
 	}
 	return rows, nil

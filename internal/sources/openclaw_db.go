@@ -69,39 +69,21 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	q := `select e.session_id, e.event_json from transcript_events e` + where +
-		` order by e.session_id, e.seq`
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows. An event_json is nothing but quotes
+	// and backslashes.
+	q := `select json_object('session_id',e.session_id,'event_json',e.event_json) ` +
+		`from transcript_events e` + where + ` order by e.session_id, e.seq`
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
 	// Rows stream through the decoder rather than landing in one buffer: a
 	// store of a few gigabytes is normal for a daily-reset agent, and
 	// holding every event_json in memory before the first session is built
 	// is what the hermes reader was written to avoid.
-	dec := json.NewDecoder(stdout)
-	tok, err := dec.Token()
+	dec, err := sqliteRows(cmd)
 	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// No stdout is a query that matched nothing or one sqlite3 refused
-			// to run; the second must not read as an empty store, or a whole
-			// harness vanishes from recall while doctor calls it healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("openclaw: query failed, the store schema may have changed: %w", waitErr)
-			}
-			return nil, nil
-		}
 		return nil, err
 	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("bad sqlite json")
-	}
+	rows := 0
 	project := "openclaw-" + openclawDBAgent(db)
 	var out []model.Session
 	var s *model.Session
@@ -118,8 +100,9 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		}
 		if err := dec.Decode(&r); err != nil {
 			_ = cmd.Wait()
-			return nil, fmt.Errorf("bad sqlite json")
+			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
+		rows++
 		if s == nil || s.ID != r.SessionID {
 			flush()
 			s = &model.Session{Harness: "openclaw", ID: r.SessionID, Project: project, Path: db}
@@ -131,11 +114,17 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		piShapedLine(s, m, true)
 	}
 	flush()
-	if _, err := dec.Token(); err != nil { // the closing ']'
+	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
 		return nil, err
 	}
 	if err := cmd.Wait(); err != nil {
+		if rows == 0 {
+			// No stdout is a query that matched nothing or one sqlite3 refused
+			// to run; the second must not read as an empty store, or a whole
+			// harness vanishes from recall while doctor calls it healthy.
+			return nil, fmt.Errorf("openclaw: query failed, the store schema may have changed: %w", err)
+		}
 		return nil, err
 	}
 	return out, nil

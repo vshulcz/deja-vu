@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - `deja bench ingest`: what an index update costs, per class of change — unchanged, an appended turn, a new transcript, a renamed one, a rewritten one — with whether the pass replaced the records already on file as the gate. (#3507, #3546)
 
+### Fixed
+- `deja index` no longer stalls on a store holding long tool output. Rows from a SQLite-backed harness are built by `json_object` rather than by the sqlite3 shell's `-json` mode, which is quadratic in the characters it escapes: 4 MB of quote-heavy text took it 412s against 0.04s, and a 520 MB opencode store took over ten minutes where it now takes three seconds. (#3553)
+
 ### Changed
 - `deja doctor --json` carries the auto-recall rows, not only the MCP ones: a script could see a missing sqlite3 and not a hook running a binary that is gone. (#3540)
 - An upgrade says why it is re-reading every source. Every other reason for a full pass names itself; a version difference printed the line a first install prints while doing the longest piece of work deja does on a large store. (#3500)

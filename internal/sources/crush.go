@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -123,8 +124,11 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	if !t.IsZero() {
 		where = " where " + newerThanEpoch("s.updated_at", t)
 	}
-	q := "select s.id as session_id, s.title as title, coalesce(s.parent_session_id,'') as parent_session_id, " +
-		"s.updated_at as updated_at, m.id as id, m.role as role, m.parts as parts, m.created_at as created_at " +
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows. A parts column is stored JSON.
+	q := "select json_object('session_id',s.id,'title',s.title," +
+		"'parent_session_id',coalesce(s.parent_session_id,''),'updated_at',s.updated_at," +
+		"'id',m.id,'role',m.role,'parts',m.parts,'created_at',m.created_at) " +
 		"from sessions s join messages m on m.session_id = s.id" + where + " order by s.id, m.created_at"
 	rows, err := crushRows(db, q)
 	if err != nil {
@@ -269,16 +273,22 @@ func crushStripCWD(s string) string {
 }
 
 func crushRows(db, q string) ([]crushRow, error) {
-	out, err := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q).Output()
+	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q).Output()
 	if err != nil {
 		return nil, err
 	}
 	if len(strings.TrimSpace(string(out))) == 0 {
 		return nil, nil
 	}
+	// One json_object per line, not an array.
 	var rows []crushRow
-	if err := json.Unmarshal(out, &rows); err != nil {
-		return nil, err
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for dec.More() {
+		var r crushRow
+		if err := dec.Decode(&r); err != nil {
+			return nil, err
+		}
+		rows = append(rows, r)
 	}
 	return rows, nil
 }

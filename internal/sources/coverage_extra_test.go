@@ -41,12 +41,12 @@ func TestOpencodeLoadersWithFakeSQLiteAndMalformedOutput(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := filepath.Join(bin, "sqlite3")
-	out := `[{
-		"id":"s1","directory":"proj","time_created":"2026-01-02T03:00:00Z","time_updated":"2026-01-02T03:01:00Z",
-		"role":"user","text":"fake sqlite needle","pt":"2026-01-02T03:00:30Z","mt":"2026-01-02T03:00:00Z"},
-		{"id":"","text":"skipped"},
-		{"id":"s1","directory":"proj","role":"assistant","text":"","pt":1767337200000}]`
-	if err := os.WriteFile(script, []byte("#!/bin/sh\ncase \"$*\" in *count*) printf '1|1\\n' ;; *badjson*) printf '{' ;; *scalar*) printf '{}' ;; *) printf '%s' '"+out+"' ;; esac\n"), 0o755); err != nil {
+	// One object per line, the framing sqlite3 emits for a json_object
+	// projection in its default output mode.
+	out := `{"id":"s1","directory":"proj","time_created":"2026-01-02T03:00:00Z","time_updated":"2026-01-02T03:01:00Z","role":"user","text":"fake sqlite needle","pt":"2026-01-02T03:00:30Z","mt":"2026-01-02T03:00:00Z"}
+{"id":"","text":"skipped"}
+{"id":"s1","directory":"proj","role":"assistant","text":"","pt":1767337200000}`
+	if err := os.WriteFile(script, []byte("#!/bin/sh\ncase \"$*\" in *count*) printf '1|1\\n' ;; *badjson*) printf '{' ;; *scalar*) printf '42' ;; *) printf '%s' '"+out+"' ;; esac\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))

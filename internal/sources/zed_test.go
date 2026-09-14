@@ -511,25 +511,28 @@ func TestParseZedDBSurvivesASqlite3ThatDoesNotAnswerInRows(t *testing.T) {
 	}
 	zedHome(t)
 	real := zedTestDB(t, zedSchema)
-	const oneRow = `[{"id":"x","summary":"s","updated_at":"","data_type":"json","data":""}`
+	const oneRow = `{"id":"x","summary":"s","updated_at":"","data_type":"json","data":""}`
 	cases := []struct {
 		name, stdout string
 		exit         int
 		wantErr      bool
 	}{
 		{name: "not json at all", stdout: "not json\n", wantErr: true},
-		{name: "a json object rather than an array", stdout: `{"id":"x"}`, wantErr: true},
-		// Stopping mid-row is the same cut-short answer as stopping between
-		// rows, and with a clean exit it is read the same way: whatever rows
+		// The rows arrive as bare objects, one per line — an array is the
+		// shape the shell's own -json mode used to produce and no longer a
+		// row the reader can take.
+		{name: "a json array rather than objects", stdout: `[{"id":"x"}]`, wantErr: true},
+		// Stopping mid-object is a cut-short answer, and with a clean exit it
+		// is read the same way as stopping between objects: whatever rows
 		// arrived whole. Go 1.25 told the two apart by which step failed, Go
 		// 1.27 does not, and the exit status was always the better signal.
-		{name: "an array that stops mid-row", stdout: `[{"id":"x",`, wantErr: false},
-		// A truncated array that still exits 0 is read as the rows it did
+		{name: "a stream that stops mid-object", stdout: `{"id":"x",`, wantErr: false},
+		// A truncated stream that still exits 0 is read as the rows it did
 		// deliver: the exit status is what says the query was cut short, and a
 		// real sqlite3 that dies mid-stream returns one. Asserting an error
 		// here would be asserting something the tool cannot tell us.
-		{name: "a truncated array that exited cleanly", stdout: oneRow, wantErr: false},
-		{name: "a truncated array whose sqlite3 failed", stdout: oneRow, exit: 1, wantErr: true},
+		{name: "a whole row and then nothing, exited cleanly", stdout: oneRow, wantErr: false},
+		{name: "a whole row whose sqlite3 failed", stdout: oneRow, exit: 1, wantErr: true},
 		{name: "no output and a failed exit", stdout: "", exit: 1, wantErr: true},
 		{name: "no output and a clean exit", stdout: "", exit: 0, wantErr: false},
 	}

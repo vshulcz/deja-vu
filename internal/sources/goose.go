@@ -357,48 +357,30 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
 	}
-	q := `select s.id,s.working_dir,s.description,s.created_at,s.updated_at,` +
-		`m.role,m.content_json,m.created_timestamp ` +
+	// json_object, one object per row, rather than the sqlite3 shell's -json
+	// formatter: that one is quadratic in the number of characters it escapes,
+	// and a message blob is mostly quotes and backslashes. See opencode.go.
+	q := `select json_object('id',s.id,'working_dir',s.working_dir,` +
+		`'description',s.description,'created_at',s.created_at,'updated_at',s.updated_at,` +
+		`'role',m.role,'content_json',m.content_json,` +
+		`'created_timestamp',m.created_timestamp) ` +
 		`from sessions s join messages m on m.session_id=s.id ` +
 		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +
 		` order by s.id,m.created_timestamp,m.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	stdout, err := cmd.StdoutPipe()
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(stdout)
-	dec.UseNumber()
-	tok, err := dec.Token()
-	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// No stdout means two very different things: a query that matched
-			// nothing, or one sqlite3 refused to run because the harness
-			// changed its schema. Reporting the second as "no sessions" makes
-			// a whole harness disappear from recall while doctor still calls
-			// the store healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("goose: query failed, the store schema may have changed: %w", waitErr)
-			}
-			return nil, nil
-		}
-		return nil, err
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("bad sqlite json")
 	}
 	by := map[string]*model.Session{}
+	rows := 0
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
 			_ = cmd.Wait()
-			return nil, err
+			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
+		rows++
 		id, _ := r["id"].(string)
 		if id == "" {
 			continue
@@ -433,11 +415,19 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		s.Touch(t)
 		appendGooseParts(s, role, t, speech, toolOut, commands, paths)
 	}
-	if _, err := dec.Token(); err != nil {
+	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
 		return nil, err
 	}
 	if err := cmd.Wait(); err != nil {
+		if rows == 0 {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			return nil, fmt.Errorf("goose: query failed, the store schema may have changed: %w", err)
+		}
 		return nil, err
 	}
 	var out []model.Session

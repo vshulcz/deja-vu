@@ -61,42 +61,21 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		where = " and s.id in (select m2.session_id from messages m2 where " +
 			norm + " is null or " + norm + " > '" + w + "')"
 	}
-	q := `select s.id as id,s.cwd_last as cwd,s.title as title,` +
-		`m.role as role,m.message_json as body,m.created_at as at ` +
+	// json_object rather than the shell's -json mode, which is quadratic in
+	// what it escapes — see sqliteRows.
+	q := `select json_object('id',s.id,'cwd',s.cwd_last,'title',s.title,` +
+		`'role',m.role,'body',m.message_json,'at',m.created_at) ` +
 		`from sessions s join messages m on m.session_id=s.id` +
 		` where m.role in ('user','assistant')` + where +
 		` order by s.id,m.seq`
-	cmd := exec.Command("sqlite3", "-readonly", "-json", sqliteTarget(db), ".timeout 5000", q)
-	stdout, err := cmd.StdoutPipe()
+	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
-	}
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(stdout)
-	tok, err := dec.Token()
-	if err != nil {
-		waitErr := cmd.Wait()
-		if err == io.EOF {
-			// No stdout means two very different things: a query that matched
-			// nothing, or one sqlite3 refused to run because the harness
-			// changed its schema. Reporting the second as "no sessions" makes
-			// a whole harness disappear from recall while doctor still calls
-			// the store healthy.
-			if waitErr != nil {
-				return nil, fmt.Errorf("grok: query failed, the store schema may have changed: %w", waitErr)
-			}
-			return nil, nil
-		}
-		return nil, err
-	}
-	if d, ok := tok.(json.Delim); !ok || d != '[' {
-		_ = cmd.Wait()
-		return nil, fmt.Errorf("bad sqlite json")
 	}
 	by := map[string]*model.Session{}
 	var order []string
+	rows := 0
 	for dec.More() {
 		var r struct {
 			ID    string `json:"id"`
@@ -108,8 +87,9 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		}
 		if err := dec.Decode(&r); err != nil {
 			_ = cmd.Wait()
-			return nil, err
+			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
+		rows++
 		if r.ID == "" {
 			continue
 		}
@@ -144,6 +124,14 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		return nil, err
 	}
 	if err := cmd.Wait(); err != nil {
+		if rows == 0 {
+			// No stdout means two very different things: a query that matched
+			// nothing, or one sqlite3 refused to run because the harness
+			// changed its schema. Reporting the second as "no sessions" makes
+			// a whole harness disappear from recall while doctor still calls
+			// the store healthy.
+			return nil, fmt.Errorf("grok: query failed, the store schema may have changed: %w", err)
+		}
 		return nil, err
 	}
 	out := make([]model.Session, 0, len(order))
