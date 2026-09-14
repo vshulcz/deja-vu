@@ -1,16 +1,26 @@
 #!/bin/sh
-# Manual, on-demand: what happens to a store built by an older deja when this
+# What happens to a store built by an older deja when this
 # build reads it. Downloads the published binaries, builds a small store with
 # each, deletes one transcript the way a client's cleanup does, then upgrades.
 #
-# NOT wired into CI — it downloads release assets and takes minutes. It exists
-# because the suite could not answer "does an upgraded machine keep what it
-# had": every test builds its store with the binary under test, so a format
-# change is only ever read by the build that wrote it (#3505).
+# Run nightly with --check, and by hand without it. It exists because the suite
+# could not answer "does an upgraded machine keep what it had": every test
+# builds its store with the binary under test, so a format change is only ever
+# read by the build that wrote it (#3505). Not on pull requests: it downloads
+# release archives and takes minutes.
 #
 # Requires: gh, tar, python3, and a built deja (or pass one as $1).
-# Usage: sh scripts/migrate-matrix.sh [path-to-deja]
+# Usage: sh scripts/migrate-matrix.sh [--check] [path-to-deja]
 set -eu
+
+# --check turns the report into a gate: the newest release has to keep the
+# session whose transcript is gone, and no row may lose one silently. Nightly
+# runs it that way; by hand it prints the table and says nothing.
+check=0
+if [ "${1:-}" = "--check" ]; then
+	check=1
+	shift
+fi
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 new=${1:-}
@@ -75,6 +85,7 @@ print(",".join(ids) or "none")
 '
 }
 
+rows=$(mktemp)
 printf '%-9s %-12s %-13s %-26s %s\n' version built-with after-upgrade upgrade-said deleted-transcript
 # The list is a space-separated string on purpose, so it can be overridden from
 # the environment; splitting it is the point.
@@ -109,10 +120,15 @@ JSON
 	# The client's own cleanup: one transcript gone, its store still there.
 	rm -f "$home/claude/-work-app/s2.jsonl"
 	"$old" index >/dev/null 2>&1
+	# What the old build itself kept of it. A release from before the keep-back
+	# (#2970) drops the session on its own pass, so there is nothing for the
+	# upgrade to carry and nothing for it to report.
+	held=$(exact "$old" alpha2)
 	said=$("$new" index 2>&1 | grep -oE "re-reading your sources|cannot read those records|index is up to date" | paste -sd+ -)
 	after=$(exact "$new" alpha3)
 	kept=$(exact "$new" alpha2)
 	printf '%-9s %-12s %-13s %-26s %s\n' "$v" "$built" "$after" "${said:-(nothing)}" "$kept"
+	printf '%s\t%s\t%s\t%s\t%s\n' "$v" "$after" "${said:-(nothing)}" "$kept" "$held" >>"$rows"
 	rm -rf "$home"
 done
 
@@ -123,3 +139,42 @@ this build cannot read at all shows "none" in the second column. The last column
 is the session whose transcript was deleted before the upgrade — what a machine
 keeps of work the client has already thrown away.
 NOTE
+
+[ "$check" -eq 1 ] || exit 0
+
+# The gate. Two claims, both of them about what an upgrade costs a machine that
+# has been running deja for a while:
+#
+#   every row     — the store still answers after the upgrade, and a session
+#                   whose transcript is gone is either carried or named as lost
+#   the last row  — the newest release, whose records this build can decode,
+#                   carries it (#3529)
+#
+# Rows above that are allowed to lose it: a store older than the record-layout
+# bump holds bytes this build cannot decode, and there is nowhere else for a
+# deleted transcript to come from. What is not allowed is losing it quietly.
+python3 - "$rows" <<'GATE'
+import sys
+
+rows = [line.rstrip("\n").split("\t") for line in open(sys.argv[1]) if line.strip()]
+if not rows:
+    print("migrate-matrix: no releases were read, so nothing was checked", file=sys.stderr)
+    raise SystemExit(1)
+
+bad = []
+for version, after, said, kept, held in rows:
+    if after in ("none", "-", ""):
+        bad.append(f"{version}: the store stopped answering after the upgrade")
+    lost = kept in ("none", "-", "")
+    hadIt = held not in ("none", "-", "")
+    if lost and hadIt and "cannot read those records" not in said:
+        bad.append(f"{version}: the old build still held the session whose transcript was deleted, the upgrade lost it, and the run said nothing ({said})")
+
+newest = rows[-1]
+if newest[4] not in ("none", "-", "") and newest[3] in ("none", "-", ""):
+    bad.append(f"{newest[0]} is the newest release and its deleted-transcript session did not survive the upgrade")
+
+for line in bad:
+    print("migrate-matrix:", line, file=sys.stderr)
+raise SystemExit(1 if bad else 0)
+GATE

@@ -54,6 +54,20 @@ jobs:
       - if: steps.changed.outputs.run == 'true'
         run: go test ./...
 
+      # What an upgrade costs a machine that has been running deja for a while.
+      # Every test builds its store with the binary under test, so a format
+      # change is only ever read by the build that wrote it — the one thing the
+      # suite cannot ask (#3505). Here because it downloads five release
+      # archives and takes minutes, which is a nightly's business and not a
+      # pull request's.
+      - if: steps.changed.outputs.run == 'true'
+        name: Upgrade matrix over the released binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go build -o "$RUNNER_TEMP/deja" ./cmd/deja
+          sh scripts/migrate-matrix.sh --check "$RUNNER_TEMP/deja"
+
       - if: steps.changed.outputs.run == 'true'
         uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
