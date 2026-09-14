@@ -77,8 +77,12 @@ func TestHandoffWithNoIdObeysTheTrustPolicy(t *testing.T) {
 	}
 
 	// With the local session gone, every candidate is hidden: the reader gets
-	// the rule, not someone else's work.
+	// the rule, not someone else's work. Gone means forgotten — a rebuild
+	// keeps a session whose transcript was merely deleted (#3529).
 	if err := os.Remove(filepath.Join(store, "loc.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.Forget(dir, index.ForgetOptions{Session: "loc"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := index.Ensure(dir, "", true, nil); err != nil {

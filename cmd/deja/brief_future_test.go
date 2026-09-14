@@ -42,8 +42,13 @@ func TestBriefNamesSessionsAheadOfTheClock(t *testing.T) {
 	if !strings.Contains(buf.String(), "stamped later than this machine's clock") {
 		t.Errorf("brief does not mention the future session:\n%s", buf.String())
 	}
-	// A store with none of them says nothing extra.
+	// A store with none of them says nothing extra. `deja forget` is what
+	// takes a session out: deleting the transcript no longer does, because a
+	// rebuild keeps what the client's cleanup deleted (#3529).
 	if err := os.Remove(filepath.Join(root, "ahead.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := index.Forget(dir, index.ForgetOptions{Session: "ahead"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := index.Ensure(dir, "", true, nil); err != nil {

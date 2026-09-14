@@ -505,7 +505,23 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// Imported sessions are filtered too: excluding a project must also drop
 	// what a peer already pushed, not only what arrives next.
 	ss = append(ss, sources.FilterSessions(imported.sessions)...)
+	// And the sessions the client deleted the transcript of, which no source
+	// can hand back (#3529). Read before the file rows are carried below, so
+	// the progress weights above still count only what this pass parses.
+	orphans := orphanedSessions(dir, harness, files)
+	ss = append(ss, sources.FilterSessions(orphans.sessions)...)
 	ss = filterTombstonedSet(ss, dead)
+	for p, st := range orphans.files {
+		files[p] = st
+	}
+	if progress != nil && len(orphans.files) > 0 {
+		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja forget <id>` drops one for good\n",
+			len(orphans.files), pluralS(len(orphans.files)))
+	}
+	if progress != nil && orphans.unreadable > 0 {
+		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk and written by an older deja — this build cannot read those records, so they go with this rebuild\n",
+			orphans.unreadable, pluralS(orphans.unreadable))
+	}
 	// Nothing to search until the whole corpus is written, and on a first
 	// install that is the fourteen seconds a user decides in (#505). Publish
 	// the newest slice first: it is a valid index of a few hundred sessions,
@@ -791,6 +807,100 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) {
 			}
 		}
 	}
+}
+
+// orphanState is what a full rebuild has to carry: sessions whose transcript
+// the client has deleted, and the file rows that keep them in the manifest.
+type orphanState struct {
+	sessions []model.Session
+	files    map[string]FileState
+	// unreadable counts the ones whose records this build cannot decode. A
+	// record-layout bump — version 38 moved the role out of the compressed
+	// body — leaves an older store's bytes unreadable here, and a transcript
+	// that is gone from disk has nowhere else to come from. Measured against
+	// released binaries: a store from 0.19.5 (content version 35) upgrades
+	// with its deleted-transcript sessions unrecoverable, and saying so is the
+	// difference between a loss and a silent one.
+	unreadable int
+}
+
+// orphanedSessions preserves sessions the client's own housekeeping deleted.
+// The incremental pass keeps them by never re-reading the file (#2970); a full
+// rebuild reads the sources and writes what it read, so it wrote the store
+// without them — 6 of 8 sessions gone on a store where the transcripts had
+// been cleaned up, and a rebuild runs on a content-version bump, a changed
+// exclude list and a damaged index, not only on `deja index --rebuild` (#3529).
+//
+// The rule is the incremental pass's: a file gone while the store directory
+// around it is still there is the cleanup, and a tree gone whole is an
+// uninstall or a disk that is not mounted, which is dropped as before.
+func orphanedSessions(dir, harness string, files map[string]FileState) orphanState {
+	out := orphanState{files: map[string]FileState{}}
+	m, err := readManifest(dir)
+	if err != nil {
+		return out
+	}
+	want := map[string]bool{}
+	for _, p := range sortedKeys(m.Files) {
+		if p == syncImportPath {
+			continue // importedSessions carries these
+		}
+		if _, ok := files[p]; ok {
+			continue
+		}
+		if harness != "" {
+			name := harnessForPath(p)
+			if store := sources.HarnessForKind(name); store != "" {
+				name = store
+			}
+			if name != harness {
+				continue
+			}
+		}
+		if _, err := os.Lstat(p); err == nil {
+			continue // on disk after all, just not in this pass's set
+		}
+		if _, err := os.Stat(filepath.Dir(p)); err != nil {
+			continue
+		}
+		want[p] = true
+	}
+	if len(want) == 0 {
+		return out
+	}
+	by := map[string]*model.Session{}
+	seen := map[string]bool{}
+	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		if !want[r.SourcePath] {
+			return
+		}
+		seen[r.SourcePath] = true
+		// Only a path that still has records: `deja forget` drops the records
+		// and leaves the row, and carrying that row put a transcript deja no
+		// longer holds back into doctor's "still searchable" count.
+		out.files[r.SourcePath] = m.Files[r.SourcePath]
+		s := by[r.Key]
+		if s == nil {
+			meta, ok := m.Sessions[r.Key]
+			if !ok {
+				return
+			}
+			cp := sessionFromMeta(meta)
+			cp.Path = r.SourcePath
+			s = &cp
+			by[r.Key] = s
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	})
+	for _, key := range sortedKeys(by) {
+		out.sessions = append(out.sessions, *by[key])
+	}
+	for p := range want {
+		if !seen[p] {
+			out.unreadable++
+		}
+	}
+	return out
 }
 
 // deriveImportedNoteState recovers the state of an imported promoted note from
