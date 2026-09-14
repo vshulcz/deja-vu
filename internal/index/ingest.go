@@ -858,6 +858,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 	// counts nothing here and its whole weight arrives at the end.
 	var readMu sync.Mutex
 	readPerHarness := map[string]int{}
+	readTook := map[string]time.Duration{}
 	restore := sources.SetFileProgress(func(path string) {
 		name := harnessForPath(path)
 		if store := sources.HarnessForKind(name); store != "" {
@@ -892,7 +893,13 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		wg.Add(1)
 		go func(i int, name string, load func() []model.Session) {
 			defer wg.Done()
+			started := time.Now()
+			stop := sayItIsStillReading(name, started, progress)
 			ss := safeLoad(name, load, progress)
+			stop()
+			readMu.Lock()
+			readTook[name] = time.Since(started)
+			readMu.Unlock()
 			results[i] = loaded{name: name, ss: ss}
 			// Report as this store lands rather than after every store has,
 			// so the bar moves during the parse instead of jumping at the end.
@@ -940,11 +947,84 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 		}
 		ss = append(ss, r.ss...)
 		if progress != nil && !SuppressHarnessNarration {
-			fmt.Fprintln(progress, harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name]))
+			readMu.Lock()
+			took := readTook[r.name]
+			readMu.Unlock()
+			fmt.Fprintln(progress, withReadTime(
+				harnessNarration(r.name, r.ss, sources.SkipReason(r.name), unreadable[r.name], refused[r.name]), took))
 		}
 	}
 	return ss
 }
+
+// readSlowAfter is when a store that is still being read says so, and the
+// point above which its read time is reported when it lands. A cold pass over
+// a large corpus is seconds per store; anything past this is a store worth
+// naming while the wait is happening. readStillReadingEvery is how often it
+// repeats after that, so a long wait stays visibly alive without filling the
+// screen. Variables so a test can shorten them.
+var (
+	readSlowAfter         = 15 * time.Second
+	readStillReadingEvery = 30 * time.Second
+)
+
+// withReadTime puts the time on a store's line once the wait was long enough
+// to have been worth reporting. Every store on an ordinary pass reads in
+// milliseconds, and stamping those would bury the one that did not.
+func withReadTime(line string, took time.Duration) string {
+	if took < readSlowAfter {
+		return line
+	}
+	return line + " — the read took " + roundedSeconds(took)
+}
+
+// sayItIsStillReading names a store that is taking long enough for the run to
+// look hung, and keeps saying so until the read lands. Returns the function
+// that stops it.
+//
+// Without this a slow store is indistinguishable from a stuck one: an index
+// run over a 520 MB opencode store printed `indexing sessions into …` and
+// nothing else for thirteen minutes and fifty-four seconds, of which 0.75s was
+// deja's own CPU, and `deja doctor` called the store healthy throughout
+// (#3553, #3555). Which store it is, and that it is still moving, is the whole
+// of what a person needs to decide between waiting and interrupting.
+func sayItIsStillReading(name string, started time.Time, progress io.Writer) func() {
+	if progress == nil || SuppressHarnessNarration {
+		return func() {}
+	}
+	// The thresholds are read here rather than in the goroutine: they are
+	// package variables so a test can shorten them, and reading them once
+	// keeps the notice out of that race.
+	after, every := readSlowAfter, readStillReadingEvery
+	done := make(chan struct{})
+	var once sync.Once
+	go func() {
+		timer := time.NewTimer(after)
+		defer timer.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-timer.C:
+			}
+			fmt.Fprintf(progress, "deja: %s: still reading (%s)\n", harnessLabel(name), roundedSeconds(time.Since(started)))
+			timer.Reset(every)
+		}
+	}()
+	return func() { once.Do(func() { close(done) }) }
+}
+
+// harnessLabel is the store's name as a person reads it: "deja" is the notes
+// pseudo-source and narrates as "notes".
+func harnessLabel(name string) string {
+	if name == "deja" {
+		return "notes"
+	}
+	return name
+}
+
+// roundedSeconds drops the sub-second noise: "42s", "13m54s".
+func roundedSeconds(d time.Duration) string { return d.Round(time.Second).String() }
 
 // harnessNarration is the line an index run prints for one store. A store can
 // be half-readable — cursor keeps CLI transcripts as JSONL and its IDE sessions
