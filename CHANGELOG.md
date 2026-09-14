@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
 
 ### Fixed
+- The grok linearity test takes the best of three timing pairs. A ratio of two short timings measures the runner as surely as an absolute bound does: the same parse is a steady 4.0x here and read 8.6x once on the windows leg, failing a pull request that touched neither grok nor parsing. (#3590)
 - An ordinary Russian word is no longer read as a key word: `включены`, `исключение`, `переключены` and `выключен` all contain `ключ`, and the pattern that allows words between the key and the colon reached across the sentence — a markdown link came back as `https:[redacted:credential]`. (#3589)
 - A password assigned with `=` is masked at the length people actually choose, including the `DB_PASS=` spelling: a JDBC URL, a query string, `--from-literal=password=` and a dotenv line all kept theirs in the clear under sixteen characters. A colon keeps its older reading. (#3588)
 - A secret whose value is not ASCII is redacted. Every key-value pattern ended in `[A-Za-z0-9/+=._-]{16,}`, so `пароль: БазаПароль2026` and `password: 非常に長いパスワード2026` were stored in the clear whatever the key word — the key words were widened to those languages and the value class was not. Index format version 43 masks what is already stored. (#3587)

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,16 +68,34 @@ func parseGrokTiming(t *testing.T, lines int) (time.Duration, map[string]int) {
 // absolute bound measures the machine. Four times the lines should cost about
 // four times as much; sixteen would mean something has gone quadratic.
 func TestGrokIndexesTheRunWithoutGoingQuadratic(t *testing.T) {
-	small, _ := parseGrokTiming(t, 500)
-	large, roles := parseGrokTiming(t, 2000)
-	t.Logf("500 lines in %v, 2000 lines in %v; roles=%v", small, large, roles)
+	// The best of three pairs, not one. A ratio of two short timings on a
+	// shared runner measures the runner: the same parse is a steady 4.0x here
+	// and came back 8.6x once on the windows leg, where the 500-line baseline
+	// read 62ms against 370ms on this machine — the small number is the one
+	// noise distorts, and it distorts the ratio upward. Taking the smallest
+	// ratio cannot hide a parse that has gone quadratic, because every pair
+	// would read about 16x.
+	best := math.Inf(1)
+	var roles map[string]int
+	for attempt := 0; attempt < 3; attempt++ {
+		small, _ := parseGrokTiming(t, 500)
+		large, r := parseGrokTiming(t, 2000)
+		roles = r
+		t.Logf("500 lines in %v, 2000 lines in %v; roles=%v", small, large, roles)
+		if small <= 0 {
+			continue
+		}
+		if ratio := float64(large) / float64(small); ratio < best {
+			best = ratio
+		}
+	}
 	if roles[RoleToolOutput] == 0 {
 		t.Fatal("the run is not indexed: no tool records from a session that is mostly tool events")
 	}
-	if small <= 0 {
+	if math.IsInf(best, 1) {
 		t.Skip("timer resolution too coarse to compare")
 	}
-	if ratio := float64(large) / float64(small); ratio > 8 {
-		t.Errorf("4x the lines cost %.1fx the time, which is not linear", ratio)
+	if best > 8 {
+		t.Errorf("4x the lines cost %.1fx the time at best of three, which is not linear", best)
 	}
 }
