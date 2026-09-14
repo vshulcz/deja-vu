@@ -428,12 +428,13 @@ func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) strin
 	// deja can say about a command that has not run yet, and the session-start
 	// block that says it is measurably not heard — nine of the ten sessions
 	// told about a missing command ran it anyway.
-	// Retried, but only among the cheap producers. Both of these are a sidecar
-	// lookup; the two below rank and then load whole sessions, and reaching
-	// them on every action costs 133 ms median against 21 ms — which would be
-	// every action, since the median session runs a command it has not run
-	// before 100% of the time. That is the 172 ms #3001 filed as the problem,
-	// so a walk that has already skipped something stops before paying it.
+	// Retried all the way down, and past the first two the retry pays lookups
+	// only. Every producer here is a sidecar read except the decision's own
+	// fallback, which ranks candidates and then loads whole sessions for a
+	// command table written before it carried the session key: measured on a
+	// store in that state, 118 ms median against 17 ms. That is the 172 ms
+	// #3001 filed, so the retry asks the table and stops rather than searching
+	// — a first pass, which is almost every call, still searches (#3603).
 	skipped := false
 	if line := missingProgramLine(dir, cmd); line != "" {
 		if !used(line) {
@@ -446,9 +447,6 @@ func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) strin
 			return line
 		}
 		skipped = true
-	}
-	if skipped {
-		return ""
 	}
 	use, ok := index.CommandHistory(dir, cmd)
 	if !ok {
@@ -517,11 +515,19 @@ func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) strin
 	// clear the idf floor — measured: every candidate at 0 informative terms,
 	// so the scan never ran and the count printed alone. Whether the promoted
 	// session ran the command is a fact rather than a ranking (#2516).
+	// Checked against what the session has already been given, the same as the
+	// producers above it: the walk reaching this far is the point of the
+	// fall-through, and a decision said twice is the repeat it exists to get
+	// past.
 	if d := promotedCommandDecision(dir, cwd, cmd); d != "" {
-		return head + commandDecisionLabel(cmd, d) + d
+		if line := head + commandDecisionLabel(cmd, d) + d; !used(line) {
+			return line
+		}
 	}
-	if d := commandDecisionLine(dir, cwd, cmd); d != "" {
-		return head + " — last time: " + d
+	if d := commandDecisionLine(dir, cwd, cmd, skipped); d != "" {
+		if line := head + " — last time: " + d; !used(line) {
+			return line
+		}
 	}
 	// And with neither, nothing. The head alone is a count and a date — "run
 	// in 5 sessions, last 2026-05-21" — which is the pointer this comment
@@ -643,7 +649,7 @@ func promotedCommandDecision(dir, cwd, cmd string) string {
 // the files a session touched but not the commands it ran, so there is no
 // cheaper lookup, and this hook fires on a build or a deploy rather than on
 // every message — the prompt hook already pays a search per keystroke.
-func commandDecisionLine(dir, cwd, cmd string) string {
+func commandDecisionLine(dir, cwd, cmd string, lookupOnly bool) string {
 	// The command table names the newest session in each project that ran this
 	// command, and that session's row carries what it settled. Two map lookups,
 	// where the search below ranks candidates and then loads whole sessions to
@@ -658,7 +664,11 @@ func commandDecisionLine(dir, cwd, cmd string) string {
 	}
 	// And the search, for a table written before it carried the session key:
 	// an index built by an older deja has none, and its reader should not go
-	// quiet until the next build.
+	// quiet until the next build. Not on the retry, which is already past one
+	// line it could not use — a second fact is worth a lookup and not a scan.
+	if lookupOnly {
+		return ""
+	}
 	terms := prompt.Terms(normalizedCommandText(cmd))
 	if len(terms) == 0 {
 		return ""

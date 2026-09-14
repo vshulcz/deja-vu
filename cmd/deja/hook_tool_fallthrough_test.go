@@ -107,6 +107,25 @@ func TestTheToolHookFallsThroughToTheLineBehindARepeatedFact(t *testing.T) {
 		t.Errorf("the same fact came back a second time:\n  %s", second)
 	}
 
+	// And with both of the cheap facts said, the walk reaches the decision
+	// behind them. The first fix stopped here — the two producers past this
+	// point ranked and then loaded whole sessions, which is the cost #3001
+	// filed — and since #3605 the decision is a table lookup, so the only
+	// thing the bound still bought was silence.
+	said[dedupeFact(second)] = true
+	third := commandHookLineSkipping(dir, "/work/app", cmd, saidAlready)
+	if third == "" {
+		t.Fatal("the hook went silent with a decision still unsaid behind two repeated facts")
+	}
+	if !strings.Contains(third, "make migrate-orders") && !strings.Contains(third, "last time") {
+		t.Errorf("the third line is neither the command's history nor its decision:\n  %s", third)
+	}
+	for _, earlier := range []string{first, second} {
+		if dedupeFact(third) == dedupeFact(earlier) {
+			t.Errorf("a fact already given came back:\n  %s", third)
+		}
+	}
+
 	// And when everything it can say has been said, silence is the answer.
 	all := func(string) bool { return true }
 	if line := commandHookLineSkipping(dir, "/work/app", cmd, all); line != "" {
