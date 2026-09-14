@@ -44,13 +44,20 @@ func TestAnAssignedSecretKeepsOneMarker(t *testing.T) {
 	for _, in := range []string{
 		`api_key="abcdefghijklmnopqrstuvwxyz0123456789"`,
 		`password: 'hunter2hunter2hunter2hunter2'`,
+		`{"token": "ghp_abcdefghijklmnop"}`,
 	} {
-		got, _ := Text(in)
+		got, counts := Text(in)
 		if n := strings.Count(got, "[redacted:"); n != 1 {
 			t.Errorf("%q came back with %d markers: %q", in, n, got)
 		}
 		if strings.Contains(got, "quoted-secret") {
 			t.Errorf("the assignment rule's marker was replaced: %q -> %q", in, got)
+		}
+		// And counted once. The colon rule runs over text the key-value rule
+		// has already masked, and counting the match it then declines inflates
+		// the `redacted=N` that `deja sources` and `doctor` print.
+		if total := counts["credential"] + counts["quoted-secret"]; total != 1 {
+			t.Errorf("%q was counted %d times: %v", in, total, counts)
 		}
 	}
 }

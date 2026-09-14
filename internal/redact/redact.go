@@ -474,11 +474,8 @@ func Text(s string) (string, Counts) {
 	// reached (#3614). A value that is already a redaction marker is passed
 	// over rather than masked again under a different name.
 	if strings.ContainsAny(s, "\"'`") && kvAssignmentNearby(lower) {
-		s = replaceSubmatch(s, quotedAssignedSecretRE, "quoted-secret", counts, func(m []string) string {
-			if strings.HasPrefix(m[4], "[redacted:") {
-				return m[0]
-			}
-			return m[1] + m[2] + m[3] + "[redacted:quoted-secret]" + m[5]
+		s = replaceGroup(s, quotedAssignedSecretRE, 4, "quoted-secret", counts, func(m []string) bool {
+			return strings.HasPrefix(m[4], "[redacted:")
 		})
 	}
 	if kvAssignmentNearbyHints(lower, kvIntlHints) {
