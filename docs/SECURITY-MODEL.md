@@ -111,6 +111,11 @@ leaving surrounding text searchable. The current patterns cover:
 - AWS access key IDs and secret-key assignments;
 - generic credential assignments such as `api_key=`, `token=`, `secret=`,
   `password=`, and `authorization=`;
+- a secret named and quoted rather than assigned — `password "…"`, `token is
+  "…"`, `api-key: "…"` — in every spelling of the name, with or without the
+  hyphen, underscore or space, and with a colon or an equals sign as well as
+  plain prose. The quotes are what makes this safe to be loose about the
+  separator: a name with no quoted value behind it is left alone;
 - bearer tokens and JWTs;
 - PEM private-key blocks;
 - known GitHub, GitLab, OpenAI/Anthropic-style, Groq, xAI, Hugging Face, npm,
