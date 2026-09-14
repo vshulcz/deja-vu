@@ -238,7 +238,16 @@ import (
 // `--api-key`. 42 covered `--password` alone, so `gpg --passphrase …` and every
 // CLI flag that names an account credential went through in the clear. Same
 // reason as the three before it — redaction runs at ingest (#3596).
-const version = 44
+//
+// 45 stores what a session settled and, per command, which session ran it last.
+// Both are derived — the older answers stay correct, which is why the redaction
+// floor does not move — and both are what the point-of-action hook had to go
+// looking for at the moment of the action: a ranking pass plus a whole-session
+// load, 133 ms against 21 ms, on the surface that fires on every action and
+// almost never on a command its session has run before. A store built before
+// this has neither, and nothing re-derives them without the bump — the same
+// shape as 22, 23 and 32 (#3001, #3605).
+const version = 45
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -371,6 +380,14 @@ type SessionMeta struct {
 	// The field is additive: a manifest written before it existed decodes with
 	// it empty and the caller degrades to saying nothing.
 	Touched []string `json:",omitempty"`
+	// Settled is what this session concluded, extracted once here for the same
+	// reason Touched is: the point-of-action hook needs it before a command
+	// runs, and finding it at that moment cost 133 ms a call against 21 ms —
+	// a ranking pass plus a whole-session load, on a surface that fires on
+	// every action (#3001, #3605). Bounded like the digest's own extraction,
+	// and additive: a manifest written before it decodes with it empty and the
+	// caller falls back to the search it used to do.
+	Settled string `json:",omitempty"`
 	// Shared marks a row that covers more than one conversation: two
 	// transcripts wrote the same harness:id, so one row holds both. The build
 	// says so once (#698); forget had no way to know, and dropping "1 session"

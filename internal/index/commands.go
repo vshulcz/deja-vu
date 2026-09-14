@@ -49,6 +49,15 @@ type CommandUse struct {
 type ProjectUse struct {
 	Sessions int
 	Last     time.Time
+	// LastSession is the key of the newest session in this project that ran the
+	// command, so a caller can reach what that session settled — SessionMeta
+	// carries it — without ranking candidates and loading whole sessions. That
+	// search cost 133 ms an action against 21 ms on a surface that fires on
+	// every action (#3001, #3605). Whether a session ran the command is a fact
+	// this table already knows; the ranking only ever existed to guess it.
+	// Empty on a table built before this field; the caller then does the search
+	// it used to do.
+	LastSession string `json:",omitempty"`
 }
 
 // commandProjectCap bounds the per-command project map. A command run in more
@@ -61,6 +70,8 @@ const commandProjectCap = 24
 type projAcc struct {
 	sessions map[string]bool
 	last     time.Time
+	// lastKey is the session behind last, kept so ProjectUse can name it.
+	lastKey string
 }
 
 func commandsPath(dir string) string { return filepath.Join(dir, commandsFile) }
@@ -103,7 +114,7 @@ func buildCommands(tmp string, ss []model.Session) {
 			}
 			pa.sessions[key] = true
 			if m.Time.After(pa.last) {
-				pa.last = m.Time
+				pa.last, pa.lastKey = m.Time, key
 			}
 			if m.Time.After(a.use.Last) {
 				a.use.Last = m.Time
@@ -196,7 +207,7 @@ func buildCommandsFromIndex(tmp string) {
 		}
 		pa.sessions[r.Key] = true
 		if r.Time.After(pa.last) {
-			pa.last = r.Time
+			pa.last, pa.lastKey = r.Time, r.Key
 		}
 		if r.Time.After(a.use.Last) {
 			a.use.Last = r.Time
@@ -258,7 +269,7 @@ func cappedProjects(byProject map[string]*projAcc) map[string]ProjectUse {
 	out := make(map[string]ProjectUse, len(names))
 	for _, proj := range names {
 		pa := byProject[proj]
-		out[proj] = ProjectUse{Sessions: len(pa.sessions), Last: pa.last}
+		out[proj] = ProjectUse{Sessions: len(pa.sessions), Last: pa.last, LastSession: pa.lastKey}
 	}
 	return out
 }
@@ -271,6 +282,44 @@ func ReadCommands(dir string) []CommandUse {
 		return nil
 	}
 	return out
+}
+
+// CommandSettled is what the newest session that ran this command settled,
+// for the first of the given projects that has one, or "" when nothing does.
+//
+// Two map lookups where the point-of-action hook used to rank candidates and
+// then load whole sessions to ask which of them had run the command: 133 ms an
+// action against 21 ms, on the surface that fires on every action, and nothing
+// warm because almost every action is a command its session has not run before
+// (#3001, #3605). The ranking was only ever guessing at a fact the command
+// table already holds.
+//
+// allow is the trust policy's question, asked per project the way every other
+// caller of this table asks it. A project that fails it is skipped rather than
+// making the whole answer empty: a command run in an allowed project and a
+// withheld one still has a settled line the reader may see.
+func CommandSettled(dir, cmd string, projects []string, allow func(string) bool) string {
+	use, ok := CommandHistory(dir, cmd)
+	if !ok || len(use.ByProject) == 0 {
+		return ""
+	}
+	m, err := readManifestCached(dir)
+	if err != nil {
+		return ""
+	}
+	for _, proj := range projects {
+		pu, ok := use.ByProject[proj]
+		if !ok || pu.LastSession == "" {
+			continue
+		}
+		if allow != nil && !allow(proj) {
+			continue
+		}
+		if meta, ok := m.Sessions[pu.LastSession]; ok && meta.Settled != "" {
+			return meta.Settled
+		}
+	}
+	return ""
 }
 
 // CommandHistory reports how widely this machine has run a command. The match

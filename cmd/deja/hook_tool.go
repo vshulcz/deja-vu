@@ -596,6 +596,21 @@ func promotedCommandDecision(dir, cwd, cmd string) string {
 // cheaper lookup, and this hook fires on a build or a deploy rather than on
 // every message — the prompt hook already pays a search per keystroke.
 func commandDecisionLine(dir, cwd, cmd string) string {
+	// The command table names the newest session in each project that ran this
+	// command, and that session's row carries what it settled. Two map lookups,
+	// where the search below ranks candidates and then loads whole sessions to
+	// ask which of them ran it — 133 ms an action against 21 ms, on a surface
+	// that fires on every action and almost never on a command its session has
+	// run before (#3001, #3605). Whether a session ran the command was always a
+	// fact this table held; the ranking existed to guess it.
+	pol := policy.Load()
+	allow := func(project string) bool { return pol.Allows(policy.ActivationAuto, project) }
+	if d := index.CommandSettled(dir, cmd, digest.ProjectNameCandidates(cwd), allow); d != "" {
+		return trimTrailingFragment(search.SafeText(strings.TrimSpace(d)))
+	}
+	// And the search, for a table written before it carried the session key:
+	// an index built by an older deja has none, and its reader should not go
+	// quiet until the next build.
 	terms := prompt.Terms(normalizedCommandText(cmd))
 	if len(terms) == 0 {
 		return ""
@@ -604,7 +619,6 @@ func commandDecisionLine(dir, cwd, cmd string) string {
 	if err != nil {
 		return ""
 	}
-	pol := policy.Load()
 	states := sources.PromotedLifecycles()
 	for _, s := range ranked {
 		// The old rule wanted every one of the command's words to be rare.
