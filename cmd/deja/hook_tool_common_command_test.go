@@ -112,7 +112,7 @@ func TestTheCommandLineIgnoresASessionSharingOneOrdinaryWord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if line := commandDecisionLine(dir, "/work/app", "terraform apply"); line != "" {
+	if line := commandDecisionLine(dir, "/work/app", "terraform apply", false); line != "" {
 		t.Errorf("a session sharing one ordinary word became this command's history: %q", line)
 	}
 }
