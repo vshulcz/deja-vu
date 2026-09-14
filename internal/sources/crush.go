@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -273,7 +272,7 @@ func crushStripCWD(s string) string {
 }
 
 func crushRows(db, q string) ([]crushRow, error) {
-	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q).Output()
+	out, err := sqliteOutput(db, q)
 	if err != nil {
 		return nil, err
 	}

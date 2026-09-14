@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -123,7 +122,8 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		`'content',cast(content as text),'timestamp',timestamp) from messages ` +
 		`where role in ('user','assistant') and content is not null and content <> ''` + where +
 		` order by session_id,timestamp,id`
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
@@ -241,7 +241,7 @@ func nonEmptyFile(p string) bool {
 // no cwd, keeps the profile.
 func hermesSessionCwds(db string) map[string]string {
 	q := `select json_object('id',id,'cwd',cwd) from sessions where cwd is not null and cwd <> ''`
-	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q).Output()
+	out, err := sqliteOutput(db, q)
 	if err != nil {
 		return nil
 	}
