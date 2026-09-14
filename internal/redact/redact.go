@@ -3,6 +3,7 @@ package redact
 import (
 	"math"
 	"sync/atomic"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
@@ -142,7 +143,53 @@ var (
 	// Nobody writes `--password` in prose: the flag is machine input, and what
 	// follows it is the value whatever its length.
 	passwordFlagRE = regexp.MustCompile(`(?i)(^|\s)(--?(?:password|passwd|pwd))([ =]\\*['"]?)([^\s'"]{3,128})`)
+	// A secret whose VALUE is not ASCII. Every pattern above ends in
+	// `[A-Za-z0-9/+=._-]{16,}`, so `пароль: БазаПароль2026` and `password:
+	// 非常に長いパスワード2026` were stored in the clear whatever the key word or
+	// the length — #1319 widened the key words to the languages people type in
+	// and left the value class where it was (#3587).
+	//
+	// The digit is what keeps this away from prose. A value class wide enough
+	// for Cyrillic is wide enough for an ordinary word, and "пароль:
+	// неправильный" is a sentence; a passphrase someone chose is
+	// "БазаПароль2026". Eight runes rather than sixteen because a word in
+	// these scripts carries more meaning per character — `数据库密码2026年` is
+	// ten — the same reasoning #1319 recorded for the line-length bound.
+	//
+	// Words between the key and the colon, the way genericKVIntlFillerRE
+	// allows: "пароль от стейджа: …" is how the line is actually written.
+	intlValueRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\n:=]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
 )
+
+// worthRedactingIntl reports whether a non-ASCII value looks like a secret
+// rather than a word. A digit is the signal: prose in these scripts does not
+// carry one, and a passphrase someone chose usually does.
+func worthRedactingIntl(v string) bool {
+	v = strings.Trim(v, `"'`)
+	if n := utf8.RuneCountInString(v); n < 8 || n > 128 {
+		return false
+	}
+	if notASecretValue(v) {
+		return false
+	}
+	for _, r := range v {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+	}
+	return false
+}
+
+// hasNonASCII reports whether the text carries a byte outside ASCII, which is
+// the necessary condition for intlValueRE to match anything.
+func hasNonASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= 0x80 {
+			return true
+		}
+	}
+	return false
+}
 
 // notASecretValue reports whether what follows a password key is plainly not a
 // password: a placeholder, a variable the shell will expand, or a word that
@@ -346,6 +393,14 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(lower, "passw") || strings.Contains(lower, "pwd") {
 		s = replaceGroup(s, passwordFlagRE, 4, "credential", counts, func(m []string) bool {
 			return notASecretValue(m[4])
+		})
+	}
+	// Its own gate, on the one thing the pattern needs: a byte outside ASCII.
+	// Every other pattern here can only match an ASCII value, so this runs
+	// exactly where they cannot.
+	if hasNonASCII(s) && (strings.ContainsAny(s, ":=")) {
+		s = replaceGroup(s, intlValueRE, 4, "credential", counts, func(m []string) bool {
+			return !worthRedactingIntl(m[4])
 		})
 	}
 	if strings.Contains(lower, "sshpass") {

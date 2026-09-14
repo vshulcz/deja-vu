@@ -466,7 +466,8 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 // shown rather than about what deja derives. A store below it must not be
 // quoted while it is re-read: 41 masks the argument-credential shapes already
 // on disk, where eight of twenty-four planted secrets were stored in the clear,
-// and 42 the password given as a long flag at any length (#3535, #3572).
+// 42 the password given as a long flag at any length, and 43 a secret whose value is
+// not ASCII (#3535, #3572, #3587).
 // Redaction runs at ingest, so text written before either is text this build
 // would not write.
 //
@@ -474,7 +475,7 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 // about what deja derives — a role filed better, a title read from a different
 // field — leaves the older answers correct, and there are three of those for
 // every one of these.
-const redactionFloor = 42
+const redactionFloor = 43
 
 // mustRebuildBeforeAnswering reports whether an index has to be rebuilt before
 // it may answer anything at all, rather than answering under its own older

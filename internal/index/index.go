@@ -226,7 +226,13 @@ import (
 // Same reasoning as 41 — redaction runs at ingest, so without the bump the fix
 // holds for the next conversation and leaves every earlier one quotable
 // (#3572).
-const version = 42
+//
+// 43 masks a secret whose value is not ASCII. Every key-value pattern ended in
+// `[A-Za-z0-9/+=._-]{16,}`, so a password written in the alphabet its owner
+// types in was stored in the clear whatever the key word: 41 widened the key
+// words to those languages and left the value class where it was. Same reason
+// as 41 and 42 — redaction runs at ingest (#3587).
+const version = 43
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
