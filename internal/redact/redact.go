@@ -53,14 +53,21 @@ var (
 	// in RE2, so a Cyrillic or CJK key word can never sit behind it — these get
 	// their own pattern. A Russian speaker writing "пароль: …" had the secret
 	// stored in the clear because every pattern here was English-only.
-	genericKVIntlRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	genericKVIntlRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	// The same key words with a few of their own between the word and the
 	// colon. "пароль от стейджа: …" is how the line is actually written, and
 	// genericKVIntlRE needs the delimiter to follow the word directly. The
 	// value class is unchanged — 16 or more ASCII characters — so a sentence
 	// that merely mentions a token ("токен лежит в файле: строка 12") still
 	// matches nothing.
-	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\n:=]{1,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	// Bounded on both sides, because RE2 has no \b for these alphabets and the
+	// key words live inside ordinary ones: "включены", "исключение",
+	// "переключены" and "выключен" all contain "ключ". Unbounded, the filler
+	// reached across the sentence and masked what followed — a markdown link
+	// came back as `https:[redacted:credential]` and a log path as the whole
+	// value (#3589). The leading group is a character, not a lookbehind, so it
+	// is put back with the rest.
+	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=][^\n:=]{0,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	bearerRE              = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
@@ -177,7 +184,7 @@ var (
 	//
 	// Words between the key and the colon, the way genericKVIntlFillerRE
 	// allows: "пароль от стейджа: …" is how the line is actually written.
-	intlValueRE = regexp.MustCompile(`(?i)(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\n:=]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
+	intlValueRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\p{L}\n:=]?[^\n:=]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
 )
 
 // worthRedactingIntl reports whether a non-ASCII value looks like a secret
@@ -396,14 +403,14 @@ func Text(s string) (string, Counts) {
 	if kvAssignmentNearbyHints(lower, kvIntlHints) {
 		intlPatternRuns.Add(1)
 		s = replaceSubmatch(s, genericKVIntlRE, "credential", counts, func(m []string) string {
-			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+			return m[1] + m[2] + m[3] + m[4] + "[redacted:credential]" + closingQuote(m[4], m[6])
 		})
 	}
 	// Its own gate: the adjacency one cannot see a delimiter that is a few
 	// words away, which is the whole point of this pattern.
 	if strings.ContainsAny(s, ":=") && containsAnyFold(s, kvIntlHints) {
 		s = replaceSubmatch(s, genericKVIntlFillerRE, "credential", counts, func(m []string) string {
-			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+			return m[1] + m[2] + m[3] + m[4] + "[redacted:credential]" + closingQuote(m[4], m[6])
 		})
 	}
 	// Its own gate rather than the key-value one: that gate asks for a
