@@ -454,6 +454,14 @@ integration looks), `missing`, or `plugin` (the harness carries its own).
 `binary_missing` marks a row whose entries name a deja binary that is no longer
 there — what an upgrade leaves behind, with every hook exiting 127.
 
+The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
+event by event, so they have two states of their own: `out of date` (some of the
+events this release writes are there and some are not — the file keeps working
+and lacks everything added since) and `unreadable` for a settings file that will
+not parse. `codex-hook` also reports what codex's trust store says about the
+entry: `untrusted` (codex has never been shown it and runs no hook at all) or
+`disabled`.
+
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a
 finding: nothing about the index is wrong, and a rebuild would lose them.
