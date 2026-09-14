@@ -43,12 +43,12 @@ func TestAStaleBucketIdSaysTheDaysRegrouped(t *testing.T) {
 	} else if !strings.Contains(err.Error(), moved) {
 		t.Errorf("promote does not name the id the note moved to: %v", err)
 	}
-	out, err := captureRun(t, "forget", "--session", stale)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, moved) {
-		t.Errorf("forget does not name the id the note moved to:\n%s", out)
+	// The refusal carries the hint: a selector that named nothing is a failure
+	// since #3601, and the id it moved to is the useful half of the answer.
+	if _, err := captureRun(t, "forget", "--session", stale); err == nil {
+		t.Fatal("the stale id resolved for forget")
+	} else if !strings.Contains(err.Error(), moved) {
+		t.Errorf("forget does not name the id the note moved to: %v", err)
 	}
 
 	// An id that never existed keeps the plain refusal — the hint is a fact

@@ -3601,6 +3601,16 @@ func runForget(dir string, args []string) error {
 				return nil
 			}
 		}
+		// A name that matched nothing is a failure, the way `--unforget` has
+		// treated one since #2263: `deja forget --session $ID && echo removed`
+		// printed "removed" for a session still on disk under another id, which
+		// is the shape #3567 closed for a mistyped command. A window is not a
+		// name — `--before 30d` on a young store covering nothing is the right
+		// outcome, and a cleanup loop under `set -e` must not abort on it.
+		if o.Session != "" || o.Project != "" {
+			return fmt.Errorf("nothing matched %s — no session was dropped%s",
+				forgetSelector(o), movedBucketHint(dir, o.Session))
+		}
 		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped%s\n", forgetSelector(o), movedBucketHint(dir, o.Session))
 		return nil
 	}

@@ -1337,18 +1337,35 @@ func TestBlameDoesNotBlameTheIndexWhenItIsFull(t *testing.T) {
 
 // Nothing matched is a different answer from nothing was dropped: reporting a
 // missing session as a successful removal of zero leaves the reader believing
-// they deleted something that is still there under another id.
+// they deleted something that is still there under another id — and a script
+// reads the code, not the wording, so `forget --session $ID && echo removed`
+// printed "removed" for a session that is still there (#3601).
 func TestForgetSaysWhenNothingMatched(t *testing.T) {
 	seedBriefIndex(t)
 	out, err := captureRun(t, "forget", "--session", "no-such-session")
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatalf("a session that is not there was reported as a success: %q", out)
 	}
 	if strings.Contains(out, "sessions dropped") {
 		t.Fatalf("reported a removal that did not happen: %q", out)
 	}
-	if !strings.Contains(out, "nothing matched") || !strings.Contains(out, `session "no-such-session"`) {
-		t.Fatalf("does not name the selector that came back empty: %q", out)
+	msg := err.Error()
+	if !strings.Contains(msg, "nothing matched") || !strings.Contains(msg, `session "no-such-session"`) {
+		t.Fatalf("does not name the selector that came back empty: %q", msg)
+	}
+}
+
+// A window is not a name: `--before 30d` on a store younger than that covers
+// nothing, which is the right outcome rather than a mistake. A cleanup loop
+// under `set -e` would otherwise abort on a young machine (#3601).
+func TestForgetIsQuietWhenAWindowCoversNothing(t *testing.T) {
+	seedBriefIndex(t)
+	out, err := captureRun(t, "forget", "--before", "3650d")
+	if err != nil {
+		t.Fatalf("a window that covered nothing was reported as a failure: %v: %q", err, out)
+	}
+	if !strings.Contains(out, "nothing matched") {
+		t.Fatalf("does not say the window covered nothing: %q", out)
 	}
 }
 
