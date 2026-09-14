@@ -4239,10 +4239,13 @@ func ensureError(dir string, err error) error {
 		return fmt.Errorf("the index directory went away mid-build (%s) — the disk it lives on may have been unmounted; the index already there is unharmed, so reconnect it and run `deja index` again, or point DEJA_INDEX_DIR somewhere local", dir)
 	}
 	// Already worded where it was raised — the leftover-swap case names the
-	// directory to remove and the command to rerun, and "ensure:" in front of
-	// it is internal noise (#1009).
-	if strings.HasPrefix(err.Error(), "an earlier index swap left ") {
-		return err
+	// directory to remove and the command to rerun, the refused index path
+	// names the file it will not delete, and "ensure:" in front of either is
+	// internal noise (#1009).
+	for _, worded := range []string{"an earlier index swap left ", "the index path "} {
+		if strings.HasPrefix(err.Error(), worded) {
+			return err
+		}
 	}
 	return fmt.Errorf("ensure: %w", err)
 }
