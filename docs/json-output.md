@@ -497,7 +497,10 @@ another machine and can be made arbitrarily long, so it is bounded before it is
 reported. `host` is not: it is a name to act on — `deja sync ssh <host>` — and a
 bounded name names no machine, so it is reported exactly as the config file
 spells it, however long. Neither can carry a raw control byte into a terminal:
-the JSON encoder escapes those in any string.
+the JSON encoder escapes those in any string. The text a session holds is
+filtered on top of that — the bidi overrides and the invisible tag block are
+ordinary characters to the encoder, and nothing recalled from a transcript needs
+to reorder a reader's screen or arrive invisible; newlines and tabs are kept.
 `sync.imported` names the machines whose work is in this index without a peer
 row of their own — the state a first exchange leaves, when a batch was carried
 by hand or by a shared folder and no `deja sync ssh` target has been named yet.

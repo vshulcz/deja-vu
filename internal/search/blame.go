@@ -455,7 +455,17 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		}
 	}
 	if jsonOutput {
-		_ = json.NewEncoder(w).Encode(hits)
+		// The printed rows below are filtered; this one was not, and it is the
+		// row a dashboard reads (#3616).
+		out := make([]BlameHit, len(hits))
+		copy(out, hits)
+		for i := range out {
+			out[i].Session = SafeSession(out[i].Session)
+			out[i].Title = SafeText(out[i].Title)
+			out[i].Snippets = SafeStrings(out[i].Snippets)
+			out[i].LifecycleNote = SafeText(out[i].LifecycleNote)
+		}
+		_ = json.NewEncoder(w).Encode(out)
 		return
 	}
 	color := colorOK(w)
