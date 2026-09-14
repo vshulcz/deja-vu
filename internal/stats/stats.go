@@ -39,19 +39,22 @@ type Report struct {
 	// NarrowedBy names the filters that emptied a report over a store that is
 	// not empty, and OlderThanWindow is the extra line --since earns. Filled by
 	// the caller, which is where the flags the reader typed still exist.
-	NarrowedBy      string         `json:"-"`
-	OlderThanWindow string         `json:"-"`
-	Sparkline       string         `json:"sparkline"`
-	DateRange       DateRangeStats `json:"date_range"`
-	Longest         SessionStat    `json:"longest_session"`
-	BusiestDay      DayStat        `json:"busiest_day"`
-	Recall          usage.Summary  `json:"recall"`
-	WeekRecalls     int            `json:"week_recalls"`
-	WeekBytes       int            `json:"week_bytes"`
-	WeekInjected    int            `json:"week_injected"`
-	HandoffsIn      int            `json:"handoffs_received"`
-	AgentCredits    int            `json:"agent_credits"`
-	WeekCredits     int            `json:"week_agent_credits"`
+	NarrowedBy      string `json:"-"`
+	OlderThanWindow string `json:"-"`
+	// NoSuchRole is the line for a role the store holds none of at all, so a
+	// reader can tell "this harness records no edits" from "the filter missed".
+	NoSuchRole   string         `json:"-"`
+	Sparkline    string         `json:"sparkline"`
+	DateRange    DateRangeStats `json:"date_range"`
+	Longest      SessionStat    `json:"longest_session"`
+	BusiestDay   DayStat        `json:"busiest_day"`
+	Recall       usage.Summary  `json:"recall"`
+	WeekRecalls  int            `json:"week_recalls"`
+	WeekBytes    int            `json:"week_bytes"`
+	WeekInjected int            `json:"week_injected"`
+	HandoffsIn   int            `json:"handoffs_received"`
+	AgentCredits int            `json:"agent_credits"`
+	WeekCredits  int            `json:"week_agent_credits"`
 	// UsedNotCredited is the other half of the 2% (#3079): a reply that names
 	// a recalled session and does not say the line. An upper bound — see
 	// UsedNotCredited.
@@ -138,7 +141,10 @@ func Filter(ss []model.Session, o search.Options) []model.Session {
 			cp := s
 			cp.Messages = nil
 			for _, m := range s.Messages {
-				if m.Role == o.Role {
+				// The documented spelling, not only the stored one: `--role
+				// tool` is what help promises and "tool-output" is what is on
+				// disk, so a bare equality counted nothing (#3592).
+				if search.RoleMatches(m.Role, o.Role) {
 					cp.Messages = append(cp.Messages, m)
 				}
 			}

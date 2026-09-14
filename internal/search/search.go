@@ -1591,6 +1591,12 @@ func roleMatches(stored, want string) bool {
 	return want == "tool" && stored == roleToolOutput
 }
 
+// RoleMatches is roleMatches for the callers that filter records themselves.
+// `deja stats` is one: it retrieves everything and narrows locally, and its own
+// comparison was a bare string equality, so `--role tool` reported an empty
+// store while `--role tool-output` counted six records in it.
+func RoleMatches(stored, want string) bool { return roleMatches(stored, want) }
+
 // isWorkRecord reports whether a message records what an agent did rather than
 // what was said. Mirrors index.isToolRole, which cannot be imported here.
 func isWorkRecord(role string) bool {

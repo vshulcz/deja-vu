@@ -144,7 +144,11 @@ func runStats(dir string, args []string) error {
 	if redaction {
 		return printRedactionReport(dir, jsonOut)
 	}
-	ss, err := index.SearchWithRecovery(dir, search.Options{All: true}, progress)
+	// Role travels with the query rather than being applied only afterwards:
+	// the index withholds command, files and edit records from a caller that
+	// did not ask for them, so `deja stats --role command` filtered a set those
+	// records had already been dropped from and reported an empty store (#3592).
+	ss, err := index.SearchWithRecovery(dir, search.Options{All: true, Role: options.Role}, progress)
 	if err != nil {
 		// `mkdir …/idx.tmp: permission denied` names a path nobody chose and a
 		// syscall nobody can act on. index and search have worded this since
@@ -177,9 +181,14 @@ func runStats(dir string, args []string) error {
 		// is then advice for a state deja is not in — indexing changes nothing
 		// and doctor reports the stores as found — which is the same backside
 		// `last` grew when it learned to filter (#637, #949).
-		if len(ss) > 0 {
+		//
+		// Counted off the manifest rather than off `ss`: --role travels with the
+		// query, so a role the store holds none of empties the retrieval itself
+		// and the corpus size is the only thing left that knows better.
+		if n, err := index.SessionCount(dir); err == nil && n > 0 {
 			report.NarrowedBy = activeFilters(options, sinceRaw, harnessRaw)
 			report.OlderThanWindow = olderThanWindow(dir, options.Since)
+			report.NoSuchRole = emptyRoleNote(dir, options.Role)
 		}
 		report.HiddenBySettings = hiddenByOwnSettings()
 	}
@@ -293,6 +302,7 @@ func printStats(w io.Writer, r stats.Report) {
 		if r.NarrowedBy != "" {
 			fmt.Fprintf(w, "deja: no sessions match %s\n", r.NarrowedBy)
 			fmt.Fprint(w, r.OlderThanWindow)
+			fmt.Fprint(w, r.NoSuchRole)
 			return
 		}
 		if r.HiddenBySettings != "" {
