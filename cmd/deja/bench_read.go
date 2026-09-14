@@ -143,13 +143,19 @@ begin;
 			sqlText(id), sqlText("/bench/"+s.Project), stamp.Format(time.RFC3339), stamp.Format(time.RFC3339))
 		for j, m := range s.Messages {
 			mid := fmt.Sprintf("%s-m%03d", id, j)
+			// The blobs are marshalled rather than assembled: a transcript is
+			// full of quotes, and hand-written JSON around it is one apostrophe
+			// away from a store that does not parse.
+			message := benchJSON(map[string]any{"role": roleOrUser(m.Role)})
+			part := benchJSON(map[string]any{
+				"type": "text",
+				"text": m.Text,
+				"time": map[string]any{"start": stamp.Format(time.RFC3339)},
+			})
 			fmt.Fprintf(&b, "insert into message values(%s,%s,%d,%s);\n",
-				sqlText(mid), sqlText(id), stamp.UnixMilli(),
-				sqlText(fmt.Sprintf(`{"role":%q}`, roleOrUser(m.Role))))
+				sqlText(mid), sqlText(id), stamp.UnixMilli(), sqlText(message))
 			fmt.Fprintf(&b, "insert into part values(%s,%s,%s);\n",
-				sqlText(mid+"-p"), sqlText(mid),
-				sqlText(fmt.Sprintf(`{"type":"text","text":%s,"time":{"start":%q}}`,
-					benchJSONString(m.Text), stamp.Format(time.RFC3339))))
+				sqlText(mid+"-p"), sqlText(mid), sqlText(part))
 		}
 	}
 	if longKB > 0 {
@@ -193,12 +199,12 @@ func roleOrUser(role string) string {
 // sqlText renders a Go string as a SQL literal.
 func sqlText(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
 
-// benchJSONString renders a Go string as a JSON string, for embedding in a blob
-// that is itself written as a SQL literal.
-func benchJSONString(s string) string {
-	b, err := json.Marshal(s)
+// benchJSON marshals a blob for the store, so nothing in a transcript can
+// break out of the JSON it is written into.
+func benchJSON(v any) string {
+	b, err := json.Marshal(v)
 	if err != nil {
-		return `""`
+		return "{}"
 	}
 	return string(b)
 }
