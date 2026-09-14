@@ -1,6 +1,7 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,6 +106,11 @@ const (
 	// ReadStateNewer means the binary was rolled back, not the index.
 	ReadStateNewer
 )
+
+// ErrStoreWithheld is what a by-identity read answers when the store on disk
+// was written under redaction rules this build has moved past. The advice is
+// the same as every other surface's: run the pass that re-reads the sources.
+var ErrStoreWithheld = errors.New("this index was written before deja learned to mask something it now masks — run `deja index` to re-read your sources")
 
 // ReadStateOf reports which of those the index in dir is. An unreadable
 // manifest is not one of them — that is damage, and indexDamageReason names it.

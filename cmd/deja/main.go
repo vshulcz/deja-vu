@@ -615,6 +615,13 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	var s model.Session
 	var ok bool
 	if o.harness != "" {
+		// The same pass the prefix form runs. Without it the exact-identity
+		// path read whatever was on disk, and a store below the redaction
+		// floor is fresh — so `show --harness` printed text this build would
+		// not write while `show <prefix>` re-read the sources first (#3617).
+		// A store that cannot be rebuilt — read-only, no space — falls through
+		// to the loader, which refuses and says why.
+		_ = index.Ensure(dir, "", false, os.Stderr)
 		// Exact identity first — that is what --harness is for, and what
 		// --json requires. But the usage line documents an id *prefix*, and
 		// routing --harness straight to the exact lookup made every
