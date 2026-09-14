@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -13,6 +14,12 @@ import (
 // lock file nobody can act on, on the first screen a new install shows. Every
 // other command routes the same failure through ensureError.
 func TestBriefNamesWhyABuildCouldNotRun(t *testing.T) {
+	// The refusal is produced by a directory mode, and a mode is not how
+	// windows refuses a write: 0500 there leaves the directory writable and the
+	// build succeeds, so the test measured the platform rather than the message.
+	if runtime.GOOS == "windows" {
+		t.Skip("directory modes do not refuse writes on windows")
+	}
 	tmp := hermeticEnv(t)
 	ro := filepath.Join(tmp, "ro")
 	if err := os.MkdirAll(ro, 0o755); err != nil {
