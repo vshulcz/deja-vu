@@ -43,6 +43,10 @@ func runStats(dir string, args []string) error {
 	html := false
 	redaction := false
 	var options search.Options
+	// What the reader typed, before checkHarness rewrites an alias: naming a
+	// "deja" filter to someone who passed `--harness notes` names a flag they
+	// did not pass, the same reason `last` keeps these (#2191).
+	sinceRaw, harnessRaw := "", ""
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
@@ -90,6 +94,7 @@ func runStats(dir string, args []string) error {
 			switch args[i-1] {
 			case "--harness":
 				options.Harness = v
+				harnessRaw = v
 			case "--project":
 				options.Project = v
 			case "--role":
@@ -100,6 +105,7 @@ func runStats(dir string, args []string) error {
 					return err
 				}
 				options.Since = d
+				sinceRaw = v
 			}
 		default:
 			return fmt.Errorf("stats: unknown flag %q", args[i])
@@ -167,6 +173,14 @@ func runStats(dir string, args []string) error {
 	report.PolicyWithheld = policyHidden
 	report.EmptiedByPolicy = report.TotalSessions == 0 && policyHidden > 0
 	if report.TotalSessions == 0 {
+		// A filter emptied a store that has sessions in it. "run `deja index`"
+		// is then advice for a state deja is not in — indexing changes nothing
+		// and doctor reports the stores as found — which is the same backside
+		// `last` grew when it learned to filter (#637, #949).
+		if len(ss) > 0 {
+			report.NarrowedBy = activeFilters(options, sinceRaw, harnessRaw)
+			report.OlderThanWindow = olderThanWindow(dir, options.Since)
+		}
 		report.HiddenBySettings = hiddenByOwnSettings()
 	}
 	// Replaced spans are kept out of ordinary retrieval, so they are not in
@@ -274,6 +288,11 @@ func printStats(w io.Writer, r stats.Report) {
 			// The rule is named on stderr a line above; repeating "run `deja
 			// index`" here sends the reader after a build that changes nothing.
 			fmt.Fprintln(w, "deja: nothing to report — the trust policy withholds every indexed session from this path")
+			return
+		}
+		if r.NarrowedBy != "" {
+			fmt.Fprintf(w, "deja: no sessions match %s\n", r.NarrowedBy)
+			fmt.Fprint(w, r.OlderThanWindow)
 			return
 		}
 		if r.HiddenBySettings != "" {

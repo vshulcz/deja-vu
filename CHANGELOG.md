@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The freshness walk no longer runs to be discarded: `deja index` walked every store a second time whenever it had already reported what it did, 52 ms on a 2.0 GB store. (#3501)
 
 ### Fixed
+- `deja stats` names the filter that emptied it instead of calling the index unbuilt. `--since 30d` over a store whose sessions are all older answered "nothing indexed yet — run `deja index`", which is advice for a state deja is not in; `--harness` and `--project` did the same. The usage line now also names the four filters stats has always taken. (#3591)
 - The grok linearity test takes the best of three timing pairs. A ratio of two short timings measures the runner as surely as an absolute bound does: the same parse is a steady 4.0x here and read 8.6x once on the windows leg, failing a pull request that touched neither grok nor parsing. (#3590)
 - An ordinary Russian word is no longer read as a key word: `включены`, `исключение`, `переключены` and `выключен` all contain `ключ`, and the pattern that allows words between the key and the colon reached across the sentence — a markdown link came back as `https:[redacted:credential]`. (#3589)
 - A password assigned with `=` is masked at the length people actually choose, including the `DB_PASS=` spelling: a JDBC URL, a query string, `--from-literal=password=` and a dotenv line all kept theirs in the clear under sixteen characters. A colon keeps its older reading. (#3588)

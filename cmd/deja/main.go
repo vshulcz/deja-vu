@@ -3754,6 +3754,7 @@ Usage:
   deja log [n] [--last] [--json]
   deja statusline
   deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
+             [--project name] [--harness name] [--since 30d] [--role name]
   deja remember "text" [--project name] [--tag name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja mcp

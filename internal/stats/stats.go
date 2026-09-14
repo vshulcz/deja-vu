@@ -35,18 +35,23 @@ type Report struct {
 	EmptiedByPolicy bool `json:"-"`
 	// HiddenBySettings is the reader's own tombstones and exclusions, when
 	// those are why the report is empty.
-	HiddenBySettings string         `json:"-"`
-	Sparkline        string         `json:"sparkline"`
-	DateRange        DateRangeStats `json:"date_range"`
-	Longest          SessionStat    `json:"longest_session"`
-	BusiestDay       DayStat        `json:"busiest_day"`
-	Recall           usage.Summary  `json:"recall"`
-	WeekRecalls      int            `json:"week_recalls"`
-	WeekBytes        int            `json:"week_bytes"`
-	WeekInjected     int            `json:"week_injected"`
-	HandoffsIn       int            `json:"handoffs_received"`
-	AgentCredits     int            `json:"agent_credits"`
-	WeekCredits      int            `json:"week_agent_credits"`
+	HiddenBySettings string `json:"-"`
+	// NarrowedBy names the filters that emptied a report over a store that is
+	// not empty, and OlderThanWindow is the extra line --since earns. Filled by
+	// the caller, which is where the flags the reader typed still exist.
+	NarrowedBy      string         `json:"-"`
+	OlderThanWindow string         `json:"-"`
+	Sparkline       string         `json:"sparkline"`
+	DateRange       DateRangeStats `json:"date_range"`
+	Longest         SessionStat    `json:"longest_session"`
+	BusiestDay      DayStat        `json:"busiest_day"`
+	Recall          usage.Summary  `json:"recall"`
+	WeekRecalls     int            `json:"week_recalls"`
+	WeekBytes       int            `json:"week_bytes"`
+	WeekInjected    int            `json:"week_injected"`
+	HandoffsIn      int            `json:"handoffs_received"`
+	AgentCredits    int            `json:"agent_credits"`
+	WeekCredits     int            `json:"week_agent_credits"`
 	// UsedNotCredited is the other half of the 2% (#3079): a reply that names
 	// a recalled session and does not say the line. An upper bound — see
 	// UsedNotCredited.
