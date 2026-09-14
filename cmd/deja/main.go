@@ -1907,8 +1907,17 @@ func hiddenByOwnSettings() string {
 	if n := len(index.Tombstones()); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d session%s forgotten (`deja forget --list`)", n, pluralS(n)))
 	}
-	if pats := sources.ExclusionPatterns(); len(pats) > 0 {
-		parts = append(parts, fmt.Sprintf("%d project pattern%s excluded from indexing (%s)", len(pats), pluralS(len(pats)), sources.ExcludePath()))
+	// Counted apart, because they are different rules and the reader acts on
+	// them differently: a project pattern hides work deja read, and a
+	// `harness:` line means a whole store was never walked (#3499). Calling
+	// both "project patterns" told someone who had excluded their only store
+	// that a project of theirs was hidden.
+	stores := sources.ExcludedHarnesses()
+	if n := len(sources.ExclusionPatterns()) - len(stores); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d project pattern%s excluded from indexing (%s)", n, pluralS(n), sources.ExcludePath()))
+	}
+	if n := len(stores); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d store%s not read at all (%s)", n, pluralS(n), sources.ExcludePath()))
 	}
 	if len(parts) == 0 {
 		return ""
@@ -3030,6 +3039,14 @@ func commonDir(paths []string) string {
 	return dir
 }
 
+// projectExcludePatterns is how many lines in the exclude file are project
+// patterns. A `harness:` line lives in the same file and is not one, so
+// counting them together reported "excluded-patterns=1" against every store on
+// a machine whose only rule was "never read this one" (#3499).
+func projectExcludePatterns() int {
+	return len(sources.ExclusionPatterns()) - len(sources.ExcludedHarnesses())
+}
+
 func printSources(dir string) {
 	redactions := map[string]int{}
 	if red, err := index.Redactions(dir); err == nil {
@@ -3085,7 +3102,17 @@ func printSources(dir string) {
 		{"crush", sources.CrushDataHome(), sources.CrushDBs(), sources.CrushDBs, sources.LoadCrush},
 		{"deja", sources.NotesFile(), []string{sources.NotesFile()}, func() []string { return presentFiles(sources.NotesFile()) }, sources.LoadNotes},
 	}
+	skipStore := sources.ExcludedHarnesses()
 	for _, it := range items {
+		// A store the reader excluded is named and not read. Walking it here
+		// reported three sessions and eighteen messages for a harness deja had
+		// just been told never to open, which is the opposite of what this
+		// screen is for (#3499).
+		if skipStore[it.name] {
+			fmt.Printf("%s\t%s\texcluded — `harness:%s` is in %s\n",
+				it.name, it.location, it.name, sources.ExcludePath())
+			continue
+		}
 		redacted := 0
 		for _, root := range it.roots {
 			redacted += redactionsUnder(redactions, root)
@@ -3126,7 +3153,7 @@ func printSources(dir string) {
 				note = "\t(" + reason + " — Zed threads unavailable)"
 			}
 		}
-		if n := len(sources.ExclusionPatterns()); n > 0 {
+		if n := projectExcludePatterns(); n > 0 {
 			note += fmt.Sprintf("\texcluded-patterns=%d", n)
 		}
 		if excluded > 0 {
@@ -3154,7 +3181,7 @@ func printSources(dir string) {
 		aiderLocation += string(os.PathListSeparator) + roots
 	}
 	note := ""
-	if n := len(sources.ExclusionPatterns()); n > 0 {
+	if n := projectExcludePatterns(); n > 0 {
 		note = fmt.Sprintf("\texcluded-patterns=%d", n)
 	}
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
@@ -3192,7 +3219,7 @@ func printSources(dir string) {
 	if size > 0 && !sources.SQLite3Available() {
 		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
 	}
-	if n := len(sources.ExclusionPatterns()); n > 0 {
+	if n := projectExcludePatterns(); n > 0 {
 		note += fmt.Sprintf("\texcluded-patterns=%d", n)
 	}
 	if opencodeExcluded > 0 {

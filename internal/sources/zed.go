@@ -202,7 +202,8 @@ func zedSinceWhere(t time.Time) string {
 
 func zedRows(db, cols, where string) ([]zedRow, error) {
 	q := "select " + cols + " from threads" + where + " order by updated_at"
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err

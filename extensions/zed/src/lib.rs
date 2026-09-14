@@ -72,6 +72,13 @@ impl DejaExtension {
             return Ok(path);
         }
 
+        // And the way that works inside the sandbox: ask the host to run deja
+        // rather than asking the filesystem where it is. See deja_on_path.
+        if let Some(name) = deja_on_path() {
+            self.cached_binary_path = Some(name.clone());
+            return Ok(name);
+        }
+
         // A copy from an earlier session is worth more than a fresh one: asking
         // GitHub for the latest release is a network round trip, and it happens
         // inside the window Zed gives the server to answer `initialize`. Sixty
@@ -213,6 +220,35 @@ fn installed_binary() -> Option<String> {
     candidates
         .into_iter()
         .find(|path| std::fs::metadata(path).is_ok())
+}
+
+/// `deja` if the host can run it, which is the one question that matters.
+///
+/// `installed_binary` below asks the filesystem, and inside the wasm sandbox an
+/// extension runs in it cannot: measured on the same target this is built for,
+/// every absolute candidate comes back `NotFound` (WASI errno 44) with no
+/// preopened directories, while a run with the filesystem preopened finds both
+/// an 11 MB `/opt/homebrew/bin/deja` and an 18 MB `~/.local/bin/deja` (#3392).
+/// So a user who already has deja was given an 11 MB download of it.
+///
+/// This asks differently. `zed::process::Command` runs on the host, not in the
+/// sandbox — the slash command has used it all along — so running `deja
+/// --version` answers whether the host can launch `deja`, by the same mechanism
+/// Zed will use to launch the server. Nothing is inferred: if the probe
+/// succeeds, the bare name works.
+///
+/// A false negative is the safe direction and the likely one: the command
+/// inherits whatever environment the host hands an extension, so a PATH that
+/// does not carry deja means a download, which is exactly today's behaviour.
+fn deja_on_path() -> Option<String> {
+    let output = zed::process::Command::new("deja")
+        .args(vec!["--version".to_string()])
+        .output()
+        .ok()?;
+    if output.status == Some(0) {
+        return Some("deja".to_string());
+    }
+    None
 }
 
 /// The newest `deja-<version>/deja` this extension downloaded before, if any.

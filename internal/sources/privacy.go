@@ -47,6 +47,51 @@ func ExclusionPatterns() []string {
 	return out
 }
 
+// harnessExcludePrefix marks a line in the exclude file that names a store
+// rather than a project.
+//
+// One file rather than two: the reader already keeps their privacy rules here,
+// and a store they will never read is the same kind of rule. `harness:opencode`
+// reads as what it is beside the project patterns, and a project that happens
+// to be called "harness:something" was never addressable by a pattern anyway.
+const harnessExcludePrefix = "harness:"
+
+// ExcludedHarnesses is the set of stores the reader has asked deja not to read.
+//
+// `deja doctor` reports a store it found but could not read as `needs-sqlite3`
+// or `needs-zstd`, which names a package to install. For a harness the reader
+// does not use, that is advice for a problem they do not have, and there was no
+// way to stop it: the exclude file took project patterns only (#3499).
+//
+// Exact names, not globs. The set is the twenty-five the loader registers and
+// `deja sources` prints them, so there is nothing to match loosely against, and
+// a typo that silently matched several stores is worse than one that matches
+// none.
+//
+// The prefix is what keeps the two namespaces apart, in both directions: a
+// plain `opencode` line is a project pattern and does not exclude the store of
+// that name, and a `harness:opencode` line carries its prefix into the project
+// matcher below, where it matches no project anyone has.
+func ExcludedHarnesses() map[string]bool {
+	out := map[string]bool{}
+	for _, pattern := range ExclusionPatterns() {
+		if name := strings.TrimPrefix(pattern, harnessExcludePrefix); name != pattern {
+			if name = strings.TrimSpace(name); name != "" {
+				out[name] = true
+			}
+		}
+	}
+	for _, name := range strings.Split(os.Getenv("DEJA_EXCLUDE_HARNESSES"), ",") {
+		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+// HarnessExcluded reports whether this store is one of them.
+func HarnessExcluded(name string) bool { return ExcludedHarnesses()[strings.ToLower(name)] }
+
 // Excluder answers exclusion questions from patterns read once. Sync imports
 // ask per record, and re-opening the exclude file for each one costs seconds
 // on a large batch.
@@ -62,6 +107,9 @@ func (e Excluder) Match(project string) bool {
 	project = strings.ToLower(project)
 	bare := strings.TrimPrefix(project, "imported:")
 	for _, pattern := range e.patterns {
+		// A `harness:` line names a store, not a project. Left in the pattern
+		// list it would exclude any project whose name contains the harness's —
+		// `harness:continue` would take out a project called "continue-deploy".
 		if strings.Contains(project, pattern) {
 			return true
 		}

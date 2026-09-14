@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -68,7 +67,8 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		`from sessions s join messages m on m.session_id=s.id` +
 		` where m.role in ('user','assistant')` + where +
 		` order by s.id,m.seq`
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err
