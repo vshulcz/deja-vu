@@ -143,6 +143,19 @@ var (
 	// Nobody writes `--password` in prose: the flag is machine input, and what
 	// follows it is the value whatever its length.
 	passwordFlagRE = regexp.MustCompile(`(?i)(^|\s)(--?(?:password|passwd|pwd))([ =]\\*['"]?)([^\s'"]{3,128})`)
+	// A password assigned with `=`, at the length people actually choose. The
+	// key-value floor of sixteen characters is right where the key word could
+	// be describing anything — `token`, `secret`, `key` — and wrong for this
+	// family, where the word names the value: measured through an index pass,
+	// `password=JdbcPass2026` in a JDBC URL, `password=QueryPass2026` in a
+	// query string, `--from-literal=password=K8sPass2026x` and a dotenv
+	// `DATABASE_PASSWORD=DotenvPass2026` all reached `deja show` in the clear
+	// (#3588).
+	//
+	// An equals sign and not a colon. `password: hunter2` is prose by an older
+	// decision this does not touch (escaped_json_test) — a colon is how a
+	// sentence is written and `=` is how a value is assigned.
+	passwordAssignRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:password|passwd|pwd))(\\*['"]?=\s*)(\\*['"]?)([^\s'"&]{3,128})`)
 	// A secret whose VALUE is not ASCII. Every pattern above ends in
 	// `[A-Za-z0-9/+=._-]{16,}`, so `пароль: БазаПароль2026` and `password:
 	// 非常に長いパスワード2026` were stored in the clear whatever the key word or
@@ -392,6 +405,9 @@ func Text(s string) (string, Counts) {
 	// equals sign when it is written `--password secret`.
 	if strings.Contains(lower, "passw") || strings.Contains(lower, "pwd") {
 		s = replaceGroup(s, passwordFlagRE, 4, "credential", counts, func(m []string) bool {
+			return notASecretValue(m[4])
+		})
+		s = replaceGroup(s, passwordAssignRE, 4, "credential", counts, func(m []string) bool {
 			return notASecretValue(m[4])
 		})
 	}

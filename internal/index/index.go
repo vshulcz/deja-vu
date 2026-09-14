@@ -231,7 +231,8 @@ import (
 // `[A-Za-z0-9/+=._-]{16,}`, so a password written in the alphabet its owner
 // types in was stored in the clear whatever the key word: 41 widened the key
 // words to those languages and left the value class where it was. Same reason
-// as 41 and 42 — redaction runs at ingest (#3587).
+// as 41 and 42 — redaction runs at ingest (#3587), and the password assigned
+// with an equals sign at any length (#3588).
 const version = 43
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
