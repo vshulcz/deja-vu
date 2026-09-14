@@ -649,6 +649,14 @@ func doctorHarnesses(w io.Writer, dir string) {
 
 	printRow := func(name, path string, present bool, detail string) {
 		status := "missing"
+		// A store the reader excluded says so whether or not it is on disk:
+		// "missing" would read as deja not finding it, and "found" as deja
+		// about to read it. Neither is true (#3499).
+		if inspected[name] == "excluded" {
+			fmt.Fprintf(w, "  %-12s %-9s %s\n", name, "excluded",
+				"not read — `harness:"+name+"` is in "+reportPath(sources.ExcludePath()))
+			return
+		}
 		if present {
 			status = "found"
 			// A directory deja cannot open loses its sessions from recall

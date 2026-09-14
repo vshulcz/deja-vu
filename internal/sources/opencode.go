@@ -173,7 +173,8 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	// What sqlite3 says when it refuses, not merely that it did. "exit status
 	// 1" is what a person was asked to report, and it names neither a renamed
 	// column nor a locked database nor a file that is not a database (#1642).
@@ -330,9 +331,9 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 // have one. The column arrived with subagents; a query that fails is a store
 // without it, and nothing is stamped.
 func opencodeParents(db string) map[string]string {
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
-		`select json_object('id',id,'parent_id',parent_id) from session `+
-			`where parent_id is not null and parent_id <> ''`)
+	cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'parent_id',parent_id) from session `+
+		`where parent_id is not null and parent_id <> ''`)
+	defer stopRead()
 	b, err := cmd.Output()
 	if err != nil || len(b) == 0 {
 		return nil
@@ -357,7 +358,8 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	if fi, e := os.Stat(OpencodeDB()); e != nil || fi.Size() == 0 {
 		return 0, 0, nil
 	}
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(OpencodeDB()), ".timeout 5000", "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
+	cmd, stopRead := sqliteReadCmd(OpencodeDB(), "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')")
+	defer stopRead()
 	b, err := cmd.Output()
 	if err != nil {
 		return 0, 0, err
@@ -404,8 +406,8 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	probe := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
-		"select id from session order by time_created desc limit 1")
+	probe, stopRead := sqliteReadCmd(db, "select id from session order by time_created desc limit 1")
+	defer stopRead()
 	var whyNot bytes.Buffer
 	probe.Stderr = &whyNot
 	out, err := probe.Output()
@@ -443,9 +445,9 @@ func opencodeSynthetic(v any) bool {
 // opencodeTitles maps a session id to the name opencode gave it, for the names
 // worth having. A store without the column stamps nothing.
 func opencodeTitles(db string) map[string]string {
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000",
-		`select json_object('id',id,'title',title) from session `+
-			`where title is not null and title <> ''`)
+	cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'title',title) from session `+
+		`where title is not null and title <> ''`)
+	defer stopRead()
 	b, err := cmd.Output()
 	if err != nil || len(b) == 0 {
 		return nil

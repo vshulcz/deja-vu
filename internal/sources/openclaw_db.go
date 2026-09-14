@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -74,7 +73,8 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	// and backslashes.
 	q := `select json_object('session_id',cast(e.session_id as text),'event_json',cast(e.event_json as text)) ` +
 		`from transcript_events e` + where + ` order by e.session_id, e.seq`
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	// Rows stream through the decoder rather than landing in one buffer: a
 	// store of a few gigabytes is normal for a daily-reset agent, and
 	// holding every event_json in memory before the first session is built

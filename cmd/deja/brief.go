@@ -12,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/nfcfold"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
@@ -568,10 +569,19 @@ func printNoHistory(w io.Writer, stale bool) {
 	// that claim. Every other empty answer draws the line through
 	// emptyIndexHint; this screen is written as an introduction rather than an
 	// answer, so it says it in its own shape (#1979).
+	// And the other reason nothing was found: the reader asked deja not to read
+	// it. "No agent has run here yet" is then advice for a state deja is not in
+	// — the store is on disk and deja was told to leave it alone (#3499).
+	excluded := len(sources.ExcludedHarnesses())
 	if denied := deniedStoreCount(); denied > 0 {
 		fmt.Fprintf(w, "Nothing was found on this machine, but %d store%s could not be\n",
 			denied, pluralS(denied))
 		fmt.Fprintf(w, "read (permission denied) — `deja doctor` names %s.\n", pluralWhich(denied))
+	} else if excluded > 0 {
+		fmt.Fprintf(w, "Nothing was found on this machine, and %d store%s excluded in\n",
+			excluded, pluralS(excluded))
+		fmt.Fprintf(w, "%s — `deja doctor` names %s.\n",
+			reportPath(sources.ExcludePath()), pluralWhich(excluded))
 	} else {
 		fmt.Fprintln(w, "Nothing was found on this machine, which usually means no agent has")
 		fmt.Fprintln(w, "run here yet, or its store lives somewhere else.")

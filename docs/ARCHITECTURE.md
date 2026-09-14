@@ -41,6 +41,8 @@ File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Re
 
 opencode and Cursor IDE state are read through the local `sqlite3` command. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency.
 
+Every one of those reads carries a wall-clock budget, ten minutes by default. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself, and nothing in the tree set a deadline, so the run looked hung rather than slow. A store that runs out is an ordinary read error: the harness reports as unreadable, `deja doctor` names it, and the rest of the index still builds. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the cap off for someone who would rather wait than lose a store.
+
 ## Index format
 
 Default path: `~/.cache/deja/index.db`.

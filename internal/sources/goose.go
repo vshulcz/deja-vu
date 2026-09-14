@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -300,7 +299,7 @@ func gooseToolResult(m map[string]any) string {
 // why — the failure that produced #2873 in the first place. So: a type is a
 // person's work until goose is known to write it for itself.
 func gooseTypeFilter(db string) string {
-	out, err := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", "pragma table_info(sessions)").Output()
+	out, err := sqliteOutput(db, "pragma table_info(sessions)")
 	if err != nil || !bytes.Contains(out, []byte("session_type")) {
 		return ""
 	}
@@ -367,7 +366,8 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		`from sessions s join messages m on m.session_id=s.id ` +
 		`where m.role in ('user','assistant')` + gooseTypeFilter(db) + where +
 		` order by s.id,m.created_timestamp,m.id` + lim
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	dec, err := sqliteRows(cmd)
 	if err != nil {
 		return nil, err

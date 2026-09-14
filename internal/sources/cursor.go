@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -286,7 +285,8 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 func cursorQuery(db, q string) ([]map[string]any, error) {
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. A bubble's text is a chat turn.
-	cmd := exec.Command("sqlite3", "-readonly", sqliteTarget(db), ".timeout 5000", q)
+	cmd, stopRead := sqliteReadCmd(db, q)
+	defer stopRead()
 	b, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("cursor sqlite: %w", err)
