@@ -146,11 +146,16 @@ begin;
 			// The blobs are marshalled rather than assembled: a transcript is
 			// full of quotes, and hand-written JSON around it is one apostrophe
 			// away from a store that does not parse.
-			message := benchJSON(map[string]any{"role": roleOrUser(m.Role)})
-			part := benchJSON(map[string]any{
-				"type": "text",
-				"text": m.Text,
-				"time": map[string]any{"start": stamp.Format(time.RFC3339)},
+			message := benchJSON(benchMessageBlob{Role: roleOrUser(m.Role)})
+			// Field order matters: the reader gates on `"type":"text"` inside
+			// the first 120 bytes of the blob, which is what keeps it from
+			// parsing every part in the table. A map would sort the keys and
+			// push the type past a long turn, and the fixture would then
+			// measure a store the reader skips.
+			part := benchJSON(benchPartBlob{
+				Type: "text",
+				Text: m.Text,
+				Time: benchPartTime{Start: stamp.Format(time.RFC3339)},
 			})
 			fmt.Fprintf(&b, "insert into message values(%s,%s,%d,%s);\n",
 				sqlText(mid), sqlText(id), stamp.UnixMilli(), sqlText(message))
@@ -198,6 +203,21 @@ func roleOrUser(role string) string {
 
 // sqlText renders a Go string as a SQL literal.
 func sqlText(s string) string { return "'" + strings.ReplaceAll(s, "'", "''") + "'" }
+
+// The blobs the fixture writes, in the field order opencode writes them.
+type benchMessageBlob struct {
+	Role string `json:"role"`
+}
+
+type benchPartBlob struct {
+	Type string        `json:"type"`
+	Text string        `json:"text"`
+	Time benchPartTime `json:"time"`
+}
+
+type benchPartTime struct {
+	Start string `json:"start"`
+}
 
 // benchJSON marshals a blob for the store, so nothing in a transcript can
 // break out of the JSON it is written into.

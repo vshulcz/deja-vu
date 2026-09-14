@@ -52,6 +52,18 @@ func TestBenchReadHoldsTheLongValueToTheRestOfTheStore(t *testing.T) {
 	if plain.Sessions == 0 || plain.Messages == 0 {
 		t.Fatalf("the ordinary store read nothing: %#v", plain)
 	}
+	// Every message of the corpus has to come back, or the benchmark is timing
+	// a store the reader mostly skips. The reader gates on `"type":"text"` in
+	// the head of a part, so a fixture that writes its fields in another order
+	// halves what it measures without saying so.
+	corpus := bench.Generate(bench.Seed)
+	want := 0
+	for _, s := range corpus.Sessions {
+		want += len(s.Messages)
+	}
+	if plain.Messages != want {
+		t.Fatalf("read %d messages of the corpus's %d — the reader skipped what the fixture wrote", plain.Messages, want)
+	}
 	// The long value is one more message, and it is the only difference
 	// between the two stores — otherwise the ratio below compares two
 	// different corpora.
