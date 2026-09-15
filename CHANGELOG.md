@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.20.1] - 2026-09-15
 
 ### Changed
+- The relevance tier reads and folds the messages that matched instead of every message of every candidate. The ranking already knew which records they were — the per-message signals are keyed by their offsets — and the exact tier has read records at offsets since it was written. On a 2,716-session store one relevance query was folding 120.7 MB across 140,355 messages, of which 10.3% held any query term: measured interleaved, 1,740 ms to 480 ms and peak RSS 377 MB to 158 MB. Quality is unchanged on every benchmark — LoCoMo 69.7% hit@1 / 0.767 MRR, LongMemEval 84.8% / 0.894, day0bench over 19,195 sessions 13/60 hit@1 and 27/60 hit@5 with p50 80 ms to 61 ms, and the recall and prompt benches identical. (#3491)
 - A search hit carries the passages that matched rather than its session's whole transcript: the matched messages, each with the answer after it, at most twenty per hit, plus `messages_total` and `messages_capped`. The size of an answer used to be the size of the reader's longest transcript — on a 2,716-session store `deja search --json` returned 136 MB over 50 hits and 140,841 messages, and encoding it was a second of the 2.7 it took and half a gigabyte of resident memory. Measured interleaved on that store: 136.18 MB to 2.60 MB, 2,660 ms to 1,790 ms, peak RSS 803 MB to 361 MB, with the recall, context and prompt benches unmoved. `deja blame --json` takes the same bound. (#3620)
 
 ### Added

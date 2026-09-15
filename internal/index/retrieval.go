@@ -486,7 +486,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		if len(weak) > relevanceWindow {
 			weak = weak[:relevanceWindow]
 		}
-		ss, err := sessionsServable(dir, weak, o)
+		ss, err := sessionsAtOffsets(dir, m, o, weak, rank.offsets)
 		if err != nil {
 			return SearchResult{}, err
 		}
@@ -498,7 +498,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 		weak = weak[:relevanceWindow-len(keep)]
 	}
 	keep = append(keep, weak...)
-	ss, err := sessionsServable(dir, keep, o)
+	ss, err := sessionsAtOffsets(dir, m, o, keep, rank.offsets)
 	if err == nil && len(m.Sessions) >= bestMessageStore {
 		ss = rerankByBestMessage(ss, terms, rank.idf)
 	}
@@ -850,6 +850,11 @@ type relevanceRanking struct {
 	// to show can weigh it the same way the ranking weighed the session rather
 	// than approximating it.
 	idf map[string]float64
+	// offsets are the records that matched, per session ordinal. The ranking
+	// collects them anyway — the per-message signals are keyed by offset — and
+	// they are what lets the tier read and fold the messages that matched
+	// instead of every message of every candidate (#3491).
+	offsets map[uint32][]int64
 }
 
 // relevanceScored is one session's standing after the ranking pass: its score
@@ -1435,6 +1440,20 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		strong = append(strong, r.strong)
 		naming = append(naming, r.naming)
 	}
+	// The records that matched, for the sessions that survived the window.
+	// perMessage is keyed by offset because the per-message signals need it;
+	// handing it on is what lets the caller read those records instead of
+	// every record of every candidate (#3491).
+	offsets := make(map[uint32][]int64, len(ranked))
+	for _, r := range ranked {
+		if mm := perMessage[r.meta.Ord]; len(mm) > 0 {
+			offs := make([]int64, 0, len(mm))
+			for off := range mm {
+				offs = append(offs, off)
+			}
+			offsets[r.meta.Ord] = offs
+		}
+	}
 	return relevanceRanking{
 		metas:       metas,
 		informative: matched,
@@ -1444,7 +1463,67 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		termsKnown:  termsKnown,
 		total:       matchedTotal,
 		idf:         idfOf,
+		offsets:     offsets,
 	}, readErr
+}
+
+// sessionsAtOffsets loads the records at the given offsets and groups them by
+// session, in the order the metas are given.
+//
+// It is scanRecordsWithVariants without the record matcher: that one re-checks
+// the query against every record it reads, which is right for the exact tier
+// and wrong here — a relevance match is a stem or a rare-word hit the raw query
+// does not appear in. The withholding rules are the same, and so is the ignore
+// rule, because this is the other place a tier turns manifest entries into
+// sessions (#3491).
+func sessionsAtOffsets(dir string, m Manifest, o query.Options, metas []SessionMeta, offsets map[uint32][]int64) ([]model.Session, error) {
+	var flat []int64
+	rank := make(map[string]int, len(metas))
+	for i, meta := range metas {
+		rank[meta.Harness+":"+meta.ID] = i
+		flat = append(flat, offsets[meta.Ord]...)
+	}
+	if len(flat) == 0 {
+		return nil, nil
+	}
+	f, err := openIndexFile(filepath.Join(dir, "records.bin"))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	by := map[string]*model.Session{}
+	if err := eachRecordAt(f, sortedUniqueOffsets(flat), tablesFromManifest(m), func(r Record) {
+		meta, ok := m.Sessions[r.Key]
+		if !ok {
+			return
+		}
+		if _, wanted := rank[r.Key]; !wanted {
+			return
+		}
+		if !recordServable(r.Role, o) {
+			return
+		}
+		sess := by[r.Key]
+		if sess == nil {
+			cp := sessionFromMeta(meta)
+			sess = &cp
+			by[r.Key] = sess
+		}
+		sess.Messages = append(sess.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	}); err != nil {
+		return nil, err
+	}
+	out := make([]model.Session, 0, len(by))
+	for _, sess := range by {
+		orderPromotedNote(sess)
+		out = append(out, *sess)
+	}
+	// Back into the ranked order: the records came off disk in log order, and
+	// the order the ranking chose is what the caller serves.
+	sort.SliceStable(out, func(i, j int) bool {
+		return rank[out[i].Harness+":"+out[i].ID] < rank[out[j].Harness+":"+out[j].ID]
+	})
+	return ignoredByPolicy(out), nil
 }
 
 // FirstMatch tries candidate queries in order under ONE lock and manifest
