@@ -130,6 +130,23 @@ Stemmed search may also include `variants`; semantic search sets `semantic`.
 matches overlap this hit — an earlier-attempt signal. `reused` (optional)
 counts recent agent recalls that served this session.
 
+### What a hit's `messages` are
+
+The passages that matched, each with the message after it — the answer to what
+matched — and at most twenty per hit. `messages_total` is how many messages the
+session holds and `messages_capped` says the list is a selection; both are
+omitted when the whole session fits. `snippets` is unchanged: the two or three
+excerpts the text output prints.
+
+A hit used to carry its session's whole message list, which made the size of an
+answer the size of the reader's longest transcript: on a 2,716-session store one
+relevance answer was 136 MB over 50 hits and 140,841 messages, and encoding it
+cost a second of wall time and half a gigabyte of resident memory. The same
+answer is 2.6 MB now. `deja show --json` is the surface for a whole session, and
+it carries a window (`offset`, `limit`, `total`, `returned`) for the same reason.
+
+`deja blame --json` applies the same bound to the messages that mention the file.
+
 `--limit N` bounds the ranked result set to 1–100 hits, on the tiers that serve
 that cap (see [`hits` is not a fixed
 window](#hits-is-not-a-fixed-window-across-tiers)). Every machine session has

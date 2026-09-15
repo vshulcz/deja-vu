@@ -15,6 +15,10 @@ func TestBlameHitShapeIsStable(t *testing.T) {
 		"session": true, "title": true, "count": true, "snippets": true,
 		"score": true, "specificity": true, "tier": true,
 		"lifecycle": true, "lifecycle_note": true, "lifecycle_at": true,
+		// The bound on what a hit carries, and the count it was bounded
+		// against: an answer used to be the size of the reader's longest
+		// transcript (#3620).
+		"messages_total": true, "messages_capped": true,
 	}
 	got := map[string]bool{}
 	rt := reflect.TypeOf(BlameHit{})

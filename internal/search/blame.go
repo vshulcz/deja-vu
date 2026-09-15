@@ -35,6 +35,13 @@ type BlameHit struct {
 	Count    int           `json:"count"`
 	Snippets []string      `json:"snippets"`
 	Score    float64       `json:"score"`
+	// The same bound the search hits carry: the messages that mention the file
+	// rather than the session's whole transcript, which was 46 MB of one JSON
+	// answer on a real store (#3620).
+	MessagesTotal  int  `json:"messages_total,omitempty"`
+	MessagesCapped bool `json:"messages_capped,omitempty"`
+	// matched are the indices of those messages, in message order.
+	matched []int
 	// Specificity is how fully the session named the file — a path against a
 	// bare name — and is what orders the answer before the score does (#2840).
 	Specificity float64 `json:"specificity"`
@@ -148,7 +155,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			role  string
 		}
 		var mentions []mention
-		for _, message := range session.Messages {
+		for mi, message := range session.Messages {
 			// The transcript's record of a past `deja blame` names the file in
 			// every line of its own output, so blame ranked its own answer as
 			// the history of the file and quoted it back. Recall was fixed for
@@ -166,6 +173,7 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 				specificity = level
 			}
 			mentions = append(mentions, mention{text, count, level, message.Role})
+			hit.matched = append(hit.matched, mi)
 		}
 		// A path-shaped mention outranks a bare filename however often the bare
 		// name is repeated; among equally specific ones, the message that keeps
@@ -448,6 +456,22 @@ func sessionTitle(s model.Session) string {
 	return ""
 }
 
+// boundedBlameHit is boundedHit for a blame answer: the messages that mention
+// the file, bounded, with the session's real count beside them.
+func boundedBlameHit(h BlameHit) BlameHit {
+	total := len(h.Session.Messages)
+	if total == 0 {
+		return h
+	}
+	h.MessagesTotal = total
+	kept, capped := boundedMessages(h.Session.Messages, h.matched)
+	if len(kept) != total {
+		h.Session.Messages = kept
+		h.MessagesCapped = capped
+	}
+	return h
+}
+
 func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -460,6 +484,7 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		out := make([]BlameHit, len(hits))
 		copy(out, hits)
 		for i := range out {
+			out[i] = boundedBlameHit(out[i])
 			out[i].Session = SafeSession(out[i].Session)
 			out[i].Title = SafeText(out[i].Title)
 			out[i].Snippets = SafeStrings(out[i].Snippets)

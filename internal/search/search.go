@@ -92,6 +92,15 @@ type Hit struct {
 	// decision was rejected, superseded or has gone stale. A hit on a raw
 	// transcript used to arrive with no trace of that, so a decision someone
 	// had explicitly reverted came back reading like current truth.
+	// MessagesTotal is how many messages the session holds, and MessagesCapped
+	// says the list below it is the matched passages rather than all of them.
+	// A hit used to carry every message of its session: on a real store one
+	// relevance answer was 136 MB over 50 hits and 140,841 messages, its
+	// largest hit 53 MB, because the size of an answer was the size of the
+	// reader's longest transcript. `show --json` is the surface for a whole
+	// session and has a documented window; a hit is about what matched (#3620).
+	MessagesTotal  int  `json:"messages_total,omitempty"`
+	MessagesCapped bool `json:"messages_capped,omitempty"`
 	// Moved is set by the CLI when some of the files this session touched have
 	// commits since it ended. Computing it means forking git, which this
 	// package does not do, so it arrives filled in rather than derived here.
@@ -99,6 +108,10 @@ type Hit struct {
 	Lifecycle     string `json:"lifecycle,omitempty"`
 	LifecycleNote string `json:"lifecycle_note,omitempty"`
 	LifecycleAt   string `json:"lifecycle_at,omitempty"`
+	// matched are the indices of the messages that carried the match, in
+	// message order. The scorers compute them anyway; keeping them is what
+	// lets the JSON serve the passages a hit is about instead of a transcript.
+	matched []int
 	// snipTexts are the passages this hit would quote, chosen during scoring
 	// and rendered only if the hit survives the cap. Rendering them in the
 	// scoring loop made a search cost the same at --limit 1 and --limit 100:
@@ -353,6 +366,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 			if lastIdx < 0 || c.at > snipCands[lastIdx].at {
 				lastIdx = i
 			}
+		}
+		for _, c := range snipCands {
+			doc.hit.matched = append(doc.hit.matched, c.at)
 		}
 		shown := -1
 		for i := 0; i < len(snipCands) && i < 3; i++ {
@@ -1312,6 +1328,85 @@ func mergeSessions(in []model.Session) []model.Session {
 	return out
 }
 
+// jsonHitMessages is how many messages one hit may carry. Three excerpts is
+// what the text path shows; twenty leaves room for the passages around them
+// and still bounds an answer a script has to hold in memory.
+const jsonHitMessages = 20
+
+// boundedHit is one hit with its session's message list reduced to the
+// passages that matched.
+//
+// The whole list was encoded before: 136 MB for one relevance answer on a real
+// store, a second of the 2.6 it took, and half a gigabyte of resident memory —
+// all of it text the caller did not ask about, since a hit's own excerpts are
+// in `snippets` and a whole session is what `show --json` is for (#3620).
+//
+// A tier that records no indices — nothing in tree does, but the field is
+// unexported and a future one might not — keeps the newest messages, where a
+// session says what it settled.
+func boundedHit(h Hit) Hit {
+	total := len(h.Session.Messages)
+	if total == 0 {
+		return h
+	}
+	h.MessagesTotal = total
+	kept, capped := boundedMessages(h.Session.Messages, h.matched)
+	if len(kept) != total {
+		h.Session.Messages = kept
+		h.MessagesCapped = capped
+	}
+	return h
+}
+
+// boundedMessages keeps the messages at the given indices, in message order,
+// at most jsonHitMessages of them.
+//
+// No indices — nothing in tree, but the field is unexported and a future tier
+// might not set it — keeps the newest, where a session says what it settled.
+func boundedMessages(ms []model.Message, matched []int) ([]model.Message, bool) {
+	total := len(ms)
+	keep := make([]int, 0, len(matched)*2)
+	for _, i := range matched {
+		// The match and the line after it: a question is answered by what
+		// follows, which is why the MCP listing attaches exactly that (#1163).
+		keep = append(keep, i, i+1)
+	}
+	if len(matched) == 0 {
+		from := total - jsonHitMessages
+		if from < 0 {
+			from = 0
+		}
+		for i := from; i < total; i++ {
+			keep = append(keep, i)
+		}
+	}
+	// Without repeats: a message can match several terms, and the exact path
+	// appends one candidate per match.
+	seen := make(map[int]bool, len(keep))
+	order := make([]int, 0, len(keep))
+	for _, i := range keep {
+		if i < 0 || i >= total || seen[i] {
+			continue
+		}
+		seen[i] = true
+		order = append(order, i)
+	}
+	sort.Ints(order)
+	if len(order) > jsonHitMessages {
+		// The newest of them: a long session's later word on the subject is
+		// the one worth carrying, which is the rule the third excerpt follows.
+		order = order[len(order)-jsonHitMessages:]
+	}
+	if len(order) == total {
+		return ms, false
+	}
+	out := make([]model.Message, 0, len(order))
+	for _, i := range order {
+		out = append(out, ms[i])
+	}
+	return out, true
+}
+
 // SafeSession is a session with the text a transcript supplied filtered the way
 // the printer filters it: newlines and tabs survive, because a JSON string
 // holds them and a reader may want the shape of a message, and the characters
@@ -1369,7 +1464,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		// and the invisible instructions that SafeText exists to stop — on the
 		// one surface a dashboard reads (#3616).
 		for i := range hits {
-			hits[i] = safeHit(hits[i])
+			hits[i] = safeHit(boundedHit(hits[i]))
 		}
 		// One shape, always. The exact path used to emit a bare array while
 		// every fallback path emitted an object, so a consumer had to handle
@@ -2826,6 +2921,9 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 				hit.Count++
 				best = append(best, msgScore{mi, distinct, weighted, center})
 			}
+		}
+		for _, b := range best {
+			hit.matched = append(hit.matched, b.idx)
 		}
 		// Heaviest first; a stable sort keeps message order among ties.
 		sort.SliceStable(best, func(i, j int) bool { return best[i].weighted > best[j].weighted })

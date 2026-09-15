@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.20.1] - 2026-09-15
 
+### Changed
+- A search hit carries the passages that matched rather than its session's whole transcript: the matched messages, each with the answer after it, at most twenty per hit, plus `messages_total` and `messages_capped`. The size of an answer used to be the size of the reader's longest transcript — on a 2,716-session store `deja search --json` returned 136 MB over 50 hits and 140,841 messages, and encoding it was a second of the 2.7 it took and half a gigabyte of resident memory. Measured interleaved on that store: 136.18 MB to 2.60 MB, 2,660 ms to 1,790 ms, peak RSS 803 MB to 361 MB, with the recall, context and prompt benches unmoved. `deja blame --json` takes the same bound. (#3620)
+
 ### Added
 - A store can be excluded, not just a project: a line prefixed `harness:` in `~/.config/deja/exclude`, or `DEJA_EXCLUDE_HARNESSES`. deja then neither walks it nor asks for the tool that would read it, and every screen that mentions stores says so — `deja doctor` on both its surfaces, `deja sources`, and the empty screens, which used to blame a machine no agent had run on for a store that is on disk and deliberately unread. Previously the only way to stop `needs-sqlite3` advice for a harness the reader does not use was to install the package. (#3499)
 - `deja bench read`: what it costs to read a database-backed store, and what one long escape-heavy value does to it. Every other benchmark runs against an already-indexed corpus, which is how a reader that took 2,287s on a 6.16 MB value stayed invisible while all of them held flat. (#3552)
