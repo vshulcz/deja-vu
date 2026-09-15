@@ -1,0 +1,61 @@
+{
+  "benchmark": "LoCoMo",
+  "harness": "scripts/locomo",
+  "run_at": "2026-09-15",
+  "dataset": {
+    "name": "locomo10.json",
+    "bytes": 2805274,
+    "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4"
+  },
+  "questions": 1982,
+  "wall_seconds": 8.853070834,
+  "median_search_ms": 3.858,
+  "rows": [
+    {
+      "name": "multi-hop",
+      "n": 282,
+      "hit@1": 47.5177304964539,
+      "hit@5": 71.98581560283688,
+      "mrr": 0.5792410107903156
+    },
+    {
+      "name": "temporal",
+      "n": 321,
+      "hit@1": 69.78193146417445,
+      "hit@5": 87.85046728971963,
+      "mrr": 0.7752889315235603
+    },
+    {
+      "name": "open-domain",
+      "n": 92,
+      "hit@1": 35.869565217391305,
+      "hit@5": 66.30434782608695,
+      "mrr": 0.5024805508501163
+    },
+    {
+      "name": "single-hop",
+      "n": 841,
+      "hit@1": 76.81331747919144,
+      "hit@5": 89.65517241379311,
+      "mrr": 0.8233676202909261
+    },
+    {
+      "name": "adversarial*",
+      "n": 446,
+      "hit@1": 77.3542600896861,
+      "hit@5": 89.01345291479821,
+      "mrr": 0.8284186270073898
+    }
+  ],
+  "total": {
+    "name": "TOTAL",
+    "n": 1982,
+    "hit@1": 69.72754793138245,
+    "hit@5": 85.62058526740665,
+    "mrr": 0.7670881932644322
+  },
+  "notes": {
+    "adversarial": "category 5 is unanswerable by design and is reported as its own row",
+    "metric": "session-level retrieval through the production search ladder; no LLM answers a question"
+  }
+}

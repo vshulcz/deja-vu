@@ -25,6 +25,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/scripts/benchresult"
 )
 
 type locomoSample struct {
@@ -44,6 +45,7 @@ var evidenceRE = regexp.MustCompile(`D(\d+):\d+`)
 func main() {
 	dataPath := flag.String("data", "locomo10.json", "path to locomo10.json")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
+	out := flag.String("out", "", "write the run's numbers as JSON to this path")
 	flag.Parse()
 	var missFile *os.File
 	if *dumpMisses != "" {
@@ -146,6 +148,37 @@ func main() {
 	}
 	fmt.Printf("%-18s %6d %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), total.mrr/float64(total.n))
 	fmt.Println("* adversarial questions are unanswerable by design; retrieval still locates the referenced session")
+
+	if *out == "" {
+		return
+	}
+	ds, err := benchresult.DescribeDataset(*dataPath)
+	if err != nil {
+		fatal(err)
+	}
+	res := benchresult.Result{
+		Benchmark:      "LoCoMo",
+		Harness:        "scripts/locomo",
+		Dataset:        ds,
+		Questions:      total.n,
+		WallSeconds:    time.Since(start).Seconds(),
+		MedianSearchMS: float64(searchTimes[len(searchTimes)/2].Microseconds()) / 1000,
+		Total: benchresult.Row{Name: "TOTAL", N: total.n, Hit1: pct(total.r1, total.n),
+			Hit5: pct(total.r5, total.n), MRR: total.mrr / float64(total.n)},
+		Notes: map[string]string{
+			"metric":      "session-level retrieval through the production search ladder; no LLM answers a question",
+			"adversarial": "category 5 is unanswerable by design and is reported as its own row",
+		},
+	}
+	for _, c := range cats {
+		b := byCat[c]
+		res.Rows = append(res.Rows, benchresult.Row{Name: names[c], N: b.n,
+			Hit1: pct(b.r1, b.n), Hit5: pct(b.r5, b.n), MRR: b.mrr / float64(b.n)})
+	}
+	if err := benchresult.Write(*out, res); err != nil {
+		fatal(err)
+	}
+	fmt.Printf("wrote %s\n", *out)
 }
 
 func buildDialogIndex(sample locomoSample) (string, func(), error) {
