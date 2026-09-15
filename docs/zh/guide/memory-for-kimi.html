@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+<meta name="description" content="如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话">
+<meta property="og:description" content="如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话">
+<meta name="twitter:description" content="如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Kimi Code 加记忆", "description": "如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 Kimi Code 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么让 Kimi Code 记得之前的会话？", "acceptedAnswer": {"@type": "Answer", "text": "用 /plugins install https://github.com/vshulcz/deja-vu 装插件，或者跑 deja install kimi-auto。两种方式都会加上 MCP 工具（查的是本机所有智能体转录构成的本地索引）以及每次提问时的召回。"}}, {"@type": "Question", "name": "Kimi Code 的会话历史存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.kimi-code/sessions 下，按会话内的每个 agent 一份 JSONL 线上日志——KIMI_CODE_HOME 可以整棵树搬走。"}}, {"@type": "Question", "name": "Kimi 插件会和 deja CLI 的安装冲突吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。插件的每一半在发现 deja install kimi 已经接好的东西时就让位，所以工具不会列两遍，召回也不会注入两次。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html" aria-current="page">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>给 Kimi Code 加记忆</h1>
+<p class="pagelede">一条 /plugins install，会话就不再从空白开始<span class="mins" data-mins></span></p>
+
+<p>Kimi Code 每个会话都从空白开始，而它留下来的会话只是它自己的。真正能回答今天这个问题的历史，通常散在前几个月你用过的其他工具里。</p>
+
+<h2>Kimi 已经有的部分</h2>
+<p>会话写在 <code>~/.kimi-code/sessions</code> 下，是 JSONL 线上日志，一个会话里的每个 agent 各一份（<code>KIMI_CODE_HOME</code> 可以把整棵树搬走）。这些文件可读、也完整；只是没有谁会替你读回来。</p>
+
+<h2>接上召回</h2>
+<pre>/plugins install https://github.com/vshulcz/deja-vu</pre>
+<p>Kimi 直接从仓库装插件——清单文件放在仓库根目录，这也是那个文件存在的唯一原因。它需要 <a href="https://github.com/vshulcz/deja-vu">deja</a> 二进制，建索引和检索都由它来做：</p>
+<pre>brew install deja-vu
+# 或者
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+<p>如果走 CLI，<code>deja install kimi-auto</code> 会把 MCP 服务器写进 <code>mcp.json</code>，把一个 <code>[[hooks]]</code> 块写进 <code>config.toml</code>。两种方式并存没问题：插件会读这两个文件，安装器已经覆盖的部分它就跳过。</p>
+
+<h2>装完多了什么</h2>
+<ul>
+<li>MCP 服务器，带 <code>deja</code> 工具和它在各处都提供的六种模式。</li>
+<li><code>deja-history</code> 技能，这样在工具不可达时智能体也知道 CLI 的用法。</li>
+<li><code>/deja:recall &lt;查询&gt;</code>，用来直接提问。</li>
+<li>会话第一次提问时的项目摘要，之后每次提问时的召回——都走 <code>UserPromptSubmit</code> 钩子。Kimi 会把钩子的 stdout 追加到这一轮的上下文里，并且会把该事件上的每个钩子都跑一遍，所以两者并存；摘要限制为每个会话一次。历史给不出答案时，召回保持沉默。</li>
+<li>压缩时的遗忘，走 <code>PreCompact</code> 钩子：线程丢掉上下文时，已经给它看过的块列表也一起丢掉，这样召回可以再说一遍。</li>
+</ul>
+<p>在 Kimi Code 0.28.1 上靠读它实际发出的请求量过：<code>UserPromptSubmit</code> 是唯一一个输出能到达模型的事件。<code>SessionStart</code> 钩子会跑，但输出无处可去，所以摘要改成搭第一次提问的车；<code>PreToolUse</code> 能拦住一个工具，却不能往里加东西；<code>PostToolUse</code> 和 <code>PostToolUseFailure</code> 是发出即忘，所以命令失败之后的那次修复——Claude Code 和 Codex 有的那一份——在这里没有落点。</p>
+
+<h2>和这个 harness 无关的那一半</h2>
+<p>索引覆盖这台机器上每个智能体的转录——今天是二十五个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="../../guide/repeated-mistakes.html">同一面墙又撞上来</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/kimi">插件源码</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

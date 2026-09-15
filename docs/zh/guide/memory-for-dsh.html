@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+<meta name="description" content="如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话">
+<meta property="og:description" content="如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话">
+<meta name="twitter:description" content="如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 DeepSeek Harness 加记忆", "description": "如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 dsh 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "DeepSeek Harness 记得之前的会话吗？", "acceptedAnswer": {"@type": "Answer", "text": "它可以通过内置的 session-query 子系统搜自己的会话，但读不到这台机器上其他智能体记录的内容；而且新会话默认不会去查。"}}, {"@type": "Question", "name": "怎么给 dsh 加上跨智能体的记忆？", "acceptedAnswer": {"@type": "Answer", "text": "dsh plugin --profile web add dsh-deja，或者在装了 CLI 的情况下用 deja install dsh-auto。两种方式都会给模型一批工具，查的是本机所有智能体转录构成的本地索引，并在系统提示里带上召回。"}}, {"@type": "Question", "name": "DeepSeek Harness 的会话存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 $DSH_HOME 下（默认 ~/.dsh），格式是 zstd 分帧的 JSONL，一个会话一个文件——所以读它们需要 zstd。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="memory-for-dsh.html" aria-current="page">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>给 DeepSeek Harness 加记忆</h1>
+<p class="pagelede">dsh 自己的会话由 session-query 回答；这一页讲剩下的那部分<span class="mins" data-mins></span></p>
+
+<p>dsh 本来就能回答关于它自己对话的问题——内置的 <code>session-query</code> 子系统就是干这个的。这一页讲的是另一个问题：在同一台机器上，你在 Claude Code、Codex、Cursor、opencode 或 Zed 里做过什么，包括 dsh 还没装上来之前。</p>
+
+<h2>dsh 已经有的部分</h2>
+<p>会话放在 <code>$DSH_HOME</code>（默认 <code>~/.dsh</code>）下，格式是 zstd 分帧的 JSONL，一个会话一个文件，<code>session-query</code> 搜的就是它们。两个限制：只有 dsh 自己的历史，而且新会话不会主动去查，除非你开口。</p>
+
+<h2>接上召回</h2>
+<pre>dsh plugin --profile web add dsh-deja</pre>
+<p>插件跑的是 <a href="https://github.com/vshulcz/deja-vu">deja</a> 二进制，索引由它来建。npm 会随包装一份，但 PATH 上已有的 <code>deja</code> 优先，<code>DEJA_BIN</code> 又能覆盖这两者——所以版本由你自己的 <code>deja update</code> 或 <code>brew upgrade</code> 决定，而不是某个插件版本冻住的那一份。</p>
+<p>如果用 CLI：</p>
+<pre>deja install dsh-auto</pre>
+<p>这条命令把 MCP 服务器和 <code>/deja</code> 命令写进 profile 的补丁层，并装上那个把召回放到模型前面的插件。<code>deja install --auto</code> 一次过对这台机器上其他每个智能体做同样的事。</p>
+<p>两种方式一起用也没问题：包会去看安装器在 <code>$DSH_HOME/plugins/deja/</code> 里写了什么，只补缺的那部分，所以不会出现两个 <code>/deja</code> 命令或者同一段召回来两次。</p>
+
+<h2>装完多了什么</h2>
+<p>六个模型可以调用的工具——搜历史会话、完整读一个会话、看某个文件的改动史、问某个报错最后是怎么修好的、问某条命令在这台机器上实际怎么跑、记下一个结论——一个直接提问用的 <code>/deja</code> 命令，以及会自己到场的召回：每次组装之前，插件会问这台机器的历史能不能回答当前提问，能就加进去。多数情况下它什么也不说。</p>
+<p>如果你自己写 dsh 插件，有个实现细节值得知道：召回走的是 <code>ctx.systemPrompt.context</code>，不是 <code>agent/pre-step</code> 上的中间件。那个看起来更顺的写法能正常加载、能跑完一轮，但永远到不了模型——瀑布流里后面的监听器会用 payload 重建自己的回答，插进去的消息被丢掉，而且什么都不报。这个结论是靠读 dsh 实际发出的请求定下来的。</p>
+
+<h2>和这个 harness 无关的那一半</h2>
+<p>索引覆盖这台机器上每个智能体的转录——今天是二十五个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="../../guide/switching-agents.html">换一个智能体</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/dsh">插件源码</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

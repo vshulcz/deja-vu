@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+<meta name="description" content="如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话">
+<meta property="og:description" content="如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话">
+<meta name="twitter:description" content="如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Qwen Code 加记忆", "description": "如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 Qwen Code 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么给 Qwen Code 加记忆？", "acceptedAnswer": {"@type": "Answer", "text": "跑 qwen extensions install https://github.com/vshulcz/deja-vu，或者用 deja install qwen-auto 直接接好 MCP 服务器和技能。"}}, {"@type": "Question", "name": "Qwen Code 的会话存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.qwen/projects/<project>/chats 下，JSONL 格式，deja 索引的就是这些文件。"}}, {"@type": "Question", "name": "Qwen Code 能读 Claude 格式的插件市场吗？", "acceptedAnswer": {"@type": "Answer", "text": "能。qwen extensions sources add 接受 Claude 格式的市场，而这个仓库本身就是一个。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html" aria-current="page">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/getting-started.html">Getting started</a>
+<a href="../../guide/does-my-agent-remember.html">Does my agent remember?</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/benchmarks.html">Benchmarks</a>
+<a href="../../guide/compare.html">Compare</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>给 Qwen Code 加记忆</h1>
+<p class="pagelede">它吃 Gemini 的扩展格式，也吃 Claude 格式的市场<span class="mins" data-mins></span></p>
+
+<p>Qwen Code 把每个会话都留在磁盘上，然后把下一个会话开成空的。上周你想明白的事还在那里，当时你开着的另一个智能体里做的事也还在。</p>
+
+<h2>Qwen 已经有的部分</h2>
+<p>会话放在 <code>~/.qwen/projects/&lt;project&gt;/chats</code> 下，JSONL 格式。完整，但没有任何东西读它——包括 Qwen 自己的下一个会话。</p>
+
+<h2>接上召回</h2>
+<pre>qwen extensions install https://github.com/vshulcz/deja-vu</pre>
+<p>Qwen Code 和 Gemini CLI 共用扩展格式，所以仓库根目录那个 <code>gemini-extension.json</code> 就是全部安装内容。在 Qwen Code 0.20.0 上验过：它会报出 deja MCP 服务器、上下文文件和 <code>deja-search</code> 技能，并装到 <code>~/.qwen/extensions/deja</code> 下。</p>
+<p>另一条路是 CLI 安装，它还会把指引写到 Qwen 真正会读的地方：</p>
+<pre>deja install qwen-auto</pre>
+<p>两条路一起跑是安全的，不会变成两份：MCP 服务器按名字索引，所以扩展里的 <code>deja</code> 和 <code>settings.json</code> 里的那个会合成同一个服务器，而不是把每个工具列两遍。</p>
+<p>Qwen 也读 Claude 格式的插件市场，而这个仓库正是一个：</p>
+<pre>qwen extensions sources add https://github.com/vshulcz/deja-vu</pre>
+<p>无论走哪条路都需要那个二进制，因为扩展交付的是文件，不是运行时：</p>
+<pre>brew install deja-vu
+# 或者
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+
+<h2>接好之后有什么</h2>
+<p><code>deja install qwen-auto</code> 会往 <code>~/.qwen/settings.json</code> 里写四个钩子，和里面原有的内容并存：</p>
+<ul>
+<li><code>SessionStart</code> 上的项目摘要：在你敲任何字之前，先给出这个项目过去的会话定下了什么。</li>
+<li><code>UserPromptSubmit</code> 上的召回，历史给不出答案时保持沉默。</li>
+<li><code>PostToolUseFailure</code> 上的修复，只针对 <code>run_shell_command</code>：某条命令报的错以前在这台机器上解决过，上次紧跟其后的做法会直接落在这次失败的工具结果上。</li>
+<li><code>PreCompact</code> 上的遗忘，让被压缩的线程刚丢掉的那些块可以再说一遍。</li>
+</ul>
+<p>以上在 Qwen Code 0.20.0 上靠读它实际发出的请求量过。<code>PostToolUse</code> 只在工具成功时触发——Qwen 给它加了判断，失败时走 <code>PostToolUseFailure</code>——所以修复以前挂在一个失败时永不触发的事件上；在旧版之上再装一次会把那条记录删掉。<code>PreToolUse</code> 会跑，但输出被丢弃。失败的载荷把命令输出放在 <code>error</code> 字段里，包在 Qwen 自己写的 <code>Command: / Output: / Exit Code:</code> 块中，deja 在匹配之前会把它拆开。</p>
+<p>那个版本上的开销，在预置好的索引上：会话开始 2.3 KB，一个修复块 397 字节；无话可说时 0 字节、约 30 毫秒。</p>
+
+<h2>和这个 harness 无关的那一半</h2>
+<p>索引覆盖这台机器上每个智能体的转录——今天是二十五个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="../../registry/qwen.html">Qwen 的会话文件是怎么读的</a> · <a href="../../guide/memory-for-gemini.html">Memory for Gemini CLI</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

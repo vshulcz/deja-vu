@@ -77,3 +77,6 @@ https://vshulcz.github.io/deja-vu/registry/amp.html
 https://vshulcz.github.io/deja-vu/registry/copilot-chat.html
 https://vshulcz.github.io/deja-vu/registry/continue.html
 https://vshulcz.github.io/deja-vu/registry/crush.html
+https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html
+https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html
+https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html
