@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Each published extension's version in the repository is what npm serves. The release writes the number into a temporary copy, so the files here never learned it: `extensions/opencode/package.json` said 0.1.2 for a package npm serves as 0.20.1, and all four were behind. The guard that should have said so compared npm against the newest release tag — a rule that stopped being true when a release ahead of npm started publishing the next patch of that package's own line rather than skipping it (#2993), and one a shallow CI checkout could never evaluate, since it has no tags. It compares the repository against npm now, and `node scripts/extension-drift.mjs --write` is the catch-up. (#3627)
 - `deja forget --session` and `--project` exit non-zero when the selector names nothing. `deja forget --session $ID && echo removed` printed "removed" for a session still on disk under another id — a script reads the exit code, not the wording, and the sibling `--unforget` has refused a miss since #2263. A window is not a name: `--before 30d` on a young store still exits 0. (#3601)
 
 ## [0.20.1] - 2026-09-15
