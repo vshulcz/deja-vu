@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to delete Codex CLI sessions — deja-vu</title>
+<meta name="description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to delete Codex CLI sessions">
+<meta property="og:description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="How to delete Codex CLI sessions">
+<meta name="twitter:description" content="How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Codex sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "Delete its rollout file: rm ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl. The sessions directory is dated, so one day's work is one directory, and rm -rf ~/.codex/sessions removes every session. Prompt history is a separate file, ~/.codex/history.jsonl, and survives that."}}, {"@type": "Question", "name": "Where does Codex CLI store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: rollouts at sessions/YYYY/MM/DD/rollout-*.jsonl as append-only JSONL, and prompt history at history.jsonl. Codex inside Xcode uses ~/Library/Developer/Xcode/CodingAssistant/codex instead."}}, {"@type": "Question", "name": "Does deleting a Codex rollout remove the prompt from history?", "acceptedAnswer": {"@type": "Answer", "text": "No. history.jsonl holds your prompts independently of the rollouts, with no assistant replies and no project metadata, so a prompt can survive the session it belongs to. Delete both if you want it gone."}}, {"@type": "Question", "name": "Does Codex CLI delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing sweeps them on a schedule the way Claude Code's cleanupPeriodDays does; the rollout files stay until you remove them."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html" aria-current="page">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold"><summary>Per-agent guides <span class="n">22</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete Codex CLI sessions, and what you lose</h1>
+<p class="pagelede">they are rollout files under <code>~/.codex/sessions</code>, one per session, and prompt history is a separate file<span class="mins" data-mins></span></p>
+
+<p>Codex writes each session to disk as it runs. The store is <code>${CODEX_HOME:-~/.codex}</code>, and there are two separate things in it: the rollouts, which are the conversations, and <code>history.jsonl</code>, which is your prompts. Deleting one does not touch the other — that is the part people get wrong.</p>
+
+<h2>How to delete Codex sessions</h2>
+<p>There is no command; the sessions are files. The path is dated, so a day of work is a directory.</p>
+<pre># what is there, newest first
+ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl | head
+
+# one session
+rm ~/.codex/sessions/2026/09/15/rollout-&lt;id&gt;.jsonl
+
+# one day
+rm -rf ~/.codex/sessions/2026/09/15
+
+# every session
+rm -rf ~/.codex/sessions
+
+# your prompts, which the lines above do not touch
+rm ~/.codex/history.jsonl</pre>
+<p>If <code>CODEX_HOME</code> is set, all of the above moves with it. Codex running inside Xcode keeps its own store under <code>~/Library/Developer/Xcode/CodingAssistant/codex</code>, and deleting the CLI's sessions leaves that one intact.</p>
+
+<h2>What is in a rollout</h2>
+<p>JSON Lines, appended as the session runs. The first record is <code>session_meta</code> and carries the session id and the working directory; the rest are events whose payload holds a role and the content. Because the file is appended to while the session is live, the last line of an interrupted session can be torn — a reader has to tolerate that, and <code>rm</code> does not care either way.</p>
+<p>It is plain text and it is verbatim: whatever a command printed into the conversation is in the file. Treat the directory the way you treat your shell history. The <a href="../registry/codex.html">format registry</a> documents every field.</p>
+
+<h2>What you lose</h2>
+<p>The rollouts are what any later search over your own work reads — including <code>codex resume</code>, which lists what is on disk. Delete them and the record of what the agent ran goes with them: the commands, their output, and the edits, none of which are recoverable from a summary.</p>
+<p>deja indexes these files along with every other agent's on the machine, so a decision made in Codex answers a question asked in Claude Code or Cursor. A session it has already indexed stays searchable after the file goes; only <code>deja forget</code> drops one on purpose. That is a reason to index before deleting, not a reason to keep gigabytes.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="memory-for-codex.html">Giving Codex recall over the rest</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -80,3 +80,5 @@ https://vshulcz.github.io/deja-vu/registry/crush.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html
+https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html
+https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to delete Cursor chat history — deja-vu</title>
+<meta name="description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to delete Cursor chat history">
+<meta property="og:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="How to delete Cursor chat history">
+<meta name="twitter:description" content="How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Cursor chat history, and what you lose", "description": "How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cursor chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Cursor store chat history?", "acceptedAnswer": {"@type": "Answer", "text": "In state.vscdb, a SQLite database under the Cursor user directory — ~/Library/Application Support/Cursor/User on macOS, ~/.config/Cursor/User elsewhere — in globalStorage/ and workspaceStorage/<id>/. Chats are rows in the cursorDiskKV table: composerData:<id> per chat and bubbleId:<chat>:<bubble> per message."}}, {"@type": "Question", "name": "How do I delete Cursor chat history?", "acceptedAnswer": {"@type": "Answer", "text": "Deleting a chat in the Cursor UI is the safe operation. The database it writes to holds the rest of the IDE's state as well, so removing state.vscdb clears chats and also whatever else was in it. Cursor CLI transcripts are separate plain files under ~/.cursor/projects/<encoded-path>/agent-transcripts and can be deleted on their own."}}, {"@type": "Question", "name": "Does Cursor archive chats instead of deleting them?", "acceptedAnswer": {"@type": "Answer", "text": "There is no archive directory to recover from: a chat you remove is gone from the database. Anything that indexed it beforehand is the only copy left."}}, {"@type": "Question", "name": "Why is Cursor's history a database and not files?", "acceptedAnswer": {"@type": "Answer", "text": "Cursor is a VS Code fork and uses VS Code's key-value store for extension state, so the chats are values beside other IDE state rather than one file per conversation. Reading them needs the sqlite3 CLI."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html" aria-current="page">Delete Cursor chat history</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold"><summary>Per-agent guides <span class="n">22</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete Cursor chat history, and what you lose</h1>
+<p class="pagelede">the chats are rows in a SQLite database the IDE also uses for everything else<span class="mins" data-mins></span></p>
+
+<p>Cursor does not keep one file per conversation. The IDE stores chats as rows in <code>state.vscdb</code>, a SQLite database that also holds the rest of its state, and the CLI writes transcripts as ordinary files somewhere else entirely. Which one you are trying to delete decides what you can safely do.</p>
+
+<h2>Where the chats are</h2>
+<p>The user directory is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> elsewhere, with <code>state.vscdb</code> under <code>globalStorage/</code> and under each <code>workspaceStorage/&lt;id&gt;/</code>. Inside it, the <code>cursorDiskKV</code> table holds one value per chat at <code>composerData:&lt;id&gt;</code> and one per message at <code>bubbleId:&lt;chat-id&gt;:&lt;bubble-id&gt;</code>. Cursor CLI is the simple case: <code>~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code>, one file per transcript.</p>
+<pre># the IDE store
+ls -lh ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
+
+# what is in it, if sqlite3 is installed
+sqlite3 ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb \
+  "select count(*) from cursorDiskKV where key like 'composerData:%'"
+
+# the CLI transcripts, which are plain files
+ls -t ~/.cursor/projects/*/agent-transcripts/**/*.jsonl | head</pre>
+
+<h2>How to delete it</h2>
+<p>Delete a chat from the Cursor UI. That is not a hedge — the database is live state the IDE owns, and editing it underneath a running editor is how people lose window layouts and extension settings along with the chat they meant to remove.</p>
+<p>If you want the history gone from disk rather than from the list, close Cursor first, and know what you are removing:</p>
+<pre># chats and every other bit of state in this database
+rm ~/Library/Application\ Support/Cursor/User/globalStorage/state.vscdb
+
+# one workspace's chats and that workspace's state
+rm -rf ~/Library/Application\ Support/Cursor/User/workspaceStorage/&lt;id&gt;
+
+# CLI transcripts only, which are nothing but transcripts
+rm -rf ~/.cursor/projects/&lt;encoded-path&gt;/agent-transcripts</pre>
+<p>There is no archive to restore from. The <a href="../registry/cursor.html">format registry</a> documents both stores field by field, including the bubble types and the millisecond timestamps.</p>
+
+<h2>What you lose</h2>
+<p>The chats are the record of what you worked out and what the agent ran. Cursor's own search over them goes with the rows, and so does any future search: a question you answered in March is answerable only while the history of March exists somewhere.</p>
+<p>deja reads both stores — the IDE database through <code>sqlite3</code> and the CLI transcripts directly — along with every other agent's history on the machine, so what you settled in Cursor comes back in Claude Code or Codex. Sessions already in its index stay searchable once the originals are gone.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="memory-for-cursor.html">Giving Cursor recall over the rest</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

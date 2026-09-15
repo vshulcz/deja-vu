@@ -46,6 +46,8 @@
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="session-files-on-disk.html" aria-current="page">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="after-compaction.html">After compaction</a>
 <a href="repeated-mistakes.html">Repeated mistakes</a>
@@ -99,7 +101,7 @@
 <h1>How to delete Claude Code sessions, and what you lose</h1>
 <p class="pagelede">they are files under <code>~/.claude/projects</code>: <code>rm</code> is the whole operation, and <code>cleanupPeriodDays</code> does it on a timer<span class="mins" data-mins></span></p>
 
-<p>Every session your agent runs is written to disk as it happens. Claude Code puts JSONL under <code>~/.claude/projects</code>, one directory per project and one file per session; Codex writes <code>~/.codex/sessions/**/rollout-*.jsonl</code>; Cursor uses a SQLite database. <a href="where-sessions-are-stored.html">Where each agent writes</a> has the rest.</p>
+<p>Every session your agent runs is written to disk as it happens. Claude Code puts JSONL under <code>~/.claude/projects</code>, one directory per project and one file per session; Codex writes <code>~/.codex/sessions/**/rollout-*.jsonl</code> (<a href="delete-codex-sessions.html">deleting those</a>); Cursor keeps chats in a SQLite database (<a href="delete-cursor-chat-history.html">deleting those</a>). <a href="where-sessions-are-stored.html">Where each agent writes</a> has the rest.</p>
 <p>Nobody tells you these files exist until they are large — 875 of them and 1.6 GB on the laptop measured below, one file of which was 586 MB.</p>
 
 <h2>How to delete Claude Code sessions</h2>
