@@ -108,6 +108,7 @@
 <h2>Control what's kept</h2>
 <ul>
 <li><b>Exclude</b> — <code>~/.config/deja/exclude</code> patterns or <code>DEJA_EXCLUDE_PROJECTS</code> skip projects at index time, and <code>sync export</code> honours them too, so a project excluded later does not leave the machine. Sessions indexed before the pattern existed stay searchable locally until <code>deja index --rebuild</code>; <code>deja index</code> tells you when that is the case.</li>
+<li><b>Exclude a whole store</b> — a line prefixed <code>harness:</code> in the same file names an agent instead of a project — <code>harness:opencode</code> — and deja neither walks that store nor asks for the tool that would read it. <code>DEJA_EXCLUDE_HARNESSES</code> is the comma-separated form. Store names are exact, not patterns: they are the ones <code>deja sources</code> prints, and both it and <code>deja doctor</code> then report the store as <code>excluded</code> rather than naming a package to install.</li>
 <li><b>Forget</b> — <code>deja forget</code> removes sessions and records a tombstone so they don't come back on the next index; <code>--dry-run</code> to preview, <code>--list</code> to see the tombstones, <code>--unforget &lt;id&gt;</code> to reverse one.</li>
 <li><b>Redaction report</b> — <code>deja stats --redaction</code> shows what was masked, per rule and harness.</li>
 <li><b>Audit what agents received</b> — <code>deja log</code> lists recent recalls and injections; <code>deja log --last</code> prints the exact digest most recently served.</li>

@@ -156,7 +156,9 @@ URLs, and high-entropy values for shapes no pattern knows. The value becomes
 
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later
 `deja index` cannot restore them from the source history. `--unforget` lifts a tombstone.
-Project exclusions are one pattern per line in `~/.config/deja/exclude`.
+Project exclusions are one pattern per line in `~/.config/deja/exclude`; a line prefixed
+`harness:` names a store instead — `harness:opencode` — and deja neither walks it nor asks
+for the tool that would read it.
 
 The [security model](docs/SECURITY-MODEL.md) documents data flows, redaction limits, trust
 assumptions and release verification.
