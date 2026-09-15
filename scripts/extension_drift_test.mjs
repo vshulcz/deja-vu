@@ -5,9 +5,11 @@
 // it compared npm against the newest release tag and a CI checkout has none
 // (#3627).
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
-import { PACKAGES, behindNpm, compareVersions } from "./extension-drift.mjs";
+import { MIRRORS, PACKAGES, behindNpm, compareVersions } from "./extension-drift.mjs";
 
 const pkgs = {
   "extensions/opencode": { name: "opencode-deja", version: "0.20.1" },
@@ -56,6 +58,19 @@ test("every package is reported when all are behind", () => {
     "dsh-deja",
     "opencode-deja",
   ]);
+});
+
+// The root manifest mirrors extensions/dsh for the DeepSeek Harness catalogs,
+// and cmd/deja's TestRootManifestMirrorsTheDshPlugin pins them to one version.
+// Catching the extension up and leaving the mirror behind fails that test on
+// every pull request, which is what happened here.
+test("the mirror names a real file and holds the same version", () => {
+  const root = path.join(import.meta.dirname, "..");
+  const version = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8")).version;
+  assert.deepEqual(Object.keys(MIRRORS), ["extensions/dsh"]);
+  for (const [dir, mirror] of Object.entries(MIRRORS)) {
+    assert.equal(version(mirror), version(`${dir}/package.json`), `${mirror} vs ${dir}`);
+  }
 });
 
 test("versions order by number", () => {

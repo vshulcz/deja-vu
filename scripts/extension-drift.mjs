@@ -82,15 +82,25 @@ function readPkg(dir) {
   return { name: pkg.name, version: pkg.version };
 }
 
+// The repository root carries a manifest that mirrors extensions/dsh for the
+// DeepSeek Harness catalogs, and TestRootManifestMirrorsTheDshPlugin pins the
+// two to the same version. Catching one up without the other turns the tree
+// red, which is how this was found.
+export const MIRRORS = { "extensions/dsh": "package.json" };
+
+function bump(file, version) {
+  const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+  pkg.version = version;
+  fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+}
+
 if (process.argv[1] && process.argv[1].endsWith("extension-drift.mjs")) {
   const write = process.argv.includes("--write");
   const bad = behindNpm(PACKAGES, readPkg, npmLatest);
   for (const p of bad) {
     if (write) {
-      const file = `${p.dir}/package.json`;
-      const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
-      pkg.version = p.npm;
-      fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+      bump(`${p.dir}/package.json`, p.npm);
+      if (MIRRORS[p.dir]) bump(MIRRORS[p.dir], p.npm);
       console.log(`${p.name}: ${p.repo} -> ${p.npm}`);
       continue;
     }
