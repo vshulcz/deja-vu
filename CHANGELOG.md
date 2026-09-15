@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-09-15
+
 ### Added
 - A store can be excluded, not just a project: a line prefixed `harness:` in `~/.config/deja/exclude`, or `DEJA_EXCLUDE_HARNESSES`. deja then neither walks it nor asks for the tool that would read it, and every screen that mentions stores says so — `deja doctor` on both its surfaces, `deja sources`, and the empty screens, which used to blame a machine no agent had run on for a store that is on disk and deliberately unread. Previously the only way to stop `needs-sqlite3` advice for a harness the reader does not use was to install the package. (#3499)
 - `deja bench read`: what it costs to read a database-backed store, and what one long escape-heavy value does to it. Every other benchmark runs against an already-indexed corpus, which is how a reader that took 2,287s on a 6.16 MB value stayed invisible while all of them held flat. (#3552)
