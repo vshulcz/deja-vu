@@ -14,9 +14,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
+
+// mainPackage matches the clause at the top of a command, and only at the
+// start of a line so a mention inside a comment or a string does not count.
+var mainPackage = regexp.MustCompile(`(?m)^package main\b`)
 
 func main() {
 	entries, err := os.ReadDir("scripts")
@@ -29,11 +34,21 @@ func main() {
 		if !e.IsDir() {
 			continue
 		}
-		// A directory is only a command if it holds Go source; scripts/demo is
-		// python and never produces a binary here.
+		// Only a `package main` directory produces a binary named after it.
+		// scripts/demo is python and never produces one; scripts/benchresult is
+		// a library the harnesses import, and a .gitignore line for it would
+		// claim a file that cannot exist.
 		matches, _ := filepath.Glob(filepath.Join("scripts", e.Name(), "*.go"))
-		if len(matches) > 0 {
-			packages[e.Name()] = true
+		for _, m := range matches {
+			b, err := os.ReadFile(m)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			if mainPackage.Match(b) {
+				packages[e.Name()] = true
+				break
+			}
 		}
 	}
 
