@@ -1,0 +1,100 @@
+name: Release follow-up
+
+# A release leaves two things for the repository to catch up on, and both are
+# manual: the Windows manifests are regenerated and attached to the release but
+# never committed back, and each published extension's version is decided by npm
+# and written into a temporary copy. On 15 September 2026 both were forgotten
+# after v0.20.1 — the manifests turned every later pull request red, which is how
+# anyone found out, and all four extension versions had been behind for releases
+# before that with nothing saying so (#3624, #3627).
+#
+# So the reminder arrives with the release rather than with the next pull
+# request. This does not perform the catch-up: the commands are here, and the
+# person who runs them is the person who reads the issue.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: release-followup
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Has the repository caught up
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The manifest check asks GitHub for the newest release and the drift
+          # check asks npm; neither needs history, but the tags cost nothing and
+          # a future check may want them.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+
+      - name: Read what is behind
+        id: behind
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          # The tag the release ran on, for the command the issue prints.
+          VERSION: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -uo pipefail
+          left=""
+          if ! out=$(go run ./scripts/pinmanifests -check 2>&1); then
+            left="${left}- the Windows manifests and plugin files: \`go run ./scripts/pinmanifests -version ${VERSION#v} -checksums <checksums.txt from the release>\`"$'\n'"  \`\`\`"$'\n'"  ${out}"$'\n'"  \`\`\`"$'\n'
+          fi
+          if ! out=$(node scripts/extension-drift.mjs 2>&1); then
+            left="${left}- the published extension versions: \`node scripts/extension-drift.mjs --write\`"$'\n'"  \`\`\`"$'\n'"  ${out}"$'\n'"  \`\`\`"$'\n'
+          fi
+          # A flag rather than the emptiness of the block below: a heredoc
+          # output ends in a newline either way, and an issue per release is
+          # the wrong thing to bet on trimming.
+          if [ -n "$left" ]; then
+            echo "behind=yes" >>"$GITHUB_OUTPUT"
+          else
+            echo "behind=no" >>"$GITHUB_OUTPUT"
+          fi
+          {
+            echo "left<<LEFT_EOF"
+            printf '%s' "$left"
+            echo
+            echo LEFT_EOF
+          } >>"$GITHUB_OUTPUT"
+
+      - name: File or update the reminder
+        if: steps.behind.outputs.behind == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ github.event.workflow_run.head_branch }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          LEFT: ${{ steps.behind.outputs.left }}
+        run: |
+          set -euo pipefail
+          body="${VERSION} is published — [the run](${RUN_URL}) — and the repository has not caught up:"$'\n\n'"${LEFT}"$'\n'"Until it does, \`pinmanifests -check\` fails on every pull request, and the extension versions in this repository say a number npm does not serve."
+          existing=$(gh issue list --repo "$REPO" --state open --label release-followup \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "$body"
+            echo "commented on #$existing"
+          else
+            gh issue create --repo "$REPO" --label release-followup \
+              --title "the repository has not caught up to the release" --body "$body"
+          fi
