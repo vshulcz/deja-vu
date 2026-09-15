@@ -1,44 +1,76 @@
-// The rule this guard exists for: a package npm holds ahead of the release line
-// is skipped by every release, silently, until the project catches up.
+// The rule this guard exists for: the version in this repository is derived
+// from what npm serves, and a derived copy nobody writes back is a file that
+// says the wrong number. Every one of the four was behind — opencode-deja read
+// 0.1.2 against 0.20.1 on npm — and the previous rule could not see it, because
+// it compared npm against the newest release tag and a CI checkout has none
+// (#3627).
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
-import { PACKAGES, compareVersions, stranded } from "./extension-drift.mjs";
+import { MIRRORS, PACKAGES, behindNpm, compareVersions } from "./extension-drift.mjs";
 
-const names = {
-  "extensions/opencode": { name: "opencode-deja" },
-  "extensions/dsh": { name: "dsh-deja" },
-  "extensions/openclaw": { name: "@vshulcz/openclaw-deja" },
-  "extensions/pi": { name: "@vshulcz/pi-deja" },
+const pkgs = {
+  "extensions/opencode": { name: "opencode-deja", version: "0.20.1" },
+  "extensions/dsh": { name: "dsh-deja", version: "0.20.8" },
+  "extensions/openclaw": { name: "@vshulcz/openclaw-deja", version: "0.20.1" },
+  "extensions/pi": { name: "@vshulcz/pi-deja", version: "0.20.1" },
 };
-const readPkg = (dir) => names[dir];
+const readPkg = (dir) => pkgs[dir];
 
-// The state this was written for: dsh-deja published by hand at 0.20.4 while
-// the release line was 0.19.2. Comparing the package against its own manifest
-// sees nothing wrong there — both say 0.20.4 — which is why the comparison is
-// against the release line.
-test("the August state is caught", () => {
-  const bad = stranded(PACKAGES, readPkg, (n) => (n === "dsh-deja" ? "0.20.4" : "0.19.2"), "0.19.2");
+// The state this was written for, on the day 0.20.1 shipped: dsh-deja's own
+// line had run ahead and the release published the next patch of it, while
+// every repository copy stayed where it was.
+test("the September state is caught", () => {
+  const behind = { ...pkgs, "extensions/dsh": { name: "dsh-deja", version: "0.20.5" } };
+  const bad = behindNpm(PACKAGES, (d) => behind[d], (n) => (n === "dsh-deja" ? "0.20.8" : "0.20.1"));
   assert.deepEqual(bad.map((p) => p.name), ["dsh-deja"]);
-  assert.equal(bad[0].npm, "0.20.4");
-  assert.equal(bad[0].line, "0.19.2");
+  assert.equal(bad[0].npm, "0.20.8");
+  assert.equal(bad[0].repo, "0.20.5");
 });
 
-test("level with the line, or behind it, is not drift", () => {
-  assert.deepEqual(stranded(PACKAGES, readPkg, () => "0.19.2", "0.19.2"), []);
-  assert.deepEqual(stranded(PACKAGES, readPkg, () => "0.18.0", "0.19.2"), []);
+test("level with npm is not drift", () => {
+  assert.deepEqual(
+    behindNpm(PACKAGES, readPkg, (n) => (n === "dsh-deja" ? "0.20.8" : "0.20.1")),
+    [],
+  );
+});
+
+// A release in flight bumps the repository first and publishes after, so ahead
+// of npm is the normal state for the length of a release run.
+test("ahead of npm is not drift", () => {
+  assert.deepEqual(behindNpm(PACKAGES, readPkg, () => "0.19.0"), []);
 });
 
 test("what cannot be answered is not drift", () => {
-  // npm unreachable, and a checkout without tags: a pull request must not fail
-  // for either.
-  assert.deepEqual(stranded(PACKAGES, readPkg, () => "", "0.19.2"), []);
-  assert.deepEqual(stranded(PACKAGES, readPkg, () => "0.99.0", ""), []);
+  // npm unreachable, and a package it has never heard of: a pull request must
+  // not fail for either.
+  assert.deepEqual(behindNpm(PACKAGES, readPkg, () => ""), []);
+  assert.deepEqual(behindNpm(PACKAGES, (d) => ({ name: pkgs[d].name }), () => "0.99.0"), []);
 });
 
-test("every package is reported when all are stranded", () => {
-  const bad = stranded(PACKAGES, readPkg, () => "0.21.0", "0.19.2");
-  assert.deepEqual(bad.map((p) => p.name).sort(), ["@vshulcz/openclaw-deja", "@vshulcz/pi-deja", "dsh-deja", "opencode-deja"]);
+test("every package is reported when all are behind", () => {
+  const bad = behindNpm(PACKAGES, readPkg, () => "0.99.0");
+  assert.deepEqual(bad.map((p) => p.name).sort(), [
+    "@vshulcz/openclaw-deja",
+    "@vshulcz/pi-deja",
+    "dsh-deja",
+    "opencode-deja",
+  ]);
+});
+
+// The root manifest mirrors extensions/dsh for the DeepSeek Harness catalogs,
+// and cmd/deja's TestRootManifestMirrorsTheDshPlugin pins them to one version.
+// Catching the extension up and leaving the mirror behind fails that test on
+// every pull request, which is what happened here.
+test("the mirror names a real file and holds the same version", () => {
+  const root = path.join(import.meta.dirname, "..");
+  const version = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8")).version;
+  assert.deepEqual(Object.keys(MIRRORS), ["extensions/dsh"]);
+  for (const [dir, mirror] of Object.entries(MIRRORS)) {
+    assert.equal(version(mirror), version(`${dir}/package.json`), `${mirror} vs ${dir}`);
+  }
 });
 
 test("versions order by number", () => {

@@ -1,17 +1,22 @@
 #!/usr/bin/env node
-// Report harness packages npm holds ahead of this project's release line.
+// Report harness packages whose version in this repository is not what npm
+// serves, and with --write, catch them up.
 //
-// The release script refuses to publish a package when npm is ahead of the
-// version being released, because moving `latest` backwards cannot be undone.
-// That refusal is right, and it is also permanent: a package published by hand
-// at a version the release line has not reached is skipped by every release
-// after it, silently, until the project's own version catches up. dsh-deja sat
-// at 0.20.4 that way from 25 August against a 0.19.2 release line, and two
-// fixes merged for it would never have shipped.
+// npm is where these versions are decided: a package npm holds ahead of the
+// release is published as the next patch of its own line rather than skipped
+// (#2993), which is how dsh-deja reached 0.20.8 against a 0.20.1 release. The
+// release writes that number into a temporary copy, so the repository's own
+// package.json never learned it — every one of the four was behind, and
+// `extensions/opencode/package.json` said 0.1.2 for a package npm serves as
+// 0.20.1 (#3627).
 //
-// The comparison is against the newest release tag, not against the version in
-// the package's own package.json: those two are equal in exactly the state this
-// exists to catch.
+// The previous rule compared npm against the newest release tag and called a
+// package ahead of it stranded, which was right while a release skipped such a
+// package — the state dsh-deja sat in from 25 August 2026 at 0.20.4 against a
+// 0.19.2 line, when two fixes for it would never have shipped. It has not been
+// right since #2993, and it could only ever fire where the tags are: a shallow
+// CI checkout has none, so the job that was supposed to catch this said
+// nothing.
 //
 // Nothing here publishes.
 import { execFileSync } from "node:child_process";
@@ -28,21 +33,6 @@ export function npmLatest(name) {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-  } catch {
-    return "";
-  }
-}
-
-// releaseLine is the newest release tag, without its leading v. "" when the
-// tags are not in the checkout, which is the default for a shallow clone —
-// again, not drift.
-export function releaseLine() {
-  try {
-    const tag = execFileSync("git", ["tag", "--list", "v*", "--sort=-v:refname"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).split("\n")[0].trim();
-    return tag.replace(/^v/, "");
   } catch {
     return "";
   }
@@ -66,17 +56,22 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-// stranded reports the packages the next release would skip. Lookups are
-// injected so the rule can be tested without the network or a tag history.
-export function stranded(packages, readPkg, latest, line) {
-  if (!line) return [];
+// behindNpm reports the packages whose version in this repository is not the
+// one npm serves. Lookups are injected so the rule can be tested without the
+// network.
+//
+// A package npm has never heard of, or a lookup that failed, is not drift: a
+// network failure must not fail a pull request. A repository version *ahead* of
+// npm is not drift either — that is a release in flight, and the publish
+// decides the number either way.
+export function behindNpm(packages, readPkg, latest) {
   const out = [];
   for (const dir of packages) {
-    const { name } = readPkg(dir);
+    const { name, version } = readPkg(dir);
     const live = latest(name);
-    if (!live) continue;
-    if (compareVersions(live, line) > 0) {
-      out.push({ dir, name, npm: live, line });
+    if (!live || !version) continue;
+    if (compareVersions(version, live) < 0) {
+      out.push({ dir, name, npm: live, repo: version });
     }
   }
   return out;
@@ -87,13 +82,32 @@ function readPkg(dir) {
   return { name: pkg.name, version: pkg.version };
 }
 
+// The repository root carries a manifest that mirrors extensions/dsh for the
+// DeepSeek Harness catalogs, and TestRootManifestMirrorsTheDshPlugin pins the
+// two to the same version. Catching one up without the other turns the tree
+// red, which is how this was found.
+export const MIRRORS = { "extensions/dsh": "package.json" };
+
+function bump(file, version) {
+  const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+  pkg.version = version;
+  fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+}
+
 if (process.argv[1] && process.argv[1].endsWith("extension-drift.mjs")) {
-  const bad = stranded(PACKAGES, readPkg, npmLatest, releaseLine());
+  const write = process.argv.includes("--write");
+  const bad = behindNpm(PACKAGES, readPkg, npmLatest);
   for (const p of bad) {
+    if (write) {
+      bump(`${p.dir}/package.json`, p.npm);
+      if (MIRRORS[p.dir]) bump(MIRRORS[p.dir], p.npm);
+      console.log(`${p.name}: ${p.repo} -> ${p.npm}`);
+      continue;
+    }
     console.error(
-      `${p.name}: npm serves ${p.npm}, the release line is ${p.line} — ` +
-        `every release skips it until this project's version passes ${p.npm}`,
+      `${p.name}: this repository says ${p.repo}, npm serves ${p.npm} — ` +
+        `run: node scripts/extension-drift.mjs --write`,
     );
   }
-  process.exit(bad.length ? 1 : 0);
+  process.exit(!write && bad.length ? 1 : 0);
 }
