@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"time"
 	"unicode"
@@ -513,11 +514,26 @@ func ProjectNameCandidates(cwd string) []string {
 	return names
 }
 
+// worktreeListBudget is how long the root lookup may take before it gives up.
+//
+// The call is cheap where processes are cheap — measured at 5 ms on a fresh
+// repository here — and the budget is there so a session-start hook cannot hang
+// on a slow disk. A cold `git.exe` on windows is nothing like 5 ms: the CI
+// runner missed 400 ms on exactly this call, and what a user loses when it does
+// is the project scoping for an agent started in a subdirectory, silently
+// (#3624).
+var worktreeListBudget = func() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 2 * time.Second
+	}
+	return 400 * time.Millisecond
+}()
+
 // gitWorktreeRoots lists the repo's worktree roots (including the main one)
 // when cwd is inside a git repository. Best effort with a hard timeout: no
 // git, no repo, or a slow disk simply yields nothing.
 func gitWorktreeRoots(cwd string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), worktreeListBudget)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "worktree", "list", "--porcelain").Output()
 	if err != nil {

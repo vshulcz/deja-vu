@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- The repository-root lookup gets a budget windows can meet. `git worktree list` is 5 ms where processes are cheap and the 400 ms bound was sized for that; a cold `git.exe` misses it, and what a user loses is the project scoping for an agent started in a subdirectory — silently, since the lookup is best-effort. Two seconds on windows, unchanged elsewhere, and the test that pins the behaviour names a machine slower than the budget instead of failing on it. (#3624)
 - `deja forget --session` and `--project` exit non-zero when the selector names nothing. `deja forget --session $ID && echo removed` printed "removed" for a session still on disk under another id — a script reads the exit code, not the wording, and the sibling `--unforget` has refused a miss since #2263. A window is not a name: `--before 30d` on a young store still exits 0. (#3601)
 
 ## [0.20.1] - 2026-09-15

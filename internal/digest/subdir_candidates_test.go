@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // An agent started in a package directory is standing in the project all the
@@ -24,6 +25,19 @@ func TestProjectNameCandidatesNameTheRepositoryFromASubdirectory(t *testing.T) {
 	}
 	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v %s", err, out)
+	}
+
+	// The lookup runs under a budget so a session-start hook cannot hang, and
+	// this test is about what it answers, not about how fast the machine is.
+	// The windows runner missed the budget on a cold `git.exe` and the failure
+	// read as a wrong answer (#3624), so the speed is measured first and named.
+	start := time.Now()
+	if out, err := exec.Command("git", "-C", sub, "worktree", "list", "--porcelain").CombinedOutput(); err != nil {
+		t.Skipf("git cannot list worktrees here: %v %s", err, out)
+	}
+	if took := time.Since(start); took > worktreeListBudget {
+		t.Skipf("git worktree list took %v on this machine, past the %v budget the lookup runs under",
+			took.Round(time.Millisecond), worktreeListBudget)
 	}
 
 	// The premise: standing at the root, the project's own names are there.
