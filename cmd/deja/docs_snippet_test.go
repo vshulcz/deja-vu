@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 )
 
@@ -82,6 +83,54 @@ func TestGuideSnippetsFitWhatSearchShows(t *testing.T) {
 			if got.value != "" && got.value != desc {
 				t.Errorf("%s: %s does not match the description", name, got.what)
 			}
+		}
+	}
+}
+
+// A result page shows a date for a how-to, and a reader choosing between
+// results uses it; none of the fifty guide pages carried one, so there was
+// nothing to show. And the site declared no name of its own, which is why a
+// result was labelled vshulcz.github.io — somebody's personal page rather than
+// the project's documentation.
+func TestGuidePagesSayWhenAndWhoseTheyAre(t *testing.T) {
+	root := filepath.Join("..", "..")
+	pages, err := filepath.Glob(filepath.Join(root, "docs", "guide", "*.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	today := time.Now().UTC().Format("2006-01-02")
+	date := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+	for _, p := range pages {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		name := filepath.Base(p)
+		for _, field := range []string{"datePublished", "dateModified"} {
+			m := regexp.MustCompile(`"` + field + `": ?"([^"]*)"`).FindSubmatch(b)
+			if m == nil {
+				t.Errorf("%s has no %s, so search has no date to show", name, field)
+				continue
+			}
+			got := string(m[1])
+			if !date.MatchString(got) {
+				t.Errorf("%s: %s is %q, want YYYY-MM-DD", name, field, got)
+			}
+			if got > today {
+				t.Errorf("%s: %s is %s, which is in the future", name, field, got)
+			}
+		}
+	}
+
+	home, err := os.ReadFile(filepath.Join(root, "docs", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"@type": "WebSite"`, `"name": "deja-vu"`,
+		`"url": "https://vshulcz.github.io/deja-vu/"`} {
+		if !strings.Contains(string(home), want) {
+			t.Errorf("docs/index.html does not declare %s", want)
 		}
 	}
 }
