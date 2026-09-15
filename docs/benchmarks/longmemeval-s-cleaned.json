@@ -1,0 +1,95 @@
+{
+  "benchmark": "LongMemEval-S",
+  "harness": "scripts/longmemeval",
+  "run_at": "2026-09-15",
+  "dataset": {
+    "name": "longmemeval_s_cleaned.json",
+    "bytes": 277383467,
+    "sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442"
+  },
+  "flags": {
+    "limit": 0,
+    "skip_abs": true
+  },
+  "questions": 470,
+  "wall_seconds": 121.609228958,
+  "median_search_ms": 13.881,
+  "rows": [
+    {
+      "name": "knowledge-update",
+      "n": 72,
+      "hit@1": 94.44444444444444,
+      "hit@5": 98.61111111111111,
+      "hit@10": 98.61111111111111,
+      "hit@20": 98.61111111111111,
+      "mrr": 0.9652777777777778
+    },
+    {
+      "name": "multi-session",
+      "n": 121,
+      "hit@1": 87.60330578512396,
+      "hit@5": 96.69421487603306,
+      "hit@10": 96.69421487603306,
+      "hit@20": 97.52066115702479,
+      "mrr": 0.9169421487603305
+    },
+    {
+      "name": "single-session-assistant",
+      "n": 56,
+      "hit@1": 100,
+      "hit@5": 100,
+      "hit@10": 100,
+      "hit@20": 100,
+      "mrr": 1
+    },
+    {
+      "name": "single-session-preference",
+      "n": 30,
+      "hit@1": 36.666666666666664,
+      "hit@5": 90,
+      "hit@10": 90,
+      "hit@20": 100,
+      "mrr": 0.5810561660561661
+    },
+    {
+      "name": "single-session-user",
+      "n": 64,
+      "hit@1": 90.625,
+      "hit@5": 95.3125,
+      "hit@10": 96.875,
+      "hit@20": 96.875,
+      "mrr": 0.9280133928571429
+    },
+    {
+      "name": "temporal-reasoning",
+      "n": 127,
+      "hit@1": 80.31496062992126,
+      "hit@5": 92.1259842519685,
+      "hit@10": 94.48818897637796,
+      "hit@20": 94.48818897637796,
+      "mrr": 0.85568991376078
+    }
+  ],
+  "total": {
+    "name": "TOTAL",
+    "n": 470,
+    "hit@1": 85.31914893617021,
+    "hit@5": 95.53191489361703,
+    "hit@10": 96.38297872340425,
+    "hit@20": 97.23404255319149,
+    "mrr": 0.8977599173875769
+  },
+  "extra": {
+    "avg_candidates": 28.76595744680851,
+    "evidence_recall": {
+      "@1": 55.117021276595736,
+      "@10": 89.02836879432624,
+      "@20": 91.50354609929076,
+      "@5": 86.33333333333336
+    }
+  },
+  "notes": {
+    "metric": "hit@k credits a question when any of its evidence sessions ranks in the top k",
+    "official": "evidence_recall is the stricter per-evidence metric the dataset defines"
+  }
+}

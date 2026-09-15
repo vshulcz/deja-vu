@@ -27,6 +27,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/prompt"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/scripts/benchresult"
 )
 
 type lmeQuestion struct {
@@ -48,6 +49,13 @@ type lmeTurn struct {
 	Content string `json:"content"`
 }
 
+// bucket counts one slice of a run. It sits at package level so the record
+// written by -out can be built from the same counters the table prints.
+type bucket struct {
+	n, r1, r5, r10, r20, miss int
+	mrr                       float64
+}
+
 func main() {
 	dataPath := flag.String("data", "longmemeval_s.json", "path to longmemeval_s.json")
 	limit := flag.Int("limit", 0, "run only the first N questions (0 = all)")
@@ -59,6 +67,7 @@ func main() {
 	gateSignals := flag.Int("gate-signals", 0, "compare the gate's inputs on haystacks that hold the answer and haystacks that do not (0 = off)")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
+	out := flag.String("out", "", "write the run's numbers as JSON to this path")
 	flag.Parse()
 	evSum := map[int]float64{}
 	evN := 0
@@ -112,10 +121,6 @@ func main() {
 		questions = questions[:*limit]
 	}
 
-	type bucket struct {
-		n, r1, r5, r10, r20, miss int
-		mrr                       float64
-	}
 	byType := map[string]*bucket{}
 	total := &bucket{}
 	var searchTimes []time.Duration
@@ -202,6 +207,57 @@ func main() {
 	if evN > 0 {
 		fmt.Printf("%-28s %6s %7.1f%% %7.1f%% %7.1f%% %7.1f%%\n", "evidence-recall (official)", "", 100*evSum[1]/float64(evN), 100*evSum[5]/float64(evN), 100*evSum[10]/float64(evN), 100*evSum[20]/float64(evN))
 	}
+
+	if *out != "" {
+		writeResult(*out, *dataPath, *skipAbs, *limit, total, byType, types,
+			searchTimes, avgHits, start, evSum, evN)
+	}
+}
+
+// writeResult saves what this run measured, so the number in the docs has a run
+// behind it in the repository rather than a harness a reader has to execute.
+func writeResult(out, dataPath string, skipAbs bool, limit int, total *bucket,
+	byType map[string]*bucket, types []string, searchTimes []time.Duration,
+	avgHits float64, start time.Time, evSum map[int]float64, evN int) {
+	ds, err := benchresult.DescribeDataset(dataPath)
+	if err != nil {
+		fatal(err)
+	}
+	row := func(name string, b *bucket) benchresult.Row {
+		h10, h20 := pct(b.r10, b.n), pct(b.r20, b.n)
+		return benchresult.Row{Name: name, N: b.n, Hit1: pct(b.r1, b.n), Hit5: pct(b.r5, b.n),
+			Hit10: &h10, Hit20: &h20, MRR: b.mrr / float64(b.n)}
+	}
+	res := benchresult.Result{
+		Benchmark:      "LongMemEval-S",
+		Harness:        "scripts/longmemeval",
+		Dataset:        ds,
+		Flags:          map[string]any{"skip_abs": skipAbs, "limit": limit},
+		Questions:      total.n,
+		WallSeconds:    time.Since(start).Seconds(),
+		MedianSearchMS: float64(searchTimes[len(searchTimes)/2].Microseconds()) / 1000,
+		Total:          row("TOTAL", total),
+		Notes: map[string]string{
+			"metric":   "hit@k credits a question when any of its evidence sessions ranks in the top k",
+			"official": "evidence_recall is the stricter per-evidence metric the dataset defines",
+		},
+		Extra: map[string]any{"avg_candidates": avgHits},
+	}
+	for _, t := range types {
+		res.Rows = append(res.Rows, row(t, byType[t]))
+	}
+	if evN > 0 {
+		res.Extra["evidence_recall"] = map[string]float64{
+			"@1":  100 * evSum[1] / float64(evN),
+			"@5":  100 * evSum[5] / float64(evN),
+			"@10": 100 * evSum[10] / float64(evN),
+			"@20": 100 * evSum[20] / float64(evN),
+		}
+	}
+	if err := benchresult.Write(out, res); err != nil {
+		fatal(err)
+	}
+	fmt.Printf("wrote %s\n", out)
 }
 
 type questionDetail struct {
