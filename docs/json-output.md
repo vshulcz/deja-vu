@@ -428,8 +428,10 @@ endpoint. `index.path` points at the index
 directory; `index.db` is that directory's name, not a file. `index.state` is
 `missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
 written, so `deja index` cannot fix it), `damaged` (records or postings are
-gone; the next search rebuilds it) or `rereading` (the store is readable but
-answers nothing until the sources are re-read). An index that is not what this
+gone; the next search rebuilds it), `rereading` (the store is readable but
+answers nothing until the sources are re-read) or `path-is-a-file` (a regular
+file sits where the directory belongs, so no build will run there — deja
+refuses rather than deleting it). An index that is not what this
 build writes also carries `index.format`: `unreadable` (a layout this build
 cannot read), `withheld` (text written before deja learned to mask something it
 now masks), `older-rules` (readable, answering, re-deriving behind the answer)
@@ -453,6 +455,14 @@ without anyone asking, one row per harness deja can wire. `state` is `wired`,
 integration looks), `missing`, or `plugin` (the harness carries its own).
 `binary_missing` marks a row whose entries name a deja binary that is no longer
 there — what an upgrade leaves behind, with every hook exiting 127.
+
+The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
+event by event, so they have two states of their own: `out of date` (some of the
+events this release writes are there and some are not — the file keeps working
+and lacks everything added since) and `unreadable` for a settings file that will
+not parse. `codex-hook` also reports what codex's trust store says about the
+entry: `untrusted` (codex has never been shown it and runs no hook at all) or
+`disabled`.
 
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a
@@ -497,7 +507,10 @@ another machine and can be made arbitrarily long, so it is bounded before it is
 reported. `host` is not: it is a name to act on — `deja sync ssh <host>` — and a
 bounded name names no machine, so it is reported exactly as the config file
 spells it, however long. Neither can carry a raw control byte into a terminal:
-the JSON encoder escapes those in any string.
+the JSON encoder escapes those in any string. The text a session holds is
+filtered on top of that — the bidi overrides and the invisible tag block are
+ordinary characters to the encoder, and nothing recalled from a transcript needs
+to reorder a reader's screen or arrive invisible; newlines and tabs are kept.
 `sync.imported` names the machines whose work is in this index without a peer
 row of their own — the state a first exchange leaves, when a batch was carried
 by hand or by a shared folder and no `deja sync ssh` target has been named yet.

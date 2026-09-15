@@ -247,7 +247,14 @@ import (
 // almost never on a command its session has run before. A store built before
 // this has neither, and nothing re-derives them without the bump — the same
 // shape as 22, 23 and 32 (#3001, #3605).
-const version = 45
+//
+// 46 masks a secret written `api-key "…"` or `api key "…"`, and one assigned
+// with a colon where the value is too short for the key-value rule —
+// `x-api-key: "s3cretvalue"`. The gate in front of the quoted rule admitted
+// three of the four spellings its own pattern accepts, so which spelling a tool
+// happened to print decided whether the value was stored in the clear. Same
+// reason as 41 through 44: redaction runs at ingest (#3614).
+const version = 46
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

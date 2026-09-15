@@ -102,3 +102,62 @@ func TestDoctorJSONCarriesTheAutoRecallRows(t *testing.T) {
 		t.Errorf("a plugin calling a binary that exists was reported dead: %+v", got)
 	}
 }
+
+// The two rows this section did not have. doctor's text report has named the
+// Claude Code and codex hook wirings since they existed, and the JSON a script
+// reads carried neither, because both predate the autoWirings table. So a
+// machine watching its own install saw nothing at all about the harness most
+// people run — including the state an upgrade leaves, where the entries are
+// wired, name a deja that is gone, and every hook exits 127 (#3502, #3510).
+func TestDoctorJSONCarriesTheClaudeAndCodexHookRows(t *testing.T) {
+	hermeticEnv(t)
+
+	// Nothing installed: both named, and named as missing rather than left out
+	// of the report, which reads the same as a harness deja cannot wire.
+	rows := autoRecallRows(t)
+	for _, name := range []string{"claude-code", "codex-hook"} {
+		row, ok := rows[name]
+		if !ok {
+			t.Fatalf("doctor --json has no %s row", name)
+		}
+		if row.State != "missing" {
+			t.Errorf("%s with nothing installed reads %q, want missing", name, row.State)
+		}
+		if row.Path == "" {
+			t.Errorf("%s row names no file: %+v", name, row)
+		}
+	}
+
+	var all []string
+	for _, h := range claudeHookWiring {
+		all = append(all, h.Event)
+	}
+
+	// Everything the installer writes, naming a binary that is there.
+	writeClaudeSettings(t, all...)
+	got := autoRecallRows(t)["claude-code"]
+	if got.State != "wired" {
+		t.Errorf("a complete claude wiring reads %q, want wired", got.State)
+	}
+	if got.BinaryMissing {
+		t.Errorf("a wiring naming the running binary was reported dead: %+v", got)
+	}
+
+	// The same wiring after the binary moved away.
+	gone := filepath.Join(os.Getenv("HOME"), "gone", "deja")
+	writeClaudeSettingsNaming(t, gone, all...)
+	got = autoRecallRows(t)["claude-code"]
+	if got.State != "wired" {
+		t.Errorf("a wiring whose binary is gone reads %q, want wired", got.State)
+	}
+	if !got.BinaryMissing {
+		t.Errorf("the row says nothing about a binary that is not there: %+v", got)
+	}
+
+	// And an older install that has some of the events: the JSON says which
+	// state it is in, not just that a file is present.
+	writeClaudeSettings(t, all[:1]...)
+	if got := autoRecallRows(t)["claude-code"].State; got != "out of date" {
+		t.Errorf("a one-of-%d wiring reads %q, want out of date", len(all), got)
+	}
+}

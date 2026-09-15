@@ -512,7 +512,11 @@ func briefWorkKey(s string) string {
 func buildForFirstRun(dir string) (bool, error) {
 	prepareFirstIndexGreeting(dir)
 	if err := withBuildProgress(func() error { return index.Ensure(dir, "", false, os.Stderr) }); err != nil {
-		return false, err
+		// Through the same translator `deja index` uses: this screen is the
+		// first thing a new install runs, and it reported a refused build as
+		// `open /…/index.db.lock: permission denied` — an internal lock file
+		// and a syscall, which is the shape #798 replaced everywhere else.
+		return false, ensureError(dir, err)
 	}
 	before := index.LastBuild
 	maybeFirstIndexGreeting(dir)

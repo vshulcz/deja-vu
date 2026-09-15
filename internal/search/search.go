@@ -1312,6 +1312,49 @@ func mergeSessions(in []model.Session) []model.Session {
 	return out
 }
 
+// SafeSession is a session with the text a transcript supplied filtered the way
+// the printer filters it: newlines and tabs survive, because a JSON string
+// holds them and a reader may want the shape of a message, and the characters
+// that make displayed order disagree with stored order do not.
+//
+// The JSON surfaces need this and the printed ones do not: a control byte is
+// escaped by the encoder, while U+202E and the invisible tag block are ordinary
+// characters to it, so a reader rendering the text got the reordering and the
+// invisible instructions the text path strips (#1090, #3616).
+func SafeSession(s model.Session) model.Session {
+	s.Title = SafeText(s.Title)
+	s.Project = SafeText(s.Project)
+	if len(s.Messages) > 0 {
+		ms := make([]model.Message, len(s.Messages))
+		copy(ms, s.Messages)
+		for i := range ms {
+			ms[i].Text = SafeText(ms[i].Text)
+		}
+		s.Messages = ms
+	}
+	return s
+}
+
+// SafeStrings is SafeSession for the free-text lists beside a session: the
+// snippets a hit quotes, the titles blame carries.
+func SafeStrings(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	out := make([]string, len(in))
+	for i, s := range in {
+		out[i] = SafeText(s)
+	}
+	return out
+}
+
+func safeHit(h Hit) Hit {
+	h.Session = SafeSession(h.Session)
+	h.Snippets = SafeStrings(h.Snippets)
+	h.LifecycleNote = SafeText(h.LifecycleNote)
+	return h
+}
+
 func Print(w io.Writer, hits []Hit, o Options) {
 	for i := range hits {
 		if hits[i].Tier == "" {
@@ -1320,6 +1363,14 @@ func Print(w io.Writer, hits []Hit, o Options) {
 		hits[i].Session.SetSource(o.SourceInstance)
 	}
 	if o.JSON {
+		// The same filter the printer applies. A control byte is escaped by the
+		// encoder, but U+202E and the invisible tag block are ordinary
+		// characters to it, so a reader rendering the text got the reordering
+		// and the invisible instructions that SafeText exists to stop — on the
+		// one surface a dashboard reads (#3616).
+		for i := range hits {
+			hits[i] = safeHit(hits[i])
+		}
 		// One shape, always. The exact path used to emit a bare array while
 		// every fallback path emitted an object, so a consumer had to handle
 		// two contracts and could not tell which it had until it looked.

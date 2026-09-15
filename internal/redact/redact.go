@@ -79,8 +79,13 @@ var (
 	//
 	// The quotes are what make it safe to be this loose: "password
 	// authentication failed" has no quoted value and matches nothing.
-	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(\\*["'` + "`" + `])`)
-	pemPrivateRE   = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
+	quotedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[\s_-]?key)(\s+(?:is\s+|was\s+|for\s+)?)(\\*["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(\\*["'` + "`" + `])`)
+	// The same names in the shape a header or a config line is written in, for
+	// a value too short for genericKVRE's class: `x-api-key: "s3cretvalue"`
+	// went through in the clear, because the prose rule wants whitespace after
+	// the name and the KV rule wants sixteen characters of value (#3614).
+	quotedAssignedSecretRE = regexp.MustCompile(`(?i)\b(password|passwd|pwd|secret|token|api[\s_-]?key)(\\*['"]?\s*[:=]\s*)(\\*["'` + "`" + `])([^"'` + "`" + `\n]{6,80})(\\*["'` + "`" + `])`)
+	pemPrivateRE           = regexp.MustCompile(`(?s)-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----.*?-----END [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----`)
 	// A key pasted into a transcript is often not pasted whole: the output was
 	// truncated, the session ended, the tail landed in another message. The
 	// closing marker was required, so the half that carries the key material
@@ -430,10 +435,20 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
 		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
 	}
-	if strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
-		strings.Contains(lower, "pwd") || strings.Contains(lower, "secret") ||
-		strings.Contains(lower, "token") || strings.Contains(lower, "api key") ||
-		strings.Contains(lower, "api_key") || strings.Contains(lower, "apikey") {
+	// The gate has to admit every spelling the pattern accepts, and it did not:
+	// `api_key "…"` and `apikey "…"` were masked while `api-key "…"`,
+	// `API-KEY: "…"` and `x-api-key: "…"` went through in the clear, because
+	// the hyphen was missing here (#3614).
+	//
+	// ContainsAny is the cheap half: the pattern needs a quote character, so a
+	// text without one cannot match it, and this drops the rule from 1023 runs
+	// to 769 on a 4851-message sample (#3491).
+	if strings.ContainsAny(s, "\"'`") &&
+		(strings.Contains(lower, "password") || strings.Contains(lower, "passwd") ||
+			strings.Contains(lower, "pwd") || strings.Contains(lower, "secret") ||
+			strings.Contains(lower, "token") || strings.Contains(lower, "api key") ||
+			strings.Contains(lower, "api-key") || strings.Contains(lower, "api_key") ||
+			strings.Contains(lower, "apikey")) {
 		s = replaceSubmatch(s, quotedSecretRE, "quoted-secret", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:quoted-secret]" + m[5]
 		})
@@ -452,6 +467,15 @@ func Text(s string) (string, Counts) {
 		})
 		s = replaceSubmatch(s, envKeyRE, "credential", counts, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:credential]" + closingQuote(m[3], m[5])
+		})
+	}
+	// After the KV rules: a value long enough for them keeps the `credential`
+	// marker they wrote, and what is left is the short quoted value nothing
+	// reached (#3614). A value that is already a redaction marker is passed
+	// over rather than masked again under a different name.
+	if strings.ContainsAny(s, "\"'`") && kvAssignmentNearby(lower) {
+		s = replaceGroup(s, quotedAssignedSecretRE, 4, "quoted-secret", counts, func(m []string) bool {
+			return strings.HasPrefix(m[4], "[redacted:")
 		})
 	}
 	if kvAssignmentNearbyHints(lower, kvIntlHints) {

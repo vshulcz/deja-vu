@@ -6,6 +6,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 type recentJSON struct {
@@ -33,6 +34,9 @@ func printRecentJSONWithheld(w io.Writer, sessions []model.Session, sourceInstan
 	for i := range sessions {
 		sessions[i].Messages = nil
 		sessions[i].SetSource(sourceInstance)
+		// The listing's own printer filters what a transcript supplied; this
+		// path did not, and a title is free text (#3616).
+		sessions[i] = search.SafeSession(sessions[i])
 	}
 	if sessions == nil {
 		sessions = []model.Session{}
@@ -60,6 +64,7 @@ func printSessionJSON(w io.Writer, session model.Session, offset, limit int, sou
 	total := len(session.Messages)
 	session.Messages = sliceMessages(session.Messages, offset, limit)
 	session.SetSource(sourceInstance)
+	session = search.SafeSession(session)
 	return json.NewEncoder(w).Encode(sessionJSON{
 		SchemaVersion: jsonout.Version,
 		Session:       session,

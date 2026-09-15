@@ -2259,6 +2259,14 @@ func FindByIdentity(dir, harness, id string) (model.Session, bool, error) {
 	if err != nil {
 		return model.Session{}, false, err
 	}
+	// The floor, before the records: this loader serves a whole session to
+	// `show` and to the MCP tools, and a store written before deja learned to
+	// mask something it now masks holds text this build would not write. The
+	// ranked paths rebuild first; this one has no ranking to hang that on, so
+	// it says what the state is and serves nothing (#3617).
+	if mustRebuildBeforeAnswering(m, version) {
+		return model.Session{}, false, ErrStoreWithheld
+	}
 	meta, ok := m.Sessions[harness+":"+id]
 	if !ok {
 		return model.Session{}, false, nil

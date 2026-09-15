@@ -615,6 +615,13 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	var s model.Session
 	var ok bool
 	if o.harness != "" {
+		// The same pass the prefix form runs. Without it the exact-identity
+		// path read whatever was on disk, and a store below the redaction
+		// floor is fresh — so `show --harness` printed text this build would
+		// not write while `show <prefix>` re-read the sources first (#3617).
+		// A store that cannot be rebuilt — read-only, no space — falls through
+		// to the loader, which refuses and says why.
+		_ = index.Ensure(dir, "", false, os.Stderr)
 		// Exact identity first — that is what --harness is for, and what
 		// --json requires. But the usage line documents an id *prefix*, and
 		// routing --harness straight to the exact lookup made every
@@ -3161,6 +3168,18 @@ func printSources(dir string) {
 		}
 		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
+	// The two rows below are written by hand rather than driven by the table
+	// above, and the exclusion has to reach them too: the store #3499 named is
+	// one of them, and an excluded opencode kept being opened and kept printing
+	// the sqlite3 error the exclusion exists to silence.
+	excludedRow := func(name, location string) bool {
+		if !skipStore[name] {
+			return false
+		}
+		fmt.Printf("%s\t%s\texcluded — `harness:%s` is in %s\n",
+			name, location, name, sources.ExcludePath())
+		return true
+	}
 	aiderFiles := sources.AiderFiles()
 	var aiderSize int64
 	aiderRedactions := 0
@@ -3170,8 +3189,13 @@ func printSources(dir string) {
 		}
 		aiderRedactions += redactions[p]
 	}
-	rawAiderSessions := sources.LoadAider()
-	aiderSessions := sources.FilterSessions(rawAiderSessions)
+	aiderLocationForSkip := filepath.Join(sources.Home(), ".aider.chat.history.md")
+	skipAider := excludedRow("aider", aiderLocationForSkip)
+	var rawAiderSessions, aiderSessions []model.Session
+	if !skipAider {
+		rawAiderSessions = sources.LoadAider()
+		aiderSessions = sources.FilterSessions(rawAiderSessions)
+	}
 	aiderMessages := 0
 	for _, s := range aiderSessions {
 		aiderMessages += len(s.Messages)
@@ -3187,7 +3211,12 @@ func printSources(dir string) {
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
-	fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	if !skipAider {
+		fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+	}
+	if excludedRow("opencode", sources.OpencodeDB()) {
+		return
+	}
 	var size int64
 	if fi, err := os.Stat(sources.OpencodeDB()); err == nil {
 		size = fi.Size()
@@ -4242,10 +4271,13 @@ func ensureError(dir string, err error) error {
 		return fmt.Errorf("the index directory went away mid-build (%s) — the disk it lives on may have been unmounted; the index already there is unharmed, so reconnect it and run `deja index` again, or point DEJA_INDEX_DIR somewhere local", dir)
 	}
 	// Already worded where it was raised — the leftover-swap case names the
-	// directory to remove and the command to rerun, and "ensure:" in front of
-	// it is internal noise (#1009).
-	if strings.HasPrefix(err.Error(), "an earlier index swap left ") {
-		return err
+	// directory to remove and the command to rerun, the refused index path
+	// names the file it will not delete, and "ensure:" in front of either is
+	// internal noise (#1009).
+	for _, worded := range []string{"an earlier index swap left ", "the index path "} {
+		if strings.HasPrefix(err.Error(), worded) {
+			return err
+		}
 	}
 	return fmt.Errorf("ensure: %w", err)
 }

@@ -468,8 +468,10 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 // quoted while it is re-read: 41 masks the argument-credential shapes already
 // on disk, where eight of twenty-four planted secrets were stored in the clear,
 // 42 the password given as a long flag at any length, 43 a secret whose value is
-// not ASCII, and 44 the rest of the flag family — `--passphrase`, `--secret`,
-// `--token`, `--api-key` (#3535, #3572, #3587, #3596).
+// not ASCII, 44 the rest of the flag family — `--passphrase`, `--secret`,
+// `--token`, `--api-key` — and 46 the spellings of "api key" the gate left out
+// plus the colon form under the key-value floor (#3535, #3572, #3587, #3596,
+// #3614).
 // Redaction runs at ingest, so text written before either is text this build
 // would not write.
 //
@@ -477,7 +479,7 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 // about what deja derives — a role filed better, a title read from a different
 // field — leaves the older answers correct, and there are three of those for
 // every one of these.
-const redactionFloor = 44
+const redactionFloor = 46
 
 // mustRebuildBeforeAnswering reports whether an index has to be rebuilt before
 // it may answer anything at all, rather than answering under its own older

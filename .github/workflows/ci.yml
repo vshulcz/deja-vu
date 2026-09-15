@@ -133,6 +133,40 @@ jobs:
           report=$(./deja bench recall --json)
           printf '%s\n' "$report"
           printf '%s\n' "$report" | jq -e '.lexical.recall_at_5 >= 0.85'
+      # What an update costs, per class of change. The four quality benchmarks
+      # all measure what comes back; the event that happens most — a new
+      # conversation appears on disk — had no number anywhere, which is how a
+      # path that re-tokenised the entire store on every new session survived
+      # two months and twenty releases (#3500, fixed in #3503).
+      #
+      # The gate is the shape rather than the clock: only a transcript that was
+      # rewritten may make the pass replace the records already on file. A
+      # wall-clock budget on a shared runner measures the runner, which is the
+      # lesson #3590 cost a red pull request to learn.
+      - name: Ingest cost per class of change
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          report=$(./deja bench ingest --json)
+          printf '%s\n' "$report"
+          # Nothing but a rewrite rewrites.
+          printf '%s\n' "$report" | jq -e '
+            [.classes[] | select(.name != "rewritten transcript") | .rewritten]
+            | length > 0 and all(. == false)'
+          # And the rewrite class is still there to be compared against, so a
+          # renamed or removed class cannot make the check above vacuous.
+          printf '%s\n' "$report" | jq -e '
+            [.classes[] | select(.name == "rewritten transcript" and .rewritten)]
+            | length == 1'
+          # And every class is present. A wall-clock comparison stood here and
+          # failed on the runner while the local margin was five-fold — which
+          # is the lesson above, applied to this step rather than quoted by it.
+          # What the gate can hold on a shared machine is the shape: the five
+          # classes exist, and only one of them rewrites.
+          printf '%s\n' "$report" | jq -e '
+            [.classes[].name] | sort == [
+              "appended turn", "new transcript", "renamed transcript",
+              "rewritten transcript", "unchanged"]'
       # Printing coverage and failing on it are different things: the bar in
       # CONTRIBUTING said 95% while the number slid to 80%, because nothing
       # in the build ever looked at it. The floor here is where the packages

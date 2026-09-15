@@ -52,7 +52,7 @@ before their source sessions have been indexed. See [compaction recovery](compac
 Privacy control files are primary data, not cache data: the XDG-aware
 `~/.config/deja/tombstones` list prevents forgotten source sessions from being
 re-ingested, and `~/.config/deja/exclude` contains project patterns skipped at
-ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` reports it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. Store names are exact, not globs: they are the twenty-five `deja sources` prints. Patterns also
+ingest. `DEJA_EXCLUDE_PROJECTS` adds comma-separated patterns. A line in the same file prefixed `harness:` names a store instead of a project — `harness:opencode` — and deja then neither walks it nor asks for the tool that would read it; `deja doctor` and `deja sources` both report it as `excluded` rather than naming a package to install. `DEJA_EXCLUDE_HARNESSES` is the comma-separated form. Store names are exact, not globs: they are the twenty-five `deja sources` prints. Patterns also
 apply at `sync export`, so a project excluded after the index was built does not
 leave the machine; what is already indexed stays searchable locally until
 `deja index --rebuild`, and `deja index` says so when the list has changed. A full `forget`
@@ -111,6 +111,11 @@ leaving surrounding text searchable. The current patterns cover:
 - AWS access key IDs and secret-key assignments;
 - generic credential assignments such as `api_key=`, `token=`, `secret=`,
   `password=`, and `authorization=`;
+- a secret named and quoted rather than assigned — `password "…"`, `token is
+  "…"`, `api-key: "…"` — in every spelling of the name, with or without the
+  hyphen, underscore or space, and with a colon or an equals sign as well as
+  plain prose. The quotes are what makes this safe to be loose about the
+  separator: a name with no quoted value behind it is left alone;
 - bearer tokens and JWTs;
 - PEM private-key blocks;
 - known GitHub, GitLab, OpenAI/Anthropic-style, Groq, xAI, Hugging Face, npm,
