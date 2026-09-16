@@ -20,4 +20,19 @@ block, which deja has no use for and ignores.
   half of a store it does not understand without saying so. The transcripts are
   the conversation either way; the database becomes work the day a sample of it
   exists.
-- Read support only.
+- Wiring: `deja install zcode` writes the server into `mcp.servers` in
+  `~/.zcode/cli/config.json` — one level deeper than the `mcpServers` every
+  other client here uses — and `deja install zcode-auto` adds the hooks to the
+  same file, on `SessionStart` and `UserPromptSubmit`.
+- **Three things decide whether that works, and all three are silent when
+  wrong.** Config-file hooks do nothing without `hooks.enabled: true`. A
+  config hook gets no template expansion, so the command carries an absolute
+  path. And the output schema is strict: one key ZCode does not recognise and
+  the whole response is discarded — which is why the installed line ends in
+  `--strict`, dropping deja's receipt line and keeping the context.
+- The shapes were not read from ZCode's own documentation, which does not
+  describe them. They come from volcengine/OpenViking's memory plugin, whose
+  `examples/agent-hook-plugin/DESIGN.md` records the surface it established by
+  inspecting a live install — seven hook events, the manifest probe order, the
+  strict schema — and ships an installer against it. Nothing here is verified
+  on the machine deja was written on.

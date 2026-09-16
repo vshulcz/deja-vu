@@ -781,6 +781,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installKimchi(exe, uninstall)
 	case "gjc":
 		return installGjc(exe, uninstall)
+	case "zcode":
+		return installZCode(exe, uninstall)
+	case "zcode-auto":
+		return installZCodeAuto(exe, uninstall)
 	case "cline-auto":
 		mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 		if err != nil {
@@ -3893,7 +3897,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "kimchi", "gjc", "aider",
+		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "kimchi", "gjc", "zcode", "zcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -4027,6 +4031,7 @@ func existingTargetChecks() map[string]string {
 		"kiro":         sources.KiroRoot(),
 		"kimchi":       sources.KimchiRoot(),
 		"gjc":          sources.GjcRoot(),
+		"zcode":        sources.ZCodeRoot(),
 		// These six have install targets and were in the matrix with nothing
 		// looking for them, so `--auto` wired the other nineteen and said
 		// nothing about Amp, prime-agent, Crush, Continue, Zed or VS Code on a

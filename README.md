@@ -288,7 +288,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | gajae-code | ✅ | — | ✅ | ✅ | — | paste | none |
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | — | paste | none |
 | Command Code | — | — | — | ? | — | paste | none |
-| ZCode | ⚠ | — | — | ? | — | paste | none |
+| ZCode | ✅ | ✅ | ? | ? | — | paste | none |
 | Kiro | ✅ | — | — | ? | — | paste | none |
 | Kilo Code | ✅ | ⚠ | ✅ | — | — | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |

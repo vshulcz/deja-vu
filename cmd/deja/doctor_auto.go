@@ -67,6 +67,10 @@ func autoWirings() []autoWiring {
 		// whole of auto-recall here — there is no digest hook to look for.
 		{"crush", func() string { return crushConfigPath() }, "hook-tool", ""},
 		{"grok", func() string { return grokHooksPath() }, "hook-context", ""},
+		// ZCode keeps its hooks in the same file as its server map, and the
+		// line deja writes ends in `--strict` — its schema discards a whole
+		// response over one key it does not know.
+		{"zcode", func() string { return zcodeConfigPath() }, "hook-context", ""},
 		{"aider", func() string { return aiderContextPath() }, "",
 			"context file — refreshed by `deja aider`, not by aider itself"},
 		// Roo's guidance moved out of the always-on rules file into a skill;

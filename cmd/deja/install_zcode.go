@@ -1,0 +1,231 @@
+package main
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+// ZCode keeps everything in one file — `~/.zcode/cli/config.json` — and both
+// halves of an install live in it: the server under `mcp.servers`, and the
+// hooks under `hooks`, which is Claude Code's shape down to the nesting
+// (`hooks.<Event>[].hooks[] = {type, command, timeout}`).
+//
+// The shapes are not guessed. They are the surface volcengine/OpenViking's
+// memory plugin established by inspecting a live install and shipped an
+// installer against (examples/agent-hook-plugin/DESIGN.md and
+// hosts/zcode/{hooks.json,.mcp.json}): seven hook events, config-file hooks
+// requiring `hooks.enabled: true`, no template expansion in a config hook — so
+// the command carries an absolute path — and a strict output schema that
+// discards the whole response over one unrecognised key, which is what
+// `--strict` is for.
+//
+// Two events are wired, the two deja has something to say at: SessionStart
+// puts the project's memory in front of the model before the first prompt, and
+// UserPromptSubmit answers the prompt that was just typed (#3651).
+func zcodeConfigPath() string {
+	return filepath.Join(sources.ZCodeConfigDir(), "cli", "config.json")
+}
+
+// installZCode writes the server under `mcp.servers`, which is one level
+// deeper than the `mcpServers` every other client here uses, so the shared
+// installMCPJSON cannot be pointed at it.
+func installZCode(exe string, uninstall bool) (installResult, error) {
+	path := zcodeConfigPath()
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
+	root := map[string]any{}
+	if len(old) > 0 {
+		if err := json.Unmarshal(old, &root); err != nil {
+			return installResult{}, configParseError(path, err)
+		}
+	}
+	mcp, _ := root["mcp"].(map[string]any)
+	if mcp == nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		mcp = map[string]any{}
+	}
+	servers, _ := mcp["servers"].(map[string]any)
+	if servers == nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		servers = map[string]any{}
+	}
+	if uninstall {
+		if _, ok := servers["deja"]; !ok {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		delete(servers, "deja")
+	} else {
+		servers["deja"] = mcpServerEntry(exe)
+	}
+	mcp["servers"] = servers
+	root["mcp"] = mcp
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return installResult{}, err
+	}
+	action, err := writeIfChanged(path, old, next)
+	if err != nil {
+		return installResult{}, err
+	}
+	return installResult{Path: path, Action: action}, nil
+}
+
+// zcodeHookEntry is one wired event, in the shape the config takes.
+func zcodeHookEntry(command string, timeout int) map[string]any {
+	return map[string]any{
+		"hooks": []any{map[string]any{
+			"type":    "command",
+			"command": command,
+			"timeout": timeout,
+		}},
+	}
+}
+
+func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
+	// The server first, then the hooks: `deja install --auto` installs the
+	// -auto target alone, and hooks without the server would leave the tool
+	// half-wired with nothing saying so.
+	server, err := installZCode(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	hooksRes, err := installZCodeHooks(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(server, hooksRes), nil
+}
+
+func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
+	path := zcodeConfigPath()
+	old, err := readConfig(path)
+	if err != nil {
+		return installResult{}, err
+	}
+	root := map[string]any{}
+	if len(old) > 0 {
+		if err := json.Unmarshal(old, &root); err != nil {
+			return installResult{}, configParseError(path, err)
+		}
+	}
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		if uninstall {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		hooks = map[string]any{}
+	}
+	events, _ := hooks["events"].(map[string]any)
+	// The config has held both shapes: OpenViking's installer writes the
+	// events at the top of `hooks`, and its own verification step looks for
+	// `hooks.events`. Whichever is there is the one we edit, so an install
+	// beside theirs does not write a second block that never fires.
+	container := hooks
+	if events != nil {
+		container = events
+	}
+
+	wanted := map[string]map[string]any{
+		"SessionStart":     zcodeHookEntry(exe+" hook-context --strict", 30),
+		"UserPromptSubmit": zcodeHookEntry(exe+" hook-prompt --strict", 20),
+	}
+	changed := false
+	for event, entry := range wanted {
+		list, _ := container[event].([]any)
+		kept := make([]any, 0, len(list))
+		for _, item := range list {
+			if zcodeEntryIsOurs(item) {
+				changed = true
+				continue
+			}
+			kept = append(kept, item)
+		}
+		if uninstall {
+			if len(kept) == 0 {
+				delete(container, event)
+			} else {
+				container[event] = kept
+			}
+			continue
+		}
+		container[event] = append(kept, entry)
+		changed = true
+	}
+	if uninstall {
+		if !changed {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+	} else {
+		// Config-file hooks do not run at all without this, and the plugin
+		// that got here first records the same: the merge has to set it.
+		if on, _ := hooks["enabled"].(bool); !on {
+			hooks["enabled"] = true
+			changed = true
+		}
+	}
+	if events != nil {
+		hooks["events"] = container
+	}
+	root["hooks"] = hooks
+	next, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return installResult{}, err
+	}
+	next = append(next, '\n')
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return installResult{}, err
+	}
+	action, err := writeIfChanged(path, old, next)
+	if err != nil {
+		return installResult{}, err
+	}
+	return installResult{Path: path, Action: action}, nil
+}
+
+// zcodeEntryIsOurs recognises a hook deja wrote, so a second install replaces
+// it instead of stacking another copy, and an uninstall takes only ours.
+func zcodeEntryIsOurs(item any) bool {
+	m, ok := item.(map[string]any)
+	if !ok {
+		return false
+	}
+	list, _ := m["hooks"].([]any)
+	for _, h := range list {
+		entry, ok := h.(map[string]any)
+		if !ok {
+			continue
+		}
+		if cmd, _ := entry["command"].(string); zcodeCommandIsOurs(cmd) {
+			return true
+		}
+	}
+	return false
+}
+
+// zcodeCommandIsOurs reports whether a config command line runs one of deja's
+// hooks. The shared hookCommandKindOf reads the subcommand off the end of the
+// reference command, and the lines deja writes here end in `--strict`, so this
+// looks for the pair instead: a deja binary, then a hook subcommand.
+func zcodeCommandIsOurs(cmd string) bool {
+	fields := strings.Fields(cmd)
+	for i := 0; i+1 < len(fields); i++ {
+		if isDejaBinaryToken(fields[i]) && hookNames[fields[i+1]] {
+			return true
+		}
+	}
+	return false
+}

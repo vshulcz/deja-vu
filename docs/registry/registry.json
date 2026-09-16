@@ -870,8 +870,8 @@
       "display_name": "ZCode",
       "last_verified": "2026-09-16",
       "capabilities": {
-        "mcp": false,
-        "auto": false,
+        "mcp": true,
+        "auto": true,
         "skill": false,
         "command": false,
         "resume": false,
@@ -879,18 +879,10 @@
         "prereq": "none"
       },
       "gaps": {
-        "mcp": {
-          "state": "blocked",
-          "why": "ZCode's server map (`mcp.servers` in ~/.zcode/cli/config.json) takes a strict `type`/`url`/`headers` shape — an HTTP endpoint — and deja's server is a local stdio process, so there is nothing to write there. The way in is its hook block, whose SessionStart injects through `hookSpecificOutput.additionalContext`, the shape Claude Code uses. Both read from a third party's live-verified integration matrix rather than from this machine (#3651).",
-          "source": "https://github.com/akitaonrails/ai-memory/blob/main/docs/support-matrix.md"
-        },
-        "auto": {
-          "state": "todo",
-          "why": "No hook surface read from the tool's own source yet (#3647)."
-        },
         "skill": {
-          "state": "todo",
-          "why": "No skill channel written yet; the reader came first (#3647)."
+          "state": "unknown",
+          "why": "Nothing found names a user-level skill directory for ZCode. Its extension surface, as inspected by the memory plugin that got there first, is the hook block and the server map in `~/.zcode/cli/config.json` plus a plugin manifest probe order; guidance therefore reaches the model through the MCP tool descriptions and the injected session block (#3651).",
+          "source": "https://github.com/volcengine/OpenViking/blob/main/examples/agent-hook-plugin/DESIGN.md"
         },
         "command": {
           "state": "unknown",

@@ -17,9 +17,14 @@ import (
 // silently skipping the half of a store it does not understand. The transcripts
 // are the conversation either way (#3647).
 
+// ZCodeConfigDir is ZCode's user directory: the project store, and under
+// `cli/config.json` everything it is configured with — the server map and the
+// hooks both live in that one file.
+func ZCodeConfigDir() string { return filepath.Join(Home(), ".zcode") }
+
 // ZCodeRoot is the project store root. DEJA_ZCODE_ROOT replaces it.
 func ZCodeRoot() string {
-	return EnvPath("DEJA_ZCODE_ROOT", filepath.Join(Home(), ".zcode", "projects"))
+	return EnvPath("DEJA_ZCODE_ROOT", filepath.Join(ZCodeConfigDir(), "projects"))
 }
 
 // ZCodeSessionFiles lists the transcripts.

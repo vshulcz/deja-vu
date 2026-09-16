@@ -519,6 +519,11 @@
       "path": "<tmp>/home/.grok/hooks/deja.json"
     },
     {
+      "name": "zcode",
+      "state": "missing",
+      "path": "<tmp>/home/.zcode/cli/config.json"
+    },
+    {
       "name": "aider",
       "state": "missing",
       "path": "<tmp>/home/.config/deja/aider-context.md"

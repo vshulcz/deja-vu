@@ -582,6 +582,11 @@ func cmdHookContext(dir string, rest []string) error {
 		// flag on from the command line, so the same session gets it once.
 		case "--once", "-once":
 			once = true
+		// --strict is for a host that validates the hook's JSON and discards
+		// the whole output over a key it does not know. It drops the receipt
+		// line and keeps the context (see hook_strict.go).
+		case "--strict", "-strict":
+			strictHookOutput = true
 		}
 	}
 	_ = runHookContextMode(dir, plain, once)
@@ -3821,7 +3826,7 @@ Usage:
   deja wip [--json]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
-  deja hook-context [--plain] [--once]  (session start: the project digest, once per session)
+  deja hook-context [--plain] [--once] [--strict]  (session start: the project digest, once per session)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
   deja hook-tool [--plain] [--crush]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)

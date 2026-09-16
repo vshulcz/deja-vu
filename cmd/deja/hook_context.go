@@ -431,9 +431,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 			// found, once (#3073), then once a week what the week looked
 			// like (#3065).
 			resp.SystemMessage = joinNotes(resp.SystemMessage, joinNotes(builtNote(dir), weekNote(dir)))
-			if b, err := json.Marshal(resp); err == nil {
-				fmt.Fprintln(os.Stdout, string(b))
-			}
+			emitHookResponse(resp)
 			return nil
 		}
 		// A first build (or one forced by a new index format) is running in
@@ -465,9 +463,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 				var resp sessionStartHookResponse
 				resp.HookSpecificOutput.HookEventName = "SessionStart"
 				resp.SystemMessage = line
-				if b, err := json.Marshal(resp); err == nil {
-					fmt.Fprintln(os.Stdout, string(b))
-				}
+				emitHookResponse(resp)
 			}
 		}
 		return nil
@@ -600,11 +596,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if note := staleReadOnlyNote(dir); note != "" {
 		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
 	}
-	b, err := json.Marshal(resp)
-	if err != nil {
-		return nil
-	}
-	fmt.Fprintln(os.Stdout, string(b))
+	emitHookResponse(resp)
 	return nil
 }
 

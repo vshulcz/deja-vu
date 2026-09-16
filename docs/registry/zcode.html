@@ -58,8 +58,27 @@
 <p>the conversation either way; the database becomes work the day a sample of it</p>
 <p>exists.</p>
 <ul>
-<li>Read support only.</li>
+<li>Wiring: <code>deja install zcode</code> writes the server into <code>mcp.servers</code> in</li>
 </ul>
+<p><code>~/.zcode/cli/config.json</code> — one level deeper than the <code>mcpServers</code> every</p>
+<p>other client here uses — and <code>deja install zcode-auto</code> adds the hooks to the</p>
+<p>same file, on <code>SessionStart</code> and <code>UserPromptSubmit</code>.</p>
+<ul>
+<li>**Three things decide whether that works, and all three are silent when</li>
+</ul>
+<p>wrong.** Config-file hooks do nothing without <code>hooks.enabled: true</code>. A</p>
+<p>config hook gets no template expansion, so the command carries an absolute</p>
+<p>path. And the output schema is strict: one key ZCode does not recognise and</p>
+<p>the whole response is discarded — which is why the installed line ends in</p>
+<p><code>--strict</code>, dropping deja&#39;s receipt line and keeping the context.</p>
+<ul>
+<li>The shapes were not read from ZCode&#39;s own documentation, which does not</li>
+</ul>
+<p>describe them. They come from volcengine/OpenViking&#39;s memory plugin, whose</p>
+<p><code>examples/agent-hook-plugin/DESIGN.md</code> records the surface it established by</p>
+<p>inspecting a live install — seven hook events, the manifest probe order, the</p>
+<p>strict schema — and ships an installer against it. Nothing here is verified</p>
+<p>on the machine deja was written on.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your
