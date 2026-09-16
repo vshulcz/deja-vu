@@ -1,0 +1,4 @@
+{"type": "session", "version": 3, "id": "reg-gjc-001", "timestamp": "2026-09-16T14:00:00Z", "cwd": "/workspace/gjc-demo", "title": "registry conformance"}
+{"type": "service_tier_change", "id": "st1", "parentId": null, "timestamp": "2026-09-16T14:00:01Z", "tier": "priority"}
+{"type": "message", "id": "u1", "parentId": "st1", "timestamp": "2026-09-16T14:00:18Z", "message": {"role": "user", "content": [{"type": "text", "text": "the cron fires twice on the hour"}]}}
+{"type": "message", "id": "a1", "parentId": "u1", "timestamp": "2026-09-16T14:00:37Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "Two units were enabled, the timer and the service, so each hour ran the job twice."}]}}

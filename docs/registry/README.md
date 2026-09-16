@@ -31,6 +31,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Kilo Code](kilocode.md) | task JSON in VS Code globalStorage, plus the CLI's OpenCode-schema SQLite |
 | [Kiro](kiro.md) | one JSONL per session from the CLI, another from the IDE |
 | [Senpi](senpi.md) | pi's session JSONL under its own agent directory |
+| [gajae-code](gjc.md) | pi's session JSONL, sub-agent passes one level down |
 | [Kimchi Coding](kimchi.md) | pi's session JSONL, flat root |
 | [Command Code](commandcode.md) | flat role/content JSONL per session |
 | [ZCode](zcode.md) | flat role/content JSONL per session |

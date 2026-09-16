@@ -113,6 +113,48 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	}
 }
 
+// gjc keeps a sub-agent's passes one directory deeper than the session they
+// belong to. Indexed as sessions of their own they repeat the parent's work and
+// compete with it for the same recall slot, so they are skipped unless asked
+// for — the switch Claude Code's and Cursor's sub-agents already use (#3647).
+func TestGjcSkipsSubagentPassesUnlessAskedFor(t *testing.T) {
+	root := fixtureRoot(t, "gjc", "DEJA_GJC_ROOT")
+	files := GjcSessionFiles()
+	if len(files) != 1 {
+		t.Fatalf("files = %v, want the session alone", files)
+	}
+	if strings.Contains(filepath.ToSlash(files[0]), "/session/") {
+		t.Fatalf("a sub-agent pass was listed as a session: %s", files[0])
+	}
+
+	ss, err := ParseGjcFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ss) != 1 || ss[0].Harness != "gjc" {
+		t.Fatalf("sessions = %+v", ss)
+	}
+	if ss[0].ID != "reg-gjc-001" {
+		t.Errorf("id = %q, want the header's id", ss[0].ID)
+	}
+	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[1].Text, "twice") {
+		t.Errorf("messages = %+v", ss[0].Messages)
+	}
+	// The service_tier_change line is not a turn, and read as one it is an
+	// empty message in the middle of the session.
+	for _, m := range ss[0].Messages {
+		if m.Text == "" {
+			t.Errorf("a bookkeeping line became a message: %+v", ss[0].Messages)
+		}
+	}
+
+	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "1")
+	if got := GjcSessionFiles(); len(got) != 2 {
+		t.Errorf("with sub-agents asked for, files = %v, want both", got)
+	}
+	_ = root
+}
+
 // fixtureRoot points one reader at its committed fixture store.
 func fixtureRoot(t *testing.T, name, env string) string {
 	t.Helper()

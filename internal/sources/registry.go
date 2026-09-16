@@ -336,6 +336,15 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			Name: "gjc", Load: LoadGjc, Files: GjcSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "gjc",
+				Match:     GjcUnderRoot,
+				Parse:     fullParse(ParseGjcFile),
+				ParseFrom: offsetParse(ParseGjcFileFromOffset),
+			}},
+		},
+		{
 			Name: "kimchi", Load: LoadKimchi, Files: KimchiSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "kimchi",

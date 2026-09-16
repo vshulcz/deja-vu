@@ -176,6 +176,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		}
 	case "senpi":
 		sessions, err = ParseSenpiFile(path)
+	case "gjc":
+		sessions, err = ParseGjcFile(path)
 	case "kimchi":
 		sessions, err = ParseKimchiFile(path)
 	case "commandcode":

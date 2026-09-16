@@ -863,6 +863,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("commandcode", commandRoot, doctorExists(commandRoot), sources.CommandCodeSessionFiles())
 	zcodeRoot := sources.ZCodeRoot()
 	printFiles("zcode", zcodeRoot, doctorExists(zcodeRoot), sources.ZCodeSessionFiles())
+	gjcRoot := sources.GjcRoot()
+	printFiles("gjc", gjcRoot, doctorExists(gjcRoot), sources.GjcSessionFiles())
 
 	// Kiro's two clients write different files under one root, and the row says
 	// which of them answered: a CLI user and an IDE user have nothing in common

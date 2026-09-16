@@ -3102,6 +3102,7 @@ func printSources(dir string) {
 		{"kimchi", sources.KimchiRoot(), []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.LoadKimchi},
 		{"commandcode", sources.CommandCodeRoot(), []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles, sources.LoadCommandCode},
 		{"zcode", sources.ZCodeRoot(), []string{sources.ZCodeRoot()}, sources.ZCodeSessionFiles, sources.LoadZCode},
+		{"gjc", sources.GjcRoot(), []string{sources.GjcRoot()}, sources.GjcSessionFiles, sources.LoadGjc},
 		{"continue", filepath.Join(sources.ContinueRoot(), "sessions"), []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.LoadContinue},
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
 		{"omp", sources.OmpRoot(), []string{sources.OmpRoot()}, sources.OmpSessionFiles, sources.LoadOmp},

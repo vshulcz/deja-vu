@@ -729,6 +729,51 @@
       }
     },
     {
+      "id": "gjc",
+      "store_paths": [
+        "${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl",
+        "${DEJA_GJC_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/gjc/-workspace-gjc-demo/session.jsonl"
+      ],
+      "parser_source": "internal/sources/gjc.go",
+      "last_verified": "2026-09-16",
+      "display_name": "gajae-code",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now; the reader landed first (#3647)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "No hook surface read from the tool's own source yet (#3647)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill channel written yet (#3647)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3647)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "No resume command verified here, so a handover is a paste (#3647)."
+        }
+      }
+    },
+    {
       "id": "kimchi",
       "store_paths": [
         "${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/*.jsonl",
