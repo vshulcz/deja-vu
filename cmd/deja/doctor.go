@@ -853,6 +853,15 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	printRow("kilocode", kiloLoc, kiloTasks > 0 || kiloHasDB, kiloDetail)
 
+	// Cherry Studio writes Claude Code transcripts under its own app data, so
+	// the row names the roots it found rather than the app directory (#3644).
+	cherryFiles := len(sources.CherryStudioSessionFiles())
+	cherryLoc := "CherryStudio/Data/Agents/.claude"
+	if roots := sources.CherryStudioRoots(); len(roots) > 0 {
+		cherryLoc = strings.Join(roots, string(os.PathListSeparator))
+	}
+	printRow("cherrystudio", cherryLoc, cherryFiles > 0, doctorCount(cherryFiles, "file"))
+
 	continueDir := filepath.Join(sources.ContinueRoot(), "sessions")
 	printFilesBeside("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles(),
 		filepath.Join(continueDir, "sessions.json"))

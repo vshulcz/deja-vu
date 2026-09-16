@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Cherry Studio stores its history — session format</title>
+<meta name="description" content="Where Cherry Studio writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/cherrystudio.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Cherry Studio stores its history — session format">
+<meta property="og:description" content="Where Cherry Studio writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/cherrystudio.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Cherry Studio stores its history — session format">
+<meta name="twitter:description" content="Where Cherry Studio writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Cherry Studio writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Cherry Studio","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/cherrystudio.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/cherrystudio.html","name":"Cherry Studio","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html" aria-current="page">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html">Kilo Code</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Cherry Studio</h1>
+<ul>
+<li><strong>ID</strong>: <code>cherrystudio</code></li>
+<li><strong>Store</strong>: <code>&lt;app data&gt;/CherryStudio/Data/Agents/.claude/&lt;projects&gt;/&lt;workspace&gt;/&lt;session&gt;.jsonl</code> — <code>~/Library/Application Support/CherryStudio</code> on macOS, <code>%APPDATA%\CherryStudio</code> on Windows, <code>$XDG_CONFIG_HOME/CherryStudio</code> elsewhere</li>
+<li><strong>Store (before the upgrade that added <code>Data/Agents</code>)</strong>: <code>&lt;app data&gt;/CherryStudio/.claude/&lt;projects&gt;/…</code>, read so a store that predates it is not lost</li>
+<li><strong>Read override</strong>: <code>DEJA_CHERRYSTUDIO_ROOTS</code> replaces the root list</li>
+<li><strong>Format</strong>: Claude Code&#39;s own transcript JSONL</li>
+<li><strong>Needs</strong>: nothing</li>
+</ul>
+<p>Cherry Studio runs Claude Code sessions from a desktop app and writes ordinary</p>
+<p>Claude Code transcripts under its own app data, so the parsing is Claude&#39;s.</p>
+<p><strong>Last verified:</strong> 2026-09-16</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>A snapshot per stream chunk.</strong> Cherry Studio appends the same API call three</li>
+</ul>
+<p>or four times as the response streams: a new <code>uuid</code> each time, the same</p>
+<p><code>requestId</code> and <code>message.id</code>, and the text growing. Read plainly that is one</p>
+<p>reply stored three times in prefixes — a recall can then quote half a sentence</p>
+<p>and <code>deja show</code> prints the answer twice before finishing it. The reader</p>
+<p>collapses a run by <code>requestId</code> (else <code>message.id</code>, else <code>uuid</code>) and keeps the</p>
+<p>longest text. Stock Claude Code writes one record per turn, so its reader is</p>
+<p>unchanged and a test pins that.</p>
+<ul>
+<li>Sessions are their own harness rather than extra Claude roots: a reader should</li>
+</ul>
+<p>see which app the work happened in, and <code>deja sources</code> says <code>cherrystudio</code>.</p>
+<ul>
+<li>Read support only. Nothing is wired into Cherry Studio — no hooks, no MCP, no</li>
+</ul>
+<p><code>deja install</code> — and since it embeds Claude Code rather than being it, that</p>
+<p>question belongs to the app&#39;s own plugin surface.</p>
+
+<hr>
+<p>deja reads this format and twenty-six others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

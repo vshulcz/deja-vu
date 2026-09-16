@@ -305,6 +305,20 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			// Cherry Studio runs Claude Code sessions from a desktop app and
+			// writes them in Claude's own format, with a snapshot per stream
+			// chunk that the reader collapses (#3644).
+			Name: "cherrystudio", Load: LoadCherryStudio, Files: CherryStudioSessionFiles,
+			Kinds: []FileKind{{
+				Name: "cherrystudio",
+				Match: func(p string) bool {
+					return strings.HasSuffix(p, ".jsonl") && CherryStudioUnderRoot(p)
+				},
+				Parse:     fullParse(ParseCherryStudioFile),
+				ParseFrom: offsetParse(ParseCherryStudioFileFromOffset),
+			}},
+		},
+		{
 			// Kilo Code keeps the extension's task files and the CLI's
 			// OpenCode-schema database; both parsers are already here, so this
 			// entry is paths and a name (#3643).

@@ -1,7 +1,7 @@
 # @vshulcz/pi-deja
 
 pi remembers its own sessions. This extension answers the other question: what
-was done in the twenty-five other coding agents on this machine — Claude Code,
+was done in the twenty-six other coding agents on this machine — Claude Code,
 Codex, Cursor, Gemini, OpenClaw and Hermes among them — including the months
 before pi was installed.
 

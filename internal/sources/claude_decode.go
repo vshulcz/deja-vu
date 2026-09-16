@@ -46,11 +46,21 @@ type claudeLine struct {
 	// placeholder. Indexed as the person's words, a skill body became 52
 	// questions nobody asked on one machine (#3267).
 	IsMeta bool `json:"isMeta"`
+	// RequestID is the API call this record reports on. A store that appends a
+	// snapshot per stream chunk repeats it, which is how a run of prefixes is
+	// recognised as one reply (#3644).
+	RequestID string `json:"requestId"`
+	// UUID is the record's own id, the fallback identity when neither
+	// requestId nor message.id is present.
+	UUID string `json:"uuid"`
 }
 
 type claudeMessage struct {
 	Role    string          `json:"role"`
 	Content json.RawMessage `json:"content"`
+	// ID identifies the API call a streaming snapshot belongs to, beside the
+	// line's own requestId. Used only where a store writes snapshots.
+	ID string `json:"id"`
 }
 
 func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, error) {
@@ -64,8 +74,29 @@ func parseClaudeTypedFromOffset(path string, offset int64) ([]model.Session, err
 // the sole owner of filesystem I/O; compaction supplies its already-read
 // memory slice so no unredacted temporary transcript reaches disk.
 func parseClaudeTypedWithScanner(path string, scan func(func([]byte)) error) ([]model.Session, error) {
+	return parseClaudeTypedWithOptions(path, scan, claudeParseOptions{Harness: "claude"})
+}
+
+// claudeParseOptions are the differences between the stores that share Claude
+// Code's transcript format.
+type claudeParseOptions struct {
+	// Harness names the store on every session it produces.
+	Harness string
+	// CollapseSnapshots keeps one record per API call where the store appends a
+	// snapshot per stream chunk, as Cherry Studio does (#3644).
+	CollapseSnapshots bool
+}
+
+func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
+	opts claudeParseOptions) ([]model.Session, error) {
+	harness := opts.Harness
+	if harness == "" {
+		harness = "claude"
+	}
+	// index of the message a request id last wrote, for the collapse
+	snapshotAt := map[string]int{}
 	s := model.Session{
-		Harness: "claude",
+		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Project: claudeProjectName(claudeProjectDir(path)),
 		Path:    path,
@@ -109,6 +140,19 @@ func parseClaudeTypedWithScanner(path string, scan func(func([]byte)) error) ([]
 			}
 		}
 		if txt != "" {
+			// A snapshot run is one reply: the later record carries the longer
+			// text, so it replaces the earlier rather than following it.
+			if key := claudeCallIdentity(v); opts.CollapseSnapshots && key != "" {
+				if at, ok := snapshotAt[key]; ok && at < len(s.Messages) &&
+					s.Messages[at].Role == role {
+					if len(txt) >= len(s.Messages[at].Text) {
+						s.Messages[at].Text = txt
+						s.Messages[at].Time = t
+					}
+					return
+				}
+				snapshotAt[key] = len(s.Messages)
+			}
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: txt, Time: t})
 		}
 		if v.Message != nil {
@@ -624,4 +668,22 @@ func claudeCommands(raw json.RawMessage) []string {
 		out = append(out, "$ "+part.Input.Command)
 	}
 	return out
+}
+
+// claudeCallIdentity is which API call a record reports on: the requestId when
+// the store writes one, else the message id, else the record's own uuid. A
+// store that appends a snapshot per stream chunk repeats the first two and
+// changes the third, which is what makes the first two usable and the third a
+// last resort (#3644).
+func claudeCallIdentity(v claudeLine) string {
+	if v.RequestID != "" {
+		return "req:" + v.RequestID
+	}
+	if v.Message != nil && v.Message.ID != "" {
+		return "msg:" + v.Message.ID
+	}
+	if v.UUID != "" {
+		return "uuid:" + v.UUID
+	}
+	return ""
 }

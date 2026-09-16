@@ -216,6 +216,13 @@
       "indexed_sessions": 0
     },
     {
+      "name": "cherrystudio",
+      "state": "missing",
+      "paths": null,
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deepseek",
       "state": "missing",
       "paths": [

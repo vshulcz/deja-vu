@@ -84,3 +84,4 @@ https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html
 https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html
 https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/registry/kilocode.html
+https://vshulcz.github.io/deja-vu/registry/cherrystudio.html

@@ -153,6 +153,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseClineFile(path)
 	case "roo":
 		sessions, err = ParseRooTask(path)
+	case "cherrystudio":
+		sessions, err = ParseCherryStudioFile(path)
 	case "kilocode":
 		// Two stores, both in a format another harness here already uses: the
 		// extension's task files and the CLI's OpenCode-schema database.

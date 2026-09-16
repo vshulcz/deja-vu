@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Cherry Studio is read. It runs Claude Code sessions from a desktop app and writes them as ordinary Claude Code transcripts under its own app data, so the parsing is Claude's — with one difference that matters for text rather than for tokens: Cherry Studio appends the same API call three or four times as the response streams, a new uuid each time and the text growing. Read plainly that is one reply stored three times in prefixes, so a recall could quote half a sentence and `deja show` print the answer twice before finishing it; the reader collapses a run by its request id and keeps the longest. Stock Claude Code writes one record per turn and its reader is unchanged, which a test pins. 51,851 stars, and the store was unread. (#3644)
 - Kilo Code is read, both of its stores, and neither needed a new parser. The extension (`kilocode.kilo-code`) writes Roo's task shape under the host's globalStorage, and the CLI writes OpenCode's message schema to `~/.local/share/kilo/kilo.db` — Kilo is a Roo fork that vendors OpenCode, and its own `legacy-migration` reads the task directory to import it into that database, so the task files are the history of anyone who used it before the migration and the database is where it goes afterwards. 27,321 stars and deja read neither. Read support only for now: nothing is wired into Kilo, which the registry records as a gap rather than leaving blank. (#3643)
 
 ### Fixed
