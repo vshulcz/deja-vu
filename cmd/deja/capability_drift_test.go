@@ -187,8 +187,9 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		// Fixed order, not a map range: with a map the first of several bad
 		// entries to fail is whichever came up, and the rest stay hidden until
 		// the next run reports a different one.
-		have := map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command}
-		for _, cap := range []string{"mcp", "auto", "skill", "command"} {
+		have := map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command,
+			"resume": c.Resume}
+		for _, cap := range []string{"mcp", "auto", "skill", "command", "resume"} {
 			have := have[cap]
 			g, ok := h.Gaps[cap]
 			if have {
@@ -203,8 +204,28 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			if !gapStates[g.State] {
 				t.Fatalf("%s: %s gap state %q is not one of todo/impossible/blocked/unknown", h.ID, cap, g.State)
 			}
-			if strings.TrimSpace(g.Why) == "" {
+			why := strings.TrimSpace(g.Why)
+			if why == "" {
 				t.Fatalf("%s: %s gap has no why", h.ID, cap)
+			}
+			// A reason has to say something. "No slash command yet." passed the
+			// check above on eight entries and told a reader nothing they could
+			// act on — not the surface, not what is missing, not what would
+			// close it. The floor is a sentence that names the shape of the
+			// problem, and a reference so the trail is followable.
+			if len(why) < 60 {
+				t.Fatalf("%s: %s gap why is %d characters (%q) — say what the surface is and what is missing",
+					h.ID, cap, len(why), why)
+			}
+			// Work has to be followable: a `todo` somebody could pick up, and an
+			// `unknown` somebody could go and find out, both need an issue or a
+			// link. `impossible` is a fact about the harness and carries its own
+			// explanation; `blocked` already needs the source link above.
+			if g.State == "todo" || g.State == "unknown" {
+				if !strings.Contains(why, "#") && !strings.HasPrefix(g.Source, "http") {
+					t.Fatalf("%s: %s is %s and cites neither an issue nor a source: %q",
+						h.ID, cap, g.State, why)
+				}
 			}
 			// "Blocked" is a claim about someone else's bug, so it has to point
 			// at it — otherwise nobody can tell when it stops being true.

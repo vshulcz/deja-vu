@@ -238,7 +238,7 @@
         },
         "command": {
           "state": "todo",
-          "why": "Copilot Chat has no user-level command file deja knows how to write yet"
+          "why": "VS Code Copilot Chat takes prompt files — `*.prompt.md` in the user's prompts directory or a workspace `.github/prompts`, invoked as `/<name>` in the chat box — and deja writes neither yet. The user-level directory is per-platform (`~/Library/Application Support/Code/User/prompts` on macOS and the matching Roaming/config paths elsewhere), so it needs the same host walk the workspaceStorage reader already does (#3651)."
         },
         "resume": {
           "state": "impossible",
@@ -544,7 +544,7 @@
         },
         "resume": {
           "state": "todo",
-          "why": "The CLI has --resume for the last session and --fork <sessionId>, but nothing that takes the id of an arbitrary session; the editor reopens one from its history view"
+          "why": "Continue's CLI has `--resume` for the last session and `--fork <sessionId>`, but nothing that takes the id of an arbitrary session, and the editor reopens one from its own history view. `--fork` is the near miss worth checking: if it accepts any id from the store deja reads, the resume line becomes that command rather than a paste (#3651)."
         }
       }
     },
