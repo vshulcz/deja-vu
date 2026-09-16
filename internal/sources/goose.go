@@ -90,8 +90,6 @@ func GooseRoots() []string {
 	return GooseDataDirs()
 }
 
-func gooseSessionsDir() string { return filepath.Join(GooseRoot(), "sessions") }
-
 // GooseSessionsDirs are the session directories of every candidate root.
 func GooseSessionsDirs() []string {
 	roots := GooseRoots()
