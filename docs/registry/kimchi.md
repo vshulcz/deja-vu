@@ -20,4 +20,13 @@ parsing is pi's.
 - The default root sits under the config home rather than a dot directory of its
   own, so `XDG_CONFIG_HOME` moves it. `KIMCHI_CODING_AGENT_DIR` moves it
   outright.
-- Read support only.
+- Wiring: `deja install kimchi` writes the server into `<agent dir>/mcp.json`
+  — `join(getAgentDir(), "mcp.json")` in Kimchi's own
+  `src/extensions/mcp-adapter/config.ts`, so `KIMCHI_CODING_AGENT_DIR` moves
+  it for the installer the same way it moves it for the reader.
+- Everything past the tool is behind one of Kimchi's own switches, and both
+  ship disabled: `kimchi resources enable extensions.claude-code-hook-adapter`
+  runs the hooks `deja install claude` already wrote, and
+  `extensions.claude-code-skills` loads the skill from `~/.claude/skills`.
+  deja records those as blocked rather than claiming auto-recall it does not
+  control.

@@ -775,6 +775,12 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installKilocode(exe, uninstall)
 	case "cherrystudio":
 		return installCherryStudio(exe, uninstall)
+	case "kiro":
+		return installKiro(exe, uninstall)
+	case "kimchi":
+		return installKimchi(exe, uninstall)
+	case "gjc":
+		return installGjc(exe, uninstall)
 	case "cline-auto":
 		mcp, err := installMCPJSON(sources.ClineMCPSettingsPath(), exe, uninstall)
 		if err != nil {
@@ -3887,7 +3893,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "aider",
+		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "kimchi", "gjc", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -4018,6 +4024,9 @@ func existingTargetChecks() map[string]string {
 		// Cherry Studio keeps its servers in its own database, so --auto only
 		// writes the import file where the app itself has a store.
 		"cherrystudio": cherryStudioFirstRoot(),
+		"kiro":         sources.KiroRoot(),
+		"kimchi":       sources.KimchiRoot(),
+		"gjc":          sources.GjcRoot(),
 		// These six have install targets and were in the matrix with nothing
 		// looking for them, so `--auto` wired the other nineteen and said
 		// nothing about Amp, prime-agent, Crush, Continue, Zed or VS Code on a

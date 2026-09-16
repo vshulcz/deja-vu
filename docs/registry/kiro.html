@@ -83,10 +83,19 @@
 <p>the machine this was written on — and a reader built against a guessed shape</p>
 <p>is one that drops history without saying so.</p>
 <ul>
-<li>Read support only. Kiro takes MCP servers in <code>~/.kiro/settings/mcp.json</code> and</li>
+<li>Wiring: <code>deja install kiro</code> writes the server into</li>
 </ul>
-<p>agent hooks in <code>.kiro/hooks/</code>, so the wiring exists to be written; the</p>
-<p>registry records each as a gap rather than leaving it blank.</p>
+<p><code>~/.kiro/settings/mcp.json</code>, which the CLI and the IDE both read — the same</p>
+<p>file <code>kiro-cli mcp add --scope global</code> writes. One thing the installer</p>
+<p>cannot do for you: a custom agent (<code>~/.kiro/agents/&lt;name&gt;.json</code>) does not</p>
+<p>inherit global servers, so the entry has to be repeated in that agent&#39;s own</p>
+<p><code>mcpServers</code> block, and the install note says so.</p>
+<ul>
+<li>Auto-recall is still a gap, and not for lack of a hook system: Kiro&#39;s agent</li>
+</ul>
+<p>hooks are per-workspace and fire on file events, not before a prompt, and</p>
+<p>its steering files (<code>.kiro/steering/*.md</code>) are per-workspace too. Both need</p>
+<p>a per-project install, which deja does not have yet.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

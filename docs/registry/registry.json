@@ -746,26 +746,19 @@
       "last_verified": "2026-09-16",
       "display_name": "gajae-code",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
-        "skill": false,
+        "skill": true,
         "command": false,
         "resume": false,
         "handoff": "paste",
         "prereq": "none"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Read support only for now; the reader landed first (#3647)."
-        },
         "auto": {
           "state": "todo",
-          "why": "No hook surface read from the tool's own source yet (#3647)."
-        },
-        "skill": {
-          "state": "todo",
-          "why": "No skill channel written yet (#3647)."
+          "why": "gjc has native hooks with pi's event names — `session_start`, `before_agent_start`, `tool_call` — but they are TypeScript modules loaded with Bun `import()` rather than command hooks, so this is the pi extension ported rather than a config line. Its two docs disagree on the directory (`~/.gjc/hooks/{pre,post}` in docs/hooks.md, `~/.gjc/agent/hooks/{pre,post}` in docs/customization.md), which has to be settled against the loader first (#3651).",
+          "source": "https://github.com/Yeachan-Heo/gajae-code/blob/main/docs/hooks.md"
         },
         "command": {
           "state": "todo",
@@ -791,7 +784,7 @@
       "display_name": "Kimchi Coding",
       "last_verified": "2026-09-16",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
         "skill": false,
         "command": false,
@@ -800,17 +793,15 @@
         "prereq": "none"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
-        },
         "auto": {
-          "state": "todo",
-          "why": "No hook surface read from the tool's own source yet (#3647)."
+          "state": "blocked",
+          "why": "Kimchi can run the hooks `deja install claude` already writes, through a compatibility extension that ships disabled: `kimchi resources enable extensions.claude-code-hook-adapter`. That switch is the user's, so deja records it rather than claiming auto-recall (docs/hooks.md).",
+          "source": "https://github.com/getkimchi/kimchi/blob/main/docs/hooks.md"
         },
         "skill": {
-          "state": "todo",
-          "why": "No skill channel written yet; the reader came first (#3647)."
+          "state": "blocked",
+          "why": "Same shape: `extensions.claude-code-skills` loads ~/.claude/skills — where deja already writes — and also ships disabled (#3651).",
+          "source": "https://github.com/getkimchi/kimchi/blob/main/docs/hooks.md"
         },
         "command": {
           "state": "todo",
@@ -931,7 +922,7 @@
       "last_verified": "2026-09-16",
       "display_name": "Kiro",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
         "skill": false,
         "command": false,
@@ -940,17 +931,13 @@
         "prereq": "none"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Read support only for now. Kiro takes MCP servers in ~/.kiro/settings/mcp.json and agent hooks in .kiro/hooks, so the wiring exists to be written; the reader landed first because a store nobody reads is history nobody can search (#3103)."
-        },
         "auto": {
           "state": "todo",
-          "why": "Kiro's agent hooks are per-workspace and event-driven, and whether one fires before a prompt is unverified here — the app is not on this machine (#3103)."
+          "why": "Kiro's agent hooks are per-workspace and fire on file events (`.kiro/hooks/`), not before a prompt, so there is no session-start surface a global install can write. Its steering files (`.kiro/steering/*.md`) are the per-workspace channel and would need a per-project install (#3651)."
         },
         "skill": {
           "state": "todo",
-          "why": "No skill or steering file written yet; the reader came first (#3103)."
+          "why": "No user-level skill directory found: steering files are per-workspace, so guidance reaches the model through the MCP tool descriptions until a per-project install exists (#3651)."
         },
         "command": {
           "state": "todo",
@@ -958,7 +945,7 @@
         },
         "resume": {
           "state": "todo",
-          "why": "`kiro-cli chat --resume-id <sessionId>` is documented and unverified here, so deja hands the session over by paste rather than claiming a command it has not run (#3103)."
+          "why": "`kiro-cli chat --resume-id <sessionId>` is documented and unverified here, so a handover is a paste (#3103)."
         }
       }
     },

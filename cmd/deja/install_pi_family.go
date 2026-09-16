@@ -1,0 +1,67 @@
+package main
+
+import (
+	"path/filepath"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+// Kimchi and gajae-code are pi descendants, and they kept pi's wiring as well
+// as its transcript: the MCP server goes in `mcp.json` in the agent directory.
+// Both were read from the tools' own source rather than assumed from the
+// lineage (#3651):
+//
+//   - Kimchi: `join(getAgentDir(), "mcp.json")` in
+//     src/extensions/mcp-adapter/config.ts, with the agent dir honouring
+//     KIMCHI_CODING_AGENT_DIR — the same variable the reader uses.
+//   - gajae-code: `~/.gjc/agent/mcp.json` for the user scope, in its
+//     docs/customization.md surface table, which also gives it native skills
+//     at `~/.gjc/agent/skills/<name>/SKILL.md`.
+//
+// What each of them does about auto-recall is their own switch, and the
+// registry records it rather than this file pretending to it: Kimchi runs
+// deja's Claude Code hooks through a compatibility extension that ships
+// disabled (`kimchi resources enable extensions.claude-code-hook-adapter`),
+// and gjc's native hooks are TypeScript modules with pi's event names, which
+// is a second piece of work rather than a config line.
+
+func kimchiMCPPath() string {
+	return filepath.Join(sources.KimchiConfigDir(), "mcp.json")
+}
+
+func installKimchi(exe string, uninstall bool) (installResult, error) {
+	res, err := installMCPJSON(kimchiMCPPath(), exe, uninstall)
+	if err != nil || uninstall {
+		return res, err
+	}
+	// The two compatibility extensions are how a Kimchi session gets anything
+	// beyond the tool: both ship disabled, so the note names the commands
+	// instead of leaving the user to find out that nothing arrives on its own.
+	res.Note = joinNotes(res.Note, "for recall without asking: `kimchi resources enable "+
+		"extensions.claude-code-hook-adapter` picks up the hooks `deja install claude` writes, "+
+		"and `extensions.claude-code-skills` picks up the skill")
+	return res, nil
+}
+
+func gjcMCPPath() string {
+	return filepath.Join(sources.GjcConfigDir(), "mcp.json")
+}
+
+// gjcSkillPath is gjc's native skill location. Claude's and Codex's skill
+// directories are import candidates in gjc rather than things it loads, so
+// writing there would leave a skill no session reads.
+func gjcSkillPath() string {
+	return filepath.Join(sources.GjcConfigDir(), "skills", "deja-search", "SKILL.md")
+}
+
+func installGjc(exe string, uninstall bool) (installResult, error) {
+	res, err := installMCPJSON(gjcMCPPath(), exe, uninstall)
+	if err != nil {
+		return res, err
+	}
+	skill, skillErr := installSkillFile(gjcSkillPath(), uninstall)
+	if skillErr != nil {
+		return installResult{}, skillErr
+	}
+	return wroteAll(res, skill), nil
+}

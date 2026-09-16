@@ -42,9 +42,12 @@ import (
 // sample here covers — the store is not on this machine, and a reader written
 // against a guess is a reader that silently drops history (#3103).
 
+// KiroConfigDir is Kiro's user directory: sessions, settings, agents.
+func KiroConfigDir() string { return filepath.Join(Home(), ".kiro") }
+
 // KiroRoot is the session store root. DEJA_KIRO_ROOT replaces it.
 func KiroRoot() string {
-	return EnvPath("DEJA_KIRO_ROOT", filepath.Join(Home(), ".kiro", "sessions"))
+	return EnvPath("DEJA_KIRO_ROOT", filepath.Join(KiroConfigDir(), "sessions"))
 }
 
 // KiroCLIFiles lists the CLI transcripts: the .jsonl half of each pair.

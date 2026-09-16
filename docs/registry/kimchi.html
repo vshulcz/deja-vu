@@ -60,8 +60,19 @@
 <p>own, so <code>XDG_CONFIG_HOME</code> moves it. <code>KIMCHI_CODING_AGENT_DIR</code> moves it</p>
 <p>outright.</p>
 <ul>
-<li>Read support only.</li>
+<li>Wiring: <code>deja install kimchi</code> writes the server into <code>&lt;agent dir&gt;/mcp.json</code></li>
 </ul>
+<p>— <code>join(getAgentDir(), &#34;mcp.json&#34;)</code> in Kimchi&#39;s own</p>
+<p><code>src/extensions/mcp-adapter/config.ts</code>, so <code>KIMCHI_CODING_AGENT_DIR</code> moves</p>
+<p>it for the installer the same way it moves it for the reader.</p>
+<ul>
+<li>Everything past the tool is behind one of Kimchi&#39;s own switches, and both</li>
+</ul>
+<p>ship disabled: <code>kimchi resources enable extensions.claude-code-hook-adapter</code></p>
+<p>runs the hooks <code>deja install claude</code> already wrote, and</p>
+<p><code>extensions.claude-code-skills</code> loads the skill from <code>~/.claude/skills</code>.</p>
+<p>deja records those as blocked rather than claiming auto-recall it does not</p>
+<p>control.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

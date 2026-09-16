@@ -63,8 +63,21 @@
 </ul>
 <p>empty messages.</p>
 <ul>
-<li>Read support only.</li>
+<li>Wiring: <code>deja install gjc</code> writes the server into <code>~/.gjc/agent/mcp.json</code></li>
 </ul>
+<p>and the skill into <code>~/.gjc/agent/skills/deja-search/SKILL.md</code>. Both paths</p>
+<p>are from gjc&#39;s own surface table (<code>docs/customization.md</code>), and the skill</p>
+<p>location matters: gjc loads its native skills directory, while Claude&#39;s and</p>
+<p>Codex&#39;s are import candidates it does not read, so a skill written there</p>
+<p>would be a file no session ever sees.</p>
+<ul>
+<li>Auto-recall is the next step rather than a config line. gjc&#39;s native hooks</li>
+</ul>
+<p>carry pi&#39;s event names — <code>session_start</code>, <code>before_agent_start</code>, <code>tool_call</code></p>
+<p>— but they are TypeScript modules loaded with Bun <code>import()</code>, so this is</p>
+<p>pi&#39;s extension ported. Its two documents also disagree on the directory</p>
+<p>(<code>~/.gjc/hooks/{pre,post}</code> against <code>~/.gjc/agent/hooks/{pre,post}</code>), which</p>
+<p>has to be settled against the loader before anything is written there.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

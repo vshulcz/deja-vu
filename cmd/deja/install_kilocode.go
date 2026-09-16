@@ -78,39 +78,11 @@ func installKilocode(exe string, uninstall bool) (installResult, error) {
 	return out, nil
 }
 
-// installKilocodeSkill writes the shared manual where Kilo reads it. The file
-// is deja's own, so an edited copy is kept rather than replaced — the rule
-// every skill here follows.
+// installKilocodeSkill writes the shared manual where Kilo reads it: the
+// directory its loader looks in first. The writing itself is the shared
+// skill-file installer, which every harness with a skill directory uses.
 func installKilocodeSkill(uninstall bool) (installResult, error) {
-	path := kilocodeSkillPath()
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return installResult{}, err
-	}
-	if uninstall {
-		if len(old) == 0 {
-			return installResult{Path: path, Action: "unchanged"}, nil
-		}
-		if err := os.Remove(path); err != nil {
-			return installResult{}, err
-		}
-		return installResult{Path: path, Action: "removed"}, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
-	}
-	next := []byte(skillFile(skillBody))
-	if string(old) == string(next) {
-		return installResult{Path: path, Action: "unchanged"}, nil
-	}
-	if err := writeSkillOfOurs(path, old, next); err != nil {
-		return installResult{}, err
-	}
-	action := "wrote"
-	if len(old) > 0 {
-		action = "updated"
-	}
-	return installResult{Path: path, Action: action}, nil
+	return installSkillFile(kilocodeSkillPath(), uninstall)
 }
 
 // kilocodeFirstRoot is what says Kilo Code is on this machine: its own

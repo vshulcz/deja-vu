@@ -39,6 +39,13 @@ directory per session under the workspace, holding `session.json` (id, model,
   `conversations_v2`. No sample of either is in hand — Kiro is not installed on
   the machine this was written on — and a reader built against a guessed shape
   is one that drops history without saying so.
-- Read support only. Kiro takes MCP servers in `~/.kiro/settings/mcp.json` and
-  agent hooks in `.kiro/hooks/`, so the wiring exists to be written; the
-  registry records each as a gap rather than leaving it blank.
+- Wiring: `deja install kiro` writes the server into
+  `~/.kiro/settings/mcp.json`, which the CLI and the IDE both read — the same
+  file `kiro-cli mcp add --scope global` writes. One thing the installer
+  cannot do for you: a custom agent (`~/.kiro/agents/<name>.json`) does not
+  inherit global servers, so the entry has to be repeated in that agent's own
+  `mcpServers` block, and the install note says so.
+- Auto-recall is still a gap, and not for lack of a hook system: Kiro's agent
+  hooks are per-workspace and fire on file events, not before a prompt, and
+  its steering files (`.kiro/steering/*.md`) are per-workspace too. Both need
+  a per-project install, which deja does not have yet.

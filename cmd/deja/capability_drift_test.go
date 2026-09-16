@@ -107,8 +107,17 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		}
 		// Kilo Code reads skills from ~/.kilocode/skills rather than from an
 		// instructions file, so the check is the path install writes.
-		if h.ID == "kilocode" {
-			gotSkill = strings.HasSuffix(kilocodeSkillPath(), filepath.Join("skills", "deja-search", "SKILL.md"))
+		// Kilo Code and gajae-code read skills from a directory of their own
+		// rather than from an instructions file, so the check is the path
+		// install writes — and both go through the shared skill installer, so
+		// one rule covers them.
+		for _, own := range []struct {
+			id   string
+			path string
+		}{{"kilocode", kilocodeSkillPath()}, {"gjc", gjcSkillPath()}} {
+			if h.ID == own.id {
+				gotSkill = strings.HasSuffix(own.path, filepath.Join("skills", "deja-search", "SKILL.md"))
+			}
 		}
 		// Cline has no user-level instructions file at all, so its skill rides
 		// inside the plugin deja generates. Read that off the generated
