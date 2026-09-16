@@ -263,8 +263,15 @@ import (
 // tier, and none of it is a credential. This one moves in the other direction
 // from 41 through 46: a store built before it holds `[redacted:entropy]` where
 // a published key was, and only re-reading the sources brings the text back
-// (#3637).
-const version = 47
+
+// 48 reads a Codex rollout Codex has compressed, and the sessions it has
+// archived. Codex rewrites a rollout as `rollout-*.jsonl.zst` once it is seven
+// days old and reads either name itself, so a matcher wanting `.jsonl` alone
+// stopped seeing every session older than a week — silently, since a file that
+// is not a candidate is not a skip either. `archived_sessions` is its second
+// directory, same JSONL, never walked. A store built before this holds neither,
+// and nothing re-reads a file the old rule never matched (#3640).
+const version = 48
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

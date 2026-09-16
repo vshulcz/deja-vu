@@ -29,6 +29,16 @@ func SkipReason(harness string) string {
 		}
 		return "zstd CLI not found"
 	}
+	// Codex compresses a rollout once it is seven days old, so a store can hold
+	// most of its history behind zstd — the same failure as DeepSeek Harness's,
+	// and the same rule: only the compressed ones need the tool, and a store of
+	// plain rollouts must not claim a problem it does not have (#3640).
+	if harness == "codex" {
+		if ZstdAvailable() || len(CodexCompressedFiles()) == 0 {
+			return ""
+		}
+		return "zstd CLI not found"
+	}
 	if SQLite3Available() {
 		return ""
 	}

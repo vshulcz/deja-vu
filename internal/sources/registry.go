@@ -95,7 +95,7 @@ func Registry() []Harness {
 				{
 					Name: "codex",
 					Match: func(p string) bool {
-						return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-") && underAnyCodexRoot(p) && underAnyCodexSessionsRoot(p)
+						return codexRolloutWanted(p) && underAnyCodexRoot(p) && underAnyCodexSessionsRoot(p)
 					},
 					Parse:     fullParse(ParseCodexRollout),
 					ParseFrom: offsetParse(ParseCodexRolloutFromOffset),

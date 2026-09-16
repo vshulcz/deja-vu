@@ -162,7 +162,12 @@ func parseOpenClawArchive(path string) ([]model.Session, error) {
 // file. A scanner that reads from a path is what every transcript parser here
 // takes, and an archive is small enough that a temporary copy is cheaper than
 // teaching all of them to read a stream.
-func zstdToTemp(path string) (string, error) {
+func zstdToTemp(path string) (string, error) { return zstdToTempNamed(path, "openclaw") }
+
+// zstdToTempNamed is zstdToTemp for any store whose transcripts arrive as zstd
+// frames; harness names the store in the error and in the temporary file, so a
+// failure says which reader hit it. Codex compresses its own rollouts (#3640).
+func zstdToTempNamed(path, harness string) (string, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -173,10 +178,10 @@ func zstdToTemp(path string) (string, error) {
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("openclaw: zstd -d %s: %w: %s", filepath.Base(path), err,
+		return "", fmt.Errorf("%s: zstd -d %s: %w: %s", harness, filepath.Base(path), err,
 			strings.TrimSpace(errBuf.String()))
 	}
-	f, err := os.CreateTemp("", "deja-openclaw-*.jsonl")
+	f, err := os.CreateTemp("", "deja-"+harness+"-*.jsonl")
 	if err != nil {
 		return "", err
 	}

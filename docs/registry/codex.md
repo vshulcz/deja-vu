@@ -2,7 +2,7 @@
 
 ## Store and files
 
-Codex CLI stores state under `${CODEX_HOME:-~/.codex}`. Xcode-hosted Codex sessions use `${HOME}/Library/Developer/Xcode/CodingAssistant/codex`. deja keeps both stores under the single `codex` harness: `DEJA_CODEX_ROOT` relocates the CLI store and `DEJA_XCODE_CODEX_ROOT` relocates the Xcode store. Rollouts are `sessions/YYYY/MM/DD/rollout-*.jsonl`; `history.jsonl` belongs to the CLI store and contains prompt history.
+Codex CLI stores state under `${CODEX_HOME:-~/.codex}`. Xcode-hosted Codex sessions use `${HOME}/Library/Developer/Xcode/CodingAssistant/codex`. deja keeps both stores under the single `codex` harness: `DEJA_CODEX_ROOT` relocates the CLI store and `DEJA_XCODE_CODEX_ROOT` relocates the Xcode store. Rollouts are `sessions/YYYY/MM/DD/rollout-*.jsonl`, and a rollout Codex has compressed is `rollout-*.jsonl.zst` — its own background worker rewrites one once it is seven days old (`COMPRESSED_SUFFIX`, `MIN_ROLLOUT_AGE` in `codex-rs/rollout/src/compression.rs`), and it materializes the plain file back before appending, so both names exist for one session while that happens. `archived_sessions/` holds the same JSONL for sessions Codex has archived. `history.jsonl` belongs to the CLI store and contains prompt history.
 
 ## Rollout records
 
@@ -30,6 +30,7 @@ History entries map to one-message sessions with role `user` and project `histor
 - Rollout files are append-only JSONL and may have a torn final line.
 - Events without a payload and non-message payloads are ignored.
 - `history.jsonl` duplicates user prompts but lacks assistant responses and project metadata.
+- Reading a compressed rollout needs the `zstd` CLI; without it the store reports `zstd CLI not found` rather than quietly holding fewer sessions. A store of plain rollouts needs nothing.
 - Older records use `payload.message`; current records generally use structured `payload.content`.
 
 **Last verified:** 2026-09-10

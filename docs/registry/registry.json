@@ -153,9 +153,13 @@
       "id": "codex",
       "store_paths": [
         "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl",
+        "${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl.zst",
+        "${CODEX_HOME:-~/.codex}/archived_sessions/**/rollout-*.jsonl",
+        "${CODEX_HOME:-~/.codex}/archived_sessions/**/rollout-*.jsonl.zst",
         "${CODEX_HOME:-~/.codex}/history.jsonl",
         "${DEJA_CODEX_ROOT}/sessions/**/rollout-*.jsonl",
         "${HOME}/Library/Developer/Xcode/CodingAssistant/codex/sessions/**/rollout-*.jsonl",
+        "${HOME}/Library/Developer/Xcode/CodingAssistant/codex/archived_sessions/**/rollout-*.jsonl",
         "${DEJA_XCODE_CODEX_ROOT}/sessions/**/rollout-*.jsonl"
       ],
       "format_kind": "jsonl-rollout-and-history",

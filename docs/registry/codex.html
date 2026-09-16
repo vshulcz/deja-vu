@@ -38,7 +38,7 @@
 <article>
 <h1>Codex CLI session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Codex CLI stores state under <code>${CODEX_HOME:-~/.codex}</code>. Xcode-hosted Codex sessions use <code>${HOME}/Library/Developer/Xcode/CodingAssistant/codex</code>. deja keeps both stores under the single <code>codex</code> harness: <code>DEJA_CODEX_ROOT</code> relocates the CLI store and <code>DEJA_XCODE_CODEX_ROOT</code> relocates the Xcode store. Rollouts are <code>sessions/YYYY/MM/DD/rollout-*.jsonl</code>; <code>history.jsonl</code> belongs to the CLI store and contains prompt history.</p>
+<p>Codex CLI stores state under <code>${CODEX_HOME:-~/.codex}</code>. Xcode-hosted Codex sessions use <code>${HOME}/Library/Developer/Xcode/CodingAssistant/codex</code>. deja keeps both stores under the single <code>codex</code> harness: <code>DEJA_CODEX_ROOT</code> relocates the CLI store and <code>DEJA_XCODE_CODEX_ROOT</code> relocates the Xcode store. Rollouts are <code>sessions/YYYY/MM/DD/rollout-*.jsonl</code>, and a rollout Codex has compressed is <code>rollout-*.jsonl.zst</code> — its own background worker rewrites one once it is seven days old (<code>COMPRESSED_SUFFIX</code>, <code>MIN_ROLLOUT_AGE</code> in <code>codex-rs/rollout/src/compression.rs</code>), and it materializes the plain file back before appending, so both names exist for one session while that happens. <code>archived_sessions/</code> holds the same JSONL for sessions Codex has archived. <code>history.jsonl</code> belongs to the CLI store and contains prompt history.</p>
 <h2 id="rollout-records">Rollout records</h2>
 <p>A rollout begins with session metadata and then event records. The parser reads <code>payload.role</code>, <code>payload.content</code>, and the older <code>payload.message</code> fallback.</p>
 <pre><code class="language-json">{&#34;timestamp&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;type&#34;:&#34;session_meta&#34;,&#34;payload&#34;:{&#34;session_id&#34;:&#34;session-7&#34;,&#34;cwd&#34;:&#34;/work/api&#34;}}
@@ -53,6 +53,7 @@
 <li>Rollout files are append-only JSONL and may have a torn final line.</li>
 <li>Events without a payload and non-message payloads are ignored.</li>
 <li><code>history.jsonl</code> duplicates user prompts but lacks assistant responses and project metadata.</li>
+<li>Reading a compressed rollout needs the <code>zstd</code> CLI; without it the store reports <code>zstd CLI not found</code> rather than quietly holding fewer sessions. A store of plain rollouts needs nothing.</li>
 <li>Older records use <code>payload.message</code>; current records generally use structured <code>payload.content</code>.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-09-10</p>

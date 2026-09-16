@@ -58,8 +58,11 @@ func LoadCodex() []model.Session {
 	roots := CodexRoots()
 	var files []string
 	for _, root := range roots {
-		files = append(files, walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)...)
+		for _, dir := range codexSessionDirs(root) {
+			files = append(files, walkFiles(dir, codexRolloutWanted)...)
+		}
 	}
+	files = codexOnePerSession(files)
 	ss := parseFiles(files, ParseCodexRollout)
 	// history.jsonl repeats the prompts of sessions whose rollout deja has
 	// already read, with a coarser timestamp — so the ingest de-duplicator,
@@ -80,8 +83,56 @@ func LoadCodex() []model.Session {
 	return ss
 }
 
+// codexRolloutSuffixes are the two names one rollout can have. Codex
+// compresses a rollout once it is seven days old — `COMPRESSED_SUFFIX = ".zst"`
+// and `MIN_ROLLOUT_AGE = 7 days` in its own `rollout/src/compression.rs`, run by
+// a background worker — and reads either form through
+// `open_rollout_line_reader`, so nothing on its side changes. A matcher that
+// wants `.jsonl` alone stops seeing every session older than a week, and says
+// nothing about it: the file is not a candidate, so it is not a skip either
+// (#3640).
+var codexRolloutSuffixes = []string{".jsonl", ".jsonl.zst"}
+
 func codexRolloutWanted(p string) bool {
-	return strings.HasSuffix(p, ".jsonl") && strings.Contains(filepath.Base(p), "rollout-")
+	if !strings.Contains(filepath.Base(p), "rollout-") {
+		return false
+	}
+	for _, suf := range codexRolloutSuffixes {
+		if strings.HasSuffix(p, suf) {
+			return true
+		}
+	}
+	return false
+}
+
+// codexSessionDirs are the directories a rollout lives in. `archived_sessions`
+// is Codex's own `ARCHIVED_SESSIONS_SUBDIR`, beside `SESSIONS_SUBDIR`, holding
+// the same JSONL — so a session moved there left the index on the next pass.
+func codexSessionDirs(root string) []string {
+	return []string{filepath.Join(root, "sessions"), filepath.Join(root, "archived_sessions")}
+}
+
+// codexSessionID is the id the filename carries, without either suffix.
+func codexSessionID(path string) string {
+	base := strings.TrimPrefix(filepath.Base(path), "rollout-")
+	for _, suf := range codexRolloutSuffixes {
+		base = strings.TrimSuffix(base, suf)
+	}
+	return base
+}
+
+// codexCompressed reports whether this rollout needs the zstd CLI to be read.
+func codexCompressed(p string) bool { return strings.HasSuffix(p, ".jsonl.zst") }
+
+// CodexCompressedFiles lists the rollouts that need zstd, for the skip note.
+func CodexCompressedFiles() []string {
+	var out []string
+	for _, f := range CodexFiles() {
+		if codexCompressed(f) {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // CodexSidecarFiles lists what a Codex store keeps beside its transcripts: the
@@ -101,8 +152,12 @@ func codexSidecarFiles(root string) []string {
 	return walkFiles(root, func(p string) bool {
 		// A rollout outside sessions is unknown content and must remain visible
 		// to doctor as unrecognised rather than being silently classified away.
-		if codexRolloutWanted(p) && underCodexRoot(p, filepath.Join(root, "sessions")) {
-			return false
+		if codexRolloutWanted(p) {
+			for _, dir := range codexSessionDirs(root) {
+				if underCodexRoot(p, dir) {
+					return false
+				}
+			}
 		}
 		rel, err := filepath.Rel(root, p)
 		if err != nil {
@@ -134,7 +189,9 @@ func codexSidecarFiles(root string) []string {
 func CodexFiles() []string {
 	var files []string
 	for _, root := range CodexRoots() {
-		files = append(files, walkFiles(filepath.Join(root, "sessions"), codexRolloutWanted)...)
+		for _, dir := range codexSessionDirs(root) {
+			files = append(files, walkFiles(dir, codexRolloutWanted)...)
+		}
 	}
 	if hist := filepath.Join(CodexRoot(), "history.jsonl"); fileExists(hist) {
 		files = append(files, hist)
@@ -158,11 +215,40 @@ func underAnyCodexRoot(path string) bool {
 
 func underAnyCodexSessionsRoot(path string) bool {
 	for _, root := range CodexRoots() {
-		if underCodexRoot(path, filepath.Join(root, "sessions")) {
-			return true
+		for _, dir := range codexSessionDirs(root) {
+			if underCodexRoot(path, dir) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// codexOnePerSession keeps one file per session id. Codex materializes a
+// compressed rollout back to `.jsonl` before appending to it, so both names
+// exist for the same session while that happens, and upstream's own dedup keys
+// on the session rather than on the path for the same reason. The plain file
+// wins: it is the one being written to, and reading it needs no external tool.
+func codexOnePerSession(files []string) []string {
+	best := map[string]string{}
+	order := []string{}
+	for _, f := range files {
+		id := codexSessionID(f)
+		prev, ok := best[id]
+		if !ok {
+			best[id] = f
+			order = append(order, id)
+			continue
+		}
+		if codexCompressed(prev) && !codexCompressed(f) {
+			best[id] = f
+		}
+	}
+	out := make([]string, 0, len(order))
+	for _, id := range order {
+		out = append(out, best[id])
+	}
+	return out
 }
 
 func ParseCodexHistory(path string) ([]model.Session, error) {
@@ -188,7 +274,29 @@ func ParseCodexRollout(path string) ([]model.Session, error) {
 }
 
 func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, error) {
-	s := model.Session{Harness: "codex", ID: strings.TrimSuffix(strings.TrimPrefix(filepath.Base(path), "rollout-"), ".jsonl"), Project: projectName(filepath.Dir(path)), Path: path}
+	// A compressed rollout is read through the same scanner as a plain one, by
+	// decompressing it to a temporary file first — the pattern openclaw's
+	// archives already use, because every transcript parser here takes a path.
+	// The frame is immutable: Codex materializes a rollout back to `.jsonl`
+	// before appending, so the offset the incremental pass carries for a
+	// compressed file is a whole-file read (#3640).
+	if codexCompressed(path) {
+		plain, err := zstdToTempNamed(path, "codex")
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = os.Remove(plain) }()
+		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), projectName(filepath.Dir(path)))
+		for i := range ss {
+			ss[i].Path = path
+		}
+		return ss, err
+	}
+	return parseCodexRolloutPath(path, offset, codexSessionID(path), projectName(filepath.Dir(path)))
+}
+
+func parseCodexRolloutPath(path string, offset int64, id, project string) ([]model.Session, error) {
+	s := model.Session{Harness: "codex", ID: id, Project: project, Path: path}
 	// An appended rollout is parsed from where the last read stopped, so the
 	// session_meta line at the top is never seen again and the id falls back
 	// to the filename — which matches the real ThreadId in 0 of 28 rollouts on
