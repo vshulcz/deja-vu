@@ -53,7 +53,12 @@ func SkipReason(harness string) string {
 	case "hermes":
 		present = len(HermesDBs()) > 0
 	case "goose":
-		present = fileExists(GooseDB())
+		for _, db := range GooseDBs() {
+			if fileExists(db) {
+				present = true
+				break
+			}
+		}
 	}
 	if !present {
 		return ""

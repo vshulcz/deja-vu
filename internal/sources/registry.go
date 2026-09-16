@@ -229,13 +229,28 @@ func Registry() []Harness {
 			Kinds: []FileKind{{
 				Name: "goose-jsonl",
 				Match: func(p string) bool {
-					return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, gooseSessionsDir())
+					if !strings.HasSuffix(p, ".jsonl") {
+						return false
+					}
+					for _, dir := range GooseSessionsDirs() {
+						if strings.HasPrefix(p, dir) {
+							return true
+						}
+					}
+					return false
 				},
 				Parse:     fullParse(ParseGooseFile),
 				ParseFrom: offsetParse(ParseGooseFileFromOffset),
 			}, {
-				Name:      "goose-db",
-				Match:     func(p string) bool { return p == GooseDB() },
+				Name: "goose-db",
+				Match: func(p string) bool {
+					for _, db := range GooseDBs() {
+						if p == db {
+							return true
+						}
+					}
+					return false
+				},
 				Parse:     dbParse(ParseGooseDB, ParseGooseDBSince),
 				ParseFrom: dbParseFrom(ParseGooseDB, ParseGooseDBSince),
 			}},

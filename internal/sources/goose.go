@@ -14,46 +14,128 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// GooseDataDir is Block's Goose CLI data root. On Linux it honors XDG_DATA_HOME;
-// on Windows it uses %APPDATA%\Block\goose\data.
-func GooseDataDir() string {
+// GooseDataDir is where goose keeps its data on this platform — the first of
+// GooseDataDirs, which is the one goose itself would write to.
+func GooseDataDir() string { return GooseDataDirs()[0] }
+
+// GooseDataDirs are the data roots a goose install can have, the current one
+// first. goose resolves its own directories through etcetera's
+// choose_app_strategy with author and top-level domain "Block"
+// (crates/goose/src/config/paths.rs): the Apple strategy on macOS, XDG on
+// Linux, the Windows strategy on Windows. So on a mac the sessions are under
+// `~/Library/Application Support/Block/goose`, which goose's own comment
+// names, and reading only `~/.local/share/goose` there reported `goose
+// missing` to every mac user who had used it (#3642).
+//
+// The older locations stay as candidates rather than as the answer: an install
+// that predates the change still has its sessions there — this machine is one
+// of them, which is why a single-root reader looked correct from inside it.
+// Every directory that exists is read.
+func GooseDataDirs() []string {
 	// GOOSE_PATH_ROOT relocates config, data and state together; a user who
 	// sets it has every session under it and none where we would look.
 	if root := os.Getenv("GOOSE_PATH_ROOT"); root != "" {
-		return filepath.Join(root, "data")
+		return []string{filepath.Join(root, "data")}
 	}
-	if runtime.GOOS == "windows" {
-		if appdata := os.Getenv("APPDATA"); appdata != "" {
-			return filepath.Join(appdata, "Block", "goose", "data")
+	xdg := filepath.Join(Home(), ".local", "share")
+	if v := os.Getenv("XDG_DATA_HOME"); v != "" {
+		xdg = v
+	}
+	var out []string
+	add := func(paths ...string) {
+		for _, path := range paths {
+			if path == "" {
+				continue
+			}
+			path = filepath.Clean(path)
+			seen := false
+			for _, existing := range out {
+				if existing == path {
+					seen = true
+					break
+				}
+			}
+			if !seen {
+				out = append(out, path)
+			}
 		}
-		return filepath.Join(Home(), "AppData", "Roaming", "Block", "goose", "data")
 	}
-	if runtime.GOOS == "linux" {
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, "goose")
+	switch runtime.GOOS {
+	case "windows":
+		appdata := os.Getenv("APPDATA")
+		if appdata == "" {
+			appdata = filepath.Join(Home(), "AppData", "Roaming")
 		}
+		add(filepath.Join(appdata, "Block", "goose", "data"))
+	case "darwin":
+		support := filepath.Join(Home(), "Library", "Application Support")
+		add(filepath.Join(support, "Block", "goose"), filepath.Join(support, "goose"))
 	}
-	return filepath.Join(Home(), ".local", "share", "goose")
+	// XDG is the current answer on Linux and a real fallback everywhere else:
+	// an older goose wrote here whatever the platform.
+	add(filepath.Join(xdg, "goose"), filepath.Join(xdg, "Block", "goose"))
+	return out
 }
 
 // GooseRoot is the session-reading root; DEJA_GOOSE_ROOT overrides it without
 // affecting where Goose itself stores data.
 func GooseRoot() string { return EnvPath("DEJA_GOOSE_ROOT", GooseDataDir()) }
 
+// GooseRoots are the data roots to read. DEJA_GOOSE_ROOT names one and then it
+// is the whole answer, the way DEJA_CODEX_ROOT is for Codex.
+func GooseRoots() []string {
+	if p := os.Getenv("DEJA_GOOSE_ROOT"); p != "" {
+		return []string{p}
+	}
+	return GooseDataDirs()
+}
+
 func gooseSessionsDir() string { return filepath.Join(GooseRoot(), "sessions") }
 
-// GooseDB is the SQLite session store used by Goose >= 1.10.0.
-func GooseDB() string {
-	if p := os.Getenv("DEJA_GOOSE_DB"); p != "" {
-		return p
+// GooseSessionsDirs are the session directories of every candidate root.
+func GooseSessionsDirs() []string {
+	roots := GooseRoots()
+	out := make([]string, 0, len(roots))
+	for _, root := range roots {
+		out = append(out, filepath.Join(root, "sessions"))
 	}
-	return filepath.Join(gooseSessionsDir(), "sessions.db")
+	return out
+}
+
+// GooseDB is the SQLite session store used by Goose >= 1.10.0: the first one
+// that exists, or the primary root's when none does, so a caller reporting
+// where it looked still names a directory.
+func GooseDB() string {
+	dbs := GooseDBs()
+	for _, db := range dbs {
+		if fileExists(db) {
+			return db
+		}
+	}
+	return dbs[0]
+}
+
+// GooseDBs are the SQLite stores of every candidate root.
+func GooseDBs() []string {
+	if p := os.Getenv("DEJA_GOOSE_DB"); p != "" {
+		return []string{p}
+	}
+	dirs := GooseSessionsDirs()
+	out := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		out = append(out, filepath.Join(dir, "sessions.db"))
+	}
+	return out
 }
 
 func gooseJSONLFiles() []string {
-	return walkFiles(gooseSessionsDir(), func(p string) bool {
-		return strings.HasSuffix(p, ".jsonl") && filepath.Base(p) != "sessions.db"
-	})
+	var out []string
+	for _, dir := range GooseSessionsDirs() {
+		out = append(out, walkFiles(dir, func(p string) bool {
+			return strings.HasSuffix(p, ".jsonl") && filepath.Base(p) != "sessions.db"
+		})...)
+	}
+	return out
 }
 
 // GooseJSONLFiles lists legacy JSONL session files (pre-1.10.0 storage).
@@ -62,16 +144,21 @@ func GooseJSONLFiles() []string { return gooseJSONLFiles() }
 // GooseSessionFiles lists legacy JSONL sessions and the SQLite store when present.
 func GooseSessionFiles() []string {
 	out := gooseJSONLFiles()
-	if fi, err := os.Stat(GooseDB()); err == nil && fi.Size() > 0 {
-		out = append(out, GooseDB())
+	for _, db := range GooseDBs() {
+		if fi, err := os.Stat(db); err == nil && fi.Size() > 0 {
+			out = append(out, db)
+		}
 	}
 	return out
 }
 
 func LoadGoose() []model.Session {
 	ss := parseFiles(gooseJSONLFiles(), ParseGooseFile)
-	dbSS, _ := ParseGooseDB(GooseDB())
-	return append(ss, dbSS...)
+	for _, db := range GooseDBs() {
+		dbSS, _ := ParseGooseDB(db)
+		ss = append(ss, dbSS...)
+	}
+	return ss
 }
 
 func ParseGooseFile(path string) ([]model.Session, error) {

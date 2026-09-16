@@ -39,9 +39,11 @@
 <h1>Goose</h1>
 <ul>
 <li><strong>ID</strong>: <code>goose</code></li>
-<li><strong>Store (legacy)</strong>: <code>~/.local/share/goose/sessions/*.jsonl</code> (pre-1.10.0; files remain on disk after migration)</li>
-<li><strong>Store (current)</strong>: <code>~/.local/share/goose/sessions/sessions.db</code> (SQLite, Goose &gt;= 1.10.0)</li>
-<li><strong>Linux relocation</strong>: <code>$XDG_DATA_HOME/goose/sessions/...</code></li>
+<li><strong>Store (current, macOS)</strong>: <code>~/Library/Application Support/Block/goose/sessions/sessions.db</code> — goose resolves its directories through etcetera&#39;s <code>choose_app_strategy</code> with author &#34;Block&#34;, which is the Apple strategy on macOS (<code>crates/goose/src/config/paths.rs</code>)</li>
+<li><strong>Store (current, Linux)</strong>: <code>$XDG_DATA_HOME/goose/sessions/sessions.db</code>, default <code>~/.local/share/goose/sessions/sessions.db</code> (SQLite, Goose &gt;= 1.10.0)</li>
+<li><strong>Store (current, Windows)</strong>: <code>%APPDATA%\Block\goose\data\sessions\sessions.db</code></li>
+<li><strong>Store (legacy)</strong>: <code>sessions/*.jsonl</code> in any of those roots (pre-1.10.0; files remain on disk after migration), plus the older <code>~/.local/share/Block/goose</code> and <code>~/Library/Application Support/goose</code> layouts</li>
+<li><strong>Relocation</strong>: <code>GOOSE_PATH_ROOT</code> moves config, data and state together, and is then the whole answer</li>
 <li><strong>Read override</strong>: <code>DEJA_GOOSE_ROOT</code> (takes precedence for reads); <code>DEJA_GOOSE_DB</code> for the SQLite path</li>
 <li><strong>Format</strong>: legacy JSONL (metadata header + message records) and SQLite relational store</li>
 </ul>

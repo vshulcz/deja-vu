@@ -459,7 +459,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"hermes", []string{sources.HermesHome(), sources.HermesProfilesRoot()}, sources.HermesSessionFiles(), parseDoctorHermes},
 		{"qwen", []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles(), sources.ParseQwenFile},
 		{"kimi", []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles(), sources.ParseKimiFile},
-		{"goose", []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles(), parseDoctorGoose},
+		{"goose", sources.GooseSessionsDirs(), sources.GooseSessionFiles(), parseDoctorGoose},
 		{"continue", []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles(), sources.ParseContinueFile},
 		{"crush", []string{sources.CrushDataHome()}, sources.CrushDBs(), sources.ParseCrushDB},
 		{"pi", []string{sources.PiRoot()}, sources.PiSessionFiles(), sources.ParsePiFile},

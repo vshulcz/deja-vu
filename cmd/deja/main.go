@@ -3089,7 +3089,7 @@ func printSources(dir string) {
 		}},
 		{"qwen", filepath.Join(sources.QwenRoot(), "projects"), []string{filepath.Join(sources.QwenRoot(), "projects")}, sources.QwenSessionFiles, sources.LoadQwen},
 		{"kimi", filepath.Join(sources.KimiRoot(), "sessions"), []string{filepath.Join(sources.KimiRoot(), "sessions")}, sources.KimiSessionFiles, sources.LoadKimi},
-		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), []string{filepath.Join(sources.GooseRoot(), "sessions")}, sources.GooseSessionFiles, sources.LoadGoose},
+		{"goose", filepath.Join(sources.GooseRoot(), "sessions"), sources.GooseSessionsDirs(), sources.GooseSessionFiles, sources.LoadGoose},
 		{"hermes", sources.HermesProfilesRoot(), []string{sources.HermesProfilesRoot()}, sources.HermesSessionFiles, sources.LoadHermes},
 		{"copilot", sources.CopilotRoot(), []string{sources.CopilotRoot()}, sources.CopilotSessionFiles, sources.LoadCopilot},
 		{"copilot-chat", strings.Join(sources.CopilotChatRoots(), string(os.PathListSeparator)), sources.CopilotChatRoots(), sources.CopilotChatSessionFiles, sources.LoadCopilotChat},
