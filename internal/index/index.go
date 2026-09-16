@@ -254,7 +254,17 @@ import (
 // three of the four spellings its own pattern accepts, so which spelling a tool
 // happened to print decided whether the value was stored in the clear. Same
 // reason as 41 through 44: redaction runs at ingest (#3614).
-const version = 46
+//
+// 47 stops masking a value whose label says it is public. The entropy pass
+// takes the word before the separator as the label, so a WireGuard dump —
+// `public key: <base64>`, one line per interface and one per peer — read as
+// `key:` and every one of those lines became `[redacted:entropy]`. Measured on
+// a 2,719-session store, that was the largest single class inside the entropy
+// tier, and none of it is a credential. This one moves in the other direction
+// from 41 through 46: a store built before it holds `[redacted:entropy]` where
+// a published key was, and only re-reading the sources brings the text back
+// (#3637).
+const version = 47
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

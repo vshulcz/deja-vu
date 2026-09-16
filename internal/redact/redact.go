@@ -820,7 +820,45 @@ func assignmentValue(s string, start int) bool {
 	if len(key) < 3 {
 		return false
 	}
+	if labelSaysPublic(s, i+1, key) {
+		return false
+	}
 	return !query.IsStopWord(strings.ToLower(key))
+}
+
+// labelSaysPublic reports whether the label in front of the value says the
+// value is published, in which case masking it removes something a reader is
+// entitled to and a search is expected to match.
+//
+// The entropy pass takes the word before the separator as the label, so a
+// WireGuard dump — `public key: <base64>`, one per interface and one per peer —
+// reads as `key:` and every line becomes `[redacted:entropy]`. On a real corpus
+// that was the largest single class inside the entropy tier, ahead of npm
+// lockfile integrity hashes, and none of it is a credential: a public key is
+// public by construction.
+//
+// The rest of the redactor already follows the label — `password=` is treated
+// as a password because it says so — and this is the same rule in the other
+// direction. It does not cover `peer:`, which names a party rather than
+// claiming to be public, and it does not touch the pattern rules: a PEM private
+// key block is caught by its own rule whatever the line around it says.
+func labelSaysPublic(s string, keyStart int, key string) bool {
+	switch strings.ToLower(key) {
+	case "pubkey", "publickey", "public_key", "public-key":
+		return true
+	case "key", "keys":
+		// The word before it, if any: "public key: …" but not "api key: …".
+		i := keyStart - 1
+		for i >= 0 && (s[i] == ' ' || s[i] == '\t' || s[i] == '"' || s[i] == '\'') {
+			i--
+		}
+		end := i + 1
+		for i >= 0 && isWordByte(s[i]) {
+			i--
+		}
+		return strings.EqualFold(s[i+1:end], "public")
+	}
+	return false
 }
 
 func isWordByte(c byte) bool {
