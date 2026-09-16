@@ -48,8 +48,14 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 	if !ok {
 		t.Fatalf("no deja server in %v", cfg.Servers)
 	}
-	if srv.Command != "/usr/local/bin/deja" || len(srv.Args) == 0 || srv.Args[0] != "mcp" {
-		t.Errorf("server entry = %q %v, want the binary and `mcp`", srv.Command, srv.Args)
+	// windows gets the `cmd /c <exe> mcp` shim, so the binary is an argument
+	// there rather than the command: what has to hold on every platform is that
+	// the entry ends in `mcp` and names this executable.
+	if len(srv.Args) == 0 || srv.Args[len(srv.Args)-1] != "mcp" {
+		t.Errorf("server entry = %q %v, want it to end in `mcp`", srv.Command, srv.Args)
+	}
+	if !strings.Contains(srv.Command+" "+strings.Join(srv.Args, " "), "/usr/local/bin/deja") {
+		t.Errorf("server entry = %q %v, want the binary in it", srv.Command, srv.Args)
 	}
 
 	skill := filepath.Join(home, ".kilocode", "skills", "deja-search", "SKILL.md")

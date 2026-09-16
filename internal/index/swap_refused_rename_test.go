@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -14,6 +15,16 @@ import (
 // still open, so a test can stand where Windows is without needing it.
 func heldOpen(from, to string) error {
 	return &os.LinkError{Op: "rename", Old: from, New: to, Err: syscall.Errno(32)}
+}
+
+// sleepTick is how much one Sleep can overshoot on this platform: windows
+// rounds up to the scheduler's ~15.6ms tick, everywhere else the error is
+// small enough that a millisecond stands in for it.
+func sleepTick() time.Duration {
+	if runtime.GOOS == "windows" {
+		return 16 * time.Millisecond
+	}
+	return time.Millisecond
 }
 
 // onWindows makes the wait apply on the machine running the test.
@@ -104,9 +115,15 @@ func TestASwapThatCannotRenameKeepsTheOldIndex(t *testing.T) {
 	// Bounded by what a reader will wait for it, not by "eventually": the
 	// failed rename and the restore share that window, with a floor under the
 	// restore so it is never left none of it.
-	if took := time.Since(start); took > swapRenameWait+restoreRenameFloor+swapRenameStep {
-		t.Errorf("the index was away for %v, past the %v it may take", took,
-			swapRenameWait+restoreRenameFloor+swapRenameStep)
+	//
+	// The bound carries slack for the clock rather than for the code: this
+	// window is thirteen 20ms sleeps, and on windows each one rounds up to the
+	// ~15.6ms scheduler tick, so the runner measured 296ms against a nominal
+	// 280ms and the leg went red on arithmetic (#3648). One tick per platform,
+	// four of them, is still an order below "eventually".
+	bound := swapRenameWait + restoreRenameFloor + swapRenameStep + 4*sleepTick()
+	if took := time.Since(start); took > bound {
+		t.Errorf("the index was away for %v, past the %v it may take", took, bound)
 	}
 	if b, err := os.ReadFile(filepath.Join(dir, "records.bin")); err != nil || string(b) != "old" {
 		t.Errorf("the previous index is not where it was: %q %v", b, err)
