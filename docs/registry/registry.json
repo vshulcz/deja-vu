@@ -660,30 +660,26 @@
       "last_verified": "2026-09-16",
       "display_name": "Cherry Studio",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
         "skill": false,
         "command": false,
         "resume": false,
         "handoff": "paste",
-        "prereq": "none"
+        "prereq": "import the server once in Settings -> MCP"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Read support only: the store is read and nothing is wired into Cherry Studio. It runs Claude Code sessions from a desktop app, so the hooks and MCP question is that app's plugin surface rather than Claude Code's (#3644)."
-        },
         "auto": {
-          "state": "todo",
-          "why": "Read support only: the store is read and nothing is wired into Cherry Studio. It runs Claude Code sessions from a desktop app, so the hooks and MCP question is that app's plugin surface rather than Claude Code's (#3644)."
+          "state": "impossible",
+          "why": "Cherry Studio has no hook surface for a third party: it is an Electron app whose agent sessions run inside it, and the extension points are the MCP server list and its import paths (#3644)."
         },
         "skill": {
           "state": "todo",
-          "why": "Read support only: the store is read and nothing is wired into Cherry Studio. It runs Claude Code sessions from a desktop app, so the hooks and MCP question is that app's plugin surface rather than Claude Code's (#3644)."
+          "why": "No skill channel found: the app loads no user-level instructions file a third party can write, so guidance reaches the model through the MCP tool descriptions (#3644)."
         },
         "command": {
-          "state": "todo",
-          "why": "Read support only: the store is read and nothing is wired into Cherry Studio. It runs Claude Code sessions from a desktop app, so the hooks and MCP question is that app's plugin surface rather than Claude Code's (#3644)."
+          "state": "impossible",
+          "why": "No slash-command surface for a third party: commands are the app's own and an MCP server cannot register one (#3644)."
         }
       }
     },

@@ -30,6 +30,18 @@ the one above.
   unchanged and a test pins that.
 - Sessions are their own harness rather than extra Claude roots: a reader should
   see which app the work happened in, and `deja sources` says `cherrystudio`.
-- Read support only. Nothing is wired into Cherry Studio — no hooks, no MCP, no
-  `deja install` — and since it embeds Claude Code rather than being it, that
-  question belongs to the app's own plugin surface.
+- Wiring: `deja install cherrystudio` writes
+  `<config>/deja/cherrystudio-mcp.json` and says to import it in Settings → MCP
+  → Import from JSON. The app keeps its MCP servers in its own SQLite store — a
+  drizzle schema seeded from a built-in preset list
+  (`src/main/data/services/McpServerService.ts`,
+  `src/main/data/db/seeding/seeders/builtinMcpServerSeeder.ts`) — so there is no
+  config file to write, and writing into a running app's database is not an
+  installer's job. Its import paths are JSON, DXT and MCPB
+  (`src/renderer/pages/settings/McpSettings/McpServersList.tsx`); the MCPB
+  bundle this project already publishes is the other one and needs nothing new.
+- No hook surface for a third party, so auto-recall is recorded as impossible
+  rather than as a gap someone could close: the agent sessions run inside the
+  Electron app, and the extension points are the MCP server list and its import
+  paths. Same for slash commands. A skill channel was not found either — the
+  guidance reaches the model through the MCP tool descriptions.

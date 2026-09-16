@@ -69,10 +69,24 @@
 </ul>
 <p>see which app the work happened in, and <code>deja sources</code> says <code>cherrystudio</code>.</p>
 <ul>
-<li>Read support only. Nothing is wired into Cherry Studio — no hooks, no MCP, no</li>
+<li>Wiring: <code>deja install cherrystudio</code> writes</li>
 </ul>
-<p><code>deja install</code> — and since it embeds Claude Code rather than being it, that</p>
-<p>question belongs to the app&#39;s own plugin surface.</p>
+<p><code>&lt;config&gt;/deja/cherrystudio-mcp.json</code> and says to import it in Settings → MCP</p>
+<p>→ Import from JSON. The app keeps its MCP servers in its own SQLite store — a</p>
+<p>drizzle schema seeded from a built-in preset list</p>
+<p>(<code>src/main/data/services/McpServerService.ts</code>,</p>
+<p><code>src/main/data/db/seeding/seeders/builtinMcpServerSeeder.ts</code>) — so there is no</p>
+<p>config file to write, and writing into a running app&#39;s database is not an</p>
+<p>installer&#39;s job. Its import paths are JSON, DXT and MCPB</p>
+<p>(<code>src/renderer/pages/settings/McpSettings/McpServersList.tsx</code>); the MCPB</p>
+<p>bundle this project already publishes is the other one and needs nothing new.</p>
+<ul>
+<li>No hook surface for a third party, so auto-recall is recorded as impossible</li>
+</ul>
+<p>rather than as a gap someone could close: the agent sessions run inside the</p>
+<p>Electron app, and the extension points are the MCP server list and its import</p>
+<p>paths. Same for slash commands. A skill channel was not found either — the</p>
+<p>guidance reaches the model through the MCP tool descriptions.</p>
 
 <hr>
 <p>deja reads this format and twenty-six others, and turns what it finds into memory your
