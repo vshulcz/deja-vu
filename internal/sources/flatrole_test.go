@@ -45,6 +45,14 @@ func TestCommandCodeSkipsTheCheckpointStream(t *testing.T) {
 	if s.Messages[2].Role != "assistant" || !strings.Contains(s.Messages[2].Text, "host index") {
 		t.Errorf("the answer is wrong: %+v", s.Messages[2])
 	}
+
+	// The skip has to be nameable, or doctor counts the checkpoint stream as a
+	// file deja failed to understand and the row reports drift on a store it is
+	// reading correctly.
+	cps := CommandCodeCheckpointFiles()
+	if len(cps) != 1 || !strings.HasSuffix(cps[0], ".checkpoints.jsonl") {
+		t.Errorf("checkpoint files = %v, want the one beside the transcript", cps)
+	}
 	_ = root
 }
 

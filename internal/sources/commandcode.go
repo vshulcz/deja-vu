@@ -33,6 +33,16 @@ func commandCodeIsTranscript(p string) bool {
 	return strings.HasSuffix(p, ".jsonl") && !strings.HasSuffix(p, ".checkpoints.jsonl")
 }
 
+// CommandCodeCheckpointFiles lists the snapshot streams sitting beside the
+// transcripts. deja does not read them — they are not conversations — and they
+// are named so `deja doctor` can count them as a deliberate skip rather than
+// as a file it failed to understand, which is how a store reports drift.
+func CommandCodeCheckpointFiles() []string {
+	return walkFiles(CommandCodeRoot(), func(p string) bool {
+		return strings.HasSuffix(p, ".checkpoints.jsonl")
+	})
+}
+
 // CommandCodeUnderRoot lets the registry claim a path for incremental ingest.
 func CommandCodeUnderRoot(p string) bool {
 	return strings.HasPrefix(p, CommandCodeRoot()) && commandCodeIsTranscript(p)

@@ -860,7 +860,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	kimchiRoot := sources.KimchiRoot()
 	printFiles("kimchi", kimchiRoot, doctorExists(kimchiRoot), sources.KimchiSessionFiles())
 	commandRoot := sources.CommandCodeRoot()
-	printFiles("commandcode", commandRoot, doctorExists(commandRoot), sources.CommandCodeSessionFiles())
+	// The checkpoint stream beside each transcript is named rather than left to
+	// the unread count: it is not a conversation, and "1 not recognised here"
+	// on a store deja reads correctly is the line that sends someone looking
+	// for drift that is not there.
+	printFilesBeside("commandcode", commandRoot, doctorExists(commandRoot),
+		sources.CommandCodeSessionFiles(), sources.CommandCodeCheckpointFiles()...)
 	zcodeRoot := sources.ZCodeRoot()
 	printFiles("zcode", zcodeRoot, doctorExists(zcodeRoot), sources.ZCodeSessionFiles())
 	gjcRoot := sources.GjcRoot()
