@@ -284,12 +284,12 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | ✅ | ✕ | — | ✕ | ✕ | paste | import the server once in Settings -> MCP |
-| Senpi | ? | — | — | — | — | paste | none |
-| gajae-code | ✅ | — | ✅ | — | — | paste | none |
-| Kimchi Coding | ✅ | ⚠ | ⚠ | — | — | paste | none |
-| Command Code | — | — | — | — | — | paste | none |
-| ZCode | ⚠ | — | — | — | — | paste | none |
-| Kiro | ✅ | — | — | — | — | paste | none |
+| Senpi | ? | ? | ? | ? | ? | paste | none |
+| gajae-code | ✅ | — | ✅ | ✅ | — | paste | none |
+| Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | — | paste | none |
+| Command Code | — | — | — | ? | — | paste | none |
+| ZCode | ⚠ | — | — | ? | — | paste | none |
+| Kiro | ✅ | — | — | ? | — | paste | none |
 | Kilo Code | ✅ | ⚠ | ✅ | — | — | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |

@@ -63,5 +63,9 @@ func installGjc(exe string, uninstall bool) (installResult, error) {
 	if skillErr != nil {
 		return installResult{}, skillErr
 	}
-	return wroteAll(res, skill), nil
+	command, cmdErr := installCommandFile("gjc", exe, uninstall)
+	if cmdErr != nil {
+		return installResult{}, cmdErr
+	}
+	return wroteAll(res, skill, command), nil
 }

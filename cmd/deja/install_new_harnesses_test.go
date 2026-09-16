@@ -103,6 +103,15 @@ func TestInstallGjcWritesTheServerAndTheNativeSkill(t *testing.T) {
 		t.Errorf("the skill does not mention deja: %q", string(b)[:60])
 	}
 
+	// And the slash command, in the directory gjc's own plugin marketplace
+	// verifies after an install.
+	command := filepath.Join(home, ".gjc", "agent", "commands", "deja.md")
+	if cb, err := os.ReadFile(command); err != nil {
+		t.Fatalf("command: %v", err)
+	} else if !strings.Contains(string(cb), "deja") {
+		t.Errorf("the command file does not mention deja: %q", string(cb)[:60])
+	}
+
 	if again, err := installGjc("/usr/local/bin/deja", false); err != nil {
 		t.Fatal(err)
 	} else if again.Action != "unchanged" {
