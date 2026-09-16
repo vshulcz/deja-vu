@@ -680,6 +680,10 @@
         "command": {
           "state": "impossible",
           "why": "No slash-command surface for a third party: commands are the app's own and an MCP server cannot register one (#3644)."
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "Cherry Studio has no command that reopens a session from outside: the sessions live in the desktop app and are picked from its own UI, so deja hands one over as a paste (#3644)."
         }
       }
     },
@@ -707,8 +711,8 @@
       },
       "gaps": {
         "mcp": {
-          "state": "todo",
-          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+          "state": "unknown",
+          "why": "Nobody can say what Senpi's config surface is: no public source, documentation or package for Senpi (OmO Native) was found — only its transcript format, which is pi's. `unknown` rather than `todo` because the work cannot start until there is something to read against (#3651)."
         },
         "auto": {
           "state": "todo",
@@ -843,7 +847,8 @@
       "gaps": {
         "mcp": {
           "state": "todo",
-          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+          "why": "Reported to read `~/.commandcode/mcp.json`, with four lifecycle hook events in `~/.commandcode/settings.json` whose SessionStart injects. That is one third party's matrix and the CLI is closed, so nothing is written until a live install confirms the path: a config file at a guessed location is a capability the matrix would be claiming falsely (#3651).",
+          "source": "https://github.com/akitaonrails/ai-memory/blob/main/docs/support-matrix.md"
         },
         "auto": {
           "state": "todo",
@@ -887,8 +892,9 @@
       },
       "gaps": {
         "mcp": {
-          "state": "todo",
-          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+          "state": "blocked",
+          "why": "ZCode's server map (`mcp.servers` in ~/.zcode/cli/config.json) takes a strict `type`/`url`/`headers` shape — an HTTP endpoint — and deja's server is a local stdio process, so there is nothing to write there. The way in is its hook block, whose SessionStart injects through `hookSpecificOutput.additionalContext`, the shape Claude Code uses. Both read from a third party's live-verified integration matrix rather than from this machine (#3651).",
+          "source": "https://github.com/akitaonrails/ai-memory/blob/main/docs/support-matrix.md"
         },
         "auto": {
           "state": "todo",
@@ -991,6 +997,10 @@
         "command": {
           "state": "todo",
           "why": "No slash command yet. Kilo reads skills from ~/.kilocode/skills, ~/.kilo/skills and the project tree, which is the channel deja writes; a command would be a second one (#3643)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "Kilo's CLI can reopen a session and the flag has not been verified here; the extension's tasks reopen from its own history view. The same split Roo has, where deja prints a command only for the half it can (#3643)."
         }
       }
     },
