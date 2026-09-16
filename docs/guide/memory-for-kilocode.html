@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to Kilo Code: every agent's sessions — deja-vu</title>
+<meta name="description" content="Kilo Code keeps its tasks in the editor's global storage and its CLI history in a SQLite store. deja reads both, and adds the sessions from every other agent.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to Kilo Code: every agent's sessions">
+<meta property="og:description" content="Kilo Code keeps its tasks in the editor's global storage and its CLI history in a SQLite store. deja reads both, and adds the sessions from every other agent.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to Kilo Code: every agent's sessions">
+<meta name="twitter:description" content="Kilo Code keeps its tasks in the editor's global storage and its CLI history in a SQLite store. deja reads both, and adds the sessions from every other agent.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Kilo Code", "description": "Kilo Code keeps its tasks in the editor's global storage and its CLI history in a SQLite store. deja reads both, and adds the sessions from every other agent.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-16", "dateModified": "2026-09-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Kilo Code", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where is Kilo Code's history stored?", "acceptedAnswer": {"@type": "Answer", "text": "The extension writes task files under the editor's global storage: <globalStorage>/kilocode.kilo-code/tasks/<taskId>/api_conversation_history.json. The CLI writes to a SQLite store at ~/.local/share/kilo/kilo.db. A session can exist in both once Kilo's own migration has run, because it imports the task files rather than deleting them."}}, {"@type": "Question", "name": "How do I add memory to Kilo Code?", "acceptedAnswer": {"@type": "Answer", "text": "deja install kilocode writes the deja MCP server into settings/mcp_settings.json for every editor that carries the extension — the file Kilo's own KilocodePaths names — and the deja-search skill into ~/.kilocode/skills, where its loader looks first."}}, {"@type": "Question", "name": "Does Kilo Code have hooks?", "acceptedAnswer": {"@type": "Answer", "text": "Not yet. A search of the Kilo repository finds no hook surface, and Kilo is a Roo fork whose hooks are still open pull requests upstream, so recall arrives when the model calls the tool rather than on its own."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">25</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html" aria-current="page">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Kilo Code</h1>
+<p class="pagelede">two stores, no hooks yet — so recall is a tool it reaches for<span class="mins" data-mins></span></p>
+
+<p>Kilo Code keeps two stores, and which one holds your history depends on how you use it. The extension writes Roo's task shape under the editor's global storage — <code>tasks/&lt;taskId&gt;/api_conversation_history.json</code> — and the CLI writes OpenCode's message schema to <code>~/.local/share/kilo/kilo.db</code>. Kilo vendors OpenCode and its own <code>legacy-migration</code> imports the task directory into that database, so the task files are the history of anyone who used Kilo before the migration and the database is where it goes afterwards. deja reads both.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install kilocode</pre>
+<p>That writes two things:</p>
+<ul>
+<li><b>The MCP server</b>, into <code>&lt;globalStorage&gt;/kilocode.kilo-code/settings/mcp_settings.json</code> for every host that carries the extension. One tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</li>
+<li><b>The <code>deja-search</code> skill</b>, into <code>~/.kilocode/skills</code>, which is where Kilo's loader looks first. It is what tells the model when to look: before re-debugging an error, when you say "didn't we fix this".</li>
+</ul>
+<p>On a machine with the CLI and no editor, the skill is still written and the run says so rather than reporting a server it wired nowhere.</p>
+
+<h2>Why there is no session-start injection</h2>
+<p>Kilo has no lifecycle hooks. It is a Roo fork, and Roo's Claude Code-style hooks system is still in flight upstream — <a href="https://github.com/RooCodeInc/Roo-Code/pull/10785">PR #10785</a> among others — so there is no event deja can answer and recall is something the model reaches for. The day one of those merges, auto-recall becomes work rather than a promise; until then the <a href="../registry/kilocode.html">registry entry</a> records it as a gap.</p>
+
+<h2>Reading the CLI store</h2>
+<p>The database half needs the <code>sqlite3</code> CLI, and <code>deja doctor</code> says so by name when it is missing rather than reporting a store with no sessions in it.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in Kilo Code answers a question asked in Claude Code, and the Roo tasks you had before switching are read too. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/kilocode.html">The Kilo Code session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cherry Studio memory: every agent's sessions — deja-vu</title>
+<meta name="description" content="Cherry Studio writes its agent sessions under its own app data. deja reads them, and hands the same memory to every other agent on the machine.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Cherry Studio memory: every agent's sessions">
+<meta property="og:description" content="Cherry Studio writes its agent sessions under its own app data. deja reads them, and hands the same memory to every other agent on the machine.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Cherry Studio memory: every agent's sessions">
+<meta name="twitter:description" content="Cherry Studio writes its agent sessions under its own app data. deja reads them, and hands the same memory to every other agent on the machine.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Cherry Studio", "description": "Cherry Studio writes its agent sessions under its own app data. deja reads them, and hands the same memory to every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-16", "dateModified": "2026-09-16"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Cherry Studio", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Cherry Studio store its agent sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under its own app data: <app data>/CherryStudio/Data/Agents/.claude/projects/<workspace>/<session>.jsonl — ~/Library/Application Support/CherryStudio on macOS, %APPDATA%\\CherryStudio on Windows. Installs older than the upgrade that added Data/Agents keep them directly under .claude/projects, and deja reads both."}}, {"@type": "Question", "name": "How do I add an MCP server to Cherry Studio?", "acceptedAnswer": {"@type": "Answer", "text": "Settings → MCP → Import from JSON, or Import from MCPB with a bundle. deja install cherrystudio writes the file that JSON import takes and tells you where to point it; the .mcpb from the latest release is the other path. Cherry Studio keeps its MCP servers in its own database, so there is no config file for an installer to write."}}, {"@type": "Question", "name": "Can Cherry Studio see my Claude Code or Codex sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Once the server is imported, yes: the index covers the transcripts of thirty-three agents on the machine, including sessions from before deja was installed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">25</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html" aria-current="page">Memory for Cherry Studio</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Cherry Studio</h1>
+<p class="pagelede">a desktop app running Claude Code — and one snapshot per stream chunk<span class="mins" data-mins></span></p>
+
+<p>Cherry Studio runs Claude Code sessions from a desktop app, and it writes them as ordinary Claude Code transcripts under its own data directory. So the sessions are readable — but they are the app's, not the CLI's, and deja reports them as Cherry Studio rather than folding them into Claude Code: a reader should see which app the work happened in.</p>
+
+<h2>Reading what is already there</h2>
+<pre>deja index</pre>
+<p>One difference from a stock Claude Code store matters for text rather than for tokens. Cherry Studio appends the same API call three or four times as the response streams — a new uuid each time, the same request id, the text growing. Read plainly that turns one reply into three messages, each a prefix of the next, so a recall can quote half a sentence and <code>deja show</code> prints the answer twice before finishing it. deja collapses the run and keeps the whole answer.</p>
+
+<h2>Getting recall into the app</h2>
+<pre>deja install cherrystudio</pre>
+<p>Cherry Studio keeps its MCP servers in its own SQLite store, seeded from a built-in list, so there is no config file to write and writing into a running app's database is not an installer's job. What the app has is import: <b>Settings → MCP → Import from JSON</b>. The command writes that file — <code>&lt;config&gt;/deja/cherrystudio-mcp.json</code> — and says where to point it. The <code>.mcpb</code> bundle from the <a href="https://github.com/vshulcz/deja-vu/releases/latest">latest release</a> is the same server through the app's other import path.</p>
+<p>Once imported, the agent has one tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</p>
+
+<h2>Why nothing arrives on its own</h2>
+<p>There is no hook surface a third party can use: the agent sessions run inside the Electron app, and the extension points are the MCP server list and its import paths. So recall is something the model reaches for, and the <a href="../registry/cherrystudio.html">registry entry</a> records auto-recall as impossible rather than as work someone could pick up.</p>
+
+<h2>The part that is not about this harness</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-three of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a session you ran in the app answers a question asked in Claude Code or Cursor later. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/cherrystudio.html">The Cherry Studio session format</a></p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

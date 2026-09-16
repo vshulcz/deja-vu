@@ -70,8 +70,15 @@ func TestGuideStructuredDataDescribesItsOwnPage(t *testing.T) {
 		// breadcrumb and the questions use.
 		harness, _, _ = strings.Cut(harness, "-")
 
+		// A brand written with a space is the same name as its one-word id:
+		// "Kilo Code" is kilocode and "Cherry Studio" is cherrystudio, so the
+		// comparison folds the separators away. Spelled out, the check said a
+		// page about Kilo Code did not name Kilo Code.
+		fold := func(s string) string {
+			return strings.NewReplacer(" ", "", "-", "", "_", "").Replace(strings.ToLower(s))
+		}
 		foreign := func(text string) string {
-			low := strings.ToLower(text)
+			low := fold(text)
 			if strings.Contains(low, harness) {
 				return ""
 			}
@@ -107,7 +114,7 @@ func TestGuideStructuredDataDescribesItsOwnPage(t *testing.T) {
 					if item.Position != 2 {
 						continue
 					}
-					if !strings.Contains(strings.ToLower(item.Name), harness) {
+					if !strings.Contains(fold(item.Name), harness) {
 						t.Errorf("%s: breadcrumb reads %q, which does not name %s — the page was copied and this block came with it", name, item.Name, harness)
 					}
 				}
