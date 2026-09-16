@@ -277,6 +277,13 @@ type rooHistoryItem struct {
 }
 
 func ParseRooTask(path string) ([]model.Session, error) {
+	return parseRooShapedTask(path, "roo")
+}
+
+// parseRooShapedTask reads one task directory of the Roo store. Kilo Code is a
+// Roo fork and its extension writes the same three files, so the only thing
+// that differs is the harness a session belongs to (#3643).
+func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -293,7 +300,7 @@ func ParseRooTask(path string) ([]model.Session, error) {
 	}
 	taskDir := filepath.Dir(path)
 	taskID := filepath.Base(taskDir)
-	s := model.Session{Harness: "roo", ID: "roo-task-" + taskID, Path: path, Project: "roo"}
+	s := model.Session{Harness: harness, ID: harness + "-task-" + taskID, Path: path, Project: harness}
 	base := time.Time{}
 	var item rooHistoryItem
 	if hb, err := os.ReadFile(filepath.Join(taskDir, "history_item.json")); err == nil && json.Unmarshal(hb, &item) == nil {

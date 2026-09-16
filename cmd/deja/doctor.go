@@ -835,6 +835,24 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	printRow("roo", rooLoc, rooFiles > 0, doctorCount(rooFiles, "file"))
 
+	// Kilo Code keeps the extension's task files and the CLI's database, so the
+	// row names both and says which half answered (#3643).
+	kiloTasks := len(sources.KiloTaskFiles())
+	kiloLoc := "VS Code globalStorage " + sources.KiloExtensionID
+	if roots := sources.KiloRoots(); len(roots) > 0 {
+		kiloLoc = strings.Join(roots, string(os.PathListSeparator))
+	}
+	kiloDB := sources.KiloDB()
+	kiloHasDB := doctorExists(kiloDB)
+	if kiloHasDB {
+		kiloLoc = kiloLoc + string(os.PathListSeparator) + kiloDB
+	}
+	kiloDetail := doctorCount(kiloTasks, "task file")
+	if kiloHasDB {
+		kiloDetail += ", CLI store present"
+	}
+	printRow("kilocode", kiloLoc, kiloTasks > 0 || kiloHasDB, kiloDetail)
+
 	continueDir := filepath.Join(sources.ContinueRoot(), "sessions")
 	printFilesBeside("continue", continueDir, doctorExists(continueDir), sources.ContinueSessionFiles(),
 		filepath.Join(continueDir, "sessions.json"))

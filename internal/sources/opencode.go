@@ -77,14 +77,27 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
+	return ParseOpencodeDBWhere(db, opencodeSinceWhere(t), 0)
+}
+
+// opencodeSinceWhere bounds a read to what changed after the watermark. Shared
+// with the other stores in this schema — Kilo's CLI database is one (#3643).
+func opencodeSinceWhere(t time.Time) string {
 	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
-	where := fmt.Sprintf(" and (%s or m.time_created > '%s' or %s or json_extract(p.data,'$.time.start') > '%s')",
+	return fmt.Sprintf(" and (%s or m.time_created > '%s' or %s or json_extract(p.data,'$.time.start') > '%s')",
 		newerThanEpoch("m.time_created", t), rfc,
 		newerThanEpoch("json_extract(p.data,'$.time.start')", t), rfc)
-	return ParseOpencodeDBWhere(db, where, 0)
 }
 
 func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) {
+	return parseOpencodeSchemaDB("opencode", db, where, limit)
+}
+
+// parseOpencodeSchemaDB reads a store in OpenCode's message schema. Kilo's CLI
+// writes that schema too — tokscale reads it through the same path under
+// `OpenCodeSchemaConfig::kilo` — so the harness a session belongs to is the
+// only difference (#3643).
+func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Session, error) {
 	// The sqlite3 CLI CREATES a missing database file on open — never let it.
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
@@ -200,7 +213,7 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 		s := by[id]
 		if s == nil {
 			dir, _ := r["directory"].(string)
-			s = &model.Session{Harness: "opencode", ID: id, Project: projectName(dir), Path: dir, Started: parseTimeAny(r["time_created"]), Updated: parseTimeAny(r["time_updated"])}
+			s = &model.Session{Harness: harness, ID: id, Project: projectName(dir), Path: dir, Started: parseTimeAny(r["time_created"]), Updated: parseTimeAny(r["time_updated"])}
 			by[id] = s
 		}
 		role := str(r["role"])

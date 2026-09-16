@@ -644,6 +644,51 @@
       "gaps": {}
     },
     {
+      "id": "kilocode",
+      "store_paths": [
+        "<vscode-globalStorage>/kilocode.kilo-code/tasks/*/api_conversation_history.json",
+        "${DEJA_KILO_ROOTS}/tasks/*/api_conversation_history.json",
+        "~/.local/share/kilo/kilo.db",
+        "${XDG_DATA_HOME}/kilo/kilo.db",
+        "${DEJA_KILO_DB}"
+      ],
+      "format_kind": "json+sqlite",
+      "fixture_paths": [
+        "fixtures/registry/kilocode/tasks/registry-kilocode/api_conversation_history.json",
+        "fixtures/registry/kilocode/kilo.sql"
+      ],
+      "parser_source": "internal/sources/kilo.go",
+      "last_verified": "2026-09-16",
+      "display_name": "Kilo Code",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "sqlite3 for the CLI store"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+        }
+      }
+    },
+    {
       "id": "roo",
       "store_paths": [
         "<vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json",

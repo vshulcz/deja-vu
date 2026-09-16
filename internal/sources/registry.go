@@ -305,6 +305,24 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			// Kilo Code keeps the extension's task files and the CLI's
+			// OpenCode-schema database; both parsers are already here, so this
+			// entry is paths and a name (#3643).
+			Name: "kilocode", Load: LoadKilo, Files: KiloSessionFiles,
+			Kinds: []FileKind{{
+				Name: "kilocode-task",
+				Match: func(p string) bool {
+					return hasBase(p, "api_conversation_history.json") && kiloUnderTasks(p)
+				},
+				Parse: fullParse(ParseKiloTask),
+			}, {
+				Name:      "kilocode-db",
+				Match:     func(p string) bool { return p == KiloDB() },
+				Parse:     dbParse(ParseKiloDB, ParseKiloDBSince),
+				ParseFrom: dbParseFrom(ParseKiloDB, ParseKiloDBSince),
+			}},
+		},
+		{
 			Name: "roo", Load: LoadRoo, Files: RooTaskFiles,
 			Kinds: []FileKind{{
 				Name: "roo",

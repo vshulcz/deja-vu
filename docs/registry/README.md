@@ -28,6 +28,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Copilot CLI](copilot.md) | session event JSONL |
 | [VS Code Copilot Chat](copilot-chat.md) | JSON/JSONL mutation log in VS Code workspaceStorage |
 | [Roo Code](roo.md) | task JSON in VS Code globalStorage |
+| [Kilo Code](kilocode.md) | task JSON in VS Code globalStorage, plus the CLI's OpenCode-schema SQLite |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |
 | [Hermes](hermes.md) | SQLite state store |

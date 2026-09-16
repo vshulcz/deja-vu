@@ -1,0 +1,4 @@
+[
+  {"role": "user", "content": [{"type": "text", "text": "<task>why does the migration hang</task>"}]},
+  {"role": "assistant", "content": [{"type": "text", "text": "the advisory lock was never released"}]}
+]

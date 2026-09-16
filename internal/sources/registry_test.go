@@ -153,6 +153,25 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseClineFile(path)
 	case "roo":
 		sessions, err = ParseRooTask(path)
+	case "kilocode":
+		// Two stores, both in a format another harness here already uses: the
+		// extension's task files and the CLI's OpenCode-schema database.
+		if strings.HasSuffix(path, ".sql") {
+			if !SQLite3Available() {
+				t.Skip("sqlite3 not installed")
+			}
+			sql, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			db := filepath.Join(work, "kilo.db")
+			if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
+				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+			}
+			sessions, err = ParseKiloDB(db)
+		} else {
+			sessions, err = ParseKiloTask(path)
+		}
 	case "continue":
 		sessions, err = ParseContinueFile(path)
 	case "opencode":

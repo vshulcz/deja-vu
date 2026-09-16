@@ -52,6 +52,11 @@ func SkipReason(harness string) string {
 		present = fileExists(GrokDB())
 	case "hermes":
 		present = len(HermesDBs()) > 0
+	case "kilocode":
+		// Only the CLI store needs sqlite3; the extension's task files are
+		// plain JSON, so a Kilo install with no database has nothing to
+		// explain (#3643).
+		present = fileExists(KiloDB())
 	case "goose":
 		for _, db := range GooseDBs() {
 			if fileExists(db) {

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Kilo Code stores its history — session format</title>
+<meta name="description" content="Where Kilo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/kilocode.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Kilo Code stores its history — session format">
+<meta property="og:description" content="Where Kilo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/kilocode.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Kilo Code stores its history — session format">
+<meta name="twitter:description" content="Where Kilo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Kilo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Kilo Code","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/kilocode.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/kilocode.html","name":"Kilo Code","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html" aria-current="page">Kilo Code</a><a href="kimi.html">Kimi Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Kilo Code</h1>
+<ul>
+<li><strong>ID</strong>: <code>kilocode</code></li>
+<li><strong>Store (extension)</strong>: <code>&lt;vscode-globalStorage&gt;/kilocode.kilo-code/tasks/&lt;taskId&gt;/api_conversation_history.json</code> with <code>history_item.json</code> beside it — the Roo task shape, read across the same hosts Roo is (Code, Code - Insiders, VSCodium, Cursor, Windsurf)</li>
+<li><strong>Store (CLI)</strong>: <code>~/.local/share/kilo/kilo.db</code>, or <code>$XDG_DATA_HOME/kilo/kilo.db</code> where that is set — OpenCode&#39;s message schema</li>
+<li><strong>Read overrides</strong>: <code>DEJA_KILO_ROOTS</code> replaces the globalStorage list; <code>DEJA_KILO_DB</code> names the database</li>
+<li><strong>Format</strong>: task JSON (Cline lineage) and SQLite (OpenCode schema)</li>
+<li><strong>Needs</strong>: <code>sqlite3</code> for the CLI store; the task files need nothing</li>
+</ul>
+<p><strong>Last verified:</strong> 2026-09-16</p>
+<p>Kilo Code is a Roo Code fork that vendors OpenCode — <code>packages/opencode</code> is</p>
+<p>1,780 files inside the Kilo repository — and <code>packages/kilo-vscode/src/legacy-migration</code></p>
+<p>reads the task directory to import it into the database. So the task files are</p>
+<p>the history of anyone who used Kilo before that migration, and the database is</p>
+<p>where it goes afterwards; deja reads both and neither needed a new parser.</p>
+<p>The extension id is <code>kilocode.kilo-code</code>, confirmed from</p>
+<p><code>packages/kilo-vscode/package.json</code> (<code>publisher: kilocode</code>, <code>name: kilo-code</code>).</p>
+<p>Task JSON: one document per task, an array of <code>{role, content}</code> turns in Cline&#39;s</p>
+<p>shape, with the user&#39;s first turn wrapped in <code>&lt;task&gt;…&lt;/task&gt;</code>. <code>history_item.json</code></p>
+<p>supplies the id, the millisecond timestamp and the workspace, which is what names</p>
+<p>the project; without it the task&#39;s directory mtime is the base time.</p>
+<p>SQLite: <code>session</code> joined to <code>message</code> and <code>part</code>, exactly as OpenCode writes it —</p>
+<p>see <a href="opencode.html">OpenCode</a> for the field-by-field description.</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li>Two stores for one harness, and a session can exist in both if the migration</li>
+</ul>
+<p>has run: the task files are not deleted by it.</p>
+<ul>
+<li>A Roo task and a Kilo task are the same file name in sibling directories under</li>
+</ul>
+<p>one globalStorage, so the reader matches on the extension id rather than on the</p>
+<p>file.</p>
+<ul>
+<li>tokscale&#39;s Kilo reader notes that an assistant turn whose payload carries no</li>
+</ul>
+<p><code>time</code> object falls back to the file&#39;s mtime. deja sorts by time rather than</p>
+<p>counting tokens, so the turn still needs a time; the OpenCode path already</p>
+<p>falls back the same way.</p>
+<ul>
+<li>Read support only for now. Nothing is wired into Kilo — no hooks, no MCP, no</li>
+</ul>
+<p><code>deja install</code> — and since the extension is a Roo fork, that question is Roo&#39;s.</p>
+
+<hr>
+<p>deja reads this format and twenty-five others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
