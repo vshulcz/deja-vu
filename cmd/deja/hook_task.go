@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -30,8 +31,19 @@ var taskNoiseFiles = map[string]bool{
 // A variable rather than a constant because a slow machine — a cold Windows
 // runner was the first one seen — blows through it and both calls return
 // nothing, which is indistinguishable from "no repo" and made the test for
-// this function flaky (#516).
-var taskGitBudget = 400 * time.Millisecond
+// this function flaky (#516). The tests answered that by widening it to 20s,
+// which left the product shipping the number that misses: on windows the two
+// calls return nothing and recall ranks by recency instead of by the files the
+// repository is touching, silently. Platform budget, same as the root lookup
+// (#3624) and the compaction fingerprint (#3645).
+var taskGitBudget = taskBudgetFor(runtime.GOOS)
+
+func taskBudgetFor(goos string) time.Duration {
+	if goos == "windows" {
+		return 2 * time.Second
+	}
+	return 400 * time.Millisecond
+}
 
 // changedTaskFiles returns basenames of files the repo is actively touching:
 // uncommitted changes first, then files from the last few commits. Best

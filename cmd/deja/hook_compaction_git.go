@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -59,8 +60,26 @@ func boundedWorktreeDigest(ctx context.Context, root string) string {
 	return digest
 }
 
+// compactionGitBudget bounds the seven git calls this function makes, together.
+// It exists so a compaction cannot hang on a slow disk, and where processes are
+// cheap 750 ms is a ceiling nothing reaches.
+//
+// A cold git.exe is not cheap, and the whole budget is what one of these runs
+// spent on the CI runner: the digest never finished and `symbolic-ref` returned
+// nothing, so the fingerprint came back `partial:` and told the agent not to
+// trust the context deja had just handed it. Same shape as the root lookup in
+// #3624, same reason (#3645).
+var compactionGitBudget = compactionBudgetFor(runtime.GOOS)
+
+func compactionBudgetFor(goos string) time.Duration {
+	if goos == "windows" {
+		return 4 * time.Second
+	}
+	return 750 * time.Millisecond
+}
+
 func compactionFreshness(root string) model.RepositoryFreshness {
-	ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), compactionGitBudget)
 	defer cancel()
 	f := model.RepositoryFreshness{CheckedAt: time.Now().UTC()}
 	gitValue := func(args ...string) (string, error) {

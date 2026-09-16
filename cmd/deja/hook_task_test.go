@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -181,6 +182,32 @@ func TestChangedTaskFilesRespectsItsBudget(t *testing.T) {
 	}
 	if d := time.Since(started); d > 5*time.Second {
 		t.Fatalf("took %v — the budget did not bound the call", d)
+	}
+}
+
+// Both tests above set the budget aside to test something else, so the number
+// the product actually ships had none of its own. What it costs when it misses
+// is file ranking: recall falls back to recency and nothing says so (#3645).
+func TestChangedTaskFilesBudgetIsSizedForTheSlowPlatform(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	repo := taskRepoWithAChange(t)
+
+	start := time.Now()
+	got := changedTaskFiles(repo)
+	took := time.Since(start)
+	if len(got) == 0 {
+		t.Fatalf("the smallest fixture there is found nothing inside the %v this platform gets (it took %v)",
+			taskGitBudget, took.Round(time.Millisecond))
+	}
+	if win, unix := taskBudgetFor("windows"), taskBudgetFor("linux"); win <= unix {
+		t.Errorf("windows budget = %v against %v elsewhere: two cold git.exe do not fit in the number a cheap fork gets",
+			win, unix)
+	}
+	if taskBudgetFor(runtime.GOOS) != taskGitBudget {
+		t.Errorf("the budget in use (%v) is not the one this platform gets (%v)",
+			taskGitBudget, taskBudgetFor(runtime.GOOS))
 	}
 }
 
