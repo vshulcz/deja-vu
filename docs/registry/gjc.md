@@ -34,4 +34,11 @@ project directory names the project, and the header's cwd wins when it is there.
   — but they are TypeScript modules loaded with Bun `import()`, so this is
   pi's extension ported. Its two documents also disagree on the directory
   (`~/.gjc/hooks/{pre,post}` against `~/.gjc/agent/hooks/{pre,post}`), which
-  has to be settled against the loader before anything is written there.
+  is settled now, and against the loader rather than either document:
+  `resolveScopePaths` puts the user-scope hooks at `<agent dir>/hooks/<pre|post>`,
+  so `docs/hooks.md`'s `~/.gjc/hooks` is stale. What still stops a hook being
+  written there is the shape: a directory hook is a module exporting
+  `default (api) => api.on("tool_call", …)` whose only documented return is
+  `{block, reason}` — allow or refuse, with no channel for adding context. The
+  lifecycle events come from the in-process API, which is the plugin surface,
+  so auto-recall here is a gjc plugin rather than a file.

@@ -757,8 +757,8 @@
       "gaps": {
         "auto": {
           "state": "todo",
-          "why": "gjc has native hooks with pi's event names — `session_start`, `before_agent_start`, `tool_call` — but they are TypeScript modules loaded with Bun `import()` rather than command hooks, so this is the pi extension ported rather than a config line. Its two docs disagree on the directory (`~/.gjc/hooks/{pre,post}` in docs/hooks.md, `~/.gjc/agent/hooks/{pre,post}` in docs/customization.md), which has to be settled against the loader first (#3651).",
-          "source": "https://github.com/Yeachan-Heo/gajae-code/blob/main/docs/hooks.md"
+          "why": "Settled against the loader rather than the docs, which disagree: `resolveScopePaths` in packages/coding-agent/src/customization/types.ts puts the user-scope hooks at `<getAgentDir()>/hooks/<pre|post>`, so `~/.gjc/agent/hooks/pre` is the path and docs/hooks.md's `~/.gjc/hooks` is stale. What stops a hook being written there is the shape: a directory hook is a TypeScript module exporting `default (api) => api.on(\"tool_call\", …)`, and the only documented return is `{block, reason}` — allow or refuse, with no channel for adding context, which is what deja's tool hook exists to do. The lifecycle events (`session_start`, `before_agent_start`) come from the in-process HookAPI, which is the plugin surface rather than the directory, so auto-recall here is a gjc plugin and not a file (#3651).",
+          "source": "https://github.com/Yeachan-Heo/gajae-code/blob/main/docs/examples/gjc-hooks/pre/bash.ts"
         },
         "resume": {
           "state": "todo",

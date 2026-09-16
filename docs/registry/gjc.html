@@ -77,7 +77,14 @@
 <p>— but they are TypeScript modules loaded with Bun <code>import()</code>, so this is</p>
 <p>pi&#39;s extension ported. Its two documents also disagree on the directory</p>
 <p>(<code>~/.gjc/hooks/{pre,post}</code> against <code>~/.gjc/agent/hooks/{pre,post}</code>), which</p>
-<p>has to be settled against the loader before anything is written there.</p>
+<p>is settled now, and against the loader rather than either document:</p>
+<p><code>resolveScopePaths</code> puts the user-scope hooks at <code>&lt;agent dir&gt;/hooks/&lt;pre|post&gt;</code>,</p>
+<p>so <code>docs/hooks.md</code>&#39;s <code>~/.gjc/hooks</code> is stale. What still stops a hook being</p>
+<p>written there is the shape: a directory hook is a module exporting</p>
+<p><code>default (api) =&gt; api.on(&#34;tool_call&#34;, …)</code> whose only documented return is</p>
+<p><code>{block, reason}</code> — allow or refuse, with no channel for adding context. The</p>
+<p>lifecycle events come from the in-process API, which is the plugin surface,</p>
+<p>so auto-recall here is a gjc plugin rather than a file.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your
