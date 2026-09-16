@@ -69,6 +69,12 @@ func dbParseFrom(full func(string) ([]model.Session, error), since func(string, 
 
 func hasBase(p, base string) bool { return filepath.Base(p) == base }
 
+// underRoot is the plain claim a single-root harness makes: this path is inside
+// my store and has my extension.
+func underRoot(p, root, ext string) bool {
+	return root != "" && strings.HasPrefix(p, root) && strings.HasSuffix(p, ext)
+}
+
 // Registry returns every harness in load order. Flattening the kinds preserves
 // the original path-match precedence (matches are on disjoint roots/basenames,
 // so order only needs to stay deterministic).
@@ -316,6 +322,46 @@ func Registry() []Harness {
 				},
 				Parse:     fullParse(ParseCherryStudioFile),
 				ParseFrom: offsetParse(ParseCherryStudioFileFromOffset),
+			}},
+		},
+		{
+			// Senpi and Kimchi are pi descendants and kept its envelope, so
+			// both entries are a root and a name (#3647).
+			Name: "senpi", Load: LoadSenpi, Files: SenpiSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "senpi",
+				Match:     func(p string) bool { return underRoot(p, SenpiRoot(), ".jsonl") },
+				Parse:     fullParse(ParseSenpiFile),
+				ParseFrom: offsetParse(ParseSenpiFileFromOffset),
+			}},
+		},
+		{
+			Name: "kimchi", Load: LoadKimchi, Files: KimchiSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "kimchi",
+				Match:     func(p string) bool { return underRoot(p, KimchiRoot(), ".jsonl") },
+				Parse:     fullParse(ParseKimchiFile),
+				ParseFrom: offsetParse(ParseKimchiFileFromOffset),
+			}},
+		},
+		{
+			// Command Code and ZCode both write a flat role/content transcript
+			// under a Claude-shaped project directory (#3647).
+			Name: "commandcode", Load: LoadCommandCode, Files: CommandCodeSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "commandcode",
+				Match:     CommandCodeUnderRoot,
+				Parse:     fullParse(ParseCommandCodeFile),
+				ParseFrom: offsetParse(ParseCommandCodeFileFromOffset),
+			}},
+		},
+		{
+			Name: "zcode", Load: LoadZCode, Files: ZCodeSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "zcode",
+				Match:     ZCodeUnderRoot,
+				Parse:     fullParse(ParseZCodeFile),
+				ParseFrom: offsetParse(ParseZCodeFileFromOffset),
 			}},
 		},
 		{

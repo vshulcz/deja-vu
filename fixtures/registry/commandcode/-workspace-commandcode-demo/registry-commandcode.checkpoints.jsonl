@@ -1,0 +1,2 @@
+{"type":"checkpoint","id":"cp1","timestamp":"2026-09-16T12:00:06Z","files":["retry.go"]}
+{"type":"checkpoint","id":"cp2","timestamp":"2026-09-16T12:00:22Z","files":["retry.go","retry_test.go"]}

@@ -30,6 +30,10 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Roo Code](roo.md) | task JSON in VS Code globalStorage |
 | [Kilo Code](kilocode.md) | task JSON in VS Code globalStorage, plus the CLI's OpenCode-schema SQLite |
 | [Kiro](kiro.md) | one JSONL per session from the CLI, another from the IDE |
+| [Senpi](senpi.md) | pi's session JSONL under its own agent directory |
+| [Kimchi Coding](kimchi.md) | pi's session JSONL, flat root |
+| [Command Code](commandcode.md) | flat role/content JSONL per session |
+| [ZCode](zcode.md) | flat role/content JSONL per session |
 | [Cherry Studio](cherrystudio.md) | Claude Code transcripts under the desktop app's data, one snapshot per stream chunk |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |

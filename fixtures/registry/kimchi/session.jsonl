@@ -1,0 +1,3 @@
+{"type": "session", "version": 3, "id": "reg-kimchi-001", "timestamp": "2026-09-16T11:00:00Z", "cwd": "/workspace/kimchi-demo", "title": "registry conformance"}
+{"type": "message", "id": "u1", "parentId": null, "timestamp": "2026-09-16T11:00:15Z", "message": {"role": "user", "content": [{"type": "text", "text": "the build caches the old wasm bundle"}]}}
+{"type": "message", "id": "a1", "parentId": "u1", "timestamp": "2026-09-16T11:00:39Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "The output filename has no hash, so the CDN served the previous build."}]}}

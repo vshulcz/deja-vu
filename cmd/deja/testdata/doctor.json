@@ -232,6 +232,42 @@
       "indexed_sessions": 0
     },
     {
+      "name": "senpi",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.senpi/agent/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "kimchi",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.config/kimchi/harness/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "commandcode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.commandcode/projects"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "zcode",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.zcode/projects"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deepseek",
       "state": "missing",
       "paths": [

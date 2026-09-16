@@ -684,6 +684,186 @@
       }
     },
     {
+      "id": "senpi",
+      "store_paths": [
+        "${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl",
+        "${DEJA_SENPI_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/senpi/-workspace-senpi-demo/session.jsonl"
+      ],
+      "parser_source": "internal/sources/senpi.go",
+      "display_name": "Senpi",
+      "last_verified": "2026-09-16",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "No hook surface read from the tool's own source yet (#3647)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill channel written yet; the reader came first (#3647)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3647)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "No resume command verified here, so a handover is a paste (#3647)."
+        }
+      }
+    },
+    {
+      "id": "kimchi",
+      "store_paths": [
+        "${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/*.jsonl",
+        "${DEJA_KIMCHI_ROOT}/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/kimchi/session.jsonl"
+      ],
+      "parser_source": "internal/sources/senpi.go",
+      "display_name": "Kimchi Coding",
+      "last_verified": "2026-09-16",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "No hook surface read from the tool's own source yet (#3647)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill channel written yet; the reader came first (#3647)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3647)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "No resume command verified here, so a handover is a paste (#3647)."
+        }
+      }
+    },
+    {
+      "id": "commandcode",
+      "store_paths": [
+        "~/.commandcode/projects/*/*.jsonl",
+        "${DEJA_COMMANDCODE_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/commandcode/-workspace-commandcode-demo/registry-commandcode.jsonl"
+      ],
+      "parser_source": "internal/sources/commandcode.go",
+      "display_name": "Command Code",
+      "last_verified": "2026-09-16",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "No hook surface read from the tool's own source yet (#3647)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill channel written yet; the reader came first (#3647)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3647)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "No resume command verified here, so a handover is a paste (#3647)."
+        }
+      }
+    },
+    {
+      "id": "zcode",
+      "store_paths": [
+        "~/.zcode/projects/*/*.jsonl",
+        "${DEJA_ZCODE_ROOT}/*/*.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl"
+      ],
+      "parser_source": "internal/sources/zcode.go",
+      "display_name": "ZCode",
+      "last_verified": "2026-09-16",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now: the reader landed first because a store nobody reads is history nobody can search (#3647)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "No hook surface read from the tool's own source yet (#3647)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill channel written yet; the reader came first (#3647)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3647)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "No resume command verified here, so a handover is a paste (#3647)."
+        }
+      }
+    },
+    {
       "id": "kiro",
       "store_paths": [
         "~/.kiro/sessions/cli/*.jsonl",

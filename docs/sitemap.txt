@@ -86,3 +86,7 @@ https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/registry/kilocode.html
 https://vshulcz.github.io/deja-vu/registry/cherrystudio.html
 https://vshulcz.github.io/deja-vu/registry/kiro.html
+https://vshulcz.github.io/deja-vu/registry/commandcode.html
+https://vshulcz.github.io/deja-vu/registry/kimchi.html
+https://vshulcz.github.io/deja-vu/registry/senpi.html
+https://vshulcz.github.io/deja-vu/registry/zcode.html

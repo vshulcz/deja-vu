@@ -1,0 +1,4 @@
+{"type": "session", "version": 3, "id": "reg-senpi-001", "timestamp": "2026-09-16T10:00:00Z", "cwd": "/workspace/senpi-demo", "title": "registry conformance"}
+{"type": "model_change", "id": "mc1", "parentId": null, "timestamp": "2026-09-16T10:00:01Z", "model": "omo/native-1"}
+{"type": "message", "id": "u1", "parentId": "mc1", "timestamp": "2026-09-16T10:00:20Z", "message": {"role": "user", "content": [{"type": "text", "text": "the worker exits before the queue drains"}]}}
+{"type": "message", "id": "a1", "parentId": "u1", "timestamp": "2026-09-16T10:00:44Z", "message": {"role": "assistant", "content": [{"type": "text", "text": "The shutdown closed the channel before the last batch was acknowledged."}]}}

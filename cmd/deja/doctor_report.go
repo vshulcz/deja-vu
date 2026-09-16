@@ -480,6 +480,10 @@ func doctorStoreChecks() []doctorStoreCheck {
 		// One row for both Kiro clients: the probe picks the reader from the
 		// path, the way the ingest does.
 		{"kiro", []string{sources.KiroRoot()}, sources.KiroSessionFiles(), doctorProbeKiro},
+		{"senpi", []string{sources.SenpiRoot()}, sources.SenpiSessionFiles(), sources.ParseSenpiFile},
+		{"kimchi", []string{sources.KimchiRoot()}, sources.KimchiSessionFiles(), sources.ParseKimchiFile},
+		{"commandcode", []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles(), sources.ParseCommandCodeFile},
+		{"zcode", []string{sources.ZCodeRoot()}, sources.ZCodeSessionFiles(), sources.ParseZCodeFile},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles(), sources.ParseDeepSeekFile},
 		// Zed keeps one SQLite store rather than session files, so the file
 		// list is the database itself — the shape opencode's row uses.

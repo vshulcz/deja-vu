@@ -853,6 +853,17 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	printRow("kilocode", kiloLoc, kiloTasks > 0 || kiloHasDB, kiloDetail)
 
+	// Four stores whose formats deja already had: two pi descendants and two
+	// flat-transcript clients (#3647).
+	senpiRoot := sources.SenpiRoot()
+	printFiles("senpi", senpiRoot, doctorExists(senpiRoot), sources.SenpiSessionFiles())
+	kimchiRoot := sources.KimchiRoot()
+	printFiles("kimchi", kimchiRoot, doctorExists(kimchiRoot), sources.KimchiSessionFiles())
+	commandRoot := sources.CommandCodeRoot()
+	printFiles("commandcode", commandRoot, doctorExists(commandRoot), sources.CommandCodeSessionFiles())
+	zcodeRoot := sources.ZCodeRoot()
+	printFiles("zcode", zcodeRoot, doctorExists(zcodeRoot), sources.ZCodeSessionFiles())
+
 	// Kiro's two clients write different files under one root, and the row says
 	// which of them answered: a CLI user and an IDE user have nothing in common
 	// but the directory (#3103).

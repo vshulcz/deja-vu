@@ -82,7 +82,7 @@
 <p>如果你自己写 dsh 插件，有个实现细节值得知道：召回走的是 <code>ctx.systemPrompt.context</code>，不是 <code>agent/pre-step</code> 上的中间件。那个看起来更顺的写法能正常加载、能跑完一轮，但永远到不了模型——瀑布流里后面的监听器会用 payload 重建自己的回答，插进去的消息被丢掉，而且什么都不报。这个结论是靠读 dsh 实际发出的请求定下来的。</p>
 
 <h2>和这个 harness 无关的那一半</h2>
-<p>索引覆盖这台机器上每个智能体的转录——今天是二十八个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>索引覆盖这台机器上每个智能体的转录——今天是三十二个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
 <p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../guide/switching-agents.html">换一个智能体</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/dsh">插件源码</a></p>

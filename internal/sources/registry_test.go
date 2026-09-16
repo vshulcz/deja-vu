@@ -174,6 +174,14 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		} else {
 			sessions, err = ParseKiloTask(path)
 		}
+	case "senpi":
+		sessions, err = ParseSenpiFile(path)
+	case "kimchi":
+		sessions, err = ParseKimchiFile(path)
+	case "commandcode":
+		sessions, err = ParseCommandCodeFile(path)
+	case "zcode":
+		sessions, err = ParseZCodeFile(path)
 	case "kiro":
 		// One store per client: the CLI's pair under cli/ and the IDE's
 		// per-workspace session directory.

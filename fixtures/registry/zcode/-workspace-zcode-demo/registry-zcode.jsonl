@@ -1,0 +1,2 @@
+{"role":"user","content":"the stream stops after the first chunk","timestamp":"2026-09-16T13:00:04Z","sessionId":"reg-zcode-001"}
+{"role":"assistant","content":"The reader returned on the first empty frame instead of waiting for the next one.","model":"glm-5.2","timestamp":"2026-09-16T13:00:26Z","sessionId":"reg-zcode-001","usage":{"input_tokens":812,"output_tokens":96}}
