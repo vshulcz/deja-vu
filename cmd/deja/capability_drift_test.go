@@ -105,6 +105,11 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		if h.ID == "grok" {
 			gotSkill = true
 		}
+		// Kilo Code reads skills from ~/.kilocode/skills rather than from an
+		// instructions file, so the check is the path install writes.
+		if h.ID == "kilocode" {
+			gotSkill = strings.HasSuffix(kilocodeSkillPath(), filepath.Join("skills", "deja-search", "SKILL.md"))
+		}
 		// Cline has no user-level instructions file at all, so its skill rides
 		// inside the plugin deja generates. Read that off the generated
 		// manifest rather than trusting the registry.

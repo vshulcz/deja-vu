@@ -654,7 +654,7 @@
       ],
       "format_kind": "jsonl",
       "fixture_paths": [
-        "fixtures/registry/cherrystudio/Data/Agents/.claude/projects/-workspace-registry-demo/registry-cherrystudio.jsonl"
+        "fixtures/registry/cherrystudio/projects/-workspace-registry-demo/registry-cherrystudio.jsonl"
       ],
       "parser_source": "internal/sources/cherrystudio.go",
       "last_verified": "2026-09-16",
@@ -705,30 +705,23 @@
       "last_verified": "2026-09-16",
       "display_name": "Kilo Code",
       "capabilities": {
-        "mcp": false,
+        "mcp": true,
         "auto": false,
-        "skill": false,
+        "skill": true,
         "command": false,
         "resume": false,
         "handoff": "paste",
         "prereq": "sqlite3 for the CLI store"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
-        },
         "auto": {
-          "state": "todo",
-          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
-        },
-        "skill": {
-          "state": "todo",
-          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+          "state": "blocked",
+          "why": "Kilo Code has no hook surface: a search of Kilo-Org/kilocode finds none, and the extension is a Roo fork whose hooks are still in flight upstream (Roo PRs #10785, #11128, #11663). Recall arrives when the model calls the tool rather than on its own (#3643).",
+          "source": "https://github.com/RooCodeInc/Roo-Code/pull/11663"
         },
         "command": {
           "state": "todo",
-          "why": "Read support only: both stores are read and nothing is wired into Kilo yet. The extension is a Roo fork, so the wiring question is Roo's, and the CLI vendors OpenCode, whose plugin surface is where that half would go (#3643)."
+          "why": "No slash command yet. Kilo reads skills from ~/.kilocode/skills, ~/.kilo/skills and the project tree, which is the channel deja writes; a command would be a second one (#3643)."
         }
       }
     },

@@ -48,6 +48,11 @@
 <p>Cherry Studio runs Claude Code sessions from a desktop app and writes ordinary</p>
 <p>Claude Code transcripts under its own app data, so the parsing is Claude&#39;s.</p>
 <p><strong>Last verified:</strong> 2026-09-16</p>
+<p>The fixture in this repository sits at <code>fixtures/registry/cherrystudio/projects/…</code> rather than</p>
+<p>under a <code>.claude</code> directory: the repository excludes <code>.claude/</code>, so a fixture carrying that</p>
+<p>segment is never committed and the tests pass only on the machine that wrote it. The parse does</p>
+<p>not depend on the directory shape — the roots come from the environment — and the real layout is</p>
+<p>the one above.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>A snapshot per stream chunk.</strong> Cherry Studio appends the same API call three</li>

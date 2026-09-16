@@ -76,9 +76,17 @@
 <p>counting tokens, so the turn still needs a time; the OpenCode path already</p>
 <p>falls back the same way.</p>
 <ul>
-<li>Read support only for now. Nothing is wired into Kilo — no hooks, no MCP, no</li>
+<li>Wiring: <code>deja install kilocode</code> writes the MCP server into</li>
 </ul>
-<p><code>deja install</code> — and since the extension is a Roo fork, that question is Roo&#39;s.</p>
+<p><code>&lt;globalStorage&gt;/kilocode.kilo-code/settings/mcp_settings.json</code> for every host that carries the</p>
+<p>extension, and the shared manual into <code>~/.kilocode/skills/deja-search/SKILL.md</code>, which is where</p>
+<p>Kilo&#39;s own loader looks first (<code>packages/opencode/src/kilocode/paths.ts</code>). A machine with the CLI</p>
+<p>and no editor gets the skill and a note saying the server was not wired anywhere.</p>
+<ul>
+<li>No hooks: a search of Kilo-Org/kilocode finds no hook surface, and the extension is a Roo fork</li>
+</ul>
+<p>whose hooks are still in flight upstream, so recall arrives when the model calls the tool rather</p>
+<p>than on its own.</p>
 
 <hr>
 <p>deja reads this format and twenty-six others, and turns what it finds into memory your

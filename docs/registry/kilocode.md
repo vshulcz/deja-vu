@@ -37,5 +37,11 @@ see [OpenCode](opencode.md) for the field-by-field description.
   `time` object falls back to the file's mtime. deja sorts by time rather than
   counting tokens, so the turn still needs a time; the OpenCode path already
   falls back the same way.
-- Read support only for now. Nothing is wired into Kilo — no hooks, no MCP, no
-  `deja install` — and since the extension is a Roo fork, that question is Roo's.
+- Wiring: `deja install kilocode` writes the MCP server into
+  `<globalStorage>/kilocode.kilo-code/settings/mcp_settings.json` for every host that carries the
+  extension, and the shared manual into `~/.kilocode/skills/deja-search/SKILL.md`, which is where
+  Kilo's own loader looks first (`packages/opencode/src/kilocode/paths.ts`). A machine with the CLI
+  and no editor gets the skill and a note saying the server was not wired anywhere.
+- No hooks: a search of Kilo-Org/kilocode finds no hook surface, and the extension is a Roo fork
+  whose hooks are still in flight upstream, so recall arrives when the model calls the tool rather
+  than on its own.

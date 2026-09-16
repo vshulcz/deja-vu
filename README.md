@@ -284,7 +284,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | — | — | — | — | ? | paste | none |
-| Kilo Code | — | — | — | — | ? | paste | sqlite3 for the CLI store |
+| Kilo Code | ✅ | ⚠ | ✅ | — | ? | paste | sqlite3 for the CLI store |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 

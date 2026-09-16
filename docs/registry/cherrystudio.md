@@ -12,6 +12,12 @@ Claude Code transcripts under its own app data, so the parsing is Claude's.
 
 **Last verified:** 2026-09-16
 
+The fixture in this repository sits at `fixtures/registry/cherrystudio/projects/…` rather than
+under a `.claude` directory: the repository excludes `.claude/`, so a fixture carrying that
+segment is never committed and the tests pass only on the machine that wrote it. The parse does
+not depend on the directory shape — the roots come from the environment — and the real layout is
+the one above.
+
 ## Known quirks and drift
 
 - **A snapshot per stream chunk.** Cherry Studio appends the same API call three

@@ -1,0 +1,3 @@
+{"type":"user","sessionId":"registry-cherrystudio","timestamp":"2026-07-17T09:00:00.000Z","cwd":"/workspace/registry-demo","message":{"role":"user","content":"read the cherry studio transcript"}}
+{"type":"assistant","uuid":"u1","requestId":"req-1","sessionId":"registry-cherrystudio","timestamp":"2026-07-17T09:00:01.000Z","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"the snapshot"}]}}
+{"type":"assistant","uuid":"u2","requestId":"req-1","sessionId":"registry-cherrystudio","timestamp":"2026-07-17T09:00:02.000Z","message":{"id":"msg-1","role":"assistant","content":[{"type":"text","text":"the snapshot run collapses to one reply"}]}}

@@ -31,6 +31,11 @@ import (
 // should see which app the work happened in, and `deja sources` should say
 // cherrystudio when Cherry Studio is what is on the machine.
 
+// The fixture for this harness cannot carry the real path: the repository
+// excludes `.claude/`, so a fixture under `…/Data/Agents/.claude/projects` is
+// never committed and the suite passes only where it was written — which is
+// how it reached CI red once (#3644).
+
 // CherryStudioRoots are the transcript roots of a Cherry Studio install.
 // DEJA_CHERRYSTUDIO_ROOTS replaces the list.
 func CherryStudioRoots() []string {
