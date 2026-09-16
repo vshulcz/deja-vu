@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Kiro stores its history — session format</title>
+<meta name="description" content="Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/kiro.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Kiro stores its history — session format">
+<meta property="og:description" content="Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/kiro.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Kiro stores its history — session format">
+<meta name="twitter:description" content="Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Kiro","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/kiro.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/kiro.html","name":"Kiro","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codex.html">Codex CLI</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html">Kilo Code</a><a href="kimi.html">Kimi Code</a><a href="kiro.html" aria-current="page">Kiro</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Kiro</h1>
+<ul>
+<li><strong>ID</strong>: <code>kiro</code></li>
+<li><strong>Store (CLI)</strong>: <code>~/.kiro/sessions/cli/&lt;sessionId&gt;.jsonl</code>, with the header <code>~/.kiro/sessions/cli/&lt;sessionId&gt;.json</code> beside it</li>
+<li><strong>Store (IDE)</strong>: <code>~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;/messages.jsonl</code>, with <code>session.json</code> beside it</li>
+<li><strong>Read override</strong>: <code>DEJA_KIRO_ROOT</code> replaces the session root</li>
+<li><strong>Format</strong>: JSONL, one shape per client</li>
+<li><strong>Needs</strong>: nothing</li>
+</ul>
+<p>Kiro (kiro.dev) ships a CLI and an IDE — a VS Code fork — and they do not write</p>
+<p>the same file. The CLI stores a pair per session: a header naming the session id</p>
+<p>and the directory it ran in, and a transcript whose records are</p>
+<p><code>{&#34;kind&#34;:&#34;Prompt&#34;|&#34;AssistantMessage&#34;,&#34;data&#34;:{…}}</code> with the text in</p>
+<p><code>data.content[].data</code> and <code>data.meta.timestamp</code> in seconds. The IDE stores one</p>
+<p>directory per session under the workspace, holding <code>session.json</code> (id, model,</p>
+<p><code>workspacePaths</code>, timestamps) and <code>messages.jsonl</code>, whose lines carry</p>
+<p><code>payload.type</code> and <code>payload.content</code> with an RFC 3339 <code>timestamp</code>.</p>
+<p><strong>Last verified:</strong> 2026-09-16</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>A reply arrives in pieces.</strong> Several <code>AssistantMessage</code> records can share</li>
+</ul>
+<p>one <code>data.message_id</code>: the CLI appends the answer as it streams, each record</p>
+<p>carrying the next piece rather than the whole answer so far. Read one message</p>
+<p>per record and a recall quotes a third of a sentence, so a run under one id is</p>
+<p>joined in order. tokscale&#39;s reader sums the same records for the same reason</p>
+<p>(<code>crates/tokscale-core/src/sessions/kiro.rs</code>).</p>
+<ul>
+<li><strong>Two shapes in one IDE file.</strong> Current builds write the <code>payload</code> wrapper;</li>
+</ul>
+<p>before that the same file held flat <code>{&#34;role&#34;:…,&#34;content&#34;:…}</code> lines. Both are</p>
+<p>read, so a store that predates the change is not lost.</p>
+<ul>
+<li>The IDE file also carries the agent&#39;s own bookkeeping — <code>session_metadata</code>,</li>
+</ul>
+<p><code>usage_summary</code>, <code>turn_end</code>, <code>tool_call</code>. Those are not turns: a record whose</p>
+<p>type is not one is dropped rather than attributed to a role, and a test pins</p>
+<p>that.</p>
+<ul>
+<li><strong>Not read yet.</strong> The IDE mirrors chats into its globalStorage</li>
+</ul>
+<p>(<code>kiro.kiroagent/&lt;workspace&gt;/*.chat</code> beside extensionless execution records)</p>
+<p>and the TUI keeps sessions in <code>kiro-cli/data.sqlite3</code>, table</p>
+<p><code>conversations_v2</code>. No sample of either is in hand — Kiro is not installed on</p>
+<p>the machine this was written on — and a reader built against a guessed shape</p>
+<p>is one that drops history without saying so.</p>
+<ul>
+<li>Read support only. Kiro takes MCP servers in <code>~/.kiro/settings/mcp.json</code> and</li>
+</ul>
+<p>agent hooks in <code>.kiro/hooks/</code>, so the wiring exists to be written; the</p>
+<p>registry records each as a gap rather than leaving it blank.</p>
+
+<hr>
+<p>deja reads this format and twenty-seven others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

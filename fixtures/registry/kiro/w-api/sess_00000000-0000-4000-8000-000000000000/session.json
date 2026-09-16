@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "sess_00000000-0000-4000-8000-000000000000",
+  "modelId": "claude-sonnet-4-5",
+  "workspacePaths": ["/w/api"],
+  "createdAt": "2026-08-01T11:00:00Z",
+  "lastModifiedAt": "2026-08-01T11:12:00Z"
+}

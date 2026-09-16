@@ -1,7 +1,7 @@
 # deja for Grok Build
 
 Grok remembers its own sessions. This plugin answers the other question: what
-you did in Claude Code, Codex, Cursor, opencode, Zed and twenty-two more agents on
+you did in Claude Code, Codex, Cursor, opencode, Zed and twenty-three more agents on
 this machine — including the months before you installed anything.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a local Go binary that

@@ -477,12 +477,25 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"roo", sources.RooRoots(), sources.RooTaskFiles(), sources.ParseRooTask},
 		{"kilocode", sources.KiloRoots(), sources.KiloTaskFiles(), sources.ParseKiloTask},
 		{"cherrystudio", sources.CherryStudioRoots(), sources.CherryStudioSessionFiles(), sources.ParseCherryStudioFile},
+		// One row for both Kiro clients: the probe picks the reader from the
+		// path, the way the ingest does.
+		{"kiro", []string{sources.KiroRoot()}, sources.KiroSessionFiles(), doctorProbeKiro},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles(), sources.ParseDeepSeekFile},
 		// Zed keeps one SQLite store rather than session files, so the file
 		// list is the database itself — the shape opencode's row uses.
 		{"zed", []string{sources.ZedDB()}, presentDoctorFile(sources.ZedDB()), doctorProbeZed},
 		{"deja", []string{sources.NotesFile()}, presentDoctorFile(sources.NotesFile()), sources.ParseNotesFile},
 	}
+}
+
+// doctorProbeKiro reads one Kiro transcript with the reader its path belongs
+// to, so a store written by the IDE is not probed with the CLI's parser and
+// reported empty.
+func doctorProbeKiro(path string) ([]model.Session, error) {
+	if sources.KiroUnderIDE(path) {
+		return sources.ParseKiroIDEFile(path)
+	}
+	return sources.ParseKiroCLIFile(path)
 }
 
 // doctorProbeZed reads the thread store the way the indexer does, so the row

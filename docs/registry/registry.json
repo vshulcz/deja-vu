@@ -684,6 +684,54 @@
       }
     },
     {
+      "id": "kiro",
+      "store_paths": [
+        "~/.kiro/sessions/cli/*.jsonl",
+        "~/.kiro/sessions/*/sess_*/messages.jsonl",
+        "${DEJA_KIRO_ROOT}/cli/*.jsonl",
+        "${DEJA_KIRO_ROOT}/*/sess_*/messages.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/kiro/cli/registry-kiro.jsonl",
+        "fixtures/registry/kiro/w-api/sess_00000000-0000-4000-8000-000000000000/messages.jsonl"
+      ],
+      "parser_source": "internal/sources/kiro.go",
+      "last_verified": "2026-09-16",
+      "display_name": "Kiro",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "Read support only for now. Kiro takes MCP servers in ~/.kiro/settings/mcp.json and agent hooks in .kiro/hooks, so the wiring exists to be written; the reader landed first because a store nobody reads is history nobody can search (#3103)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "Kiro's agent hooks are per-workspace and event-driven, and whether one fires before a prompt is unverified here — the app is not on this machine (#3103)."
+        },
+        "skill": {
+          "state": "todo",
+          "why": "No skill or steering file written yet; the reader came first (#3103)."
+        },
+        "command": {
+          "state": "todo",
+          "why": "No slash command yet (#3103)."
+        },
+        "resume": {
+          "state": "todo",
+          "why": "`kiro-cli chat --resume-id <sessionId>` is documented and unverified here, so deja hands the session over by paste rather than claiming a command it has not run (#3103)."
+        }
+      }
+    },
+    {
       "id": "kilocode",
       "store_paths": [
         "<vscode-globalStorage>/kilocode.kilo-code/tasks/*/api_conversation_history.json",

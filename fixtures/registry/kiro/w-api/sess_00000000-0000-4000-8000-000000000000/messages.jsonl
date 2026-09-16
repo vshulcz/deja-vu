@@ -1,0 +1,4 @@
+{"timestamp":"2026-08-01T11:00:05Z","payload":{"type":"user","content":"the migration leaves the column nullable"}}
+{"timestamp":"2026-08-01T11:00:31Z","payload":{"type":"assistant","content":"The ALTER ran before the backfill, so NOT NULL was rejected and the step was skipped."}}
+{"timestamp":"2026-08-01T11:00:32Z","payload":{"type":"session_metadata","key":"contextUsage","value":{"usagePercentage":12.5}}}
+{"timestamp":"2026-08-01T11:00:33Z","payload":{"type":"turn_end"}}

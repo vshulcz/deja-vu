@@ -853,6 +853,18 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	printRow("kilocode", kiloLoc, kiloTasks > 0 || kiloHasDB, kiloDetail)
 
+	// Kiro's two clients write different files under one root, and the row says
+	// which of them answered: a CLI user and an IDE user have nothing in common
+	// but the directory (#3103).
+	kiroCLI := len(sources.KiroCLIFiles())
+	kiroIDE := len(sources.KiroIDEFiles())
+	kiroRoot := sources.KiroRoot()
+	kiroDetail := doctorCount(kiroCLI, "CLI file")
+	if kiroIDE > 0 {
+		kiroDetail += ", " + doctorCount(kiroIDE, "IDE file")
+	}
+	printRow("kiro", kiroRoot, kiroCLI+kiroIDE > 0, kiroDetail)
+
 	// Cherry Studio writes Claude Code transcripts under its own app data, so
 	// the row names the roots it found rather than the app directory (#3644).
 	cherryFiles := len(sources.CherryStudioSessionFiles())

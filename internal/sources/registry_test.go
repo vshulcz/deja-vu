@@ -174,6 +174,14 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		} else {
 			sessions, err = ParseKiloTask(path)
 		}
+	case "kiro":
+		// One store per client: the CLI's pair under cli/ and the IDE's
+		// per-workspace session directory.
+		if filepath.Base(path) == "messages.jsonl" {
+			sessions, err = ParseKiroIDEFile(path)
+		} else {
+			sessions, err = ParseKiroCLIFile(path)
+		}
 	case "continue":
 		sessions, err = ParseContinueFile(path)
 	case "opencode":

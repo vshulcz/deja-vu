@@ -319,6 +319,22 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			// Kiro writes one format from its CLI and another from the IDE,
+			// both under ~/.kiro/sessions (#3103).
+			Name: "kiro", Load: LoadKiro, Files: KiroSessionFiles,
+			Kinds: []FileKind{{
+				Name:      "kiro-cli",
+				Match:     KiroUnderCLI,
+				Parse:     fullParse(ParseKiroCLIFile),
+				ParseFrom: offsetParse(ParseKiroCLIFileFromOffset),
+			}, {
+				Name:      "kiro-ide",
+				Match:     KiroUnderIDE,
+				Parse:     fullParse(ParseKiroIDEFile),
+				ParseFrom: offsetParse(ParseKiroIDEFileFromOffset),
+			}},
+		},
+		{
 			// Kilo Code keeps the extension's task files and the CLI's
 			// OpenCode-schema database; both parsers are already here, so this
 			// entry is paths and a name (#3643).

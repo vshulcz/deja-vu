@@ -3097,6 +3097,7 @@ func printSources(dir string) {
 		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.RooTaskFiles, sources.LoadRoo},
 		{"kilocode", strings.Join(sources.KiloRoots(), string(os.PathListSeparator)), sources.KiloRoots(), sources.KiloSessionFiles, sources.LoadKilo},
 		{"cherrystudio", strings.Join(sources.CherryStudioRoots(), string(os.PathListSeparator)), sources.CherryStudioRoots(), sources.CherryStudioSessionFiles, sources.LoadCherryStudio},
+		{"kiro", sources.KiroRoot(), []string{sources.KiroRoot()}, sources.KiroSessionFiles, sources.LoadKiro},
 		{"continue", filepath.Join(sources.ContinueRoot(), "sessions"), []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.LoadContinue},
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
 		{"omp", sources.OmpRoot(), []string{sources.OmpRoot()}, sources.OmpSessionFiles, sources.LoadOmp},
