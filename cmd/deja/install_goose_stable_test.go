@@ -15,8 +15,9 @@ import (
 // showed a diff after each upgrade's repair (#3689).
 func TestInstallGooseTwiceChangesNothingTheSecondTime(t *testing.T) {
 	hermeticEnv(t)
-	home := os.Getenv("HOME")
-	path := filepath.Join(home, ".config", "goose", "config.yaml")
+	// Through the resolver, not a ~/.config join: goose reads its config from
+	// %APPDATA% on Windows.
+	path := filepath.Join(gooseConfigDir(), "config.yaml")
 	if _, err := captureRun(t, "install", "goose", "--no-index"); err != nil {
 		t.Fatalf("install goose: %v", err)
 	}

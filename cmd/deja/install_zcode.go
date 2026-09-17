@@ -272,7 +272,12 @@ func onlyTheEnabledSwitch(hooks map[string]any) bool {
 func zcodeCommandIsOurs(cmd string) bool {
 	fields := strings.Fields(cmd)
 	for i := 0; i+1 < len(fields); i++ {
-		if isDejaBinaryToken(fields[i]) && hookNames[fields[i+1]] {
+		// hookTokenIsDejas, not isDejaBinaryToken: the pair is what identifies
+		// the line, so a build under another name is still deja's — the test
+		// binary is `deja.test.exe`, and on Windows that read as a stranger's
+		// hook and the uninstall left the whole block (#3681 gave the other
+		// writers this predicate; this one kept the narrow test).
+		if hookTokenIsDejas(fields[i]) && hookNames[fields[i+1]] {
 			return true
 		}
 	}
