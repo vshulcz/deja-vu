@@ -33,6 +33,26 @@ func ProjectMatches(project, from, want string) bool {
 	return shown != project && strings.Contains(strings.ToLower(shown), strings.ToLower(want))
 }
 
+// ProjectAnyMatches is ProjectMatches over a set of names. A project has more
+// than one name form — a worktree of a repository records its own — so a
+// surface scoped to "the project I was asked in" has to ask about all of them
+// or it misses its own worktrees (#3713). No names means no filter, the way an
+// empty --project has always meant the machine.
+func ProjectAnyMatches(project, from string, wants []string) bool {
+	if len(wants) == 0 {
+		return true
+	}
+	for _, want := range wants {
+		if want = strings.TrimSpace(want); want == "" {
+			continue
+		}
+		if ProjectMatches(project, from, want) {
+			return true
+		}
+	}
+	return false
+}
+
 // DisplayProject is the label a reader is shown for a session's project: the
 // machine it came from in place of the "imported:" prefix, and the stored
 // project otherwise. It lives here so the filter and the screen cannot drift

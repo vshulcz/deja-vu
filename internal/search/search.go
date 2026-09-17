@@ -216,7 +216,7 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		if o.Harness != "" && s.Harness != o.Harness {
 			continue
 		}
-		if !query.ProjectMatches(s.Project, s.From, o.Project) {
+		if !query.ProjectAnyMatches(s.Project, s.From, o.ProjectWants()) {
 			continue
 		}
 		// By the id prefix a hit prints, and by the id a session was synced

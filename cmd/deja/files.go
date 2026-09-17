@@ -48,6 +48,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	var terms []string
 	limit := 10
 	project := ""
+	allProjects := false
 	asJSON := false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -72,6 +73,10 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			}
 			i++
 			project = args[i]
+		case "--all-projects":
+			// The answer is scoped to this project by default (#3713); this
+			// asks the machine instead.
+			allProjects = true
 		case "--":
 			// The escape `parseSearch` already offers: everything after it is
 			// the topic, dashes and all. Without it, refusing unknown flags
@@ -88,10 +93,15 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if len(terms) == 0 {
-		return fmt.Errorf("usage: deja files <topic> [--project name] [--limit n] [--json]")
+		return fmt.Errorf("usage: deja files <topic> [--project name] [--all-projects] [--limit n] [--json]")
 	}
 	q := strings.Join(terms, " ")
-	o := search.Options{Query: q, All: true, Project: project}
+	// The answer is about the repository the question was asked in. Read over
+	// the machine, a generic topic answered with the busiest project's files:
+	// asked in this repository, `deja files "timeout"` named eight paths and
+	// none of them was here (#3713, the shape #3705 fixed for `deja how`).
+	scope := howScope(howCwd(), project, allProjects)
+	o := search.Options{Query: q, All: true, Projects: scope}
 	if err := index.EnsureForSearch(dir, o, false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
@@ -110,6 +120,21 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 	// browsing is the search activation, as it is for search, last and blame
 	// (#1026).
 	hits, hidden := policyFilterSessionsCounted(policy.ActivationSearch, hits)
+	// Nothing in this project does not mean nothing anywhere, and an agent
+	// told the topic is absent when the store has it goes and guesses — the
+	// same widening `deja how` does, for the same reason (#3705).
+	widened := false
+	if len(hits) == 0 && hidden == 0 && len(scope) > 0 && project == "" {
+		wide := o
+		wide.Projects = nil
+		if again, werr := index.SearchWithRecovery(dir, wide, os.Stderr); werr == nil {
+			again, h2 := policyFilterSessionsCounted(policy.ActivationSearch, again)
+			if len(again) > 0 || h2 > 0 {
+				hits, hidden, widened = again, h2, true
+				scope = nil
+			}
+		}
+	}
 	if len(hits) == 0 {
 		// The prose branches below each name *why* the list is empty, and a
 		// consumer needs the same distinction: `files: []` on its own reads as
@@ -120,6 +145,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			return writeFilesJSON(stdout, filesJSON{
 				SchemaVersion: jsonout.Version,
 				Query:         q,
+				Project:       howScopeName(scope),
 				Withheld:      hidden,
 				Ignored:       index.IgnoredWithAllTerms(dir, query.Tokens(q)),
 				Files:         []filesRowJSON{},
@@ -268,6 +294,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			return writeFilesJSON(stdout, filesJSON{
 				SchemaVersion:   jsonout.Version,
 				Query:           q,
+				Project:         howScopeName(scope),
 				SessionsScanned: scanned,
 				Matched:         matched,
 				ReadCapped:      matched > filesMaxSessions,
@@ -331,6 +358,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		return writeFilesJSON(stdout, filesJSON{
 			SchemaVersion:   jsonout.Version,
 			Query:           q,
+			Project:         howScopeName(scope),
 			SessionsScanned: scanned,
 			Matched:         matched,
 			// Two different truncations, and a consumer that conflated them
@@ -345,6 +373,14 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		})
 	}
 	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
+	// Which project answered. An agent that reads the paths and not this line
+	// still gets the right files; one that reads both knows whether they are in
+	// the repository it is standing in (#3713).
+	if name := howScopeName(scope); name != "" {
+		fmt.Fprintf(stdout, "— in %s; --all-projects asks the machine\n", name)
+	} else if widened {
+		fmt.Fprintln(stdout, "— nothing in this project; these are elsewhere")
+	}
 	// The path column was a fixed 56, which on a 60-column pane leaves nothing
 	// for the count and wraps every row (#604). Budgeted against the window
 	// instead, with the same 56 when the window is wide enough or unknown.
@@ -394,6 +430,11 @@ type filesJSON struct {
 	Filtered int `json:"filtered"`
 	Withheld int `json:"withheld"`
 	Ignored  int `json:"ignored"`
+	// Project is the scope that answered: the project of the working directory
+	// unless --project or --all-projects said otherwise, and empty for the
+	// machine. A caller cannot tell one from the other by reading the paths
+	// (#3713).
+	Project string `json:"project,omitempty"`
 
 	Files []filesRowJSON `json:"files"`
 }

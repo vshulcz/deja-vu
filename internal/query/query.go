@@ -43,6 +43,10 @@ type Options struct {
 	Query                  string
 	Regex                  bool
 	Harness, Project, Role string
+	// Projects is Project for a caller that means one project under several
+	// names: the working directory's, whose worktrees each record their own
+	// (#3713). Set, it replaces Project in the filter; empty, nothing changes.
+	Projects []string
 	// Session narrows a search to one session, by the id prefix a hit prints.
 	// Finding the session by what was said and then searching inside it — for a
 	// command, a file, an error — took reopening the transcript by hand (#1321).
@@ -136,6 +140,18 @@ func QueryParts(q string) (terms []string, phrases []string) {
 	flushPlain()
 	terms = withoutStopWords(terms)
 	return terms, phrases
+}
+
+// ProjectWants is the project filter in force: the set where a caller gave
+// one, the single --project name otherwise, and nothing for the machine.
+func (o Options) ProjectWants() []string {
+	if len(o.Projects) > 0 {
+		return o.Projects
+	}
+	if strings.TrimSpace(o.Project) != "" {
+		return []string{o.Project}
+	}
+	return nil
 }
 
 // IsStopWord reports whether a token is a query-time stop word. Retrieval

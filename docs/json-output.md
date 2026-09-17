@@ -730,6 +730,7 @@ Which files a piece of work touched:
 {
   "schema_version": 2,
   "query": "singbox",
+  "project": "app",
   "sessions_scanned": 34,
   "matched": 34,
   "read_capped": false,
@@ -768,6 +769,11 @@ would report the wrong one:
 `filtered` counts recorded paths dropped because they are not under a
 repository on this disk today — moved, archived, or an unmounted volume. It
 separates "recorded nothing" from "recorded files this build will not show".
+
+`project` is the scope that answered: the project of the working directory
+unless `--project` or `--all-projects` said otherwise, and omitted for the
+machine. Reading the paths cannot tell one from the other — they look plausible
+from any project — which is why the answer names it (#3713).
 
 `withheld` and `ignored` are what the policy rules took out before any of this
 was counted, on the same terms as `how`: an empty `files` otherwise reads as
