@@ -251,3 +251,62 @@ func TestGuidanceStatusSeesAHarnessOwnSkillFile(t *testing.T) {
 		t.Errorf("with the skill on disk, status = %q, want written", got)
 	}
 }
+
+// Zed's server key is the id its extension owns — `deja-context-server`, not
+// `deja` — and its settings carry comments, so the file is read as text. With a
+// build under another name in that entry, neither the name test nor the `deja`
+// key matched and the row said `wired` about a server pointing into a scratch
+// directory (#3683).
+func TestTheCommandIsReadableUnderDejasOtherKeys(t *testing.T) {
+	dir := t.TempDir()
+	stray := filepath.Join(dir, "tmp", "deja-arm")
+	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stray, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	// JSONC, the shape Zed writes: a comment at the top is what keeps this out
+	// of the JSON branch.
+	jsonc := filepath.Join(dir, "settings.json")
+	body := "// Zed settings\n{\n  \"context_servers\": {\n    \"deja-context-server\": {\n" +
+		"      \"args\": [\n        \"mcp\"\n      ],\n      \"command\": " +
+		strconv.Quote(stray) + "\n    }\n  }\n}\n"
+	if err := os.WriteFile(jsonc, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(jsonc); got != stray {
+		t.Errorf("jsonc: dejaCommandIn = %q, want %q", got, stray)
+	}
+
+	// And the same key in a file that does parse as JSON.
+	plain := filepath.Join(dir, "plain.json")
+	b, err := json.Marshal(map[string]any{"context_servers": map[string]any{
+		"deja-context-server": map[string]any{"command": stray, "args": []string{"mcp"}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(plain, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(plain); got != stray {
+		t.Errorf("json: dejaCommandIn = %q, want %q", got, stray)
+	}
+
+	// Somebody else's server keeps its own command out of it, whichever shape.
+	other := filepath.Join(dir, "other.json")
+	ob, err := json.Marshal(map[string]any{"context_servers": map[string]any{
+		"memory": map[string]any{"command": "/usr/local/bin/memory"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, ob, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(other); got != "" {
+		t.Errorf("another server's command was read as deja's: %q", got)
+	}
+}

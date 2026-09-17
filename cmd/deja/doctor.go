@@ -1343,8 +1343,26 @@ func dejaCommandIn(path string) string {
 					return cmd
 				}
 			}
+			// And the keys deja writes that are not just `deja`: Zed's entry is
+			// `deja-context-server`, the id its extension owns. With a build
+			// under another name in it — `deja-arm` from a probe run — neither
+			// the name test nor the `deja` key matched, so the row said `wired`
+			// about a server pointing into a scratch directory (#3683).
+			for key, v := range m {
+				if !strings.HasPrefix(strings.ToLower(key), "deja") {
+					continue
+				}
+				if cmd := mcpEntryCommand(v); cmd != "" {
+					return cmd
+				}
+			}
 		}
-		return ""
+		// Parsed, and nothing of deja's under any container this knows. The
+		// text reader looks for the key by name instead, which is how a
+		// harness with a container nobody has added here still gets an answer
+		// — and it can only find what this walk missed, since both require a
+		// deja-named key or binary (#3683).
+		return dejaKeyedCommand(string(b))
 	}
 	// The attributed read first. The scan below takes any `command` in the file
 	// whose value looks like deja, and goose keeps a `slash_commands` list at
@@ -1387,7 +1405,8 @@ func dejaCommandIn(path string) string {
 // (#3663).
 func mcpServerMaps(root map[string]any) []map[string]any {
 	var out []map[string]any
-	for _, key := range []string{"mcpServers", "mcp", "servers"} {
+	// context_servers is Zed's spelling of the same map (#3683).
+	for _, key := range []string{"mcpServers", "mcp", "servers", "context_servers"} {
 		m, _ := root[key].(map[string]any)
 		if m == nil {
 			continue
@@ -1552,7 +1571,34 @@ func dejaBlockOpens(trimmed string) (opens, beside bool) {
 		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
 		return true, true
 	}
+	// A quoted JSON key, for the files that do not parse as JSON: Zed's
+	// settings carry comments, so the whole text is read a line at a time, and
+	// its server key is `deja-context-server` rather than `deja` (#3683).
+	if key, ok := jsonKeyOpening(trimmed); ok && strings.HasPrefix(strings.ToLower(key), "deja") {
+		return true, false
+	}
 	return false, false
+}
+
+// jsonKeyOpening reads `"name": {` — the line that opens an object under a
+// key — and returns the key.
+func jsonKeyOpening(trimmed string) (string, bool) {
+	if !strings.HasPrefix(trimmed, `"`) {
+		return "", false
+	}
+	end := strings.Index(trimmed[1:], `"`)
+	if end < 0 {
+		return "", false
+	}
+	key := trimmed[1 : 1+end]
+	rest := strings.TrimSpace(trimmed[1+end+1:])
+	if !strings.HasPrefix(rest, ":") {
+		return "", false
+	}
+	if strings.TrimSpace(strings.TrimPrefix(rest, ":")) != "{" {
+		return "", false
+	}
+	return key, true
 }
 
 // doctorWiringNote adds what "wired" cannot promise for a given harness. Three
