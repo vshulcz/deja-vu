@@ -28,7 +28,17 @@ func TestCommandFilesMatchEachHarnessShape(t *testing.T) {
 			if !strings.Contains(body, exe) {
 				t.Errorf("%s command does not name the binary:\n%s", h, body)
 			}
-			if !strings.HasPrefix(body, "---\n") || !strings.Contains(body, "description:") {
+			if h == "cursor" {
+				// Cursor reads the description off the first line and shows
+				// `---` for a file that opens with frontmatter — measured in
+				// its own palette against two project commands (#3666).
+				if strings.HasPrefix(body, "---\n") {
+					t.Errorf("cursor command opens with frontmatter, which it shows as its description:\n%s", body)
+				}
+				if !strings.HasPrefix(body, "Search this machine's past AI coding sessions") {
+					t.Errorf("cursor command does not open with its description:\n%s", body)
+				}
+			} else if !strings.HasPrefix(body, "---\n") || !strings.Contains(body, "description:") {
 				t.Errorf("%s command has no markdown frontmatter:\n%s", h, body)
 			}
 			if !strings.Contains(body, "$ARGUMENTS") {

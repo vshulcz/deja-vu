@@ -52,6 +52,16 @@ rather than filling the gap from general knowledge.
 `
 }
 
+// cursorCommand is the same instruction without the frontmatter. Cursor takes a
+// command's description from the first line of the file, measured against its
+// own palette: two project commands side by side, one with `description:` in
+// frontmatter and one with a plain first line, listed as `---` and
+// `DESC-FROM-FIRST-LINE`. So deja's entry showed `---` where the reader chooses
+// which command to run (#3666).
+func cursorCommand(exe string) string {
+	return "Search this machine's past AI coding sessions (deja-vu)\n\n" + commandBody(exe, "$ARGUMENTS")
+}
+
 func markdownCommand(exe string) string {
 	return `---
 description: Search this machine's past AI coding sessions (deja-vu)
@@ -108,6 +118,9 @@ func commandFilePath(harness string) string {
 // third entry doing what the other two already do, so Gemini joins the eight
 // harnesses where the skill is the command (#3665).
 func commandFileText(harness, exe string) string {
+	if harness == "cursor" {
+		return cursorCommand(exe)
+	}
 	return markdownCommand(exe)
 }
 
