@@ -239,8 +239,14 @@ var exeIsTemporary = func(p string) bool {
 	return underTempDir(p)
 }
 
-// underTempDir reports whether a path sits under this machine's temp directory,
-// or under the two that are temp everywhere regardless of what TMPDIR says.
+// underTempDir reports whether a path sits somewhere something else will
+// delete: this machine's temp directory, the two that are temp everywhere
+// regardless of what TMPDIR says, or any directory called tmp or temp along the
+// way.
+//
+// That last rule is what the scratch directories in #3656 needed. A build left
+// in `~/.claude/jobs/<id>/tmp/` is under nobody's TMPDIR and is thrown away all
+// the same, and five harnesses on one machine were wired to one.
 func underTempDir(p string) bool {
 	if p == "" {
 		return false
@@ -262,6 +268,12 @@ func underTempDir(p string) bool {
 	}
 	for _, root := range roots {
 		if p == root || strings.HasPrefix(p, root+string(filepath.Separator)) {
+			return true
+		}
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(filepath.Dir(p)), "/") {
+		switch strings.ToLower(seg) {
+		case "tmp", "temp":
 			return true
 		}
 	}

@@ -14,6 +14,13 @@ import (
 func TestOtherBinaryNoteNamesOnlyAStrangePath(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("PATH", dir)
+	// Everything a test writes is in a temp directory, so the judgement is
+	// driven here rather than inherited: one path counts as disposable, the
+	// rest do not.
+	stray := filepath.Join(dir, "scratch", "deja")
+	was := wiringPathIsTemporary
+	wiringPathIsTemporary = func(p string) bool { return p == stray }
+	t.Cleanup(func() { wiringPathIsTemporary = was })
 
 	// The deja a user would recognise: the one on PATH.
 	onPath := filepath.Join(dir, "deja")
@@ -29,7 +36,6 @@ func TestOtherBinaryNoteNamesOnlyAStrangePath(t *testing.T) {
 	}
 
 	// A build left in a scratch directory is the case worth naming.
-	stray := filepath.Join(dir, "scratch", "deja")
 	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
 		t.Fatal(err)
 	}

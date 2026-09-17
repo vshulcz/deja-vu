@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 )
 
@@ -17,9 +16,9 @@ import (
 // run, while the row read `wired` — because the row is about the config file,
 // and the config file was fine (#3656).
 //
-// The note is informational on purpose. Running a dev build while the wiring
-// points at the installed one is an ordinary state for anyone working on deja,
-// so this says which two binaries are involved and stops.
+// What every real case had in common is not "a different binary" — that is
+// ordinary, and on windows it is what every config looks like — but a binary in
+// a directory something else will delete.
 func dejaWiredElsewhere(path string) string {
 	other := dejaHookCommandIn(path)
 	if other == "" {
@@ -37,26 +36,21 @@ func dejaWiredElsewhere(path string) string {
 		// Gone is the other check's business, and it says more.
 		return ""
 	}
-	// Two binaries count as "this deja": the one running, and the one `deja`
-	// resolves to on PATH. A wiring that names either is a wiring a user can
-	// explain — including the ordinary case of a dev build inspecting a machine
-	// wired to the installed copy, which the first version of this reported on
-	// every single row.
-	if self, err := os.Executable(); err == nil && samePathTarget(other, self) {
-		return ""
-	}
-	if onPath, err := exec.LookPath("deja"); err == nil && samePathTarget(other, onPath) {
-		return ""
-	}
-	// And deja's own launcher, which the hook writers name deliberately
-	// (dejaLauncherPath): a shim beside the wiring record that execs whichever
-	// deja is installed. Calling it a stranger reported every correctly wired
-	// machine as broken, which is how the existing doctor test caught this
-	// version of the check.
-	if launcher := dejaLauncherPath(); launcher != "" && samePathTarget(other, launcher) {
+	if !wiringPathIsTemporary(other) {
 		return ""
 	}
 	return other
+}
+
+// wiringPathIsTemporary is the judgement, as a variable for the reason
+// exeIsTemporary is one: a test's fixtures all live in a temp directory, so
+// under a test binary this would answer yes to everything and the check could
+// never be exercised either way.
+var wiringPathIsTemporary = func(p string) bool {
+	if underTestBinary() {
+		return false
+	}
+	return underTempDir(p)
 }
 
 // dejaHookCommandIn is dejaHookCommandMissing's sibling: the deja binary a
@@ -107,6 +101,6 @@ func otherBinaryNote(path, target string) string {
 	if other == "" {
 		return ""
 	}
-	return "runs " + other + ", which is neither this binary nor the deja on PATH — " +
-		"`deja install " + target + "` points it here"
+	return "runs " + other + ", a build in a temporary directory — it works until that directory is " +
+		"cleaned; `deja install " + target + "` points the entry at this binary"
 }

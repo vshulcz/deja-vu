@@ -62,6 +62,12 @@ func TestAStrangeNamedBuildIsReported(t *testing.T) {
 		t.Fatal(err)
 	}
 	stray := filepath.Join(dir, "scratch", "deja-cont")
+	// Everything a test writes is in a temp directory, so the judgement is
+	// driven here rather than inherited: one path counts as disposable, the
+	// rest do not.
+	was := wiringPathIsTemporary
+	wiringPathIsTemporary = func(p string) bool { return p == stray }
+	t.Cleanup(func() { wiringPathIsTemporary = was })
 	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
 		t.Fatal(err)
 	}
