@@ -23,7 +23,12 @@ type Repeat struct {
 // which every check before this answered "wired" to. It is the symptom the
 // reader actually sees, in the log deja already keeps: the machine in #3421
 // was serving one session eight identical blocks per prompt for a day.
-func RepeatedInjections(indexDir string) []Repeat {
+//
+// `since` bounds the window, because a doubling that has been fixed is history
+// and the whole log kept reporting it: one machine's entries were collapsed to
+// one per event and doctor went on naming the morning they were not, with a
+// remedy already applied (#3697). A zero time reads everything.
+func RepeatedInjections(indexDir string, since time.Time) []Repeat {
 	type key struct {
 		into, kind string
 		sec        int64
@@ -33,6 +38,9 @@ func RepeatedInjections(indexDir string) []Repeat {
 		// Only what an injection is: an agent asking a tool twice in a second
 		// is a busy agent, not a doubled hook.
 		if e.Into == "" || !injectedKind(e.Kind) {
+			continue
+		}
+		if !since.IsZero() && e.Time.Before(since) {
 			continue
 		}
 		k := key{e.Into, e.Kind, e.Time.Unix()}

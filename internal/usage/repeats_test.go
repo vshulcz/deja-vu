@@ -50,7 +50,7 @@ func TestRepeatedInjectionsCountsOneSecond(t *testing.T) {
 		Event{Time: at, Kind: KindDejaVu, Bytes: 800},
 	)
 
-	got := RepeatedInjections(dir)
+	got := RepeatedInjections(dir, time.Time{})
 	if len(got) != 1 {
 		t.Fatalf("repeats = %+v, want the one doubled session", got)
 	}
@@ -70,11 +70,11 @@ func TestRepeatedInjectionsIsSilentOnAHealthyLog(t *testing.T) {
 		Event{Time: at, Kind: KindDejaVu, Bytes: 800, Into: "a"},
 		Event{Time: at.Add(time.Minute), Kind: KindHook, Bytes: 800, Into: "a"},
 	)
-	if got := RepeatedInjections(dir); got != nil {
+	if got := RepeatedInjections(dir, time.Time{}); got != nil {
 		t.Errorf("repeats = %+v, want none", got)
 	}
 	// And a machine with no log at all.
-	if got := RepeatedInjections(filepath.Join(t.TempDir(), "index.db")); got != nil {
+	if got := RepeatedInjections(filepath.Join(t.TempDir(), "index.db"), time.Time{}); got != nil {
 		t.Errorf("repeats = %+v on a machine that has never served one", got)
 	}
 }
@@ -93,7 +93,7 @@ func TestRepeatedInjectionsOrdersWhatMatters(t *testing.T) {
 	}
 	writeEvents(t, dir, events...)
 
-	got := RepeatedInjections(dir)
+	got := RepeatedInjections(dir, time.Time{})
 	if len(got) != 2 {
 		t.Fatalf("repeats = %+v, want both sessions", got)
 	}
@@ -109,7 +109,7 @@ func TestRepeatedInjectionsOrdersWhatMatters(t *testing.T) {
 		Event{Time: at, Kind: KindTool, Bytes: 90, Into: "heavy"},
 		Event{Time: at, Kind: KindTool, Bytes: 90, Into: "heavy"},
 	)
-	if got := RepeatedInjections(dir); len(got) != 2 || got[0].Into != "heavy" {
+	if got := RepeatedInjections(dir, time.Time{}); len(got) != 2 || got[0].Into != "heavy" {
 		t.Errorf("order = %+v, want the worst first", got)
 	}
 }

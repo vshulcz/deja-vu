@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,37 @@ func TestDoctorSaysNothingAboutOrdinaryInjections(t *testing.T) {
 	doctorDoubleInjections(&out, dir)
 	if got := out.String(); got != "" {
 		t.Errorf("doctor invented a repeat:\n%s", got)
+	}
+}
+
+// An install collapses the entries, so a repeat from before the last one deja
+// recorded is fixed history. Reading the whole log kept the row naming the
+// morning before the repair, with a remedy the reader had already applied
+// (#3697).
+func TestDoctorStopsNamingARepeatFromBeforeTheLastInstall(t *testing.T) {
+	hermeticEnv(t)
+	dir := index.DefaultDir()
+	at := time.Now().UTC().Add(-2 * time.Hour)
+	writeInjectionLog(t, dir,
+		usage.Event{Time: at, Kind: usage.KindDejaVu, Bytes: 833, Into: "agent-1"},
+		usage.Event{Time: at.Add(300 * time.Microsecond), Kind: usage.KindDejaVu, Bytes: 833, Into: "agent-1"},
+	)
+	var before bytes.Buffer
+	doctorDoubleInjections(&before, dir)
+	if before.String() == "" {
+		t.Fatal("the row says nothing about a repeat from two hours ago, so there is nothing to bound")
+	}
+	// The record written since: an install has been through the file.
+	if err := os.MkdirAll(filepath.Dir(wiringStatePath()), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wiringStatePath(), []byte(`{"version":"test"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var after bytes.Buffer
+	doctorDoubleInjections(&after, dir)
+	if got := after.String(); got != "" {
+		t.Errorf("the row still names a repeat from before the install that fixed it:\n%s", got)
 	}
 }
 
