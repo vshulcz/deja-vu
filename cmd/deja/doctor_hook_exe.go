@@ -46,6 +46,14 @@ func dejaHookCommandMissing(path string) string {
 		return ""
 	}
 	text := string(b)
+	// A quoted path first, because the scan below cannot answer for one: it
+	// reads the path out of the text around it, and a path with a space in it
+	// is skipped on purpose — the boundary that ends every other path ends
+	// that one in the middle. Since #3692 deja quotes its own hook lines when
+	// a path needs it, and a quoted span has ends that can be read exactly.
+	if missing := quotedDejaCommandMissing(text); missing != "" {
+		return missing
+	}
 	for _, loc := range hookExePath.FindAllStringIndex(text, -1) {
 		if !hookExeBoundary(text, loc[0]-1) || !hookExeBoundary(text, loc[1]) {
 			continue
@@ -56,6 +64,28 @@ func dejaHookCommandMissing(path string) string {
 		// The windows form is written escaped, and the escapes are not part of
 		// the path: stat would miss and the note would print them back.
 		cand := quotedPathUnescape.Replace(text[loc[0]:loc[1]])
+		if !filepath.IsAbs(cand) {
+			continue
+		}
+		if _, err := os.Stat(cand); err != nil {
+			return cand
+		}
+	}
+	return ""
+}
+
+// quotedDejaCommandQuoted matches a hook line whose binary is quoted, in
+// either quote and with the escaped double quote a JSON file spells it with:
+// `'<path>' hook-prompt`, `"<path>" hook-prompt`, `\"<path>\" hook-prompt`.
+// The subcommand beside it is what says the line is deja's; the path itself
+// need not look like anything.
+var quotedDejaCommandQuoted = regexp.MustCompile(`(?:\\?["']|')([^"'\n]+?)(?:\\?["']|')\s+(hook-[a-z-]+|warmup-status|recall|statusline|mcp)\b`)
+
+// quotedDejaCommandMissing returns the binary a quoted hook line runs when it
+// is not there, and "" otherwise.
+func quotedDejaCommandMissing(text string) string {
+	for _, m := range quotedDejaCommandQuoted.FindAllStringSubmatch(text, -1) {
+		cand := quotedPathUnescape.Replace(m[1])
 		if !filepath.IsAbs(cand) {
 			continue
 		}

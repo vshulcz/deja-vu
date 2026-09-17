@@ -71,7 +71,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 			{"SessionStart", "hook-context"}, {"PreCompact", "hook-precompact"},
 			{"UserPromptSubmit", "hook-prompt"}, {"PreToolUse", "hook-tool"},
 		} {
-			root = updateClaudeHook(root, ev[0], exe+" "+ev[1], "", true)
+			root = updateClaudeHook(root, ev[0], hookRun(exe, ev[1]), "", true)
 		}
 		if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 			delete(root, "hooks")
@@ -98,14 +98,14 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	// inline. An empty matcher takes whatever source grok names next, and
 	// PreCompact drops its documented `manual|auto` for the same reason — every
 	// trigger it can name is a compaction, which is the one deja wants.
-	root = updateClaudeHook(root, "SessionStart", exe+" hook-context", "", false)
-	root = updateClaudeHook(root, "PreCompact", exe+" hook-precompact", "", false)
-	root = updateClaudeHook(root, "UserPromptSubmit", exe+" hook-prompt", "", false)
+	root = updateClaudeHook(root, "SessionStart", hookRun(exe, "hook-context"), "", false)
+	root = updateClaudeHook(root, "PreCompact", hookRun(exe, "hook-precompact"), "", false)
+	root = updateClaudeHook(root, "UserPromptSubmit", hookRun(exe, "hook-prompt"), "", false)
 	// Scoped to the tools that change something, so it never fires on a read.
 	// Grok maps the Claude names onto its own, so `Bash` here reaches
 	// run_terminal_command, `Write` reaches write and `Agent` reaches
 	// spawn_subagent — the one of them whose reply grok acts on.
-	root = updateClaudeHook(root, "PreToolUse", exe+" hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
+	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err

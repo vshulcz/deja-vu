@@ -45,6 +45,41 @@ func hookExeFor(exe string, uninstall bool) string {
 	return hookCommandExe(exe)
 }
 
+// hookRun is a hook command line: the binary, quoted where the shell running
+// it would otherwise split the path, and the subcommand and flags beside it.
+//
+// The launcher lives under the home directory, so a home with a space in its
+// name made every hook entry deja writes unrunnable — 34 of them on one stand,
+// and a shell says so plainly: `sh: /tmp/deja: No such file or directory`.
+// Windows is where an ordinary machine meets this (`C:\Users\Name Surname`,
+// `C:\Program Files`), and there the entry names the binary itself, since the
+// launcher is unix-only (#3692).
+//
+// Only where the line is a command string a shell parses. The generated
+// plugins interpolate the path into JavaScript with %q and are already quoted
+// for that language; MCP entries keep the command and its arguments in
+// separate fields and must stay unquoted.
+func hookRun(exe string, rest ...string) string {
+	return strings.Join(append([]string{hookCommandQuote(exe)}, rest...), " ")
+}
+
+// hookCommandQuote quotes a path for the shell the harness hands a hook
+// command to, and leaves an ordinary path alone: a config full of quoted paths
+// where none of them needs it is a diff in somebody's dotfiles for nothing.
+//
+// cmd.exe does not know single quotes and a Windows path cannot contain a
+// double quote, so the two platforms quote differently — and a backslash is
+// not a reason to quote on Windows, where every path has them.
+func hookCommandQuote(s string) string {
+	if runtime.GOOS == "windows" {
+		if !strings.ContainsAny(s, " \t") {
+			return s
+		}
+		return `"` + s + `"`
+	}
+	return shellQuoteIfNeeded(s)
+}
+
 // hookCommandExe is the path a hook entry should name. It writes the launcher
 // and returns it; if that cannot be done — a read-only home, a platform
 // without one — the caller gets the binary's own path and the wiring is what

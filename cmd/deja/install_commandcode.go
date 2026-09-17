@@ -77,7 +77,7 @@ func installCommandCodeAuto(exe string, uninstall bool) (installResult, error) {
 		// seconds (default 30, max 600), so the numbers the other
 		// settings.json targets pass would be ten minutes each.
 		r, err := installSettingsHookCmd(commandCodeSettings(), h.Event, h.Matcher, 30,
-			hookExe+" "+h.Sub, uninstall)
+			hookRun(hookExe, h.Sub), uninstall)
 		if err != nil {
 			return installResult{}, err
 		}

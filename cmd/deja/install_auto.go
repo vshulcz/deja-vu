@@ -64,7 +64,7 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, configParseError(path, err)
 	}
 	for _, h := range codexHookWiring {
-		updateCodexHook(root, h.Event, exe+" "+h.Sub, h.Matcher, uninstall)
+		updateCodexHook(root, h.Event, hookRun(exe, h.Sub), h.Matcher, uninstall)
 	}
 	if hooks, _ := root["hooks"].(map[string]any); len(hooks) == 0 {
 		delete(root, "hooks")
@@ -445,7 +445,7 @@ func installQwenAuto(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.QwenConfigDir(), "settings.json")
 	var res installResult
 	for i, h := range qwenHookWiring {
-		r, err := installSettingsHookRetiring(path, h.Event, h.Matcher, 60000, exe+" "+h.Sub, uninstall, qwenRetiredEvents)
+		r, err := installSettingsHookRetiring(path, h.Event, h.Matcher, 60000, hookRun(exe, h.Sub), uninstall, qwenRetiredEvents)
 		if err != nil {
 			return installResult{}, err
 		}
@@ -462,7 +462,7 @@ func installQwenAuto(exe string, uninstall bool) (installResult, error) {
 // installSettingsHook merges one hook entry into a settings.json that the
 // host also uses for everything else, leaving the rest of the file alone.
 func installSettingsHook(path, event, matcher string, timeout int, exe string, uninstall bool) (installResult, error) {
-	return installSettingsHookCmd(path, event, matcher, timeout, exe+" hook-context", uninstall)
+	return installSettingsHookCmd(path, event, matcher, timeout, hookRun(exe, "hook-context"), uninstall)
 }
 
 func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string, uninstall bool) (installResult, error) {
@@ -627,13 +627,13 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	s := strings.TrimRight(removeKimiHookBlock(lfText(old)), "\n")
 	if !uninstall {
-		block := kimiHookEntry("UserPromptSubmit", exe+" hook-context --plain --once") +
-			"\n" + kimiHookEntry("UserPromptSubmit", exe+" hook-prompt --plain") +
+		block := kimiHookEntry("UserPromptSubmit", hookRun(exe, "hook-context", "--plain", "--once")) +
+			"\n" + kimiHookEntry("UserPromptSubmit", hookRun(exe, "hook-prompt", "--plain")) +
 			// Compaction throws away what the session was shown, and the list
 			// that stops those blocks repeating has to go with it. Nothing is
 			// read back from this hook: forgetting is a side effect, which is
 			// all a fire-and-forget event can carry.
-			"\n" + kimiHookEntry("PreCompact", exe+" hook-precompact")
+			"\n" + kimiHookEntry("PreCompact", hookRun(exe, "hook-precompact"))
 		if s != "" {
 			s += "\n\n"
 		}

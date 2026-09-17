@@ -354,7 +354,7 @@ func writeGooseHook(exe string) (string, error) {
 			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
 					"type":    "command",
-					"command": shellQuote(exe) + " hook-goose",
+					"command": hookRun(exe, "hook-goose"),
 					"timeout": 20,
 				}},
 			}},
@@ -367,7 +367,7 @@ func writeGooseHook(exe string) (string, error) {
 			"UserPromptSubmit": []any{map[string]any{
 				"hooks": []any{map[string]any{
 					"type":    "command",
-					"command": shellQuote(exe) + " hook-goose-prompt",
+					"command": hookRun(exe, "hook-goose-prompt"),
 					"timeout": 20,
 				}},
 			}},

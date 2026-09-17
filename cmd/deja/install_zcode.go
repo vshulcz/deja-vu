@@ -162,8 +162,8 @@ func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
 	}
 
 	wanted := map[string]map[string]any{
-		"SessionStart":     zcodeHookEntry(exe+" hook-context --strict", 30),
-		"UserPromptSubmit": zcodeHookEntry(exe+" hook-prompt --strict", 20),
+		"SessionStart":     zcodeHookEntry(hookRun(exe, "hook-context", "--strict"), 30),
+		"UserPromptSubmit": zcodeHookEntry(hookRun(exe, "hook-prompt", "--strict"), 20),
 	}
 	changed := false
 	for event, entry := range wanted {

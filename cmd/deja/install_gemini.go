@@ -67,7 +67,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			// and prints systemMessage.
 			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
-					"type": "command", "command": exe + " hook-context",
+					"type": "command", "command": hookRun(exe, "hook-context"),
 					// Gemini reads timeout in milliseconds; a Claude-style 10
 					// kills the hook before it can answer.
 					"timeout": 10000,
@@ -79,7 +79,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			// case; additionalContext is not.
 			"BeforeAgent": []any{map[string]any{
 				"hooks": []any{map[string]any{
-					"type": "command", "command": exe + " hook-prompt",
+					"type": "command", "command": hookRun(exe, "hook-prompt"),
 					"timeout": 10000,
 				}},
 			}},
@@ -95,7 +95,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			"AfterTool": []any{map[string]any{
 				"matcher": "run_shell_command",
 				"hooks": []any{map[string]any{
-					"type": "command", "command": exe + " hook-tool-after",
+					"type": "command", "command": hookRun(exe, "hook-tool-after"),
 					"timeout": 10000,
 				}},
 			}},

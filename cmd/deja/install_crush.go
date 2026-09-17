@@ -116,7 +116,7 @@ func installCrushAuto(exe string, uninstall bool) (installResult, error) {
 		root["hooks"] = hooks
 		noteBlockAdded(path, "hooks")
 	}
-	cmd := shellQuoteIfNeeded(exe) + " hook-tool --crush"
+	cmd := hookRun(exe, "hook-tool", "--crush")
 	list, _ := hooks["PreToolUse"].([]any)
 	kept := make([]any, 0, len(list))
 	for _, item := range list {
