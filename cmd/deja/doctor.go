@@ -1288,6 +1288,15 @@ func dejaCommandIn(path string) string {
 		}
 		return ""
 	}
+	// The attributed read first. The scan below takes any `command` in the file
+	// whose value looks like deja, and goose keeps a `slash_commands` list at
+	// the bottom of the same config with `- command: "deja"` in it — so the
+	// scan answered with the name of a slash command and the MCP entry three
+	// lines from the top, pointing at a build in a scratch directory, was never
+	// looked at (#3662).
+	if cmd := dejaKeyedCommand(string(b)); cmd != "" {
+		return cmd
+	}
 	for _, m := range commandValue.FindAllStringSubmatch(string(b), -1) {
 		// One group per quoting, so a quote inside a value cannot end it: a
 		// path under C:\Users\O'Brien is a path, not a delimiter.
@@ -1310,7 +1319,7 @@ func dejaCommandIn(path string) string {
 			return value
 		}
 	}
-	return dejaKeyedCommand(string(b))
+	return ""
 }
 
 // quotedPathUnescape undoes what a quoted string does to a Windows path. Only

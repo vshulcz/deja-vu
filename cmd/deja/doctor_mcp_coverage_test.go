@@ -108,6 +108,39 @@ func TestTheCommandIsReadableInADSHPatchLayer(t *testing.T) {
 	}
 }
 
+// goose keeps a `slash_commands` list at the bottom of the same config it keeps
+// its MCP extensions in, and one of those commands is called `deja`. The
+// whole-file scan answered with that name — a bare word, so neither binary
+// check had anything to look at — and the extension three lines from the top,
+// pointing at a build in a scratch directory, was never read (#3662).
+func TestASlashCommandDoesNotMaskTheWiredBinary(t *testing.T) {
+	dir := t.TempDir()
+	stray := filepath.Join(dir, "tmp", "deja-shapes")
+	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stray, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.yaml")
+	body := "extensions:\n  deja:\n    enabled: true\n    type: stdio\n    name: deja\n" +
+		"    cmd: \"" + stray + "\"\n    args:\n      - \"mcp\"\n    timeout: 60\n" +
+		"  developer:\n    enabled: true\n    type: builtin\n" +
+		"slash_commands:\n  - command: \"deja\"\n    prompt: \"search past sessions\"\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(path); got != stray {
+		t.Errorf("dejaCommandIn = %q, want the extension's binary %q", got, stray)
+	}
+	was := wiringPathIsTemporary
+	wiringPathIsTemporary = func(p string) bool { return p == stray }
+	t.Cleanup(func() { wiringPathIsTemporary = was })
+	if note := otherBinaryNote(path, "goose"); !strings.Contains(note, stray) {
+		t.Errorf("note = %q, want it to name the build in the scratch directory", note)
+	}
+}
+
 // The guidance column said "unsupported" about files deja had written: four
 // harnesses' manuals come from their own install target rather than from the
 // generic guidance step.
