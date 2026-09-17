@@ -886,7 +886,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	kiloDetail := doctorCount(kiloTasks, "task file")
 	if kiloHasDB {
-		kiloDetail += ", CLI store present"
+		kiloDetail += ", CLI store present" + doctorDBPrereqNote(sqlite)
 	}
 	printRow("kilocode", kiloLoc, kiloTasks > 0 || kiloHasDB, kiloDetail)
 
@@ -917,7 +917,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 	zcodeDetail := doctorCount(len(zcodeTranscripts), "file")
 	if zcodeHasDB {
-		zcodeDetail += ", CLI store present"
+		zcodeDetail += ", CLI store present" + doctorDBPrereqNote(sqlite)
 	}
 	printRow("zcode", zcodeLoc, doctorExists(zcodeRoot) || zcodeHasDB, zcodeDetail)
 	gjcRoot := sources.GjcRoot()
@@ -1003,6 +1003,20 @@ func toolFromSkip(reason string) string {
 	default:
 		return "the sqlite3 CLI"
 	}
+}
+
+// doctorDBPrereqNote is what a row has to add about the half of a store that
+// needs the sqlite3 CLI. Kilo's and ZCode's rows named their database and said
+// nothing about the tool that reads it, so on a machine without sqlite3 those
+// sessions were missing from recall with the row reporting the store present
+// (#3679). The rows for the stores that are only a database say it through
+// doctorSQLiteDetail; these two have transcripts as well, so the note rides
+// beside the count.
+func doctorDBPrereqNote(sqlite bool) string {
+	if sqlite {
+		return ""
+	}
+	return " but the sqlite3 CLI is missing — those sessions are unavailable"
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
