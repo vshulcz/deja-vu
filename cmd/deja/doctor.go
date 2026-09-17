@@ -1268,8 +1268,7 @@ func dejaCommandIn(path string) string {
 	}
 	var root map[string]any
 	if json.Unmarshal(b, &root) == nil {
-		for _, key := range []string{"mcpServers", "mcp", "servers"} {
-			m, _ := root[key].(map[string]any)
+		for _, m := range mcpServerMaps(root) {
 			for _, v := range m {
 				if cmd := mcpEntryDejaCommand(v); cmd != "" {
 					return cmd
@@ -1320,6 +1319,26 @@ func dejaCommandIn(path string) string {
 		}
 	}
 	return ""
+}
+
+// mcpServerMaps returns every map of servers a config might keep them in. The
+// three top-level spellings, and `mcp.servers` one level deeper — which is
+// OpenClaw's and ZCode's shape, and was read as an entry rather than as a map
+// of them, so no check here could see the binary either of those two runs
+// (#3663).
+func mcpServerMaps(root map[string]any) []map[string]any {
+	var out []map[string]any
+	for _, key := range []string{"mcpServers", "mcp", "servers"} {
+		m, _ := root[key].(map[string]any)
+		if m == nil {
+			continue
+		}
+		out = append(out, m)
+		if nested, ok := m["servers"].(map[string]any); ok {
+			out = append(out, nested)
+		}
+	}
+	return out
 }
 
 // quotedPathUnescape undoes what a quoted string does to a Windows path. Only

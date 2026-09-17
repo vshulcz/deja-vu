@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -138,6 +139,49 @@ func TestASlashCommandDoesNotMaskTheWiredBinary(t *testing.T) {
 	t.Cleanup(func() { wiringPathIsTemporary = was })
 	if note := otherBinaryNote(path, "goose"); !strings.Contains(note, stray) {
 		t.Errorf("note = %q, want it to name the build in the scratch directory", note)
+	}
+}
+
+// OpenClaw and ZCode keep their servers one level deeper, under `mcp.servers`.
+// That map was read as if it were a single entry, so nothing here could name
+// the binary either of them runs and both rows reported `wired` about builds in
+// a scratch directory (#3663).
+func TestTheCommandIsReadableUnderNestedMCPServers(t *testing.T) {
+	dir := t.TempDir()
+	stray := filepath.Join(dir, "tmp", "deja-prog2")
+	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stray, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "openclaw.json")
+	body, err := json.Marshal(map[string]any{
+		"mcp": map[string]any{"servers": map[string]any{
+			"deja": map[string]any{"command": stray, "args": []string{"mcp"}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(path); got != stray {
+		t.Errorf("dejaCommandIn = %q, want the nested entry's command %q", got, stray)
+	}
+	was := wiringPathIsTemporary
+	wiringPathIsTemporary = func(p string) bool { return p == stray }
+	t.Cleanup(func() { wiringPathIsTemporary = was })
+	if note := otherBinaryNote(path, "openclaw"); !strings.Contains(note, stray) {
+		t.Errorf("note = %q, want it to name the build in the scratch directory", note)
+	}
+	// And a binary that is gone is the other half of the same read.
+	if err := os.Remove(stray); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandMissing(path); got != stray {
+		t.Errorf("dejaCommandMissing = %q, want %q", got, stray)
 	}
 }
 
