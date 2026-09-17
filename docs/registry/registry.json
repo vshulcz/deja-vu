@@ -936,7 +936,7 @@
         "auto": false,
         "skill": true,
         "command": true,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "sqlite3 for the CLI store"
       },
@@ -945,10 +945,6 @@
           "state": "blocked",
           "why": "Kilo Code has no hook surface: a search of Kilo-Org/kilocode finds none, and the extension is a Roo fork whose hooks are still in flight upstream (Roo PRs #10785, #11128, #11663). Recall arrives when the model calls the tool rather than on its own (#3643).",
           "source": "https://github.com/RooCodeInc/Roo-Code/pull/11663"
-        },
-        "resume": {
-          "state": "todo",
-          "why": "Kilo's CLI can reopen a session and the flag has not been verified here; the extension's tasks reopen from its own history view. The same split Roo has, where deja prints a command only for the half it can (#3643)."
         }
       }
     },

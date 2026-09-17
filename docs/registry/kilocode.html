@@ -61,6 +61,12 @@
 <p>see <a href="opencode.html">OpenCode</a> for the field-by-field description.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
+<li>Resume: <code>kilo -s &lt;id&gt;</code> for a session from the CLI store — &#34;session id to</li>
+</ul>
+<p>continue&#34; in Kilo&#39;s own CLI options (<code>packages/opencode/src/cli/cmd/tui.ts</code>).</p>
+<p>An editor task is refused with the reason: those live under the host&#39;s</p>
+<p>globalStorage and reopen from Kilo&#39;s history view, the same split Roo has.</p>
+<ul>
 <li>Two stores for one harness, and a session can exist in both if the migration</li>
 </ul>
 <p>has run: the task files are not deleted by it.</p>

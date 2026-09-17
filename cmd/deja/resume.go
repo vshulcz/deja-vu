@@ -137,6 +137,17 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
+	case "kilocode":
+		// `kilo -s <id>` — "session id to continue" in Kilo's own CLI options
+		// (packages/opencode/src/cli/cmd/tui.ts). That is the CLI half of the
+		// store; the extension's tasks live under the editor's globalStorage
+		// and reopen from its own history view, the split Roo has too, so
+		// those are refused with the reason rather than given a command that
+		// would not find them.
+		if s.Path != sources.KiloDB() {
+			return "", "", fmt.Errorf("session %s is a Kilo Code editor task — reopen it from Kilo's history view; the CLI lists only its own sessions", digest.Short(s.ID))
+		}
+		return "", "kilo -s " + s.ID, nil
 	case "continue":
 		// `cn --fork <sessionId>` loads the session by id straight out of the
 		// store deja reads — `historyManager.load` opens

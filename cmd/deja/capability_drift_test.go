@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 type capRegistry struct {
@@ -316,6 +317,12 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		}
 		t.Setenv("DEJA_ROO_CLI_ROOT", root)
 		s.Path = filepath.Join(dir, "api_conversation_history.json")
+	}
+	if harness == "kilocode" {
+		// Only the CLI half of Kilo's store resumes, and the reader tells the
+		// two apart by the path: the database is the CLI's, a task file under
+		// globalStorage is the extension's.
+		s.Path = sources.KiloDB()
 	}
 	if harness == "crush" {
 		// Crush names sessions with a uuid and runs `--session` in the

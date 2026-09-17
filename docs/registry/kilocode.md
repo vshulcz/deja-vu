@@ -28,6 +28,10 @@ see [OpenCode](opencode.md) for the field-by-field description.
 
 ## Known quirks and drift
 
+- Resume: `kilo -s <id>` for a session from the CLI store — "session id to
+  continue" in Kilo's own CLI options (`packages/opencode/src/cli/cmd/tui.ts`).
+  An editor task is refused with the reason: those live under the host's
+  globalStorage and reopen from Kilo's history view, the same split Roo has.
 - Two stores for one harness, and a session can exist in both if the migration
   has run: the task files are not deleted by it.
 - A Roo task and a Kilo task are the same file name in sibling directories under
