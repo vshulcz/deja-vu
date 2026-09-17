@@ -905,8 +905,9 @@
           "why": "Kiro's agent hooks are per-workspace and fire on file events (`.kiro/hooks/`), not before a prompt, so there is no session-start surface a global install can write. Its steering files (`.kiro/steering/*.md`) are the per-workspace channel and would need a per-project install (#3651)."
         },
         "skill": {
-          "state": "todo",
-          "why": "No user-level skill directory found: steering files are per-workspace, so guidance reaches the model through the MCP tool descriptions until a per-project install exists (#3651)."
+          "state": "impossible",
+          "why": "Kiro has a user-level guidance channel and deja writes it — `~/.kiro/steering/deja.md`, the global half of steering, scanned for every project — but it is not a skill and calling it one would misdescribe what it costs. A steering document declares an inclusion mode, and the only mode measured as loaded by kiro-cli is `always`: `manual` is not loaded and cannot be invoked from a session, `fileMatch` was withheld (KiroCrew's steering reference, measured against 2.19.1). So the text rides in front of every turn whether it is wanted or not, which is why deja's file there is four lines rather than the skill it writes where one is loaded on demand — the same call aider's entry makes (#3651).",
+          "source": "https://github.com/kirodotdev/KiroCrew/blob/main/docs/reference/kiro-cli/steering.md"
         },
         "command": {
           "state": "unknown",

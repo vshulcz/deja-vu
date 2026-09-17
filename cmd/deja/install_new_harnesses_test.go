@@ -30,6 +30,20 @@ func TestInstallKiroWritesTheGlobalSettings(t *testing.T) {
 		t.Errorf("note = %q, want it to mention custom agents", res.Note)
 	}
 
+	// The global steering file is the user-level guidance channel, and it is
+	// always-on: every line is in front of every turn, so it stays short.
+	steering := filepath.Join(home, ".kiro", "steering", "deja.md")
+	sb, err := os.ReadFile(steering)
+	if err != nil {
+		t.Fatalf("steering: %v", err)
+	}
+	if !strings.Contains(string(sb), "inclusion: always") {
+		t.Errorf("the steering file declares no inclusion mode:\n%s", sb)
+	}
+	if n := strings.Count(string(sb), "\n"); n > 14 {
+		t.Errorf("the always-on file is %d lines — it costs that on every turn", n)
+	}
+
 	out, err := installKiro("/usr/local/bin/deja", true)
 	if err != nil {
 		t.Fatal(err)

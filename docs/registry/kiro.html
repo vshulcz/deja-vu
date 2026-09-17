@@ -97,6 +97,17 @@
 <p>inherit global servers, so the entry has to be repeated in that agent&#39;s own</p>
 <p><code>mcpServers</code> block, and the install note says so.</p>
 <ul>
+<li>Guidance: <code>deja install kiro</code> writes <code>~/.kiro/steering/deja.md</code>, the global</li>
+</ul>
+<p>half of steering — scanned for every project, alongside the workspace one.</p>
+<p>It is four lines on purpose. A steering document declares an inclusion mode,</p>
+<p>and the only mode measured as loaded by kiro-cli is <code>always</code>: <code>manual</code> is not</p>
+<p>loaded and cannot be invoked from a session, <code>fileMatch</code> was withheld</p>
+<p>(KiroCrew&#39;s steering reference, measured against 2.19.1). So this text is in</p>
+<p>front of every turn whether it is wanted or not, which is why it names the</p>
+<p>tool and stops rather than carrying the full skill deja writes where a skill</p>
+<p>is loaded on demand.</p>
+<ul>
 <li>Auto-recall is still a gap, and not for lack of a hook system: Kiro&#39;s agent</li>
 </ul>
 <p>hooks are per-workspace and fire on file events, not before a prompt, and</p>
