@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,11 @@ func TestRegistryPagesAreBuiltAndListed(t *testing.T) {
 			if err != nil {
 				t.Fatalf("no page built for %s — run `go run ./scripts/genregistry`: %v", id, err)
 			}
-			page := string(b)
+			// Unescaped, because the generator escapes what it writes: a
+			// heading with an apostrophe in it lands as `app&#39;s` and a raw
+			// substring check then reports a page that is perfectly correct as
+			// missing its own heading.
+			page := html.UnescapeString(string(b))
 
 			src, err := os.ReadFile(md)
 			if err != nil {

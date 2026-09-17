@@ -649,7 +649,7 @@
         "fixtures/registry/cherrystudio/projects/-workspace-registry-demo/registry-cherrystudio.jsonl"
       ],
       "parser_source": "internal/sources/cherrystudio.go",
-      "last_verified": "2026-09-16",
+      "last_verified": "2026-09-17",
       "display_name": "Cherry Studio",
       "capabilities": {
         "mcp": true,

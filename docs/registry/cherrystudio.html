@@ -96,6 +96,22 @@
 <p>Electron app, and the extension points are the MCP server list and its import</p>
 <p>paths. Same for slash commands. A skill channel was not found either — the</p>
 <p>guidance reaches the model through the MCP tool descriptions.</p>
+<h2 id="the-import-file-checked-against-the-app-s-own-validator">The import file, checked against the app&#39;s own validator</h2>
+<p>Cherry Studio 2.0.14 installed, and its importer read out of the bundle</p>
+<p>(<code>Contents/Resources/app.asar</code>, <code>out/renderer/assets/mcp-uMWTyAhi.js</code>):</p>
+<pre><code class="language-js">const McpConfigSchema = object({ mcpServers: record(string(), McpServerConfigSchema) })
+// McpServerConfigSchema = object({ id?, name?, type?, description?, url?, baseUrl?,
+//   command?, registryUrl?, args?, env?, headers?, … }).strict()
+// type ∈ stdio | sse | streamableHttp | inMemory</code></pre>
+<p>and the paste handler beside it names each server after its key unless the entry</p>
+<p>carries a <code>name</code>. So the file deja writes —</p>
+<p><code>{&#34;mcpServers&#34;:{&#34;deja&#34;:{&#34;type&#34;:&#34;stdio&#34;,&#34;command&#34;:&#34;&lt;abs path&gt;&#34;,&#34;args&#34;:[&#34;mcp&#34;]}}}</code></p>
+<p>— validates, and the server arrives called <code>deja</code>.</p>
+<p>The schema is <code>.strict()</code>, which is the part worth remembering: one key the app</p>
+<p>does not know fails the whole import rather than being dropped. A test pins</p>
+<p>deja&#39;s key set for that reason (#3674).</p>
+<p>What still needs a person: the paste itself, and a Claude account in the app</p>
+<p>before it writes any transcript at all.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your
