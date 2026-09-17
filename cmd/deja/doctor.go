@@ -1199,6 +1199,12 @@ func doctorMCP(w io.Writer) {
 			if missing := dejaCommandMissing(c.path); missing != "" {
 				fmt.Fprintf(w, "  %-12s %s\n", "",
 					"points at "+missing+", which is not there — `deja install "+c.name+"` rewrites it for this binary")
+			} else if other := otherBinaryNote(c.path, c.name); other != "" {
+				// The quieter half: the binary is there and is neither this one
+				// nor the deja on PATH. Two harnesses on the machine this was
+				// found on pointed at builds left behind by probe runs, and
+				// both rows read `wired` (#3656).
+				fmt.Fprintf(w, "  %-12s %s\n", "", other)
 			}
 		}
 		if note := doctorWiringNote(c.name); note != "" && status == "wired" {

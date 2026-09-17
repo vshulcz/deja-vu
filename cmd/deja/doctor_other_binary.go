@@ -23,6 +23,18 @@ import (
 func dejaWiredElsewhere(path string) string {
 	other := dejaHookCommandIn(path)
 	if other == "" {
+		// An MCP config keeps the binary in a `command` field and the
+		// subcommand in `args`, so the hook reader — which wants a subcommand
+		// after the path — sees nothing. That is how Hermes' entry, pointing
+		// at a probe build in a scratch directory, stayed unreported after the
+		// first version of this check (#3656).
+		other = dejaCommandIn(path)
+	}
+	if other == "" || !filepath.IsAbs(other) {
+		return ""
+	}
+	if _, err := os.Stat(other); err != nil {
+		// Gone is the other check's business, and it says more.
 		return ""
 	}
 	// Two binaries count as "this deja": the one running, and the one `deja`
