@@ -3839,7 +3839,8 @@ Usage:
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]
   deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
-  deja how <what> [--project name] [--limit n] [--json]  (commands this machine actually ran)
+  deja how <what> [--project name] [--all-projects] [--limit n] [--json]
+             (commands this project actually ran; --all-projects for the machine)
   deja sync export <dir> [--full] [--include-imported] [--peer name]
   deja sync import <dir>
   deja sync                       (exchange with every machine deja knows, both ways)

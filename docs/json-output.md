@@ -678,6 +678,7 @@ The real command this machine runs for a given tool:
   "truncated": true,
   "withheld": 0,
   "ignored": 0,
+  "project": "goprojects/deja-vu",
   "commands": [
     {
       "command": "go test ./... -race",
@@ -704,6 +705,13 @@ flag rather than trust it blind — only about one run record in a hundred carri
 an exit status at all, and `failed_every_time` is false whenever deja knows the
 outcome of no run. `exit_code` is present only when every recorded failure
 agreed on one.
+
+`project` is the scope the answer came from: the project of the working
+directory by default, whatever `--project` asked for, and absent for the whole
+machine (`--all-projects`, or a directory belonging to no project). The two
+answers differ completely — asked inside one repository, a machine-wide `how`
+returned another repository's wrapper command — so a consumer has to be able to
+tell which one it got.
 
 `withheld` and `ignored` are what the trust policy and the ignore rule took out
 before any of this was counted. Without them an empty `commands` means both

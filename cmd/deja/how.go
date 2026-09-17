@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -90,6 +91,7 @@ func (e howEntry) failureNote() string {
 func runHow(dir string, args []string, stdout io.Writer) error {
 	limit := 8
 	project := ""
+	allProjects := false
 	asJSON := false
 	var terms []string
 	for i := 0; i < len(args); i++ {
@@ -115,6 +117,10 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 			}
 			i++
 			project = args[i]
+		case "--all-projects":
+			// The answer is scoped to this project by default (#3705); this
+			// asks the machine instead.
+			allProjects = true
 		case "--":
 			// A command can start with a dash — `deja how -- -run`.
 			terms = append(terms, args[i+1:]...)
@@ -134,15 +140,31 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	entries, hidden, ignored, err := howEntries(dir, terms, project, policy.ActivationSearch)
+	scope := howScope(howCwd(), project, allProjects)
+	entries, hidden, ignored, err := howEntries(dir, terms, scope, policy.ActivationSearch)
 	if err != nil {
 		return err
+	}
+	// Nothing here does not mean nothing anywhere: the scope is a default, and
+	// an agent told "no command on this machine mentions it" when one does
+	// goes and invents one (#3705, the reasoning #2630 wrote for the ignore
+	// rule).
+	widened := false
+	// The counters too, not only the rows: the note that says a rule hid the
+	// answer is what keeps an agent from inventing a command, and a scope with
+	// nothing in it zeroes that note as surely as it zeroes the rows.
+	if len(entries) == 0 && hidden == 0 && ignored == 0 && len(scope) > 0 && project == "" {
+		wider, h2, i2, werr := howEntries(dir, terms, nil, policy.ActivationSearch)
+		if werr == nil && (len(wider) > 0 || h2 > 0 || i2 > 0) {
+			entries, hidden, ignored, widened = wider, h2, i2, true
+			scope = nil
+		}
 	}
 	if note := ignoredHiddenNoteFor("answer", ignored); note != "" {
 		fmt.Fprint(os.Stderr, note)
 	}
 	if asJSON {
-		return writeHowJSON(stdout, entries, limit, hidden, ignored)
+		return writeHowJSON(stdout, entries, limit, hidden, ignored, howScopeName(scope))
 	}
 	if len(entries) == 0 {
 		if note := policyHiddenNote(policy.ActivationSearch, hidden); note != "" {
@@ -153,6 +175,14 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		return nil
 	}
 	writeHowEntries(stdout, entries, limit, " · last ")
+	// Which project answered. An agent that reads the rows and not this line
+	// still gets the right commands; one that reads both knows whether the
+	// answer is about the repository it is standing in (#3705).
+	if name := howScopeName(scope); name != "" {
+		fmt.Fprintf(stdout, "  — in %s; `--all-projects` asks the whole machine\n", name)
+	} else if widened {
+		fmt.Fprintln(stdout, "  — nothing in this project; these ran elsewhere on this machine")
+	}
 	// The cap said nothing, so eight of thirteen ways to run the tests read as
 	// thirteen — the misread the search screen already avoids (#1632). On
 	// stderr, where search puts the same line: stdout stays the list.
@@ -207,7 +237,14 @@ func howCapNote(found, limit int, raise string) string {
 // The count of what was withheld travels with it, because filtering alone turns
 // a leak into a confident "no command mentions that" over records the policy
 // hid, and an agent told nothing exists invents something.
-func howEntries(dir string, terms []string, project, activation string) ([]howEntry, int, int, error) {
+// howEntries reads the command records, keeping the ones every term mentions.
+//
+// projects scopes the answer: any of those names matching a record's project is
+// enough, and an empty list is the whole machine. The default is the project of
+// the working directory, because this is the surface whose answer gets run —
+// asked in one repository it used to answer with another's wrapper, forty runs
+// of `rtk go test ./...` above this repository's own command (#3705).
+func howEntries(dir string, terms []string, projects []string, activation string) ([]howEntry, int, int, error) {
 	pol := policy.Load()
 	// Sessions, not records: the sentence this feeds says "matching sessions",
 	// and one withheld session that ran a command five times was reported as
@@ -221,7 +258,7 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 	ignored := map[string]bool{}
 	byCmd := map[string]*howEntry{}
 	err := index.EachRecordOfRole(dir, "command", func(meta index.SessionMeta, r index.Record) {
-		if project != "" && !strings.Contains(strings.ToLower(meta.Project), strings.ToLower(project)) {
+		if !howProjectMatches(meta.Project, projects) {
 			return
 		}
 		// Without the outcome codex and opencode append: "$ make test  → exit
@@ -294,6 +331,58 @@ func howEntries(dir string, terms []string, project, activation string) ([]howEn
 		return out[i].Command < out[j].Command
 	})
 	return out, len(hidden), len(ignored), nil
+}
+
+// howScope is the project the answer is about: what was asked for, the project
+// of the working directory otherwise, and the whole machine when either
+// `--all-projects` or a directory belonging to no project says so.
+func howScope(cwd, project string, allProjects bool) []string {
+	if allProjects {
+		return nil
+	}
+	if strings.TrimSpace(project) != "" {
+		return []string{project}
+	}
+	if cwd == "" {
+		return nil
+	}
+	return digest.ProjectNameCandidates(cwd)
+}
+
+// howCwd is the directory the answer is about. A caller with none — a daemon, a
+// process whose directory has been removed — asks the machine.
+func howCwd() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return cwd
+}
+
+// howScopeName is what to call the scope on screen and in --json: the first
+// name form, which is the one a person recognises, and "" for the machine.
+func howScopeName(scope []string) string {
+	if len(scope) == 0 {
+		return ""
+	}
+	return scope[0]
+}
+
+// howProjectMatches reports whether a record's project is one the answer was
+// scoped to. Substring, the way `--project` has always matched, so `--project
+// deja` still finds `goprojects/deja-vu`; an empty scope takes everything.
+func howProjectMatches(recordProject string, projects []string) bool {
+	if len(projects) == 0 {
+		return true
+	}
+	low := strings.ToLower(recordProject)
+	for _, name := range projects {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name != "" && strings.Contains(low, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func pluralRuns(n int) string {
@@ -383,8 +472,13 @@ type howJSON struct {
 	// them here the envelope reintroduces exactly what the counts exist to
 	// prevent: `commands: []` reads as "nothing matched" when it can mean
 	// "everything that matched was withheld".
-	Withheld int          `json:"withheld"`
-	Ignored  int          `json:"ignored"`
+	Withheld int `json:"withheld"`
+	Ignored  int `json:"ignored"`
+	// Project is the scope the answer was read from: the project of the
+	// working directory by default, what `--project` asked for, and "" for the
+	// whole machine. A caller could not tell one from the other, and the
+	// answer differs completely between them (#3705).
+	Project  string       `json:"project,omitempty"`
 	Commands []howRowJSON `json:"commands"`
 }
 
@@ -407,7 +501,7 @@ type howRowJSON struct {
 	ExitCode *int `json:"exit_code,omitempty"`
 }
 
-func writeHowJSON(stdout io.Writer, entries []howEntry, limit, withheld, ignored int) error {
+func writeHowJSON(stdout io.Writer, entries []howEntry, limit, withheld, ignored int, project string) error {
 	found := len(entries)
 	if len(entries) > limit {
 		entries = entries[:limit]
@@ -441,6 +535,7 @@ func writeHowJSON(stdout io.Writer, entries []howEntry, limit, withheld, ignored
 		Truncated:     found > len(rows),
 		Withheld:      withheld,
 		Ignored:       ignored,
+		Project:       project,
 		Commands:      rows,
 	})
 }

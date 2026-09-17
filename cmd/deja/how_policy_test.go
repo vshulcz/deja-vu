@@ -58,7 +58,7 @@ func TestHowHonoursTheChannelsOwnPolicy(t *testing.T) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	entries, _, _, err := howEntries(dir, []string{"zonkomatic"}, "", policy.ActivationSearch)
+	entries, _, _, err := howEntries(dir, []string{"zonkomatic"}, nil, policy.ActivationSearch)
 	if err != nil {
 		t.Fatal(err)
 	}

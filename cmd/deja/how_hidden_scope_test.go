@@ -52,7 +52,7 @@ func TestHowCountsOnlyWhatTheQuestionAsked(t *testing.T) {
 	}
 
 	// Asked about something the hidden session never ran.
-	_, hidden, _, err := howEntries(dir, []string{"terraform"}, "", policy.ActivationSearch)
+	_, hidden, _, err := howEntries(dir, []string{"terraform"}, nil, policy.ActivationSearch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestHowCountsOnlyWhatTheQuestionAsked(t *testing.T) {
 
 	// Asked about what it did run, the count has to survive — a scoped number
 	// that is always zero would pass the check above and hide a real leak.
-	_, hidden, _, err = howEntries(dir, []string{"vet"}, "", policy.ActivationSearch)
+	_, hidden, _, err = howEntries(dir, []string{"vet"}, nil, policy.ActivationSearch)
 	if err != nil {
 		t.Fatal(err)
 	}

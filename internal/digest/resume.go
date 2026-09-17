@@ -72,7 +72,7 @@ func ResumeFrom(s model.Session, readsAsFailure func(output string) bool) Resume
 			}
 		case sources.RoleEdit, sources.RoleFiles:
 			for _, f := range strings.Fields(text) {
-				if f = strings.TrimSpace(f); f != "" {
+				if f = strings.TrimSpace(f); looksLikeAPath(f) {
 					files = append(files, f)
 				}
 			}
@@ -183,6 +183,44 @@ func worthAsDecision(text string) bool {
 // decisionMinRunes is the bar for a decision worth repeating back. "Затащил."
 // clears every marker test and says nothing a week later.
 const decisionMinRunes = 20
+
+// looksLikeAPath keeps the tokens of a files or edit record that name a file.
+//
+// Every whitespace-separated token used to count, so a record carrying a
+// sentence — a tool result phrased as prose, a reader filing a description
+// under the files role — contributed one "file" per word, and `deja wip`
+// printed `was.`, `it`, `as`, `exactly` beside the real paths. They also
+// crowd the real ones out, since only a handful are named (#3706).
+//
+// A separator, an extension, or a leading `/`, `~` or `.`: that is what a path
+// looks like in these records, where deja writes absolute ones. A bare
+// `Makefile` is left out, which is the price of not printing prose.
+func looksLikeAPath(s string) bool {
+	if s == "" {
+		return false
+	}
+	if strings.ContainsAny(s, `/\`) {
+		return true
+	}
+	if strings.HasPrefix(s, "~") || strings.HasPrefix(s, ".") {
+		return true
+	}
+	// An extension: a dot inside the name with a short alphanumeric tail, and
+	// nothing after it. `was.` has the dot at the end and is not one.
+	if i := strings.LastIndexByte(s, '.'); i > 0 && i < len(s)-1 {
+		ext := s[i+1:]
+		if len(ext) > 5 {
+			return false
+		}
+		for _, r := range ext {
+			if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
 
 // newestFirst keeps the last few distinct paths in the order they were last
 // touched, newest first — which is the order an agent picking the work back up
