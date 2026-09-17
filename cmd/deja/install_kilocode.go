@@ -68,6 +68,16 @@ func installKilocode(exe string, uninstall bool) (installResult, error) {
 		results = append(results, skillRes)
 	}
 
+	// And the slash command, in the global directory Kilo's workflows doc
+	// names. Same file the other markdown-command harnesses get.
+	cmdRes, err := installCommandFile("kilocode", exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	if cmdRes.Path != "" {
+		results = append(results, cmdRes)
+	}
+
 	out := wroteAll(results...)
 	if seen == 0 {
 		// Saying nothing here would leave the reader thinking the MCP server is

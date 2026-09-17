@@ -955,7 +955,7 @@
         "mcp": true,
         "auto": false,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": false,
         "handoff": "paste",
         "prereq": "sqlite3 for the CLI store"
@@ -965,10 +965,6 @@
           "state": "blocked",
           "why": "Kilo Code has no hook surface: a search of Kilo-Org/kilocode finds none, and the extension is a Roo fork whose hooks are still in flight upstream (Roo PRs #10785, #11128, #11663). Recall arrives when the model calls the tool rather than on its own (#3643).",
           "source": "https://github.com/RooCodeInc/Roo-Code/pull/11663"
-        },
-        "command": {
-          "state": "todo",
-          "why": "No slash command yet. Kilo reads skills from ~/.kilocode/skills, ~/.kilo/skills and the project tree, which is the channel deja writes; a command would be a second one (#3643)."
         },
         "resume": {
           "state": "todo",

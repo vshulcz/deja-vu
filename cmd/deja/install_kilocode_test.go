@@ -67,6 +67,15 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 		t.Errorf("the skill does not mention deja: %q", string(sb)[:60])
 	}
 
+	// And the global slash command, in the directory Kilo's workflows doc
+	// names: a file called deja.md there is invoked as /deja.
+	command := filepath.Join(home, ".config", "kilo", "commands", "deja.md")
+	if cb, err := os.ReadFile(command); err != nil {
+		t.Fatalf("command: %v", err)
+	} else if !strings.Contains(string(cb), "deja") {
+		t.Errorf("the command file does not mention deja: %q", string(cb)[:60])
+	}
+
 	// Idempotent: a second run reports nothing changed rather than rewriting.
 	again, err := installKilocode("/usr/local/bin/deja", false)
 	if err != nil {
