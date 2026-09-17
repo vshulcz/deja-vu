@@ -15,6 +15,10 @@ project directory names the project, and the header's cwd wins when it is there.
 
 ## Known quirks and drift
 
+- Resume: `gjc --resume <id>`. From its session-operations document:
+  `--resume <id|path>` at startup opens an existing session, and a session
+  belonging to another project forks into the current one — so deja prints
+  the command without a working directory rather than guessing at one.
 - **Sub-agent passes sit one directory deeper**, under a directory named for the
   session they belong to, one file per pass. They are skipped: a sub-agent's
   transcript repeats the parent's work in its own words, and indexed as a

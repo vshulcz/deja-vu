@@ -51,6 +51,12 @@
 <p><strong>Last verified:</strong> 2026-09-16</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
+<li>Resume: <code>gjc --resume &lt;id&gt;</code>. From its session-operations document:</li>
+</ul>
+<p><code>--resume &lt;id|path&gt;</code> at startup opens an existing session, and a session</p>
+<p>belonging to another project forks into the current one — so deja prints</p>
+<p>the command without a working directory rather than guessing at one.</p>
+<ul>
 <li><strong>Sub-agent passes sit one directory deeper</strong>, under a directory named for the</li>
 </ul>
 <p>session they belong to, one file per pass. They are skipped: a sub-agent&#39;s</p>

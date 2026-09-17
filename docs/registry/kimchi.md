@@ -13,6 +13,10 @@ parsing is pi's.
 
 ## Known quirks and drift
 
+- Resume: `kimchi --session <id>`. Its own argument parser rewrites
+  `--resume <selector>` to `--session <id>` (`src/cli-args.ts`), so the id
+  deja indexes is the selector Kimchi takes — `deja resume` prints that
+  command rather than handing over a paste.
 - The root is flat — one directory, every session in it — so there is no encoded
   project directory to read a name from. The header line's `cwd` is what names
   the project, the same choice omp and prime-agent make for the same reason;

@@ -746,7 +746,7 @@
         "auto": false,
         "skill": true,
         "command": true,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "none"
       },
@@ -755,10 +755,6 @@
           "state": "todo",
           "why": "Settled against the loader rather than the docs, which disagree: `resolveScopePaths` in packages/coding-agent/src/customization/types.ts puts the user-scope hooks at `<getAgentDir()>/hooks/<pre|post>`, so `~/.gjc/agent/hooks/pre` is the path and docs/hooks.md's `~/.gjc/hooks` is stale. What stops a hook being written there is the shape: a directory hook is a TypeScript module exporting `default (api) => api.on(\"tool_call\", …)`, and the only documented return is `{block, reason}` — allow or refuse, with no channel for adding context, which is what deja's tool hook exists to do. The lifecycle events (`session_start`, `before_agent_start`) come from the in-process HookAPI, which is the plugin surface rather than the directory, so auto-recall here is a gjc plugin and not a file (#3651).",
           "source": "https://github.com/Yeachan-Heo/gajae-code/blob/main/docs/examples/gjc-hooks/pre/bash.ts"
-        },
-        "resume": {
-          "state": "todo",
-          "why": "No resume command verified here, so a handover is a paste (#3647)."
         }
       }
     },
@@ -780,7 +776,7 @@
         "auto": false,
         "skill": false,
         "command": false,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "none"
       },
@@ -799,10 +795,6 @@
           "state": "blocked",
           "why": "In Kimchi a skill is the command: `extensions.claude-code-skills` contributes skills through Pi resource discovery so `/skill:<name>` works, and it ships disabled. So this is not a second file to write — it is the same switch the skill waits on, and a command file of our own would add an entry nothing reads (#3651).",
           "source": "https://github.com/getkimchi/kimchi/blob/main/docs/hooks.md"
-        },
-        "resume": {
-          "state": "todo",
-          "why": "No resume command verified here, so a handover is a paste (#3647)."
         }
       }
     },

@@ -125,6 +125,17 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
+	case "kimchi":
+		// Kimchi's own argument parser rewrites `--resume <selector>` to
+		// `--session <id>` (src/cli-args.ts), so the id deja indexes is the
+		// selector it takes.
+		return "", "kimchi --session " + s.ID, nil
+	case "gjc":
+		// gjc's session-operations doc: `--resume <id|path>` at startup opens
+		// an existing session. A session from another project forks into the
+		// current one there, so no working directory is printed rather than
+		// one deja would be guessing at.
+		return "", "gjc --resume " + s.ID, nil
 	case "hermes":
 		// Hermes takes the same session ID deja indexes, so this resumes the
 		// exact conversation rather than the most recent one.

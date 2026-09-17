@@ -49,6 +49,12 @@
 <p><strong>Last verified:</strong> 2026-09-16</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
+<li>Resume: <code>kimchi --session &lt;id&gt;</code>. Its own argument parser rewrites</li>
+</ul>
+<p><code>--resume &lt;selector&gt;</code> to <code>--session &lt;id&gt;</code> (<code>src/cli-args.ts</code>), so the id</p>
+<p>deja indexes is the selector Kimchi takes — <code>deja resume</code> prints that</p>
+<p>command rather than handing over a paste.</p>
+<ul>
 <li>The root is flat — one directory, every session in it — so there is no encoded</li>
 </ul>
 <p>project directory to read a name from. The header line&#39;s <code>cwd</code> is what names</p>
