@@ -48,7 +48,16 @@
 <ul>
 <li><strong>MCP</strong>: <code>deja install vscode</code> writes the user <code>mcp.json</code> VS Code reads in agent mode (top-level <code>servers</code>, <code>type: stdio</code>). Verified on VS Code 1.134.0: Copilot Chat started the server and called the <code>deja</code> tool with <code>mode: recall</code>.</li>
 <li><strong>Skill</strong>: the same install writes <code>&lt;User&gt;/prompts/deja.instructions.md</code> with <code>applyTo: &#34;**&#34;</code>, VS Code&#39;s custom instructions, which are in front of the model on every chat. Verified on 1.134.0: with that file and no mention of deja in the question, Copilot Chat called <code>recall</code> on its own.</li>
-<li><strong>Command</strong>: not wired. Copilot Chat has no user-level command file deja knows how to write; the MCP prompt deja serves is listed (<code>prompts/list</code>) but its slash form is unverified.</li>
+<li><strong>Command</strong>: a prompt file. <code>deja install vscode</code> writes</li>
+</ul>
+<p><code>&lt;User&gt;/prompts/deja.prompt.md</code> for every host it finds — the same <code>User</code></p>
+<p>directory this reader walks for workspaceStorage — and the chat box lists it</p>
+<p>as <code>/deja</code>. The frontmatter carries the description shown beside it and an</p>
+<p>argument hint, and the body tells the model to call the recall tool, with the</p>
+<p>CLI as the fallback when the tool is not in that window. This is the only way</p>
+<p>in here: Copilot Chat fires no session-start or per-prompt hook, so nothing</p>
+<p>arrives unasked.</p>
+<ul>
 <li><strong>Auto-recall</strong>: none in the hook sense — Copilot Chat has no session-start or per-prompt event. The instructions file is what makes recall arrive without being asked for.</li>
 <li><strong>Resume</strong>: Chat: Show Chats… in the editor, not a command.</li>
 <li><strong>Handoff</strong>: paste.</li>

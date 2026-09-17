@@ -226,7 +226,7 @@
         "mcp": true,
         "auto": false,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": false,
         "handoff": "paste",
         "prereq": ""
@@ -235,10 +235,6 @@
         "auto": {
           "state": "impossible",
           "why": "VS Code Copilot Chat has no session-start or per-prompt hook, so there is nothing to install"
-        },
-        "command": {
-          "state": "todo",
-          "why": "VS Code Copilot Chat takes prompt files — `*.prompt.md` in the user's prompts directory or a workspace `.github/prompts`, invoked as `/<name>` in the chat box — and deja writes neither yet. The user-level directory is per-platform (`~/Library/Application Support/Code/User/prompts` on macOS and the matching Roaming/config paths elsewhere), so it needs the same host walk the workspaceStorage reader already does (#3651)."
         },
         "resume": {
           "state": "impossible",

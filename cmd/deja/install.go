@@ -815,7 +815,20 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "copilot":
 		return installCopilotMCP(exe, uninstall)
 	case "vscode", "copilot-chat":
-		return installVSCodeMCP(exe, uninstall)
+		mcp, err := installVSCodeMCP(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// The prompt file is the only thing that tells Copilot Chat's model to
+		// reach for the tool: it fires no hook, so nothing arrives on its own.
+		prompt, err := installCopilotChatPrompt(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		if prompt.Path == "" {
+			return mcp, nil
+		}
+		return wroteAll(mcp, prompt), nil
 	case "hermes":
 		return installHermesMCP(exe, uninstall)
 	case "hermes-auto":

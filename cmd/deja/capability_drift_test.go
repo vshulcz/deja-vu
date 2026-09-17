@@ -105,8 +105,6 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		if h.ID == "grok" {
 			gotSkill = true
 		}
-		// Kilo Code reads skills from ~/.kilocode/skills rather than from an
-		// instructions file, so the check is the path install writes.
 		// Kilo Code and gajae-code read skills from a directory of their own
 		// rather than from an instructions file, so the check is the path
 		// install writes — and both go through the shared skill installer, so
@@ -160,6 +158,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// Continue declares its slash commands in the assistant config, as
 			// `prompts:`, so the artifact to read is the config deja writes.
 			gotCommand = strings.Contains(continueInstalledConfig(t, "/bin/deja"), "- name: deja")
+		case "copilot-chat":
+			// Copilot Chat has no commands directory; its command is a prompt
+			// file, which is what the artifact check reads.
+			gotCommand = strings.Contains(copilotChatPrompt("/bin/deja"), "description:")
 		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok", "zed":
 			// These make a skill invocable by name, so the skill deja installs
 			// is the command and a second file would only add another entry.
