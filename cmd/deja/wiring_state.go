@@ -180,9 +180,20 @@ func recordWiring(targets []string, uninstall bool) {
 	for _, t := range targets {
 		have[t] = !uninstall
 	}
+	known := map[string]bool{}
+	for _, t := range installTargetNames() {
+		known[t] = true
+	}
 	var kept []string
 	for t, on := range have {
-		if on {
+		// Only names deja knows. The record is written from the arguments,
+		// before any of them has been through installTarget, so `deja install
+		// nosuchtarget` — a typo, or a probe listing the names — was kept
+		// beside the targets that worked, and every repair after that retried
+		// it, failed, and counted it in the "could not rewire" line a person
+		// sees at session start. A name already in a record written by an
+		// older build drops out here too (#3695).
+		if on && known[t] {
 			kept = append(kept, t)
 		}
 	}
