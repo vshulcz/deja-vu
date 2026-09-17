@@ -804,35 +804,18 @@
       "display_name": "Command Code",
       "last_verified": "2026-09-16",
       "capabilities": {
-        "mcp": false,
-        "auto": false,
-        "skill": false,
-        "command": false,
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
         "resume": false,
         "handoff": "paste",
         "prereq": "none"
       },
       "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Reported to read `~/.commandcode/mcp.json`, with four lifecycle hook events in `~/.commandcode/settings.json` whose SessionStart injects. That is one third party's matrix and the CLI is closed, so nothing is written until a live install confirms the path: a config file at a guessed location is a capability the matrix would be claiming falsely (#3651).",
-          "source": "https://github.com/akitaonrails/ai-memory/blob/main/docs/support-matrix.md"
-        },
-        "auto": {
-          "state": "todo",
-          "why": "No hook surface read from the tool's own source yet (#3647)."
-        },
-        "skill": {
-          "state": "todo",
-          "why": "No skill channel written yet; the reader came first (#3647)."
-        },
-        "command": {
-          "state": "unknown",
-          "why": "The CLI is closed and no source, doc or third-party integration names a custom-command surface for it — the same reason its MCP path is still unwritten. One live install answers both (#3651)."
-        },
         "resume": {
-          "state": "todo",
-          "why": "No resume command verified here, so a handover is a paste (#3647)."
+          "state": "unknown",
+          "why": "No resume flag is described by either integration that documents the rest of Command Code's surfaces, and the CLI is closed, so there is nothing to read one out of. A live install answers it in one `--help` (#3651)."
         }
       }
     },

@@ -524,6 +524,11 @@
       "path": "<tmp>/home/.zcode/cli/config.json"
     },
     {
+      "name": "commandcode",
+      "state": "missing",
+      "path": "<tmp>/home/.commandcode/settings.json"
+    },
+    {
       "name": "aider",
       "state": "missing",
       "path": "<tmp>/home/.config/deja/aider-context.md"

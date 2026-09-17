@@ -84,6 +84,11 @@ func commandFilePath(harness string) string {
 		return crushCommandPath()
 	case "gemini":
 		return filepath.Join(sources.GeminiHome(), "commands", "deja.toml")
+	case "commandcode":
+		// `~/.commandcode/commands/<name>.md`, the name taken from the
+		// basename — the surface two independent integrations describe from
+		// the vendor's docs.
+		return filepath.Join(homeDir(), ".commandcode", "commands", "deja.md")
 	case "kilocode":
 		// Kilo's own workflows doc: global commands live in
 		// `~/.config/kilo/commands/`, project ones in `.kilo/commands/`, and a

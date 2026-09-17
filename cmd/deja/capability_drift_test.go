@@ -117,7 +117,8 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// Cherry Studio discovers the skill directories of the agent CLIs a
 			// machine has, `~/.agents/skills` among them, so deja's shared skill
 			// is what it lists — it has no directory of its own.
-			{"cherrystudio", sharedSkillPath()}} {
+			{"cherrystudio", sharedSkillPath()},
+			{"commandcode", commandCodeSkillPath()}} {
 			if h.ID == own.id {
 				gotSkill = strings.Contains(own.path, filepath.Join("skills", "deja-search")) ||
 					strings.Contains(own.path, filepath.Join("skills", "deja-history"))

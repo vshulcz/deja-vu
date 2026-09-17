@@ -62,8 +62,34 @@
 <p>where a command&#39;s error text lives. It is indexed as tool output rather than</p>
 <p>dropped, so a user can search for an error they have already hit.</p>
 <ul>
-<li>Read support only.</li>
+<li>Wiring: <code>deja install commandcode</code> writes all four of its user-scoped</li>
 </ul>
+<p>surfaces, and <code>commandcode-auto</code> adds the hooks —</p>
+<p><code>~/.commandcode/mcp.json</code> for the server, <code>skills/deja-search/SKILL.md</code>,</p>
+<p><code>commands/deja.md</code> for <code>/deja</code>, and a <code>hooks</code> key in <code>settings.json</code> in</p>
+<p>Claude&#39;s shape.</p>
+<ul>
+<li><strong>Two things there fail quietly if copied from another harness.</strong> The</li>
+</ul>
+<p>timeout unit is seconds, not milliseconds — the numbers deja passes to</p>
+<p>other settings.json targets would be ten minutes each, past the documented</p>
+<p>600-second maximum. And the tool matcher is a regex over Command Code&#39;s own</p>
+<p>display names — <code>SHELL</code>, <code>READ</code>, <code>EDIT</code>, <code>WRITE</code>, <code>SEARCH</code>, <code>GLOB</code>, <code>LIST</code></p>
+<p>— so a Claude-shaped <code>Bash</code> matcher never fires at all. Both are pinned by</p>
+<p>tests.</p>
+<ul>
+<li>There is no per-prompt event: the four documented are <code>SessionStart</code>,</li>
+</ul>
+<p><code>PreToolUse</code>, <code>PostToolUse</code> and <code>Stop</code>, so the digest rides SessionStart and</p>
+<p>the rest is the tool-time pair.</p>
+<ul>
+<li><strong>None of this is verified on the machine deja was written on.</strong> The CLI is</li>
+</ul>
+<p>closed, and every path above comes from two independent integrations that</p>
+<p>both cite the vendor&#39;s docs: rulesync&#39;s <code>commandcode-paths.ts</code> and</p>
+<p><code>types/hooks.ts</code>, and akitaonrails/ai-memory&#39;s support matrix, which reports</p>
+<p>the same MCP file and says its SessionStart injects. If a live install</p>
+<p>disagrees, this entry is where to correct it.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your
