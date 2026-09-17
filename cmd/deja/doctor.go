@@ -1588,7 +1588,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		// pointed at a throwaway build with every other row repaired.
 		{"deepseek", dshPatchPath(), doctorDSHWired, nil},
 		{"roo", doctorFirstExisting(rooMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.RooExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
-		{"kilocode", doctorFirstExisting(kilocodeMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.KiloExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"kilocode", kilocodeDoctorPath(), doctorKilocodeWired, nil},
 		{"kiro", kiroMCPSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"senpi", senpiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kimchi", kimchiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
@@ -1654,6 +1654,32 @@ func doctorFirstExisting(paths []string, fallback string) string {
 		return paths[0]
 	}
 	return fallback
+}
+
+// kilocodeDoctorPath names the config that is actually there. Kilo has two: the
+// extension's settings under a VS Code host, and the CLI's own
+// `<config>/kilo/kilo.jsonc`, which is OpenCode-shaped because the CLI is
+// OpenCode vendored. A machine with only the CLI had its row pointing at an
+// editor path that does not exist (#3672).
+func kilocodeDoctorPath() string {
+	for _, p := range kilocodeMCPSettingsPaths() {
+		if doctorExists(p) {
+			return p
+		}
+	}
+	if cli := kilocodeCLIConfigPath(); doctorExists(cli) {
+		return cli
+	}
+	if paths := kilocodeMCPSettingsPaths(); len(paths) > 0 {
+		return paths[0]
+	}
+	return vsCodeExtensionMCPPath(sources.KiloExtensionID)
+}
+
+// doctorKilocodeWired reads whichever of the two shapes the named file is in:
+// `mcpServers` in the extension's settings, `mcp` in the CLI's config.
+func doctorKilocodeWired(path string) bool {
+	return doctorJSONWired("mcpServers")(path) || doctorJSONWired("mcp")(path)
 }
 
 // vsCodeExtensionMCPPath is where an extension would keep its MCP settings in

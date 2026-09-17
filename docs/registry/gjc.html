@@ -91,6 +91,28 @@
 <p><code>{block, reason}</code> — allow or refuse, with no channel for adding context. The</p>
 <p>lifecycle events come from the in-process API, which is the plugin surface,</p>
 <p>so auto-recall here is a gjc plugin rather than a file.</p>
+<h2 id="measured-on-a-live-install">Measured on a live install</h2>
+<p><code>gajae-code</code> 0.17.1 (which wraps <code>@gajae-code/coding-agent</code>), in a hermetic</p>
+<p>HOME:</p>
+<ul>
+<li><code>deja install gjc</code> writes the three paths this entry claims:</li>
+</ul>
+<p><code>~/.gjc/agent/mcp.json</code>, <code>~/.gjc/agent/skills/deja-search/SKILL.md</code> and</p>
+<p><code>~/.gjc/agent/commands/deja.md</code>.</p>
+<ul>
+<li>gjc&#39;s own <code>--help</code> confirms the MCP path in its own words — <code>--no-mcp</code></li>
+</ul>
+<p>disables &#34;conventional MCP autoload (native user ~/.gjc/agent/mcp.json and</p>
+<p>project .gjc/mcp.json registrations)&#34; — and <code>-r, --resume[=&lt;value&gt;]</code> takes an</p>
+<p>ID prefix, a path, or opens a picker.</p>
+<ul>
+<li>Its screens could not be read: on this version every entry point, `gjc mcp</li>
+</ul>
+<p>list<code> and </code>gjc -p<code> included, exits with </code>Cannot find module</p>
+<p>&#39;../../../../node_modules/mupdf/dist/mupdf-wasm.wasm&#39;`. The relative path</p>
+<p>resolves only in a global install layout, and providing the module at each</p>
+<p>candidate location did not satisfy it. That is gjc&#39;s packaging, not deja&#39;s,</p>
+<p>and it is why the capability rows here still rest on its documentation.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

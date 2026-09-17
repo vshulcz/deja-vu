@@ -56,6 +56,19 @@ func installKilocode(exe string, uninstall bool) (installResult, error) {
 		results = append(results, res)
 	}
 
+	// And the CLI, which is a different config from the extension's. Kilo's CLI
+	// is OpenCode vendored and keeps `<config>/kilo/kilo.jsonc` with OpenCode's
+	// `mcp` block; deja wrote only the extension's settings, so on a CLI-only
+	// machine `kilo mcp list` said "No MCP servers configured" while the
+	// install reported success (#3672).
+	cliRes, err := installKilocodeCLI(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	if cliRes.Path != "" {
+		results = append(results, cliRes)
+	}
+
 	// The skill is a user-level file and this target was asked for by name, so
 	// it is written whether or not an editor carries the extension — the CLI is
 	// the other half of Kilo and reads the same directory. `--auto` does not
@@ -81,11 +94,34 @@ func installKilocode(exe string, uninstall bool) (installResult, error) {
 	out := wroteAll(results...)
 	if seen == 0 {
 		// Saying nothing here would leave the reader thinking the MCP server is
-		// wired in an editor that never had Kilo.
+		// wired in an editor that never had Kilo. The CLI is wired either way,
+		// which is the half the old wording denied.
 		out.Note = joinNotes(out.Note,
-			"no VS Code host has Kilo Code installed, so only the skill was written")
+			"no VS Code host has Kilo Code installed, so the extension's settings were not written — the CLI is wired")
 	}
 	return out, nil
+}
+
+// installKilocodeCLI writes the server into Kilo's own CLI config. The
+// directory is `<config>/kilo`, the same one its global commands live in, which
+// is how `kilo mcp list` finds the entry.
+func installKilocodeCLI(exe string, uninstall bool) (installResult, error) {
+	return installOpencodeShaped(kilocodeCLIConfigDir(), "kilo", exe, uninstall)
+}
+
+// kilocodeCLIConfigDir is the directory Kilo's CLI keeps its config and its
+// global commands in.
+func kilocodeCLIConfigDir() string {
+	return filepath.Join(opencodeConfigHome(), "kilo")
+}
+
+// kilocodeCLIConfigPath is the file inside it, in whichever spelling is there.
+func kilocodeCLIConfigPath() string {
+	plain := filepath.Join(kilocodeCLIConfigDir(), "kilo.json")
+	if _, err := os.Stat(plain); err == nil {
+		return plain
+	}
+	return filepath.Join(kilocodeCLIConfigDir(), "kilo.jsonc")
 }
 
 // installKilocodeSkill writes the shared manual where Kilo reads it: the

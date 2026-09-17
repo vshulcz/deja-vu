@@ -46,3 +46,22 @@ project directory names the project, and the header's cwd wins when it is there.
   `{block, reason}` — allow or refuse, with no channel for adding context. The
   lifecycle events come from the in-process API, which is the plugin surface,
   so auto-recall here is a gjc plugin rather than a file.
+
+## Measured on a live install
+
+`gajae-code` 0.17.1 (which wraps `@gajae-code/coding-agent`), in a hermetic
+HOME:
+
+- `deja install gjc` writes the three paths this entry claims:
+  `~/.gjc/agent/mcp.json`, `~/.gjc/agent/skills/deja-search/SKILL.md` and
+  `~/.gjc/agent/commands/deja.md`.
+- gjc's own `--help` confirms the MCP path in its own words — `--no-mcp`
+  disables "conventional MCP autoload (native user ~/.gjc/agent/mcp.json and
+  project .gjc/mcp.json registrations)" — and `-r, --resume[=<value>]` takes an
+  ID prefix, a path, or opens a picker.
+- Its screens could not be read: on this version every entry point, `gjc mcp
+  list` and `gjc -p` included, exits with `Cannot find module
+  '../../../../node_modules/mupdf/dist/mupdf-wasm.wasm'`. The relative path
+  resolves only in a global install layout, and providing the module at each
+  candidate location did not satisfy it. That is gjc's packaging, not deja's,
+  and it is why the capability rows here still rest on its documentation.

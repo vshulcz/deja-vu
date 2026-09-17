@@ -79,6 +79,33 @@
 <p><code>extensions.claude-code-skills</code> loads the skill from <code>~/.claude/skills</code>.</p>
 <p>deja records those as blocked rather than claiming auto-recall it does not</p>
 <p>control.</p>
+<h2 id="measured-on-a-live-install">Measured on a live install</h2>
+<p><code>@getkimchi/kimchi</code> 0.1.99, in a hermetic HOME:</p>
+<ul>
+<li><code>deja install kimchi</code> writes <code>&lt;config&gt;/kimchi/harness/mcp.json</code> and kimchi&#39;s</li>
+</ul>
+<p>own first-run panel lists it: <code>MCP servers: deja</code>.</p>
+<ul>
+<li>That panel also reports what it found from deja&#39;s Claude Code install —</li>
+</ul>
+<p><code>Claude Code skills: 1</code>, <code>Claude Code commands: 1</code>, <code>Agents skills: 2</code> — and</p>
+<p>offers <code>Migrate MCP servers to Kimchi?</code> with migrate / skip / never.</p>
+<ul>
+<li>Skill directories are chosen in the wizard (&#34;Select skill paths to enable&#34;,</li>
+</ul>
+<p>default <code>none</code>), which is a second switch beside the compatibility extension.</p>
+<ul>
+<li><code>kimchi resources enable extensions.claude-code-hook-adapter</code> adopts **all</li>
+</ul>
+<p>five** of deja&#39;s Claude hooks, and <code>kimchi resources status</code> then names each</p>
+<p>one: <code>hooks.claude-code.user.session-start.0</code>,</p>
+<p><code>…user-prompt-submit.0</code>, <code>…pre-tool-use.0</code>, <code>…post-tool-use.0</code>,</p>
+<p><code>…pre-compact.0</code>.</p>
+<ul>
+<li>What is still unverified here: whether those hooks fire in a turn. Kimchi</li>
+</ul>
+<p>requires a browser login to its own service before the first prompt, and that</p>
+<p>is not an account to create on somebody&#39;s behalf.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

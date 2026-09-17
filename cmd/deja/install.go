@@ -3090,11 +3090,20 @@ func installMCPJSON(path, exe string, uninstall bool) (installResult, error) {
 }
 
 func installOpencode(exe string, uninstall bool) (installResult, error) {
-	dir := filepath.Join(opencodeConfigHome(), "opencode")
-	path := filepath.Join(dir, "opencode.json")
+	return installOpencodeShaped(filepath.Join(opencodeConfigHome(), "opencode"), "opencode", exe, uninstall)
+}
+
+// installOpencodeShaped writes the `mcp` block into a config of OpenCode's
+// shape. Kilo Code's CLI is OpenCode vendored — `packages/opencode` inside the
+// Kilo repository — and keeps its own config at `<config>/kilo/kilo.jsonc`,
+// with the same `{"type":"local","command":[…]}` entries. Measured: with that
+// block written, `kilo mcp list` prints `✓ deja connected` and the command it
+// runs (#3672).
+func installOpencodeShaped(dir, base, exe string, uninstall bool) (installResult, error) {
+	path := filepath.Join(dir, base+".json")
 	if _, err := os.Stat(path); err != nil {
-		if _, e := os.Stat(filepath.Join(dir, "opencode.jsonc")); e == nil {
-			path = filepath.Join(dir, "opencode.jsonc")
+		if _, e := os.Stat(filepath.Join(dir, base+".jsonc")); e == nil {
+			path = filepath.Join(dir, base+".jsonc")
 		}
 	}
 	old, err := readConfig(path)

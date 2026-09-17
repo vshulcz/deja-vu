@@ -45,7 +45,19 @@
 <li><strong>Format</strong>: task JSON (Cline lineage) and SQLite (OpenCode schema)</li>
 <li><strong>Needs</strong>: <code>sqlite3</code> for the CLI store; the task files need nothing</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-16</p>
+<ul>
+<li><strong>Wiring</strong>: <code>deja install kilocode</code> writes the extension&#39;s</li>
+</ul>
+<p><code>&lt;globalStorage&gt;/kilocode.kilo-code/settings/mcp_settings.json</code> for every host</p>
+<p>that has it, <strong>and</strong> the CLI&#39;s own <code>&lt;config&gt;/kilo/kilo.jsonc</code> — Kilo vendors</p>
+<p>OpenCode, so the CLI takes OpenCode&#39;s <code>mcp</code> block. <code>kilo mcp list</code> prints</p>
+<p><code>✓ deja connected</code> once it is there. The skill goes in</p>
+<p><code>~/.kilocode/skills/deja-search/SKILL.md</code> and the command in</p>
+<p><code>&lt;config&gt;/kilo/commands/deja.md</code>.</p>
+<p>Verified on <code>@kilocode/cli</code> 7.7.3: a real <code>kilo run</code> session landed in</p>
+<p><code>~/.local/share/kilo/kilo.db</code>, deja indexed it and recall returned the phrase</p>
+<p>that was typed. <code>kilo mcp list</code> prints <code>✓ deja connected</code> after the install.</p>
+<p><strong>Last verified:</strong> 2026-09-17</p>
 <p>Kilo Code is a Roo Code fork that vendors OpenCode — <code>packages/opencode</code> is</p>
 <p>1,780 files inside the Kilo repository — and <code>packages/kilo-vscode/src/legacy-migration</code></p>
 <p>reads the task directory to import it into the database. So the task files are</p>
