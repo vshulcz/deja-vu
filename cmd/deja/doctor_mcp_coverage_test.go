@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -182,6 +183,48 @@ func TestTheCommandIsReadableUnderNestedMCPServers(t *testing.T) {
 	}
 	if got := dejaCommandMissing(path); got != stray {
 		t.Errorf("dejaCommandMissing = %q, want %q", got, stray)
+	}
+}
+
+// A TOML table keeps every key at the header's own indent, so the scan that
+// looked for the command *under* the anchor stopped at the first sibling that
+// was not one — `type = "stdio"`, the line codex writes right after the header.
+// A codex config whose command is not the first key read as naming no binary at
+// all, and the row said `wired` about a build in a scratch directory (#3668).
+func TestTheCommandIsReadableAnywhereInATOMLTable(t *testing.T) {
+	dir := t.TempDir()
+	stray := filepath.Join(dir, "tmp", "deja-prog")
+	if err := os.MkdirAll(filepath.Dir(stray), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stray, []byte("x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "config.toml")
+	body := "model = \"gpt-5\"\n\n[mcp_servers.deja]\ntype = \"stdio\"\ncommand = " +
+		strconv.Quote(stray) + "\nargs = [\"mcp\"]\nstartup_timeout_sec = 30\n\n" +
+		"[mcp_servers.other]\ncommand = \"/usr/bin/other\"\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(path); got != stray {
+		t.Errorf("dejaCommandIn = %q, want deja's own command %q", got, stray)
+	}
+	was := wiringPathIsTemporary
+	wiringPathIsTemporary = func(p string) bool { return p == stray }
+	t.Cleanup(func() { wiringPathIsTemporary = was })
+	if note := otherBinaryNote(path, "codex"); !strings.Contains(note, stray) {
+		t.Errorf("note = %q, want it to name the build in the scratch directory", note)
+	}
+	// And the table that ends before a command of its own is not answered for
+	// by the table after it.
+	empty := filepath.Join(dir, "empty.toml")
+	emptyBody := "[mcp_servers.deja]\ntype = \"stdio\"\n\n[mcp_servers.other]\ncommand = \"/usr/bin/other\"\n"
+	if err := os.WriteFile(empty, []byte(emptyBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := dejaCommandIn(empty); got != "" {
+		t.Errorf("another table's command was read as deja's: %q", got)
 	}
 }
 

@@ -1418,39 +1418,33 @@ func mcpEntryCommand(v any) string {
 	return ""
 }
 
-// dejaKeyedCommand is the same claim for the formats read as text: a `deja:`
-// or `[mcp_servers.deja]` key, then the first `command` before the next key at
-// that level. Hermes keeps its servers in YAML and named one `deja-cont`,
-// which nothing here could see (#3659).
+// dejaKeyedCommand is the same claim for the formats read as text: the line that
+// names deja, then the first `command` inside the block it opens. Hermes keeps
+// its servers in YAML and named one `deja-cont`, which nothing here could see
+// (#3659).
+//
+// Two kinds of anchor, because the block is shaped differently under each. A
+// mapping key (`deja:`) has its fields indented below it. A TOML table header
+// and a `serverName:` field both sit *beside* the command instead — TOML puts
+// every key of a table at the header's own indent, and dsh names the server in
+// a field of the row it belongs to — so for those the block is the run of
+// siblings until the next table header or a line further out.
 func dejaKeyedCommand(text string) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		opens, field := dejaBlockOpens(trimmed)
+		opens, beside := dejaBlockOpens(trimmed)
 		if !opens {
 			continue
 		}
 		indent := yamlIndentWidth(line)
-		if field {
-			// A field anchor names deja from inside the block, so the command
-			// is its sibling at the same indent rather than a line below it.
-			// Keeping the key rule here left dsh's entry unreadable: the next
-			// line is `transport:` at that same indent and the scan stopped
-			// there, one line short of the command.
-			indent--
-		}
 		for _, next := range lines[i+1:] {
 			nextTrimmed := strings.TrimSpace(next)
 			if nextTrimmed == "" {
 				continue
 			}
-			// Out of the block: another key at this level, or a new table.
-			if yamlIndentWidth(next) <= indent && !strings.HasPrefix(nextTrimmed, "-") {
-				if strings.HasPrefix(nextTrimmed, "[") || strings.Contains(nextTrimmed, ":") || strings.Contains(nextTrimmed, "=") {
-					if !strings.HasPrefix(nextTrimmed, "command") {
-						break
-					}
-				}
+			if outOfDejasBlock(next, nextTrimmed, indent, beside) {
+				break
 			}
 			if m := commandValue.FindStringSubmatch(next); m != nil {
 				for _, group := range m[1:] {
@@ -1464,15 +1458,41 @@ func dejaKeyedCommand(text string) string {
 	return ""
 }
 
+// outOfDejasBlock reports whether a line has left the block the anchor opened.
+//
+// For an anchor whose fields sit beside it, only a new table header or a line
+// further out ends the block: the old rule stopped at the first sibling that
+// was not `command`, which for codex's `[mcp_servers.deja]` is `type = "stdio"`
+// on the very next line — so a codex config whose command is not the first key
+// read as though it named no binary at all, and the row said `wired` about a
+// build in a scratch directory (#3668).
+func outOfDejasBlock(line, trimmed string, indent int, beside bool) bool {
+	if beside {
+		if strings.HasPrefix(trimmed, "[") {
+			return true
+		}
+		return yamlIndentWidth(line) < indent
+	}
+	if yamlIndentWidth(line) > indent || strings.HasPrefix(trimmed, "-") {
+		return false
+	}
+	if strings.HasPrefix(trimmed, "[") || strings.Contains(trimmed, ":") || strings.Contains(trimmed, "=") {
+		return !strings.HasPrefix(trimmed, "command")
+	}
+	return false
+}
+
 // dejaBlockOpens reports whether a line starts the block that belongs to deja,
-// and whether it did so as a key or as a field. Three of these are a key named
-// `deja`; the fourth is dsh, which has no server key at all — the name is a
-// field inside a patch-list row, beside the command rather than above it.
-func dejaBlockOpens(trimmed string) (opens, field bool) {
+// and whether that block's keys sit beside the anchor rather than under it. A
+// mapping key indents its fields below; a TOML table header does not, and dsh
+// has no server key at all — the name is a field inside a patch-list row,
+// beside the command rather than above it.
+func dejaBlockOpens(trimmed string) (opens, beside bool) {
 	switch trimmed {
-	case "deja:", "[mcp_servers.deja]", "[mcp.servers.deja]":
+	case "deja:":
 		return true, false
-	case "serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
+	case "[mcp_servers.deja]", "[mcp.servers.deja]",
+		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
 		return true, true
 	}
 	return false, false
