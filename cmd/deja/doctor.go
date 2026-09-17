@@ -120,6 +120,8 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	fmt.Fprintln(w)
 	doctorMCP(w)
 	fmt.Fprintln(w)
+	doctorCommands(w)
+	fmt.Fprintln(w)
 	doctorPeers(w, dir, time.Now())
 	fmt.Fprintln(w)
 	doctorHooks(w)

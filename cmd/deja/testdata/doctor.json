@@ -584,6 +584,63 @@
       "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     }
   ],
+  "commands": [
+    {
+      "name": "claude-code",
+      "state": "missing",
+      "path": "<tmp>/home/.claude/commands/deja.md"
+    },
+    {
+      "name": "opencode",
+      "state": "missing",
+      "path": "<tmp>/home/.config/opencode/commands/deja.md"
+    },
+    {
+      "name": "cursor",
+      "state": "missing",
+      "path": "<tmp>/home/.cursor/commands/deja.md"
+    },
+    {
+      "name": "gemini",
+      "state": "missing",
+      "path": "<tmp>/home/.gemini/commands/deja-search.toml"
+    },
+    {
+      "name": "roo",
+      "state": "missing",
+      "path": "<tmp>/home/.roo/commands/deja.md"
+    },
+    {
+      "name": "kilocode",
+      "state": "missing",
+      "path": "<tmp>/home/.config/kilo/commands/deja.md"
+    },
+    {
+      "name": "crush",
+      "state": "missing",
+      "path": "<tmp>/home/.config/crush/commands/deja.md"
+    },
+    {
+      "name": "omp",
+      "state": "missing",
+      "path": "<tmp>/home/.omp/agent/commands/deja.md"
+    },
+    {
+      "name": "gjc",
+      "state": "missing",
+      "path": "<tmp>/home/.gjc/agent/commands/deja.md"
+    },
+    {
+      "name": "commandcode",
+      "state": "missing",
+      "path": "<tmp>/home/.commandcode/commands/deja.md"
+    },
+    {
+      "name": "copilot-chat",
+      "state": "missing",
+      "path": "<tmp>/home/.config/Code/User/prompts/deja.prompt.md"
+    }
+  ],
   "sqlite3": {
     "state": "missing"
   },

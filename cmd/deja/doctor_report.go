@@ -114,7 +114,11 @@ type doctorReport struct {
 	// see a missing sqlite3 but not a hook that runs a binary which is gone —
 	// the state an upgrade leaves behind, where every hook exits 127.
 	AutoRecall []doctorAutoStatus `json:"auto_recall"`
-	SQLite3    doctorComponent    `json:"sqlite3"`
+	// Commands is the third thing an install writes. A `/deja` under a name
+	// nobody types is the same kind of silent failure as a hook that is not
+	// approved, and it happened for a release (#3655).
+	Commands []doctorCommandStatus `json:"commands"`
+	SQLite3  doctorComponent       `json:"sqlite3"`
 	// Git is the other tool the text report names, and what it is needed for
 	// degrades in silence: changed-file notes, worktree names, the task signal.
 	// A machine checking this install could see a missing sqlite3 and not a
@@ -310,6 +314,23 @@ type doctorMCPStatus struct {
 	Path  string `json:"path"`
 }
 
+type doctorCommandStatus struct {
+	Name  string `json:"name"`
+	State string `json:"state"`
+	Path  string `json:"path"`
+}
+
+// collectDoctorCommands reads the same table the text section prints, so the
+// two surfaces cannot disagree about whether a command is there.
+func collectDoctorCommands() []doctorCommandStatus {
+	files := doctorCommandFiles()
+	out := make([]doctorCommandStatus, 0, len(files))
+	for _, c := range files {
+		out = append(out, doctorCommandStatus{Name: c.name, State: commandFileState(c.path), Path: c.path})
+	}
+	return out
+}
+
 type doctorStoreCheck struct {
 	name  string
 	paths []string
@@ -335,6 +356,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.IngestFiles = index.IngestFilesReport(dir)
 	report.MCP = collectDoctorMCP()
 	report.AutoRecall = collectDoctorAutoRecall()
+	report.Commands = collectDoctorCommands()
 	report.SQLite3.State = "missing"
 	if sources.SQLite3Available() {
 		report.SQLite3.State = "ok"
