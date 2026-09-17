@@ -53,8 +53,14 @@ func TestInstallHermesWritesAMemoryProviderBesideTheHookPlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("hook plugin missing: %v", err)
 	}
-	if strings.Contains(string(hook), "MemoryProvider") {
-		t.Fatalf("hook plugin mentions MemoryProvider, which turns it into an exclusive plugin the general loader skips")
+	// The Python construct, not the bare word: the launcher path the plugin
+	// now names carries the test's own directory, and this test's name has
+	// "MemoryProvider" in it — so the loose check failed on its own name
+	// (#3682).
+	for _, forbidden := range []string{"(MemoryProvider)", "import MemoryProvider", "register_memory_provider("} {
+		if strings.Contains(string(hook), forbidden) {
+			t.Fatalf("hook plugin carries %q, which turns it into an exclusive plugin the general loader skips", forbidden)
+		}
 	}
 	// With the provider active, the hook stays silent: the provider injects
 	// the same recall before each turn.

@@ -31,6 +31,10 @@ import (
 const openclawHookName = "deja-recall"
 
 func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
+	// The launcher, not this binary: a generated plugin is as much a
+	// config as a hooks.json, and one that names the build it was
+	// installed from stops working the day that build moves (#3682).
+	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName)
 	if uninstall {
 		if err := os.RemoveAll(dir); err != nil {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -54,7 +55,8 @@ func TestInstallOpenClawHooksWritesPackAndEnablesIt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handler.js missing: %v", err)
 	}
-	for _, want := range []string{"bootstrapFiles", "hook-context", `"/bin/deja"`} {
+	// The launcher, not the build it was installed from (#3682).
+	for _, want := range []string{"bootstrapFiles", "hook-context", strconv.Quote(hookExeInConfigs("/bin/deja"))} {
 		if !strings.Contains(string(handler), want) {
 			t.Fatalf("handler.js missing %q:\n%s", want, handler)
 		}

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -28,7 +29,7 @@ func TestInstallPiExtensionWritesDiscoverableFile(t *testing.T) {
 		"ctx.ui.notify",
 		"ctx.ui.setStatus", // pi keeps a footer line; the build belongs there
 		"session_start",    // status has to appear before the first prompt
-		`"/bin/deja"`,
+		strconv.Quote(hookExeInConfigs("/bin/deja")), // the launcher (#3682)
 	} {
 		if !strings.Contains(src, want) {
 			t.Fatalf("extension missing %q:\n%s", want, src)

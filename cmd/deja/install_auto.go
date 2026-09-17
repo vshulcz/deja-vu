@@ -188,6 +188,10 @@ func entryHasCommand(entry map[string]any, cmd string) bool {
 // system prompt per request. The generated plugin shells out to
 // `deja hook-context --plain` once per session and caches the result.
 func installOpencodePlugin(exe string, uninstall bool) (installResult, error) {
+	// The launcher, not this binary: a generated plugin is as much a
+	// config as a hooks.json, and one that names the build it was
+	// installed from stops working the day that build moves (#3682).
+	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(opencodeConfigHome(), "opencode", "plugins")
 	path := filepath.Join(dir, "deja.js")
 	if uninstall {

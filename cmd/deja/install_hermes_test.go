@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -30,11 +31,11 @@ func TestInstallHermesPlugin(t *testing.T) {
 	}
 	src := string(code)
 	for _, want := range []string{
-		`ctx.register_hook("pre_llm_call"`, // the only hook that can inject
-		"ctx.register_command",             // /deja, so the tool is findable
-		"hook-context",                     // first turn: the session digest
-		"hook-prompt",                      // later turns: relevance
-		`"/bin/deja"`,
+		`ctx.register_hook("pre_llm_call"`,           // the only hook that can inject
+		"ctx.register_command",                       // /deja, so the tool is findable
+		"hook-context",                               // first turn: the session digest
+		"hook-prompt",                                // later turns: relevance
+		strconv.Quote(hookExeInConfigs("/bin/deja")), // the launcher (#3682)
 	} {
 		if !strings.Contains(src, want) {
 			t.Fatalf("plugin missing %q:\n%s", want, src)

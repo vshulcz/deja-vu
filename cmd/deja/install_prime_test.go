@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -111,7 +112,7 @@ func TestInstallPrimeAutoWritesADiscoverableExtension(t *testing.T) {
 		"hook-precompact",
 		"registerCommand",
 		"ctx.ui.setStatus",
-		`"/usr/local/bin/deja"`,
+		strconv.Quote(hookExeInConfigs("/usr/local/bin/deja")), // the launcher (#3682)
 	} {
 		if !strings.Contains(src, want) {
 			t.Fatalf("extension missing %q:\n%s", want, src)

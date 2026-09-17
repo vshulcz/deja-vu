@@ -226,7 +226,9 @@ func TestInstallOpencodePlugin(t *testing.T) {
 			t.Errorf("opencode plugin does not pass %q, so recall cannot dedupe:\n%s", want, s)
 		}
 	}
-	for _, want := range []string{"experimental.chat.system.transform", "/opt/deja", "hook-context", "cache"} {
+	for _, want := range []string{"experimental.chat.system.transform",
+		// The launcher, not the build it was installed from (#3682).
+		hookExeInConfigs("/opt/deja"), "hook-context", "cache"} {
 		if !strings.Contains(s, want) {
 			t.Fatalf("plugin missing %q:\n%s", want, s)
 		}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -131,7 +132,9 @@ func TestInstallAmpAutoWritesADiscoverablePlugin(t *testing.T) {
 		`amp.on("tool.result"`,
 		`"hook-tool-after", "--plain"`,
 		"registerCommand",
-		`"/usr/local/bin/deja"`,
+		// The launcher, not the build: a plugin that names the binary it was
+		// installed from stops working the day that build moves (#3682).
+		strconv.Quote(hookExeInConfigs("/usr/local/bin/deja")),
 		"export const description", // Amp shows this in plugin settings
 	} {
 		if !strings.Contains(src, want) {

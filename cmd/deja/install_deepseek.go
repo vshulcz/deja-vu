@@ -469,7 +469,11 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if err != nil {
 		return installResult{}, err
 	}
-	cmdAction, err := writeIfChanged(cmdPath, oldCmd, []byte(dshCommandJS(exe)))
+	// The launcher for the plugins dsh loads, the binary for the server in
+	// the patch block: a plugin that names the build it was installed from
+	// stops working the day that build moves (#3682).
+	hookExe := hookExeFor(exe, uninstall)
+	cmdAction, err := writeIfChanged(cmdPath, oldCmd, []byte(dshCommandJS(hookExe)))
 	if err != nil {
 		return installResult{}, err
 	}
@@ -482,7 +486,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err != nil {
 			return installResult{}, err
 		}
-		autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(exe)))
+		autoAction, aerr := writeIfChanged(autoPath, oldAuto, []byte(dshAutoJS(hookExe)))
 		if aerr != nil {
 			return installResult{}, aerr
 		}

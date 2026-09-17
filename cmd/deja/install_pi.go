@@ -31,6 +31,10 @@ func installPiExtension(exe string, uninstall bool) (installResult, error) {
 // `{"type":"custom_message","customType":"deja-recall"}` holding what
 // `deja hook-context` returned (#3670).
 func installPiShapedExtension(agentDir, exe string, uninstall bool) (installResult, error) {
+	// The launcher, not this binary: a generated plugin is as much a
+	// config as a hooks.json, and one that names the build it was
+	// installed from stops working the day that build moves (#3682).
+	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(agentDir, "extensions")
 	path := filepath.Join(dir, "deja.ts")
 	if uninstall {

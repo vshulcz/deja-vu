@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -63,8 +64,16 @@ func TestAntigravityPluginQuotesExecutablePath(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmd, _ := root["deja-recall"]["PreInvocation"][0]["command"].(string)
-	if !strings.HasPrefix(cmd, `"/Applications/My Tools/deja"`) {
+	// The hook runs the launcher, and the launcher carries the path with the
+	// space in it — so both have to be quoted or sh -c splits one of them
+	// (#3422, #3682).
+	if !strings.HasPrefix(cmd, strconv.Quote(hookExeInConfigs("/Applications/My Tools/deja"))) {
 		t.Fatalf("unquoted path would split under sh -c: %q", cmd)
+	}
+	if p := dejaLauncherPath(); p != "" {
+		if !strings.Contains(readFile(t, p), `'/Applications/My Tools/deja'`) {
+			t.Fatalf("the launcher does not quote the path it resolves:\n%s", readFile(t, p))
+		}
 	}
 }
 

@@ -24,6 +24,10 @@ import (
 // from it is what gets sent. Editing the array in place is discarded, as is a
 // string or a {messages} wrapper — verified against CLI 3.0.54.
 func installClineAuto(exe string, uninstall bool) (installResult, error) {
+	// The launcher, not this binary: a generated plugin is as much a config
+	// as a hooks.json, and one that names the build it was installed from
+	// stops working the day that build moves (#3682).
+	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.ClinePluginsDir(), "deja")
 	path := filepath.Join(dir, "index.js")
 	if uninstall {

@@ -52,7 +52,10 @@ func installOmpAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	a, err := writeIfChanged(path, old, []byte(ompExtensionJS(exe)))
+	// The launcher for the extension, the binary for the server above: an
+	// extension that names the build it was installed from stops working the
+	// day that build moves (#3682).
+	a, err := writeIfChanged(path, old, []byte(ompExtensionJS(hookExeFor(exe, uninstall))))
 	if err != nil {
 		return installResult{}, err
 	}

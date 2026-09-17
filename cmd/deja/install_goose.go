@@ -312,6 +312,8 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 	// `goose-auto` and every line said "unchanged" while the session-start
 	// recall was being switched on. Report the file, the way omp-auto reports
 	// its extension.
+	// writeGooseHook resolves the launcher itself, so the binary goes in as it
+	// came: wrapping it here would point the launcher at the launcher.
 	action, err := writeGooseHook(exe)
 	if err != nil {
 		return installResult{}, err
