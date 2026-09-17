@@ -23,6 +23,12 @@ func TestUnderTempDirKnowsAScratchBuild(t *testing.T) {
 		{"/private/tmp/scratch/deja", true},
 		{"/usr/local/bin/deja", false},
 		{"/opt/homebrew/bin/deja", false},
+		// Under nobody's TMPDIR and thrown away all the same. An agent's
+		// scratch build there had adopted 28 targets on one machine, and the
+		// only screen that ever said so was Gemini's own start banner quoting
+		// deja's note back (#3656).
+		{"/home/someone/.claude/jobs/9f0aa059/tmp/deja-sl", true},
+		{"/home/someone/projects/deja-vu/temp/deja", true},
 		// A literal home, not this process's: the suite runs with HOME under a
 		// temp directory, where ~/.local/bin really is temporary.
 		{"/home/someone/.local/bin/deja", false},
