@@ -1267,6 +1267,16 @@ func dejaCommandIn(path string) string {
 					return cmd
 				}
 			}
+			// Nothing recognised by name. An entry under the key deja writes
+			// is deja's own whatever binary it happens to run — a build called
+			// `deja-probe` or `deja-cont` is what a `go build -o` leaves, and
+			// an entry naming one was invisible to every check here while the
+			// row still said wired (#3659).
+			if v, ok := m["deja"]; ok {
+				if cmd := mcpEntryCommand(v); cmd != "" {
+					return cmd
+				}
+			}
 		}
 		return ""
 	}
@@ -1292,7 +1302,7 @@ func dejaCommandIn(path string) string {
 			return value
 		}
 	}
-	return ""
+	return dejaKeyedCommand(string(b))
 }
 
 // quotedPathUnescape undoes what a quoted string does to a Windows path. Only
@@ -1341,6 +1351,67 @@ func mcpEntryDejaCommand(v any) string {
 	if t, ok := m["transport"].(map[string]any); ok {
 		if cmd := mcpEntryDejaCommand(t); cmd != "" {
 			return cmd
+		}
+	}
+	return ""
+}
+
+// mcpEntryCommand is mcpEntryDejaCommand without the name test: the command an
+// entry runs, whatever it is called. Only callers that already know the entry
+// is deja's — because it sits under the key deja writes — may use it.
+func mcpEntryCommand(v any) string {
+	m, _ := v.(map[string]any)
+	if m == nil {
+		return ""
+	}
+	switch c := m["command"].(type) {
+	case string:
+		return strings.TrimSpace(c)
+	case []any:
+		for _, item := range c {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				return strings.TrimSpace(s)
+			}
+		}
+	}
+	if t, ok := m["transport"].(map[string]any); ok {
+		return mcpEntryCommand(t)
+	}
+	return ""
+}
+
+// dejaKeyedCommand is the same claim for the formats read as text: a `deja:`
+// or `[mcp_servers.deja]` key, then the first `command` before the next key at
+// that level. Hermes keeps its servers in YAML and named one `deja-cont`,
+// which nothing here could see (#3659).
+func dejaKeyedCommand(text string) string {
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "deja:" && trimmed != "[mcp_servers.deja]" && trimmed != "[mcp.servers.deja]" {
+			continue
+		}
+		indent := yamlIndentWidth(line)
+		for _, next := range lines[i+1:] {
+			nextTrimmed := strings.TrimSpace(next)
+			if nextTrimmed == "" {
+				continue
+			}
+			// Out of the block: another key at this level, or a new table.
+			if yamlIndentWidth(next) <= indent && !strings.HasPrefix(nextTrimmed, "-") {
+				if strings.HasPrefix(nextTrimmed, "[") || strings.Contains(nextTrimmed, ":") || strings.Contains(nextTrimmed, "=") {
+					if !strings.HasPrefix(nextTrimmed, "command") {
+						break
+					}
+				}
+			}
+			if m := commandValue.FindStringSubmatch(next); m != nil {
+				for _, group := range m[1:] {
+					if v := strings.TrimSpace(group); v != "" {
+						return quotedPathUnescape.Replace(v)
+					}
+				}
+			}
 		}
 	}
 	return ""
