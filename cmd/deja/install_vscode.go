@@ -150,6 +150,7 @@ func installVSCodeMCPAt(path, exe string, uninstall bool) (installResult, error)
 		return installResult{}, err
 	}
 	next = append(next, '\n')
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

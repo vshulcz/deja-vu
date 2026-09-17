@@ -58,7 +58,7 @@ func TestInstallKilocodeWiresTheServerAndTheSkill(t *testing.T) {
 		t.Errorf("server entry = %q %v, want the binary in it", srv.Command, srv.Args)
 	}
 
-	skill := filepath.Join(home, ".kilocode", "skills", "deja-search", "SKILL.md")
+	skill := filepath.Join(home, ".kilocode", "skills", "deja-history", "SKILL.md")
 	sb, err := os.ReadFile(skill)
 	if err != nil {
 		t.Fatalf("skill: %v", err)

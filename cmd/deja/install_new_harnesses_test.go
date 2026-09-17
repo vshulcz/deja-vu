@@ -108,7 +108,7 @@ func TestInstallGjcWritesTheServerAndTheNativeSkill(t *testing.T) {
 
 	// gjc loads its own skills directory; Claude's and Codex's are import
 	// candidates there, so a skill written to those would never be read.
-	skill := filepath.Join(home, ".gjc", "agent", "skills", "deja-search", "SKILL.md")
+	skill := filepath.Join(home, ".gjc", "agent", "skills", "deja-history", "SKILL.md")
 	b, err := os.ReadFile(skill)
 	if err != nil {
 		t.Fatalf("skill: %v", err)

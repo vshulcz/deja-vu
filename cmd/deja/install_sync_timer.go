@@ -64,6 +64,7 @@ func installSyncTimerLaunchd(exe string, uninstall bool) (installResult, error) 
 	if err != nil {
 		return installResult{}, err
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
@@ -133,6 +134,7 @@ func installSyncTimerSystemd(exe string, uninstall bool) (installResult, error) 
 	if err != nil {
 		return installResult{}, err
 	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}

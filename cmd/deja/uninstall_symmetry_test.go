@@ -35,9 +35,29 @@ func TestUninstallTakesBackEveryFileItWrote(t *testing.T) {
 			t.Fatalf("install %s: %v", target, err)
 		}
 	}
+	// While every target is installed, the other sweeps over the same home:
+	// every skill declares the name of its directory (#3700). Installing all
+	// of them is the most expensive thing in this suite, so it is done once.
+	skillNamesMatchTheirDirectories(t, home)
+	// What deja says it created, before the uninstall wipes the record.
+	made := append([]string(nil), readWiringState().Dirs...)
+	if len(made) == 0 {
+		t.Fatal("the record names no directory deja created, so there is nothing to check")
+	}
 	for _, target := range targets {
 		if _, err := captureRun(t, "uninstall", target); err != nil {
 			t.Fatalf("uninstall %s: %v", target, err)
+		}
+	}
+	// A directory deja made goes when the last thing in it does. Thirty-three
+	// were left on a bare home, from the harness roots down to a plugin
+	// directory four levels deep (#3698).
+	for _, dir := range made {
+		if strings.Contains(dir, filepath.Join(".config", "deja")) {
+			continue
+		}
+		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+			t.Errorf("uninstall left the empty directory it created: %s", strings.TrimPrefix(dir, home))
 		}
 	}
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
@@ -196,6 +216,44 @@ func TestUninstallRemovesACommandsDirectoryItCreated(t *testing.T) {
 	}
 	if _, err := os.Stat(commands); err == nil {
 		t.Errorf("uninstall left %s behind", commands)
+	}
+}
+
+// The prune walks upward through directories deja made (#3698), so the other
+// half of the rule has to hold too: a directory the reader has since put
+// something in stays, whoever created it.
+func TestUninstallKeepsADirectoryTheReaderHasFilled(t *testing.T) {
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range []string{"pi-auto", "claude-auto"} {
+		if _, err := captureRun(t, "install", target, "--no-index"); err != nil {
+			t.Fatalf("install %s: %v", target, err)
+		}
+	}
+	theirs := map[string]string{
+		filepath.Join(home, ".pi", "agent", "extensions", "theirs.ts"): "export default {}\n",
+		filepath.Join(home, ".claude", "commands", "theirs.md"):        "# their command\n",
+	}
+	for path, body := range theirs {
+		if _, err := os.Stat(filepath.Dir(path)); err != nil {
+			t.Fatalf("install did not create %s: %v", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, target := range []string{"pi-auto", "claude-auto"} {
+		if _, err := captureRun(t, "uninstall", target); err != nil {
+			t.Fatalf("uninstall %s: %v", target, err)
+		}
+	}
+	for path := range theirs {
+		if _, err := os.Stat(path); err != nil {
+			t.Errorf("uninstall took a file of the reader's with the directory: %s", strings.TrimPrefix(path, home))
+		}
 	}
 }
 

@@ -24,7 +24,7 @@ func TestInstallCommandCodeWritesAllFourSurfaces(t *testing.T) {
 	root := filepath.Join(home, ".commandcode")
 	assertMCPServerEntry(t, filepath.Join(root, "mcp.json"))
 
-	if b, err := os.ReadFile(filepath.Join(root, "skills", "deja-search", "SKILL.md")); err != nil {
+	if b, err := os.ReadFile(filepath.Join(root, "skills", "deja-history", "SKILL.md")); err != nil {
 		t.Fatalf("skill: %v", err)
 	} else if !strings.Contains(string(b), "deja") {
 		t.Errorf("the skill does not mention deja")
@@ -78,7 +78,7 @@ func TestInstallCommandCodeWritesAllFourSurfaces(t *testing.T) {
 	if b, err := os.ReadFile(filepath.Join(root, "settings.json")); err == nil && strings.Contains(string(b), "deja") {
 		t.Errorf("a hook survived uninstall: %s", b)
 	}
-	if _, err := os.Stat(filepath.Join(root, "skills", "deja-search", "SKILL.md")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, "skills", "deja-history", "SKILL.md")); err == nil {
 		t.Error("the skill survived uninstall")
 	}
 }

@@ -46,7 +46,18 @@ func TestASecondBuildAdoptsEveryTargetsHookEntries(t *testing.T) {
 	// The state the machine in #3681 was in: every entry names a build that is
 	// not the one about to install.
 	stranger := filepath.Join(tmp, "scratch", "deja-cont")
-	launcher := dejaLauncherPath()
+	// The launcher where there is one, and the binary's own path where there is
+	// not: on Windows deja writes no launcher (a .cmd cannot be exec'd), so
+	// going by the launcher alone skipped this test on the one platform whose
+	// leg found the bug it exists for.
+	planted := dejaLauncherPath()
+	if planted == "" {
+		exe, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		planted = exe
+	}
 	replaced := 0
 	_ = filepath.Walk(home, func(p string, fi os.FileInfo, err error) error {
 		if err != nil || !fi.Mode().IsRegular() {
@@ -57,7 +68,7 @@ func TestASecondBuildAdoptsEveryTargetsHookEntries(t *testing.T) {
 			return nil
 		}
 		text := string(b)
-		for _, was := range []string{launcher, jsonEscapedPath(launcher)} {
+		for _, was := range []string{planted, jsonEscapedPath(planted)} {
 			if was == "" || !strings.Contains(text, was) {
 				continue
 			}
@@ -70,7 +81,7 @@ func TestASecondBuildAdoptsEveryTargetsHookEntries(t *testing.T) {
 		return os.WriteFile(p, []byte(text), fi.Mode().Perm())
 	})
 	if replaced == 0 {
-		t.Skip("nothing named the launcher, so there is no stranger to plant")
+		t.Fatal("no file named the binary the install wrote, so there is no stranger to plant")
 	}
 
 	installAll()

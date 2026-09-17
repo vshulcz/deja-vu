@@ -81,6 +81,7 @@ func installGrokUserSettings(exe string, uninstall bool) (installResult, error) 
 	if uninstall && len(old) == 0 {
 		return installResult{Path: path, Action: "unchanged"}, nil
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

@@ -37,14 +37,24 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.OpenClawStateDir(), "hooks", openclawHookName)
 	if uninstall {
+		// "removed" only when there was something to remove: a second
+		// uninstall reported taking this directory again, which is a line
+		// about work that did not happen (#3698, the shape #3689 fixed in
+		// goose's report).
+		had := isRealDir(dir)
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
 		if _, err := setOpenClawHookEnabled(false); err != nil {
 			return installResult{}, err
 		}
+		if !had {
+			return installResult{Path: dir, Action: "unchanged"}, nil
+		}
+		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: dir, Action: "removed"}, nil
 	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}

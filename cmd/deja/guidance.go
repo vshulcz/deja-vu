@@ -359,6 +359,7 @@ func writeSharedSkill(harness string, uninstall bool) error {
 		}
 		return os.Remove(path)
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

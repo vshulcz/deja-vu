@@ -439,14 +439,18 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err := os.RemoveAll(filepath.Dir(dshCommandPath())); err != nil {
 			return installResult{}, err
 		}
+		// And the plugins directory above it, when deja made it (#3698).
+		pruneCreatedDir(filepath.Dir(filepath.Dir(dshCommandPath())))
 		return installResult{Path: path, Action: a}, nil
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
 	// The command plugin first: a profile row naming a file that is not there
 	// fails the whole profile load, so the layer is written last.
 	cmdPath := dshCommandPath()
+	noteCreatedDirs(filepath.Dir(cmdPath))
 	if err := os.MkdirAll(filepath.Dir(cmdPath), 0o755); err != nil {
 		return installResult{}, err
 	}

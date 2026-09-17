@@ -76,6 +76,7 @@ func installContinue(exe string, uninstall bool) (installResult, error) {
 		}
 	}
 
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

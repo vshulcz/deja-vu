@@ -31,8 +31,12 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
+		// And the directories deja made above it, while each is empty and
+		// the record says it is deja's (#3698).
+		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: dir, Action: "removed"}, nil
 	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}

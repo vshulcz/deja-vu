@@ -205,6 +205,7 @@ func refreshAiderContext(dir string) error {
 		body = "No matching history yet — start aider as `deja aider` and this file fills with what this project already knows.\n"
 	}
 	path := aiderContextPath()
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

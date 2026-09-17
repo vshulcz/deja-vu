@@ -12,7 +12,7 @@
   that has it, **and** the CLI's own `<config>/kilo/kilo.jsonc` — Kilo vendors
   OpenCode, so the CLI takes OpenCode's `mcp` block. `kilo mcp list` prints
   `✓ deja connected` once it is there. The skill goes in
-  `~/.kilocode/skills/deja-search/SKILL.md` and the command in
+  `~/.kilocode/skills/deja-history/SKILL.md` and the command in
   `<config>/kilo/commands/deja.md`.
 
 Verified on `@kilocode/cli` 7.7.3. A real `kilo run` session landed in
@@ -73,7 +73,7 @@ see [OpenCode](opencode.md) for the field-by-field description.
   writes the global one.
 - Wiring: `deja install kilocode` writes the MCP server into
   `<globalStorage>/kilocode.kilo-code/settings/mcp_settings.json` for every host that carries the
-  extension, and the shared manual into `~/.kilocode/skills/deja-search/SKILL.md`, which is where
+  extension, and the shared manual into `~/.kilocode/skills/deja-history/SKILL.md`, which is where
   Kilo's own loader looks first (`packages/opencode/src/kilocode/paths.ts`). A machine with the CLI
   and no editor gets the skill and a note saying the server was not wired anywhere.
 - No hooks: a search of Kilo-Org/kilocode finds no hook surface, and the extension is a Roo fork

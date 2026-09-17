@@ -54,6 +54,7 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	body = append(body, '\n')
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

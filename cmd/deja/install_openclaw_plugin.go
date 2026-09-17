@@ -32,14 +32,22 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
 	dir := filepath.Join(sources.OpenClawStateDir(), "extensions", openclawPluginID)
 	if uninstall {
+		// Same as the hook pack beside it: say what happened, and take the
+		// directories deja made above this one (#3698).
+		had := isRealDir(dir)
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
 		if _, err := setOpenClawPluginEnabled(false); err != nil {
 			return installResult{}, err
 		}
+		if !had {
+			return installResult{Path: dir, Action: "unchanged"}, nil
+		}
+		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: dir, Action: "removed"}, nil
 	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}

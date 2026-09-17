@@ -201,6 +201,8 @@ func installOpencodePlugin(exe string, uninstall bool) (installResult, error) {
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
 		}
+		// And the plugins directory deja made for it (#3698).
+		pruneCreatedDir(dir)
 		return installResult{Path: path, Action: "removed"}, nil
 	}
 	old, err := readConfig(path)

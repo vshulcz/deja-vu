@@ -37,8 +37,12 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
+		// And the directories deja made above it, while each is empty and
+		// the record says it is deja's (#3698).
+		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: path, Action: "removed"}, nil
 	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return installResult{}, err
 	}
@@ -56,6 +60,7 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	// so a failure here leaves a working plugin rather than a directory the
 	// uninstall path would not recognise.
 	skill := filepath.Join(dir, "skills", "deja-history")
+	noteCreatedDirs(skill)
 	if err := os.MkdirAll(skill, 0o755); err != nil {
 		return installResult{}, err
 	}

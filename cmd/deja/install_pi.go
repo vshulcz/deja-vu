@@ -44,6 +44,8 @@ func installPiShapedExtension(agentDir, exe string, uninstall bool) (installResu
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
 		}
+		// And the extensions directory deja made for it (#3698).
+		pruneCreatedDir(dir)
 		return installResult{Path: path, Action: "removed"}, nil
 	}
 	old, err := readConfig(path)

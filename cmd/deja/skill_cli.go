@@ -101,6 +101,7 @@ func writeCLISkill() (string, error) {
 	if !forceGuidance && skillWasEdited(path, old) {
 		return "", nil
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
@@ -158,6 +159,10 @@ func removeCLISkill() error {
 	// (the bound pruneGuidanceDirs already holds).
 	if dir := filepath.Dir(path); filepath.Base(dir) == cliSkillName && isRealDir(dir) {
 		_ = os.Remove(dir)
+		// And the directories above it that deja made, which the name check
+		// cannot speak for: `~/.agents/skills` and `~/.agents` were left on
+		// every machine that had neither before (#3698).
+		pruneCreatedDir(filepath.Dir(dir))
 	}
 	return nil
 }

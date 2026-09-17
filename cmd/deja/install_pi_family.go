@@ -94,7 +94,7 @@ func gjcMCPPath() string {
 // directories are import candidates in gjc rather than things it loads, so
 // writing there would leave a skill no session reads.
 func gjcSkillPath() string {
-	return filepath.Join(sources.GjcConfigDir(), "skills", "deja-search", "SKILL.md")
+	return filepath.Join(sources.GjcConfigDir(), "skills", "deja-history", "SKILL.md")
 }
 
 func installGjc(exe string, uninstall bool) (installResult, error) {

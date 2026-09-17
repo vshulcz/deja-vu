@@ -1097,6 +1097,11 @@ func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
 func pruneGuidanceDirs(path string) {
 	dir := filepath.Dir(path)
 	if filepath.Base(dir) != "deja-history" || !isRealDir(dir) {
+		// Not a skill directory of deja's, but the file may still have been
+		// the only thing in a tree deja made — the VS Code prompts folder,
+		// say, which holds no `deja-history` and was left on every machine
+		// (#3698). The record is what allows removing it.
+		pruneCreatedDir(dir)
 		return
 	}
 	if err := os.Remove(dir); err != nil {
@@ -1104,7 +1109,9 @@ func pruneGuidanceDirs(path string) {
 	}
 	if dir = filepath.Dir(dir); filepath.Base(dir) == "skills" && isRealDir(dir) {
 		_ = os.Remove(dir)
+		dir = filepath.Dir(dir)
 	}
+	pruneCreatedDir(dir)
 }
 
 // isRealDir reports whether p is a directory itself rather than a link to one.
@@ -1116,13 +1123,49 @@ func isRealDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// pruneCreatedDir removes the directory a config lived in once the config is
-// gone. os.Remove fails on a directory that is not empty, which is half the
-// rule; the other half is the record, because an empty folder the reader
-// already had is theirs and used to go with the uninstall (#3239).
+// pruneCreatedDir removes the directory a config lived in, and every one deja
+// made above it, once nothing is left in them. os.Remove fails on a directory
+// that is not empty, which is half the rule; the other half is the record,
+// because an empty folder the reader already had is theirs and used to go with
+// the uninstall (#3239).
+//
+// Upward, because a writer creates a tree: `~/.pi/agent/extensions/deja` is
+// four levels and stopping after one left the other three behind. On a bare
+// home a full uninstall left thirty-three such directories (#3698).
 func pruneCreatedDir(dir string) {
-	if isRealDir(dir) && dirWiringCreated(dir) {
-		_ = os.Remove(dir)
+	for {
+		if dir == "" || dir == string(filepath.Separator) || dir == filepath.Dir(dir) {
+			return
+		}
+		if !isRealDir(dir) || !dirWiringCreated(dir) {
+			return
+		}
+		if err := os.Remove(dir); err != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
+}
+
+// noteCreatedDirs records the directories a write is about to create, so the
+// prune above can vouch for each of them. Every missing level, not just the
+// file's own parent: MkdirAll makes the whole tree and only the last of them
+// was ever written down (#3698).
+func noteCreatedDirs(dir string) {
+	if removingWiring {
+		return
+	}
+	var missing []string
+	for d := dir; d != "" && d != string(filepath.Separator) && d != filepath.Dir(d); d = filepath.Dir(d) {
+		if isRealDir(d) {
+			break
+		}
+		missing = append(missing, d)
+	}
+	for i := len(missing) - 1; i >= 0; i-- {
+		if !slices.Contains(createdDirsByThisRun, missing[i]) {
+			createdDirsByThisRun = append(createdDirsByThisRun, missing[i])
+		}
 	}
 }
 
@@ -1478,6 +1521,10 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if snapshotTaken(path) {
 				dropOwnBackup(path)
 			}
+			// The same prune the structured branch below does: this writer
+			// wrote the file whole, and removing it can leave the tree deja
+			// made for it standing empty (#3698).
+			pruneCreatedDir(filepath.Dir(path))
 			return "removed", nil
 		}
 		// The same rule for the structured writers, which never reach zero
@@ -1498,9 +1545,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 		createdByThisRun = append(createdByThisRun, path)
 	}
 	dir := filepath.Dir(path)
-	if !removingWiring && !isRealDir(dir) {
-		createdDirsByThisRun = append(createdDirsByThisRun, dir)
-	}
+	noteCreatedDirs(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
@@ -1519,6 +1564,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 		// Recording both is the only way back, since no resolution runs
 		// backwards (review of #3340).
 		rememberSnapshot(given + ".bak")
+		noteCreatedDirs(filepath.Dir(path))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return "", err
 		}

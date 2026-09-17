@@ -40,8 +40,12 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
+		// And the directories deja made above it, while each is empty and
+		// the record says it is deja's (#3698).
+		pruneCreatedDir(filepath.Dir(dir))
 		return installResult{Path: dir, Action: "removed", Note: note}, nil
 	}
+	noteCreatedDirs(filepath.Join(dir, "hooks"))
 	if err := os.MkdirAll(filepath.Join(dir, "hooks"), 0o755); err != nil {
 		return installResult{}, err
 	}

@@ -162,6 +162,7 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	}
 	recipe := gooseRecipePath()
 	if !uninstall {
+		noteCreatedDirs(filepath.Dir(recipe))
 		if err := os.MkdirAll(filepath.Dir(recipe), 0o755); err != nil {
 			return installResult{}, err
 		}
@@ -200,6 +201,7 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 			next += "slash_commands:\n" + entry
 		}
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

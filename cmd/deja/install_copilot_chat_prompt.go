@@ -83,8 +83,11 @@ func installTextFile(path, body string, uninstall bool) (installResult, error) {
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
 		}
+		// And the directory deja made for it (#3698).
+		pruneCreatedDir(filepath.Dir(path))
 		return installResult{Path: path, Action: "removed"}, nil
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

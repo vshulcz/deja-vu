@@ -28,7 +28,7 @@ project directory names the project, and the header's cwd wins when it is there.
 - `service_tier_change` lines are not turns and are dropped rather than read as
   empty messages.
 - Wiring: `deja install gjc` writes the server into `~/.gjc/agent/mcp.json`
-  and the skill into `~/.gjc/agent/skills/deja-search/SKILL.md`. Both paths
+  and the skill into `~/.gjc/agent/skills/deja-history/SKILL.md`. Both paths
   are from gjc's own surface table (`docs/customization.md`), and the skill
   location matters: gjc loads its native skills directory, while Claude's and
   Codex's are import candidates it does not read, so a skill written there
@@ -53,7 +53,7 @@ project directory names the project, and the header's cwd wins when it is there.
 HOME:
 
 - `deja install gjc` writes the three paths this entry claims:
-  `~/.gjc/agent/mcp.json`, `~/.gjc/agent/skills/deja-search/SKILL.md` and
+  `~/.gjc/agent/mcp.json`, `~/.gjc/agent/skills/deja-history/SKILL.md` and
   `~/.gjc/agent/commands/deja.md`.
 - gjc's own `--help` confirms the MCP path in its own words — `--no-mcp`
   disables "conventional MCP autoload (native user ~/.gjc/agent/mcp.json and

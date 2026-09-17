@@ -30,7 +30,7 @@ func commandCodeMCPPath() string  { return filepath.Join(commandCodeConfigDir(),
 func commandCodeSettings() string { return filepath.Join(commandCodeConfigDir(), "settings.json") }
 
 func commandCodeSkillPath() string {
-	return filepath.Join(commandCodeConfigDir(), "skills", "deja-search", "SKILL.md")
+	return filepath.Join(commandCodeConfigDir(), "skills", "deja-history", "SKILL.md")
 }
 
 // commandCodeHookWiring is what deja has to say at each of the events Command

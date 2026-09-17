@@ -133,6 +133,7 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 			next += "extensions:\n" + entry
 		}
 	}
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
@@ -295,6 +296,8 @@ func installGooseAuto(exe string, uninstall bool) (installResult, error) {
 		plugin := filepath.Dir(filepath.Dir(gooseHookPath()))
 		removed := isRealDir(plugin)
 		_ = os.RemoveAll(plugin)
+		// And the directories deja made above it (#3698).
+		pruneCreatedDir(filepath.Dir(plugin))
 		// The recall now lives in the reader's own AGENTS.md, so uninstall
 		// takes deja's block out and leaves the file. Removing it was right
 		// while the target was a `.goosehints` deja owned outright; against
@@ -378,6 +381,7 @@ func writeGooseHook(exe string) (string, error) {
 	}
 	body = append(body, '\n')
 	path := gooseHookPath()
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
@@ -478,6 +482,7 @@ func clearGooseRecall() error {
 // raw and erased everything else in the file.
 func writeGooseRecall(body string) error {
 	path := gooseRecallPath()
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -529,6 +534,7 @@ func refreshGooseHintsFor(cwd string) error {
 		body = gooseNoHistory
 	}
 	path := gooseRecallPath()
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

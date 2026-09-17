@@ -56,6 +56,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 			if rerr := os.Remove(path); rerr != nil {
 				return installResult{}, rerr
 			}
+			pruneCreatedDir(filepath.Dir(path))
 			return installResult{Path: path, Action: "removed"}, nil
 		}
 		return installResult{}, configParseError(path, err)
@@ -80,6 +81,8 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 			if err := os.Remove(path); err != nil {
 				return installResult{}, err
 			}
+			// And the hooks directory deja made for it (#3698).
+			pruneCreatedDir(filepath.Dir(path))
 			return installResult{Path: path, Action: "removed"}, nil
 		}
 		next, err := marshalConfigLike(old, root)
@@ -111,6 +114,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	next = append(next, '\n')
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}

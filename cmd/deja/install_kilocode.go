@@ -35,7 +35,7 @@ func kilocodeMCPSettingsPaths() []string {
 // first: Kilo's own loader lists it before `.kilo`, and writing the one it
 // reads first is what a reader will find.
 func kilocodeSkillPath() string {
-	return filepath.Join(sources.Home(), ".kilocode", "skills", "deja-search", "SKILL.md")
+	return filepath.Join(sources.Home(), ".kilocode", "skills", "deja-history", "SKILL.md")
 }
 
 func installKilocode(exe string, uninstall bool) (installResult, error) {

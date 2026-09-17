@@ -24,7 +24,7 @@ string or the block array Claude's format uses, and both are read.
   dropped, so a user can search for an error they have already hit.
 - Wiring: `deja install commandcode` writes all four of its user-scoped
   surfaces, and `commandcode-auto` adds the hooks —
-  `~/.commandcode/mcp.json` for the server, `skills/deja-search/SKILL.md`,
+  `~/.commandcode/mcp.json` for the server, `skills/deja-history/SKILL.md`,
   `commands/deja.md` for `/deja`, and a `hooks` key in `settings.json` in
   Claude's shape.
 - **Two things there fail quietly if copied from another harness.** The
