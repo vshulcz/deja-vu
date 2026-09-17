@@ -50,6 +50,11 @@ func dejasOwnBookkeeping(path string) bool {
 		return true
 	case base == "wiring.json", base == "notes.jsonl":
 		return true
+	case base == "install.lock":
+		// The lock one install holds while it edits, so a second process does
+		// not build its write on the state before the first one's (#3691).
+		// deja's own file, beside wiring.json, and carrying nothing.
+		return true
 	case base == "deja-hook", base == "deja-hook.cmd":
 		// The launcher the hook entries name (#3422). It lives beside
 		// wiring.json under deja's own directory and is deja's plumbing rather

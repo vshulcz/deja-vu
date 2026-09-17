@@ -168,11 +168,16 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 		if restored {
 			return installResult{Path: path, Action: "restored"}, nil
 		}
+		// A commands/ directory deja had to create goes with the last command
+		// in it, the same rule the configs have had since #3239 — this writer
+		// made its own directory and never recorded it, so `~/.claude/commands`
+		// outlived every uninstall on a machine that had no commands of its
+		// own (#3685).
+		pruneCreatedDir(filepath.Dir(path))
 		return installResult{Path: path, Action: "removed"}, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return installResult{}, err
-	}
+	// No MkdirAll here: writeIfChanged creates the directory and records that
+	// it did, which is what lets the uninstall above take it back.
 	// A command file deja used to write under another name is dropped here
 	// rather than left beside the new one: for gemini the old name is what
 	// collided with the server's prompt, so leaving it keeps the bug for

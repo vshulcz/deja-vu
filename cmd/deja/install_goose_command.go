@@ -184,6 +184,12 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 			pad = "  "
 		}
 		entry := fmt.Sprintf("%s- command: \"deja\"\n%s  recipe_path: %s\n", pad, pad, yamlQuote(recipe))
+		// Already there, exactly: leave the file alone rather than moving the
+		// block to the bottom. See the same guard in installGoose — the two
+		// writers were swapping their keys round on every install (#3689).
+		if strings.Contains(normaliseGooseNewlines(string(old)), entry) {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		if i := strings.Index("\n"+next, "\nslash_commands:\n"); i >= 0 {
 			at := i + len("\nslash_commands:\n") - 1
 			next = next[:at] + entry + next[at:]

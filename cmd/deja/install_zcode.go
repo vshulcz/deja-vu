@@ -51,6 +51,12 @@ func installZCode(exe string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		mcp = map[string]any{}
+		// Both containers are recorded, because both may be deja's own: the
+		// uninstall took its entry out and left `"mcp": {"servers": {}}` in a
+		// file it had created itself, which is what the record exists to
+		// prevent (#2604, and this writer is new enough to have missed it —
+		// #3690).
+		noteBlockAdded(path, "mcp")
 	}
 	servers, _ := mcp["servers"].(map[string]any)
 	if servers == nil {
@@ -58,17 +64,28 @@ func installZCode(exe string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		servers = map[string]any{}
+		noteBlockAdded(path, "mcp.servers")
 	}
 	if uninstall {
 		if _, ok := servers["deja"]; !ok {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		delete(servers, "deja")
+		mcp["servers"] = servers
+		if len(servers) == 0 && blockWasAdded(path, "mcp.servers") {
+			delete(mcp, "servers")
+			forgetBlockAdded(path, "mcp.servers")
+		}
+		root["mcp"] = mcp
+		if len(mcp) == 0 && blockWasAdded(path, "mcp") {
+			delete(root, "mcp")
+			forgetBlockAdded(path, "mcp")
+		}
 	} else {
 		servers["deja"] = mcpServerEntry(exe)
+		mcp["servers"] = servers
+		root["mcp"] = mcp
 	}
-	mcp["servers"] = servers
-	root["mcp"] = mcp
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
 		return installResult{}, err
@@ -132,6 +149,7 @@ func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		hooks = map[string]any{}
+		noteBlockAdded(path, "hooks")
 	}
 	events, _ := hooks["events"].(map[string]any)
 	// The config has held both shapes: OpenViking's installer writes the
@@ -185,6 +203,15 @@ func installZCodeHooks(exe string, uninstall bool) (installResult, error) {
 		hooks["events"] = container
 	}
 	root["hooks"] = hooks
+	// A `hooks` block deja added holds nothing but the switch deja turned on
+	// once its events are out, and that switch is the reason gemini's stays:
+	// something else may be running on it. Here nothing can be — deja created
+	// the block — so it goes with them, and a block the reader already had is
+	// left exactly as gemini's is (#3690).
+	if uninstall && blockWasAdded(path, "hooks") && onlyTheEnabledSwitch(hooks) {
+		delete(root, "hooks")
+		forgetBlockAdded(path, "hooks")
+	}
 	next, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {
 		return installResult{}, err
@@ -218,6 +245,24 @@ func zcodeEntryIsOurs(item any) bool {
 		}
 	}
 	return false
+}
+
+// onlyTheEnabledSwitch reports whether a hooks block holds nothing but the
+// `enabled` flag — an empty `events` map included, since the events container
+// is written back before this is asked.
+func onlyTheEnabledSwitch(hooks map[string]any) bool {
+	for key, v := range hooks {
+		if key == "enabled" {
+			continue
+		}
+		if key == "events" {
+			if m, ok := v.(map[string]any); ok && len(m) == 0 {
+				continue
+			}
+		}
+		return false
+	}
+	return true
 }
 
 // zcodeCommandIsOurs reports whether a config command line runs one of deja's

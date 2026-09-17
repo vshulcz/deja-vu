@@ -128,8 +128,49 @@ func readWiringState() wiringState {
 	return st
 }
 
+// holdingInstallLock is set while this process has the install lock. flock is
+// held per open file, not per process, so a second attempt from the same
+// process would wait on itself — the repair runs inside a session start that
+// may itself be under the lock.
+var holdingInstallLock bool
+
+// installLockPath is deja's own file, beside the wiring record.
+func installLockPath() string {
+	return filepath.Join(xdgConfigHome(), "deja", "install.lock")
+}
+
+// holdInstallLock serialises the read-modify-write in every config writer.
+// `wait` blocks for the other process to finish; without it a caller that
+// cannot have the lock is told so and can skip its work — which is what the
+// repair does, since the process holding the lock is installing anyway.
+// busy is true only when another process holds it, which is the answer a
+// caller that means to stand down needs; a machine that will not give deja a
+// lock at all is not a reason to skip the work.
+func holdInstallLock(wait bool) (func(), bool, bool) {
+	if holdingInstallLock {
+		return func() {}, false, false
+	}
+	unlock, ok, busy := takeInstallLock(installLockPath(), wait)
+	if !ok {
+		return func() {}, false, busy
+	}
+	holdingInstallLock = true
+	return func() {
+		holdingInstallLock = false
+		unlock()
+	}, true, false
+}
+
 // recordWiring remembers the targets an install wrote. Uninstalled ones drop
 // out, so a user who removes a harness is not re-wired behind their back.
+//
+// statusline is one of them. It was skipped from the first version of this
+// record, and the cost was the whole bookkeeping: `deja install statusline` on
+// its own kept nothing wired, so with no other target the record was never
+// written at all — the file it had just created was not known to be deja's,
+// its uninstall left an empty `{}` behind instead of removing it, the snapshot it
+// took of its own config was reported as "configs you already had", and the
+// repair after a move never reached the status bar (#3684).
 func recordWiring(targets []string, uninstall bool) {
 	st := readWiringState()
 	have := map[string]bool{}
@@ -137,9 +178,6 @@ func recordWiring(targets []string, uninstall bool) {
 		have[t] = true
 	}
 	for _, t := range targets {
-		if t == "statusline" {
-			continue
-		}
 		have[t] = !uninstall
 	}
 	var kept []string
@@ -328,6 +366,20 @@ func refreshWiringAfterUpgrade() []string {
 	// spread (#885).
 	if st.Home != "" && st.Home != homeDir() {
 		return nil
+	}
+	// Not while an install is running. This is the other half of the race in
+	// #3691 and the one that fires without anyone asking: two sessions start
+	// together, or one starts while `deja install` is typing, and two
+	// processes rewrite one config from the state each read first. Waiting
+	// would sit a session start behind somebody's install, so the repair
+	// stands down instead — the process holding the lock is writing the same
+	// wiring this one would.
+	release, ok, busy := holdInstallLock(false)
+	if busy {
+		return nil
+	}
+	if ok {
+		defer release()
 	}
 	var changed []string
 	failed := false

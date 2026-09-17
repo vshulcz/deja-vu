@@ -21,11 +21,24 @@ func installClaudeCommands(exe string, uninstall bool) (installResult, error) {
 		if err := os.Remove(path); err != nil {
 			return installResult{}, err
 		}
+		// The two rules the other command files have had since #2581 and
+		// #2600: put back the file install replaced, and take the directory
+		// with the last command in it when deja made it. This writer is
+		// Claude's own and had neither, so a reader's `/deja` command came
+		// back as a `.bak` nobody restores and an empty ~/.claude/commands
+		// outlived every uninstall (#3685).
+		restored, rerr := restoreReplacedFile(path, isOurCommandFile)
+		if rerr != nil {
+			return installResult{}, rerr
+		}
+		if restored {
+			return installResult{Path: path, Action: "restored"}, nil
+		}
+		pruneCreatedDir(dir)
 		return installResult{Path: path, Action: "removed"}, nil
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return installResult{}, err
-	}
+	// No MkdirAll: writeIfChanged creates the directory and records that it
+	// did, which is what lets the uninstall above take it back.
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err

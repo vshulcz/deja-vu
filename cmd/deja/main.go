@@ -3866,8 +3866,8 @@ Usage:
   deja version
   deja <command> --help
   deja update [--force]
-  deja install <target> | --all | --auto  [--no-guidance] [--no-index]
-  deja uninstall <target> | --all | --auto
+  deja install <target>... | --all | --auto  [--no-guidance] [--no-index]
+  deja uninstall <target>... | --all | --auto
     targets:
 %s
 

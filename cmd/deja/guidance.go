@@ -181,25 +181,13 @@ func guidanceText(harness string) string {
 		// in #655 and the registry has documented the store since, so the same
 		// binary was indexing Copilot sessions and telling Copilot it did not
 		// (#3222). It gets the same skill as every other harness.
+		// One body, because several harnesses share one file. pi had a text of
+		// its own from before this one existed — and pi writes the shared
+		// ~/.agents/skills copy, so `deja install pi` replaced what codex, omp,
+		// Senpi, Kimchi and gjc read with the older, shorter version, and the
+		// next `deja install codex` put it back. Whichever ran last decided
+		// what every agent on the machine was told (#3688).
 		body := skillBody
-		if harness == "pi" {
-			body = `If the deja MCP tools are available (via pi-mcp-adapter), use them:
-
-- recall: search history with a specific error, function, or decision.
-- recall_context: get a concise digest of the best matching session.
-
-If MCP is not available, use the deja CLI via bash instead:
-
-- Search: bash("deja 'connection pool exhausted'")
-- Context: bash("deja ctx 'connection pool exhausted'")
-- Blame: bash("deja blame src/db.go")
-- Remember: bash("deja remember 'we use advisory locks because redis lost messages'")
-
-Example: for "what did we decide about token refresh?", try recall first; if unavailable, run bash("deja 'token refresh decision'").
-
-When recalled history genuinely helps, say so to the user in one short line at the start of your reply: "déjà vu: <what> — <how it was reused> (deja:<session id>)". Never credit recalls that did not help.`
-		}
-
 		if harness == "vscode" {
 			// Copilot Chat has no hook, so this file is the only thing that is
 			// in front of the model before it reads the question. It says to

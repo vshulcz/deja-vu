@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,6 +54,22 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		return fmt.Errorf("%s cannot find your home directory — set HOME to the account deja should wire", verb)
 	}
+	// One install at a time. Every writer here reads a config, edits it and
+	// writes it back, which is three steps a second process can land in the
+	// middle of: with `deja install claude-auto` and `deja install statusline`
+	// started together, eight runs in twelve lost one of the two wirings —
+	// both edit ~/.claude/settings.json, and the later write was built on the
+	// file as it was before the earlier one. The pairing is not contrived: the
+	// repair after an upgrade runs an install from the hook path, so a session
+	// starting while someone types `deja install` is exactly this (#3691).
+	// An uninstall on a machine that never had deja must leave nothing at all
+	// behind, the lock included (#676), so it only takes one where deja's own
+	// directory is already there.
+	if !uninstall || isRealDir(filepath.Dir(installLockPath())) {
+		if release, ok, _ := holdInstallLock(true); ok {
+			defer release()
+		}
+	}
 	removingWiring = uninstall
 	defer func() { removingWiring = false }()
 	guidance := true
@@ -91,7 +108,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			return fmt.Errorf("%s: unknown flag %q — it takes a target plus --no-guidance, --no-index or --force", verb, a)
 		}
 	}
-	if len(targetArgs) != 1 {
+	if len(targetArgs) == 0 {
 		// The first command a new machine runs, so a bare word they have to go
 		// look up is the worst possible answer. Every other command in this
 		// position prints the shape it wants (#830), and this one can do
@@ -102,7 +119,19 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		}
 		return fmt.Errorf("%s needs a target — no agent config found here; `deja help` lists every target deja knows", verb)
 	}
-	targets := []string{targetArgs[0]}
+	// Several names at once, because doctor asks for exactly that: the stale
+	// wiring row prints `deja install ` and the targets it recorded, and on any
+	// machine with two of them that command answered "install needs a target"
+	// — the remedy for a binary that moved was a line that could not run
+	// (#3686).
+	if len(targetArgs) > 1 {
+		for _, a := range targetArgs {
+			if a == "--all" || a == "--auto" {
+				return fmt.Errorf("%s: %s takes no other target beside it", verb, a)
+			}
+		}
+	}
+	targets := append([]string(nil), targetArgs...)
 	if targetArgs[0] == "--auto" {
 		targets = nil
 		for _, t := range existingTargets() {
@@ -119,12 +148,24 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			fmt.Println("no known agent config directories found")
 			return nil
 		}
+		if !uninstall {
+			targets = withWiredAutoTargets(targets)
+		}
 	}
 	// Uninstalling has to reach further than installing: --all wires MCP, but
 	// --auto may have written hooks and plugins too, and leaving those behind
 	// means every agent keeps shelling out to a binary the user just removed.
 	if uninstall {
 		targets = withAutoTargets(targets)
+		// The status bar is not a harness, so it is in no detected list and
+		// `uninstall --all` walked past it: the entry stayed, running the
+		// binary the reader was in the middle of removing, on every refresh
+		// (#3684). Only when it is deja's — installStatusline leaves anyone
+		// else's alone, and adding the target where there is nothing of ours
+		// would print a line about it to everybody.
+		if targetArgs[0] == "--all" && statuslineIsDejas() && !slices.Contains(targets, "statusline") {
+			targets = append(targets, "statusline")
+		}
 		// A name it does not know drops out of that expansion and leaves
 		// nothing to do, so `deja uninstall claude-cod` printed not one word
 		// and exited 0 — while `deja install claude-cod` names the near miss
@@ -1075,6 +1116,16 @@ func isRealDir(p string) bool {
 	return err == nil && fi.IsDir()
 }
 
+// pruneCreatedDir removes the directory a config lived in once the config is
+// gone. os.Remove fails on a directory that is not empty, which is half the
+// rule; the other half is the record, because an empty folder the reader
+// already had is theirs and used to go with the uninstall (#3239).
+func pruneCreatedDir(dir string) {
+	if isRealDir(dir) && dirWiringCreated(dir) {
+		_ = os.Remove(dir)
+	}
+}
+
 // backupOnce reports whether it created the snapshot, so an uninstall can take
 // its own back out afterwards without touching one the user made.
 func backupOnce(path string) (bool, error) {
@@ -1207,8 +1258,46 @@ func mentionsDeja(b []byte) bool {
 			return true
 		}
 	}
+	// And the same pair the hook reader answers with: a deja-named binary
+	// running one of deja's subcommands. The list above is markers, and the
+	// statusline is written by none of them — `"command": "<path>/deja
+	// statusline"` names no key of deja's and no hook — so a snapshot of
+	// deja's own status bar survived the uninstall beside the config, naming a
+	// binary the uninstall had just orphaned (#3684).
+	return linesRunDeja(b)
+}
+
+// linesRunDeja reports whether any line of a config runs deja: a token named
+// like a deja build beside one of deja's own subcommands. Both halves are
+// required, so a path that merely contains the word and a subcommand named in
+// prose are each not enough.
+func linesRunDeja(b []byte) bool {
+	for _, line := range strings.Split(lfText(b), "\n") {
+		fields := strings.Fields(line)
+		for i := 1; i < len(fields); i++ {
+			sub := strings.Trim(fields[i], `"',;)`)
+			if !dejaSubcommandInConfigs[sub] {
+				continue
+			}
+			if hookTokenIsDejas(fields[i-1]) {
+				return true
+			}
+		}
+	}
 	return false
 }
+
+// dejaSubcommandInConfigs is every subcommand deja writes into a config: its
+// hooks, the status bar and the MCP server. Kept beside hookNames rather than
+// folded into it — that map is the hook dispatch table and a test holds it
+// against the real one.
+var dejaSubcommandInConfigs = func() map[string]bool {
+	m := map[string]bool{"statusline": true, "mcp": true}
+	for name := range hookNames {
+		m[name] = true
+	}
+	return m
+}()
 
 // lfText is the text of a config normalised to LF, for the writers that splice
 // blocks by counting newlines. They then work in one convention and
@@ -1360,14 +1449,7 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				return "", err
 			}
-			// The directory too, when deja made it and nothing else is in it.
-			// os.Remove fails on a directory that is not empty, which is half
-			// the rule; the other half is the record, because an empty folder
-			// the reader already had is theirs and used to go with the
-			// uninstall (#3239).
-			if dir := filepath.Dir(path); isRealDir(dir) && dirWiringCreated(dir) {
-				_ = os.Remove(dir)
-			}
+			pruneCreatedDir(filepath.Dir(path))
 			if snapshotTaken(path) {
 				dropOwnBackup(path)
 			}
@@ -1991,9 +2073,26 @@ func combinedStatusline(existing, exe string) string {
 	return fmt.Sprintf(`sh -c 'json=$(cat); printf "%%s" "$json" | %s; printf " · "; printf "%%s" "$json" | %s statusline'`, existing, exe)
 }
 
+// statuslineIsDejas reports whether Claude's settings carry a status bar deja
+// wrote, whatever binary that entry names.
+func statuslineIsDejas() bool {
+	b, err := os.ReadFile(filepath.Join(sources.ClaudeConfigDir(), "settings.json"))
+	if err != nil {
+		return false
+	}
+	var root map[string]any
+	if err := json.Unmarshal(b, &root); err != nil {
+		return false
+	}
+	entry, _ := root["statusLine"].(map[string]any)
+	cmd, _ := entry["command"].(string)
+	return cmd != "" && linesRunDeja([]byte(cmd))
+}
+
 // installStatusline wires `deja statusline` as the Claude Code status bar.
 // It refuses to replace a statusline the user already configured (many run
-// ccstatusline or their own script) — printing how to combine instead.
+// ccstatusline or their own script) — printing how to combine instead — and
+// rewrites one of deja's own whatever binary that entry names.
 func installStatusline(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	old, err := readConfig(path)
@@ -2008,19 +2107,43 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	}
 	cmd := exe + " statusline"
 	existing, _ := root["statusLine"].(map[string]any)
+	// Which entry is here, by the same test the hooks use: deja's own line
+	// whatever binary it names, deja's inside one the reader built, or a
+	// stranger's. Comparing against this binary's command alone meant a
+	// statusline deja wrote from a path that has since moved read as the
+	// reader's: the install refused to touch it, printing a combine line that
+	// piped the missing binary into this one, the uninstall left it, and
+	// doctor's "run `deja install claude-auto`" fixed nothing — the status bar
+	// ran a file that was not there on every refresh (#3684).
+	kind := hookNotDejas
+	if existing != nil {
+		kind = hookCommandKindOf(existing["command"], cmd)
+	}
+	note := ""
 	if uninstall {
-		if existing == nil || existing["command"] != cmd {
+		// Only when deja's line is the whole line: one the reader combined
+		// with theirs is theirs to edit.
+		if kind != hookDejas {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
 		delete(root, "statusLine")
 	} else {
-		if existing != nil && existing["command"] != cmd {
+		if kind == hookWrapsDejas {
+			// deja's statusline already runs inside a line the reader built —
+			// the combine the error below hands out. Rewriting it would throw
+			// their half away.
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
+		if existing != nil && kind == hookNotDejas {
 			// Most people already run something here. Replacing it silently
 			// would be rude, and "append our output" is not actionable — so
 			// hand over the line that runs both. Claude pipes session JSON to
 			// the command, so it is captured once and fed to each in turn.
 			prev, _ := existing["command"].(string)
 			return installResult{}, fmt.Errorf("a statusline is already configured — to keep both, set statusLine.command to:\n\n  %s", combinedStatusline(prev, exe))
+		}
+		if prev, _ := existing["command"].(string); prev != "" && prev != cmd {
+			note = "replaced the deja statusline that was already here, which ran " + strings.Fields(prev)[0]
 		}
 		// refreshInterval makes Claude Code re-run the command on a timer
 		// instead of only after a turn, so the first index build shows a
@@ -2034,7 +2157,7 @@ func installStatusline(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 func installCodex(exe string, uninstall bool) (installResult, error) {
@@ -3821,6 +3944,38 @@ func autoTargetFor(detected string) string {
 		}
 	}
 	return detected
+}
+
+// withWiredAutoTargets appends the -auto sibling of each target the record
+// says is installed, so `deja install --all` refreshes the hook layer it finds
+// rather than writing only the server one.
+//
+// It exists for DeepSeek Harness, where both layers are entries in one patch
+// list: installing the plain target there takes the auto row out and deletes
+// the plugin, which is the documented way to drop back from --auto — and it
+// meant `install --all`, the ordinary "wire everything again" command, ended
+// auto-recall for anyone who had it, with the report saying only "updated"
+// (#3687). Added after the target rather than instead of it, because most
+// -auto writers write hooks alone and the server layer still has to be run.
+func withWiredAutoTargets(targets []string) []string {
+	wired := map[string]bool{}
+	for _, t := range readWiringState().Targets {
+		wired[t] = true
+	}
+	out := make([]string, 0, len(targets))
+	for _, t := range targets {
+		out = append(out, t)
+		// Claude's detected name is not its hook target's stem, the one case
+		// withAutoTargets also has to spell out.
+		auto := strings.TrimSuffix(t, "-auto") + "-auto"
+		if t == "claude-code" {
+			auto = "claude-auto"
+		}
+		if auto != t && wired[auto] && !slices.Contains(targets, auto) {
+			out = append(out, auto)
+		}
+	}
+	return out
 }
 
 // withAutoTargets pairs each target with its -auto sibling where one exists,

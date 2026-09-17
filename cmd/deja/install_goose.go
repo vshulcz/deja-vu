@@ -97,6 +97,16 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		}
 		fmt.Fprintf(&b, "%stimeout: 60\n", val)
 		entry := b.String()
+		// Already there, exactly: leave the file as it stands. Both writers
+		// for this config remove their block and add it back, and removing
+		// the only entry takes the key with it — so each re-appended its block
+		// at the bottom, under the other's, and every `deja install goose`
+		// swapped the two keys round and reported "updated" twice with nothing
+		// to update. A config.yaml in a dotfiles repository showed a diff after
+		// each upgrade's repair (#3689).
+		if strings.Contains(body, entry) {
+			return installResult{Path: path, Action: "unchanged"}, nil
+		}
 		// An inline value — `extensions: [a, b]` or `extensions: {…}` — is not
 		// followed by a block, so the insert below missed it and appended a
 		// second `extensions:` key. A parser takes the last of two, which is
