@@ -9,7 +9,7 @@
 Kimchi Coding is another pi descendant and writes the same envelope, so the
 parsing is pi's.
 
-**Last verified:** 2026-09-16
+**Last verified:** 2026-09-17
 
 ## Known quirks and drift
 

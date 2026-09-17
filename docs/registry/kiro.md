@@ -16,7 +16,7 @@ directory per session under the workspace, holding `session.json` (id, model,
 `workspacePaths`, timestamps) and `messages.jsonl`, whose lines carry
 `payload.type` and `payload.content` with an RFC 3339 `timestamp`.
 
-**Last verified:** 2026-09-16
+**Last verified:** 2026-09-17
 
 ## Known quirks and drift
 

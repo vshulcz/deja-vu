@@ -11,7 +11,7 @@ gajae-code (`gjc`) is a pi descendant: a `session` header carrying the id and
 the cwd, then one `message` line per turn, so the parsing is pi's. The encoded
 project directory names the project, and the header's cwd wins when it is there.
 
-**Last verified:** 2026-09-16
+**Last verified:** 2026-09-17
 
 ## Known quirks and drift
 

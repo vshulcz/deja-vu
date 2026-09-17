@@ -371,6 +371,13 @@ func Registry() []Harness {
 				Match:     ZCodeUnderRoot,
 				Parse:     fullParse(ParseZCodeFile),
 				ParseFrom: offsetParse(ParseZCodeFileFromOffset),
+			}, {
+				// The CLI's database, in OpenCode's schema — the same pair Kilo
+				// has (#3675).
+				Name:      "zcode-db",
+				Match:     func(p string) bool { return p == ZCodeDB() },
+				Parse:     dbParse(ParseZCodeDB, ParseZCodeDBSince),
+				ParseFrom: dbParseFrom(ParseZCodeDB, ParseZCodeDBSince),
 			}},
 		},
 		{

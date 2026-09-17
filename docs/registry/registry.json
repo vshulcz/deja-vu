@@ -802,7 +802,9 @@
       "id": "zcode",
       "store_paths": [
         "~/.zcode/projects/*/*.jsonl",
-        "${DEJA_ZCODE_ROOT}/*/*.jsonl"
+        "${DEJA_ZCODE_ROOT}/*/*.jsonl",
+        "~/.zcode/cli/db/db.sqlite",
+        "${DEJA_ZCODE_DB}"
       ],
       "format_kind": "jsonl",
       "fixture_paths": [
@@ -810,7 +812,7 @@
       ],
       "parser_source": "internal/sources/zcode.go",
       "display_name": "ZCode",
-      "last_verified": "2026-09-16",
+      "last_verified": "2026-09-17",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -818,7 +820,7 @@
         "command": false,
         "resume": false,
         "handoff": "paste",
-        "prereq": "none"
+        "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {
         "skill": {

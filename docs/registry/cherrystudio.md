@@ -10,7 +10,7 @@
 Cherry Studio runs Claude Code sessions from a desktop app and writes ordinary
 Claude Code transcripts under its own app data, so the parsing is Claude's.
 
-**Last verified:** 2026-09-16
+**Last verified:** 2026-09-17
 
 The fixture in this repository sits at `fixtures/registry/cherrystudio/projects/…` rather than
 under a `.claude` directory: the repository excludes `.claude/`, so a fixture carrying that
