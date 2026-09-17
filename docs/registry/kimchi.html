@@ -39,13 +39,17 @@
 <h1>Kimchi Coding</h1>
 <ul>
 <li><strong>ID</strong>: <code>kimchi</code></li>
-<li><strong>Store</strong>: <code>${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/&lt;session&gt;.jsonl</code></li>
+<li><strong>Store</strong>: <code>${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/--&lt;encoded-cwd&gt;--/&lt;session&gt;.jsonl</code></li>
 <li><strong>Read override</strong>: <code>DEJA_KIMCHI_ROOT</code> replaces the session root</li>
 <li><strong>Format</strong>: pi&#39;s session JSONL</li>
 <li><strong>Needs</strong>: nothing</li>
 </ul>
 <p>Kimchi Coding is another pi descendant and writes the same envelope, so the</p>
-<p>parsing is pi&#39;s.</p>
+<p>parsing is pi&#39;s — including the directory per project. Its own binary builds</p>
+<p>that path in <code>getDefaultSessionDirPath</code>: <code>&lt;agent&gt;/sessions/--&lt;encoded cwd&gt;--</code>,</p>
+<p>where the encoding is the working directory with the separators replaced by</p>
+<p>dashes and a <code>--</code> on each end. A session file directly under the root is read</p>
+<p>too, and then the header&#39;s <code>cwd</code> is what names the project.</p>
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>

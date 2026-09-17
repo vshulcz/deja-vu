@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -100,8 +101,23 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 		t.Errorf("senpi messages = %+v", ss[0].Messages)
 	}
 
+	// Kimchi keeps a directory per project, the way pi does: its own binary
+	// builds `<agent>/sessions/--<encoded cwd>--` in getDefaultSessionDirPath.
+	// The fixture is laid out that way, and the walk has to find it — a flat
+	// listing would read nothing on a real machine (#3678).
 	kroot := fixtureRoot(t, "kimchi", "DEJA_KIMCHI_ROOT")
-	ks, err := ParseKimchiFile(filepath.Join(kroot, "session.jsonl"))
+	nested := filepath.Join(kroot, "--workspace-kimchi-demo--", "session.jsonl")
+	files := KimchiSessionFiles()
+	found := false
+	for _, f := range files {
+		if f == nested {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the per-project transcript is not in the file list: %v", files)
+	}
+	ks, err := ParseKimchiFile(nested)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,13 +127,33 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	if ks[0].Harness != "kimchi" {
 		t.Errorf("harness = %q, want kimchi", ks[0].Harness)
 	}
-	// The root is flat, so the header's cwd is the only thing that names the
-	// project: dropped, every Kimchi session lands under no project at all.
+	// The header's cwd is what names the project — authoritative, and on a real
+	// machine the encoded directory is built from the same value, so the layout
+	// must not change the attribution. The flat case below asserts that pair.
 	if ks[0].Project != "kimchi/demo" {
 		t.Errorf("project = %q, want it from the header's cwd", ks[0].Project)
 	}
 	if ks[0].ID != "reg-kimchi-001" {
 		t.Errorf("id = %q, want the header's id", ks[0].ID)
+	}
+
+	// And a session file sitting directly under the root is still read, with
+	// the header's cwd naming the project.
+	flat := filepath.Join(t.TempDir(), "session.jsonl")
+	body, err := os.ReadFile(nested)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(flat, body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_KIMCHI_ROOT", filepath.Dir(flat))
+	fs, err := ParseKimchiFile(flat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) != 1 || fs[0].Project != ks[0].Project {
+		t.Errorf("flat file: %+v, want the same project the nested one got (%q)", fs, ks[0].Project)
 	}
 }
 

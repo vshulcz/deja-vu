@@ -732,12 +732,12 @@
     {
       "id": "kimchi",
       "store_paths": [
-        "${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/*.jsonl",
-        "${DEJA_KIMCHI_ROOT}/*.jsonl"
+        "${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/--<encoded-cwd>--/*.jsonl",
+        "${DEJA_KIMCHI_ROOT}/**/*.jsonl"
       ],
       "format_kind": "jsonl",
       "fixture_paths": [
-        "fixtures/registry/kimchi/session.jsonl"
+        "fixtures/registry/kimchi/--workspace-kimchi-demo--/session.jsonl"
       ],
       "parser_source": "internal/sources/senpi.go",
       "display_name": "Kimchi Coding",

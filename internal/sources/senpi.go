@@ -96,8 +96,11 @@ func ParseKimchiFile(path string) ([]model.Session, error) {
 	return ParseKimchiFileFromOffset(path, 0)
 }
 
-// ParseKimchiFileFromOffset is the incremental read. The root is flat, so the
-// header's cwd is what names the project.
+// ParseKimchiFileFromOffset is the incremental read. Kimchi keeps a directory
+// per project the way pi does — `getDefaultSessionDirPath` in its own binary
+// builds `<agent>/sessions/--<encoded cwd>--` — so the directory names the
+// project when there is one, and the header's cwd answers for a session file
+// that sits directly under the root (#3678).
 func ParseKimchiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parsePiShaped(path, offset, "kimchi", kimchiProject(path), true)
 }

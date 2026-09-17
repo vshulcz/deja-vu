@@ -1,13 +1,17 @@
 # Kimchi Coding
 
 - **ID**: `kimchi`
-- **Store**: `${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/<session>.jsonl`
+- **Store**: `${KIMCHI_CODING_AGENT_DIR:-${XDG_CONFIG_HOME:-~/.config}/kimchi/harness}/sessions/--<encoded-cwd>--/<session>.jsonl`
 - **Read override**: `DEJA_KIMCHI_ROOT` replaces the session root
 - **Format**: pi's session JSONL
 - **Needs**: nothing
 
 Kimchi Coding is another pi descendant and writes the same envelope, so the
-parsing is pi's.
+parsing is pi's — including the directory per project. Its own binary builds
+that path in `getDefaultSessionDirPath`: `<agent>/sessions/--<encoded cwd>--`,
+where the encoding is the working directory with the separators replaced by
+dashes and a `--` on each end. A session file directly under the root is read
+too, and then the header's `cwd` is what names the project.
 
 **Last verified:** 2026-09-17
 

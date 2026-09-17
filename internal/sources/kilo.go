@@ -142,14 +142,14 @@ func vsCodeUserDir(host string) string {
 	}
 }
 
-// kiloUnderTasks reports whether a path is inside one of the extension roots,
-// so the registry can claim it for incremental ingest.
 // KiloTaskPath reports whether a path is an extension task rather than a CLI
 // session. The two halves of Kilo's store need telling apart outside this
 // package: a task reopens from the editor's history view, a CLI session takes
 // `kilo -s`.
 func KiloTaskPath(p string) bool { return kiloUnderTasks(p) }
 
+// kiloUnderTasks reports whether a path is inside one of the extension roots,
+// so the registry can claim it for incremental ingest.
 func kiloUnderTasks(p string) bool {
 	for _, root := range KiloRoots() {
 		if strings.HasPrefix(p, filepath.Join(root, "tasks")) {
