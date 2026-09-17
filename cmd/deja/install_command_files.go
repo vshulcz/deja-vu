@@ -60,18 +60,6 @@ description: Search this machine's past AI coding sessions (deja-vu)
 ` + commandBody(exe, "$ARGUMENTS")
 }
 
-// tomlCommand is Gemini's shape: a description line and a prompt string. Args
-// arrive through {{args}}; without it the CLI appends them to the prompt, which
-// would read as an unrelated paragraph.
-//
-// The prompt is a literal string, not a basic one. A Windows exe path is full
-// of backslashes, and TOML reads those as escapes inside "…" — C:\Users would
-// have become an invalid escape and taken the whole file with it.
-func tomlCommand(exe string) string {
-	return "description = \"Search this machine's past AI coding sessions (deja-vu)\"\nprompt = '''\n" +
-		commandBody(exe, "{{args}}") + "'''\n"
-}
-
 // commandFilePaths is where each harness reads a user-level command from.
 func commandFilePath(harness string) string {
 	switch harness {
@@ -83,16 +71,6 @@ func commandFilePath(harness string) string {
 		return filepath.Join(homeDir(), ".roo", "commands", "deja.md")
 	case "crush":
 		return crushCommandPath()
-	case "gemini":
-		// `deja-search`, not `deja`. Gemini's command namespace is flat and it
-		// also lists the MCP server's own prompt, which deja names `deja` on
-		// every host — so two entries claimed one name and Gemini renamed both
-		// of them: "User command '/deja' was renamed to '/user.deja'", "MCP
-		// server 'deja' command '/deja' was renamed to '/deja.deja'". The name
-		// the receipt tells people to type then belonged to nothing. Under a
-		// name of its own the file keeps `/deja-search` and the prompt keeps
-		// `/deja` (#3655).
-		return filepath.Join(sources.GeminiHome(), "commands", "deja-search.toml")
 	case "commandcode":
 		// `~/.commandcode/commands/<name>.md`, the name taken from the
 		// basename — the surface two independent integrations describe from
@@ -120,10 +98,16 @@ func commandFilePath(harness string) string {
 	return ""
 }
 
+// Gemini deliberately has no entry in commandFilePath. Its command namespace is
+// flat and everything deja installs lands in it: the MCP server's own prompt is
+// `/deja`, and each skill deja writes is a command too — which Gemini's own
+// screen says out loud. A file of ours collided with the prompt first ("User
+// command '/deja' was renamed to '/user.deja'"), and once renamed to
+// `deja-search` it collided with deja's CLI skill instead ("Skill command
+// '/deja-search' was renamed to '/deja-search1'"). A third name would add a
+// third entry doing what the other two already do, so Gemini joins the eight
+// harnesses where the skill is the command (#3665).
 func commandFileText(harness, exe string) string {
-	if harness == "gemini" {
-		return tomlCommand(exe)
-	}
 	return markdownCommand(exe)
 }
 
@@ -137,6 +121,15 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	}
 	path := commandFilePath(harness)
 	if path == "" {
+		// A harness with no command of ours may still be carrying one an older
+		// deja wrote. Gemini is the case: both names it used claim something
+		// its own skills already have, so they come out here rather than
+		// outliving the fix for everyone who installed before (#3665).
+		if !uninstall {
+			if err := dropRetiredCommandFile(harness); err != nil {
+				return installResult{}, err
+			}
+		}
 		return installResult{}, nil
 	}
 	if uninstall {
@@ -205,7 +198,13 @@ func isOurCommandFile(b []byte) bool {
 // uses, by harness.
 func retiredCommandFiles(harness string) []string {
 	if harness == "gemini" {
-		return []string{filepath.Join(sources.GeminiHome(), "commands", "deja.toml")}
+		// Both names this file has had. Gemini has no command of deja's own
+		// any more — see the comment above commandFileText — and either
+		// leftover claims a name one of deja's own skills already has.
+		return []string{
+			filepath.Join(sources.GeminiHome(), "commands", "deja.toml"),
+			filepath.Join(sources.GeminiHome(), "commands", "deja-search.toml"),
+		}
 	}
 	return nil
 }

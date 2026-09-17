@@ -16,7 +16,9 @@ import (
 // Gemini's own screen (#3655, #3664).
 //
 // The name matters as much as the state here: it is what the reader types, and
-// two of these are not `deja`.
+// not all of these are `deja`. Gemini has no row because it has no command file
+// of deja's: its skills are commands, and a file beside them was one entry too
+// many (#3665).
 func doctorCommands(w io.Writer) {
 	fmt.Fprintln(w, "Commands:")
 	for _, c := range doctorCommandFiles() {
@@ -37,7 +39,7 @@ func doctorCommandFiles() []doctorCommandFile {
 	}
 	// The shared table, in the order `deja install --all` walks it.
 	for _, name := range []string{
-		"opencode", "cursor", "gemini", "roo", "kilocode", "crush",
+		"opencode", "cursor", "roo", "kilocode", "crush",
 		"omp", "gjc", "commandcode",
 	} {
 		if p := commandFilePath(name); p != "" {

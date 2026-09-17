@@ -601,11 +601,6 @@
       "path": "<tmp>/home/.cursor/commands/deja.md"
     },
     {
-      "name": "gemini",
-      "state": "missing",
-      "path": "<tmp>/home/.gemini/commands/deja-search.toml"
-    },
-    {
       "name": "roo",
       "state": "missing",
       "path": "<tmp>/home/.roo/commands/deja.md"

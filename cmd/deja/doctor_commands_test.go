@@ -32,8 +32,11 @@ func TestEveryCommandFileHasADoctorRow(t *testing.T) {
 			t.Errorf("%s: row names %s, install writes %s", h, got, want)
 		}
 	}
-	if rows["gemini"] == "" || !strings.HasSuffix(rows["gemini"], "deja-search.toml") {
-		t.Errorf("gemini's row must name the file install writes, got %q", rows["gemini"])
+	// Gemini is the harness with no row, and that is the claim worth pinning:
+	// its skills are already commands, so a file of deja's beside them got
+	// renamed by Gemini itself (#3665).
+	if p, ok := rows["gemini"]; ok {
+		t.Errorf("gemini has no command file and doctor claims %q", p)
 	}
 }
 
@@ -69,7 +72,7 @@ func TestDoctorPrintsTheCommandsSection(t *testing.T) {
 	if !strings.HasPrefix(text, "Commands:\n") {
 		t.Fatalf("no heading:\n%s", text)
 	}
-	for _, name := range []string{"claude-code", "gemini", "copilot-chat"} {
+	for _, name := range []string{"claude-code", "cursor", "copilot-chat"} {
 		if !strings.Contains(text, "  "+name) {
 			t.Errorf("no row for %s:\n%s", name, text)
 		}
