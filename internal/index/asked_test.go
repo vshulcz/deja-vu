@@ -151,6 +151,47 @@ func TestFindAskedTwicePicksTheWidestSpan(t *testing.T) {
 	}
 }
 
+// A resume, a fork or a share writes one conversation under a second session
+// id, and every question in it repeats verbatim. On a real 2,300-session store
+// all ten repeats at least 48 hours apart were this, so the only thing the
+// line ever had to show was the reader's own continued conversation (#3711).
+func TestFindAskedTwiceIgnoresOneConversationUnderTwoIDs(t *testing.T) {
+	turns := []string{
+		"why does the connection pool exhaust under load?",
+		"how do we roll the jwks cache without a stampede?",
+		"what did we decide about the retry budget here?",
+		"why is the nightly reindex slower than the full one?",
+	}
+	resumed := append(append([]string{}, turns...), "should the worker take its own pool?")
+	dir := askedFixture(t,
+		map[string][]string{"a": turns, "b": resumed},
+		map[string]string{
+			"a": "2026-03-01T10:00:00Z",
+			"b": "2026-05-01T10:00:00Z",
+		})
+	if got, ok := FindAskedTwice(dir, nil); ok {
+		t.Fatalf("one conversation under two ids is not a question asked twice: %q", got.Text)
+	}
+
+	// The case the surface exists for still fires: two sessions that share the
+	// question and nothing else. This is why the copy test excludes the hash
+	// they matched on — counting it would drop exactly this pair.
+	q := "why does the connection pool exhaust under load?"
+	dir = askedFixture(t,
+		map[string][]string{
+			"c": append([]string{q}, "what does the deploy script do about migrations?"),
+			"d": append([]string{q}, "how do i make the flaky cache test stop failing?"),
+		},
+		map[string]string{
+			"c": "2026-03-01T10:00:00Z",
+			"d": "2026-05-01T10:00:00Z",
+		})
+	got, ok := FindAskedTwice(dir, nil)
+	if !ok || got.Text != q {
+		t.Fatalf("two sessions sharing one question is the repeat worth showing: ok=%v text=%q", ok, got.Text)
+	}
+}
+
 func TestFindAskedTwiceStaysQuietWithoutARepeat(t *testing.T) {
 	dir := askedFixture(t,
 		map[string][]string{"a": {"why does the pool exhaust under load?"}},

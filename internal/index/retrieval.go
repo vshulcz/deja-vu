@@ -4480,6 +4480,10 @@ func FindAskedTwice(dir string, allow func(project string) bool) (AskedTwice, bo
 			continue
 		}
 		sort.Slice(metas, func(i, j int) bool { return newestFirstMeta(metas[i], metas[j]) })
+		metas = oneConversationEach(metas, h)
+		if len(metas) < 2 {
+			continue
+		}
 		span := metas[0].Updated.Sub(metas[len(metas)-1].Updated)
 		// Time between the askings, not the number of them. The same question
 		// sixteen times in one afternoon is somebody retrying; the same question
@@ -4501,6 +4505,67 @@ func FindAskedTwice(dir string, allow func(project string) bool) (AskedTwice, bo
 	}
 	return AskedTwice{Text: text, Sessions: best}, true
 }
+
+// oneConversationEach keeps one session per conversation. A resume, a fork or
+// a share writes the same conversation under a second key, and both keys carry
+// the same asked hashes — so "you asked this in two sessions" was the reader's
+// own continued conversation, told back to them as a repeat. Measured on a
+// 2,300-session store: all ten repeats at least 48 hours apart were one
+// conversation under several keys, and the line had never had anything else to
+// show (#3711).
+//
+// The signal is in the manifest, so this costs no record read: the two
+// sessions' asked sets, minus the hash they matched on. Two sessions that share
+// only the question itself are the case this surface exists for and must
+// survive, which is why want is excluded rather than counted. A third of the
+// rest in common is a copy; on that store the verdict was the same anywhere
+// between a fifth and a half, and dropped nine of the ten.
+func oneConversationEach(metas []SessionMeta, want uint64) []SessionMeta {
+	var out []SessionMeta
+	for _, meta := range metas {
+		copyOf := false
+		for _, kept := range out {
+			if sameConversation(kept, meta, want) {
+				copyOf = true
+				break
+			}
+		}
+		if !copyOf {
+			out = append(out, meta)
+		}
+	}
+	return out
+}
+
+// sameConversation reports whether two sessions look like one conversation
+// written twice, judged by the asked hashes they hold besides want.
+func sameConversation(a, b SessionMeta, want uint64) bool {
+	in := map[uint64]bool{}
+	for _, h := range a.Asked {
+		if h != want {
+			in[h] = true
+		}
+	}
+	both, union := 0, len(in)
+	for _, h := range b.Asked {
+		if h == want {
+			continue
+		}
+		if in[h] {
+			both++
+			continue
+		}
+		union++
+	}
+	if union == 0 {
+		return false
+	}
+	return float64(both)/float64(union) >= askedCopyShare
+}
+
+// askedCopyShare is how much of two sessions' other questions must coincide
+// before they are read as one conversation rather than two askings.
+const askedCopyShare = 1.0 / 3.0
 
 // askedTextFor recovers what a hash stood for by reading back the sessions that
 // carry it, stopping at the first one that yields the question.
