@@ -41,8 +41,15 @@ func suggestFirstQuery(dir string) string {
 	// how often a word appears in withheld sessions decide which of the
 	// reader's own phrases gets shown.
 	df := map[string]int{}
+	// The pair's own document frequency, not only each word's. Scoring on the
+	// words alone maximises rarity, and the rarest surviving pair on a store
+	// with prose in it is a fragment of one sentence: measured on a
+	// 2,421-session store, the pick was a verb and its object lifted out of a
+	// single message, the subject of neither session that held it (#3714).
+	pairDF := map[string]int{}
 	for _, s := range ss {
 		seen := map[string]bool{}
+		seenPair := map[string]bool{}
 		for _, m := range s.Messages {
 			if digest.IsAgentArtifact(m.Text) {
 				continue
@@ -51,6 +58,17 @@ func suggestFirstQuery(dir string) string {
 				if !seen[tok] {
 					seen[tok] = true
 					df[tok]++
+				}
+			}
+			toks := suggestPhraseTokens(m.Text)
+			for i := 0; i+1 < len(toks); i++ {
+				if toks[i] == "" || toks[i+1] == "" {
+					continue
+				}
+				p := toks[i] + " " + toks[i+1]
+				if !seenPair[p] {
+					seenPair[p] = true
+					pairDF[p]++
 				}
 			}
 		}
@@ -86,6 +104,15 @@ func suggestFirstQuery(dir string) string {
 				if df[a] < 2 || df[b] < 2 {
 					continue
 				}
+				// And so must the pair. On the store above, raising this bar
+				// moved the suggestion from a sentence fragment in 2 sessions
+				// to a phrase in 3 and lifted what a reader running it gets
+				// back from 10 sessions to 18. Two on a young store, where
+				// three of anything is most of the history and the line would
+				// simply go missing from the first screen.
+				if pairDF[a+" "+b] < minPairSessions(len(ss)) {
+					continue
+				}
 				score := math.Log(total/float64(df[a])) + math.Log(total/float64(df[b]))
 				if score > bestScore+1e-9 {
 					bestScore = score
@@ -99,6 +126,19 @@ func suggestFirstQuery(dir string) string {
 	}
 	return best
 }
+
+// minPairSessions is how often a phrase has to recur before it is worth
+// suggesting, which depends on how much history there is to recur in.
+func minPairSessions(sessions int) int {
+	if sessions < suggestBigStore {
+		return 2
+	}
+	return 3
+}
+
+// suggestBigStore is where a store stops being young. Below it, a phrase in
+// three sessions is a large share of everything said.
+const suggestBigStore = 100
 
 // suggestPhraseTokens is suggestTokens with a gap marker: an empty string
 // wherever a word was dropped, so callers can tell a real phrase from two words

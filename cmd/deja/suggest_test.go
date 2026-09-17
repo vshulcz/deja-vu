@@ -43,6 +43,50 @@ func TestSuggestFirstQueryPicksDistinctiveRecentPhrase(t *testing.T) {
 	}
 }
 
+// Scoring two words by rarity alone picks the rarest pair, and on a store with
+// prose in it that is a fragment of one sentence: on a 2,421-session store the
+// pick was a verb and its object out of a single message, the subject of
+// neither session that held it, while requiring the pair itself to recur moved
+// what a reader running it gets back from 10 sessions to 18 (#3714).
+func TestSuggestFirstQueryNeedsThePhraseToRecur(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude", "proj-a")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	now := "2026-07-20T10:00:00Z"
+	mk := func(id, text string) string {
+		return `{"type":"user","sessionId":"` + id + `","cwd":"/w/a","timestamp":"` + now + `","message":{"role":"user","content":"` + text + `"}}` + "\n"
+	}
+	// "quokka thimble" is the rarest pair and it is said once. Both of its
+	// words recur, which is all the old rule asked of them: each appears in a
+	// second session, apart. "jwks rotation" is said in two.
+	files := map[string]string{
+		"s1": mk("s1", "the quokka thimble stalls under load"),
+		"s2": mk("s2", "quokka counters look wrong here"),
+		"s3": mk("s3", "thimble metrics never reach the collector"),
+		"s4": mk("s4", "jwks rotation broke login again today"),
+		"s5": mk("s5", "jwks rotation cache still stale"),
+	}
+	for id, body := range files {
+		if err := os.WriteFile(filepath.Join(root, id+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	got := suggestFirstQuery(dir)
+	if strings.Contains(got, "quokka") || strings.Contains(got, "thimble") {
+		t.Fatalf("suggestion = %q, a pair said once — a reader running it gets the one session it came from", got)
+	}
+	if !strings.Contains(got, "jwks") {
+		t.Fatalf("suggestion = %q, want the phrase that recurs", got)
+	}
+}
+
 func TestSuggestFirstQueryEmptyOnThinCorpus(t *testing.T) {
 	hermeticEnv(t)
 	if got := suggestFirstQuery(index.DefaultDir()); got != "" {
