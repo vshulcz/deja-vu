@@ -35,8 +35,8 @@ func installAider(_ string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	path := filepath.Join(home, ".aider.conf.yml")
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	next := removeAiderReadEntry(string(old))

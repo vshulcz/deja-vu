@@ -1392,7 +1392,40 @@ func readConfig(path string) ([]byte, error) {
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
 	}
-	return b, nil
+	return bytes.TrimPrefix(b, utf8BOM), nil
+}
+
+// utf8BOM is what PowerShell 5.1 puts at the front of a file by default —
+// `Set-Content`, `Out-File`, a `>` redirect — and what editors on Windows may
+// too. Every JSON parser here refused such a config, so nine targets reported
+// `invalid character '<BOM>' looking for beginning of value`: a remedy naming
+// a character that cannot be seen, in a file its owner did not knowingly
+// change, and one a harness may well read — VS Code's own readers strip a BOM
+// (#3696). It belongs with the line endings and the indent: read past it,
+// write it back.
+var utf8BOM = []byte{0xEF, 0xBB, 0xBF}
+
+// matchByteOrderMark puts back the mark the file began with, for a writer that
+// worked on the text without it.
+func matchByteOrderMark(old, next []byte) []byte {
+	if !bytes.HasPrefix(old, utf8BOM) || bytes.HasPrefix(next, utf8BOM) || len(next) == 0 {
+		return next
+	}
+	return append(append([]byte(nil), utf8BOM...), next...)
+}
+
+// fileStartsWithBOM reports whether the file on disk begins with the mark.
+// Read from the file rather than from the bytes a writer holds, because
+// readConfig takes it off before any of them sees the text.
+func fileStartsWithBOM(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	var head [3]byte
+	n, _ := f.Read(head[:])
+	return n == len(utf8BOM) && bytes.Equal(head[:], utf8BOM)
 }
 
 func writeIfChanged(path string, old, next []byte) (string, error) {
@@ -1412,6 +1445,11 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// rewrite the file and report it changed.
 	next = matchLineEndings(old, next)
 	next = matchFinalNewline(old, next)
+	// The byte order mark is read off the file rather than out of `old`:
+	// readConfig strips it, so every writer works on the text without it and
+	// this is the one place that knows the file had one (#3696). The
+	// comparison is of the text, and the mark goes back on what is written.
+	bom := fileStartsWithBOM(path)
 	if bytes.Equal(old, next) {
 		return "unchanged", nil
 	}
@@ -1524,6 +1562,9 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	}
 	tmpName := tmp.Name()
 	defer func() { _ = os.Remove(tmpName) }()
+	if bom {
+		next = matchByteOrderMark(utf8BOM, next)
+	}
 	if _, err := tmp.Write(next); err != nil {
 		_ = tmp.Close()
 		return "", err

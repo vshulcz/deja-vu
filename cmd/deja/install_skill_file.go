@@ -11,8 +11,8 @@ import (
 // the file is deja's own so an edited copy is kept rather than replaced, an
 // unchanged file reports unchanged, and an uninstall leaves nothing behind.
 func installSkillFile(path string, uninstall bool) (installResult, error) {
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	if uninstall {

@@ -204,8 +204,8 @@ func yamlQuote(s string) string {
 // and `hermes mcp add` prompts before saving, which an installer cannot answer.
 func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(sources.HermesHome(), "config.yaml")
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	next := removeHermesMCPBlock(lfText(old))

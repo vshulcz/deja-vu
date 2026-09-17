@@ -156,8 +156,8 @@ func keepTrailingNewline(old, next string) string {
 
 func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(gooseConfigDir(), "config.yaml")
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	recipe := gooseRecipePath()

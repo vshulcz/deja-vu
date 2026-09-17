@@ -41,8 +41,8 @@ const continuePromptBody = "Search this machine's past AI coding sessions with t
 
 func installContinue(exe string, uninstall bool) (installResult, error) {
 	path := continueConfigPath()
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	body, crlf := normaliseNewlines(string(old))

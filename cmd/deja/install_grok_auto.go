@@ -41,8 +41,8 @@ func grokHooksPath() string {
 func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
 	path := grokHooksPath()
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	var root map[string]any

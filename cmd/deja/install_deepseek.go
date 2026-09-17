@@ -401,8 +401,8 @@ func installDeepSeekAuto(exe string, uninstall bool) (installResult, error) {
 
 func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error) {
 	path := filepath.Join(sources.DSHHome(), "cordis.patch.yml")
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	if uninstall {

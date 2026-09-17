@@ -34,8 +34,8 @@ const cherryStudioImportNote = "import it in Cherry Studio: Settings → MCP →
 
 func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 	path := cherryStudioImportPath()
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	if uninstall {

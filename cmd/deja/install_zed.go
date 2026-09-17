@@ -32,8 +32,8 @@ const zedLegacyServerID = "deja"
 
 // installZedMCP adds or removes deja's entry in Zed's settings.
 func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
-	old, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
+	old, err := readConfig(path)
+	if err != nil {
 		return installResult{}, err
 	}
 	entry, err := zedEntryJSON(exe)

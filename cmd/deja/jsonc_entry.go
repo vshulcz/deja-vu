@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 )
 
@@ -604,10 +603,11 @@ func jsoncIsKey(text string, end int) bool {
 // before the first write rather than after it.
 func readableStrictJSON(paths ...string) error {
 	for _, path := range paths {
-		b, err := os.ReadFile(path)
-		if os.IsNotExist(err) {
-			continue
-		}
+		// readConfig, for the byte order mark it takes off: this pre-flight
+		// reads the file the writers are about to read, and reading it more
+		// strictly than they do refuses a config they would have written
+		// (#3696).
+		b, err := readConfig(path)
 		if err != nil {
 			return err
 		}
