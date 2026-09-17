@@ -62,6 +62,7 @@ func main() {
 	skipAbs := flag.Bool("skip-abs", false, "skip abstention (_abs) questions, matching cleaned-dataset runs")
 	verbose := flag.Bool("v", false, "log per-question results")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
+	dumpAll := flag.Bool("dump-all", false, "with -dump-misses, write every question rather than only the ones ranked worse than 1 — a reordering can only be judged against what it would demote as well as what it would lift")
 	hookPrecision := flag.Int("hook-precision", 0, "measure the auto-recall hook gate on N cross-paired prompts (0 = off)")
 	answerCarry := flag.Int("answer-carry", 0, "measure how often the injected block carries the gold answer's words (0 = off)")
 	gateSignals := flag.Int("gate-signals", 0, "compare the gate's inputs on haystacks that hold the answer and haystacks that do not (0 = off)")
@@ -164,7 +165,7 @@ func main() {
 				}
 			}
 		}
-		if missFile != nil && rank != 1 {
+		if missFile != nil && (rank != 1 || *dumpAll) {
 			rec := map[string]any{
 				"question_id": q.QuestionID,
 				"type":        q.QuestionType,

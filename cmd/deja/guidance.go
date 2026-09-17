@@ -599,6 +599,15 @@ func updateGuidanceBlock(old string, uninstall bool) (string, error) {
 		if start < 0 || end < 0 {
 			break
 		}
+		// The blank line install put between their text and the block goes
+		// with it. Install trims the trailing newlines and appends
+		// `newline + newline + block`; cutting the block alone left that
+		// separator behind, so a round trip gave the reader's AGENTS.md back
+		// one line longer than it was — the same cost #2606 fixed on the goose
+		// side from the other direction (#3703).
+		if strings.HasSuffix(old[:start], newline+newline) {
+			start -= len(newline)
+		}
 		old = old[:start] + old[end:]
 	}
 	if uninstall {
