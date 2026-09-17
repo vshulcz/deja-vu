@@ -300,6 +300,13 @@ func doctorCodexHook(w io.Writer) {
 	if status == "untrusted" {
 		line += "  (codex has not been shown it — open codex once and approve it, or run /hooks; until then `codex exec` runs no hook at all)"
 	}
+	// Trust is per hook there, so a machine can have one approved hook and
+	// four that codex refuses to run — which it says on its own first screen
+	// and this row used to call `wired` (#3654).
+	if status == "wired" && st.pinned > 0 && st.approved < st.pinned {
+		line += fmt.Sprintf("\n               %d of %d hooks approved — codex runs only those; open codex once and approve the rest (/hooks)",
+			st.approved, st.pinned)
+	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
 	}

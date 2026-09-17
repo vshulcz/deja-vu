@@ -174,6 +174,10 @@ func doctorAutoRecall(w io.Writer) {
 		}
 		if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", exe)
+		} else if other := otherBinaryNote(path, a.name+"-auto"); other != "" {
+			// The quieter half of the same question: the binary is there and is
+			// not this one, which works until that file goes (#3656).
+			fmt.Fprintf(w, "  %-12s %s\n", "", other)
 		}
 		if note := doctorLauncherNote(path, a.name+"-auto"); note != "" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)

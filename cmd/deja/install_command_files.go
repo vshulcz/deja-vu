@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,7 +84,15 @@ func commandFilePath(harness string) string {
 	case "crush":
 		return crushCommandPath()
 	case "gemini":
-		return filepath.Join(sources.GeminiHome(), "commands", "deja.toml")
+		// `deja-search`, not `deja`. Gemini's command namespace is flat and it
+		// also lists the MCP server's own prompt, which deja names `deja` on
+		// every host — so two entries claimed one name and Gemini renamed both
+		// of them: "User command '/deja' was renamed to '/user.deja'", "MCP
+		// server 'deja' command '/deja' was renamed to '/deja.deja'". The name
+		// the receipt tells people to type then belonged to nothing. Under a
+		// name of its own the file keeps `/deja-search` and the prompt keeps
+		// `/deja` (#3655).
+		return filepath.Join(sources.GeminiHome(), "commands", "deja-search.toml")
 	case "commandcode":
 		// `~/.commandcode/commands/<name>.md`, the name taken from the
 		// basename — the surface two independent integrations describe from
@@ -158,6 +167,13 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return installResult{}, err
 	}
+	// A command file deja used to write under another name is dropped here
+	// rather than left beside the new one: for gemini the old name is what
+	// collided with the server's prompt, so leaving it keeps the bug for
+	// everyone who installed before the rename (#3655).
+	if err := dropRetiredCommandFile(harness); err != nil {
+		return installResult{}, err
+	}
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err
@@ -166,7 +182,48 @@ func installCommandFile(harness, exe string, uninstall bool) (installResult, err
 	return installResult{Path: path, Action: a}, err
 }
 
-// isOurCommandFile reports that a command file is one deja generated rather than
-// one the reader wrote at the same path. Every generated one names the binary's
-// own subcommands, which is what mentionsDeja reads.
-func isOurCommandFile(b []byte) bool { return mentionsDeja(b) }
+// isOurCommandFile reports that a command file is one deja generated rather
+// than one the reader wrote at the same path.
+//
+// Not mentionsDeja: that reads the markers deja leaves in *configs* — a hook
+// subcommand, an `[mcp_servers.deja]` header, a server id — and a command file
+// carries none of them. It is prose telling the model to call the recall tool,
+// so what identifies it is the description deja writes and the sentence that
+// names the tool. Asking mentionsDeja meant the answer was always no, which
+// silently turned the uninstall restore into a no-op and would have done the
+// same to the retired-name drop (#3655).
+func isOurCommandFile(b []byte) bool {
+	for _, marker := range []string{"(deja-vu)", "the deja recall tool", "deja MCP tools"} {
+		if bytes.Contains(b, []byte(marker)) {
+			return true
+		}
+	}
+	return mentionsDeja(b)
+}
+
+// retiredCommandFiles are command files deja wrote under a name it no longer
+// uses, by harness.
+func retiredCommandFiles(harness string) []string {
+	if harness == "gemini" {
+		return []string{filepath.Join(sources.GeminiHome(), "commands", "deja.toml")}
+	}
+	return nil
+}
+
+// dropRetiredCommandFile removes those, and only when the file is still deja's
+// own: a reader who wrote their own /deja for gemini keeps it.
+func dropRetiredCommandFile(harness string) error {
+	for _, path := range retiredCommandFiles(harness) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		if !isOurCommandFile(b) {
+			continue
+		}
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}

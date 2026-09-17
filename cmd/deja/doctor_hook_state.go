@@ -24,6 +24,10 @@ type hookWiringState struct {
 	// trustUnknown is codex's own state: hooks.json is wired and its trust
 	// store cannot be read, so whether codex will run the hook is unknown.
 	trustUnknown bool
+	// approved counts the hooks codex has a trust pin for, of the pinned it
+	// was asked about. Both are zero when the config could not be read.
+	approved int
+	pinned   int
 }
 
 // claudeHookWiringState reads ~/.claude/settings.json and decides the row.
@@ -112,6 +116,12 @@ func codexHookWiringState() hookWiringState {
 	if st.state != "wired" {
 		return st
 	}
+	// Trust is per hook, not per file. A machine that approved deja's hook
+	// when there was one and has five now sits with four unapproved, and codex
+	// runs none of those — its own screen says so ("5 hooks are new or
+	// changed… Continue without trusting (hooks won't run)") while this row
+	// said `wired` because the session_start pin was there (#3654).
+	st.approved, st.pinned = codexApprovedHooks(string(cfg), codexHookWiring)
 	for _, h := range codexHookWiring {
 		if !hookEventWired(st.hooks, h.Event, h.Sub) {
 			st.missing = append(st.missing, h.Event)
@@ -121,4 +131,37 @@ func codexHookWiringState() hookWiringState {
 		st.state = "out of date"
 	}
 	return st
+}
+
+// codexApprovedHooks counts how many of the events deja wrote carry a trust
+// pin in codex's config, and how many were looked for.
+//
+// The keys are `[hooks.state."<path>/hooks.json:<event>:<i>:<j>"]` with the
+// event in snake_case — `session_start`, `user_prompt_submit`, `pre_tool_use`,
+// `post_tool_use`, `pre_compact` — so the count is a read of the same store the
+// single-hook check already parses.
+func codexApprovedHooks(cfg string, wiring []struct{ Event, Sub, Matcher string }) (approved, pinned int) {
+	for _, h := range wiring {
+		pinned++
+		if strings.Contains(cfg, "hooks.json:"+codexEventKey(h.Event)+":") {
+			approved++
+		}
+	}
+	return approved, pinned
+}
+
+// codexEventKey is the event name as codex writes it into a trust key:
+// SessionStart becomes session_start.
+func codexEventKey(event string) string {
+	var out []rune
+	for i, r := range event {
+		if r >= 'A' && r <= 'Z' {
+			if i > 0 {
+				out = append(out, '_')
+			}
+			r = r - 'A' + 'a'
+		}
+		out = append(out, r)
+	}
+	return string(out)
 }
