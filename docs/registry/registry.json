@@ -903,7 +903,7 @@
         "auto": false,
         "skill": false,
         "command": false,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "none"
       },
@@ -919,10 +919,6 @@
         "command": {
           "state": "unknown",
           "why": "Kiro's upstream — Amazon Q Developer CLI — keeps user-level custom prompts in `~/.aws/amazonq/prompts` (`crates/chat-cli/src/util/paths.rs`), but Kiro renamed its config tree rather than moving it wholesale: its server file is `~/.kiro/settings/mcp.json`, not the Q path. So the location of Kiro's equivalent cannot be inferred from the fork, and writing a guessed directory would leave a command nothing lists (#3651)."
-        },
-        "resume": {
-          "state": "todo",
-          "why": "`kiro-cli chat --resume-id <sessionId>` is documented and unverified here, so a handover is a paste (#3103)."
         }
       }
     },

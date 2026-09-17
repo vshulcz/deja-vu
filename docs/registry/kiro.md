@@ -20,6 +20,10 @@ directory per session under the workspace, holding `session.json` (id, model,
 
 ## Known quirks and drift
 
+- Resume: `kiro-cli chat --resume-id <sessionId>`, which needs Kiro CLI 2.2.0
+  or newer. The IDE's sessions carry a `sess_` id and reopen from the app, so
+  `deja resume` refuses those with the reason rather than printing a command
+  that would not find them.
 - **A reply arrives in pieces.** Several `AssistantMessage` records can share
   one `data.message_id`: the CLI appends the answer as it streams, each record
   carrying the next piece rather than the whole answer so far. Read one message

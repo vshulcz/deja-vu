@@ -125,6 +125,15 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
+	case "kiro":
+		// `kiro-cli chat --resume-id <sessionId>`, which Kiro's own docs give
+		// and two orchestrators drive — one of them noting it needs Kiro CLI
+		// 2.2.0 or newer. The IDE's sessions reopen from the app instead, and
+		// those carry a `sess_` id, so only the CLI's get a command.
+		if strings.HasPrefix(s.ID, "sess_") {
+			return "", "", fmt.Errorf("session %s belongs to the Kiro IDE, which reopens it from its own history", digest.Short(s.ID))
+		}
+		return "", "kiro-cli chat --resume-id " + s.ID, nil
 	case "kimchi":
 		// Kimchi's own argument parser rewrites `--resume <selector>` to
 		// `--session <id>` (src/cli-args.ts), so the id deja indexes is the

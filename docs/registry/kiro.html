@@ -56,6 +56,12 @@
 <p><strong>Last verified:</strong> 2026-09-16</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
+<li>Resume: <code>kiro-cli chat --resume-id &lt;sessionId&gt;</code>, which needs Kiro CLI 2.2.0</li>
+</ul>
+<p>or newer. The IDE&#39;s sessions carry a <code>sess_</code> id and reopen from the app, so</p>
+<p><code>deja resume</code> refuses those with the reason rather than printing a command</p>
+<p>that would not find them.</p>
+<ul>
 <li><strong>A reply arrives in pieces.</strong> Several <code>AssistantMessage</code> records can share</li>
 </ul>
 <p>one <code>data.message_id</code>: the CLI appends the answer as it streams, each record</p>
