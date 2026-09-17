@@ -30,6 +30,17 @@ func TestResumeCommandsForTheNewHarnesses(t *testing.T) {
 		}
 	}
 
+	// Continue's flag forks rather than continues, so the command is offered
+	// with the caveat beside it. Silence there would promise the wrong thing.
+	if _, cmd, err := resumeCommand(model.Session{Harness: "continue", ID: "abc123"}); err != nil {
+		t.Errorf("continue: %v", err)
+	} else if cmd != "cn --fork abc123" {
+		t.Errorf("continue = %q", cmd)
+	}
+	if note := resumeCaveats["continue"]; !strings.Contains(note, "fork") {
+		t.Errorf("continue's caveat does not say it forks: %q", note)
+	}
+
 	_, _, err := resumeCommand(model.Session{Harness: "kiro", ID: "sess_00000000-0000-4000-8000-000000000000"})
 	if err == nil {
 		t.Fatal("an IDE session got a CLI command that would not find it")

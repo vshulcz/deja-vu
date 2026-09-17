@@ -88,10 +88,15 @@
 <p>event type(s)&#34;) and no handler ran, while the same run&#39;s tool call went</p>
 <p>through. It becomes work the day a release fires them.</p>
 <ul>
-<li><strong>Resume</strong>: <code>cn --resume</code> reopens the last session and <code>--fork &lt;id&gt;</code> branches</li>
+<li><strong>Resume</strong>: <code>cn --fork &lt;sessionId&gt;</code>, which <code>deja resume</code> prints. It takes any</li>
 </ul>
-<p>from one, but nothing takes the id of an arbitrary session; the editor</p>
-<p>reopens one from its history view.</p>
+<p>id in the store this reader walks — <code>historyManager.load</code> opens</p>
+<p><code>&lt;sessions&gt;/&lt;id&gt;.json</code> (<code>core/util/history.ts</code>) — so the earlier reading</p>
+<p>here, that nothing accepts an arbitrary id, was wrong. What it does differ</p>
+<p>in is the ending: the flag forks, so the history comes back under a new</p>
+<p>session id rather than continuing the old one, and deja says so on stderr</p>
+<p>beside the command. <code>cn --resume</code> remains the last-session shortcut, and</p>
+<p>the editor reopens one from its history view.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

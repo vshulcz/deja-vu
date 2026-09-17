@@ -62,6 +62,11 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if !doExec {
+		if note := resumeCaveats[s.Harness]; note != "" {
+			// stderr, so `$(deja resume …)` still composes: the command is the
+			// answer, the caveat is for the person reading.
+			fmt.Fprintf(os.Stderr, "deja: %s\n", note)
+		}
 		fmt.Fprintln(stdout, formatResumeCommand(dir, cmdline))
 		return nil
 	}
@@ -72,6 +77,13 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	}
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
+}
+
+// resumeCaveats names what a printed command does that "resume" does not
+// promise. Continue's is the first: its flag forks the session rather than
+// continuing it, so the work comes back under a new id.
+var resumeCaveats = map[string]string{
+	"continue": "continue forks rather than continues: the history comes back under a new session id",
 }
 
 func formatResumeCommand(dir, cmdline string) string {
@@ -125,6 +137,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
+	case "continue":
+		// `cn --fork <sessionId>` loads the session by id straight out of the
+		// store deja reads — `historyManager.load` opens
+		// `<sessions>/<id>.json` (core/util/history.ts) — and starts a new
+		// session from its history. So the history comes back and the id is
+		// not the one that continues; the caveat below says so.
+		return "", "cn --fork " + s.ID, nil
 	case "kiro":
 		// `kiro-cli chat --resume-id <sessionId>`, which Kiro's own docs give
 		// and two orchestrators drive — one of them noting it needs Kiro CLI

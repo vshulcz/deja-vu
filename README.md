@@ -278,7 +278,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | — | paste | — |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |

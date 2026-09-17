@@ -44,9 +44,14 @@ validation is still welcome.
   for every event loaded (its own log says "Hooks loaded: 8 handler(s) across 8
   event type(s)") and no handler ran, while the same run's tool call went
   through. It becomes work the day a release fires them.
-- **Resume**: `cn --resume` reopens the last session and `--fork <id>` branches
-  from one, but nothing takes the id of an arbitrary session; the editor
-  reopens one from its history view.
+- **Resume**: `cn --fork <sessionId>`, which `deja resume` prints. It takes any
+  id in the store this reader walks — `historyManager.load` opens
+  `<sessions>/<id>.json` (`core/util/history.ts`) — so the earlier reading
+  here, that nothing accepts an arbitrary id, was wrong. What it does differ
+  in is the ending: the flag forks, so the history comes back under a new
+  session id rather than continuing the old one, and deja says so on stderr
+  beside the command. `cn --resume` remains the last-session shortcut, and
+  the editor reopens one from its history view.
 - **Handoff**: paste.
 
 Costs on that version, measured from the recorded requests: deja's tool schema
