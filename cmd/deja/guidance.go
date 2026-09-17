@@ -699,6 +699,12 @@ func guidanceStatus(harness string) string {
 	harness = guidanceHarness(harness)
 	path := guidancePath(harness)
 	if path == "" {
+		// Four harnesses' manuals are written by their own install target
+		// rather than by the generic guidance step, so this said "unsupported"
+		// about a file deja had written.
+		path = ownGuidanceFile(harness)
+	}
+	if path == "" {
 		return "unsupported"
 	}
 	b, err := os.ReadFile(path)
@@ -711,10 +717,35 @@ func guidanceStatus(harness string) string {
 	if len(strings.TrimSpace(string(b))) == 0 {
 		return "absent"
 	}
-	if guidanceOwnsWholeFile(harness) || strings.Contains(string(b), guidanceStart) {
+	// A file in a directory of deja's own carries no marker either, and the
+	// harness's own installer is the one that wrote it.
+	if guidanceOwnsWholeFile(harness) || ownGuidanceFile(harness) != "" || strings.Contains(string(b), guidanceStart) {
 		return "written"
 	}
 	return "absent"
+}
+
+// ownGuidanceFile names the manual a harness's own install target writes,
+// rather than the generic guidance step. Deliberately separate from
+// guidanceOwnsWholeFile, which answers the narrower question of whether that
+// manual is a skill: Kiro's is a steering file, always included rather than
+// opened on demand, and the registry records it as not a skill.
+func ownGuidanceFile(harness string) string {
+	switch harness {
+	case "kilocode":
+		return kilocodeSkillPath()
+	case "gjc":
+		return gjcSkillPath()
+	case "commandcode":
+		return commandCodeSkillPath()
+	case "cherrystudio":
+		// It has no directory of its own; it reads the skill directories of
+		// whichever agent CLIs the machine has, the shared one among them.
+		return sharedSkillPath()
+	case "kiro":
+		return kiroSteeringPath()
+	}
+	return ""
 }
 
 func guidanceResult(harness string, uninstall bool) (installResult, error) {

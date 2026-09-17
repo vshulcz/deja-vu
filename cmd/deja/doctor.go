@@ -1396,10 +1396,19 @@ func dejaKeyedCommand(text string) string {
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed != "deja:" && trimmed != "[mcp_servers.deja]" && trimmed != "[mcp.servers.deja]" {
+		opens, field := dejaBlockOpens(trimmed)
+		if !opens {
 			continue
 		}
 		indent := yamlIndentWidth(line)
+		if field {
+			// A field anchor names deja from inside the block, so the command
+			// is its sibling at the same indent rather than a line below it.
+			// Keeping the key rule here left dsh's entry unreadable: the next
+			// line is `transport:` at that same indent and the scan stopped
+			// there, one line short of the command.
+			indent--
+		}
 		for _, next := range lines[i+1:] {
 			nextTrimmed := strings.TrimSpace(next)
 			if nextTrimmed == "" {
@@ -1425,16 +1434,42 @@ func dejaKeyedCommand(text string) string {
 	return ""
 }
 
+// dejaBlockOpens reports whether a line starts the block that belongs to deja,
+// and whether it did so as a key or as a field. Three of these are a key named
+// `deja`; the fourth is dsh, which has no server key at all — the name is a
+// field inside a patch-list row, beside the command rather than above it.
+func dejaBlockOpens(trimmed string) (opens, field bool) {
+	switch trimmed {
+	case "deja:", "[mcp_servers.deja]", "[mcp.servers.deja]":
+		return true, false
+	case "serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
+		return true, true
+	}
+	return false, false
+}
+
 // doctorWiringNote adds what "wired" cannot promise for a given harness. Three
 // CLIs share ~/.grok and read different files; one of them — @vibe-kit/grok-cli
 // — has no user-level MCP config at all, so `grok mcp list` reports nothing no
 // matter what an installer writes to the home directory. Saying "wired" without
 // that caveat is how someone concludes deja is broken.
 func doctorWiringNote(name string) string {
-	if name != "grok" {
-		return ""
+	switch name {
+	case "grok":
+		return "@vibe-kit/grok-cli reads MCP only from <cwd>/.grok/settings.json — run `grok mcp add deja -c deja -a mcp` in a project to wire that one"
+	case "cherrystudio":
+		// The only target whose "wired" is about a file the app has not read
+		// yet: Cherry Studio keeps its servers in an app database with no
+		// config file to write, so the install writes the JSON its importer
+		// takes and the row must not be read as "the app has it".
+		return "Cherry Studio has no config file to write — this is the JSON to import in Settings → MCP → Import from JSON"
+	case "roo", "kilocode":
+		// One settings file per VS Code-compatible host, and the path above is
+		// whichever one exists. `deja install` writes every host that has the
+		// extension; the row can only speak for one.
+		return "one settings file per editor — `deja install " + name + "` writes every host that has the extension"
 	}
-	return "@vibe-kit/grok-cli reads MCP only from <cwd>/.grok/settings.json — run `grok mcp add deja -c deja -a mcp` in a project to wire that one"
+	return ""
 }
 
 type doctorMCPConfig struct {
@@ -1471,7 +1506,86 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"continue", continueConfigPath(), doctorContinueWired, nil},
 		{"crush", crushConfigPath(), doctorJSONWired("mcp"), doctorJSONDejaKeys("mcp")},
 		{"zed", sources.ZedSettingsPath(), doctorZedWired, nil},
+		// The nine targets `deja install` has always had and this table never
+		// named. A row here is the only place a machine says whether the
+		// server is declared and which binary it runs, so for these the report
+		// said nothing at all — deepseek's entry on the author's machine still
+		// pointed at a throwaway build with every other row repaired.
+		{"deepseek", dshPatchPath(), doctorDSHWired, nil},
+		{"roo", doctorFirstExisting(rooMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.RooExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"kilocode", doctorFirstExisting(kilocodeMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.KiloExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"kiro", kiroMCPSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"kimchi", kimchiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},
+		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"cherrystudio", cherryStudioImportPath(), doctorFileWired, nil},
 	}
+}
+
+// dshPatchPath is the home-level patch layer installDeepSeek writes.
+func dshPatchPath() string {
+	return filepath.Join(sources.DSHHome(), "cordis.patch.yml")
+}
+
+// doctorDSHWired reads the layer for deja's own block rather than for a server
+// key: dsh has no MCP config of its own, it has an ordered list of patch
+// entries, and deja's is `mcp-deja`.
+func doctorDSHWired(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(string(b), "id: mcp-deja")
+}
+
+// doctorZCodeWired reads `mcp.servers`, one level deeper than the `mcpServers`
+// the rest of this table uses.
+func doctorZCodeWired(path string) bool {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var root struct {
+		MCP struct {
+			Servers map[string]any `json:"servers"`
+		} `json:"mcp"`
+	}
+	if json.Unmarshal(b, &root) != nil {
+		return false
+	}
+	for _, v := range root.MCP.Servers {
+		if mcpEntryDejaCommand(v) != "" {
+			return true
+		}
+	}
+	_, ok := root.MCP.Servers["deja"]
+	return ok
+}
+
+// doctorFirstExisting names the host a report should talk about when a harness
+// has one settings file per VS Code-compatible editor: the one that is there.
+// A row with no path at all says less than nothing, so fallback takes the first
+// candidate, and then the one passed in — Kilo Code's reader lists only
+// directories that exist, which on a machine without the extension is none.
+func doctorFirstExisting(paths []string, fallback string) string {
+	for _, p := range paths {
+		if doctorExists(p) {
+			return p
+		}
+	}
+	if len(paths) > 0 {
+		return paths[0]
+	}
+	return fallback
+}
+
+// vsCodeExtensionMCPPath is where an extension would keep its MCP settings in
+// plain VS Code, for a report on a machine that has neither the editor nor the
+// extension: both readers list only directories that exist, so on such a
+// machine the row had no path to print at all.
+func vsCodeExtensionMCPPath(extension string) string {
+	return filepath.Join(vsCodeDefaultUserDir(), "globalStorage", extension, "settings", "mcp_settings.json")
 }
 
 // doctorZedWired reads the same JSONC the installer writes, with the same

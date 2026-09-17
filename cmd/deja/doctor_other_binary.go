@@ -77,24 +77,6 @@ func dejaHookCommandIn(path string) string {
 	return ""
 }
 
-// samePathTarget compares two paths by what they resolve to, so a symlinked
-// install — /usr/local/bin/deja pointing at the Cellar copy — is not reported
-// as a different binary.
-func samePathTarget(a, b string) bool {
-	if a == b {
-		return true
-	}
-	ra, err := filepath.EvalSymlinks(a)
-	if err != nil {
-		return false
-	}
-	rb, err := filepath.EvalSymlinks(b)
-	if err != nil {
-		return false
-	}
-	return ra == rb
-}
-
 // otherBinaryNote is the line doctor prints for it.
 func otherBinaryNote(path, target string) string {
 	other := dejaWiredElsewhere(path)

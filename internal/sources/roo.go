@@ -26,6 +26,10 @@ import (
 // taskHistory.json. Text-only turns are indexed; the same envelope
 // unwrapping applies.
 
+// RooExtensionID is the publisher and name of the VS Code extension, which is
+// also the directory its settings live in.
+const RooExtensionID = "rooveterinaryinc.roo-cline"
+
 func RooRoots() []string {
 	if list := os.Getenv("DEJA_ROO_ROOTS"); list != "" {
 		var out []string
@@ -36,13 +40,12 @@ func RooRoots() []string {
 		}
 		return out
 	}
-	const ext = "rooveterinaryinc.roo-cline"
 	var bases []string
 	switch runtime.GOOS {
 	case "darwin":
 		app := filepath.Join(Home(), "Library", "Application Support")
 		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", ext))
+			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", RooExtensionID))
 		}
 	case "windows":
 		app := os.Getenv("APPDATA")
@@ -50,7 +53,7 @@ func RooRoots() []string {
 			app = filepath.Join(Home(), "AppData", "Roaming")
 		}
 		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", ext))
+			bases = append(bases, filepath.Join(app, host, "User", "globalStorage", RooExtensionID))
 		}
 	default:
 		cfg := os.Getenv("XDG_CONFIG_HOME")
@@ -58,7 +61,7 @@ func RooRoots() []string {
 			cfg = filepath.Join(Home(), ".config")
 		}
 		for _, host := range []string{"Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"} {
-			bases = append(bases, filepath.Join(cfg, host, "User", "globalStorage", ext))
+			bases = append(bases, filepath.Join(cfg, host, "User", "globalStorage", RooExtensionID))
 		}
 	}
 	// The roo CLI runs the same extension against a VS Code shim, so its

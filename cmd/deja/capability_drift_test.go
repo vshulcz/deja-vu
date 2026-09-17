@@ -106,23 +106,15 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		if h.ID == "grok" {
 			gotSkill = true
 		}
-		// Kilo Code and gajae-code read skills from a directory of their own
-		// rather than from an instructions file, so the check is the path
-		// install writes — and both go through the shared skill installer, so
-		// one rule covers them.
-		for _, own := range []struct {
-			id   string
-			path string
-		}{{"kilocode", kilocodeSkillPath()}, {"gjc", gjcSkillPath()},
-			// Cherry Studio discovers the skill directories of the agent CLIs a
-			// machine has, `~/.agents/skills` among them, so deja's shared skill
-			// is what it lists — it has no directory of its own.
-			{"cherrystudio", sharedSkillPath()},
-			{"commandcode", commandCodeSkillPath()}} {
-			if h.ID == own.id {
-				gotSkill = strings.Contains(own.path, filepath.Join("skills", "deja-search")) ||
-					strings.Contains(own.path, filepath.Join("skills", "deja-history"))
-			}
+		// Kilo Code, gajae-code, Command Code and Cherry Studio read skills
+		// from a directory rather than from an instructions file, and their own
+		// install target writes the file — the same table doctor's guidance
+		// column reads. Kiro is in it too and is not a skill: a steering file
+		// is always included rather than opened by name, so the path has to say
+		// which kind it is.
+		if own := ownGuidanceFile(h.ID); own != "" {
+			gotSkill = strings.Contains(own, filepath.Join("skills", "deja-search")) ||
+				strings.Contains(own, filepath.Join("skills", "deja-history"))
 		}
 		// Cline has no user-level instructions file at all, so its skill rides
 		// inside the plugin deja generates. Read that off the generated

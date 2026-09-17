@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -75,7 +76,16 @@ func TestAStrangeNamedBuildIsReported(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := filepath.Join(dir, "mcp.json")
-	if err := os.WriteFile(cfg, []byte(`{"mcpServers":{"deja":{"command":"`+stray+`","args":["mcp"]}}}`), 0o600); err != nil {
+	// Marshalled, not pasted: a Windows path glued into a JSON literal makes
+	// `\U` and `\A` out of the directory names and the file stops being JSON,
+	// which is how this passed everywhere but the windows leg.
+	body, err := json.Marshal(map[string]any{
+		"mcpServers": map[string]any{"deja": map[string]any{"command": stray, "args": []string{"mcp"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	note := otherBinaryNote(cfg, "hermes")

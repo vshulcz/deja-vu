@@ -420,6 +420,51 @@
       "name": "zed",
       "state": "config-missing",
       "path": "<tmp>/home/.config/zed/settings.json"
+    },
+    {
+      "name": "deepseek",
+      "state": "config-missing",
+      "path": "<tmp>/home/.dsh/cordis.patch.yml"
+    },
+    {
+      "name": "roo",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/mcp_settings.json"
+    },
+    {
+      "name": "kilocode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/Code/User/globalStorage/kilocode.kilo-code/settings/mcp_settings.json"
+    },
+    {
+      "name": "kiro",
+      "state": "config-missing",
+      "path": "<tmp>/home/.kiro/settings/mcp.json"
+    },
+    {
+      "name": "kimchi",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/kimchi/harness/mcp.json"
+    },
+    {
+      "name": "gjc",
+      "state": "config-missing",
+      "path": "<tmp>/home/.gjc/agent/mcp.json"
+    },
+    {
+      "name": "zcode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.zcode/cli/config.json"
+    },
+    {
+      "name": "commandcode",
+      "state": "config-missing",
+      "path": "<tmp>/home/.commandcode/mcp.json"
+    },
+    {
+      "name": "cherrystudio",
+      "state": "config-missing",
+      "path": "<tmp>/home/.config/deja/cherrystudio-mcp.json"
     }
   ],
   "auto_recall": [
