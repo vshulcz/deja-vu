@@ -31,7 +31,83 @@ concurrency:
   cancel-in-progress: ${{ github.event.action == 'synchronize' }}
 
 jobs:
+  # Whether the windows leg runs the suite, decided here rather than from the
+  # event that started this run.
+  #
+  # It was `contains(github.event.pull_request.labels.*.name, 'windows')` in the
+  # matrix job's env, which is the payload of the triggering event: a PR opened
+  # and labelled a second later has one run without the label and — when the
+  # `labeled` event produces a run at all — one with it. #3693 was labelled
+  # `windows`, its `test / windows-latest` check reported success having skipped
+  # every step in four seconds, and the three tests that leg would have caught
+  # turned main red on the next push (#3699, #3707).
+  #
+  # The label is still added for a branch that touches what has broken this leg
+  # before, so nobody has to think of it, and it is still honoured when someone
+  # adds it by hand. The difference is that the decision and the checks now come
+  # out of the same run.
+  windows-leg:
+    name: windows leg
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      full: ${{ steps.decide.outputs.full }}
+    steps:
+      - name: Decide
+        id: decide
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          full() {
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "windows leg: running the whole suite — $1" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          }
+          if [ "$EVENT" != "pull_request" ]; then
+            full "every push to main, the weekly canary and a manual run take it"
+          fi
+          labels=$(gh api "repos/$REPO/pulls/$PR" --jq '[.labels[].name] | join(",")')
+          case ",$labels," in
+            *,windows,*) full "the pull request carries the \`windows\` label" ;;
+          esac
+          # What has actually broken this leg: the store paths a parser reads
+          # (they end up in printed tables and in path handling), the generated
+          # registry pages beside them, anything about the filesystem or the
+          # index layout, and this workflow. Nobody labels a parser change
+          # `windows`, because it does not look like one — #3467 grew a printed
+          # table past a windows pipe's buffer and deadlocked the suite on main.
+          files=$(gh pr diff "$PR" --repo "$REPO" --name-only)
+          want=$(printf '%s\n' "$files" | grep -E \
+            -e '^internal/sources/' \
+            -e '^internal/index/' \
+            -e '^docs/registry/' \
+            -e '^\.github/workflows/ci\.yml$' \
+            -e '^cmd/deja/(doctor|install|sources|files|restore)' \
+            || true)
+          if [ -n "$want" ]; then
+            printf '%s\n' "$want" | while IFS= read -r f; do echo "  $f"; done
+            if [ "$DRAFT" != "true" ]; then
+              gh pr edit "$PR" --repo "$REPO" --add-label windows || true
+            fi
+            full "this branch touches paths that have broken it before"
+          fi
+          echo "full=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "windows leg: **building only** — nothing here has broken it before."
+            echo ""
+            echo "Label the pull request \`windows\` to run the whole suite on it."
+          } >> "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
   test:
+    needs: windows-leg
     name: test / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     # windows runs the suite about ten times slower than the others; the cap is
@@ -67,20 +143,24 @@ jobs:
       # so `test / windows-latest` still reports and stays a required check.
       # Dropping it from the matrix would leave every unlabelled PR waiting on
       # a check that never arrives.
-      FULL: ${{ matrix.os != 'windows-latest' || github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'windows') }}
+      #
+      # And when it is skipped it still builds: a check that ran nothing and
+      # says success is indistinguishable from one that passed, which is how
+      # #3693 was merged. `go build ./cmd/deja` on windows is two minutes and
+      # makes the green mean something — the platform's own compiler saw this
+      # commit.
+      FULL: ${{ matrix.os != 'windows-latest' || needs.windows-leg.outputs.full == 'true' }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: env.FULL == 'true'
         with:
           # The commit-trailer test reads the last sixty messages; a depth of
           # one shows it only the merge commit.
           fetch-depth: 60
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        if: env.FULL == 'true'
         with:
           go-version: '1.25.x'
       - run: go mod verify
@@ -125,7 +205,6 @@ jobs:
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
       - run: go build ./cmd/deja
-        if: env.FULL == 'true'
       - name: Benchmark lexical recall floor
         if: matrix.os == 'ubuntu-latest'
         shell: bash
