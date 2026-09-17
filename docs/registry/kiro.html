@@ -113,6 +113,23 @@
 <p>hooks are per-workspace and fire on file events, not before a prompt, and</p>
 <p>its steering files (<code>.kiro/steering/*.md</code>) are per-workspace too. Both need</p>
 <p>a per-project install, which deja does not have yet.</p>
+<h2 id="measured-on-a-live-install">Measured on a live install</h2>
+<p><code>kiro-cli</code> 2.22.0 (homebrew cask), in a hermetic HOME:</p>
+<ul>
+<li><code>deja install kiro</code> writes <code>~/.kiro/settings/mcp.json</code> and</li>
+</ul>
+<p><code>~/.kiro/steering/deja.md</code>, and says the one thing a reader has to know: a</p>
+<p>custom agent in <code>~/.kiro/agents/*.json</code> does not inherit global MCP servers.</p>
+<ul>
+<li><code>--resume-id &lt;SESSION_ID&gt;</code> is in its own help, which is the command</li>
+</ul>
+<p><code>deja resume</code> prints for a CLI session. <code>-r</code>, <code>--resume-picker</code> are beside it.</p>
+<ul>
+<li>What could not be checked: <code>kiro-cli mcp list</code> refuses before a login</li>
+</ul>
+<p>(<code>You are not logged in, please log in with kiro-cli login</code>), so whether the</p>
+<p>server appears in its own list, and whether the steering file is loaded, rests</p>
+<p>on Kiro&#39;s documentation rather than on a screen seen here.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

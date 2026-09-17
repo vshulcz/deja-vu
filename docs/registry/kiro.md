@@ -62,3 +62,17 @@ directory per session under the workspace, holding `session.json` (id, model,
   hooks are per-workspace and fire on file events, not before a prompt, and
   its steering files (`.kiro/steering/*.md`) are per-workspace too. Both need
   a per-project install, which deja does not have yet.
+
+## Measured on a live install
+
+`kiro-cli` 2.22.0 (homebrew cask), in a hermetic HOME:
+
+- `deja install kiro` writes `~/.kiro/settings/mcp.json` and
+  `~/.kiro/steering/deja.md`, and says the one thing a reader has to know: a
+  custom agent in `~/.kiro/agents/*.json` does not inherit global MCP servers.
+- `--resume-id <SESSION_ID>` is in its own help, which is the command
+  `deja resume` prints for a CLI session. `-r`, `--resume-picker` are beside it.
+- What could not be checked: `kiro-cli mcp list` refuses before a login
+  (`You are not logged in, please log in with kiro-cli login`), so whether the
+  server appears in its own list, and whether the steering file is loaded, rests
+  on Kiro's documentation rather than on a screen seen here.
