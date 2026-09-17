@@ -144,10 +144,19 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// and reopen from its own history view, the split Roo has too, so
 		// those are refused with the reason rather than given a command that
 		// would not find them.
-		if s.Path != sources.KiloDB() {
+		// Which half a session came from is the path, but not the path this
+		// used to compare: a session read out of the CLI database carries the
+		// directory it ran in, never the database file, so `!= KiloDB()` was
+		// true for every CLI session and the command was refused for the only
+		// store it was written for. An extension task is the one with a path
+		// under the host's `tasks/` (#3677).
+		if sources.KiloTaskPath(s.Path) {
 			return "", "", fmt.Errorf("session %s is a Kilo Code editor task — reopen it from Kilo's history view; the CLI lists only its own sessions", digest.Short(s.ID))
 		}
-		return "", "kilo -s " + s.ID, nil
+		// And in the directory it ran in, the way the opencode case does with
+		// the same field: Kilo is OpenCode vendored and a CLI session carries
+		// its own working directory.
+		return s.Path, "kilo -s " + s.ID, nil
 	case "continue":
 		// `cn --fork <sessionId>` loads the session by id straight out of the
 		// store deja reads — `historyManager.load` opens
