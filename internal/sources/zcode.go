@@ -60,7 +60,7 @@ func ParseZCodeDBSince(db string, t time.Time) ([]model.Session, error) {
 // ZCodeSessionFiles lists the transcripts, and the database when it holds
 // anything — the same pair Kilo has.
 func ZCodeSessionFiles() []string {
-	out := zcodeTranscriptFiles()
+	out := ZCodeTranscriptFiles()
 	if fi, err := os.Stat(ZCodeDB()); err == nil && fi.Size() > 0 {
 		out = append(out, ZCodeDB())
 	}
@@ -75,14 +75,15 @@ func ZCodeUnderRoot(p string) bool {
 // LoadZCode reads both stores: the transcripts with the flat-role reader, the
 // CLI database with OpenCode's, the way LoadKilo does for Kilo's two.
 func LoadZCode() []model.Session {
-	ss := parseFiles(zcodeTranscriptFiles(), ParseZCodeFile)
+	ss := parseFiles(ZCodeTranscriptFiles(), ParseZCodeFile)
 	dbSS, _ := ParseZCodeDB(ZCodeDB())
 	return append(ss, dbSS...)
 }
 
-// zcodeTranscriptFiles is the JSONL half on its own, so the database is not
-// handed to the transcript parser.
-func zcodeTranscriptFiles() []string {
+// ZCodeTranscriptFiles is the JSONL half on its own. Callers that parse with
+// the transcript reader need it: handed the database, that reader answers zero
+// and a store deja reads correctly reports itself broken.
+func ZCodeTranscriptFiles() []string {
 	return walkFiles(ZCodeRoot(), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl")
 	})

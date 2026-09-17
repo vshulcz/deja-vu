@@ -505,7 +505,11 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"senpi", []string{sources.SenpiRoot()}, sources.SenpiSessionFiles(), sources.ParseSenpiFile},
 		{"kimchi", []string{sources.KimchiRoot()}, sources.KimchiSessionFiles(), sources.ParseKimchiFile},
 		{"commandcode", []string{sources.CommandCodeRoot()}, sources.CommandCodeSessionFiles(), sources.ParseCommandCodeFile},
-		{"zcode", []string{sources.ZCodeRoot()}, sources.ZCodeSessionFiles(), sources.ParseZCodeFile},
+		// The transcripts, not the file list: that list now carries the CLI
+		// database too, and the transcript reader answers zero for it — which
+		// made the row read `parsed-zero` about a store whose every session
+		// deja had just indexed (#3675). Kilo's row draws the same line.
+		{"zcode", []string{sources.ZCodeRoot()}, sources.ZCodeTranscriptFiles(), sources.ParseZCodeFile},
 		{"gjc", []string{sources.GjcRoot()}, sources.GjcSessionFiles(), sources.ParseGjcFile},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles(), sources.ParseDeepSeekFile},
 		// Zed keeps one SQLite store rather than session files, so the file

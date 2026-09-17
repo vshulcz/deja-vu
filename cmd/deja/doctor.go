@@ -900,8 +900,23 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// for drift that is not there.
 	printFilesBeside("commandcode", commandRoot, doctorExists(commandRoot),
 		sources.CommandCodeSessionFiles(), sources.CommandCodeCheckpointFiles()...)
+	// ZCode has two stores, the way Kilo does: the project transcripts and the
+	// CLI's SQLite database. The count is the transcripts and the database is
+	// named beside them, or the newest "file" is a database the transcript
+	// reader cannot read and the row calls the store broken (#3675).
 	zcodeRoot := sources.ZCodeRoot()
-	printFiles("zcode", zcodeRoot, doctorExists(zcodeRoot), sources.ZCodeSessionFiles())
+	zcodeTranscripts := sources.ZCodeTranscriptFiles()
+	zcodeLoc := zcodeRoot
+	zcodeDB := sources.ZCodeDB()
+	zcodeHasDB := doctorExists(zcodeDB)
+	if zcodeHasDB {
+		zcodeLoc = zcodeLoc + string(os.PathListSeparator) + zcodeDB
+	}
+	zcodeDetail := doctorCount(len(zcodeTranscripts), "file")
+	if zcodeHasDB {
+		zcodeDetail += ", CLI store present"
+	}
+	printRow("zcode", zcodeLoc, doctorExists(zcodeRoot) || zcodeHasDB, zcodeDetail)
 	gjcRoot := sources.GjcRoot()
 	printFiles("gjc", gjcRoot, doctorExists(gjcRoot), sources.GjcSessionFiles())
 
