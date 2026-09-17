@@ -15,9 +15,23 @@
   `~/.kilocode/skills/deja-search/SKILL.md` and the command in
   `<config>/kilo/commands/deja.md`.
 
-Verified on `@kilocode/cli` 7.7.3: a real `kilo run` session landed in
+Verified on `@kilocode/cli` 7.7.3. A real `kilo run` session landed in
 `~/.local/share/kilo/kilo.db`, deja indexed it and recall returned the phrase
-that was typed. `kilo mcp list` prints `✓ deja connected` after the install.
+that was typed; `deja resume` printed `kilo -s <id>` and running it brought the
+session back with that turn on screen. `kilo mcp list` prints `✓ deja
+connected`, and all four surfaces are in its own palette at once:
+
+```
+/deja                 Search this machine's past AI coding sessions (deja-vu)
+/deja:deja:mcp        Search this machine's past coding sessions — …
+/deja-search:skill    deja-vu memory — search the user's past AI coding sessions …
+/deja-history:skill   Search the user's past AI coding sessions. Use when …
+```
+
+Kilo namespaces its palette by kind — `:mcp` for a server's prompt, `:skill`
+for a skill — so the command file, the server and both skills coexist under the
+same word. Gemini's flat namespace is the opposite case and needed the command
+file dropped there (#3665).
 
 **Last verified:** 2026-09-17
 

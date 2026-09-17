@@ -54,9 +54,19 @@
 <p><code>✓ deja connected</code> once it is there. The skill goes in</p>
 <p><code>~/.kilocode/skills/deja-search/SKILL.md</code> and the command in</p>
 <p><code>&lt;config&gt;/kilo/commands/deja.md</code>.</p>
-<p>Verified on <code>@kilocode/cli</code> 7.7.3: a real <code>kilo run</code> session landed in</p>
+<p>Verified on <code>@kilocode/cli</code> 7.7.3. A real <code>kilo run</code> session landed in</p>
 <p><code>~/.local/share/kilo/kilo.db</code>, deja indexed it and recall returned the phrase</p>
-<p>that was typed. <code>kilo mcp list</code> prints <code>✓ deja connected</code> after the install.</p>
+<p>that was typed; <code>deja resume</code> printed <code>kilo -s &lt;id&gt;</code> and running it brought the</p>
+<p>session back with that turn on screen. <code>kilo mcp list</code> prints `✓ deja</p>
+<p>connected`, and all four surfaces are in its own palette at once:</p>
+<pre><code>/deja                 Search this machine&#39;s past AI coding sessions (deja-vu)
+/deja:deja:mcp        Search this machine&#39;s past coding sessions — …
+/deja-search:skill    deja-vu memory — search the user&#39;s past AI coding sessions …
+/deja-history:skill   Search the user&#39;s past AI coding sessions. Use when …</code></pre>
+<p>Kilo namespaces its palette by kind — <code>:mcp</code> for a server&#39;s prompt, <code>:skill</code></p>
+<p>for a skill — so the command file, the server and both skills coexist under the</p>
+<p>same word. Gemini&#39;s flat namespace is the opposite case and needed the command</p>
+<p>file dropped there (#3665).</p>
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <p>Kilo Code is a Roo Code fork that vendors OpenCode — <code>packages/opencode</code> is</p>
 <p>1,780 files inside the Kilo repository — and <code>packages/kilo-vscode/src/legacy-migration</code></p>
