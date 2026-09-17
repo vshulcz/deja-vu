@@ -211,16 +211,18 @@
       "id": "copilot-chat",
       "store_paths": [
         "<vscode-User>/workspaceStorage/*/chatSessions/*.{json,jsonl}",
+        "<vscode-User>/workspaceStorage/*/GitHub.copilot-chat/transcripts/*.jsonl",
         "<vscode-User>/globalStorage/emptyWindowChatSessions/*.{json,jsonl}",
         "<vscode-User>/workspaceStorage/no-workspace/chatSessions/*.json",
         "${DEJA_COPILOT_CHAT_ROOTS}"
       ],
       "format_kind": "json-or-jsonl",
       "fixture_paths": [
-        "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/chatSessions/3b7e1f1b-0000-4000-8000-000000000000.jsonl"
+        "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/chatSessions/3b7e1f1b-0000-4000-8000-000000000000.jsonl",
+        "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/GitHub.copilot-chat/transcripts/7c9e2d2c-0000-4000-8000-000000000000.jsonl"
       ],
       "parser_source": "internal/sources/copilot_chat.go",
-      "last_verified": "2026-09-06",
+      "last_verified": "2026-09-18",
       "display_name": "VS Code Copilot Chat",
       "capabilities": {
         "mcp": true,

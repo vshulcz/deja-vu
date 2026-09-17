@@ -39,11 +39,13 @@
 <h1>VS Code Copilot Chat</h1>
 <ul>
 <li><strong>ID</strong>: <code>copilot-chat</code></li>
-<li><strong>Store</strong>: VS Code User folder <code>workspaceStorage/&lt;hash&gt;/chatSessions/&lt;sessionId&gt;.jsonl</code> (flat <code>.json</code> on older builds); empty-window chats under <code>globalStorage/emptyWindowChatSessions/</code>. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (<code>copilot</code>).</li>
+<li><strong>Store</strong>: two, and a newer extension writes only the second. VS Code User folder <code>workspaceStorage/&lt;hash&gt;/chatSessions/&lt;sessionId&gt;.jsonl</code> (flat <code>.json</code> on older builds), empty-window chats under <code>globalStorage/emptyWindowChatSessions/</code>, and the extension&#39;s own <code>workspaceStorage/&lt;hash&gt;/GitHub.copilot-chat/transcripts/&lt;sessionId&gt;.jsonl</code>. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (<code>copilot</code>).</li>
 <li><strong>Read override</strong>: <code>DEJA_COPILOT_CHAT_ROOTS</code> (path list of User folders)</li>
-<li><strong>Format</strong>: JSONL mutation log (<code>kind</code> 0 initial / 1 set / 2 push / 3 delete) or whole-file JSON; full re-parse per pass. Compaction rewrites the file, so a byte-offset resume would apply deltas to state it never saw.</li>
+<li><strong>Format</strong>: two, one per store. The <code>chatSessions</code> file is a JSONL mutation log (<code>kind</code> 0 initial / 1 set / 2 push / 3 delete) or whole-file JSON; full re-parse per pass, because compaction rewrites the file and a byte-offset resume would apply deltas to state it never saw. The <code>GitHub.copilot-chat/transcripts</code> file is a <code>type</code>-discriminated event log — <code>session.start</code>, <code>user.message</code>, <code>assistant.message</code>, <code>assistant.turn_start</code>/<code>turn_end</code>, <code>tool.execution_start</code>/<code>complete</code> — read by <code>internal/sources/copilot_agent.go</code>.</li>
 </ul>
-<p><code>workspace.json</code> next to <code>chatSessions</code> holds <code>{&#34;folder&#34;:&#34;file:///…&#34;}</code> (or <code>workspace</code> for a multi-root <code>.code-workspace</code>); the project name is the last path segment. Empty-window sessions take <code>workingDirectory</code> the same way, or <code>-</code>. <code>inputState</code> is not read (it carries the GitHub account label).</p>
+<p>On VS Code Server 1.137 there is no <code>chatSessions</code> directory at all: the machine in #3637 had 47 transcripts holding eleven weeks of chats and deja found zero files. On desktop 1.136.1 both layouts sit side by side — 28 <code>chatSessions</code> directories and five transcripts — so the second store is where a chat written by the newer extension goes, whatever the host. A transcript with no <code>user.message</code> in it is an agent run and is indexed: 11 of those 47 and all five here have none, and what the agent said and the files it touched are the only record of that work.</p>
+<p><code>globalStorage/github.copilot-chat/session-store.db</code> is a third store and is not read: every id in it also exists as a transcript, so it adds the session&#39;s <code>cwd</code> rather than history, and on the reporter&#39;s machine it covered the last two days against the transcripts&#39; eleven weeks.</p>
+<p><code>workspace.json</code> beside the storage directory holds <code>{&#34;folder&#34;:&#34;file:///…&#34;}</code> (or <code>workspace</code> for a multi-root <code>.code-workspace</code>); the project name is the last path segment. Empty-window sessions take <code>workingDirectory</code> the same way, or <code>-</code>. <code>inputState</code> is not read (it carries the GitHub account label).</p>
 <p>User turns are <code>message</code> as a string or <code>{text}</code>. Assistant speech is bare <code>{value}</code> markdown chunks (and a plain string in old files); <code>thinking</code> and UI chrome (<code>progressMessage</code>, <code>warning</code>, <code>info</code>, <code>systemNotification</code>) are skipped. Tool paths come from <code>toolInvocationSerialized.resultDetails</code> and <code>inlineReference</code>; terminal commands from <code>toolSpecificData.commandLine</code>.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install vscode</code> writes the user <code>mcp.json</code> VS Code reads in agent mode (top-level <code>servers</code>, <code>type: stdio</code>). Verified on VS Code 1.134.0: Copilot Chat started the server and called the <code>deja</code> tool with <code>mode: recall</code>.</li>
@@ -62,7 +64,7 @@
 <li><strong>Resume</strong>: Chat: Show Chats… in the editor, not a command.</li>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-06</p>
+<p><strong>Last verified:</strong> 2026-09-18</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

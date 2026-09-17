@@ -1,0 +1,7 @@
+{"type":"session.start","data":{"sessionId":"7c9e2d2c-0000-4000-8000-000000000000","version":1,"producer":"copilot-agent","copilotVersion":"0.62.0","vscodeVersion":"1.137.0","startTime":"2026-09-14T05:46:01.086Z"},"id":"e1000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:01.086Z","parentId":null}
+{"type":"user.message","data":{"content":"the packer build fails to generate a manifest for source 1 of 1","attachments":[]},"id":"e2000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:10.000Z","parentId":"e1000000-0000-4000-8000-000000000000"}
+{"type":"assistant.turn_start","data":{},"id":"e3000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:11.000Z"}
+{"type":"assistant.message","data":{"messageId":"m1000000-0000-4000-8000-000000000000","content":"The manifest post-processor only runs for a build that produced an artifact, and this source is filtered out by -only.","toolRequests":[]},"id":"e4000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:12.000Z"}
+{"type":"tool.execution_start","data":{"toolCallId":"call_1","toolName":"manage_todo_list"},"id":"e5000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:13.000Z"}
+{"type":"tool.execution_complete","data":{"toolCallId":"call_1","success":true},"id":"e6000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:14.000Z"}
+{"type":"assistant.turn_end","data":{},"id":"e7000000-0000-4000-8000-000000000000","timestamp":"2026-09-14T05:46:15.000Z"}

@@ -1,11 +1,15 @@
 # VS Code Copilot Chat
 
 - **ID**: `copilot-chat`
-- **Store**: VS Code User folder `workspaceStorage/<hash>/chatSessions/<sessionId>.jsonl` (flat `.json` on older builds); empty-window chats under `globalStorage/emptyWindowChatSessions/`. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (`copilot`).
+- **Store**: two, and a newer extension writes only the second. VS Code User folder `workspaceStorage/<hash>/chatSessions/<sessionId>.jsonl` (flat `.json` on older builds), empty-window chats under `globalStorage/emptyWindowChatSessions/`, and the extension's own `workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/<sessionId>.jsonl`. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (`copilot`).
 - **Read override**: `DEJA_COPILOT_CHAT_ROOTS` (path list of User folders)
-- **Format**: JSONL mutation log (`kind` 0 initial / 1 set / 2 push / 3 delete) or whole-file JSON; full re-parse per pass. Compaction rewrites the file, so a byte-offset resume would apply deltas to state it never saw.
+- **Format**: two, one per store. The `chatSessions` file is a JSONL mutation log (`kind` 0 initial / 1 set / 2 push / 3 delete) or whole-file JSON; full re-parse per pass, because compaction rewrites the file and a byte-offset resume would apply deltas to state it never saw. The `GitHub.copilot-chat/transcripts` file is a `type`-discriminated event log — `session.start`, `user.message`, `assistant.message`, `assistant.turn_start`/`turn_end`, `tool.execution_start`/`complete` — read by `internal/sources/copilot_agent.go`.
 
-`workspace.json` next to `chatSessions` holds `{"folder":"file:///…"}` (or `workspace` for a multi-root `.code-workspace`); the project name is the last path segment. Empty-window sessions take `workingDirectory` the same way, or `-`. `inputState` is not read (it carries the GitHub account label).
+On VS Code Server 1.137 there is no `chatSessions` directory at all: the machine in #3637 had 47 transcripts holding eleven weeks of chats and deja found zero files. On desktop 1.136.1 both layouts sit side by side — 28 `chatSessions` directories and five transcripts — so the second store is where a chat written by the newer extension goes, whatever the host. A transcript with no `user.message` in it is an agent run and is indexed: 11 of those 47 and all five here have none, and what the agent said and the files it touched are the only record of that work.
+
+`globalStorage/github.copilot-chat/session-store.db` is a third store and is not read: every id in it also exists as a transcript, so it adds the session's `cwd` rather than history, and on the reporter's machine it covered the last two days against the transcripts' eleven weeks.
+
+`workspace.json` beside the storage directory holds `{"folder":"file:///…"}` (or `workspace` for a multi-root `.code-workspace`); the project name is the last path segment. Empty-window sessions take `workingDirectory` the same way, or `-`. `inputState` is not read (it carries the GitHub account label).
 
 User turns are `message` as a string or `{text}`. Assistant speech is bare `{value}` markdown chunks (and a plain string in old files); `thinking` and UI chrome (`progressMessage`, `warning`, `info`, `systemNotification`) are skipped. Tool paths come from `toolInvocationSerialized.resultDetails` and `inlineReference`; terminal commands from `toolSpecificData.commandLine`.
 
@@ -23,4 +27,4 @@ User turns are `message` as a string or `{text}`. Assistant speech is bare `{val
 - **Resume**: Chat: Show Chats… in the editor, not a command.
 - **Handoff**: paste.
 
-**Last verified:** 2026-09-06
+**Last verified:** 2026-09-18

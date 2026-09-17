@@ -114,6 +114,11 @@ func copilotChatStoreDirs(root string) []string {
 		for _, e := range entries {
 			if e.IsDir() {
 				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), "chatSessions"))
+				// The extension's own transcripts, which on a newer Copilot
+				// Chat are the only place the history is (copilot_agent.go,
+				// #3637). One more failed open per workspace directory, which
+				// is the same term #3167 replaced the walk with.
+				out = append(out, filepath.Join(base, "workspaceStorage", e.Name(), copilotAgentParentDir, copilotAgentDirName))
 			}
 		}
 		return out
@@ -149,6 +154,11 @@ func ParseCopilotChatFile(path string) ([]model.Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	// The extension's own transcript is a different log in a different
+	// directory — an event stream rather than the delta state below (#3637).
+	if copilotAgentTranscript(path) {
+		return parseCopilotAgentTranscript(path, data)
+	}
 	if strings.EqualFold(filepath.Ext(path), ".jsonl") {
 		state, ok := copilotChatReplay(path, data)
 		if !ok {
@@ -172,6 +182,9 @@ func ParseCopilotChatFile(path string) ([]model.Session, error) {
 }
 
 func copilotChatFile(p string) bool {
+	if copilotAgentTranscript(p) {
+		return true
+	}
 	ext := filepath.Ext(p)
 	if ext != ".json" && ext != ".jsonl" {
 		return false

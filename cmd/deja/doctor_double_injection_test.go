@@ -21,7 +21,11 @@ import (
 func TestDoctorNamesASessionServedTwiceInASecond(t *testing.T) {
 	hermeticEnv(t)
 	dir := index.DefaultDir()
-	at := time.Now().UTC()
+	// Inside one second on purpose: the row groups by the second, so three
+	// events 300µs apart around a second boundary land in two of them and the
+	// assertion below reads 2 where it wrote 3. A 0.06% flake, which on a
+	// suite this size is a red main every few hundred runs.
+	at := time.Now().UTC().Truncate(time.Second).Add(100 * time.Millisecond)
 	writeInjectionLog(t, dir,
 		usage.Event{Time: at, Kind: usage.KindDejaVu, Bytes: 833, Into: "agent-1"},
 		usage.Event{Time: at.Add(300 * time.Microsecond), Kind: usage.KindDejaVu, Bytes: 833, Into: "agent-1"},
