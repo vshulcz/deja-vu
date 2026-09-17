@@ -1207,6 +1207,14 @@ func doctorMCP(w io.Writer) {
 				fmt.Fprintf(w, "  %-12s %s\n", "", other)
 			}
 		}
+		// Zed's entry can defer to an extension instead of naming a binary,
+		// and then "wired" is a fact about an id rather than about anything
+		// runnable (#3660).
+		if status == "wired" && c.name == "zed" {
+			if note := zedUnreachableNote(c.path); note != "" {
+				fmt.Fprintf(w, "  %-12s %s\n", "", note)
+			}
+		}
 		if note := doctorWiringNote(c.name); note != "" && status == "wired" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)
 		}
