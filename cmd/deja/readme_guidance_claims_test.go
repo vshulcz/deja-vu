@@ -22,6 +22,7 @@ var readmeGuidanceNames = map[string]string{
 	"qwen":        "Qwen",
 	"kimi":        "Kimi Code",
 	"pi":          "pi",
+	"senpi":       "Senpi",
 	"copilot":     "Copilot",
 	"cursor":      "Cursor",
 	"goose":       "Goose",

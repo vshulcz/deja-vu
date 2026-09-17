@@ -42,22 +42,67 @@
 <li><strong>Store</strong>: <code>${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/&lt;encoded-cwd&gt;/&lt;session&gt;.jsonl</code></li>
 <li><strong>Read override</strong>: <code>DEJA_SENPI_ROOT</code> replaces the session root</li>
 <li><strong>Format</strong>: pi&#39;s session JSONL</li>
+<li><strong>Wiring</strong>: <code>deja install senpi</code> writes the server into <code>&lt;agent&gt;/mcp.json</code>;</li>
+</ul>
+<p><code>deja install senpi-auto</code> adds the extension at <code>&lt;agent&gt;/extensions/deja.ts</code>,</p>
+<p>which is both the injection point and the <code>/deja</code> command</p>
+<ul>
 <li><strong>Needs</strong>: nothing</li>
 </ul>
 <p>Senpi (OmO Native) descends from pi and kept its transcript envelope — a</p>
 <p><code>session</code> header line, then one <code>message</code> line per turn — so the parsing is</p>
 <p>pi&#39;s. The encoded directory names the project, the way pi&#39;s does.</p>
-<p><strong>Last verified:</strong> 2026-09-16</p>
+<p>It kept the rest of pi too, which is what closes the harness: on a live install</p>
+<p>of <code>@code-yeongyu/senpi</code> every surface answered on senpi&#39;s own screen.</p>
+<ul>
+<li><code>&lt;agent&gt;/mcp.json</code> with <code>mcpServers</code> is loaded — its <code>/</code> palette lists</li>
+</ul>
+<p><code>mcp:deja:deja</code> with the server&#39;s own description.</p>
+<ul>
+<li>Skills load from the shared <code>~/.agents/skills</code> <strong>and</strong> from <code>&lt;agent&gt;/skills</code>.</li>
+</ul>
+<p>Both at once is a fault senpi announces: `&#34;deja-history&#34; collision: ✓</p>
+<p>&lt;agent&gt;/skills ✗ ~/.agents/skills (skipped)`. So deja writes the shared copy</p>
+<p>only, and takes the local one back out if an older install left it there.</p>
+<ul>
+<li>pi&#39;s extension loads unchanged, and with it the <code>/deja</code> command the palette</li>
+</ul>
+<p>shows as &#34;Search your own past coding sessions&#34;.</p>
+<ul>
+<li>A session started with that extension records what <code>deja hook-context</code></li>
+</ul>
+<p>returned as <code>{&#34;type&#34;:&#34;custom_message&#34;,&#34;customType&#34;:&#34;deja-recall&#34;}</code> — which is</p>
+<p>auto-recall arriving, in senpi&#39;s own transcript.</p>
+<ul>
+<li><code>--session &lt;path|id&gt;</code>, <code>--resume</code> and <code>--fork</code> are in its own help, so</li>
+</ul>
+<p><code>deja resume</code> prints <code>senpi --session &lt;id&gt;</code>.</p>
+<p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>Senpi&#39;s first run moves <code>~/.pi/agent</code> to <code>~/.senpi/agent</code></strong> — the whole</li>
+</ul>
+<p>directory, sessions and config and extensions, and it prints one line about</p>
+<p>it. So installing senpi on a machine that has pi leaves pi&#39;s own directory</p>
+<p>empty: pi then starts with no server, no extension and no history, while the</p>
+<p>same files answer as senpi&#39;s. Both rows are in <code>deja doctor</code> and the sessions</p>
+<p>stay searchable either way, but a pi user who wants both clients has to put</p>
+<p>pi&#39;s copy back.</p>
+<ul>
+<li>After such a migration the same transcripts can exist under both roots, and</li>
+</ul>
+<p>deja counts them per harness — so one session can appear twice in a result,</p>
+<p>once as pi and once as senpi.</p>
 <ul>
 <li><code>SENPI_CODING_AGENT_DIR</code> moves the whole agent directory, sessions included,</li>
 </ul>
 <p>so deja reads it: a machine that has already said where its sessions are</p>
 <p>should not have to say it twice in a second variable.</p>
 <ul>
-<li>Read support only. Nothing is wired into Senpi yet, which the registry records</li>
+<li>Senpi&#39;s terminal extension keeps per-session state at</li>
 </ul>
-<p>as gaps rather than leaving blank.</p>
+<p><code>sessions/&lt;project&gt;/extensions/terminal/&lt;id&gt;.json</code>. Those are not transcripts</p>
+<p>and deja does not count them as unread ones.</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

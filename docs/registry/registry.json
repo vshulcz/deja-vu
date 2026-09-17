@@ -687,38 +687,17 @@
       ],
       "parser_source": "internal/sources/senpi.go",
       "display_name": "Senpi",
-      "last_verified": "2026-09-16",
+      "last_verified": "2026-09-17",
       "capabilities": {
-        "mcp": false,
-        "auto": false,
-        "skill": false,
-        "command": false,
-        "resume": false,
-        "handoff": "paste",
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
         "prereq": "none"
       },
-      "gaps": {
-        "mcp": {
-          "state": "unknown",
-          "why": "Nobody can say what Senpi's config surface is: no public source, documentation or package for Senpi (OmO Native) was found — only its transcript format, which is pi's. `unknown` rather than `todo` because the work cannot start until there is something to read against (#3651)."
-        },
-        "auto": {
-          "state": "unknown",
-          "why": "pi's own injection point is the `before_agent_start` extension event, and Senpi kept pi's transcript format; whether it kept the extension loader, and where it looks for extensions, is not knowable from the transcripts alone (#3651)."
-        },
-        "skill": {
-          "state": "unknown",
-          "why": "Same as the rest of Senpi: pi reads skills from its agent directory, and whether Senpi kept that path — or renamed it the way it renamed the session root — cannot be checked without a source or an install (#3651)."
-        },
-        "command": {
-          "state": "unknown",
-          "why": "No public source, documentation or package for Senpi was found at all, so nothing can be said about a command surface. Its pi lineage suggests commands are registered by extensions rather than read from files, which is a lead and not a location (#3651)."
-        },
-        "resume": {
-          "state": "unknown",
-          "why": "No CLI documentation to read a resume flag from. pi's own is `pi --session <id>`, and assuming Senpi's is the same is how deja would print a command that does nothing (#3651)."
-        }
-      }
+      "gaps": {}
     },
     {
       "id": "gjc",

@@ -20,7 +20,18 @@ import (
 // pi also has a real channel to the human — ctx.ui.notify — so the recall line
 // and the "index still building" note go there instead of into the prompt.
 func installPiExtension(exe string, uninstall bool) (installResult, error) {
-	dir := filepath.Join(sources.PiConfigDir(), "extensions")
+	return installPiShapedExtension(sources.PiConfigDir(), exe, uninstall)
+}
+
+// installPiShapedExtension writes the same extension into a pi descendant's
+// agent directory. Senpi keeps pi's loader — measured on a live install of
+// @code-yeongyu/senpi: with this file in `<agent>/extensions` its start screen
+// lists `deja.ts`, its `/` palette carries the extension's own `deja` command,
+// and a session started with it records
+// `{"type":"custom_message","customType":"deja-recall"}` holding what
+// `deja hook-context` returned (#3670).
+func installPiShapedExtension(agentDir, exe string, uninstall bool) (installResult, error) {
+	dir := filepath.Join(agentDir, "extensions")
 	path := filepath.Join(dir, "deja.ts")
 	if uninstall {
 		if _, err := os.Stat(path); err != nil {

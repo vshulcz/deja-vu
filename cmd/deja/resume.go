@@ -164,6 +164,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 			return "", "", fmt.Errorf("session %s belongs to the Kiro IDE, which reopens it from its own history", digest.Short(s.ID))
 		}
 		return "", "kiro-cli chat --resume-id " + s.ID, nil
+	case "senpi":
+		// `--session <path|id>` takes a partial uuid, from senpi's own help, and
+		// `--fork` is beside it for the copy-instead-of-continue case. Measured
+		// on @code-yeongyu/senpi (#3670).
+		return "", "senpi --session " + s.ID, nil
 	case "kimchi":
 		// Kimchi's own argument parser rewrites `--resume <selector>` to
 		// `--session <id>` (src/cli-args.ts), so the id deja indexes is the

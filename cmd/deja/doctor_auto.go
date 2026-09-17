@@ -49,6 +49,10 @@ func autoWirings() []autoWiring {
 			return filepath.Join(antigravityConfigHome(), "plugins", "deja", "hooks.json")
 		}, "hook-antigravity", ""},
 		{"pi", func() string { return filepath.Join(sources.PiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
+		// Senpi loads the same extension from its own agent directory —
+		// measured live: the session it starts records what `deja hook-context`
+		// returned as a `deja-recall` custom_message (#3670).
+		{"senpi", func() string { return filepath.Join(sources.SenpiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
 		{"hermes", func() string {
 			return filepath.Join(sources.HermesHome(), "plugins", "deja", "__init__.py")
 		}, "hook-context", ""},

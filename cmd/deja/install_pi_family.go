@@ -25,6 +25,49 @@ import (
 // and gjc's native hooks are TypeScript modules with pi's event names, which
 // is a second piece of work rather than a config line.
 
+// Senpi (OmO Native) was read-only for want of anything to read its config
+// surface against: the registry had every one of its capabilities as `unknown`,
+// because no package or documentation for it was found. There is a package —
+// `@code-yeongyu/senpi` — and installing it answers all five at once, each one
+// on senpi's own screen:
+//
+//   - `<agent>/mcp.json` with `mcpServers` is loaded: the palette lists
+//     `mcp:deja:deja`.
+//   - skills load from `~/.agents/skills`, the shared directory, and from
+//     `<agent>/skills`. Both at once is a fault it announces —
+//     `"deja-history" collision: ✓ <agent>/skills ✗ ~/.agents/skills (skipped)`
+//     — the same trap pi has (#3657), so senpi takes the shared skill only.
+//   - pi's extension loads unchanged, and with it the `/deja` command.
+//   - a session started with the extension records what `deja hook-context`
+//     returned as `{"type":"custom_message","customType":"deja-recall"}`, which
+//     is auto-recall arriving.
+//   - `--session <path|id>`, `--resume` and `--fork` are in its own help.
+//
+// Senpi's first run moves `~/.pi/agent` to `~/.senpi/agent` — it is a rename of
+// pi's whole directory, sessions and config and extensions — which is worth
+// knowing before wiring both.
+func senpiMCPPath() string {
+	return filepath.Join(sources.SenpiConfigDir(), "mcp.json")
+}
+
+func installSenpi(exe string, uninstall bool) (installResult, error) {
+	return installMCPJSON(senpiMCPPath(), exe, uninstall)
+}
+
+// installSenpiAuto adds the extension, which is both the injection point and
+// the command.
+func installSenpiAuto(exe string, uninstall bool) (installResult, error) {
+	mcp, err := installSenpi(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	ext, err := installPiShapedExtension(sources.SenpiConfigDir(), exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, ext), nil
+}
+
 func kimchiMCPPath() string {
 	return filepath.Join(sources.KimchiConfigDir(), "mcp.json")
 }

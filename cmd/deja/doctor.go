@@ -433,6 +433,15 @@ func unplacedFilesIn(root string, seen []string, skipped func(string) bool, dotD
 		if !dotDirsAreTheStore && inDotDir(root, p) {
 			return nil
 		}
+		// Nor is an extension's own state. The pi family keeps it beside the
+		// transcripts, at `sessions/<project>/extensions/<name>/<id>.json` —
+		// senpi's terminal extension writes one per session — and counting
+		// those said "2 not recognised here" about a store whose every
+		// transcript had just been indexed, while `doctor --json` for the same
+		// store said ok (#3669).
+		if inExtensionState(root, p) {
+			return nil
+		}
 		if skipped != nil && skipped(p) {
 			byRule++
 			return nil
@@ -441,6 +450,22 @@ func unplacedFilesIn(root string, seen []string, skipped func(string) bool, dotD
 		return nil
 	})
 	return unread, byRule
+}
+
+// inExtensionState reports whether a path sits under an `extensions` directory
+// inside the store. A transcript never does: the directory belongs to whatever
+// extension the harness is running, and what it keeps there is state.
+func inExtensionState(root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	if err != nil {
+		return false
+	}
+	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+		if seg == "extensions" {
+			return true
+		}
+	}
+	return false
 }
 
 // printDoctorStoreWarnings says what deja could not read and why.
@@ -1565,6 +1590,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"roo", doctorFirstExisting(rooMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.RooExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kilocode", doctorFirstExisting(kilocodeMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.KiloExtensionID)), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kiro", kiroMCPSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"senpi", senpiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kimchi", kimchiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},

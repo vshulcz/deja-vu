@@ -442,6 +442,11 @@
       "path": "<tmp>/home/.kiro/settings/mcp.json"
     },
     {
+      "name": "senpi",
+      "state": "config-missing",
+      "path": "<tmp>/home/.senpi/agent/mcp.json"
+    },
+    {
       "name": "kimchi",
       "state": "config-missing",
       "path": "<tmp>/home/.config/kimchi/harness/mcp.json"
@@ -512,6 +517,11 @@
       "name": "pi",
       "state": "missing",
       "path": "<tmp>/home/.pi/agent/extensions/deja.ts"
+    },
+    {
+      "name": "senpi",
+      "state": "missing",
+      "path": "<tmp>/home/.senpi/agent/extensions/deja.ts"
     },
     {
       "name": "hermes",

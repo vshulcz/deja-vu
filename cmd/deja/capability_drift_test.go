@@ -138,7 +138,10 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			gotCommand = strings.Contains(clinePluginJS("/bin/deja"), "registerCommand")
 		case "hermes":
 			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
-		case "pi":
+		case "pi", "senpi":
+			// Senpi loads pi's extension unchanged — measured on a live
+			// install, where its `/` palette lists the extension's own `deja`
+			// command (#3670).
 			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
 		case "amp":
 			// Amp's command palette entry is registered by the plugin, the way

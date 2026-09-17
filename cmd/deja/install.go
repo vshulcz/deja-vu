@@ -777,6 +777,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCherryStudio(exe, uninstall)
 	case "kiro":
 		return installKiro(exe, uninstall)
+	case "senpi":
+		return installSenpi(exe, uninstall)
+	case "senpi-auto":
+		return installSenpiAuto(exe, uninstall)
 	case "kimchi":
 		return installKimchi(exe, uninstall)
 	case "gjc":
@@ -3914,7 +3918,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "kimchi", "gjc", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
+		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "senpi", "senpi-auto", "kimchi", "gjc", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -4046,6 +4050,7 @@ func existingTargetChecks() map[string]string {
 		// writes the import file where the app itself has a store.
 		"cherrystudio": cherryStudioFirstRoot(),
 		"kiro":         sources.KiroRoot(),
+		"senpi":        sources.SenpiRoot(),
 		"kimchi":       sources.KimchiRoot(),
 		"gjc":          sources.GjcRoot(),
 		"zcode":        sources.ZCodeRoot(),

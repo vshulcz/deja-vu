@@ -299,6 +299,11 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 		return []string{"aider", "--message", prompt}, true
 	case "pi":
 		return []string{"pi", prompt}, true
+	case "senpi":
+		// Same shape as pi's — a bare prompt argument, from its own usage line
+		// (`senpi [options] [--] [@files...] [messages...]`), measured on a
+		// live install (#3670).
+		return []string{"senpi", prompt}, true
 	case "omp":
 		return []string{"omp", prompt}, true
 	case "amp":
@@ -341,8 +346,8 @@ var handoffAlias = map[string]string{"agy": "antigravity"}
 // capability drift test keeps the two in sync.
 // Zed is paste-only for the same reason Roo is: the agent lives in the editor,
 // so there is no CLI invocation to hand a prompt to.
-var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "kilocode": true, "cherrystudio": true, "kiro": true, "senpi": true, "kimchi": true, "commandcode": true, "zcode": true, "gjc": true, "zed": true, "deepseek": true, "copilot-chat": true, "continue": true}
+var handoffPasteOnly = map[string]bool{"openclaw": true, "hermes": true, "roo": true, "kilocode": true, "cherrystudio": true, "kiro": true, "kimchi": true, "commandcode": true, "zcode": true, "gjc": true, "zed": true, "deepseek": true, "copilot-chat": true, "continue": true}
 
 func handoffTargets() []string {
-	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush"}
+	return []string{"claude", "codex", "opencode", "cursor", "copilot", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush"}
 }

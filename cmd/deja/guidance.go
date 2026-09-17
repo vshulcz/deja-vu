@@ -74,7 +74,12 @@ var sharedSkillHarnesses = map[string]bool{
 	// `"deja-history" collision: ✓ ~/.pi/agent/skills/… ✗ ~/.agents/skills/…
 	// (skipped)`, which is proof it scans the shared directory and proof that
 	// two copies are visible to a user (#3657).
-	"pi":     true,
+	"pi": true,
+	// Senpi is measured the same way and says the same thing: with a copy in
+	// both places its start screen prints `"deja-history" collision: ✓
+	// <agent>/skills ✗ ~/.agents/skills (skipped)`, which is proof it scans the
+	// shared directory (#3670).
+	"senpi":  true,
 	"cursor": true, "gemini": true, "kimi": true, "qwen": true,
 	"roo": true, "codex": true, "goose": true, "openclaw": true,
 	"omp": true, "deepseek": true, "zed": true, "amp": true, "prime": true,
@@ -236,6 +241,11 @@ func retiredGuidancePaths(harness string) []string {
 		// not harmless: pi loads that one, skips the shared file and prints the
 		// collision on every start (#3657).
 		return []string{filepath.Join(sources.PiConfigDir(), "skills", "deja-history", "SKILL.md")}
+	case "senpi":
+		// Senpi's own directory, for the same reason: it announces the
+		// collision and loads the local copy instead of the shared one, and a
+		// senpi that migrated pi's directory inherits pi's copy too (#3670).
+		return []string{filepath.Join(sources.SenpiConfigDir(), "skills", "deja-history", "SKILL.md")}
 	case "cursor":
 		return []string{filepath.Join(sources.CursorCLIHome(), "skills", "deja-history", "SKILL.md")}
 	case "roo":

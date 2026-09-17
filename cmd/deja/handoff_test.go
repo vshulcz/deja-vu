@@ -37,7 +37,10 @@ func TestHandoffCommandTable(t *testing.T) {
 		"qwen":     {"qwen", "-i", "P"},
 		"aider":    {"aider", "--message", "P"},
 		"pi":       {"pi", "P"},
-		"omp":      {"omp", "P"},
+		// Senpi's usage line takes the message as a trailing argument, the way
+		// pi's does; measured on a live install (#3670).
+		"senpi": {"senpi", "P"},
+		"omp":   {"omp", "P"},
 		// Amp's execute mode, from `amp --help` on 0.0.1788724845: -x takes the
 		// message and prints the last assistant reply.
 		"amp": {"amp", "-x", "P"},
