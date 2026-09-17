@@ -161,24 +161,16 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 			// Copilot Chat has no commands directory; its command is a prompt
 			// file, which is what the artifact check reads.
 			gotCommand = strings.Contains(copilotChatPrompt("/bin/deja"), "description:")
-		case "antigravity", "openclaw", "codex", "qwen", "kimi", "copilot", "grok", "zed", "gemini":
-			// These make a skill invocable by name, so the skill deja installs
-			// is the command and a second file would only add another entry.
-			// OpenClaw reports "Available as command: yes"; `agy plugin
-			// validate` converts a plugin command into a skill; Codex offers
-			// /skills and $name and calls custom prompts deprecated in favour
-			// of skills; Qwen lists them under /skills; Kimi invokes
-			// /skill:<name>; Copilot invokes /<skill-name>. Grok Build lists
-			// skills with user-invocable frontmatter and an argument hint for
-			// its slash-command autocomplete. Zed lists skills under `/` and
-			// invokes them by their frontmatter name. Gemini is the one
-			// measured by its own complaint: with a command file of ours
-			// present it printed "Skill command '/deja-search' was renamed to
-			// '/deja-search1'", which is proof both that the skill is a
-			// command there and that a file beside it is one entry too many
-			// (#3665).
-			gotCommand = gotSkill
 		default:
+			// Where a skill is invocable by name the skill deja installs is
+			// the command, and a file beside it would only add another entry —
+			// which Gemini says out loud by renaming one of the two. That list
+			// lives in the product, beside the report that prints those rows,
+			// so the two cannot drift (#3667).
+			if skillIsTheCommand(h.ID) {
+				gotCommand = gotSkill
+				break
+			}
 			// The rest read a command from a file, so the claim is whether we
 			// know where to write one for them.
 			gotCommand = commandFilePath(id) != ""

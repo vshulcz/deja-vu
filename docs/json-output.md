@@ -486,12 +486,15 @@ integration looks), `missing`, or `plugin` (the harness carries its own).
 there — what an upgrade leaves behind, with every hook exiting 127.
 
 `commands` is the third thing an install writes: the `/deja` a user types, one
-row per harness that reads a command from a file. `state` is `written`,
-`missing`, or `someone else's` for a file under that name deja did not write.
+row per harness. `state` is `written`, `missing`, `someone else's` for a file
+under that name deja did not write, or `skill` — the harnesses that make a skill
+invocable by name get no command file from deja, because a file beside the skill
+would only add a second entry, and `path` then names the skill that is the
+command. Each of those spells the invocation its own way (codex `/skills`, Kimi
+`/skill:<name>`, Copilot `/<skill-name>`), which is why the row does not promise
+one.
 `path` is worth reading rather than assuming: the file is not called `deja` in
-every harness, and some harnesses have no row at all because their skills are
-already invocable as commands — Gemini among them, where a file beside the
-skill got renamed by Gemini itself.
+every harness.
 
 The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
 event by event, so they have two states of their own: `out of date` (some of the

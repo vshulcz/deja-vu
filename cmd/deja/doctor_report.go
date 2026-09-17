@@ -326,7 +326,7 @@ func collectDoctorCommands() []doctorCommandStatus {
 	files := doctorCommandFiles()
 	out := make([]doctorCommandStatus, 0, len(files))
 	for _, c := range files {
-		out = append(out, doctorCommandStatus{Name: c.name, State: commandFileState(c.path), Path: c.path})
+		out = append(out, doctorCommandStatus{Name: c.name, State: c.state(), Path: c.path})
 	}
 	return out
 }

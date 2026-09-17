@@ -634,6 +634,51 @@
       "name": "copilot-chat",
       "state": "missing",
       "path": "<tmp>/home/.config/Code/User/prompts/deja.prompt.md"
+    },
+    {
+      "name": "antigravity",
+      "state": "missing",
+      "path": "<tmp>/home/.gemini/config/plugins/deja/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "codex",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "copilot",
+      "state": "missing",
+      "path": "<tmp>/home/.copilot/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "gemini",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "grok",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "kimi",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "openclaw",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "qwen",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "zed",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     }
   ],
   "sqlite3": {
