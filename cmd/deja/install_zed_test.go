@@ -546,6 +546,11 @@ func TestDoctorListsZed(t *testing.T) {
 // The extension's own entry is the user's, not ours: `deja install` writes
 // under the same id, finds that entry and leaves it exactly as it is rather
 // than turning it into a command of ours.
+//
+// While the extension is there. An entry that names no command and defers to
+// an extension which is not installed is an enabled server with nothing behind
+// it, and leaving that alone made `deja install zed` — the remedy doctor names
+// — report "unchanged" and fix nothing (#3660).
 func TestZedInstallLeavesTheExtensionEntryAlone(t *testing.T) {
 	body := `{
   "context_servers": {
@@ -556,12 +561,37 @@ func TestZedInstallLeavesTheExtensionEntryAlone(t *testing.T) {
   }
 }
 `
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	for _, dir := range zedExtensionDirs() {
+		if err := os.MkdirAll(filepath.Join(dir, zedServerID), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	path := zedSettingsFile(t, body)
 	if _, err := installZedMCP(path, "deja", false); err != nil {
 		t.Fatal(err)
 	}
 	if got := zedRead(t, path); got != body {
-		t.Fatalf("settings were rewritten:\n%s", got)
+		t.Fatalf("settings were rewritten while the extension is installed:\n%s", got)
+	}
+
+	// Now the extension goes, which is the state found on a real machine: a
+	// symlink into a scratch directory that no longer existed.
+	for _, dir := range zedExtensionDirs() {
+		if err := os.RemoveAll(filepath.Join(dir, zedServerID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	orphan := zedSettingsFile(t, body)
+	if _, err := installZedMCP(orphan, "/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	entry := zedDejaEntry(t, orphan)
+	if entry["command"] == nil {
+		t.Errorf("the orphaned entry was left with nothing to run: %v", entry)
 	}
 }
 

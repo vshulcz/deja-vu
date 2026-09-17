@@ -111,7 +111,13 @@ func zedSettingsWith(text, entry string, uninstall bool) (string, error) {
 	// The same id is the extension's, and Zed writes its own entry there when
 	// the extension is installed. That entry is the user's, not ours: leave it
 	// exactly as it is, in both directions.
-	if !zedEntryIsOurs(text, found.entry) {
+	//
+	// Unless there is no extension to belong to. An entry that names no command
+	// and defers to an extension which is not installed is an enabled server
+	// with nothing behind it, and refusing to touch it meant `deja install zed`
+	// — the remedy doctor names — reported "unchanged" and fixed nothing
+	// (#3660).
+	if !zedEntryIsOurs(text, found.entry) && (uninstall || zedExtensionReachable()) {
 		return text, nil
 	}
 	if uninstall {
