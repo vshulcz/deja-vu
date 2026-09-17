@@ -20,6 +20,25 @@ func QwenSessionFiles() []string {
 	})
 }
 
+// QwenSidecarFiles are the files qwen keeps beside its transcripts that are not
+// conversations: `<id>.runtime.json` per session, and `meta.json` and
+// `extract-cursor.json` per project. Counted as unread transcripts they made
+// doctor say "11 not recognised here" about a store it reads correctly — the
+// same wrong claim Continue's `sessions.json` and Kimi's `state.json` used to
+// produce (#3676).
+func QwenSidecarFiles() []string {
+	return walkFiles(filepath.Join(QwenRoot(), "projects"), func(p string) bool {
+		base := filepath.Base(p)
+		switch {
+		case strings.HasSuffix(base, ".runtime.json"):
+			return true
+		case base == "meta.json" || base == "extract-cursor.json":
+			return true
+		}
+		return false
+	})
+}
+
 func LoadQwen() []model.Session { return parseFiles(QwenSessionFiles(), ParseQwenFile) }
 
 // QwenProjectDirBase returns the encoded project dir name for a transcript

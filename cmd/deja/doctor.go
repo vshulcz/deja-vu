@@ -838,7 +838,10 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFilesBeside("grok", grokRoot, doctorExists(grokRoot), sources.GrokSessionFiles(), sources.GrokSidecarFiles()...)
 
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
-	printFiles("qwen", qwenRoot, doctorExists(qwenRoot), sources.QwenSessionFiles())
+	// Beside, not unread: `<id>.runtime.json`, `meta.json` and
+	// `extract-cursor.json` are qwen's own bookkeeping (#3676).
+	printFilesBeside("qwen", qwenRoot, doctorExists(qwenRoot),
+		sources.QwenSessionFiles(), sources.QwenSidecarFiles()...)
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
 	printFilesBeside("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles(), sources.KimiSidecarFiles()...)

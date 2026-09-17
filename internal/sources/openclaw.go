@@ -106,6 +106,11 @@ func OpenClawSidecarFiles() []string {
 			return true
 		case openclawCheckpointRE.MatchString(p):
 			return true
+		case filepath.Base(p) == "models.json":
+			// The agent's model catalogue, in `agents/<name>/agent/`. Counted
+			// as an unread transcript it put "1 not recognised here" on a
+			// store deja reads whole (#3676).
+			return true
 		}
 		return false
 	})
