@@ -654,20 +654,16 @@
       "capabilities": {
         "mcp": true,
         "auto": false,
-        "skill": false,
+        "skill": true,
         "command": false,
         "resume": false,
         "handoff": "paste",
-        "prereq": "import the server once in Settings -> MCP"
+        "prereq": "import the server once in Settings -> MCP; enable the skill for the agent"
       },
       "gaps": {
         "auto": {
           "state": "impossible",
           "why": "Cherry Studio has no hook surface for a third party: it is an Electron app whose agent sessions run inside it, and the extension points are the MCP server list and its import paths (#3644)."
-        },
-        "skill": {
-          "state": "todo",
-          "why": "No skill channel found: the app loads no user-level instructions file a third party can write, so guidance reaches the model through the MCP tool descriptions (#3644)."
         },
         "command": {
           "state": "impossible",

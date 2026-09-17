@@ -65,7 +65,20 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 	// The note rides on every result, not only the first: the file being
 	// unchanged does not mean anyone has imported it yet.
 	res.Note = joinNotes(res.Note, cherryStudioImportNote)
-	return res, nil
+
+	// And the skill, which does not need importing: Cherry Studio discovers
+	// the skill directories of the agent CLIs a machine has — `~/.agents/skills`
+	// among them, which is deja's own shared channel — and lists what it finds
+	// for the user to enable per agent (src/main/ai/skills/systemSkillSources.ts).
+	// So the file is written where the app already looks rather than into a
+	// directory of its own that nothing reads.
+	skill, err := installSkillFile(sharedSkillPath(), uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	out := wroteAll(res, skill)
+	out.Note = joinNotes(res.Note, "the skill is listed under Settings -> Skills once discovered; enable it for the agent")
+	return out, nil
 }
 
 // cherryStudioFirstRoot is what says the app is on this machine: a transcript

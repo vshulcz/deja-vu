@@ -283,7 +283,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Cherry Studio | ✅ | ✕ | — | ✕ | ✕ | paste | import the server once in Settings -> MCP |
+| Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Senpi | ? | ? | ? | ? | ? | paste | none |
 | gajae-code | ✅ | — | ✅ | ✅ | ✅ | paste | none |
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |

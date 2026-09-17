@@ -81,6 +81,15 @@
 <p>(<code>src/renderer/pages/settings/McpSettings/McpServersList.tsx</code>); the MCPB</p>
 <p>bundle this project already publishes is the other one and needs nothing new.</p>
 <ul>
+<li>The skill channel exists, and it is not one of its own: Cherry Studio</li>
+</ul>
+<p>discovers the skill directories of the agent CLIs a machine has —</p>
+<p><code>~/.agents/skills</code>, <code>~/.claude/skills</code>, <code>~/.codex/skills</code> and a dozen more,</p>
+<p>in <code>src/main/ai/skills/systemSkillSources.ts</code> — and lists what it finds for</p>
+<p>the user to enable per agent. <code>deja install cherrystudio</code> writes deja&#39;s</p>
+<p>shared skill into <code>~/.agents/skills</code>, which is one of those roots, so the</p>
+<p>app lists it; enabling it for the agent is the one click left.</p>
+<ul>
 <li>No hook surface for a third party, so auto-recall is recorded as impossible</li>
 </ul>
 <p>rather than as a gap someone could close: the agent sessions run inside the</p>

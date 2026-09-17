@@ -112,9 +112,14 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		for _, own := range []struct {
 			id   string
 			path string
-		}{{"kilocode", kilocodeSkillPath()}, {"gjc", gjcSkillPath()}} {
+		}{{"kilocode", kilocodeSkillPath()}, {"gjc", gjcSkillPath()},
+			// Cherry Studio discovers the skill directories of the agent CLIs a
+			// machine has, `~/.agents/skills` among them, so deja's shared skill
+			// is what it lists — it has no directory of its own.
+			{"cherrystudio", sharedSkillPath()}} {
 			if h.ID == own.id {
-				gotSkill = strings.HasSuffix(own.path, filepath.Join("skills", "deja-search", "SKILL.md"))
+				gotSkill = strings.Contains(own.path, filepath.Join("skills", "deja-search")) ||
+					strings.Contains(own.path, filepath.Join("skills", "deja-history"))
 			}
 		}
 		// Cline has no user-level instructions file at all, so its skill rides

@@ -40,6 +40,13 @@ the one above.
   installer's job. Its import paths are JSON, DXT and MCPB
   (`src/renderer/pages/settings/McpSettings/McpServersList.tsx`); the MCPB
   bundle this project already publishes is the other one and needs nothing new.
+- The skill channel exists, and it is not one of its own: Cherry Studio
+  discovers the skill directories of the agent CLIs a machine has —
+  `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills` and a dozen more,
+  in `src/main/ai/skills/systemSkillSources.ts` — and lists what it finds for
+  the user to enable per agent. `deja install cherrystudio` writes deja's
+  shared skill into `~/.agents/skills`, which is one of those roots, so the
+  app lists it; enabling it for the agent is the one click left.
 - No hook surface for a third party, so auto-recall is recorded as impossible
   rather than as a gap someone could close: the agent sessions run inside the
   Electron app, and the extension points are the MCP server list and its import
