@@ -852,8 +852,9 @@
           "why": "Nothing found names a custom-command surface in ZCode. What is documented by a third party is its hook block and a strict HTTP-only server map, so the work here is auto-recall through the hooks rather than a command file (#3651)."
         },
         "resume": {
-          "state": "todo",
-          "why": "No resume command verified here, so a handover is a paste (#3647)."
+          "state": "unknown",
+          "why": "The flag is real — `--resume <SESSION_ID>` appears in ZCode's headless contract, and the session id it takes is the one its JSON summary reports — but every documented invocation runs the app bundle's own Electron runtime with a mandatory `--prompt`, which is a turn rather than reopening a session for a person to continue. Whether the `zcode` launcher on PATH accepts the same flag on its own is unverified, and printing a command that needs a prompt would be worse than the paste (#3651).",
+          "source": "https://github.com/Q00/ouroboros/blob/main/docs/runtime-guides/zcode.md"
         }
       }
     },
