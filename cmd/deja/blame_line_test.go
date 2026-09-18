@@ -16,7 +16,8 @@ import (
 )
 
 // The attribution rule, which is the whole of this surface: the session has to
-// have written one of the lines the commit removed. Measured over 494 commits
+// have replaced the same text the commit deleted, which makes it the session
+// that performed the change and wrote the line being read. Measured over 494 commits
 // of this repository, time-and-file overlap attributed 2 of 4 dependency bumps
 // to a session that had nothing to do with them and this rule attributed none
 // (#1181).

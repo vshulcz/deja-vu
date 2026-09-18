@@ -27,11 +27,14 @@ import (
 //
 //	rule                                   one session  several  none  bumps wrongly attributed
 //	time and file overlap                       378         7     109         2 of 4
-//	the session wrote a line the commit removed 116         0     378         0 of 4
+//	the session replaced the text the commit deleted 116     0     378         0 of 4
 //	the session names the number it closes      355         0     139         2 of 4
 //
 // So this takes the middle rule and nothing else: the session has to have
-// written one of the lines the commit deleted. It answers for about a quarter
+// replaced the same text the commit shows as deleted. An edit record holds
+// what an edit replaced, so a match means that session performed this very
+// change — which makes it the author of the line being read, and the text it
+// replaced is what stood there before. It answers for about a quarter
 // of commits and says nothing for the rest, which is the trade the issue asks
 // for — a rationale invented for a line nobody reasoned about is worse than no
 // rationale. The number-closed signal is out for a reason that only shows up in
@@ -127,12 +130,12 @@ const blameGitTimeout = 5 * time.Second
 // says why.
 type lineAuthor struct {
 	Session model.Session
-	Matched string // the removed line this session is recorded as having written
+	Matched string // the text this session is recorded as having replaced
 	Asked   string // what the session was asked to do, which is its own title
 }
 
-// attributeLine picks the session that wrote one of the lines the commit
-// removed. Nothing when no session did — which is the answer for a dependency
+// attributeLine picks the session that replaced the text the commit deleted —
+// the session that made this change, and so wrote the line being read. Nothing when no session did — which is the answer for a dependency
 // bump, a merge, and any commit deja never saw.
 func attributeLine(sessions []model.Session, target search.BlameTarget, c lineCommit, removed map[string]bool) (lineAuthor, bool) {
 	if len(removed) == 0 {
