@@ -762,6 +762,9 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		if !sigs[p.Sig] {
 			continue
 		}
+		if remedyIsTheFailure(p) {
+			continue
+		}
 		// One session doing something after an error is not evidence that it
 		// worked; it is half of it. Held back, not thrown away: a caller that
 		// says so when it speaks can have them once the confirmed pairs are
@@ -805,6 +808,21 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		}
 	}
 	return out
+}
+
+// remedyIsTheFailure drops a pair whose remedy is the command that produced
+// the error. A repaired pair keeps the failing command beside the corrected
+// one, and when the two are the same command the line reads "ran next: X /
+// after this failed: X" — deja telling an agent to run again what just failed,
+// which is a loop rather than a remedy. The two strings are not equal:
+// a stored command carries its exit status, so the comparison is on the
+// command alone. Measured on a real store: 1 of the 7 served pairs that carry
+// a failing command (#3720).
+func remedyIsTheFailure(p FixPair) bool {
+	if p.Failed == "" || p.Command == "" {
+		return false
+	}
+	return normalizeCommand(p.Failed) == normalizeCommand(p.Command)
 }
 
 // FixCandidateSeen reports whether deja is holding an unconfirmed sighting for
