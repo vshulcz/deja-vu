@@ -103,6 +103,40 @@ func nothingWired() bool {
 	return true
 }
 
+// harnessPluginCarriesRecall reports whether this harness has a deja plugin of
+// its own installed — the copy that recalls when the installer has not written
+// to the file this row names. Kimi has said so since #1721; Grok's plugin works
+// the same way and went unreported (#1828).
+func harnessPluginCarriesRecall(name string) bool {
+	switch name {
+	case "kimi":
+		return kimiPluginInstalled()
+	case "grok":
+		return grokPluginInstalled()
+	}
+	return false
+}
+
+// harnessPluginNote is what to print beside a "plugin" row: the version note
+// when this deja ships a newer plugin than the installed one, and otherwise the
+// sentence that says what the plugin is doing there. A version that is current
+// is not news; what the plugin does is, because nothing else on screen says it.
+func harnessPluginNote(name string) (behind, idle string) {
+	switch name {
+	case "kimi":
+		if note := kimiPluginNote(); note != "" && note != "v"+kimiPluginVersion {
+			return note, ""
+		}
+		return "", "the Kimi Code plugin recalls on every prompt"
+	case "grok":
+		if note := grokPluginNote(); note != "" && note != "v"+grokPluginVersion {
+			return note, ""
+		}
+		return "", "the Grok Build plugin recalls on every prompt"
+	}
+	return "", ""
+}
+
 // autoWiringState is the state one auto-recall row is in, decided once for the
 // report and the JSON both: two surfaces reading one file and disagreeing is
 // the shape this repository keeps paying for. binaryMissing is the state an
@@ -112,7 +146,7 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	path := a.path()
 	b, err := os.ReadFile(path)
 	switch {
-	case a.name == "kimi" && kimiPluginInstalled() && (err != nil || !strings.Contains(string(b), a.marker)):
+	case harnessPluginCarriesRecall(a.name) && (err != nil || !strings.Contains(string(b), a.marker)):
 		state = "plugin"
 	case err != nil:
 		state = "missing"
@@ -143,12 +177,12 @@ func doctorAutoRecall(w io.Writer) {
 		// Same as the MCP line: the plugin carries this harness's recall, and
 		// its own hook is the one that runs when the installer has not written
 		// here at all.
-		if a.name == "kimi" && kimiPluginInstalled() && (err != nil || !strings.Contains(string(b), a.marker)) {
+		if harnessPluginCarriesRecall(a.name) && (err != nil || !strings.Contains(string(b), a.marker)) {
 			// Behind is the line worth the width: what it does is in the
 			// README, what to run is not obvious from anywhere.
-			note := kimiPluginNote()
-			if note == "" || note == "v"+kimiPluginVersion {
-				note = "the Kimi Code plugin recalls on every prompt"
+			note, idle := harnessPluginNote(a.name)
+			if note == "" {
+				note = idle
 			}
 			fmt.Fprintf(w, "  %-12s %-11s %s  (%s)\n", a.name, "plugin", reportPath(path), note)
 			continue

@@ -1234,6 +1234,11 @@ func doctorMCP(w io.Writer) {
 		if status != "wired" && c.name == "kimi" && kimiPluginInstalled() {
 			status = "plugin"
 		}
+		// And the Grok Build plugin, which declares the same server and stands
+		// down when config.toml already has [mcp_servers.deja] (#1828).
+		if status != "wired" && c.name == "grok" && grokPluginInstalled() {
+			status = "plugin"
+		}
 		// Same for Codex: `codex plugin add deja-vu@deja-vu` brings the server
 		// and the hooks with it.
 		if status != "wired" && c.name == "codex" && codexPluginInstalled() {
