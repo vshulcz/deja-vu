@@ -89,7 +89,7 @@ func grokPluginNote() string {
 		return ""
 	}
 	if cmp, ok := compareUpdateVersions(got, grokPluginVersion); ok && cmp < 0 {
-		return "v" + got + " installed, v" + grokPluginVersion + " ships with this deja — reinstall it in Grok to update"
+		return "v" + got + " installed, v" + grokPluginVersion + " ships with this deja — `grok plugin update deja`"
 	}
 	return "v" + got
 }

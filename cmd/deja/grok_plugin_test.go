@@ -63,8 +63,11 @@ func TestGrokPluginNoteNamesBothVersionsWhenBehind(t *testing.T) {
 	if !strings.Contains(note, "v0.1.0 installed") || !strings.Contains(note, "v"+grokPluginVersion+" ships") {
 		t.Fatalf("note = %q, want both versions named", note)
 	}
-	if !strings.Contains(note, "reinstall") {
-		t.Fatalf("note = %q, want it to say what to do", note)
+	// The command Grok actually has: `grok plugin update [<name>]`, which is
+	// also what its own plugin guide points at. Kimi has no plugin command, so
+	// its note still says to reinstall.
+	if !strings.Contains(note, "grok plugin update deja") {
+		t.Fatalf("note = %q, want the command that updates it", note)
 	}
 }
 
