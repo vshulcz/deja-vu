@@ -2745,6 +2745,14 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
 	}
+	// A line was asked about, so answer about the line first: git says which
+	// commit wrote it, and the store says which session wrote the text that
+	// commit replaced (#1181). Before the branches below, because a file no
+	// session mentions still has a commit behind the line — and "no session
+	// wrote this" is the answer, not silence.
+	if target.Line > 0 && !jsonOutput {
+		lineBlame(os.Stdout, dir, target, hits)
+	}
 	if jsonOutput {
 		search.PrintBlame(os.Stdout, hits, true)
 		return nil
@@ -3834,7 +3842,7 @@ Usage:
   deja check -       (read a plan from stdin and print factual co-occurrences)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
-  deja blame <path> [--all] [--json] [--project name] [--harness name] [--since 30d]
+  deja blame <path>[:line] [--all] [--json] [--project name] [--harness name] [--since 30d]
   deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]

@@ -1,6 +1,9 @@
 package search
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // dejaCallNames are the tools an agent calls to reach deja. A transcript line
 // carrying one of them beside a JSON argument object is the record of a call,
@@ -80,8 +83,33 @@ func isOwnCallLine(line string) bool {
 // and dropping it changed nothing measurable here.
 func dejaReportLine(line string) bool {
 	l := strings.TrimSpace(line)
-	return strings.HasPrefix(l, "=== deja ") || strings.HasPrefix(l, "$ deja ")
+	if strings.HasPrefix(l, "=== deja ") || strings.HasPrefix(l, "$ deja ") {
+		return true
+	}
+	return dejaLineAnswerLine(l)
 }
+
+// dejaLineAnswerLine recognises `deja blame <path>:<line>`'s own answer.
+//
+// Same reason the two above are recognised: a transcript that ran deja keeps
+// its output, every line of that output names the file, and blame then ranks
+// its own past answer as the history of the file and quotes it back (#1330).
+// The line answer added a new shape and it is this one (#1181).
+func dejaLineAnswerLine(l string) bool {
+	if strings.HasPrefix(l, "written in ") && strings.Contains(l, " · ") {
+		return true
+	}
+	if strings.HasPrefix(l, "why, in full: deja ctx ") {
+		return true
+	}
+	if strings.HasPrefix(l, "no indexed session wrote the lines this commit replaced") {
+		return true
+	}
+	return dejaLineHeader.MatchString(l)
+}
+
+// dejaLineHeader is the answer's first line: `pool.go:3 last changed in abc1234`.
+var dejaLineHeader = regexp.MustCompile(`^[^\s:]+:\d+ last changed in [0-9a-f]{7,40}\b`)
 
 // withoutOwnReport drops those lines, leaving everything a person wrote.
 func withoutOwnReport(text string) string {
