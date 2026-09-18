@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -47,12 +48,23 @@ type lineCommit struct {
 	Author  string
 }
 
-// gitLineCommit asks git which commit last wrote a line.
-func gitLineCommit(path string, line int) (lineCommit, bool) {
+// gitLineCommit asks git which commit last wrote a line. The second return is
+// why it could not, in the reader's words: a line asked about and then not
+// mentioned at all leaves them unable to tell "this line has no history" from
+// "your `:120` was ignored" (#3726).
+func gitLineCommit(path string, line int) (lineCommit, string) {
+	if _, err := exec.LookPath("git"); err != nil {
+		return lineCommit{}, "git is not installed, so nothing can say which commit wrote this line"
+	}
+	if fi, err := os.Stat(path); err != nil {
+		return lineCommit{}, "there is no such file here"
+	} else if fi.IsDir() {
+		return lineCommit{}, "that is a directory, not a file"
+	}
 	dir := filepath.Dir(path)
 	out, err := gitRun(dir, "blame", "-L", fmt.Sprintf("%d,%d", line, line), "--porcelain", "--", path)
 	if err != nil || strings.TrimSpace(out) == "" {
-		return lineCommit{}, false
+		return lineCommit{}, lineBlameRefusal(dir, path, line)
 	}
 	var c lineCommit
 	for i, ln := range strings.Split(out, "\n") {
@@ -62,7 +74,7 @@ func gitLineCommit(path string, line int) (lineCommit, bool) {
 			if len(head) < 7 || strings.HasPrefix(head, "0000000") {
 				// An uncommitted line has the null sha: there is no commit to
 				// attribute, and the reader is looking at their own edit.
-				return lineCommit{}, false
+				return lineCommit{}, "this line is not committed yet"
 			}
 			c.SHA = head
 		case strings.HasPrefix(ln, "summary "):
@@ -75,7 +87,48 @@ func gitLineCommit(path string, line int) (lineCommit, bool) {
 			}
 		}
 	}
-	return c, c.SHA != ""
+	if c.SHA == "" {
+		return lineCommit{}, "git named no commit for this line"
+	}
+	return c, ""
+}
+
+// lineBlameRefusal turns git's own refusal into the one sentence a reader
+// needs. The common one is a line past the end of the file, and the count is
+// what makes it actionable.
+func lineBlameRefusal(dir, path string, line int) string {
+	if n, err := countLines(path); err == nil && line > n {
+		return fmt.Sprintf("the file has %d line%s", n, pluralS(n))
+	}
+	if out, err := gitRun(dir, "rev-parse", "--is-inside-work-tree"); err != nil || strings.TrimSpace(out) != "true" {
+		return "this file is not in a repository"
+	}
+	if out, err := gitRun(dir, "ls-files", "--error-unmatch", "--", path); err != nil || strings.TrimSpace(out) == "" {
+		return "this file is not tracked, so no commit wrote the line"
+	}
+	return "git could not say which commit wrote this line"
+}
+
+// countLines is how many lines a file has, for the refusal above.
+func countLines(path string) (int, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = f.Close() }()
+	buf := make([]byte, 64*1024)
+	n := 0
+	for {
+		read, err := f.Read(buf)
+		for _, b := range buf[:read] {
+			if b == '\n' {
+				n++
+			}
+		}
+		if err != nil {
+			return n, nil
+		}
+	}
 }
 
 // gitRemovedLines is what a commit deleted, normalised the way a recorded edit
@@ -259,8 +312,9 @@ func shortSHA(s string) string {
 // is not there, when the file is not in a repository, or when the line is
 // uncommitted — none of those is a fact about the store.
 func lineBlame(w io.Writer, dir string, target search.BlameTarget, hits []search.BlameHit) {
-	c, ok := gitLineCommit(target.FullPath, target.Line)
-	if !ok {
+	c, why := gitLineCommit(target.FullPath, target.Line)
+	if why != "" {
+		fmt.Fprintf(w, "%s:%d — %s\n\n", target.Base, target.Line, why)
 		return
 	}
 	// A blame hit carries only the messages that mention the file, and an edit
