@@ -80,12 +80,15 @@ func TestIndexQuietCoversRebuild(t *testing.T) {
 // why, or a scheduled job stops working and nothing says so.
 func TestIndexQuietStillReportsFailure(t *testing.T) {
 	indexEnv(t)
-	ro := filepath.Join(t.TempDir(), "readonly")
-	if err := os.Mkdir(ro, 0o500); err != nil {
+	// A regular file where a parent directory should be, rather than an
+	// unwritable directory: a mode bit denies nothing on Windows or to root,
+	// so the build succeeded there and the test read that as quiet swallowing
+	// the error. Creating a directory underneath a file fails everywhere.
+	blocker := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.Chmod(ro, 0o700) })
-	t.Setenv("DEJA_INDEX_DIR", filepath.Join(ro, "index.db"))
+	t.Setenv("DEJA_INDEX_DIR", filepath.Join(blocker, "index.db"))
 
 	out, err := captureRunStderr(t, "index", "--quiet")
 	if err == nil {

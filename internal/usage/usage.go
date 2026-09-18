@@ -382,18 +382,34 @@ type StatusNumbers struct {
 	// This week, for the line the quiet days print.
 	WeekRecalls int
 	WeekBytes   int
+	// This week's unprompted arrivals: how many, and how much. Counted here so
+	// the week note can print both halves of its sentence from one read.
+	WeekInjections    int
+	WeekInjectedBytes int
+	// This week's déjà vu moments — prompts the reader's own history already
+	// answered. On its own terms, deliberately: it counts an event with
+	// sessions behind it whether or not the rest of that event was a miss, and
+	// it opens strictly after the cut rather than on it, which is what
+	// DejaVuWeek has always done.
+	DejaVuWeek int
 	// Today's source transcripts behind what was served, for the "less than
 	// replaying" clause.
 	RawToday int64
 }
 
-// StatusCounters is TodayDemand, Week and TodayRaw in one pass.
+// StatusCounters is every figure the day-and-week surfaces print, from one
+// walk of the log.
 //
-// The line renders on every prompt and took two of these reads — 8 ms each on a
-// busy fortnight's log — for numbers one read produces. TodayDemand's own doc
-// gives the other half of the reason: two passes can straddle a write and
-// report numbers that were never true together, and the line prints today's
-// beside the week's (#2224).
+// The status line renders on every prompt and took two of these reads — 8 ms
+// each on a busy fortnight's log — for numbers one read produces (#2224). The
+// brief took four and the week note two, for the same reason and with the same
+// answer, so the readers below are wrappers around this and the log is opened
+// once per surface rather than once per figure (#1576).
+//
+// Speed is the smaller half. Separate passes are separate snapshots: an event
+// recorded between two of them lands in the second and not the first, so a
+// line could print a "today" figure and a "this week" figure that were never
+// true at the same moment.
 func StatusCounters(indexDir string) StatusNumbers {
 	var out StatusNumbers
 	now := time.Now()
@@ -408,6 +424,12 @@ func StatusCounters(indexDir string) StatusNumbers {
 		if !e.Time.Before(midnight) && (servedKind(e.Kind) || injectedKind(e.Kind)) {
 			out.RawToday += e.RawBytes
 		}
+		// Likewise above the empty rule, and on its own boundary: a déjà vu
+		// moment is counted from the sessions behind it, and this is the rule
+		// the week note and the brief have been reading all along.
+		if e.Kind == KindDejaVu && e.Time.After(cut) && e.Sessions > 0 {
+			out.DejaVuWeek++
+		}
 		if e.FoundNothing() {
 			continue
 		}
@@ -421,9 +443,15 @@ func StatusCounters(indexDir string) StatusNumbers {
 				out.Injections++
 			}
 		}
-		if !e.Time.Before(cut) && servedKind(e.Kind) {
-			out.WeekRecalls++
-			out.WeekBytes += e.Bytes
+		if !e.Time.Before(cut) {
+			switch {
+			case servedKind(e.Kind):
+				out.WeekRecalls++
+				out.WeekBytes += e.Bytes
+			case injectedKind(e.Kind):
+				out.WeekInjections++
+				out.WeekInjectedBytes += e.Bytes
+			}
 		}
 	}
 	return out
@@ -434,29 +462,13 @@ func StatusCounters(indexDir string) StatusNumbers {
 // Automatic injections and empty results stay out of the recall count so
 // headline counters use the same demand-side definition as Week.
 //
-// Injections come back from the same pass rather than from a second call: the
-// statusline renders on every prompt, and two passes over the log can also
-// straddle a write and report two numbers that were never true together.
+// The three figures come from one walk of the log rather than three calls: two
+// passes can straddle a write and report numbers that were never true
+// together. That walk is StatusCounters, which the callers wanting more than
+// this can use directly.
 func TodayDemand(indexDir string) (recalls, bytes, injected int) {
-	now := time.Now()
-	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	for _, e := range read(Path(indexDir)) {
-		// FoundNothing, not the raw flag: on an injection the flag means no
-		// project session went in, and the environment block goes out with it
-		// — dropping those said "0 B injected" on a day memory had been
-		// arriving since morning (#1962).
-		if e.Time.Before(midnight) || ahead(e.Time, now) || e.FoundNothing() {
-			continue
-		}
-		switch {
-		case servedKind(e.Kind):
-			recalls++
-			bytes += e.Bytes
-		case injectedKind(e.Kind):
-			injected += e.Bytes
-		}
-	}
-	return recalls, bytes, injected
+	n := StatusCounters(indexDir)
+	return n.Recalls, n.Bytes, n.Injected
 }
 
 // WeekCut is when "this week" opens: seven calendar days back, at the same wall
@@ -473,31 +485,12 @@ func WeekCut(now time.Time) time.Time {
 // DejaVuWeek counts this week's déjà vu moments — prompts the user's own
 // history already answered.
 func DejaVuWeek(indexDir string) int {
-	now := time.Now()
-	cut := WeekCut(now)
-	n := 0
-	for _, e := range read(Path(indexDir)) {
-		if e.Kind == KindDejaVu && e.Time.After(cut) && !ahead(e.Time, now) && e.Sessions > 0 {
-			n++
-		}
-	}
-	return n
+	return StatusCounters(indexDir).DejaVuWeek
 }
 
 // TodayRaw sums the source-transcript volume behind today's served digests.
 func TodayRaw(indexDir string) int64 {
-	now := time.Now()
-	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	var raw int64
-	for _, e := range read(Path(indexDir)) {
-		if e.Time.Before(midnight) || ahead(e.Time, now) {
-			continue
-		}
-		if servedKind(e.Kind) || injectedKind(e.Kind) {
-			raw += e.RawBytes
-		}
-	}
-	return raw
+	return StatusCounters(indexDir).RawToday
 }
 
 // Totals summarizes the retained usage log.
@@ -544,24 +537,8 @@ func Totals(indexDir string) Summary {
 // calls) — the honest demand-side number — while injected counts the hook
 // deliveries deja pushed unprompted.
 func Week(indexDir string) (recalls, bytes, injected, injectedBytes int) {
-	now := time.Now()
-	cut := WeekCut(now)
-	for _, e := range read(Path(indexDir)) {
-		// Same rule as the day: the week that contains today has to contain
-		// today's injected bytes (#1962).
-		if e.Time.Before(cut) || ahead(e.Time, now) || e.FoundNothing() {
-			continue
-		}
-		switch {
-		case servedKind(e.Kind):
-			recalls++
-			bytes += e.Bytes
-		case injectedKind(e.Kind):
-			injected++
-			injectedBytes += e.Bytes
-		}
-	}
-	return recalls, bytes, injected, injectedBytes
+	n := StatusCounters(indexDir)
+	return n.WeekRecalls, n.WeekBytes, n.WeekInjections, n.WeekInjectedBytes
 }
 
 // Today sums today's agent-memory events and their served bytes.

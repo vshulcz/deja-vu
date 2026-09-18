@@ -102,9 +102,15 @@ func runBrief(dir string, w io.Writer) error {
 		fmt.Fprintf(w, "wire       %sno agent wired yet%s — `deja install --auto`\n", bold, reset)
 	}
 
-	recalls, bytes, _ := usage.TodayDemand(dir)
-	weekRecalls, _, _, _ := usage.Week(dir)
-	dejaVu := usage.DejaVuWeek(dir)
+	// One walk of the usage log for all four figures this screen prints. It
+	// took four, one per figure, and besides the cost they were four separate
+	// snapshots: an event recorded between two of them landed in the second
+	// and not the first, so the today line and the week line could disagree
+	// about a recall that happened while the brief was rendering (#1576).
+	counters := usage.StatusCounters(dir)
+	recalls, bytes := counters.Recalls, counters.Bytes
+	weekRecalls := counters.WeekRecalls
+	dejaVu := counters.DejaVuWeek
 	// Only when the week has nothing at all to report. Recalls and déjà vu
 	// moments are counted from usage, not from session age, so a store whose
 	// sessions are old can still have served memory this week — and hiding that
@@ -120,7 +126,7 @@ func runBrief(dir string, w io.Writer) error {
 		line += fmt.Sprintf(" · %d recall%s served", recalls, pluralS(recalls))
 		served := " (" + humanBytes(int64(bytes)) + ")"
 		full := served
-		if raw := usage.TodayRaw(dir); bytes > 0 && raw/int64(bytes) >= 2 {
+		if raw := counters.RawToday; bytes > 0 && raw/int64(bytes) >= 2 {
 			full = " (" + humanBytes(int64(bytes)) + " from " + humanBytes(raw) + ")"
 		}
 		// printableWidth, not briefWidth: a pipe reads as "do not cut", and a

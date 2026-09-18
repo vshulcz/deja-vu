@@ -37,9 +37,12 @@ func weekNoteAt(dir string, now time.Time) string {
 		return ""
 	}
 	// Served and injected both are memory the agent got; the brief's own
-	// week line counts them the same way.
-	served, _, injected, _ := usage.Week(dir)
-	recalls := served + injected
+	// week line counts them the same way. One read for both this and the déjà
+	// vu count below: the note is written from a session-start hook, and two
+	// walks of the log can also report a recall count and a déjà vu count that
+	// were never true together (#1576).
+	n := usage.StatusCounters(dir)
+	recalls := n.WeekRecalls + n.WeekInjections
 	if recalls == 0 {
 		// A quiet week is not news; the clock restarts so the next week that
 		// has something to say is the one reported.
@@ -48,8 +51,8 @@ func weekNoteAt(dir string, now time.Time) string {
 	}
 	_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 	line := fmt.Sprintf("deja this week: %d recall%s", recalls, pluralS(recalls))
-	if dv := usage.DejaVuWeek(dir); dv > 0 {
-		line += fmt.Sprintf(", %d déjà vu", dv)
+	if n.DejaVuWeek > 0 {
+		line += fmt.Sprintf(", %d déjà vu", n.DejaVuWeek)
 	}
 	line += " — deja stats --card"
 	// The first week note carries the one sentence deja says about itself, when
