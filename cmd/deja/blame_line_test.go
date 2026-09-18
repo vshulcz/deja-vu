@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -129,12 +130,29 @@ func TestBlameLineNamesTheSessionBehindTheLine(t *testing.T) {
 	}
 	const id = "aaaa1111-2222-4000-8000-c3d4e5f6a7b8"
 	stamp := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+	// Encoded rather than pasted: a Windows path carries backslashes, and a
+	// path glued into a JSON fixture by hand is this repository's most frequent
+	// windows-only failure.
 	var b strings.Builder
-	b.WriteString(`{"type":"user","sessionId":"` + id + `","cwd":"` + repo + `","timestamp":"` + stamp +
-		`","message":{"role":"user","content":"size the pool by shard"}}` + "\n")
-	b.WriteString(`{"type":"assistant","sessionId":"` + id + `","cwd":"` + repo + `","timestamp":"` + stamp +
-		`","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"` + file +
-		`","old_string":"var conns = newPool(shardCount * connsPerShard)","new_string":"var conns = newPool(shardCount)"}}]}}` + "\n")
+	for _, rec := range []map[string]any{
+		{"type": "user", "sessionId": id, "cwd": repo, "timestamp": stamp,
+			"message": map[string]any{"role": "user", "content": "size the pool by shard"}},
+		{"type": "assistant", "sessionId": id, "cwd": repo, "timestamp": stamp,
+			"message": map[string]any{"role": "assistant", "content": []any{
+				map[string]any{"type": "tool_use", "name": "Edit", "input": map[string]any{
+					"file_path":  file,
+					"old_string": "var conns = newPool(shardCount * connsPerShard)",
+					"new_string": "var conns = newPool(shardCount)",
+				}},
+			}}},
+	} {
+		line, err := json.Marshal(rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b.Write(line)
+		b.WriteByte('\n')
+	}
 	if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(b.String()), 0o644); err != nil {
 		t.Fatal(err)
 	}
