@@ -22,6 +22,14 @@ import (
 // phrase cost 2.2 s of the brief's 3.2 s, against 0.19 s for the turns a person
 // actually wrote (#625).
 func suggestFirstQuery(dir string) string {
+	// Titles first: a title is what somebody typed when they asked for the
+	// work, and measured against three other sources it is the one that names
+	// a subject rather than a fragment of whatever was being said (#3714).
+	// The message scan below stays as the fallback — a store whose sessions
+	// carry no usable title still gets a suggestion.
+	if q := suggestFromTitles(dir); q != "" {
+		return q
+	}
 	ss, err := index.SearchWithRecovery(dir, query.Options{All: true, Role: "user"}, nil)
 	if err != nil {
 		return ""

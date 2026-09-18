@@ -2608,6 +2608,15 @@ func sessionTitleFrom(s model.Session) (title string, fromAgent bool) {
 // rides in the text so every surface says the same thing.
 const harnessOutputTitlePrefix = "harness output: "
 
+// TitleIsBorrowed reports that a title is not what a person typed: the ingest
+// borrows one from what the harness or a tool wrote when a session opens with
+// plumbing, and marks it in the text. A surface that picks a phrase out of
+// titles has to skip those, or it suggests a fleet's paperwork (#3714).
+func TitleIsBorrowed(title string) bool {
+	t := strings.TrimSpace(title)
+	return strings.HasPrefix(t, harnessOutputTitlePrefix) || strings.HasPrefix(t, toolOutputTitlePrefix)
+}
+
 // titlePlaceholder reports that a title is only standing in until the session
 // says something of its own. The incremental path fills a title in when it is
 // empty; a session that opens with a slash command would otherwise keep the
