@@ -271,7 +271,13 @@ import (
 // is not a candidate is not a skip either. `archived_sessions` is its second
 // directory, same JSONL, never walked. A store built before this holds neither,
 // and nothing re-reads a file the old rule never matched (#3640).
-const version = 48
+// 49 masks a password stated in prose. Every other rule wants a delimiter — a
+// colon, an equals sign, a flag — and a person telling an agent a password
+// writes none: "the admin password is hunter2-2026" went into the index
+// verbatim, so `deja show` and `deja ctx` read it back in the clear. Redaction
+// runs at ingest, so a store built before this keeps the text until it
+// re-reads its sources (#3729).
+const version = 49
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
