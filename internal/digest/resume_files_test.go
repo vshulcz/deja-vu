@@ -35,6 +35,31 @@ func TestFilesInFlightKeepsPathsAndDropsProse(t *testing.T) {
 	}
 }
 
+// The five slots went to whatever was touched last, and on a real store that
+// was a probe script under /tmp in 238 of 400 handovers — with a repository
+// file that had lost its slot to one in 29 of them (#3716).
+func TestFilesInFlightNamesTheWorkNotTheScratch(t *testing.T) {
+	s := model.Session{Messages: []model.Message{
+		{Role: sources.RoleEdit, Text: "/Users/x/work/internal/index/retrieval.go"},
+		{Role: sources.RoleFiles, Text: "/private/tmp/deja-probe/run.sh /tmp/scan.py"},
+		{Role: sources.RoleFiles, Text: "/Users/x/.claude/projects/proj/scratchpad/notes.md"},
+		{Role: sources.RoleFiles, Text: "/Users/x/work/node_modules/left-pad/index.js"},
+		{Role: sources.RoleFiles, Text: "/Users/x/work/out/build.log /var/folders/t/T/probe.go"},
+	}}
+	got := ResumeFrom(s, nil).Files
+	if len(got) != 1 || !strings.HasSuffix(got[0], "internal/index/retrieval.go") {
+		t.Fatalf("the handover should name the work and nothing else, got %v", got)
+	}
+	// And a session that touched only throwaway files says nothing about files
+	// rather than sending the next turn to a probe script.
+	only := model.Session{Messages: []model.Message{
+		{Role: sources.RoleFiles, Text: "/private/tmp/deja-probe/run.sh"},
+	}}
+	if got := ResumeFrom(only, nil).Files; len(got) != 0 {
+		t.Fatalf("got %v, want nothing to name", got)
+	}
+}
+
 // The predicate itself, since it decides what an agent is told to open.
 func TestLooksLikeAPath(t *testing.T) {
 	for _, s := range []string{
