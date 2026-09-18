@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-the thirty-three-five the loader registers; `docs/registry/` describes each store's
+the thirty-three the loader registers; `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
 
@@ -34,6 +34,15 @@ against the loader list.
 | prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
 | DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
 | Zed | `zed.go` | threads in the SQLite store at `Zed/threads/threads.db` |
+| Crush | `crush.go` | SQLite databases named by `projects.json`, plus `<project>/.crush/crush.db` |
+| Cherry Studio | `cherrystudio.go` | Claude-format JSONL under the app's `Data/Agents/.claude/projects` |
+| Kilo Code | `kilo.go` | task JSON under the VS Code extension's storage, plus the CLI's `kilo.db` |
+| Kiro | `kiro.go` | CLI JSONL under `~/.kiro/sessions/cli`, and `messages.jsonl` per IDE session |
+| Command Code | `commandcode.go` | JSONL under `~/.commandcode/projects` |
+| ZCode | `zcode.go` | JSONL under `~/.zcode/projects`, plus the CLI's `db.sqlite` |
+| gajae-code | `gjc.go` | JSONL under `~/.gjc/agent/sessions` |
+| Senpi | `senpi.go` | JSONL under `~/.senpi/agent/sessions` |
+| Kimchi Coding | `senpi.go` | JSONL under the harness directory's `sessions`, one directory per encoded cwd |
 | Hermes | `hermes.go`, `hermes_pg.go` | SQLite state per profile, or Postgres when `DEJA_HERMES_PG_DSN` is set |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
@@ -81,7 +90,9 @@ another zone. The file is primary data; the index remains a rebuildable cache.
 
 `internal/redact` runs before every `writeRecord` path: cold rebuild, `writeSessions`, non-append incremental replacement, and append-only incremental ingest. The pass is disabled only when `DEJA_NO_REDACT=1` is set; that escape hatch is unsafe because plaintext credentials will be written to the local index.
 
-The redactor replaces only secret values, keeping keys and surrounding prose searchable. It covers AWS access keys and AWS secret assignments, generic credential assignments, bearer tokens, PEM private key blocks, GitHub/OpenAI/npm/Slack/Google provider prefixes, and connection URLs with `scheme://user:pass@host` credentials.
+The redactor replaces only secret values, keeping keys and surrounding prose searchable. It covers AWS access keys and AWS secret assignments, generic credential assignments in ASCII and in other scripts, bearer tokens and JWTs, PEM and PGP private key blocks, provider token prefixes, connection URLs with `scheme://user:pass@host` credentials, credentials handed to a program on its command line (`sshpass -p`, `mysql -pSecret`, `curl -u user:pass`, `--password` and its siblings), netrc and cookie lines, bare high-entropy values in secret-shaped positions, and a password stated in prose — "the admin password is …", where no delimiter exists for the other rules to find.
+
+Each rule that could match ordinary text carries a gate, and the gates are the part worth reading before adding a rule: the prose form requires the value to hold a digit or a symbol and to end at the first space, so "the password is wrong" and "the password is the same as staging" are left alone; the entropy rule excludes hex digests, UUIDs, paths and identifiers; the long command-line flags leave an ordinary word alone when the separator is a space rather than an `=`. `docs/SECURITY-MODEL.md` states the boundary these add up to.
 
 Redaction counts are accumulated per source file in `FileState.Redactions` and as a manifest total. `deja sources` reads those counters and prints `redacted=` per harness.
 
@@ -107,6 +118,18 @@ Regex search scans records because arbitrary regex cannot use token postings saf
 postings, then verifies the basename as a path component or standalone word in the
 candidate text. Full and longer suffix path mentions outrank bare basenames; mention
 counts are blended with recency and an absolute project-root match receives a boost.
+
+`deja blame <path>:<line>` answers about one line before that listing. Git names the
+commit that last changed the line; the session is the one whose `edit` record
+replaced the same text that commit shows as deleted, which is what makes the claim
+"this session performed this change" rather than "this session was open nearby".
+Spans are compared on whitespace-collapsed text and only from 24 runes up, since
+`}` and `return nil` are in every diff. Where no session matches, or git cannot
+answer, the line gets one sentence saying which silence it is — including the line
+count when the line is past the end of the file. No reason is printed with it: over
+81 attributed lines the session's own conclusion overlapped the change 0 times, so a
+line lifted out of a session would read as the reason for a change it has nothing to
+do with.
 
 ## Sync format
 

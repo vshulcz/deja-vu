@@ -10,6 +10,26 @@ import (
 	"testing"
 )
 
+// countWords spells the counts these documents can be at. Shared, because two
+// tests here read the same number out of the same registry.
+var countWords = map[int]string{
+	15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
+	19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
+	23: "twenty-three", 24: "twenty-four", 25: "twenty-five", 26: "twenty-six", 27: "twenty-seven",
+	28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
+	33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
+}
+
+// countWord is the word for a count, or a failure naming what to add.
+func countWord(t *testing.T, n int) string {
+	t.Helper()
+	w, ok := countWords[n]
+	if !ok {
+		t.Fatalf("registry has %d harnesses and this test has no word for it; add one", n)
+	}
+	return w
+}
+
 // The README says the harness count in words, twice. A number spelled out in
 // prose is the kind that goes stale quietly: adding a harness touches the
 // registry and the generated table, and neither of those is the sentence. This
@@ -38,17 +58,8 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		}
 	}
 
-	words := map[int]string{
-		15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen",
-		19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two",
-		23: "twenty-three", 24: "twenty-four", 25: "twenty-five", 26: "twenty-six", 27: "twenty-seven",
-		28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
-		33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
-	}
-	want, ok := words[n]
-	if !ok {
-		t.Fatalf("registry has %d harnesses and this test has no word for it; add one", n)
-	}
+	words := countWords
+	want := countWord(t, n)
 
 	// Both READMEs. The npm one is a separate, shorter file that nobody
 	// re-reads when the main one changes — it was still leading with the
@@ -88,6 +99,48 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		}
 		if !strings.Contains(text, want) {
 			t.Errorf("%s never says %q; the registry has %d harnesses", name, want, n)
+		}
+		// A bump that edits the first half of the word leaves the second half
+		// behind, and the check above cannot see it: removing "thirty-three"
+		// from "thirty-three-six" leaves "-six", which is not one of the words
+		// this test knows. Six stores landed in #3649 and every one of these
+		// documents shipped "the thirty-three-six coding agents" for three
+		// releases. The tail is what to look for.
+		for _, tail := range []string{
+			"one", "two", "three", "four", "five", "six", "seven", "eight",
+			"nine", "ten", "eleven", "twelve",
+		} {
+			if strings.Contains(text, want+"-"+tail) {
+				t.Errorf("%s writes %q — a count bump left the old number's tail behind", name, want+"-"+tail)
+			}
+		}
+	}
+}
+
+// `docs/llms.txt` is the file written for a model rather than a reader, and it
+// is checked by neither of the two tests around this one: the word check above
+// cannot take it, because the page legitimately says "and twenty-seven more"
+// beside six named agents, and the digit check below only reads `.html` and
+// `.md`. It shipped "each of the thirty-two agents" and "each of the thirty-one
+// agents" in the same file, two counts apart, for months. The phrase is what to
+// pin.
+func TestLlmsTxtCountsTheAgentsItDescribes(t *testing.T) {
+	root := filepath.Join("..", "..")
+	n := registryHarnessCount(t, root)
+
+	b, err := os.ReadFile(filepath.Join(root, "docs", "llms.txt"))
+	if err != nil {
+		t.Fatalf("llms.txt: %v", err)
+	}
+	phrase := regexp.MustCompile(`each of the ([a-z-]+) agents`)
+	found := phrase.FindAllStringSubmatch(string(b), -1)
+	if len(found) == 0 {
+		t.Fatal("llms.txt no longer says how many agents it describes; if that is on purpose, this test goes with it")
+	}
+	want := countWord(t, n)
+	for _, m := range found {
+		if m[1] != want {
+			t.Errorf("llms.txt says %q; the registry has %d (%s)", m[0], n, want)
 		}
 	}
 }

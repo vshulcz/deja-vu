@@ -1,6 +1,6 @@
 {
   "name": "dsh-deja",
-  "version": "0.20.8",
+  "version": "0.20.9",
   "description": "deja-vu memory for DeepSeek Harness: the session history of thirty-two other coding agents, searchable and recalled before each step — a local index, no LLM.",
   "type": "module",
   "main": "index.js",
@@ -50,7 +50,7 @@
     }
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.20.1"
+    "@vshulcz/deja-vu": "^0.20.2"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

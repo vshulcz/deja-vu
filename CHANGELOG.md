@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The harness count is the registry's in every document that spells it, and two of the three ways it can go stale now fail a test. #3649 bumped the word by editing its first half and left the tail behind — "the thirty-three-six coding agents" shipped for three releases in the harnesses page, its three meta tags, `llms-install.md` and this repository's architecture document, and the test that reads those files could not see it, because it removes the wanted word before looking for stale ones and `thirty-three` out of `thirty-three-six` leaves `-six`. `docs/llms.txt` was wrong on its own terms and checked by nothing: the word test cannot take that file, since it legitimately says "and twenty-seven more" beside six named agents, and the digit test only reads `.html` and `.md` — so it carried "each of the thirty-two agents" and "each of the thirty-one agents", two counts apart, in one file. The tail and that phrase are both pinned now, each verified by putting the old text back and watching the test fail. The GitHub description said "and 20 more coding agents", which is what search results showed before anyone reached a document at all. (#3741)
+- The documentation says what 0.20.2 shipped. The prose-password rule is in the security model, the privacy page and both READMEs, with the gate that keeps it off ordinary sentences; line-level blame has a section on the auditing page with what it answers for and what it deliberately does not print; `deja how` and `deja files` say that they answer from the project of the working directory, with `--all-projects` for the machine; `deja index --quiet` is where someone keeping the index warm from a shell profile will read it. The architecture document's source table listed 24 of the 33 stores and its redaction paragraph was four rules behind. The contributing guide now states when the Windows leg runs and why a directory mode bit is not a permission there, which is the trap two pull requests hit this week.
+
 ## [0.20.2] - 2026-09-18
 
 ### Added

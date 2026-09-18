@@ -150,8 +150,9 @@ and the version check in `deja doctor`.
 
 Credentials are redacted at index time: AWS keys, `api_key=` and `token=` assignments,
 bearer tokens and raw JWTs, PEM private key blocks, provider tokens, `scheme://user:pass@host`
-URLs, and high-entropy values for shapes no pattern knows. The value becomes
-`[redacted:<kind>]` and the surrounding text stays searchable. `deja share` and
+URLs, high-entropy values for shapes no pattern knows, and a password stated in prose —
+"the admin password is …", where there is no delimiter for the other rules to find. The
+value becomes `[redacted:<kind>]` and the surrounding text stays searchable. `deja share` and
 `deja sync export` re-apply redaction on the way out.
 
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later

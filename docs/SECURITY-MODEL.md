@@ -116,6 +116,12 @@ leaving surrounding text searchable. The current patterns cover:
   hyphen, underscore or space, and with a colon or an equals sign as well as
   plain prose. The quotes are what makes this safe to be loose about the
   separator: a name with no quoted value behind it is left alone;
+- a password stated in prose, with no delimiter at all — "the admin password is
+  …", "passphrase was …", and the same shapes in Russian. Every other rule here
+  needs a colon, an equals sign, a quote or a flag, and a person telling an
+  agent a password writes none of them. The value has to carry a digit or a
+  symbol and it ends at the first space, so "the password is wrong" and "the
+  password is the same as staging" are left alone;
 - bearer tokens and JWTs;
 - PEM private-key blocks;
 - known GitHub, GitLab, OpenAI/Anthropic-style, Groq, xAI, Hugging Face, npm,
