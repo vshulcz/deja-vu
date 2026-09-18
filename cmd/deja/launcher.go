@@ -98,6 +98,10 @@ func writeDejaLauncher(exe string) (string, error) {
 	if path == "" {
 		return "", nil
 	}
+	// Recorded before it is made, the way every other writer records what it
+	// creates: the prune walks what the record names, and a directory missing
+	// from it stands empty after a full uninstall (#3698, #3725).
+	noteCreatedDirs(filepath.Dir(path))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
@@ -115,9 +119,15 @@ func writeDejaLauncher(exe string) (string, error) {
 // removeDejaLauncher takes the resolver out. Only on a full uninstall: a
 // target that stays wired is still pointing at it.
 func removeDejaLauncher() {
-	if path := dejaLauncherPath(); path != "" {
-		_ = os.Remove(path)
+	path := dejaLauncherPath()
+	if path == "" {
+		return
 	}
+	_ = os.Remove(path)
+	// And the directory it lived in, while it is empty and deja's own. It was
+	// the one directory a full uninstall left standing: found by installing
+	// every target into a stand and listing what remained (#3725).
+	pruneCreatedDir(filepath.Dir(path))
 }
 
 // dejaLauncherScript is the resolver itself. Order matters and is the one from
