@@ -1286,6 +1286,20 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	if limit <= 0 {
 		limit = 5
 	}
+	// An id resolves as an id here too. `recall` is the tool an agent reaches
+	// for first and the block it reads prints a session id beside every
+	// session: asked for the 120 most recent ids on a real store, recall
+	// answered about *other* sessions 77 times, named the right one 37 and
+	// said nothing 6 (#3717).
+	if looksLikeSessionID(q) {
+		if text, id, ok := contextByID(dir, q); ok {
+			note := ""
+			if id.note != "" {
+				note = id.note + "\n"
+			}
+			return note + text, 1, id.size, []string{id.session}, nil, nil
+		}
+	}
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {

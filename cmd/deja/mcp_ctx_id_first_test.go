@@ -47,6 +47,13 @@ func TestRecallContextResolvesAnIDBeforeSearching(t *testing.T) {
 		t.Fatalf("asking for an id answered from %v (n=%d), not the session it names\n%s", ids, n, text)
 	}
 
+	// `recall` takes the same rule: it is the tool an agent reaches for first,
+	// and handed an id it answered about other sessions 77 times out of 120.
+	if text, n, _, ids, _, err := recallTextResultFrom(dir, "hhhh0002", "", 5, 0, 8000); err != nil ||
+		n != 1 || len(ids) != 1 || ids[0] != want {
+		t.Errorf("recall asked for an id answered from %v (n=%d err=%v)\n%s", ids, n, err, text)
+	}
+
 	// The controls. Words still search, and a word carrying a dash is still a
 	// query rather than a selector.
 	if _, n, _, ids, err := recallContextResult(dir, "pool exhausted", ""); err != nil || n != 1 || ids[0] != want {
