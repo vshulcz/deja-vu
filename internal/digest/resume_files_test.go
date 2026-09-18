@@ -45,6 +45,9 @@ func TestFilesInFlightNamesTheWorkNotTheScratch(t *testing.T) {
 		{Role: sources.RoleFiles, Text: "/Users/x/.claude/projects/proj/scratchpad/notes.md"},
 		{Role: sources.RoleFiles, Text: "/Users/x/work/node_modules/left-pad/index.js"},
 		{Role: sources.RoleFiles, Text: "/Users/x/work/out/build.log /var/folders/t/T/probe.go"},
+		// Recorded relative to a directory above it, which is how a harness
+		// that stores paths as typed writes a probe script.
+		{Role: sources.RoleFiles, Text: "tmp/deja-probe/shot.txt"},
 	}}
 	got := ResumeFrom(s, nil).Files
 	if len(got) != 1 || !strings.HasSuffix(got[0], "internal/index/retrieval.go") {

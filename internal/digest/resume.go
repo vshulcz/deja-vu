@@ -241,6 +241,11 @@ func throwawayPath(p string) bool {
 			return true
 		}
 	}
+	// The same probe script recorded relative to a directory above it, which
+	// is how a harness that stores paths as typed writes `tmp/probe/shot.txt`.
+	if strings.HasPrefix(p, "tmp/") || strings.HasPrefix(p, "./tmp/") {
+		return true
+	}
 	return strings.HasSuffix(p, ".log") || strings.HasSuffix(p, ".output")
 }
 
