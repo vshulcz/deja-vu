@@ -44,7 +44,9 @@ func TestASessionStartReachesTheOtherAgentsWorkInThisCheckout(t *testing.T) {
 	// Claude's project directory is the encoded working directory, which
 	// decodes to parent/base — where codex keeps the bare name. That is the
 	// "one contains the other" shape, 84 of the 144 disagreements.
-	encoded := strings.ReplaceAll(filepath.ToSlash(repo), "/", "-")
+	// A drive letter's colon cannot be part of a directory name on Windows,
+	// and the encoder drops it there too.
+	encoded := strings.ReplaceAll(strings.ReplaceAll(filepath.ToSlash(repo), ":", ""), "/", "-")
 	writeLines(t, filepath.Join(claude, encoded, "c1.jsonl"),
 		claudeLineAt("c1", "2026-03-01T09:00:00Z", "the pool leaked connections under load", repo),
 		claudeEditAt("c1", "2026-03-01T09:05:00Z", touched, repo))
