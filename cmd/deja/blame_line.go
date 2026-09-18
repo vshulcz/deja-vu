@@ -159,6 +159,10 @@ func attributeLine(sessions []model.Session, target search.BlameTarget, c lineCo
 				if key == "" || !removed[key] {
 					continue
 				}
+				// Two sessions can have written the same line — on another
+				// repository on the same store, 3 of 17 attributed commits had
+				// a second candidate. The last one to write it before the
+				// commit is the one the commit carried (#3723).
 				if best.Matched == "" || m.Time.After(bestAt) {
 					best = lineAuthor{Session: s, Matched: key, Asked: search.SessionTitle(s)}
 					bestAt = m.Time
