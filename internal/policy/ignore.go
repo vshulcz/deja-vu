@@ -67,9 +67,42 @@ func matchesAnywhere(pattern, s string) bool {
 	// the rule that describes it. Fall back to the literal middle of the
 	// pattern, which is what a directory rule means.
 	if lit := strings.Trim(pattern, "*"); lit != "" && !strings.ContainsAny(lit, "*?[") {
-		return strings.Contains(s, lit)
+		if strings.Contains(s, lit) {
+			return true
+		}
+		return strings.Contains(decodeCWDSegments(s), lit)
 	}
 	return false
+}
+
+// decodeCWDSegments spells out the directories a harness folded into one name.
+//
+// omp, claude and the stores shaped like them record a session under a
+// directory whose name is the working directory with its separators replaced by
+// dashes — `-.claude-jobs-<id>-tmp-dsh-work`. A directory rule written the way
+// a person writes it cannot match that, so the tree deja is told to keep out of
+// recall stayed in: measured on a real store, 12 of the 317 rows naming a job
+// tree were served, all of them from a harness that encodes this way (#3746).
+//
+// Only a segment that begins with a dash is decoded, which is what these
+// encoders produce because the path they encode begins with a separator. A file
+// or directory that merely has dashes in it — `my-jobs-list.jsonl` — is left
+// alone, so a rule cannot reach further than the person who wrote it meant.
+func decodeCWDSegments(s string) string {
+	if !strings.Contains(s, "/-") && !strings.HasPrefix(s, "-") {
+		return s
+	}
+	parts := strings.Split(s, "/")
+	for i, seg := range parts {
+		if i == len(parts)-1 || !strings.HasPrefix(seg, "-") {
+			continue
+		}
+		// A dot-prefixed directory arrives as `--`, since the encoder replaced
+		// both the separator and the dot: `/.claude` is `--claude`.
+		seg = strings.ReplaceAll(seg, "--", "/.")
+		parts[i] = strings.ReplaceAll(seg, "-", "/")
+	}
+	return strings.Join(parts, "/")
 }
 
 // IgnorePatterns is what is in force, for doctor to print.
