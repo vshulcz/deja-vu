@@ -197,6 +197,20 @@ var (
 	// Words between the key and the colon, the way genericKVIntlFillerRE
 	// allows: "пароль от стейджа: …" is how the line is actually written.
 	intlValueRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호|api[_-]?key|secret|token|passwd|password)([^\p{L}\n:=]?[^\n:=]{0,32}[:=]\s*)(\\*['"]?)([^\s'"]*[^\x00-\x7f][^\s'"]*)(\\*['"]?)`)
+	// A credential stated in prose rather than assigned. Every pattern above
+	// wants a delimiter — a colon, an equals sign, a flag — and a person
+	// telling an agent a password does not use one: "also the admin password is
+	// hunter2-2026, do not put it in code" went into the index verbatim, so
+	// `deja show` and `deja ctx` read it back in the clear. Found by seeding
+	// fake credentials into a transcript and asking every surface for them
+	// (#3729).
+	//
+	// The digit or the symbol in the value is what keeps this away from prose,
+	// the rule worthRedactingIntl already rests on: "the password is wrong",
+	// "the password is correct" and "the password is the same as staging" carry
+	// neither, and the value class stops at the first space so a sentence
+	// cannot be swallowed.
+	prosePasswordRE = regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}_])(password|passphrase|парол[ьяею])(\s+(?:is|was|это|будет)\s+)(\\*['"]?)([^\s'"]{8,128})`)
 )
 
 // worthRedactingIntl reports whether a non-ASCII value looks like a secret
@@ -247,6 +261,27 @@ func notASecretValue(v string) bool {
 		return true
 	}
 	return strings.HasPrefix(v, "[redacted")
+}
+
+// chosenSecret reports whether a value someone stated in prose looks like a
+// credential they chose rather than the next word of the sentence. A digit or
+// a symbol is the signal — the same one worthRedactingIntl uses — and a value
+// that is only letters is a word.
+func chosenSecret(v string) bool {
+	v = strings.Trim(v, `"'`)
+	if n := utf8.RuneCountInString(v); n < 8 || n > 128 {
+		return false
+	}
+	for _, r := range v {
+		if r >= '0' && r <= '9' {
+			return true
+		}
+		switch r {
+		case '!', '@', '#', '$', '%', '^', '&', '*', '_', '-', '+', '=', '.', '/', '\\', '|', '~', ':':
+			return true
+		}
+	}
+	return false
 }
 
 // flagHintNearby is the cheap necessary condition for passwordFlagRE: one of
@@ -515,6 +550,13 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(lower, "pass") {
 		s = replaceGroup(s, passSuffixAssignRE, 4, "credential", counts, func(m []string) bool {
 			return notASecretValue(m[4])
+		})
+	}
+	// Its own gate: the prose form has no delimiter for the others to find.
+	if strings.Contains(lower, "password") || strings.Contains(lower, "passphrase") ||
+		strings.Contains(lower, "парол") {
+		s = replaceGroup(s, prosePasswordRE, 4, "credential", counts, func(m []string) bool {
+			return notASecretValue(m[4]) || !chosenSecret(m[4])
 		})
 	}
 	// Its own gate, on the one thing the pattern needs: a byte outside ASCII.
