@@ -11,7 +11,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -164,6 +166,18 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 			// as "=== deja blame internal/index/retrieval.go …" — deja's own
 			// output, written into the transcript by an agent exercising it.
 			text := withoutOwnReport(withoutOwnCallLog(message.Text))
+			// A tool's own sentence about the file is not why the file looks
+			// the way it does. Measured over the paths agents actually asked
+			// about on a real store, 1,567 of the 7,417 quoted snippets were
+			// one — "The file … has been updated successfully", a write
+			// confirmation, a patch receipt — and `digest.IsAgentArtifact`,
+			// which recall has used since #2068, already recognised 1,565 of
+			// them. Tool output only: a command record starts with "$ " and is
+			// an artifact by that predicate, and what a session ran after
+			// touching a file is evidence rather than echo (#3721).
+			if message.Role == sources.RoleToolOutput && digest.IsAgentArtifact(text) {
+				continue
+			}
 			count, level := mentionScore(text, base, forms)
 			if count == 0 {
 				continue
