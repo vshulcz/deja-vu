@@ -472,7 +472,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// bare data tend to ignore it.
 	lead := startLead(sessionStartLead)
 	if input.Source == "compact" {
-		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a term from it to restore any details you lost.\n"
+		lead = "Context was just compacted. The project memory below is from deja's index and survived the compaction; call recall_context with a session id from it to restore any details you lost.\n"
 		// The generic digest is about the project. What a compacted session
 		// most needs is its own evidence: measured on this corpus, a summary
 		// keeps ~77% of the decisions and 0.2% of the commands that produced
@@ -1381,9 +1381,9 @@ func startLead(narrow string) string {
 
 // wideRecallLead is sessionStartLead for DEJA_RECALL=aggressive, where the
 // sessions come from this machine rather than from this checkout.
-const wideRecallLead = "The sessions below are recent work on this machine, not only in this project — deja is set to recall widely. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"
+const wideRecallLead = "The sessions below are recent work on this machine, not only in this project — deja is set to recall widely. If any is relevant to what the user asks next, call recall_context with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"
 
-const sessionStartLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with a term from it to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"
+const sessionStartLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"
 
 // dropHookCaches removes every cached session-start digest beside this index.
 // They are keyed by working directory, so there is one per project a hook has

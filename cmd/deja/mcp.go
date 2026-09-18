@@ -1671,6 +1671,39 @@ type idContext struct {
 	note string
 }
 
+// looksLikeSessionID reports whether a query is a session id rather than
+// something somebody would search for.
+//
+// Every store's id carries a digit, a dash or an underscore — a uuid,
+// `ses_01cbcf…`, cline's `1784846110172_0h0xw`, the `arev-cline-json2-…` deja
+// writes for a subagent run — and a word carries none of the three, which is
+// what keeps this from swallowing an ordinary query: "timeout" and "wiring"
+// stay searches even if a session id happens to begin with those letters. Long
+// enough to be a prefix worth resolving, and a selector has no spaces in it.
+func looksLikeSessionID(q string) bool {
+	q = strings.TrimSpace(q)
+	if len([]rune(q)) < mcpIDPrefixMin || strings.ContainsAny(q, " \t\n") {
+		return false
+	}
+	marked := false
+	for _, r := range q {
+		switch {
+		case r >= '0' && r <= '9', r == '-', r == '_':
+			marked = true
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		default:
+			// Anything else — punctuation, a slash, a non-Latin letter — is
+			// not in any store's id.
+			return false
+		}
+	}
+	return marked
+}
+
+// mcpIDPrefixMin is how much of an id has to be given before it is read as
+// one, matching the CLI's own bar.
+const mcpIDPrefixMin = 6
+
 // contextByID answers from the session an id-prefix names, for the tool an
 // agent calls with whatever deja printed at it (#1622). Empty when the string
 // is not an id, when it names nothing, or when this machine's policy withholds
@@ -1717,6 +1750,19 @@ func recallContextResult(dir, q, harness string) (string, int, int64, []string, 
 // recallContextResultFrom is recallContextResult plus the project behind the
 // session it served, for the reason recallTextResultFrom exists (#2324).
 func recallContextResultFrom(dir, q, harness string) (string, int, int64, []string, []string, string, error) {
+	// An id resolves as an id, before the words get a turn. Every session-start
+	// block prints one and tells the agent to follow up with this tool, and an
+	// id is also a searchable string: any transcript that mentions one matches
+	// it lexically, so the search answered first and the fallback below never
+	// ran. Measured on a real store, asking for the 120 most recent sessions by
+	// their own id prefix brought the right session back 24 times — the other
+	// 96 answers were a different session, stated as confidently (#3717). The
+	// CLI has had this order since #1614; this is the surface an agent uses.
+	if looksLikeSessionID(q) {
+		if text, id, ok := contextByID(dir, q); ok {
+			return text, 1, id.size, []string{id.session}, nil, id.note, nil
+		}
+	}
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
