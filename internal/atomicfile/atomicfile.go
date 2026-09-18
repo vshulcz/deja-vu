@@ -21,6 +21,7 @@ package atomicfile
 
 import (
 	"io"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"sync"
@@ -33,18 +34,39 @@ import (
 // exactly what these files have — the warmup status is polled by every surface
 // while a build writes it. Measured on windows CI: three of four concurrent
 // writers were denied. Unix succeeds on the first attempt and pays nothing.
+//
+// The wait grows and carries jitter, which is the part a flat retry got wrong
+// (#3743): a reader polling in a loop and a writer sleeping the same 5 ms every
+// time can phase-lock, so the writer wakes inside the reader's next open on
+// every attempt and spends its whole budget without landing. Twenty attempts
+// 5 ms apart were 100 ms of that; the schedule below is about 1.3 seconds, and
+// the jitter is what stops the two loops from keeping step.
 func publish(tmp, path string) error {
 	err := os.Rename(tmp, path)
 	for i := 0; err != nil && i < renameTries; i++ {
-		time.Sleep(renameWait)
+		time.Sleep(renameBackoff(i))
 		err = os.Rename(tmp, path)
 	}
 	return err
 }
 
+// renameBackoff is how long attempt i waits: doubling from renameWait to
+// renameWaitMax, plus up to half of itself again at random.
+func renameBackoff(i int) time.Duration {
+	d := renameWait << min(i, renameShifts)
+	if d > renameWaitMax {
+		d = renameWaitMax
+	}
+	return d + time.Duration(rand.Int64N(int64(d)/2+1))
+}
+
 const (
-	renameTries = 20
-	renameWait  = 5 * time.Millisecond
+	renameTries   = 30
+	renameWait    = 2 * time.Millisecond
+	renameWaitMax = 40 * time.Millisecond
+	// How many doublings reach the ceiling from renameWait; past it the shift
+	// is clamped rather than left to grow.
+	renameShifts = 5
 )
 
 // sweptDirs remembers the directories this process has already tidied, so the
