@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -22,6 +23,11 @@ type BlameTarget struct {
 	FullPath string
 	Base     string
 	Stem     string
+	// Line is the line the reader asked about, 0 when they named the file
+	// alone. `path:line` has always been accepted and the number thrown away;
+	// it is what the line-level answer needs to turn a line into the commit
+	// that wrote it (#1181).
+	Line int
 }
 
 type BlameOptions struct {
@@ -101,7 +107,7 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if name == "" {
 		return BlameTarget{}, fmt.Errorf("path required")
 	}
-	name = trimLineSuffix(name)
+	name, line := cutLineSuffix(name)
 	full, err := filepath.Abs(name)
 	if err != nil {
 		return BlameTarget{}, err
@@ -115,7 +121,23 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if stem == "" {
 		stem = base
 	}
-	return BlameTarget{FullPath: full, Base: base, Stem: stem}, nil
+	return BlameTarget{FullPath: full, Base: base, Stem: stem, Line: line}, nil
+}
+
+// cutLineSuffix is trimLineSuffix that keeps the number it cut: the first one,
+// so `file.go:120:14` reads as line 120 rather than column 14.
+func cutLineSuffix(name string) (string, int) {
+	trimmed := trimLineSuffix(name)
+	if trimmed == name {
+		return name, 0
+	}
+	rest := strings.TrimPrefix(name[len(trimmed):], ":")
+	head, _, _ := strings.Cut(rest, ":")
+	n, err := strconv.Atoi(head)
+	if err != nil || n <= 0 {
+		return trimmed, 0
+	}
+	return trimmed, n
 }
 
 // Blame ranks every session that carries evidence for the file, in full. The
@@ -452,6 +474,10 @@ func projectContainsFile(project, full string) bool {
 	rel, err := filepath.Rel(root, full)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != "."
 }
+
+// SessionTitle is what a session was asked to do, for a caller outside this
+// package that names a session on screen.
+func SessionTitle(s model.Session) string { return sessionTitle(s) }
 
 func sessionTitle(s model.Session) string {
 	if s.Title != "" {
