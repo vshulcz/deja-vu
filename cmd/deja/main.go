@@ -434,12 +434,32 @@ func indexQuietOutcome(fresh bool, sessions int) string {
 
 func cmdIndex(dir string, rest []string) error {
 	force := false
+	quiet := false
 	for _, a := range rest {
-		if a == "--rebuild" || a == "-rebuild" {
+		switch a {
+		case "--rebuild", "-rebuild":
 			force = true
-			continue
+		case "--quiet", "-quiet":
+			quiet = true
+		default:
+			return fmt.Errorf("index: unknown flag %q", a)
 		}
-		return fmt.Errorf("index: unknown flag %q", a)
+	}
+	// Where the command reports that it worked. Nobody is watching a run out
+	// of a shell profile or a hook, and a line printed over the prompt on
+	// every new shell is the kind of thing that gets a tool uninstalled
+	// rather than reported; `deja index >/dev/null` also swallows the errors
+	// you would want to see (#1827).
+	//
+	// Only the success reporting goes here. A run that cannot read a store or
+	// cannot write the index still says so on stderr, or a scheduled job
+	// stops working and nothing tells anyone. The counts and the outcome line
+	// are what quiet is about; a warning that the exclude list is not applied,
+	// a path that could not be read, and an index that came out empty for a
+	// reason are not.
+	said := io.Writer(os.Stderr)
+	if quiet {
+		said = io.Discard
 	}
 	// Silence reads as "it did not run". `update` on the newest release and
 	// `doctor` on a fresh index both say so; this one returned to the prompt
@@ -466,7 +486,7 @@ func cmdIndex(dir string, rest []string) error {
 		// suppressed until the retry window, and readWarmupStatus tells the
 		// agent memory is on its way (#839).
 		clearWarmupSentinel()
-		fmt.Fprintf(os.Stderr, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
+		fmt.Fprintf(said, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
 		// "Up to date" is the most misleading place to stay quiet about it:
 		// nothing changed on disk, so this is exactly where an exclusion set
 		// after the build looks applied and is not.
@@ -476,16 +496,24 @@ func cmdIndex(dir string, rest []string) error {
 		return nil
 	}
 	stopProgress()
-	prepareFirstIndexGreeting(dir)
+	if !quiet {
+		prepareFirstIndexGreeting(dir)
+	}
 	// The detached warmup publishes its progress so hooks can tell the user
 	// memory is on its way; an interactive run draws the live display.
 	// Counted, because a run that waited for another build prints nothing of
 	// its own: Ensure finds the index current under the lock and returns. The
 	// command then owed a closing line and had none, leaving "waiting for it
 	// to finish" as the last thing on screen (#1751).
-	progress := &countingWriter{w: os.Stderr}
+	progress := &countingWriter{w: said}
 	build := func() error { return index.Ensure(dir, "", force, progress) }
-	if err := withWarmupStatus(dir, func() error { return withBuildProgress(build) }); err != nil {
+	draw := func() error { return withBuildProgress(build) }
+	if quiet {
+		// The live display paints the same progress the sink above is
+		// discarding, and it paints it to stdout.
+		draw = build
+	}
+	if err := withWarmupStatus(dir, draw); err != nil {
 		// The command whose whole job is building the index used to pass the
 		// syscall through — `mkdir /…/index.db.tmp: permission denied` names
 		// an internal temp path and no fix, while every reading command has
@@ -500,7 +528,7 @@ func cmdIndex(dir string, rest []string) error {
 	// progress had already said what happened (#3500).
 	if progress.n == 0 {
 		fresh, n := index.UpToDate(dir, "")
-		fmt.Fprintln(os.Stderr, indexQuietOutcome(fresh, n))
+		fmt.Fprintln(said, indexQuietOutcome(fresh, n))
 	}
 	// Two transcripts can carry the same harness:id — two files with the same
 	// name in different projects. Both stay searchable, but one manifest row
@@ -534,7 +562,7 @@ func cmdIndex(dir string, rest []string) error {
 	// The parse count and the indexed count differ by exactly these, and this
 	// is where both are on screen (#868).
 	if n := index.ReportEmptySessions(); n > 0 {
-		fmt.Fprintf(os.Stderr, "deja: %d transcript%s held no message deja could index — not counted as %s\n",
+		fmt.Fprintf(said, "deja: %d transcript%s held no message deja could index — not counted as %s\n",
 			n, pluralS(n), pluralSessionWord(n))
 	}
 	if n := index.ReportCollisions(); n > 0 {
@@ -549,7 +577,7 @@ func cmdIndex(dir string, rest []string) error {
 	// came back from both of that harness's stores is one conversation and
 	// gets no warning, but it is still two transcripts against one row (#2066).
 	if b := index.LastBuild; index.ReportMerged() > 0 && b.Messages > 0 {
-		fmt.Fprintf(os.Stderr, "deja: indexed %d session%s, %d message%s — the per-harness lines above count transcripts, not rows\n",
+		fmt.Fprintf(said, "deja: indexed %d session%s, %d message%s — the per-harness lines above count transcripts, not rows\n",
 			b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 	}
 	// A machine with no agent history built an empty index and said nothing:
@@ -559,13 +587,15 @@ func cmdIndex(dir string, rest []string) error {
 	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
 		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
 	}
-	maybeFirstIndexGreeting(dir)
+	if !quiet {
+		maybeFirstIndexGreeting(dir)
+	}
 	// The live display erases itself on the way out, so a rebuild on a
 	// terminal ended with an empty screen — three seconds of animation and no
 	// record of what was built. Piped output has said it all along; this is
 	// the same two numbers for the reader who watched it happen (#867).
 	if b := index.LastBuild; !b.Initial && b.Messages > 0 && logoWanted(os.Stdout) && os.Getenv("DEJA_WARMUP_SENTINEL") == "" {
-		fmt.Fprintf(os.Stderr, "deja: indexed %d session%s, %d message%s\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
+		fmt.Fprintf(said, "deja: indexed %d session%s, %d message%s\n", b.Sessions, pluralS(b.Sessions), b.Messages, pluralS(b.Messages))
 	}
 	return nil
 }
@@ -3861,7 +3891,7 @@ Usage:
   deja forget --list | --unforget <id>
   deja doctor [--json] [--deep] [--offline]
   deja warmup
-  deja index [--rebuild]
+  deja index [--rebuild] [--quiet]
   deja embed
   deja bench recall|context|prompt|block|ingest|read [--json] [--seed n]
   deja brief         (the screen a bare deja prints on a terminal)
