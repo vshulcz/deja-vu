@@ -234,6 +234,47 @@ func HarnessSessionCounts(dir string) map[string]int {
 	return out
 }
 
+// HarnessUnreadCounts reports, per harness, how many transcripts the store
+// holds that the index has no state for at all — not read once, not partly,
+// never.
+//
+// Audited on a real store: the index tracked 1,533 files and had never tracked
+// ten, five of them written eight weeks earlier, and no surface said so. `deja
+// sources` prints a store's session count, but zero there reads as "nothing
+// written yet" rather than "five files never opened", which is the difference
+// between a quiet machine and a broken one (#3747).
+//
+// A file counted here is behind at this instant, which is not the same as
+// unreadable: a transcript written a second ago is unread until the next pass.
+// What makes it worth printing is the shape the audit found — a file that
+// cannot be appended from (no offset parser for its kind) forces a replacement
+// pass, and replacement only happens on a search, a recall or `deja index`. A
+// machine driven by hooks alone never takes that path.
+func HarnessUnreadCounts(dir string) map[string]int {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := map[string]int{}
+	for _, h := range sources.Registry() {
+		for _, p := range h.Files() {
+			if _, ok := m.Files[p]; ok {
+				continue
+			}
+			// A path the walk itself would decline is not an unread
+			// transcript: the index never intends to hold it.
+			if fi, err := os.Lstat(p); err != nil || fi.IsDir() || fi.Mode()&os.ModeSymlink != 0 {
+				continue
+			}
+			out[h.Name]++
+		}
+	}
+	return out
+}
+
 // HarnessSharedCounts reports, per harness, how many manifest rows cover more
 // than one transcript. doctor's row shows the files-to-sessions gap; without
 // this it cannot say whether the gap is a parse failure or an id collision

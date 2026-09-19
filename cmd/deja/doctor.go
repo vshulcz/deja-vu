@@ -615,6 +615,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 	fromElsewhere := index.ImportedSessionCounts(dir)
 	sharedRows := index.HarnessSharedCounts(dir)
 	keptRows := index.HarnessKeptCounts(dir)
+	// Transcripts the index has no state for at all. Audited on a real store,
+	// ten of them had never been read — five written eight weeks earlier — and
+	// nothing on any surface said so, because a store's session count reads as
+	// "nothing written yet" rather than "files never opened" (#3747).
+	neverRead := index.HarnessUnreadCounts(dir)
 
 	// The same inspection the JSON form reports, so one command does not give
 	// two answers about one store: `found` here and `unreadable` there (#999).
@@ -711,6 +716,16 @@ func doctorHarnesses(w io.Writer, dir string) {
 			default:
 				detail += doctorCount(n-imported, "indexed session") + fmt.Sprintf(", %d more from elsewhere", imported)
 			}
+		}
+		// The gap in the other direction: transcripts the index has never
+		// read. Outside the block above on purpose — a store with no indexed
+		// session at all has no entry there, and that is exactly the store
+		// this is about (#3747).
+		if u := neverRead[name]; u > 0 {
+			if detail != "" {
+				detail += ", "
+			}
+			detail += doctorCount(u, "transcript") + " never read — `deja index`"
 		}
 		// A store path can come from the environment (DEJA_NOTES_FILE) or from
 		// disk. On a fixed-width row a newline in it prints a line of its own

@@ -46,6 +46,12 @@ type doctorStore struct {
 	// report it, and the report they could send carried no more than the word
 	// "unreadable" — neither they nor we could tell a renamed column from a
 	// locked database from a missing CLI (#1642).
+	// NeverRead is how many of the store's transcripts the index has no state
+	// for at all. The printed row carries it for the same reason it carries
+	// the files-against-sessions pair, and a reader of --json could see
+	// neither: a store's session count of zero reads as "nothing written yet"
+	// rather than "five files never opened" (#3747).
+	NeverRead int    `json:"never_read,omitempty"`
 	Error     string `json:"error,omitempty"`
 	Denied    string `json:"denied,omitempty"`
 	Skipped   string `json:"skipped,omitempty"`
@@ -344,10 +350,12 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	storeMods := make([]time.Time, 0, len(stores))
 	indexed := index.HarnessSessionCounts(dir)
 	fromElsewhere := index.ImportedSessionCounts(dir)
+	neverRead := index.HarnessUnreadCounts(dir)
 	for _, check := range stores {
 		store, mod := inspectDoctorStore(check)
 		store.IndexedSessions = indexed[check.name]
 		store.Imported = fromElsewhere[check.name]
+		store.NeverRead = neverRead[check.name]
 		report.Stores = append(report.Stores, store)
 		storeMods = append(storeMods, mod)
 	}

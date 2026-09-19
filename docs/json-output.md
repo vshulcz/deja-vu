@@ -472,7 +472,10 @@ values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
 (both of which add a `skipped` field saying which CLI is missing); an existing
 but empty store directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
-permission walk was cut short or blocked carries `partial` or `unchecked`.
+permission walk was cut short or blocked carries `partial` or `unchecked`. A
+store holding transcripts the index has no state for at all carries `never_read`
+with how many — the count is absent when there are none, and goes away after an
+indexing pass.
 `sqlite3` and `git` are the two tools deja shells out to, each `ok` or
 `missing`: sqlite3 reads the opencode, Cursor, grok, hermes, goose and zed
 stores, and git supplies changed-file notes, worktree names and the task
