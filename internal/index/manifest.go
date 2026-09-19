@@ -222,8 +222,18 @@ func ManifestSourcesReadAt(dir string) time.Time {
 	if dir == "" {
 		dir = DefaultDir()
 	}
-	if m, err := readManifest(dir); err == nil && !m.SourcesReadAt.IsZero() {
+	m, err := readManifest(dir)
+	if err == nil && !m.SourcesReadAt.IsZero() {
 		return m.SourcesReadAt
+	}
+	// An index an import built on a machine that had never indexed carries no
+	// files on purpose (#1307): nothing local has been read, so the honest
+	// answer is "never" rather than the import's own clock. Only for that
+	// shape — a store written before this field has files, and answering
+	// "never" for it would call every store behind the moment someone
+	// upgrades.
+	if err == nil && len(m.Files) == 0 {
+		return time.Time{}
 	}
 	return ManifestBuiltAt(dir)
 }

@@ -118,3 +118,33 @@ func TestAStoreWithoutTheFieldFallsBackToTheBuildTime(t *testing.T) {
 			got.Format(time.RFC3339Nano), want.Format(time.RFC3339Nano))
 	}
 }
+
+// The bootstrap shape: an import on a machine that has never indexed writes a
+// manifest with no files at all, so that the next pass ingests everything
+// (#1307). Nothing local has been read there, and answering with the import's
+// own clock is what made doctor call a store current when it had not been
+// opened.
+func TestAnIndexBuiltOnlyFromImportsHasReadNothing(t *testing.T) {
+	tmp := t.TempDir()
+	setHome(t, tmp)
+	dir := filepath.Join(tmp, "index.db")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := Manifest{
+		Version:  version,
+		Format:   onDiskFormat,
+		Files:    map[string]FileState{},
+		Sessions: map[string]SessionMeta{},
+		BuiltAt:  time.Now(),
+	}
+	if err := writeManifest(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	if got := ManifestSourcesReadAt(dir); !got.IsZero() {
+		t.Errorf("an import-built index says it read the stores at %s", got.Format(time.RFC3339Nano))
+	}
+	if built := ManifestBuiltAt(dir); built.IsZero() {
+		t.Error("the same index has no build time, so the two are not being told apart")
+	}
+}
