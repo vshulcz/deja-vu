@@ -4,19 +4,18 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Resume yesterday's Claude Code or Codex session — deja-vu</title>
-<meta name="description" content="Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/resume-a-session.html">
+<title>Delete Kilo Code task history — deja-vu</title>
+<meta name="description" content="Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Resume yesterday's Claude Code or Codex session">
-<meta property="og:description" content="Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/resume-a-session.html">
+<meta property="og:title" content="Delete Kilo Code task history">
+<meta property="og:description" content="Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
-
 <meta name="author" content="vshulcz">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <meta name="theme-color" content="#0d0b16">
@@ -25,16 +24,16 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Resume yesterday's Claude Code or Codex session">
-<meta name="twitter:description" content="Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.">
+<meta name="twitter:title" content="Delete Kilo Code task history">
+<meta name="twitter:description" content="Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Resuming the session you had yesterday", "description": "Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.", "url": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-25", "dateModified": "2026-09-19"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Resuming a session","item":"https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I resume a previous coding session?","acceptedAnswer":{"@type":"Answer","text":"deja resume <id> prints the command that reopens that exact conversation, including the directory it must run in. Twenty of the twenty-five indexed harnesses support it."}},{"@type":"Question","name":"Can I find a session from a different agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja searches every agent's transcripts at once and each hit carries its harness and session id, which the agents' own resume commands cannot do."}},{"@type":"Question","name":"What if I only want the conclusion?","acceptedAnswer":{"@type":"Answer","text":"deja ctx <id-prefix> returns the session as a digest — decisions, files touched, commands run — small enough to paste into a session you are already in."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kilo Code task history", "description": "Kilo Code keeps each task as JSON under the VS Code extension's storage, and its CLI keeps a separate SQLite store.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Kilo Code task history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Kilo Code store task history?", "acceptedAnswer": {"@type": "Answer", "text": "Two places. The VS Code extension writes one directory per task under its global storage, kilocode.kilo-code/tasks/<id>/api_conversation_history.json, and the CLI keeps its own SQLite store at ~/.local/share/kilo/kilo.db."}}, {"@type": "Question", "name": "Does deleting a task in the extension remove the CLI's copy?", "acceptedAnswer": {"@type": "Answer", "text": "No. They are separate stores with separate contents: a task removed in VS Code leaves whatever the CLI recorded, and clearing the CLI database leaves the extension's task directories."}}, {"@type": "Question", "name": "Which VS Code builds does this cover?", "acceptedAnswer": {"@type": "Answer", "text": "Code, Code - Insiders, VSCodium, and the forks that reuse the same layout, including Cursor and Windsurf — each keeps its own globalStorage, so the same extension can have several unrelated task trees on one machine."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -51,7 +50,7 @@
 <a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
 <a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
 <a href="delete-opencode-session-history.html">Delete opencode session history</a>
-<a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
+<a href="delete-kilo-code-task-history.html" aria-current="page">Delete Kilo Code task history</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="after-compaction.html">After compaction</a>
@@ -86,7 +85,7 @@
 </details>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
-<a href="resume-a-session.html" aria-current="page">Resuming a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="token-cost.html">What memory costs</a>
@@ -106,31 +105,38 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>Resuming the session you had yesterday</h1>
-<p class="pagelede">find it across every agent, then reopen it in the right one<span class="mins" data-mins></span></p>
+<h1>How to delete Kilo Code task history, and what the other half keeps</h1>
+<p class="pagelede">two stores that do not know about each other: the extension's task directories and the CLI's database<span class="mins" data-mins></span></p>
+<p>Kilo Code records a task twice over, in two stores that know nothing about each other: the VS Code extension writes a directory per task, and the command-line version keeps a SQLite database. Deleting in one leaves the other untouched, which is the part that surprises people.</p>
 
-<p>Every agent can resume its own last session. None of them can tell you which session you want, and none of them can see the one you had in a different tool — which is where the answer usually is.</p>
+<h2>Where the tasks are</h2>
+<pre>&lt;globalStorage&gt;/kilocode.kilo-code/tasks/&lt;id&gt;/api_conversation_history.json
+~/.local/share/kilo/kilo.db</pre>
+<p>The extension's <code>globalStorage</code> is <code>~/Library/Application Support/Code/User/globalStorage</code> on macOS and <code>~/.config/Code/User/globalStorage</code> on Linux, with <code>Code - Insiders</code>, <code>VSCodium</code>, Cursor or Windsurf in place of <code>Code</code> for those hosts. The CLI store follows <code>XDG_DATA_HOME</code> when it is set.</p>
 
-<h2>Find it first</h2>
-<pre>deja "connection pool exhausted"</pre>
-<p>Search runs over every agent's transcripts on the machine at once, and each hit carries the harness it belongs to and its session id. That is the step the tools themselves cannot do: <code>claude --resume</code> lists Claude's sessions, <code>codex resume</code> lists Codex's, and neither knows the other exists.</p>
+<h2>How to delete it</h2>
+<p>In the extension, delete the task from Kilo's own history view. On disk a task is one directory, so with VS Code closed:</p>
+<pre>rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks/&lt;id&gt;
+rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks</pre>
+<p>The CLI is the half people forget. Its history is rows in a database, so removing the file is the whole operation, and deleting rows will not shrink it:</p>
+<pre>rm ~/.local/share/kilo/kilo.db</pre>
+<p>Both halves, then — clearing one and calling it done is how a conversation you meant to remove stays on the machine.</p>
 
-<h2>Then reopen it</h2>
-<pre>deja resume &lt;id&gt;</pre>
-<p>It prints the command that reopens that exact conversation, including the directory it has to run in when the tool scopes its session list by working directory:</p>
-<pre>cd '/path/to/project' &amp;&amp; grok --resume 01a03433-0c67-7331-8eb1-cd6173d4c8f9</pre>
-<p>Twenty of the thirty-three harnesses deja indexes can be reopened this way. The other five are refusals with a reason rather than silence: aider appends to a transcript file and has no notion of reopening one conversation, Zed and VS Code Copilot Chat reopen from their own UI rather than a terminal, neither of DeepSeek Harness's two apps takes a session id, and Continue reopens the last session or forks one but takes no arbitrary id. Roo Code splits: what its CLI wrote resumes, what the editor wrote reopens there. The <a href="../registry/README.html">format registry</a> records which is which, and why.</p>
+<h2>What you lose</h2>
+<p>A task directory is the record of what the agent read, changed and ran, and Kilo has no search across tasks: the list is the only way in. Once the directory is gone, the reasoning behind every file that task touched is gone with it.</p>
 
-<h2>When resuming is the wrong tool</h2>
-<p>Reopening a session brings back the whole conversation, including the parts that were wrong before they were right. Often what you want is the conclusion, not the road to it:</p>
-<pre>deja ctx &lt;id-prefix&gt;</pre>
-<p>That returns the session as a digest — what was decided, which files it touched, which commands ran — small enough to paste into a session you are already in. <a href="find-a-session.html">Finding a session</a> covers the search side in more detail.</p>
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kilo stores — the extension's task JSON and the CLI database — and the other thirty-two agents on the machine, into one local index:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "kilo task about the migration"</pre>
+<p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone.</p>
 
-<h2>The part that is not about this</h2>
-<p>The index covers every agent's transcripts on the machine — <a href="where-sessions-are-stored.html">each in its own format</a> — including sessions from before deja was installed. Indexing and search are local: BM25 over the transcripts, credentials stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
-
-<p><a href="getting-started.html">Getting started</a> &middot; <a href="find-a-session.html">Finding a session</a> &middot; <a href="switching-agents.html">Switching agents</a></p>
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-kilocode.html">Memory for Kilo Code</a> · <a href="../registry/kilocode.html">The Kilo Code format</a></p>
 </article>
+
+
+
+
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
 </div>
