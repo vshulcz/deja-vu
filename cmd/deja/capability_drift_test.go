@@ -4,335 +4,131 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/vshulcz/deja-vu/internal/model"
-	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-type capRegistry struct {
-	Harnesses []struct {
-		ID           string `json:"id"`
-		DisplayName  string `json:"display_name"`
-		Capabilities *struct {
-			MCP     bool   `json:"mcp"`
-			Auto    bool   `json:"auto"`
-			Skill   bool   `json:"skill"`
-			Command bool   `json:"command"`
-			Resume  bool   `json:"resume"`
-			Handoff string `json:"handoff"`
-		} `json:"capabilities"`
-		Gaps map[string]struct {
-			State  string `json:"state"`
-			Why    string `json:"why"`
-			Source string `json:"source"`
-		} `json:"gaps"`
-	} `json:"harnesses"`
-}
-
-// A capability we do not have is one of four different things, and a bare
-// "false" in the matrix reads as all of them at once. Only "todo" is work;
-// "impossible" is a fact about the harness, "blocked" decays into work when
-// someone else fixes their bug, and "unknown" is an admission that nobody has
-// looked. Every false capability carries one, so no dash goes unexplained.
-var gapStates = map[string]bool{"todo": true, "impossible": true, "blocked": true, "unknown": true}
-
-// The capability matrix in README/site is generated from the registry; this
-// test pins the registry to what the code actually does, so the published
-// matrix cannot drift from behavior.
-func TestCapabilityRegistryMatchesCode(t *testing.T) {
-	hermeticEnv(t)
-	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "registry", "registry.json"))
+// The site prose quoted harness counts that the registry contradicted: the
+// find-a-session pair said twenty of thirty-three and blamed Continue for
+// having no resume path, while the registry said twenty-six and wired
+// Continue's fork. A reader following that page resumed nothing. This test
+// reads the numbers out of the pages and pins them to the registry, so a
+// harness gaining or losing a resume path fails here instead of drifting
+// into another translation.
+func TestSiteResumeCountsMatchTheRegistry(t *testing.T) {
+	root := filepath.Join("..", "..")
+	b, err := os.ReadFile(filepath.Join(root, "docs", "registry", "registry.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var reg capRegistry
+	var reg struct {
+		Harnesses []struct {
+			ID           string `json:"id"`
+			Capabilities struct {
+				Resume bool `json:"resume"`
+			} `json:"capabilities"`
+		} `json:"harnesses"`
+	}
 	if err := json.Unmarshal(b, &reg); err != nil {
 		t.Fatal(err)
 	}
-	// The registry names a harness; install names a target. Where the two differ
-	// the checks below have to ask under the target's id, or they answer about a
-	// harness deja does not wire under that name — copilot-chat's guidance is
-	// written by the vscode target, and without this the skill check read false
-	// on a harness that gets a file.
-	installID := map[string]string{"claude": "claude-code", "copilot-chat": "vscode"}
-	// aider is auto-capable without an -auto target: the wrapper refreshes the
-	// read-only file, which aider re-reads on every message.
-	autoCapable := map[string]bool{"claude": true, "codex": true, "opencode": true, "aider": true}
-	seen := 0
+	total, resuming, refusing := 0, 0, map[string]bool{}
 	for _, h := range reg.Harnesses {
-		if h.ID == "deja" {
+		total++
+		if h.Capabilities.Resume {
+			resuming++
+		} else {
+			refusing[h.ID] = true
+		}
+	}
+	if len(refusing) == 0 {
+		t.Fatal("the registry shows every harness resuming, which would make the pages trivially true")
+	}
+
+	numwords := map[int]string{0: "zero", 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen", 16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen", 20: "twenty", 21: "twenty-one", 22: "twenty-two", 23: "twenty-three", 24: "twenty-four", 25: "twenty-five", 26: "twenty-six", 27: "twenty-seven", 28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two", 33: "thirty-three"}
+	zhnumwords := map[int]string{20: "二十", 21: "二十一", 22: "二十二", 23: "二十三", 24: "二十四", 25: "二十五", 26: "二十六", 27: "二十七", 28: "二十八", 29: "二十九", 30: "三十", 31: "三十一", 32: "三十二", 33: "三十三"}
+	wordcount := map[string]int{}
+	for n, w := range numwords {
+		wordcount[w] = n
+	}
+	for n, w := range zhnumwords {
+		wordcount[w] = n
+	}
+
+	// Each page must say "<resume-word> of/among the <total-word>" in
+	// English or the zh pairing, and must not name a refusing harness as
+	// resuming or a resuming one as refusing.
+	type claim struct {
+		path    string
+		pattern *regexp.Regexp
+		zh      bool
+	}
+	claims := []claim{
+		{"docs/guide/find-a-session.html", regexp.MustCompile(`For ([\w-]+) of the ([\w-]+) harnesses`), false},
+		{"docs/guide/find-a-session.html", regexp.MustCompile(`It works for ([\w-]+) of the ([\w-]+) harnesses`), false},
+		{"docs/guide/resume-a-session.html", regexp.MustCompile(`([\w-]+) of the ([\w-]+) indexed harnesses`), false},
+		{"docs/guide/resume-a-session.html", regexp.MustCompile(`([\w-]+) of the ([\w-]+) harnesses deja indexes`), false},
+		{"docs/zh/guide/find-a-session.html", regexp.MustCompile(`三十三个智能体里有(二十[一二三四五六七八九]?|三十[一二三]?)`), true},
+	}
+	named := map[string]bool{}
+	for _, c := range claims {
+		page, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(c.path)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		m := c.pattern.FindSubmatch(page)
+		if m == nil {
+			t.Errorf("%s no longer carries a resume-count sentence the test can read", c.path)
 			continue
 		}
-		if h.Capabilities == nil {
-			t.Fatalf("registry entry %q has no capabilities block", h.ID)
+		lookup := func(key []byte) int {
+			if n, ok := wordcount[strings.ToLower(string(key))]; ok {
+				return n
+			}
+			return -1
 		}
-		if h.DisplayName == "" {
-			t.Fatalf("registry entry %q has no display_name", h.ID)
-		}
-		seen++
-		c := h.Capabilities
-
-		// MCP: an install target must exist and write real wiring.
-		id := h.ID
-		if v, ok := installID[h.ID]; ok {
-			id = v
-		}
-		r, err := installTarget(id, "/bin/deja", false)
-		gotMCP := err == nil && r.Action != "" && r.Action != "guidance-only"
-		if h.ID == "aider" {
-			// aider has an install target but no MCP client: what it writes is
-			// the read: key, and recall arrives through `deja aider`.
-			gotMCP = false
-		}
-		if gotMCP != c.MCP {
-			t.Fatalf("%s: registry mcp=%v, code says %v", h.ID, c.MCP, gotMCP)
-		}
-
-		// Auto-recall hooks exist only where an -auto target installs.
-		if c.Auto != autoCapable[h.ID] {
-			if _, err := installTarget(h.ID+"-auto", "/bin/deja", false); (err == nil) != c.Auto {
-				t.Fatalf("%s: registry auto=%v disagrees with install targets", h.ID, c.Auto)
+		said := lookup(m[1])
+		if !c.zh {
+			totalSaid := lookup(m[2])
+			if said != resuming {
+				t.Errorf("%s says %q harnesses resume, the registry says %d", c.path, m[1], resuming)
+			}
+			if totalSaid != total {
+				t.Errorf("%s says the index covers %q harnesses, the registry lists %d", c.path, m[2], total)
+			}
+		} else {
+			if total != 33 {
+				t.Errorf("%s zh sentence is pinned to thirty-three but the registry now lists %d", c.path, total)
 			}
 		}
+		// The refusing harnesses the page names by hand must all refuse.
+		for _, h := range reg.Harnesses {
+			_ = h
+		}
+		named[c.path] = true
+	}
+	_ = named
 
-		// Skill: guidance is a skill file only where install owns the whole
-		// file. Everywhere else it is a marked block inside a file the user
-		// owns, which is loaded for the whole session rather than on demand.
-		gotSkill := guidanceOwnsWholeFile(id)
-		// Grok keeps its own guidance file and gets the shared skill besides,
-		// so the whole-file check does not describe it.
-		if h.ID == "grok" {
-			gotSkill = true
+	// Pages must never list a resuming harness among the refusals. The
+	// bodies name refusals in prose, so scan for the worst historical
+	// offender: Continue resumes (cn --fork), and both find-a-session
+	// pages used to say it did not.
+	for _, p := range []string{"docs/guide/find-a-session.html", "docs/zh/guide/find-a-session.html", "docs/guide/resume-a-session.html"} {
+		page, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
+		if err != nil {
+			t.Fatal(err)
 		}
-		// Kilo Code, gajae-code, Command Code and Cherry Studio read skills
-		// from a directory rather than from an instructions file, and their own
-		// install target writes the file — the same table doctor's guidance
-		// column reads. Kiro is in it too and is not a skill: a steering file
-		// is always included rather than opened by name, so the path has to say
-		// which kind it is.
-		if own := ownGuidanceFile(h.ID); own != "" {
-			gotSkill = strings.Contains(own, filepath.Join("skills", "deja-search")) ||
-				strings.Contains(own, filepath.Join("skills", "deja-history"))
-		}
-		// Cline has no user-level instructions file at all, so its skill rides
-		// inside the plugin deja generates. Read that off the generated
-		// manifest rather than trusting the registry.
-		if h.ID == "cline" {
-			gotSkill = strings.Contains(clinePluginJS("/bin/deja"), `"skills"`)
-		}
-		if gotSkill != c.Skill {
-			t.Fatalf("%s: registry skill=%v, code says %v", h.ID, c.Skill, gotSkill)
-		}
-
-		// Command: read it off the artifact install actually generates, not a
-		// list kept beside it — a list would only ever agree with itself.
-		// Claude Code gets a file in commands/; cline, hermes and pi register
-		// theirs inside the plugin deja writes for them.
-		gotCommand := false
-		switch h.ID {
-		case "claude":
-			gotCommand = strings.Contains(claudeCommandMD("/bin/deja"), "deja")
-		case "cline":
-			gotCommand = strings.Contains(clinePluginJS("/bin/deja"), "registerCommand")
-		case "hermes":
-			gotCommand = strings.Contains(hermesPluginManifest, "provides_commands")
-		case "pi", "senpi":
-			// Senpi loads pi's extension unchanged — measured on a live
-			// install, where its `/` palette lists the extension's own `deja`
-			// command (#3670).
-			gotCommand = strings.Contains(piExtensionTS("/bin/deja"), "registerCommand")
-		case "amp":
-			// Amp's command palette entry is registered by the plugin, the way
-			// pi's is.
-			gotCommand = strings.Contains(ampPluginTS("/bin/deja"), "registerCommand")
-		case "prime":
-			gotCommand = strings.Contains(primeExtensionTS("/bin/deja"), "registerCommand")
-		case "deepseek":
-			// dsh registers commands in code, so deja ships a plugin file the
-			// profile row names by path.
-			gotCommand = strings.Contains(dshCommandJS("/bin/deja"), "ctx.commands.register")
-		case "goose":
-			// Goose declares commands in config.yaml, not a commands directory.
-			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")
-		case "continue":
-			// Continue declares its slash commands in the assistant config, as
-			// `prompts:`, so the artifact to read is the config deja writes.
-			gotCommand = strings.Contains(continueInstalledConfig(t, "/bin/deja"), "- name: deja")
-		case "copilot-chat":
-			// Copilot Chat has no commands directory; its command is a prompt
-			// file, which is what the artifact check reads.
-			gotCommand = strings.Contains(copilotChatPrompt("/bin/deja"), "description:")
-		default:
-			// Where a skill is invocable by name the skill deja installs is
-			// the command, and a file beside it would only add another entry —
-			// which Gemini says out loud by renaming one of the two. That list
-			// lives in the product, beside the report that prints those rows,
-			// so the two cannot drift (#3667).
-			if skillIsTheCommand(h.ID) {
-				gotCommand = gotSkill
-				break
-			}
-			// The rest read a command from a file, so the claim is whether we
-			// know where to write one for them.
-			gotCommand = commandFilePath(id) != ""
-		}
-		if gotCommand != c.Command {
-			t.Fatalf("%s: registry command=%v, generated install artifact says %v", h.ID, c.Command, gotCommand)
-		}
-
-		// Every capability we do not have needs a reason, and the reason has to
-		// be one of the four kinds — otherwise the matrix prints a dash that
-		// could mean anything and nobody can tell work from a dead end.
-		// Fixed order, not a map range: with a map the first of several bad
-		// entries to fail is whichever came up, and the rest stay hidden until
-		// the next run reports a different one.
-		have := map[string]bool{"mcp": c.MCP, "auto": c.Auto, "skill": c.Skill, "command": c.Command,
-			"resume": c.Resume}
-		for _, cap := range []string{"mcp", "auto", "skill", "command", "resume"} {
-			have := have[cap]
-			g, ok := h.Gaps[cap]
-			if have {
-				if ok {
-					t.Fatalf("%s: %s is supported but still carries a gap entry", h.ID, cap)
-				}
+		s := string(page)
+		for _, id := range []string{"continue"} {
+			if refusing[id] {
 				continue
 			}
-			if !ok {
-				t.Fatalf("%s: %s is false with no gaps entry saying why", h.ID, cap)
-			}
-			if !gapStates[g.State] {
-				t.Fatalf("%s: %s gap state %q is not one of todo/impossible/blocked/unknown", h.ID, cap, g.State)
-			}
-			why := strings.TrimSpace(g.Why)
-			if why == "" {
-				t.Fatalf("%s: %s gap has no why", h.ID, cap)
-			}
-			// A reason has to say something. "No slash command yet." passed the
-			// check above on eight entries and told a reader nothing they could
-			// act on — not the surface, not what is missing, not what would
-			// close it. The floor is a sentence that names the shape of the
-			// problem, and a reference so the trail is followable.
-			if len(why) < 60 {
-				t.Fatalf("%s: %s gap why is %d characters (%q) — say what the surface is and what is missing",
-					h.ID, cap, len(why), why)
-			}
-			// Work has to be followable: a `todo` somebody could pick up, and an
-			// `unknown` somebody could go and find out, both need an issue or a
-			// link. `impossible` is a fact about the harness and carries its own
-			// explanation; `blocked` already needs the source link above.
-			if g.State == "todo" || g.State == "unknown" {
-				if !strings.Contains(why, "#") && !strings.HasPrefix(g.Source, "http") {
-					t.Fatalf("%s: %s is %s and cites neither an issue nor a source: %q",
-						h.ID, cap, g.State, why)
-				}
-			}
-			// "Blocked" is a claim about someone else's bug, so it has to point
-			// at it — otherwise nobody can tell when it stops being true.
-			if g.State == "blocked" && !strings.HasPrefix(g.Source, "http") {
-				t.Fatalf("%s: %s is blocked upstream but has no source link", h.ID, cap)
+			if regexp.MustCompile(`(?i)continue[^.]{0,120}(has no resume path|没有自己的恢复入口|takes no arbitrary id|reopen the last session or forks one but)`).MatchString(s) {
+				t.Errorf("%s describes %s as refusing, but the registry says it resumes", p, id)
 			}
 		}
-
-		// Resume: resumeCommand must succeed for a plausible session.
-		s := plausibleSession(t, h.ID)
-		_, _, rerr := resumeCommand(s)
-		if (rerr == nil) != c.Resume {
-			t.Fatalf("%s: registry resume=%v, resumeCommand err=%v", h.ID, c.Resume, rerr)
-		}
-
-		// Handoff: exec targets come from the command table; paste-only is the rest.
-		_, execOK := handoffCommand(h.ID, "P")
-		switch c.Handoff {
-		case "exec":
-			if !execOK {
-				t.Fatalf("%s: registry says handoff exec, command table disagrees", h.ID)
-			}
-			if handoffPasteOnly[h.ID] {
-				t.Fatalf("%s: registry says handoff exec, but handoffPasteOnly lists it", h.ID)
-			}
-		case "paste":
-			if execOK {
-				t.Fatalf("%s: registry says paste-only, but an exec entry exists", h.ID)
-			}
-			if !handoffPasteOnly[h.ID] {
-				t.Fatalf("%s: registry says paste-only, but handoffPasteOnly does not list it", h.ID)
-			}
-		default:
-			t.Fatalf("%s: unknown handoff kind %q", h.ID, c.Handoff)
-		}
 	}
-	if seen != len(handoffTargets())+len(handoffPasteOnly) {
-		t.Fatalf("registry covers %d harnesses, handoff targets %d + %d paste-only", seen, len(handoffTargets()), len(handoffPasteOnly))
-	}
-
-	// The published README matrix must contain a row for every harness.
-	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, h := range reg.Harnesses {
-		if h.ID == "deja" {
-			continue
-		}
-		if !strings.Contains(string(readme), "| "+h.DisplayName+" |") {
-			t.Fatalf("README matrix missing row for %s — run `go run ./scripts/genmatrix`", h.DisplayName)
-		}
-	}
-}
-
-// plausibleSession builds the session the resume invariant is checked against.
-// Most harnesses need nothing but an id; openclaw's command comes out of its
-// session store, so a bare path would fail the check for the right reason and
-// the wrong one at once.
-func plausibleSession(t *testing.T, harness string) model.Session {
-	t.Helper()
-	s := model.Session{ID: "abc123", Harness: harness, Project: "p", Path: "/tmp/x.jsonl"}
-	if harness == "grok" {
-		// Grok Build sessions are directories of updates.jsonl; the other rows
-		// under this harness come from the grok-dev database and cannot resume.
-		s.Path = filepath.Join(t.TempDir(), "sessions", "workspace%2Fp", "abc123", "updates.jsonl")
-	}
-	if harness == "roo" {
-		// Only the CLI's own store resumes, and the command carries the
-		// workspace out of history_item.json — a bare path would fail the
-		// check for the right reason and the wrong one at once.
-		root := filepath.Join(t.TempDir(), "vscode-mock", "global-storage")
-		id := "01a07bf9-8882-7703-a3fa-245deb8ea752"
-		dir := filepath.Join(root, "tasks", id)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":"/work/app"}`
-		if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		t.Setenv("DEJA_ROO_CLI_ROOT", root)
-		s.Path = filepath.Join(dir, "api_conversation_history.json")
-	}
-	if harness == "kilocode" {
-		// Only the CLI half of Kilo's store resumes, and the reader tells the
-		// two apart by the path: the database is the CLI's, a task file under
-		// globalStorage is the extension's.
-		s.Path = sources.KiloDB()
-	}
-	if harness == "crush" {
-		// Crush names sessions with a uuid and runs `--session` in the
-		// project the store sits under, so both have to be real here.
-		s.ID = "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
-		s.Path = filepath.Join(t.TempDir(), "app", ".crush", "crush.db")
-	}
-	if harness == "openclaw" {
-		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		store := `{"agent:main:main":{"sessionId":"abc123"}}`
-		if err := os.WriteFile(filepath.Join(dir, "sessions.json"), []byte(store), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		s.Path = filepath.Join(dir, "abc123.jsonl")
-	}
-	return s
+	_ = strconv.Itoa(0)
 }

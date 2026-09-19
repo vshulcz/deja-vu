@@ -36,7 +36,7 @@
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "找回解决问题的那次会话", "description": "怎么在整台机器的所有智能体里同时搜聊天记录：按你记得的那个词搜，而不是按你记不清的话题搜，然后用会话 id 继续那次对话。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "找回解决问题的那次会话", "item": "https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么找到修复某个问题时的那次会话？", "acceptedAnswer": {"@type": "Answer", "text": "按你记得最清楚的东西搜——一条报错原文、一个函数名、一个文件路径或一个旗标。这些内容在会话记录里是原样保存的，哪怕你已经忘了当时用的是哪个工具、哪个项目、哪个月。"}}, {"@type": "Question", "name": "能在跑那次会话的智能体里重新打开它吗？", "acceptedAnswer": {"@type": "Answer", "text": "deja 读的三十三个智能体里有二十个可以：deja resume <id> 把 id 交回给那个智能体，对话就在那里继续。其余的没有自己的恢复入口。"}}, {"@type": "Question", "name": "只记得大概是什么时候怎么办？", "acceptedAnswer": {"@type": "Answer", "text": "时间只是提示，不是过滤器：查询里带日期会把最近的会话往前排，但不会藏掉更早的；deja last 还能按项目、角色或智能体列出最近的会话。"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么找到修复某个问题时的那次会话？", "acceptedAnswer": {"@type": "Answer", "text": "按你记得最清楚的东西搜——一条报错原文、一个函数名、一个文件路径或一个旗标。这些内容在会话记录里是原样保存的，哪怕你已经忘了当时用的是哪个工具、哪个项目、哪个月。"}}, {"@type": "Question", "name": "能在跑那次会话的智能体里重新打开它吗？", "acceptedAnswer": {"@type": "Answer", "text": "deja 读的三十三个智能体里有二十六个可以：deja resume <id> 把 id 交回给那个智能体，对话就在那里继续。其余的没有自己的恢复入口。"}}, {"@type": "Question", "name": "只记得大概是什么时候怎么办？", "acceptedAnswer": {"@type": "Answer", "text": "时间只是提示，不是过滤器：查询里带日期会把最近的会话往前排，但不会藏掉更早的；deja last 还能按项目、角色或智能体列出最近的会话。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -92,7 +92,7 @@
 <pre>deja show 8f31c0a9      # 读那次会话
 deja ctx  8f31c0a9      # 一份 Markdown 摘要，粘到你正在做的事情里
 deja resume 8f31c0a9    # 在跑那次会话的智能体里重新打开</pre>
-<p><code>resume</code> 把 id 交回给拥有那次会话的智能体，并带上项目目录，让那个智能体自己的列表收窄到这一个。deja 读的三十三个智能体里有二十个可以这样恢复。剩下五个——aider、Continue、VS Code Copilot Chat、DeepSeek Harness 和 Zed——没有自己的恢复入口，deja 会直说，而不是假装可以。Roo Code 一半一半：它命令行创建的任务用 <code>roo --session-id</code>，编辑器里的任务回到编辑器里打开。</p>
+<p><code>resume</code> 把 id 交回给拥有那次会话的智能体，并带上项目目录，让那个智能体自己的列表收窄到这一个。deja 读的三十三个智能体里有二十六个可以这样恢复。剩下七个——aider、Cherry Studio、Command Code、DeepSeek Harness、VS Code Copilot Chat、ZCode 和 Zed——没有自己的恢复入口，deja 会直说，而不是假装可以。Roo Code 一半一半：它命令行创建的任务用 <code>roo --session-id</code>，编辑器里的任务回到编辑器里打开。</p>
 <p>id 按前缀匹配，所以结果里打印的八个字符就够输入了。</p>
 
 <h2>答案是一条命令而不是一次会话的时候</h2>
