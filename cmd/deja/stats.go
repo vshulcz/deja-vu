@@ -235,6 +235,13 @@ func runStats(dir string, args []string) error {
 		return enc.Encode(report)
 	}
 	printStats(os.Stdout, report)
+	// The screen says "wrapped for sharing" at the top and then never says how.
+	// `--card` draws the same numbers as one object — a terminal card, or an
+	// SVG with a path — and nobody finds a flag they were not told about.
+	// Only where there is something worth a picture.
+	if report.TotalSessions > 0 {
+		fmt.Fprintln(os.Stdout, "\n  As a card       deja stats --card  ·  deja stats --card agent-history.svg")
+	}
 	if sshTip != "" {
 		fmt.Fprintln(os.Stdout, sshTip)
 	}

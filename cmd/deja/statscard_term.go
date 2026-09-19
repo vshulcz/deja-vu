@@ -213,7 +213,9 @@ func heroStat(r stats.Report) (string, string) {
 	// installed deja an hour ago has it, and it is the one figure on the card
 	// that is about the person's own history rather than about deja.
 	case r.RepeatQuestions > 0:
-		return formatStatNumber(r.RepeatQuestions), "questions you asked more than once"
+		// "1 questions" was the headline on any store with exactly one
+		// repeat, which is most stores in their first week.
+		return formatStatNumber(r.RepeatQuestions), "question" + pluralS(r.RepeatQuestions) + " you asked more than once"
 	case r.WeekRecalls > 0:
 		return formatStatNumber(r.WeekRecalls), "recalls handed to your agents this week"
 	case r.Recall.Recalls+r.Recall.Injections > 0:
@@ -250,6 +252,17 @@ func cardCells(r stats.Report) []struct{ value, label string } {
 		{formatStatNumber(r.TotalSessions), "sessions"},
 		{formatStatNumber(r.TotalMessages), "messages"},
 		{strconv.Itoa(len(r.Harnesses)), "agents"},
+	}
+	// What the agents rewrote takes the middle cell where there is something to
+	// say: 15,982 spans across 1,653 files on one real store, and it is the
+	// figure on the terminal screen that makes people stop. The card was built
+	// out of counts about deja — sessions, messages, agents — and left out the
+	// one that is about what happened to the reader's own code. Message count
+	// gives up the place: it is the largest number here and the emptiest.
+	// Three cells and no more, because the fourth would run into the agent
+	// bars at x=470.
+	if r.Spans > 0 {
+		cells[1] = struct{ value, label string }{formatStatNumber(r.Spans), "spans replaced"}
 	}
 	out := cells[:0]
 	for _, c := range cells {

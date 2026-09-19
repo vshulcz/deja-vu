@@ -34,6 +34,18 @@ type session struct {
 	id      string
 	daysAgo int
 	turns   []turn
+	// edits are what the turn replaced. A store without them makes the stats
+	// card show a card about deja — sessions, messages, agents — with nothing
+	// on it about what happened to the reader's own code, and `deja restore`
+	// has nothing to demonstrate. One real store carries 15,982 of these.
+	edits []edit
+}
+
+// edit is one replaced span, in the shape a Claude `Edit` call records.
+type edit struct {
+	path string
+	old  string
+	new  string
 }
 
 // Written as real engineering conversations: a question, a diagnosis, and a
@@ -42,51 +54,118 @@ var sessions = []session{
 	{"claude", "payments", "a1f2c93b", 214, []turn{
 		{"user", "prepared statements keep failing behind pgbouncer after the driver upgrade"},
 		{"assistant", "pgx v5.5 changed prepared-statement caching, and pgbouncer in transaction mode cannot hold those across connections. Two options: set default_query_exec_mode to simple protocol, or pin the driver. We pinned pgx to 5.4.3 and left a note to revisit once pgbouncer 1.24 ships prepared-statement support."},
-	}},
+	}, nil},
 	{"claude", "payments", "b7d4e118", 203, []turn{
 		{"user", "why is the idempotency key colliding on retries"},
 		{"assistant", "The key was derived from the request body hash, and the client retried with a regenerated timestamp inside the body. Moved the key to a client-supplied header and made the server reject a retry that changes the body under the same key."},
-	}},
+	}, nil},
 	{"codex", "search-svc", "cx0031", 188, []turn{
 		{"user", "the reindex job OOMs at about 80% every night"},
 		{"assistant", "It loads the whole postings map before writing. Streaming the writes and flushing per bucket dropped peak RSS from 6.1 GB to 900 MB. The 80% point was simply where the largest tenant landed."},
-	}},
+	}, nil},
 	{"cursor", "web-ui", "cu0044", 171, []turn{
 		{"user", "hydration mismatch only in production, never locally"},
 		{"assistant", "The server rendered dates in UTC and the client in the browser locale. Locally both were UTC so it never showed. Fixed by formatting on the client after mount, and added a test that runs the renderer under TZ=Asia/Tokyo."},
-	}},
+	}, nil},
 	{"claude", "infra", "c9a01d55", 152, []turn{
 		{"user", "should we move the queue off redis"},
 		{"assistant", "We lost messages twice under memory pressure because eviction does not respect list keys. Decision: move the job queue to Postgres advisory locks, keep redis for caching only. Throughput fell from 12k/s to 4k/s, which is well above what we need."},
-	}},
+	}, nil},
 	{"codex", "infra", "cx0038", 140, []turn{
 		{"user", "terraform wants to recreate the whole cluster"},
 		{"assistant", "The node pool name changed because the module was bumped to v4, and that field forces replacement. Pinned the module and imported the existing pool instead of letting it recreate."},
-	}},
+	}, nil},
 	{"claude", "api-gateway", "d3f77a20", 121, []turn{
 		{"user", "jwt refresh fails for about a minute after every deploy"},
 		{"assistant", "Clock skew between the auth pods and the gateway, plus a 30s token lifetime. Added a 60s leeway on validation and moved to 15m tokens with refresh. The minute matched the rollout window."},
-	}},
+	}, nil},
 	{"cursor", "web-ui", "cu0051", 98, []turn{
 		{"user", "bundle grew 400kb after the icon refactor"},
 		{"assistant", "The barrel file re-exported every icon, so tree shaking gave up. Importing each icon by path brought it back to 210 kB. Added a lint rule banning barrel imports from that package."},
-	}},
+	}, nil},
 	{"claude", "ml-pipeline", "e5b28c04", 76, []turn{
 		{"user", "feature parity check fails only for the batch path"},
 		{"assistant", "Streaming used event time, batch used ingestion time, so late events landed in different windows. Standardised on event time and backfilled two days."},
-	}},
+	}, nil},
 	{"codex", "search-svc", "cx0052", 61, []turn{
 		{"user", "why did we drop the trigram index"},
 		{"assistant", "It was 40% of the database size and only helped queries shorter than four characters, which are 2% of traffic. We dropped it and added a length guard that falls back to a prefix scan."},
-	}},
+	}, nil},
 	{"claude", "payments", "f1c66b93", 44, []turn{
 		{"user", "webhook signatures started failing for one provider"},
 		{"assistant", "They rotated to a new signing key and publish both for 30 days. We were pinning a single key. Now we verify against every published key and log which one matched."},
-	}},
+	}, nil},
 	{"claude", "infra", "a8e30f71", 22, []turn{
 		{"user", "the nightly backup restore test is flaky"},
 		{"assistant", "The restore ran before the WAL archive finished uploading, so it occasionally restored a truncated tail. Added a wait on the archive marker rather than a fixed sleep."},
-	}},
+	}, nil},
+}
+
+// asked twice is the part of a real store the synthetic one had none of: the
+// same question, months apart, in a different agent. It is what the card's
+// headline counts ("questions you asked more than once") and the whole reason
+// the product exists, so a demo without it shows the weakest version of both.
+var repeats = []session{
+	{"codex", "payments", "cx0077", 96, []turn{
+		{"user", "prepared statements keep failing behind pgbouncer after the driver upgrade"},
+		{"assistant", "Same shape as the one from March: pgbouncer in transaction mode cannot hold prepared statements across connections. The note said revisit at pgbouncer 1.24; it is still on 1.22 here, so the pin stays."},
+	}, nil},
+	{"cursor", "web-ui", "cu0061", 52, []turn{
+		{"user", "hydration mismatch only in production, never locally"},
+		{"assistant", "This is the UTC-versus-locale one again. Format on the client after mount; the test that pins it runs under TZ=Asia/Tokyo."},
+	}, nil},
+	{"codex", "search-svc", "cx0081", 40, []turn{
+		{"user", "why did we drop the trigram index"},
+		{"assistant", "Because it was 40% of the database and only helped queries under four characters. The length guard that replaced it is still in place."},
+	}, nil},
+	{"claude", "payments", "c4d17a90", 31, []turn{
+		{"user", "why is the idempotency key colliding on retries"},
+		{"assistant", "The client regenerates a timestamp inside the body, and the key was the body hash. It moved to a client header in February and the server rejects a retry that changes the body."},
+	}, nil},
+	{"cursor", "billing", "cu0074", 12, []turn{
+		{"user", "how do we rotate the signing key without dropping webhooks"},
+		{"assistant", "Verify against every published key rather than one, and log which matched. That is what the provider rotation in July needed."},
+	}, nil},
+	{"claude", "billing", "d9f2b311", 3, []turn{
+		{"user", "how do we rotate the signing key without dropping webhooks"},
+		{"assistant", "Asked in September and answered the same way: verify against all published keys, log the match. Nothing has changed since."},
+	}, nil},
+	{"claude", "infra", "b2c19e44", 17, []turn{
+		{"user", "should we move the queue off redis"},
+		{"assistant", "Decided in April and still holds: the job queue is on Postgres advisory locks, redis is cache only. Throughput 4k/s against the 12k/s redis did, which is well above what this needs."},
+	}, nil},
+}
+
+// spansFor gives a session the edits its turns imply. The replaced text is what
+// `deja restore` hands back and what `deja blame <path>:<line>` attributes, and
+// a store with none of it makes both look like claims rather than features.
+func spansFor(i int, project string) []edit {
+	files := []string{
+		"internal/pool/pool.go", "internal/queue/worker.go", "cmd/api/main.go",
+		"internal/index/ingest.go", "web/src/date.ts", "internal/auth/jwt.go",
+	}
+	olds := []string{
+		"cfg.MaxConnLifetime = 30 * time.Minute",
+		"retries := 3 // the default nobody chose",
+		"if err := q.Publish(ctx, job); err != nil {",
+		"const flushEvery = 64 * 1024",
+		"return new Date(value).toLocaleString()",
+		"token, err := jwt.Parse(raw, keyFor(kid))",
+	}
+	news := []string{
+		"cfg.MaxConnLifetime = 4 * time.Minute",
+		"retries := retriesFromConfig(cfg, 5)",
+		"if err := q.PublishWithKey(ctx, job, job.Key); err != nil {",
+		"const flushEvery = 256 * 1024",
+		"return formatInTimeZone(value, tz)",
+		"token, err := jwt.Parse(raw, keysFor(kid, leeway))",
+	}
+	k := i % len(files)
+	return []edit{{
+		path: "/work/" + project + "/" + files[k],
+		old:  olds[k],
+		new:  news[k],
+	}}
 }
 
 func main() {
@@ -102,7 +181,7 @@ func main() {
 	// relative to it.
 	now := time.Date(2026, 7, 1, 12, 0, 0, 0, time.UTC)
 
-	all := append(background(*fill), sessions...)
+	all := append(append(background(*fill), sessions...), repeats...)
 	for _, s := range all {
 		if err := write(*out, s, now); err != nil {
 			fmt.Fprintln(os.Stderr, "corpus:", err)
@@ -154,13 +233,19 @@ func background(n int) []session {
 					turn{"assistant", "That path is different: " + causes[(i+k+3)%len(causes)] + ". Try " + fixes[(i+k+5)%len(fixes)] + "."})
 			}
 		}
-		out = append(out, session{
+		s := session{
 			harness: harnesses[i%len(harnesses)],
 			project: projects[(i/2)%len(projects)],
 			id:      fmt.Sprintf("bg%04d", i),
 			daysAgo: 4 + (i*331)%355,
 			turns:   turns,
-		})
+		}
+		// Claude's writer is the one that records edits, and one session in
+		// five is about the rate a real store carries.
+		if s.harness == "claude" && i%5 == 0 {
+			s.edits = spansFor(i, s.project)
+		}
+		out = append(out, s)
 	}
 	return out
 }
@@ -186,6 +271,27 @@ func writeClaude(root string, s session, start time.Time) error {
 			"sessionId": s.id,
 			"timestamp": start.Add(time.Duration(i) * time.Minute).Format(time.RFC3339),
 			"message":   map[string]any{"role": t.role, "content": t.text},
+		})
+		if err != nil {
+			return err
+		}
+		lines = append(lines, line...)
+		lines = append(lines, '\n')
+	}
+	for i, e := range s.edits {
+		line, err := json.Marshal(map[string]any{
+			"type":      "assistant",
+			"sessionId": s.id,
+			"timestamp": start.Add(time.Duration(len(s.turns)+i) * time.Minute).Format(time.RFC3339),
+			"message": map[string]any{"role": "assistant", "content": []map[string]any{{
+				"type": "tool_use",
+				"name": "Edit",
+				"input": map[string]any{
+					"file_path":  e.path,
+					"old_string": e.old,
+					"new_string": e.new,
+				},
+			}}},
 		})
 		if err != nil {
 			return err

@@ -85,13 +85,21 @@ func renderStatsCard(r stats.Report) string {
 	}
 	// Whatever the hero did not take: the week's recalls when the repeat count
 	// leads, the repeat count otherwise.
-	if n := r.WeekRecalls; n > 0 && r.RepeatQuestions > 0 {
+	hero, _ := heroStat(r)
+	switch {
+	case r.WeekRecalls > 0 && formatStatNumber(r.WeekRecalls) != hero:
 		cardText(&b, w-pad, rowY, 12, "400",
-			formatStatNumber(n)+" recalls handed to your agents this week", "#8b989a",
+			formatStatNumber(r.WeekRecalls)+" recalls handed to your agents this week", "#8b989a",
 			"text-anchor=\"end\"")
-	} else if n := r.RepeatQuestions; n > 0 {
+	case r.SpanFiles > 0:
+		// The files behind the spans cell, which is the sentence that makes
+		// the number mean something: 1,653 files on one real store.
 		cardText(&b, w-pad, rowY, 12, "400",
-			formatStatNumber(n)+" questions asked more than once", "#8b989a",
+			"across "+formatStatNumber(r.SpanFiles)+" file"+pluralS(r.SpanFiles)+" deja can restore", "#8b989a",
+			"text-anchor=\"end\"")
+	case r.RepeatQuestions > 0 && formatStatNumber(r.RepeatQuestions) != hero:
+		cardText(&b, w-pad, rowY, 12, "400",
+			formatStatNumber(r.RepeatQuestions)+" questions asked more than once", "#8b989a",
 			"text-anchor=\"end\"")
 	}
 
