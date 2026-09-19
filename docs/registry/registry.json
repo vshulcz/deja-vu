@@ -501,7 +501,7 @@
         "fixtures/registry/opencode/opencode.sql"
       ],
       "parser_source": "internal/sources/opencode.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-19",
       "display_name": "opencode",
       "capabilities": {
         "mcp": true,
