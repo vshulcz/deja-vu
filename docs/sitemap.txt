@@ -100,3 +100,4 @@ https://vshulcz.github.io/deja-vu/registry/zcode.html
 https://vshulcz.github.io/deja-vu/registry/gjc.html
 https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html
 https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html
+https://vshulcz.github.io/deja-vu/zh/guide/privacy.html

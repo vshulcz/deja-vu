@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
+<meta name="description" content="deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/privacy.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="隐私：索引什么、脱敏什么、什么都不外传">
+<meta property="og:description" content="deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="隐私：索引什么、脱敏什么、什么都不外传">
+<meta name="twitter:description" content="deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "隐私：索引什么、脱敏什么、什么都不外传", "description": "deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "隐私", "item": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "deja 会把我的会话上传到别处吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。建索引和检索都没有网络路径，索引和它的使用日志不离开这台机器。只有 deja update、deja sync ssh 和 doctor 的版本检查会联网，后者可以用 --offline 关掉。"}}, {"@type": "Question", "name": "凭据会被写进索引吗？", "acceptedAnswer": {"@type": "Answer", "text": "会先脱敏再写：API key、JWT、PEM/PGP 私钥块、bearer 与 HTTP Basic、各家提供商的令牌、scheme://user:pass@host 形式的 URL、处在密钥位置上的高熵值，以及写在散文里的口令。脱敏在任何长度截断之前进行，所以跨过截断点的密钥也不会漏过。"}}, {"@type": "Question", "name": "怎么让某个项目完全不进索引？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.config/deja/exclude 里写模式，或者用 DEJA_EXCLUDE_PROJECTS；sync export 也遵守它。整个工具的历史可以用 harness: 前缀排除，例如 harness:opencode。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="privacy.html" aria-current="page">隐私</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/privacy.html">Session files on disk</a>
+<a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
+<a href="../../guide/delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>隐私</h1>
+<p class="pagelede">索引了什么，脱敏了什么，什么永远不出这台机器<span class="mins" data-mins></span></p>
+<p>deja 索引的正是可能带着凭据的会话历史，所以隐私在这里是第一顺位的问题，不是事后补的。</p>
+<h2>索引了什么</h2>
+<p>对话本身，以及智能体在对话期间做过的事：工具调用提到的文件路径、执行过的命令、每次改动替换掉的那段原文，以及工具打印出来的内容。最后这一项正是脱敏重要的原因——命令输出里的凭据远多于散文——这些内容和对话本身走同一条脱敏流程。被替换掉的原文是你自己文件里的代码，存下来是为了让 <code>deja restore</code> 能把工作还给你，它和其他一切一样留在本机。</p>
+<p>在 Claude Code 和 Codex 上，索引还会保留压缩前那一刻的一小包工作上下文——任务、结论、涉及的文件和命令，同样脱敏，最多 32 个会话/工作区组合。它放在索引清单里，不进 sync 导出，遵守被排除的项目和 <code>DEJA_RECALL=off</code>，而且即使那个会话还没被索引，<code>deja forget</code> 也能把它删掉。</p>
+
+<h2>默认只在本地</h2>
+<p>建索引和检索没有网络路径，索引及其使用日志不离开这台机器。只有三种情况会联网：<code>deja update</code>、<code>deja sync ssh</code>，以及 <code>doctor</code> 里的版本检查（用 <code>--offline</code> 可以关掉）。</p>
+
+<h2>脱敏</h2>
+<p>密钥在建索引时就被剥掉：API key、JWT、PEM/PGP 私钥块、bearer 与 HTTP Basic、各家提供商的令牌、<code>scheme://user:pass@host</code> 形式的 URL，（自 0.14.2 起）处在密钥位置上的裸高熵值——赋值右侧，或单独占一行的令牌——以及（自 0.20.2 起）写在散文里、名字和值之间没有任何分隔符的口令，比如「the admin password is …」。最后这条要求值里带数字或符号，所以「the password is wrong」这样的句子不会被动。</p>
+<p>这一切发生在任何内容被写下之前。脱敏作用于完整消息、在长度截断之前，所以跨过截断边界的密钥也漏不过去。搜索、MCP 召回、<code>share</code> 和 <code>sync</code> 对外给出的都是脱敏之后的内容。</p>
+
+<h2>控制留下什么</h2>
+<ul>
+<li><b>排除项目</b>——在 <code>~/.config/deja/exclude</code> 写模式，或用 <code>DEJA_EXCLUDE_PROJECTS</code>，建索引时就跳过；<code>sync export</code> 同样遵守，所以后来被排除的项目不会离开这台机器。在规则存在之前已经索引过的会话，本地仍然可搜，直到 <code>deja index --rebuild</code>——<code>deja index</code> 会告诉你正处在这种情况。</li>
+<li><b>排除整个工具</b>——同一个文件里以 <code>harness:</code> 开头的一行指的是某个智能体而不是项目，例如 <code>harness:opencode</code>：deja 既不走这个存储，也不会去要读它所需的工具。逗号分隔的形式是 <code>DEJA_EXCLUDE_HARNESSES</code>。名字是精确匹配而不是模式，就是 <code>deja sources</code> 打印出来的那些。</li>
+<li><b>遗忘</b>——<code>deja forget</code> 移除会话并写下墓碑，下次建索引不会把它们带回来；<code>--dry-run</code> 预览，<code>--list</code> 看墓碑，<code>--unforget &lt;id&gt;</code> 撤销一条。</li>
+<li><b>脱敏报告</b>——<code>deja stats --redaction</code> 按规则和工具列出被遮盖了什么。</li>
+<li><b>审计智能体收到过什么</b>——<code>deja log</code> 列出最近的召回与注入，<code>deja log --last</code> 原样打印最近一次送出的摘要。</li>
+<li><b>信任范围</b>——<code>~/.config/deja/policy.json</code> 决定哪种记忆在哪里生效。按激活路径（<code>search</code>、<code>mcp</code>、<code>auto</code>）允许或拒绝来源：<code>local</code>、<code>imported</code>（从另一台机器同步来的），或者某一台具体的机器，例如 <code>imported:mini</code>。举个例子——同步来的会话可搜，但永不自动注入：<code>{"activations":{"auto":{"imported":false}}}</code>。<code>deja embed</code> 是唯一会把会话文本发出机器的命令，所以它要求三条路径一致同意：任何一条规则不放行的内容都不会被嵌入。</li>
+</ul>
+<p>模式匹配不是密钥检测：某家新提供商的令牌形状、没有名字的凭据、编码或变形过的数据、跨行断开的密钥，都可能原样通过；脱敏也无法去掉「看起来不像凭据的敏感文字」。分享或导出之前请自己看一眼。完整边界写在<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">安全模型</a>里。</p>
+<p>还有一句值得直说：出现在记录里的凭据，早就被写下它的那个智能体发给模型提供商了。脱敏保护的是从那份记录派生出来的东西——本地索引、分享、同步——它不能撤销原来的暴露。请轮换那个凭据。</p>
+
+<p><a href="session-files-on-disk.html">会话文件怎么删</a> · <a href="where-sessions-are-stored.html">历史文件在哪里</a> · <a href="getting-started.html">快速开始</a></p>
+</article>
+
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>
