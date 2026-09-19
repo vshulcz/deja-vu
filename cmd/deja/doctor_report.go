@@ -93,6 +93,13 @@ type doctorIndexReport struct {
 	// note's ts (#2063), or a store whose stamps were read in the wrong unit
 	// (#2102). doctor has named the same fact for a peer since #1855.
 	SessionsAhead int `json:"sessions_stamped_ahead"`
+	// SourcesReadAt is when deja last walked this machine's stores, which is
+	// not when the index was last written: an import rewrites the manifest
+	// without opening a transcript, and a machine that syncs on a timer looked
+	// freshly indexed on every surface that compared against the build time
+	// (#3747). Empty when the store predates the field, and the word "never"
+	// when an import built the index and nothing local has been read at all.
+	SourcesReadAt string `json:"sources_read_at,omitempty"`
 	// Format is how the store on disk relates to this build, when it is not
 	// what this build writes. The text screen has carried a `format` row for
 	// this since #877 and the JSON carried nothing, so a script watching index
@@ -798,6 +805,14 @@ func inspectDoctorIndex(dir string, storeMods []time.Time) doctorIndexReport {
 	// transcript, so comparing against the build time reported zero stale
 	// stores on a machine that syncs on a timer (#3747).
 	readAt := index.ManifestSourcesReadAt(dir)
+	if readAt.IsZero() {
+		// An import built this index and nothing local has been read; a
+		// machine reading the JSON should not have to infer that from an
+		// absent field.
+		result.SourcesReadAt = "never"
+	} else {
+		result.SourcesReadAt = readAt.UTC().Format(time.RFC3339)
+	}
 	for _, mod := range storeMods {
 		if !mod.IsZero() && mod.After(readAt) {
 			result.StaleStores++

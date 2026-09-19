@@ -360,6 +360,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     "state": "ok",
     "path": "/home/user/.cache/deja/index.db",
     "stale_stores": 0,
+    "sources_read_at": "2026-09-19T10:54:36Z",
     "sessions_stamped_ahead": 0
   },
   "mcp": [
@@ -453,6 +454,8 @@ when unavailable; `policy` is always present. `embed.state` is the endpoint's,
 when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an
 endpoint is configured, so `embed` is present in that case even with no
+`index.sources_read_at` is when deja last walked this machine's stores, in RFC 3339, which is not when the index was last written: an import from a peer rewrites the index without opening a local transcript, so on a machine that syncs on a timer the two drift apart, and `stale_stores` is counted against this field rather than the build time. It is `never` when an import built the index and nothing local has been read yet, and absent on a store written before deja recorded it.
+
 endpoint. `index.path` points at the index
 directory; `index.db` is that directory's name, not a file. `index.state` is
 `missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
