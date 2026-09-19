@@ -31,4 +31,4 @@ Only parts with `type: "text"` are messages. The role comes from `message.data.r
 - A missing database must not be passed to SQLite because the CLI would create it.
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-19
