@@ -69,6 +69,7 @@ func main() {
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	out := flag.String("out", "", "write the run's numbers as JSON to this path")
+	score := flag.String("score", "", "score a ranking another system produced instead of running deja: a JSON file mapping question_id to the session ids it ranked, best first")
 	flag.Parse()
 	evSum := map[int]float64{}
 	evN := 0
@@ -116,6 +117,13 @@ func main() {
 	}
 	if *agentCases > 0 {
 		runAgentCases(questions, *agentCases)
+		return
+	}
+	// Somebody else's ranking, scored by this file's arithmetic rather than by
+	// their README. Nothing is indexed and no store is built: the questions and
+	// the dataset digest are all that is needed (#3794).
+	if *score != "" {
+		scoreSubmission(*score, *dataPath, questions, *out)
 		return
 	}
 	if *limit > 0 && len(questions) > *limit {
