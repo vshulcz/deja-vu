@@ -13,6 +13,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Does my agent remember previous conversations](https://vshulcz.github.io/deja-vu/guide/does-my-agent-remember.html): what Claude Code, Codex and Cursor keep between sessions, and what they do not
 - [Where history lives](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html): the conversation history file each of the thirty-three agents writes, and its format
 - [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how to delete Claude Code sessions, how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
+- [Delete Cline task history](https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html): distinguish the modern CLI session store from the VS Code extension task tree and remove only the conversation data you intend to delete
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
 
