@@ -36,6 +36,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [快速开始](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)：安装、接上智能体、第一次查询
 - [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
 - [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
+- [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：三十三个智能体各自把会话写在磁盘的哪里，用什么格式
 
 ## Per-harness setup
 

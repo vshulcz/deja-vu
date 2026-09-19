@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
+<meta name="description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="每个编程智能体把会话历史存在哪里">
+<meta property="og:description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="每个编程智能体把会话历史存在哪里">
+<meta name="twitter:description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "每个编程智能体把会话历史存在哪里", "description": "三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "历史文件在哪里", "item": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Claude Code 的会话记录在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "默认在 ~/.claude/projects 下，每个工作目录一个子目录，每个会话一个 .jsonl 文件，一行一条记录。CLAUDE_CONFIG_DIR 可以改这个位置。"}}, {"@type": "Question", "name": "这些文件可以直接删掉吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以，它们是各个工具自己写的日志。删掉之后那次会话就没有记录了；deja 的索引是可重建的缓存，删掉源文件也不会把它们找回来。"}}, {"@type": "Question", "name": "为什么有的工具用的是数据库而不是文件？", "acceptedAnswer": {"@type": "Answer", "text": "opencode、Hermes、Zed 和 Goose 把会话放进 SQLite；Zed 还把每条正文压成 zstd 帧，所以只用 sqlite3 看到的是二进制。Cursor 更麻烦：老版本把内容塞在 state.vscdb 的键值里，命令行版才是 JSONL。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="where-sessions-are-stored.html" aria-current="page">历史文件在哪里</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/harnesses.html">Harnesses</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>每个编程智能体把会话历史存在哪里</h1>
+<p class="pagelede">三十三个智能体，一张表<span class="mins" data-mins></span></p>
+
+<p>每一个编程智能体都会把你说过的话、它做过的事写到本机的文件里。格式各不相同，位置各不相同，而且没有任何一处把它们写在一起——所以这里就是那一处。表格来自 deja 的解析器所依据的同一份格式登记表。</p>
+
+<h2>各自写在哪里</h2>
+<table>
+<thead><tr><th>智能体</th><th>会话记录的位置</th><th>格式</th></tr></thead>
+<tbody>
+<tr><td><a href="../../registry/aider.html">aider</a></td><td><code>~/.aider.chat.history.md</code></td><td>一份 Markdown 日志</td></tr>
+<tr><td><a href="../../registry/amp.html">Amp</a></td><td><code>~/.local/share/amp/threads/*.json</code></td><td>一个会话一个 JSON 文件</td></tr>
+<tr><td><a href="../../registry/antigravity.html">Antigravity</a></td><td><code>~/.gemini/antigravity*/brain/*/.system_generated/logs/transcript.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/cherrystudio.html">Cherry Studio</a></td><td><code>&lt;app data&gt;/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl</code></td><td>JSONL，用的是 Claude Code 的格式</td></tr>
+<tr><td><a href="../../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code></td><td>JSON 文件</td></tr>
+<tr><td><a href="../../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollout，外加一个 history 文件</td></tr>
+<tr><td><a href="../../registry/commandcode.html">Command Code</a></td><td><code>~/.commandcode/projects/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/continue.html">Continue</a></td><td><code>${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json</code></td><td>JSON 文件，每次整份重写</td></tr>
+<tr><td><a href="../../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-~/.copilot/session-state}/*/events.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/crush.html">Crush</a></td><td><code>&lt;project&gt;/.crush/crush.db</code></td><td>SQLite 数据库，每个项目一个</td></tr>
+<tr><td><a href="../../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code></td><td>SQLite 键值库，或 JSONL</td></tr>
+<tr><td><a href="../../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/gjc.html">gajae-code</a></td><td><code>${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code></td><td>JSON 或 JSONL</td></tr>
+<tr><td><a href="../../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code></td><td>JSONL，另有一个 SQLite 索引</td></tr>
+<tr><td><a href="../../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code></td><td>JSONL 事件流，外加 JSON 元数据</td></tr>
+<tr><td><a href="../../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/profiles/*/state.db</code></td><td>SQLite 数据库</td></tr>
+<tr><td><a href="../../registry/kilocode.html">Kilo Code</a></td><td><code>&lt;vscode-globalStorage&gt;/kilocode.kilo-code/tasks/*/api_conversation_history.json</code></td><td>JSON 文件，外加命令行版自己的 SQLite 库</td></tr>
+<tr><td><a href="../../registry/kimchi.html">Kimchi Coding</a></td><td><code>${XDG_CONFIG_HOME:-~/.config}/kimchi/harness/sessions/--&lt;encoded-cwd&gt;--/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/kiro.html">Kiro</a></td><td><code>~/.kiro/sessions/cli/*.jsonl</code> and <code>~/.kiro/sessions/*/sess_*/messages.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>SQLite 数据库</td></tr>
+<tr><td><a href="../../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code></td><td>JSON 文件</td></tr>
+<tr><td><a href="../../registry/senpi.html">Senpi</a></td><td><code>${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/copilot-chat.html">VS Code Copilot Chat</a></td><td><code>&lt;vscode-User&gt;/workspaceStorage/*/chatSessions/*.{json,jsonl}</code></td><td>JSON 或 JSONL</td></tr>
+<tr><td><a href="../../registry/zcode.html">ZCode</a></td><td><code>~/.zcode/projects/*/*.jsonl</code></td><td>JSONL，外加命令行版自己的 SQLite 库</td></tr>
+<tr><td><a href="../../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code></td><td>SQLite 数据库</td></tr>
+</tbody>
+</table>
+<p>每一行都链到<a href="../../registry/README.html">会话格式登记表</a>里对应的页面：记录的字段结构、角色怎么映射、有哪些环境变量可以改路径，以及 deja 没能核实的部分。每条记录都带着最后一次对着真实存储核对的日期。</p>
+
+<h2>自己读它们</h2>
+<p>多数是 JSONL —— 一行一个 JSON 对象，会话进行时不断追加：</p>
+<pre>ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs tail -5 | jq -r '.message.content'</pre>
+<p>有几个是数据库而不是文件。opencode 用 <code>opencode.db</code>，Hermes 每个 profile 一个 <code>state.db</code>，Zed 把所有会话放进一个 SQLite 库、并把每条正文压成 zstd 帧——所以光用 <code>sqlite3</code> 看到的是一堆二进制，要读正文还需要 <code>zstd</code>。Cursor 最别扭：旧版本把内容塞进 <code>state.vscdb</code> 的键值里，命令行版写的才是 JSONL。</p>
+<p>两点实用提醒。路径是会变的：Claude Code 认 <code>CLAUDE_CONFIG_DIR</code>，Codex 认 <code>CODEX_HOME</code>，Kimi 认 <code>KIMI_CODE_HOME</code>，Goose 和 opencode 跟随 <code>XDG_DATA_HOME</code>。另外，这些文件里有什么，取决于当时会话里有什么——包括粘贴进去或打印出来的密钥，所以请把它们当日志对待。</p>
+
+<h2>然后能拿它们做什么</h2>
+<p>读一个文件回答的是「那次会话我做了什么」。真正常问的是另一个问题——「是哪一次会话」——而这需要一份跨越全部存储的索引。<a href="https://github.com/vshulcz/deja-vu">deja</a> 建的就是这个：在本机为上面每一个存储建一份索引，命令行能查，智能体也能通过 MCP 自己查。</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "connection pool exhausted"</pre>
+<p>没有需要提前打开的记录开关：文件本来就在那里，包括你装任何东西之前的那几个月。<a href="getting-started.html">索引和检索都在本地</a>，凭据在建索引时就被脱敏。</p>
+
+<p><a href="../../registry/README.html">完整登记表</a> · <a href="forgetting.html">为什么会忘事</a> · <a href="getting-started.html">快速开始</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

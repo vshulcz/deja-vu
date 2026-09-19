@@ -94,3 +94,4 @@ https://vshulcz.github.io/deja-vu/registry/kimchi.html
 https://vshulcz.github.io/deja-vu/registry/senpi.html
 https://vshulcz.github.io/deja-vu/registry/zcode.html
 https://vshulcz.github.io/deja-vu/registry/gjc.html
+https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html
