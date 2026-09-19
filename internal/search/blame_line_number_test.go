@@ -20,7 +20,7 @@ func TestCutLineSuffixKeepsTheLine(t *testing.T) {
 		{"C:/work/pool.go", "C:/work/pool.go", 0},
 		{"weird:name.go", "weird:name.go", 0},
 	} {
-		path, line := cutLineSuffix(tc.in)
+		path, line, _ := cutLineSuffix(tc.in)
 		if path != tc.path || line != tc.line {
 			t.Errorf("cutLineSuffix(%q) = %q, %d; want %q, %d", tc.in, path, line, tc.path, tc.line)
 		}

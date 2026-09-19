@@ -312,6 +312,20 @@ func shortSHA(s string) string {
 // is not there, when the file is not in a repository, or when the line is
 // uncommitted — none of those is a fact about the store.
 func lineBlame(w io.Writer, dir string, target search.BlameTarget, hits []search.BlameHit) {
+	// A line was asked for in a form that is not a line. Said before the file
+	// answer, which otherwise prints as if nothing had been asked and reads as
+	// "this file has no history" rather than "your `:0` went nowhere" (#3738).
+	if target.Line == 0 && target.LineSpec != "" {
+		// The spec is part of the name when the trim would not take it as a
+		// line — `a.txt:abc` is a path as far as everything else here is
+		// concerned — and appending it again printed `a.txt:abc:abc`.
+		head := target.Base
+		if !strings.HasSuffix(head, ":"+target.LineSpec) {
+			head += ":" + target.LineSpec
+		}
+		fmt.Fprintf(w, "%s — %q is not a line number, so this is about the whole file\n\n", head, target.LineSpec)
+		return
+	}
 	c, why := gitLineCommit(target.FullPath, target.Line)
 	if why != "" {
 		fmt.Fprintf(w, "%s:%d — %s\n\n", target.Base, target.Line, why)

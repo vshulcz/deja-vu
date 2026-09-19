@@ -2796,7 +2796,9 @@ func runBlame(dir string, args []string) error {
 	// commit replaced (#1181). Before the branches below, because a file no
 	// session mentions still has a commit behind the line — and "no session
 	// wrote this" is the answer, not silence.
-	if target.Line > 0 && !jsonOutput {
+	// A spec that is not a line gets the same first word: it went nowhere, and
+	// the answer below is about the file (#3738).
+	if (target.Line > 0 || target.LineSpec != "") && !jsonOutput {
 		lineBlame(os.Stdout, dir, target, hits)
 	}
 	if jsonOutput {

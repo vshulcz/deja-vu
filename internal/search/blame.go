@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -28,6 +29,13 @@ type BlameTarget struct {
 	// it is what the line-level answer needs to turn a line into the commit
 	// that wrote it (#1181).
 	Line int
+	// LineSpec is what came after the colon when it was meant as a line and
+	// could not be used: `:0`, a number past what fits in an int, `:abc`. The
+	// line answer says which silence it is when it cannot answer (#3726), and
+	// said nothing at all when the spec itself was the problem — the file
+	// answer printed as if no line had been asked for, so a typed mistake read
+	// as "this file has no history" (#3738).
+	LineSpec string
 }
 
 type BlameOptions struct {
@@ -107,7 +115,7 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if name == "" {
 		return BlameTarget{}, fmt.Errorf("path required")
 	}
-	name, line := cutLineSuffix(name)
+	name, line, spec := cutLineSuffix(name)
 	full, err := filepath.Abs(name)
 	if err != nil {
 		return BlameTarget{}, err
@@ -121,23 +129,42 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 	if stem == "" {
 		stem = base
 	}
-	return BlameTarget{FullPath: full, Base: base, Stem: stem, Line: line}, nil
+	return BlameTarget{FullPath: full, Base: base, Stem: stem, Line: line, LineSpec: spec}, nil
 }
 
 // cutLineSuffix is trimLineSuffix that keeps the number it cut: the first one,
 // so `file.go:120:14` reads as line 120 rather than column 14.
-func cutLineSuffix(name string) (string, int) {
+//
+// The third return is that number when it cannot be used — `:0`, or one past
+// what an int holds. The caller says so rather than answering about the file as
+// if nothing had been asked (#3738).
+func cutLineSuffix(name string) (string, int, string) {
 	trimmed := trimLineSuffix(name)
 	if trimmed == name {
-		return name, 0
+		return name, 0, unusableLineSpec(name)
 	}
 	rest := strings.TrimPrefix(name[len(trimmed):], ":")
 	head, _, _ := strings.Cut(rest, ":")
 	n, err := strconv.Atoi(head)
 	if err != nil || n <= 0 {
-		return trimmed, 0
+		return trimmed, 0, head
 	}
-	return trimmed, n
+	return trimmed, n, ""
+}
+
+// unusableLineSpec is what a reader put after a colon that the trim would not
+// take as a line: `:abc`, `:2.5`, `:-1`. Only when nothing of that name is on
+// disk — a file may legitimately carry a colon, and its own name is not a
+// mistake to report.
+func unusableLineSpec(name string) string {
+	head, tail, ok := lastColon(name)
+	if !ok || tail == "" || head == "" || allDigits(tail) {
+		return ""
+	}
+	if _, err := os.Stat(name); err == nil {
+		return ""
+	}
+	return tail
 }
 
 // Blame ranks every session that carries evidence for the file, in full. The
