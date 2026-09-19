@@ -4,6 +4,14 @@
 
 opencode stores sessions in `~/.local/share/opencode/opencode.db`. On Linux it honors `XDG_DATA_HOME`, producing `$XDG_DATA_HOME/opencode/opencode.db`; deja also accepts `DEJA_OPENCODE_DB`. The store is SQLite and deja reads it through the `sqlite3` command-line tool.
 
+Beside the database, opencode writes one file per session recording what that
+session changed: `storage/session_diff/ses_<id>.json`, a list of
+`{file, status, additions, deletions, patch}` with `patch` in unified-diff form.
+On one machine that is 1,002 files, and of 400 of those sessions only 17 held an
+edit record from the database — so for the rest it is the only account of what
+the session touched. deja reads it and folds the records into the session the
+database gives, by id; `DEJA_OPENCODE_DIFFS` overrides where it looks.
+
 ## Schema
 
 The parser joins three tables:
@@ -31,4 +39,4 @@ Only parts with `type: "text"` are messages. The role comes from `message.data.r
 - A missing database must not be passed to SQLite because the CLI would create it.
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-19

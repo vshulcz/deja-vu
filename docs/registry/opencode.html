@@ -39,6 +39,13 @@
 <h1>opencode session format</h1>
 <h2 id="store-and-files">Store and files</h2>
 <p>opencode stores sessions in <code>~/.local/share/opencode/opencode.db</code>. On Linux it honors <code>XDG_DATA_HOME</code>, producing <code>$XDG_DATA_HOME/opencode/opencode.db</code>; deja also accepts <code>DEJA_OPENCODE_DB</code>. The store is SQLite and deja reads it through the <code>sqlite3</code> command-line tool.</p>
+<p>Beside the database, opencode writes one file per session recording what that</p>
+<p>session changed: <code>storage/session_diff/ses_&lt;id&gt;.json</code>, a list of</p>
+<p><code>{file, status, additions, deletions, patch}</code> with <code>patch</code> in unified-diff form.</p>
+<p>On one machine that is 1,002 files, and of 400 of those sessions only 17 held an</p>
+<p>edit record from the database — so for the rest it is the only account of what</p>
+<p>the session touched. deja reads it and folds the records into the session the</p>
+<p>database gives, by id; <code>DEJA_OPENCODE_DIFFS</code> overrides where it looks.</p>
 <h2 id="schema">Schema</h2>
 <p>The parser joins three tables:</p>
 <pre><code class="language-sql">session(id, directory, time_created, time_updated)
@@ -56,7 +63,7 @@ part(id, message_id, data)</code></pre>
 <li>A missing database must not be passed to SQLite because the CLI would create it.</li>
 <li>The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-17</p>
+<p><strong>Last verified:</strong> 2026-09-19</p>
 
 <hr>
 <p>deja reads this format and thirty-two others, and turns what it finds into memory your

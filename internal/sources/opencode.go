@@ -44,6 +44,60 @@ func LoadOpencode() []model.Session {
 	// parse, so the pass says so and does not record the store as read.
 	ss, err := ParseOpencodeDBWhere(OpencodeDB(), "", 0)
 	diagFileError(OpencodeDB(), err)
+	// And the diff store beside it, which is the only record of what most of
+	// those sessions changed (#3791). A full pass goes through Load rather
+	// than through the file kinds, so registering the kind alone left this
+	// store unread on every rebuild — which is how this was found.
+	return withOpencodeDiffs(ss)
+}
+
+// withOpencodeDiffs folds each session's diff records into the session the
+// database gave, by id.
+//
+// Not as sessions of their own: handing back a second session with the same id
+// goes down the collision path, which exists for two different conversations
+// that happen to share an id. It filed the pair under one project, dropped the
+// other's, and printed "1 session shares an id with another transcript" — a
+// line that would read one thousand on this machine. The diff is not another
+// conversation, it is the same one's account of what it changed.
+//
+// A diff whose session the database no longer holds stands on its own: opencode
+// prunes the database and leaves the diff, and what it says about a file is
+// still true.
+func withOpencodeDiffs(ss []model.Session) []model.Session {
+	files := OpencodeDiffFiles()
+	if len(files) == 0 {
+		return ss
+	}
+	at := map[string]int{}
+	for i, s := range ss {
+		at[s.ID] = i
+	}
+	for _, p := range files {
+		parsed, err := ParseOpencodeDiff(p)
+		if err != nil {
+			// One file's problem: a diff opencode is in the middle of writing
+			// must not cost the store its other sessions.
+			diagFileError(p, err)
+			continue
+		}
+		for _, d := range parsed {
+			i, ok := at[d.ID]
+			if !ok {
+				// A diff whose session the database no longer holds. It is not
+				// a session of its own: there is no conversation in it, no
+				// project and no title, so every screen that lists sessions
+				// would carry a blank row, and blame would answer a question
+				// about a line with a session nobody can read. The file stays
+				// on disk for whenever that id comes back.
+				continue
+			}
+			ss[i].Messages = append(ss[i].Messages, d.Messages...)
+			// The session keeps its own times; a diff is written at the end
+			// and would otherwise move the session's last-updated past what
+			// the conversation says.
+		}
+	}
 	return ss
 }
 

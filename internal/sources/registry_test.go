@@ -195,6 +195,13 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 	case "continue":
 		sessions, err = ParseContinueFile(path)
 	case "opencode":
+		// Two stores under one harness: the database, and the per-session diff
+		// files beside it (#3791). The fixture's own name says which it is,
+		// the way the reader does.
+		if strings.HasSuffix(filepath.Base(path), ".json") {
+			sessions, err = ParseOpencodeDiff(path)
+			break
+		}
 		if !SQLite3Available() {
 			t.Skip("sqlite3 not installed")
 		}

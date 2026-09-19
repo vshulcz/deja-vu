@@ -109,13 +109,30 @@ func Registry() []Harness {
 			},
 		},
 		{
-			Name: "opencode", Load: LoadOpencode, Files: func() []string { return []string{OpencodeDB()} },
-			Kinds: []FileKind{{
-				Name:      "opencode",
-				Match:     func(p string) bool { return p == OpencodeDB() },
-				Parse:     dbParse(ParseOpencodeDB, ParseOpencodeDBSince),
-				ParseFrom: dbParseFrom(ParseOpencodeDB, ParseOpencodeDBSince),
-			}},
+			Name: "opencode", Load: LoadOpencode,
+			Files: func() []string {
+				return append([]string{OpencodeDB()}, OpencodeDiffFiles()...)
+			},
+			Kinds: []FileKind{
+				{
+					Name:      "opencode",
+					Match:     func(p string) bool { return p == OpencodeDB() },
+					Parse:     dbParse(ParseOpencodeDB, ParseOpencodeDBSince),
+					ParseFrom: dbParseFrom(ParseOpencodeDB, ParseOpencodeDBSince),
+				},
+				{
+					// The per-session diff store beside the database: for most
+					// sessions it is the only record of what they changed
+					// (#3791). Keyed on the same session ids, so what it holds
+					// merges into the session the database gave.
+					Name: "opencode-diff",
+					Match: func(p string) bool {
+						return strings.HasPrefix(p, OpencodeDiffDir()+string(filepath.Separator)) &&
+							strings.HasSuffix(p, ".json")
+					},
+					Parse: fullParse(ParseOpencodeDiff),
+				},
+			},
 		},
 		{
 			Name: "aider", Load: LoadAider, Files: AiderFiles,
