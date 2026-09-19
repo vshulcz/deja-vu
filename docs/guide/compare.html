@@ -153,7 +153,7 @@
 <tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>your DB</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
-<tr><td>Benchmark, harness in repo</td><td class="us">85.3% hit@1 LME-S · <a href="benchmarks.html">measured</a> · <a href="day-zero.html">day zero vs four tools</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Benchmark, harness in repo</td><td class="us">85.3% hit@1 LME-S (470q cleaned) · <a href="benchmarks.html">measured</a> · <a href="day-zero.html">day zero vs four tools</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Install</td><td class="us">one binary</td><td>pip + keys</td><td>docker</td><td>pip / server</td><td>pip</td><td>npm + Claude</td><td>installer + deps</td></tr>
 <tr><td>License</td><td class="us">MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
 </table>
@@ -176,7 +176,7 @@
 <tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td class="y">no — ships a local model (~300&nbsp;MB)</td><td>yes</td><td>yes</td><td>yes</td></tr>
 <tr><td>Background process</td><td class="us y">none</td><td>none; a vector store backend (ChromaDB by default)</td><td>Postgres + pgvector, or Neo4j</td><td>Neo4j, FalkorDB or Neptune</td><td>Docker service, or embedded</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>semantic, optional keyword and recency boosts, optional LLM rerank</td><td>graph + vector, strategy picked for you</td><td>embeddings + BM25 + graph traversal</td><td>hybrid sparse/dense over memory banks</td></tr>
-<tr><td>Published retrieval numbers</td><td class="us">85.3% hit@1 / 95.5% hit@5 LME-S, <a href="benchmarks.html">harness in repo</a></td><td>96.6% R@5 LongMemEval (500q, no LLM); 88.9% R@10 LoCoMo</td><td>0.79 on BEAM at 100k tokens</td><td>none in README; a Zep paper reports separately</td><td class="n">—</td></tr>
+<tr><td>Published retrieval numbers</td><td class="us">85.3% hit@1 / 95.5% hit@5 LME-S on the 470-question cleaned set, 84.8% hit@1 on all 500, <a href="benchmarks.html">harness in repo</a></td><td>96.6% R@5 LongMemEval (500q, no LLM); 88.9% R@10 LoCoMo</td><td>0.79 on BEAM at 100k tokens</td><td>none in README; a Zep paper reports separately</td><td class="n">—</td></tr>
 <tr><td>Install</td><td class="us">one binary</td><td><code>uv tool install</code></td><td><code>uv pip install</code> + a database</td><td>pip + a graph database</td><td>docker</td></tr>
 <tr><td>License</td><td class="us">MIT</td><td>MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td></tr>
 </table>

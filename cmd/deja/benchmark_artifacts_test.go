@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -69,6 +70,7 @@ func TestBenchmarkPageMatchesTheCommittedRuns(t *testing.T) {
 	}
 
 	lme := read("longmemeval-s-cleaned.json")
+	full := read("longmemeval-s-full.json")
 	locomo := read("locomo.json")
 
 	// One decimal is how the page writes a percentage, and three how it writes
@@ -81,6 +83,9 @@ func TestBenchmarkPageMatchesTheCommittedRuns(t *testing.T) {
 		{"LongMemEval hit@1", "hit@1 " + pct1(lme.Total.Hit1)},
 		{"LongMemEval hit@5", "hit@5 " + pct1(lme.Total.Hit5)},
 		{"LongMemEval MRR", "MRR " + mrr3(lme.Total.MRR)},
+		{"the full-set questions", fmt.Sprintf("(%d questions, abstention included)", full.Total.N)},
+		{"the full-set hit@1", "hit@1 " + pct1(full.Total.Hit1)},
+		{"the full-set MRR", "MRR " + mrr3(full.Total.MRR)},
 		{"LoCoMo questions", fmt.Sprintf("%s questions", withThousands(locomo.Total.N))},
 		{"LoCoMo hit@1", "hit@1 " + pct1(locomo.Total.Hit1)},
 		{"LoCoMo hit@5", "hit@5 " + pct1(locomo.Total.Hit5)},
@@ -122,6 +127,141 @@ func TestBenchmarkPageMatchesTheCommittedRuns(t *testing.T) {
 			t.Errorf("benchmarks.html does not state evidence recall %s as recorded: %q", want.at, want.text)
 		}
 	}
+}
+
+// The headline figure is quoted in six other places, and only the guide page
+// was pinned to the run. Nothing said which run: the committed record is the
+// 470-question cleaned set, `-skip-abs`, and a re-run without that flag returns
+// 84.8% — which reads as drift in every one of these files and cost an hour of
+// chasing a number that had not moved. The guide page states both denominators;
+// the short quotes state one, so they have to state the one the record holds.
+func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
+	root := filepath.Join("..", "..")
+	b, err := os.ReadFile(filepath.Join(root, "docs", "benchmarks", "longmemeval-s-cleaned.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lme benchArtifact
+	if err := json.Unmarshal(b, &lme); err != nil {
+		t.Fatal(err)
+	}
+	locomoRaw, err := os.ReadFile(filepath.Join(root, "docs", "benchmarks", "locomo.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var locomo benchArtifact
+	if err := json.Unmarshal(locomoRaw, &locomo); err != nil {
+		t.Fatal(err)
+	}
+
+	fullRaw, err := os.ReadFile(filepath.Join(root, "docs", "benchmarks", "longmemeval-s-full.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var full benchArtifact
+	if err := json.Unmarshal(fullRaw, &full); err != nil {
+		t.Fatal(err)
+	}
+
+	pct1 := func(v float64) string { return fmt.Sprintf("%.1f", v) }
+	wantHit1 := pct1(lme.Total.Hit1)
+	wantFull := pct1(full.Total.Hit1)
+	wantLoCoMo := pct1(locomo.Total.Hit1)
+
+	// In these files hit@1 is only ever ours — the comparison table quotes the
+	// neighbours' own metrics under their own names (R@5, BEAM) and never a
+	// hit@1. If that changes, this check needs the cell, not the file.
+	quoted := regexp.MustCompile(`([0-9]+\.[0-9])%\s*hit@1`)
+	for _, name := range []string{
+		"README.md",
+		"README.zh.md",
+		"npm/README.md",
+		"docs/llms.txt",
+		"docs/guide/compare.html",
+	} {
+		raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		text := string(raw)
+		// By offset, not by the matched text: two quotes in one file can read
+		// the same and belong to different runs, and searching for the string
+		// finds the first one every time.
+		found := quoted.FindAllStringSubmatchIndex(text, -1)
+		if len(found) == 0 {
+			t.Errorf("%s no longer quotes hit@1; if that is on purpose, take it out of this list", name)
+		}
+		for _, m := range found {
+			whole, got := text[m[0]:m[1]], text[m[2]:m[3]]
+			// A quote that names the full set is about the other run. The
+			// comparison table does that on purpose, because the neighbour's
+			// cell states its own 500-question denominator and a row where
+			// only one side says what it counted is not a comparison.
+			want := wantHit1
+			if namesTheFullSet(text, m[0], m[1], full.Total.N) {
+				want = wantFull
+			}
+			if got != want {
+				t.Errorf("%s says %q; the run it names scored %s%%", name, whole, want)
+			}
+		}
+		// Both READMEs put the LoCoMo figure next to it, in a sentence that
+		// names no metric.
+		if strings.Contains(text, "LoCoMo") && strings.Contains(name, "README") {
+			if !strings.Contains(text, wantLoCoMo+"%") {
+				t.Errorf("%s does not carry the LoCoMo run's %s%%", name, wantLoCoMo)
+			}
+		}
+	}
+
+	// The landing page animates the figure, so it lives in an attribute no
+	// text search reaches. The label under the counter is what identifies it.
+	index, err := os.ReadFile(filepath.Join(root, "docs", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ok := countedBefore(string(index), "hit@1 · LongMemEval-S")
+	if !ok {
+		t.Fatal("docs/index.html has no counter labelled hit@1 · LongMemEval-S")
+	}
+	if got != wantHit1 {
+		t.Errorf("the landing counter is %s; the committed run is %s", got, wantHit1)
+	}
+}
+
+// namesTheFullSet reports whether a quoted figure says, within the sentence
+// around it, that it counted every question rather than the cleaned set.
+func namesTheFullSet(text string, start, end, n int) bool {
+	// A narrow window on purpose: one cell states both runs, so a wide one
+	// reads the full set's denominator as the cleaned figure's too.
+	lo := start - 40
+	if lo < 0 {
+		lo = 0
+	}
+	hi := end + 40
+	if hi > len(text) {
+		hi = len(text)
+	}
+	return strings.Contains(text[lo:hi], fmt.Sprint(n))
+}
+
+// countedBefore returns the data-count value of the counter a label belongs to.
+func countedBefore(html, label string) (string, bool) {
+	at := strings.Index(html, label)
+	if at < 0 {
+		return "", false
+	}
+	const attr = `data-count="`
+	open := strings.LastIndex(html[:at], attr)
+	if open < 0 {
+		return "", false
+	}
+	rest := html[open+len(attr):]
+	end := strings.IndexByte(rest, '"')
+	if end < 0 {
+		return "", false
+	}
+	return rest[:end], true
 }
 
 // withThousands writes 1982 the way the page does.
