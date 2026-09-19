@@ -37,6 +37,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
 - [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
 - [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：三十三个智能体各自把会话写在磁盘的哪里，用什么格式
+- [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
 
 ## Per-harness setup
 

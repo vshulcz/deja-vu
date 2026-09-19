@@ -88,6 +88,7 @@
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</loc><lastmod>2026-09-15</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/kilocode.html</loc><lastmod>2026-09-16</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/cherrystudio.html</loc><lastmod>2026-09-16</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
@@ -98,4 +99,5 @@
   <url><loc>https://vshulcz.github.io/deja-vu/registry/zcode.html</loc><lastmod>2026-09-16</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/gjc.html</loc><lastmod>2026-09-16</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>

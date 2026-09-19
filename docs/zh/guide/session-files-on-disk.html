@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>怎么删 Claude Code 的会话文件 — deja-vu</title>
+<meta name="description" content="Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="怎么删 Claude Code 的会话文件">
+<meta property="og:description" content="Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="怎么删 Claude Code 的会话文件">
+<meta name="twitter:description" content="Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "怎么删 Claude Code 的会话文件", "description": "Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "会话文件怎么删", "item": "https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Claude Code 的会话文件在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.claude/projects 下，一个项目一个目录，一个会话一个 .jsonl 文件。目录名是把工作目录里的斜杠换成短横线，文件名就是会话 id。"}}, {"@type": "Question", "name": "会话文件能直接删吗？", "acceptedAnswer": {"@type": "Answer", "text": "能，删了智能体也不会坏。代价是：claude --resume 的列表就是读这些文件生成的，删掉的会话立刻从列表消失；而且没有归档，删掉就是删掉，重建不出来。"}}, {"@type": "Question", "name": "为什么以前的会话自己没了？", "acceptedAnswer": {"@type": "Answer", "text": "Claude Code 默认只保留 30 天，到期自己清理，设置项是 ~/.claude/settings.json 里的 cleanupPeriodDays，清理时不会有任何提示。想留就把这个数字改大。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="session-files-on-disk.html" aria-current="page">会话文件怎么删</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
+<a href="../../guide/delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>怎么删 Claude Code 的会话文件，以及会失去什么</h1>
+<p class="pagelede">它们就是 <code>~/.claude/projects</code> 下的文件：<code>rm</code> 就是全部操作，而 <code>cleanupPeriodDays</code> 会定时替你删<span class="mins" data-mins></span></p>
+
+<p>智能体跑的每一次会话，都会在进行时写到磁盘上。Claude Code 把 JSONL 放在 <code>~/.claude/projects</code>，一个项目一个目录、一个会话一个文件；Codex 写在 <code>~/.codex/sessions/**/rollout-*.jsonl</code>；Cursor 把聊天放进 SQLite 数据库。其余工具见<a href="where-sessions-are-stored.html">历史文件在哪里</a>。</p>
+<p>在它们变大之前，没有人会告诉你这些文件存在——下面那台笔记本上是 875 个文件、1.6 GB，其中单个文件有 586 MB。</p>
+
+<h2>怎么删</h2>
+<p>没有专门的命令：会话就是文件，删掉文件就是全部操作。目录名是把工作目录的斜杠换成短横线，文件名就是会话 id。</p>
+<pre># 先看看有什么，最新的在前
+ls -t ~/.claude/projects/-Users-you-project/*.jsonl
+
+# 删一个会话
+rm ~/.claude/projects/-Users-you-project/&lt;session-id&gt;.jsonl
+
+# 删一个项目的全部会话
+rm -rf ~/.claude/projects/-Users-you-project
+
+# 全删
+rm -rf ~/.claude/projects/*
+
+# 或者交给 Claude Code 自己定时删：超过 N 天的会话自动消失
+# ~/.claude/settings.json
+{ "cleanupPeriodDays": 7 }</pre>
+<p>三件事和多数人的预期不一样。删掉的会话会立刻从 <code>claude --resume</code> 的列表里消失——那个列表就是读这些文件生成的。你的提问历史是另一个文件 <code>~/.claude/history.jsonl</code>，不删它就还在。而且没有归档：<code>--resume</code> 里不见了的会话，是被 <code>cleanupPeriodDays</code> 清掉的，文件是删了，不是存到别处了。</p>
+
+<h2>它们到底能长到多大</h2>
+<p>一位开发者的 <code>~/.claude/projects</code>：十三个项目，两个月的高强度日常使用。</p>
+<table>
+<tr><th>指标</th><th>数值</th></tr>
+<tr><td>会话文件数</td><td>875</td></tr>
+<tr><td>总大小</td><td>1.6 GB</td></tr>
+<tr><td>中位大小</td><td>304 KB</td></tr>
+<tr><td>90 分位</td><td>644 KB</td></tr>
+<tr><td>最大的单个文件</td><td>586 MB</td></tr>
+</table>
+<p>有意思的是分布：一次普通会话大约三分之一兆，而少数几个失控的会话占掉了大部分空间。决定体积的是工具输出，不是你打了多少字——cat 过大文件、或者跑过一个啰嗦构建的会话，比一次纯粹讨论设计的会话大几个数量级。</p>
+<p>查你自己的：</p>
+<pre>du -sh ~/.claude/projects
+find ~/.claude/projects -name '*.jsonl' -size +50M</pre>
+
+<h2>文件里面是什么</h2>
+<p>Claude Code 的会话文件是 JSON Lines：一行一个 JSON 对象，会话进行时不断追加。每条记录带着角色、时间戳、会话 id 和内容——你的提问、助手的回复，或者一次工具调用及其结果。Codex、Copilot CLI 和 Antigravity 用的是同样的一行一条结构、不同的字段名；Cursor、Zed、Goose 和 Hermes 用的是 SQLite。<a href="../../registry/README.html">格式登记表</a>逐字段记录了每一种。</p>
+<p>两个值得知道的后果。它是纯文本，所以 <code>grep</code> 能用，你自己写的工具也能用。以及它是原样记录：终端里滚过去的东西都在里面，包括命令打印出来的任何内容——请把这个目录当成你的 shell 历史来对待。</p>
+
+<h2>Claude Code 会替你删</h2>
+<p>默认情况下，Claude Code 只保留 <b>30 天</b>，之后自行删除——设置项是 <code>~/.claude/settings.json</code> 里的 <code>cleanupPeriodDays</code>。清理时不会有任何提示；人们通常是在 <code>--resume</code> 里找不到六月那次会话时才发现。想让文件留下来，就在这个月过去之前把数字调大：</p>
+<pre>{ "cleanupPeriodDays": 3650 }</pre>
+<p>deja 索引过的内容会留下：被清理掉的记录仍然可以搜到，因为索引不跟着某一个文件一起消失——只有 <code>deja forget</code> 会有意地把一个会话丢掉。但文件本身确实没了，<code>--resume</code> 也跟着没了。</p>
+<p>这个清理是 Claude Code 自己做的，不是 cron，而且在客户端无法确定保留期时会暂停——这就是为什么上面那台按默认设置的机器上，仍然留着 69 个超过 31 天的文件。别把这当成安全：文档写的行为是 30 天后删除，清理真正跑起来的那天，六月那次会话就没了。</p>
+
+<h2>自己删可以吗</h2>
+<p>可以，智能体不会因此出问题。你失去的是：</p>
+<ul>
+<li><b>恢复会话。</b><code>claude --resume</code> 的列表就是读这些文件来的，删一个就少一个。</li>
+<li><b>以后对历史的任何检索。</b>凡是回答「这个问题我以前遇到过吗」的东西，读的都是这些文件。删掉的记录无法恢复，也无法重新推导出来——智能体不会替你把它重建。</li>
+<li><b>你自己的审计记录。</b>它是智能体在你仓库里究竟跑过什么的唯一凭据，见<a href="../../guide/auditing-agents.html">审计智能体</a>。</li>
+</ul>
+<p>如果只是想腾空间，请精准地删，而不是清空整个目录：</p>
+<pre># 那几个异常大的文件，通常腾出的空间就够了
+find ~/.claude/projects -name '*.jsonl' -size +100M -ls
+
+# 一个你再也不会打开的项目
+rm -rf ~/.claude/projects/-Users-you-old-project</pre>
+<p>按时间删是最诱人也最该避免的做法：越老的会话恰恰是你已经不记得的那些，按每字节的价值算，它们最值钱。</p>
+
+<h2>让它们有用，而不只是占地方</h2>
+<p>这些文件已经是你解决过的每一个问题的完整记录，缺的只是一个入口——从 875 个文件里找出该打开的那 300 KB，没人会手动做这件事。</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> 在本地为这些记录建一份索引——这台机器上的每一个智能体，包括它装上之前的会话——然后以毫秒级从里面作答。几个 GB 的记录大约十秒建完。没有任何内容被上传，凭据在建索引时就被脱敏。在上面那台机器上，1.6 GB 的记录对应 204 MB 的索引。</p>
+
+<p><a href="does-my-agent-remember.html">智能体记得之前的对话吗</a> · <a href="where-sessions-are-stored.html">历史文件在哪里</a> · <a href="getting-started.html">快速开始</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，全部在本地运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

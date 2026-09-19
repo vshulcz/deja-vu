@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete Gemini CLI chat history — deja-vu</title>
+<meta name="description" content="Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete Gemini CLI chat history">
+<meta property="og:description" content="Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Delete Gemini CLI chat history">
+<meta name="twitter:description" content="Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Gemini CLI chat history", "description": "Where Gemini CLI keeps chats under ~/.gemini/tmp, how to map a project id back to a directory, what to delete and what the prompt log keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Gemini CLI chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Gemini CLI store chat history?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.gemini/tmp/<project-id>/chats/, as .json or .jsonl files — one per chat, with a sub-agent's run nested one directory deeper. GEMINI_CLI_HOME moves the whole tree."}}, {"@type": "Question", "name": "Which directory belongs to which project?", "acceptedAnswer": {"@type": "Answer", "text": "The directory name is a project id, not a path. ~/.gemini/projects.json maps ids back to directories, and a .project_root file inside the id directory names it as well."}}, {"@type": "Question", "name": "Does deleting a chat delete the prompt log?", "acceptedAnswer": {"@type": "Answer", "text": "No. logs.json sits beside the chats in the same id directory and keeps what you typed; it survives deleting the chats and has to be removed separately."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="delete-gemini-cli-history.html" aria-current="page">Delete Gemini CLI chat history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold"><summary>Per-agent guides <span class="n">25</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Where Gemini CLI keeps chat history, and how to delete it</h1>
+<p class="pagelede">under <code>~/.gemini/tmp</code>, in a directory named after a project id rather than a path<span class="mins" data-mins></span></p>
+
+<p>Gemini CLI writes each chat to disk as it happens, in a tree whose directory names are project ids. That is the part that makes it hard to clean up by hand: the path tells you nothing about which repository it came from, and the prompt log lives beside the chats rather than inside them.</p>
+
+<h2>Where the chats are</h2>
+<pre>~/.gemini/tmp/&lt;project-id&gt;/chats/*.json        # one file per chat
+~/.gemini/tmp/&lt;project-id&gt;/chats/&lt;parent&gt;/*.jsonl  # a sub-agent's run, one level deeper
+~/.gemini/tmp/&lt;project-id&gt;/logs.json           # what you typed, kept separately
+~/.gemini/tmp/&lt;project-id&gt;/logs/               # the rest of that session's own bookkeeping</pre>
+<p><code>GEMINI_CLI_HOME</code> moves the whole tree. Both chat shapes exist on purpose: older builds write a single JSON document per chat, newer ones append JSONL, and a machine can hold both.</p>
+
+<h2>Which directory is which project</h2>
+<p>The id is not a path, and two mappings answer it. <code>~/.gemini/projects.json</code> holds the reverse mapping; inside each id directory, a <code>.project_root</code> file names the directory the chats came from. Either is enough:</p>
+<pre># from the registry Gemini keeps
+python3 -c 'import json;print(json.load(open("'"$HOME"'/.gemini/projects.json")))' 2>/dev/null
+
+# or from the marker beside the chats
+for d in ~/.gemini/tmp/*/; do
+  printf '%s  ' "$(basename "$d")"
+  cat "$d/.project_root" 2>/dev/null || echo "(no marker)"
+done</pre>
+<p>Without one of those, deleting by directory name is deleting something you cannot identify.</p>
+
+<h2>How to delete it</h2>
+<pre># one chat
+rm ~/.gemini/tmp/&lt;project-id&gt;/chats/&lt;file&gt;
+
+# every chat for one project, sub-agent runs included
+rm -rf ~/.gemini/tmp/&lt;project-id&gt;/chats
+
+# the prompt log for that project, which the line above does not touch
+rm ~/.gemini/tmp/&lt;project-id&gt;/logs.json
+
+# everything Gemini CLI has kept
+rm -rf ~/.gemini/tmp/*</pre>
+<p>Two traps. The tree also holds checkpoint files, which are not chats — a tool that walks it looking for sessions has to skip them, and so do you. And <code>~/.gemini/tmp</code> is where Antigravity keeps its own store on some installs, so a blanket <code>rm -rf ~/.gemini/tmp</code> can take a different agent's history with it; that is why deja reads the two apart rather than treating the directory as one store.</p>
+
+<h2>What you lose</h2>
+<p>The chats are the record of what was tried and what worked. Gemini CLI has no search across projects, so a decision from two months ago is reachable only while its chat file exists — and a sub-agent's run, nested one directory deeper, is often the only place a piece of work was described at all.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> indexes both Gemini chat shapes, the sub-agent runs and the other thirty-two agents on the machine into one local index — searchable from the shell, and readable by the agents themselves over MCP:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "gemini retry budget"</pre>
+<p>Nothing to switch on first: the files are already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good when you do want it gone.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-gemini.html">Memory for Gemini CLI</a> · <a href="../registry/gemini.html">The Gemini CLI format</a></p>
+</article>
+
+
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
