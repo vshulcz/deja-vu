@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete VS Code Copilot Chat history — deja-vu</title>
+<meta name="description" content="Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete VS Code Copilot Chat history">
+<meta property="og:description" content="Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Delete VS Code Copilot Chat history">
+<meta name="twitter:description" content="Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete VS Code Copilot Chat history", "description": "Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Copilot Chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does VS Code Copilot Chat store conversations?", "acceptedAnswer": {"@type": "Answer", "text": "Under the VS Code user directory, per workspace: workspaceStorage/<hash>/chatSessions/ holds one file per chat, and newer builds also write workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/*.jsonl. Chats from a window with no folder open live in globalStorage/emptyWindowChatSessions/."}}, {"@type": "Question", "name": "How do I delete one conversation rather than all of them?", "acceptedAnswer": {"@type": "Answer", "text": "From the Chat view: Show Chats, then delete the one you mean. On disk a conversation is one file, so removing that file with VS Code closed does the same thing — but removing the whole workspaceStorage/<hash> directory takes that workspace's other state with it."}}, {"@type": "Question", "name": "Why are there two folders of chats?", "acceptedAnswer": {"@type": "Answer", "text": "The extension changed where it writes. Older builds keep chatSessions; newer ones keep GitHub.copilot-chat/transcripts, and a machine that has been through an upgrade has both. On VS Code Server 1.137 there is no chatSessions directory at all."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="delete-copilot-chat-history.html" aria-current="page">Delete Copilot Chat history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold"><summary>Per-agent guides <span class="n">25</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete VS Code Copilot Chat history, and what you lose</h1>
+<p class="pagelede">two stores, one newer than the other, and a machine that has upgraded has both<span class="mins" data-mins></span></p>
+
+<p>Copilot Chat keeps your conversations per workspace, inside VS Code's own user directory — and it has changed where it writes them. An older build keeps <code>chatSessions</code>; a newer one keeps <code>GitHub.copilot-chat/transcripts</code>; a machine that has been through that upgrade has both, with different chats in each. Which one you are looking at decides what deleting actually removes.</p>
+
+<h2>Where the chats are</h2>
+<p>The user directory is <code>~/Library/Application Support/Code/User</code> on macOS, <code>~/.config/Code/User</code> on Linux and <code>%APPDATA%\Code\User</code> on Windows — with <code>Code - Insiders</code> or <code>VSCodium</code> in place of <code>Code</code> for those builds. Under it:</p>
+<pre>&lt;User&gt;/workspaceStorage/&lt;hash&gt;/chatSessions/*.json          # one file per chat
+&lt;User&gt;/workspaceStorage/&lt;hash&gt;/GitHub.copilot-chat/transcripts/*.jsonl
+&lt;User&gt;/globalStorage/emptyWindowChatSessions/*.json          # a window with no folder open
+&lt;User&gt;/workspaceStorage/no-workspace/chatSessions/*.json</pre>
+<p>The <code>&lt;hash&gt;</code> is not a folder name, which is what makes this awkward to do by hand. The directory beside the chats says which project it belongs to:</p>
+<pre>for d in ~/Library/Application\ Support/Code/User/workspaceStorage/*/; do
+  printf '%s  ' "$(basename "$d")"
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("folder",""))' "$d/workspace.json" 2>/dev/null || echo
+done</pre>
+<p>Counts from one real machine, measured while the second store was being added to deja: 179 workspace directories, 28 of them holding <code>chatSessions</code>, and 5 holding transcripts. On VS Code Server 1.137 there was no <code>chatSessions</code> directory at all and 47 transcripts held eleven weeks of chats — so "my history is gone" after an upgrade is usually "my history moved".</p>
+
+<h2>How to delete it</h2>
+<p>Use the Chat view — <b>Show Chats</b>, then delete the one you mean. It is the only route that keeps the extension's own index of the list in step with what is on disk.</p>
+<p>If you want it gone from disk instead, close VS Code first, and be precise about the level you are removing:</p>
+<pre># one conversation
+rm ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions/&lt;id&gt;.json
+
+# every chat for one workspace, both stores
+rm -rf ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions \
+       ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/GitHub.copilot-chat
+
+# every chat everywhere
+rm -rf ~/Library/Application\ Support/Code/User/workspaceStorage/*/chatSessions \
+       ~/Library/Application\ Support/Code/User/workspaceStorage/*/GitHub.copilot-chat \
+       ~/Library/Application\ Support/Code/User/globalStorage/emptyWindowChatSessions</pre>
+<p>Do not delete <code>workspaceStorage/&lt;hash&gt;</code> itself unless you mean to: that directory also holds the workspace's editor state, extension data and whatever else was written for that project. There is no archive to restore any of it from — the <a href="../registry/copilot-chat.html">format registry</a> documents both stores field by field, including the <code>type</code>-discriminated event log the newer one uses.</p>
+
+<h2>What you lose</h2>
+<p>More than the conversation. The transcripts record what the agent did as well as what it said, and a transcript with no user turn at all is an agent run — 11 of those 47 on the machine above, and the only record that the work happened. Deleting the chat is deleting the answer to "why is this file like this" for every file that run touched.</p>
+<p>The other cost is search. Copilot Chat has no search across workspaces; the list is per project, and a question you worked out in March is answerable only while March still exists somewhere.</p>
+
+<h2>Keeping it searchable instead</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Copilot Chat stores — and the other thirty-two agents' histories on the same machine — into one local index you can search from the shell, and that the agents can search themselves over MCP:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja "copilot chat refactor of the retry loop"</pre>
+<p>Nothing to switch on first: the files are already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index for good when you do want it gone.</p>
+
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="recover-a-deleted-session.html">Recovering a deleted session</a> · <a href="../registry/copilot-chat.html">The Copilot Chat format</a></p>
+</article>
+
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
