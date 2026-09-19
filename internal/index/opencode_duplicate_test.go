@@ -131,7 +131,7 @@ update session set time_updated=1785166787000 where id='s1';`
 	if err := Ensure(dir, "", false, &said); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(said.String(), "incremental index") {
+	if !strings.Contains(said.String(), replacementPassMarker) {
 		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said.String())
 	}
 	s, ok, err := FindByIdentity(dir, "opencode", "s1")

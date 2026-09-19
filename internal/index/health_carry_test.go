@@ -329,7 +329,7 @@ func TestAClipSurvivesAPassOverAnotherFile(t *testing.T) {
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if said := out.String(); !strings.Contains(said, "incremental index") {
+	if said := out.String(); !strings.Contains(said, replacementPassMarker) {
 		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
 	}
 	if got := clippedFor(t, dir, "claude"); got != 1 {
@@ -350,7 +350,7 @@ func TestAClipSurvivesAPassOverAnotherFile(t *testing.T) {
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if said := out.String(); !strings.Contains(said, "incremental index") {
+	if said := out.String(); !strings.Contains(said, replacementPassMarker) {
 		t.Fatalf("the re-read did not take the merge path: %q", said)
 	}
 	if got := clippedFor(t, dir, "claude"); got != 1 {

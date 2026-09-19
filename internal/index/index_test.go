@@ -560,7 +560,7 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if err := Ensure(idx, "claude", false, &log); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(log.String(), "incremental index") {
+	if !strings.Contains(log.String(), replacementPassMarker) {
 		t.Fatalf("want non-append incremental log, got %q", log.String())
 	}
 	if got, ok, err := FindByPrefix(idx, "s1"); err != nil || !ok || len(got.Messages) != 1 {

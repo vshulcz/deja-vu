@@ -2538,6 +2538,12 @@ func isGooseStore(path string) bool {
 	return strings.EqualFold(filepath.Base(path), "sessions.db")
 }
 
+// replacementPassMarker opens the line the replacement-grade pass prints, and
+// is what the tests that care which path ran match on. They used to match
+// "incremental index", which is why that phrase survived in a line a user
+// reads: an assertion on prose keeps the prose from being fixed.
+const replacementPassMarker = "re-reading"
+
 // pluralS keeps "1 sessions" off the first line anyone sees from deja (#737).
 func pluralS(n int) string {
 	if n == 1 {
@@ -3434,7 +3440,19 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	}
 	sayKept()
 	if progress != nil {
-		fmt.Fprintf(progress, "deja: incremental index changed_files=%d removed_files=%d sessions=%d\n", len(changed), len(removed), len(replacements))
+		// A sentence, like every other line this prints. It used to read
+		// "incremental index changed_files=306 removed_files=0 sessions=1789",
+		// which is a log line for whoever wrote it, on a path every user hits:
+		// the first `deja blame` or search after a day of work prints it above
+		// the answer. Zero counts are left out rather than shown as zero.
+		line := fmt.Sprintf("deja: %s %d changed transcript%s", replacementPassMarker, len(changed), pluralS(len(changed)))
+		if len(replacements) > 0 {
+			line += fmt.Sprintf(", %d session%s replaced", len(replacements), pluralS(len(replacements)))
+		}
+		if len(removed) > 0 {
+			line += fmt.Sprintf(", %d gone", len(removed))
+		}
+		fmt.Fprintln(progress, line)
 	}
 	tmp := dir + ".tmp"
 	os.RemoveAll(tmp)

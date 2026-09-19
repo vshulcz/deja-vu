@@ -72,7 +72,7 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if said := out.String(); !strings.Contains(said, "incremental index") {
+	if said := out.String(); !strings.Contains(said, replacementPassMarker) {
 		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
 	}
 	m, err := readManifest(dir)
@@ -186,7 +186,7 @@ func TestAGooseSessionKeepsItsEarlierTurns(t *testing.T) {
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if said := out.String(); !strings.Contains(said, "incremental index") {
+	if said := out.String(); !strings.Contains(said, replacementPassMarker) {
 		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
 	}
 	s, ok, err := FindByIdentity(dir, "goose", "g1")
