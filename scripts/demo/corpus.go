@@ -92,6 +92,7 @@ var sessions = []session{
 func main() {
 	out := flag.String("out", "", "directory to write the fake home into")
 	fill := flag.Int("fill", 380, "background sessions, so the demo shows a believable amount of history")
+	blame := flag.Bool("blame", false, "also write the git repository and the session the line-level blame demo needs")
 	flag.Parse()
 	if *out == "" {
 		fmt.Fprintln(os.Stderr, "corpus: -out is required")
@@ -104,6 +105,16 @@ func main() {
 	all := append(background(*fill), sessions...)
 	for _, s := range all {
 		if err := write(*out, s, now); err != nil {
+			fmt.Fprintln(os.Stderr, "corpus:", err)
+			os.Exit(1)
+		}
+	}
+	if *blame {
+		if err := writeBlameStand(*out, now); err != nil {
+			fmt.Fprintln(os.Stderr, "corpus:", err)
+			os.Exit(1)
+		}
+		if err := blameManifest(*out); err != nil {
 			fmt.Fprintln(os.Stderr, "corpus:", err)
 			os.Exit(1)
 		}
