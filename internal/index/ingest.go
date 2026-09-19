@@ -2527,7 +2527,31 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 			return newIsDB, false
 		}
 	}
+	// opencode writes a per-session diff file beside its database and both
+	// carry the same session id — one conversation in two stores, the same
+	// shape as the goose migration above. The database row owns the session;
+	// the diff is that session's account of what it changed, and the messages
+	// merge either way. Reporting the pair told a reader with 84 such diffs
+	// that 84 of their sessions were clashing, which is a data problem they do
+	// not have (#3791).
+	if s.Harness == "opencode" {
+		if newIsDiff, heldIsDiff := isOpencodeDiff(s.Path), isOpencodeDiff(held.Path); newIsDiff != heldIsDiff {
+			return !newIsDiff, false
+		}
+	}
 	return s.Path < held.Path, true
+}
+
+// isOpencodeDiff reports whether a path is one of opencode's per-session diff
+// files rather than its database. Named, not compared against
+// sources.OpencodeDiffDir(), for the reason isGooseStore gives: the row deja
+// already holds was written by an earlier pass that may have read a
+// differently configured root.
+func isOpencodeDiff(path string) bool {
+	if !strings.EqualFold(filepath.Ext(path), ".json") {
+		return false
+	}
+	return filepath.Base(filepath.Dir(path)) == "session_diff"
 }
 
 // isGooseStore reports whether a path is goose's database rather than one of
