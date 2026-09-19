@@ -153,6 +153,7 @@ func TestLlmsTxtCountsTheAgentsItDescribes(t *testing.T) {
 func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 	root := filepath.Join("..", "..")
 	n := registryHarnessCount(t, root)
+	want := countWord(t, n)
 
 	claim := regexp.MustCompile(`(\d+)\s*(?:&nbsp;)?\s*(?:coding\s+)?(?:harnesses|harness|agents)\b`)
 	var files []string
@@ -193,8 +194,36 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 				t.Errorf("%s says %q; the registry has %d harnesses", name, strings.TrimSpace(m[0]), n)
 			}
 		}
+		// The same claim spelled out. Only seven documents are pinned by word
+		// above, and `docs/guide/where-sessions-are-stored.html` is not one of
+		// them: its lede said "twenty-five agents, one table" over a table of
+		// twenty-five rows while the registry held thirty-three, so the page
+		// whose whole purpose is completeness was missing eight stores and the
+		// suite was green. A relative count — "and twenty-seven more agents" —
+		// is a different sentence and is left alone.
+		for _, m := range spelled.FindAllStringSubmatch(string(b), -1) {
+			// "and twenty-seven more agents" counts from the ones already
+			// named, and "the other thirty-two" counts from all but the page's
+			// own harness. Both move with the total and neither equals it.
+			if strings.TrimSpace(m[3]) != "" {
+				continue
+			}
+			expect := want
+			if strings.TrimSpace(m[1]) != "" {
+				expect = countWord(t, n-1)
+			}
+			if !strings.EqualFold(m[2], expect) {
+				t.Errorf("%s spells %q; the registry has %d, so this should be %q", name, strings.TrimSpace(m[0]), n, expect)
+			}
+		}
 	}
 }
+
+// spelled matches a spelled-out count of agents. It captures a preceding
+// "other" and a following "more", because both make the number relative: one
+// counts every harness but this page's own, the other counts the ones not yet
+// named.
+var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents)\b`)
 
 // registryHarnessCount is how many harnesses deja reads, from the one file that
 // decides it. deja itself is in the registry as the reader, not as something it
