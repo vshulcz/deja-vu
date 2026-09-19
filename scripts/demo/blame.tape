@@ -3,6 +3,10 @@
 #   go run ./scripts/demo -out /tmp/demo-home -fill 60 -blame
 #   rm -rf /tmp/demo-home/.cache/deja
 #   vhs scripts/demo/blame.tape
+#   cp assets/blame.gif docs/assets/blame.gif
+#
+# The copy is not optional: the README reads from assets/ and the site is
+# served from docs/, so both hold the recording.
 #
 # One beat, because the whole point is a comparison the viewer makes in two
 # seconds: git names a commit and a person, and that is all git can do. deja
