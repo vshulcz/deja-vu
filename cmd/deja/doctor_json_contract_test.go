@@ -40,8 +40,7 @@ func TestDoctorJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		"ingest_health": true, "ingest_files": true, "deep": true,
 		// doctorStore
 		"name": true, "state": true, "paths": true, "files": true,
-		"indexed_sessions": true, "indexed_from_elsewhere": true,
-		"never_read": true,
+		"indexed_sessions": true, "indexed_from_elsewhere": true, "never_read": true,
 		"denied": true, "skipped": true, "partial": true, "unchecked": true,
 		// doctorComponent
 		"path": true, "stale_stores": true, "sessions_stamped_ahead": true,
