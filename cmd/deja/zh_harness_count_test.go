@@ -39,19 +39,37 @@ func TestChineseDocsCountTheHarnessesTheRegistryHas(t *testing.T) {
 	}
 
 	files := []string{"README.zh.md"}
-	err := filepath.WalkDir(filepath.Join(root, "docs", "zh"), func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() || filepath.Ext(path) != ".html" {
-			return err
-		}
-		rel, err := filepath.Rel(root, path)
+	// docs/zh was the whole list, and the count went stale where the readers
+	// actually are: `extensions/dsh/docs/zh.md` said twenty-one agents, twelve
+	// releases out of date, on the third most visited page in the repository
+	// (145 unique readers in fourteen days, against 146 for README.zh.md). A
+	// Chinese page under extensions/ is a Chinese page.
+	for _, dir := range []string{filepath.Join(root, "docs", "zh"), filepath.Join(root, "extensions")} {
+		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			switch filepath.Ext(path) {
+			case ".html":
+			case ".md":
+				// Only the translated ones: an English README states the count
+				// in words and is checked by the test beside this one.
+				if !strings.Contains(filepath.Base(path), "zh") {
+					return nil
+				}
+			default:
+				return nil
+			}
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			files = append(files, filepath.ToSlash(rel))
+			return nil
+		})
 		if err != nil {
-			return err
+			t.Fatalf("%s: %v", dir, err)
 		}
-		files = append(files, filepath.ToSlash(rel))
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("docs/zh: %v", err)
 	}
 
 	claims := 0

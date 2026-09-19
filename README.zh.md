@@ -33,6 +33,13 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+连不上 `raw.githubusercontent.com` 时走 npm 镜像，版本是同一个：
+
+```sh
+npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com
+deja install --auto
+```
+
 安装十秒，建索引约十秒，然后就能用了。第二条命令会把 MCP 召回接到它找到的每一个智能体上，
 在支持的地方打开会话启动时的召回，并建好第一份索引，这样下一次会话不必再等。
 
