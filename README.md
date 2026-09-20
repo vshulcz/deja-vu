@@ -22,7 +22,7 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7%</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<b>85.3% hit@1</b> on LongMemEval-S &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
@@ -36,7 +36,8 @@ the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
+<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> so other developers can find it.</sub></p>
 
 ## Install
 
