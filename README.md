@@ -526,6 +526,14 @@ you installed this.
 the [parser registry](docs/ARCHITECTURE.md#source-parsers). Priorities and non-goals are in
 [ROADMAP.md](ROADMAP.md). Good first issues are labeled.
 
+## Support
+
+Bugs and questions go to [issues](https://github.com/vshulcz/deja-vu/issues).
+Anything you think is exploitable goes through the private advisory link in
+[SECURITY.md](SECURITY.md) instead. What deja reads, what it never sends
+anywhere, and how to exclude a project or forget a session is under
+[Privacy](#privacy).
+
 ## License
 
 MIT © [Vladislav Shulcz](https://github.com/vshulcz)
