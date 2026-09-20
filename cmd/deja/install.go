@@ -477,7 +477,15 @@ func installIndexWarmup(dir string, mcp, hooks, guidance int, summary bool) {
 	} else {
 		fmt.Fprintln(os.Stderr, "index: already built")
 	}
-	fmt.Fprintln(os.Stderr, "try: deja \"something you fixed weeks ago\"")
+	// A question from their own history, already run, beats the placeholder:
+	// the placeholder is the reader's problem to solve at the moment they are
+	// least able to (#575). The placeholder stays for a machine with too little
+	// history to build one from.
+	if p, ok := buildTryPrompt(dir); ok {
+		printTryPrompt(os.Stderr, p)
+	} else {
+		fmt.Fprintln(os.Stderr, "try: deja \"something you fixed weeks ago\"")
+	}
 	printInstallProof(dir)
 }
 
