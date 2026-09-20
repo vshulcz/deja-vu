@@ -161,7 +161,7 @@ func pageFor(id, display, h1 string) meta {
 	if id == "README" {
 		return meta{
 			Title:       "Where coding agents store their history — session format registry",
-			Description: "Where Claude Code, Codex, Cursor, opencode and twenty-nine more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
+			Description: "Where Claude Code, Codex, Cursor, opencode and thirty more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
 			Heading:     h1,
 			Slug:        "README",
 		}
