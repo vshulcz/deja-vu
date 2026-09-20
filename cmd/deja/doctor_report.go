@@ -484,7 +484,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 	aiderPaths := []string{sources.Home()}
 	aiderPaths = append(aiderPaths, filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS"))...)
 	cursorFiles := append(sources.CursorTranscripts(), sources.CursorDBs()...)
-	return []doctorStoreCheck{
+	checks := []doctorStoreCheck{
 		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles(), sources.ParseClaudeFile},
 		{"codex", sources.CodexRoots(), sources.CodexFiles(), parseDoctorCodex},
 		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), doctorProbeOpencode},
@@ -533,6 +533,17 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"zed", []string{sources.ZedDB()}, presentDoctorFile(sources.ZedDB()), doctorProbeZed},
 		{"deja", []string{sources.NotesFile()}, presentDoctorFile(sources.NotesFile()), sources.ParseNotesFile},
 	}
+	// A store DEJA_STORES silences has no row: it is not missing, not empty and
+	// not unreadable, and saying any of those about a store nobody asked deja to
+	// read is the noise this variable exists to remove.
+	out := make([]doctorStoreCheck, 0, len(checks))
+	for _, c := range checks {
+		if sources.StoreSilenced(c.name) {
+			continue
+		}
+		out = append(out, c)
+	}
+	return out
 }
 
 // doctorProbeKiro reads one Kiro transcript with the reader its path belongs

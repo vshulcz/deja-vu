@@ -110,35 +110,31 @@ probably missing and worth an issue.
 ## Isolating deja in your tests
 
 Your CI must not read the history of whoever runs it, and a test that indexes
-the developer's own store is slow and unrepeatable. Point the index and every
-store root somewhere empty:
+the developer's own store is slow and unrepeatable. Name the stores you want
+and nothing else is read:
 
 ```sh
 export DEJA_INDEX_DIR="$tmp/index.db"
-export DEJA_CLAUDE_ROOT="$tmp/claude"      # the store you are exercising
-# Every other store, pointed at nothing. The names live in the format
-# registry, which is published: 45 of them today, and the list grows with
-# every harness.
-for v in $(curl -fsSL https://vshulcz.github.io/deja-vu/registry/registry.json |
-             grep -o 'DEJA_[A-Z0-9_]*' | sort -u); do
-  export "$v=$tmp/empty"
-done
+export DEJA_STORES=claude                  # the store you are exercising
+export DEJA_CLAUDE_ROOT="$tmp/claude"      # your fixtures
 ```
 
-Two things that recipe does not cover, both found by running it:
+`DEJA_STORES` takes a comma-separated list of store names — the names `deja
+sources` prints, with `notes` for deja's own promoted notes. Every other store
+resolves to nothing: no path, no `1 path could not be read`, and no row in
+`deja doctor`. A name that is not a store is refused before the command runs,
+because a typo would otherwise silence everything and read as a machine with no
+history.
 
-- **`DEJA_NOTES_FILE`.** deja's own promoted notes are a store too, and it is
-  not in the registry because it is not a harness — so a loop over the registry
-  leaves it pointing at the developer's own notes. Set it as well.
-- The store you point at a directory that holds no database will be reported as
-  unreadable — `1 path could not be read` — which is noise rather than a
-  failure. Point the database-backed ones at a path inside your temporary
-  directory if you want silence.
+It is an environment variable rather than a flag because hooks and the MCP
+server are started by somebody else's process, and there is no command line of
+yours to put a flag on.
 
-`deja doctor --json` is the wrong source for the variable names, and it is the
-mistake to avoid: its `stores[].paths` are resolved paths, not the variables
-that set them. There is no single switch for "read nothing but what I name"
-yet, which is #3802.
+The recipe before this was a loop over the 45 `DEJA_*_ROOT`/`_DB` names
+in the published registry, and it leaked twice: the notes store is not in that
+registry, because it is not a harness, so the loop left it pointing at the
+developer's own notes — and `deja doctor --json` is no help either, since its
+`stores[].paths` are resolved paths rather than the variables behind them.
 
 `fixtures/registry/<harness>/` in this repository holds a small, publishable
 transcript for every format deja reads — take one rather than writing your own,

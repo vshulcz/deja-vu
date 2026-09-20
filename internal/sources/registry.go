@@ -75,10 +75,34 @@ func underRoot(p, root, ext string) bool {
 	return root != "" && strings.HasPrefix(p, root) && strings.HasSuffix(p, ext)
 }
 
-// Registry returns every harness in load order. Flattening the kinds preserves
-// the original path-match precedence (matches are on disjoint roots/basenames,
-// so order only needs to stay deterministic).
+// Registry returns the harnesses deja reads, in load order. Flattening the
+// kinds preserves the original path-match precedence (matches are on disjoint
+// roots/basenames, so order only needs to stay deterministic).
+//
+// DEJA_STORES narrows it; without that variable this is every harness deja
+// knows, which is what it has always been.
 func Registry() []Harness {
+	all := allHarnesses()
+	want, ok := storesSelection()
+	if !ok {
+		return all
+	}
+	out := make([]Harness, 0, len(want))
+	for _, h := range all {
+		if want[h.Name] {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
+// AllHarnesses is every harness deja knows how to read, whatever DEJA_STORES
+// says. The set `--harness` accepts, and the number the documentation counts:
+// silencing a store for one run does not make deja a tool that reads fewer
+// harnesses.
+func AllHarnesses() []Harness { return allHarnesses() }
+
+func allHarnesses() []Harness {
 	return []Harness{
 		{
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,
@@ -589,7 +613,7 @@ func Registry() []Harness {
 // It is the set `--harness` accepts — independent of what is installed, so a
 // known-but-empty harness stays valid and only a typo is rejected.
 func HarnessNames() []string {
-	reg := Registry()
+	reg := allHarnesses()
 	out := make([]string, 0, len(reg))
 	for _, h := range reg {
 		out = append(out, h.Name)
@@ -599,7 +623,7 @@ func HarnessNames() []string {
 
 // IsKnownHarness reports whether name is a harness deja can read.
 func IsKnownHarness(name string) bool {
-	for _, h := range Registry() {
+	for _, h := range allHarnesses() {
 		if h.Name == name {
 			return true
 		}
@@ -612,7 +636,7 @@ func IsKnownHarness(name string) bool {
 // person wants this one — the index run narrates per store, and looking a kind
 // up under the harness's own name found nothing (#2229).
 func HarnessForKind(kind string) string {
-	for _, h := range Registry() {
+	for _, h := range allHarnesses() {
 		if h.Name == kind {
 			return h.Name
 		}

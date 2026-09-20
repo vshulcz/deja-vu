@@ -322,6 +322,12 @@ func run(args []string) error {
 	if stop, err := homelessRefusal(name); stop {
 		return err
 	}
+	// A typo in DEJA_STORES silences every store rather than narrowing to one,
+	// and what follows reads like a machine with no history instead of like a
+	// mistake. Checked once, before any command runs.
+	if err := sources.StoresSelectionError(); err != nil {
+		return err
+	}
 	if len(args) == 0 {
 		// briefWanted, not logoWanted: a reader who turned colour off still
 		// has an index and a terminal, and the brief is what that reader came

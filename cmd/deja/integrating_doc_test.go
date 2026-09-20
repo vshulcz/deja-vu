@@ -37,10 +37,9 @@ func TestIntegratingNamesCommandsThatExist(t *testing.T) {
 		t.Fatalf("only %d commands were read out of the page; the scan is wrong", found)
 	}
 
-	// The count of store variables, which the page tells people to loop over.
-	// It moves with every harness, and the page is the one place that states it
-	// as a number.
-	count := regexp.MustCompile(`(\d+) of them today`).FindStringSubmatch(text)
+	// The count of store variables. It moves with every harness, and the page
+	// states it to say how much work DEJA_STORES replaces.
+	count := regexp.MustCompile("over the (\\d+) `DEJA_").FindStringSubmatch(text)
 	if count == nil {
 		t.Fatal("the page no longer says how many store variables there are; if that is on purpose, this check goes with it")
 	}

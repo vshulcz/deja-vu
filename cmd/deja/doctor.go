@@ -603,8 +603,27 @@ func noteBucketsRegrouped(dir string) int {
 	return moved
 }
 
+// storeLabels names stores the way the rows below do: the registry calls
+// deja's own notes "deja", and nothing a person reads does.
+func storeLabels(names []string) []string {
+	out := make([]string, 0, len(names))
+	for _, n := range names {
+		if n == "deja" {
+			n = "notes"
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
 func doctorHarnesses(w io.Writer, dir string) {
 	fmt.Fprintln(w, "Harness stores:")
+	// Say the selection out loud. Without this line a narrowed run looks like
+	// a machine that has thirty-four stores missing, and the variable is set by
+	// whoever started the process — not necessarily by whoever is reading.
+	if only, ok := sources.StoresSelected(); ok {
+		fmt.Fprintf(w, "  reading only %s (%s)\n", strings.Join(storeLabels(only), ", "), sources.StoresEnv)
+	}
 	sqlite := sources.SQLite3Available()
 
 	// Files are what deja found; sessions are what they became. The two differ
@@ -634,6 +653,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	}
 
 	printRow := func(name, path string, present bool, detail string) {
+		// A store DEJA_STORES silences has no row at all. The line above says
+		// which stores are being read; a row saying "missing" about one of the
+		// others would be answering a question nobody asked.
+		if sources.StoreSilenced(name) {
+			return
+		}
 		status := "missing"
 		// A store the reader excluded says so whether or not it is on disk:
 		// "missing" would read as deja not finding it, and "found" as deja
