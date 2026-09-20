@@ -116,6 +116,41 @@ func TestThinANDGetsRelevanceTailBeneathIt(t *testing.T) {
 	}
 }
 
+// The label says nothing matched; the answer holds a session that matched
+// every word. Which one, and how many, has to survive to the caller or every
+// surface above repeats the label's claim (#3815).
+func TestTheStrictHeadIsCountedAndNamedUnderTheRelevanceLabel(t *testing.T) {
+	dir := seedStore(t, relevanceWindow+10)
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many bikes do I own", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Tier != query.TierRelevance {
+		t.Fatalf("tier = %q, want the relabelled answer this is about", r.Tier)
+	}
+	if r.Strict != 1 {
+		t.Fatalf("strict = %d, want the one session that satisfied the AND", r.Strict)
+	}
+	var strict, ranked int
+	for _, s := range r.Sessions {
+		switch {
+		case s.ID == "incidental" && r.IsStrict(s):
+			strict++
+		case s.ID == "answer" && !r.IsStrict(s):
+			ranked++
+		case r.IsStrict(s):
+			t.Fatalf("%q was ranked into the answer but is named as a match", s.ID)
+		}
+	}
+	if strict != 1 {
+		t.Fatal("the session that holds every query word is not named as one")
+	}
+	if ranked != 1 {
+		t.Fatal("the session the tail brought in is missing, or is named a match")
+	}
+}
+
 func TestWordFormFallbackKeepsItsAnnotationUnderTheTail(t *testing.T) {
 	dir := seedStore(t, relevanceWindow+10)
 
@@ -162,6 +197,11 @@ func TestWideANDIsLeftAlone(t *testing.T) {
 	}
 	if len(r.Sessions) < thinAND {
 		t.Fatalf("expected a wide AND, got %d sessions", len(r.Sessions))
+	}
+	// Strict counts the head of a relabelled answer. This answer kept its own
+	// tier, so there is nothing for it to disambiguate and it stays zero.
+	if r.Strict != 0 || r.StrictIDs != nil {
+		t.Fatalf("an answer on tier %q reported %d strict sessions", r.Tier, r.Strict)
 	}
 	for _, s := range r.Sessions {
 		if s.ID == "answer" {

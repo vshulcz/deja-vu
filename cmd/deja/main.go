@@ -1033,8 +1033,9 @@ func cmdCtx(dir string, rest []string) error {
 		// sessions — and so did a query with no flag (#3345).
 		hits, _ = capTierHits(search.ErrorHits(ss), o)
 	} else if result.Tier == search.TierRelevance {
-		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits, _ = capTierHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), o)
+		o.Strict = result.Strict
+		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
+		hits, _ = capTierHits(markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result), o)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return err
 	}
@@ -1414,8 +1415,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		hits, capped = capTierHits(hits, o)
 		o.Capped = o.Capped || capped
 	case search.TierRelevance:
-		fmt.Fprintln(os.Stderr, "deja: no exact match; showing sessions ranked by relevance to the whole query")
-		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF)
+		o.Strict = result.Strict
+		fmt.Fprintln(os.Stderr, relevanceLead(result.Strict))
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(o.Query), result.TermIDF), result)
 		// This tier ranks and truncates inside retrieval, so counting the
 		// sessions it handed back measures its window, not the match: every
 		// query deeper than the window reported the window's own size and
@@ -1592,6 +1594,42 @@ func printNeighbour(w io.Writer, variants map[string][]string) {
 			}
 		}
 	}
+}
+
+// relevanceLead is the sentence above a relevance answer.
+//
+// It said "no exact match" whatever the answer held. The relevance tier is
+// also where a strict answer of fewer than thinAND sessions is published once
+// the ranking has been hung underneath it, and there the sentence is false:
+// over 93 two-word queries on a 2,422-session store, every one of the 20
+// answers labelled relevance carried a strict head of 1 to 9 sessions, so the
+// line disowned a real match every time it fired (#3815).
+func relevanceLead(strict int) string {
+	if strict > 0 {
+		return fmt.Sprintf("deja: %s %s every word of the query; the rest below are ranked by relevance", pluralSessions(strict), holdOrHolds(strict))
+	}
+	return "deja: no exact match; showing sessions ranked by relevance to the whole query"
+}
+
+func holdOrHolds(n int) string {
+	if n == 1 {
+		return "holds"
+	}
+	return "hold"
+}
+
+// markStrictHits flags the hits of a relevance answer that hold every word of
+// the query, so a caller reading one hit is told what that hit is. The count
+// on the envelope says how many there are; the order does not, because the
+// merged ranking can put a ranked session above a strict one.
+func markStrictHits(hits []search.Hit, result index.SearchResult) []search.Hit {
+	if result.Strict == 0 {
+		return hits
+	}
+	for i := range hits {
+		hits[i].Strict = result.IsStrict(hits[i].Session)
+	}
+	return hits
 }
 
 func printStemmed(w io.Writer, variants map[string][]string) {

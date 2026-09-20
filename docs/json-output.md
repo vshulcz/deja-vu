@@ -37,10 +37,21 @@ from a list of hits:
 
 - `tier` — which tier answered: `exact`, `close`, `stemmed`, `semantic`,
   `error`, or `relevance`. **`relevance` means nothing matched** and these are
-  the nearest sessions deja could find. Counting those as hits overstates
+  the nearest sessions deja could find — unless `strict` is set, in which case
+  that many of them do match (see below). Counting those as hits overstates
   recall, and this used to be readable only as a sentence on stderr. **`error`
   IS a match** — the query was a pasted error and these sessions hit that exact
   error (matched by signature, not by words); count them as hits.
+- `strict` — how many of the hits hold every word of the query. Present on the
+  `relevance` tier, where an answer of fewer than ten matching sessions is
+  published with the ranking merged underneath it: the tier label then says
+  nothing matched while `strict` says how much of it did. Each such hit also
+  carries `"strict": true`, and the order is the merged ranking's, so they are
+  not the first hits. Omitted when there are none, which is the ordinary
+  relevance answer. **A caller counting recall should count `strict` hits and
+  not the rest.** Measured over 93 two-word queries on a 2,422-session store:
+  all 20 answers labelled `relevance` had a strict head of 1 to 9 sessions,
+  and none of them had matched nothing.
 - `total` and `capped` — how many sessions matched, and whether a cap hid some.
 - `policy_withheld` — how many matching sessions this machine's trust policy
   kept out of the answer. Omitted when none were. Present on `search --json`,

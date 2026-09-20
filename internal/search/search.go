@@ -66,7 +66,13 @@ type searchJSONEnvelope struct {
 	Tier string `json:"tier"`
 	// Total is how many sessions matched before the cap; Capped says whether
 	// the cap hid any. Counting the returned hits alone measures the cap.
-	Total    int                 `json:"total"`
+	Total int `json:"total"`
+	// Strict is how many of the hits hold every word of the query. It appears
+	// on the relevance tier, where a thin strict answer is merged into the
+	// ranking and published under a label that means nothing matched: a
+	// caller counting recall reads this rather than dropping the answer
+	// (#3815). Omitted when none did, which is the ordinary relevance case.
+	Strict   int                 `json:"strict,omitempty"`
 	Capped   bool                `json:"capped,omitempty"`
 	Withheld int                 `json:"policy_withheld,omitempty"`
 	Hits     []Hit               `json:"hits"`
@@ -83,6 +89,11 @@ type Hit struct {
 	Score      float64       `json:"score"`
 	Tier       string        `json:"tier"`
 	TierDetail string        `json:"tier_detail,omitempty"`
+	// Strict marks a hit on the relevance tier that holds every word of the
+	// query: the answer there is a thin strict head merged into the ranking,
+	// and the tier label alone cannot tell the two apart (#3815). The order
+	// is the merged ranking's, so these are not the first hits.
+	Strict bool `json:"strict,omitempty"`
 	// Superseded holds the date of a newer session in the same project whose
 	// matches overlap this one — a signal that this hit is an earlier attempt.
 	Superseded string `json:"superseded,omitempty"`
@@ -1473,6 +1484,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			SchemaVersion: jsonout.Version,
 			Tier:          setTier(o),
 			Total:         o.Total,
+			Strict:        o.Strict,
 			Capped:        o.Capped,
 			Withheld:      o.PolicyWithheld,
 			Hits:          hits,

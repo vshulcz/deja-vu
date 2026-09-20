@@ -1183,9 +1183,15 @@ func recallText(dir, q, harness string, limit, budget int) (string, error) {
 // the question itself — and an agent read three unrelated sessions as the
 // answer to it. On the relevance tier the line says what they are instead
 // (#2074).
-func recallCountLine(q, tier string, offset, served, total int, namesTheAsked bool) string {
+func recallCountLine(q, tier string, offset, served, total, strict int, namesTheAsked bool) string {
 	q = clampEcho(q)
 	switch {
+	case tier == search.TierRelevance && strict > 0 && offset > 0:
+		return fmt.Sprintf("deja recall for %q (%d-%d of %d ranked; %d %s every word)\n", q, offset+1, offset+served, total, strict, holdOrHolds(strict))
+	case tier == search.TierRelevance && strict > 0:
+		// "none about it" over an answer that holds the whole query is the
+		// count line's half of #3815.
+		return fmt.Sprintf("deja recall for %q (%d of %d ranked; %d %s every word)\n", q, served, total, strict, holdOrHolds(strict))
 	case tier == search.TierRelevance && namesTheAsked && offset > 0:
 		// "none about it" is the same claim the lead makes, so it follows the
 		// same reading: the exact match failed, and the first session named
@@ -1253,10 +1259,15 @@ func recallHeaderReserve(q, tier string, offset, limit, total int) int {
 	// The longer of the two relevance lines: this reserves room before the
 	// answer is built, and reserving for the shorter one would let the
 	// other overrun what it was promised.
-	short := len(recallCountLine(q, tier, offset, limit, total, true))
-	long := len(recallCountLine(q, tier, offset, limit, total, false))
+	short := len(recallCountLine(q, tier, offset, limit, total, 0, true))
+	long := len(recallCountLine(q, tier, offset, limit, total, 0, false))
 	if short > long {
 		long = short
+	}
+	// The strict line names a count of its own and can be the longest of the
+	// three, so reserve for it too rather than let it overrun (#3815).
+	if strict := len(recallCountLine(q, search.TierRelevance, offset, limit, total, limit, false)); strict > long {
+		long = strict
 	}
 	return recallCountLineReserve + long
 }
@@ -1330,7 +1341,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss)
 	} else if result.Tier == search.TierRelevance {
-		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF), result)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, nil, err
 	}
@@ -1373,6 +1384,16 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		hits = hits[:limit]
 	}
 	attachAnswers(dir, hits)
+	// Counted on the page rather than taken from the result: the strict head
+	// is small but the trust policy can withhold part of it and paging can
+	// leave the rest behind, and a line counting sessions the reader cannot
+	// see is worse than no line (#3815).
+	strictShown := 0
+	for _, h := range hits {
+		if h.Strict {
+			strictShown++
+		}
+	}
 	var b strings.Builder
 	served := 0
 	// One answer for both lines: the lead and the count used to be able to
@@ -1394,6 +1415,14 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		fmt.Fprintf(&b, "No exact match; using close spellings: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Tier == search.TierError {
 		fmt.Fprintln(&b, "No exact match; these sessions hit the same error (matched by signature).")
+	} else if strictShown > 0 {
+		// Before every heuristic below it, because this one is a fact about
+		// the answer rather than a reading of its wording: these sessions
+		// were matched, not ranked, and the relevance label they arrive
+		// under is what a thin strict answer gets once the ranking is hung
+		// underneath it (#3815).
+		fmt.Fprintf(&b, "%s below %s every word of the query; the rest are ranked by wording. Check that one describes what is happening now before acting on it.\n",
+			pluralSessions(strictShown), holdOrHolds(strictShown))
 	} else if namesTheAsked {
 		// The same reading recall_context got in #2831: the tier says the
 		// exact match failed, not that the answer is unrelated. On a store
@@ -1495,7 +1524,12 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		if index.StampedAhead(h.Session.Updated, time.Now()) {
 			fmt.Fprintln(&hb, "[stamped later than this machine's clock — its date cannot place it against the others]")
 		}
-		if h.Tier != search.TierExact {
+		if h.Strict {
+			// The tier label belongs to the set; this hit holds the whole
+			// query, and printing "relevance" over it is the per-session half
+			// of the same false claim (#3815).
+			fmt.Fprintln(&hb, "[holds every word of the query]")
+		} else if h.Tier != search.TierExact {
 			fmt.Fprintf(&hb, "[%s]\n", h.Tier)
 		}
 		for _, sn := range h.Snippets {
@@ -1573,7 +1607,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
 	// agent asks for offset=served and the arithmetic has to hold.
-	b.WriteString(recallCountLine(q, result.Tier, offset, served, total, namesTheAsked))
+	b.WriteString(recallCountLine(q, result.Tier, offset, served, total, strictShown, namesTheAsked))
 	b.WriteString(hb.String())
 	// From what was served, not from the limit: the loop also stops on the
 	// token budget, and then this said "2 more" while five were left — the
@@ -1802,7 +1836,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	if result.Tier == search.TierError {
 		hits = search.ErrorHits(ss)
 	} else if result.Tier == search.TierRelevance {
-		hits = search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF)
+		hits = markStrictHits(search.RelevanceHitsWeighted(ss, index.RelevanceMatchTerms(q), result.TermIDF), result)
 	} else if hits, err = search.Run(ss, o); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	}
@@ -1843,7 +1877,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.PrintContext(&b, whole, q)
 	text := b.String() + contextOthersNote(len(hits))
 	if hits[0].Tier != search.TierExact {
-		text = contextTierLead(hits[0].Tier, sessionNamesTheAsked(whole, q, result.TermIDF)) +
+		text = contextTierLead(hits[0].Tier, hits[0].Strict, sessionNamesTheAsked(whole, q, result.TermIDF)) +
 			contextIgnoredWords(result) + text
 	}
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
@@ -2013,8 +2047,15 @@ const nothingIsAboutThis = "No session is about this. Nothing matched the query,
 // matched nothing — recall says "No session is about this" in a sentence, and
 // this tool, which returns far more text, said it in one word that reads like
 // a label on an answer (#2787, the shape #2074 fixed for the counted page).
-func contextTierLead(tier string, namesTheAsked bool) string {
+func contextTierLead(tier string, strict, namesTheAsked bool) string {
 	if tier == search.TierRelevance {
+		if strict {
+			// Not a reading of the wording but a fact about retrieval: this
+			// session holds every word that was asked, and it is under the
+			// relevance label because the strict answer was too thin to
+			// stand on its own (#3815).
+			return "This session holds every word of the query; it is under the relevance label because few others do. Check that it describes what is happening now before acting on it.\n"
+		}
 		if namesTheAsked {
 			// The tier says the exact match failed; it does not say the answer
 			// is unrelated. On a store with any competition an ordinary

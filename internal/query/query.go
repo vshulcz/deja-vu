@@ -63,6 +63,11 @@ type Options struct {
 	// survived it. Counting the survivors measures the cap.
 	Total  int
 	Capped bool
+	// Strict is how many of these sessions hold every word of the query. It
+	// is nonzero only on the relevance tier, where a thin strict answer is
+	// merged into the ranking and published under that label: the tier then
+	// says nothing matched while this says how much of it did.
+	Strict int
 	// PolicyWithheld is how many matching sessions the trust policy kept out
 	// of this answer. The reason travelled on stderr only, so a caller reading
 	// --json could not tell a rule from an empty history (#990).

@@ -714,12 +714,33 @@ type SearchResult struct {
 	// matched (#2612).
 	Total  int
 	Capped bool
+	// Strict is how many of Sessions matched rather than ranked: they hold
+	// every word of the query, in the forms Variants names when the answer
+	// carries any. Only withRelevanceTail sets it: that is where
+	// a strict answer too thin to trust on its own gets the relevance
+	// ranking hung underneath it and the whole thing is labelled relevance,
+	// which the tier contract defines as nothing matched. Measured over 93
+	// two-word queries on a 2,422-session store, all 20 answers labelled
+	// relevance had a strict head of 1 to 9 sessions and none of them had
+	// matched nothing (#3815).
+	Strict int
+	// StrictIDs is which of them, keyed harness+":"+id — the order of
+	// Sessions is the merged ranking's, so the head is not the first Strict
+	// of them. A caller telling a reader what one session is needs the
+	// answer for that session, not the count.
+	StrictIDs map[string]bool `json:",omitempty"`
 	// TermIDF is what the relevance ranking judged each query term to be worth.
 	// It travels with the answer so the caller choosing which message to show
 	// can weigh the words the same way the ranking weighed the session. Without
 	// it that choice was made by counting terms, one each, and the two disagreed
 	// exactly when one rare word carried the session. Empty on every other tier.
 	TermIDF map[string]float64 `json:",omitempty"`
+}
+
+// IsStrict says whether this session holds every word of the query rather
+// than having been ranked into the answer underneath the ones that do.
+func (r SearchResult) IsStrict(s model.Session) bool {
+	return r.StrictIDs[s.Harness+":"+s.ID]
 }
 
 func DefaultDir() string {

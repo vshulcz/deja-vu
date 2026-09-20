@@ -19,6 +19,7 @@ func TestSearchJSONKeysMatchTheDocumentedContract(t *testing.T) {
 		// envelope
 		"schema_version": true, "tier": true, "total": true, "capped": true,
 		"policy_withheld": true, "hits": true, "fuzzy": true, "stemmed": true,
+		"strict":   true,
 		"semantic": true, "variants": true,
 		// hit
 		"session": true, "count": true, "snippets": true, "score": true,
@@ -35,7 +36,7 @@ func TestSearchJSONKeysMatchTheDocumentedContract(t *testing.T) {
 	}
 	now := time.Now()
 	env := searchJSONEnvelope{
-		SchemaVersion: jsonout.Version, Tier: "exact", Total: 1, Capped: true,
+		SchemaVersion: jsonout.Version, Tier: "exact", Total: 1, Strict: 1, Capped: true,
 		Withheld: 1, Fuzzy: true, Stemmed: true, Semantic: true,
 		Variants: map[string][]string{"a": {"b"}},
 		Hits: []Hit{{
@@ -50,6 +51,7 @@ func TestSearchJSONKeysMatchTheDocumentedContract(t *testing.T) {
 			Count: 1, Snippets: []string{"s"}, Score: 1, Tier: "exact",
 			TierDetail: "d", Superseded: "2026", Reused: 1, Moved: "2026",
 			Lifecycle: "accepted", LifecycleNote: "n", LifecycleAt: "2026",
+			Strict: true,
 		}},
 	}
 	b, err := json.Marshal(env)

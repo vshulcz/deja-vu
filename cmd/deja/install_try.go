@@ -95,9 +95,8 @@ func buildTryPrompt(dir string) (tryPrompt, bool) {
 			continue
 		}
 		hits, _ := policyFilterSessionsCounted(policy.ActivationSearch, result.Sessions)
-		// Relevance means nothing matched and these are the nearest sessions
-		// deja could find, which is exactly the miss this exists to avoid.
-		if result.Tier == "relevance" || len(hits) < tryPromptMinSessions {
+		hits = matchedSessions(result, hits)
+		if len(hits) < tryPromptMinSessions {
 			continue
 		}
 		// A hit carries only the messages that matched, so the decision has to
@@ -116,6 +115,32 @@ func buildTryPrompt(dir string) (tryPrompt, bool) {
 		}, true
 	}
 	return tryPrompt{}, false
+}
+
+// matchedSessions is the part of an answer that matched rather than ranked.
+//
+// On every tier but relevance that is the whole answer. Relevance means
+// nothing matched and these are the nearest sessions deja could find, which is
+// the miss this screen exists to avoid — except that a strict answer of fewer
+// than ten sessions is published under the same label once the ranking has
+// been hung underneath it, and dropping those cost most of a Russian store: of
+// 93 two-word topics, 20 came back labelled relevance and every one of them
+// held every query word in 1 to 9 sessions (#3815). The ranked tail is still
+// not a match, so it is not what the prompt counts or dates.
+func matchedSessions(result index.SearchResult, hits []model.Session) []model.Session {
+	if result.Tier != "relevance" {
+		return hits
+	}
+	if result.Strict == 0 {
+		return nil
+	}
+	strict := make([]model.Session, 0, result.Strict)
+	for _, s := range hits {
+		if result.IsStrict(s) {
+			strict = append(strict, s)
+		}
+	}
+	return strict
 }
 
 // sessionHeadline is what a session is about, as the listings say it: the first

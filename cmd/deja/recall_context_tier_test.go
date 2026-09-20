@@ -12,7 +12,7 @@ import (
 // matched nothing reads as a label on an answer, where recall says it in a
 // sentence (#2787, the shape #2074 fixed for the counted page).
 func TestTheContextLeadSaysWhatTheSessionIs(t *testing.T) {
-	lead := contextTierLead(search.TierRelevance, false)
+	lead := contextTierLead(search.TierRelevance, false, false)
 	if strings.HasPrefix(lead, "[") {
 		t.Errorf("a whole session is still introduced by a marker: %q", lead)
 	}
@@ -26,7 +26,7 @@ func TestTheContextLeadSaysWhatTheSessionIs(t *testing.T) {
 // The other tiers keep their marker: they did match, and the marker says how.
 func TestTheOtherTiersKeepTheirMarker(t *testing.T) {
 	for _, tier := range []string{search.TierError, search.TierSemantic, search.TierStemmed, search.TierClose} {
-		lead := contextTierLead(tier, false)
+		lead := contextTierLead(tier, false, false)
 		if !strings.HasPrefix(lead, "["+tier+"]") {
 			t.Errorf("%s lost its marker: %q", tier, lead)
 		}
@@ -67,7 +67,7 @@ func TestAMashOfWordsTheStoreHoldsIsNotCalledAbsent(t *testing.T) {
 // One sentence, two surfaces: the page of sessions and the single session say
 // the same thing about the same situation.
 func TestBothRelevanceLeadsShareTheirSentence(t *testing.T) {
-	if !strings.Contains(contextTierLead(search.TierRelevance, false), nothingIsAboutThis) {
+	if !strings.Contains(contextTierLead(search.TierRelevance, false, false), nothingIsAboutThis) {
 		t.Error("the single-session lead drifted from the shared sentence")
 	}
 	// On a question the store has an answer to, both surfaces say so instead

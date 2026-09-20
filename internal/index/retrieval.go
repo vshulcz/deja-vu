@@ -379,6 +379,11 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	// the user it fell back to stems or close spellings, even though the order
 	// is now this tier's to keep.
 	out.Stemmed, out.Fuzzy, out.Variants = res.Stemmed, res.Fuzzy, res.Variants
+	// And keep the size of the head. Without it the label is the only thing
+	// the caller has, and the label says nothing matched while len(ss)
+	// sessions hold every word — which is what both the CLI sentence and the
+	// agent-facing lead went on to claim (#3815).
+	out.Strict, out.StrictIDs = len(ss), seen
 	return out, nil
 }
 
