@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,6 +138,11 @@ func TestTheGitNoteRecordsTheAttributionOnceOnItsOwnRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	git("init", "-q")
+	// A note is a git object, so writing one needs a committer identity. A CI
+	// runner has none configured, which is how the first run of this test found
+	// out that the failure said only "exit status 128".
+	git("config", "user.name", "t")
+	git("config", "user.email", "t@example.com")
 	git("add", "pool.go")
 	git("commit", "-qm", "first")
 	sha := strings.TrimSpace(git("rev-parse", "HEAD"))
@@ -180,5 +186,54 @@ func TestTheGitNoteRecordsTheAttributionOnceOnItsOwnRef(t *testing.T) {
 	// to record, and the refusal says so rather than writing an empty note.
 	if err := writeGitNote(&out, target, commit, lineAuthor{}, false); err == nil {
 		t.Error("a note was written for a line nothing is attributed to")
+	}
+}
+
+// "exit status 128" names nothing. A note is a git object, so a machine with no
+// committer identity configured cannot write one — which is what CI hit on the
+// first run of the test above, and what a reader has to be told to fix.
+func TestTheGitNotePassesOnGitsOwnRefusal(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	repo := t.TempDir()
+	run := func(env []string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), env...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return string(out)
+	}
+	ident := []string{
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com",
+		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com",
+	}
+	path := filepath.Join(repo, "pool.go")
+	if err := os.WriteFile(path, []byte("package pool\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run(nil, "init", "-q")
+	run(ident, "add", "pool.go")
+	run(ident, "commit", "-qm", "first")
+	sha := strings.TrimSpace(run(nil, "rev-parse", "HEAD"))
+
+	// No identity anywhere this git can read: not in the repository, not in a
+	// global or system file, not in the environment.
+	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"} {
+		t.Setenv(k, "")
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
+	err := writeGitNote(io.Discard, search.BlameTarget{Base: "pool.go", Line: 1, FullPath: path},
+		lineCommit{SHA: sha}, lineAuthor{Session: model.Session{Harness: "claude", ID: "abc123"}}, true)
+	if err == nil {
+		t.Skip("this git wrote a note with no identity configured")
+	}
+	if strings.Contains(err.Error(), "exit status") {
+		t.Errorf("the failure says only the exit code: %v", err)
 	}
 }

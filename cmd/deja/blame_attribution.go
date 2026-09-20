@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -138,6 +140,20 @@ func blameLineOnly(w io.Writer, dir string, target search.BlameTarget, hits []se
 	return nil
 }
 
+// gitStderrLine is the first line git wrote to stderr before it failed.
+func gitStderrLine(err error) string {
+	var ex *exec.ExitError
+	if !errors.As(err, &ex) {
+		return ""
+	}
+	for _, line := range strings.Split(string(ex.Stderr), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
 // gitNoteRef is where an opt-in attribution is written: a ref of deja's own, so
 // `git log --notes=deja` shows it and nothing deja writes lands in the notes
 // ref git shows by default.
@@ -184,6 +200,13 @@ func writeGitNote(w io.Writer, target search.BlameTarget, c lineCommit, a lineAu
 		}
 	}
 	if _, err := gitRun(dir, "notes", "--ref="+gitNoteRef, "append", "-m", body, c.SHA); err != nil {
+		// git's own first line, because "exit status 128" names nothing. The one
+		// this hits in practice is a machine with no committer identity
+		// configured — a note is a git object and needs one — which a reader can
+		// fix and a bare status code cannot tell them about.
+		if why := gitStderrLine(err); why != "" {
+			return fmt.Errorf("blame --git-note: git could not write the note: %s", search.SafeLine(why))
+		}
 		return fmt.Errorf("blame --git-note: git could not write the note: %w", err)
 	}
 	fmt.Fprintf(w, "wrote refs/notes/%s on %s — `git log --notes=%s` shows it\n", gitNoteRef, shortSHA(c.SHA), gitNoteRef)
