@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -152,20 +153,10 @@ func gitRemovedLines(path, sha string) map[string]bool {
 }
 
 // blameSpanKey is the form a diff line and a recorded edit span are compared
-// in: one space between words, and nothing shorter than a line that could only
-// have been written on purpose.
-func blameSpanKey(s string) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if len([]rune(s)) < blameSpanMinRunes {
-		return ""
-	}
-	return s
-}
-
-// blameSpanMinRunes is where a line stops being evidence. Measured on this
-// repository's diffs, below this the matches are braces, `return err` and
-// import lines — present in every commit and in every session.
-const blameSpanMinRunes = 24
+// in. The indexer hashes the written side through the same function, because a
+// normalisation that differs by one space attributes nothing and reads as a
+// ranking problem.
+func blameSpanKey(s string) string { return sources.WrittenLineKey(s) }
 
 // gitRun is one git call, bounded. git is optional for deja and a repository
 // can be enormous; a caller that cannot answer says nothing.
@@ -183,14 +174,93 @@ const blameGitTimeout = 5 * time.Second
 // says why.
 type lineAuthor struct {
 	Session model.Session
-	Matched string // the text this session is recorded as having replaced
+	Matched string // the text this session replaced, or the line it wrote
 	Asked   string // what the session was asked to do, which is its own title
+	// Wrote distinguishes the two rules. Replacing the text a commit deleted
+	// proves the session made that very change; having written the line, in
+	// this file, before the commit is weaker — a line written in twenty
+	// sessions attributes to the last of them rather than to all.
+	Wrote bool
 }
 
 // attributeLine picks the session that replaced the text the commit deleted —
-// the session that made this change, and so wrote the line being read. Nothing when no session did — which is the answer for a dependency
-// bump, a merge, and any commit deja never saw.
+// the session that made this change, and so wrote the line being read. Failing
+// that, the session that wrote this very line into this very file before the
+// commit: 71% of commits delete nothing at all, so the replaced side is silent
+// about most lines in a repository, and a line a commit added has no replaced
+// text for any rule to match (#3773). Nothing when neither has evidence, which
+// is the answer for a dependency bump, a merge, and any commit deja never saw.
 func attributeLine(sessions []model.Session, target search.BlameTarget, c lineCommit, removed map[string]bool) (lineAuthor, bool) {
+	if a, ok := attributeByReplaced(sessions, target, c, removed); ok {
+		return a, true
+	}
+	return attributeByWritten(sessions, target, c)
+}
+
+// attributeByWritten is the weaker rule: a session that wrote this line, into
+// this file, before the commit that carried it.
+func attributeByWritten(sessions []model.Session, target search.BlameTarget, c lineCommit) (lineAuthor, bool) {
+	line := fileLine(target.FullPath, target.Line)
+	want, ok := sources.HashWrittenLine(line)
+	if !ok {
+		// Too short to be evidence: `}` and `return nil` were written by every
+		// session, so a match would say nothing about this one.
+		return lineAuthor{}, false
+	}
+	best := lineAuthor{}
+	var bestAt time.Time
+	for _, s := range sessions {
+		for _, m := range s.Messages {
+			if m.Role != sources.RoleWrote {
+				continue
+			}
+			path, has := sources.WroteRecordHas(m.Text, want)
+			if !has || !recordNamesFile(path, target) {
+				continue
+			}
+			// A session that wrote it after the commit wrote something else:
+			// the same line arrived at again, later.
+			if !m.Time.IsZero() && !c.When.IsZero() && m.Time.After(c.When) {
+				continue
+			}
+			if best.Matched == "" || m.Time.After(bestAt) {
+				best = lineAuthor{
+					Session: s,
+					Matched: blameSpanKey(line),
+					Asked:   search.SessionTitle(s),
+					Wrote:   true,
+				}
+				bestAt = m.Time
+			}
+		}
+	}
+	return best, best.Matched != ""
+}
+
+// fileLine reads one line of a file, which is the text git attributed to the
+// commit.
+func fileLine(path string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	// A generated file can hold a line longer than the scanner's default 64 KB,
+	// and stopping there would answer about the wrong line.
+	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	for i := 1; sc.Scan(); i++ {
+		if i == n {
+			return sc.Text()
+		}
+	}
+	return ""
+}
+
+func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c lineCommit, removed map[string]bool) (lineAuthor, bool) {
 	if len(removed) == 0 {
 		return lineAuthor{}, false
 	}
@@ -280,12 +350,18 @@ func printLineAuthor(w io.Writer, target search.BlameTarget, c lineCommit, a lin
 		// Silence is the honest answer, and it has to say which silence: deja
 		// holds no session that wrote this line, rather than deja having
 		// nothing about the file at all.
-		fmt.Fprintf(w, "  no indexed session wrote the lines this commit replaced — nothing to say about this line\n")
+		fmt.Fprintf(w, "  no indexed session wrote this line or the lines this commit replaced — nothing to say about this line\n")
 		return
 	}
 	s := a.Session
 	fmt.Fprintf(w, "  written in %s · %s · %s\n", search.SafeLine(s.Harness), shortID(s.ID), search.SafeLine(s.Project))
-	fmt.Fprintf(w, "  replaced: %s\n", search.SafeLine(trunc80(a.Matched)))
+	// Which rule answered, because the two are not equally strong and a reader
+	// deciding whether to trust the attribution needs to know which they have.
+	if a.Wrote {
+		fmt.Fprintf(w, "  wrote this line: %s\n", search.SafeLine(trunc80(a.Matched)))
+	} else {
+		fmt.Fprintf(w, "  replaced: %s\n", search.SafeLine(trunc80(a.Matched)))
+	}
 	if a.Asked != "" {
 		fmt.Fprintf(w, "  asked: %s\n", search.SafeLine(trunc80(a.Asked)))
 	}

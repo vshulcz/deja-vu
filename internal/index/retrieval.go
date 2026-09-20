@@ -1777,6 +1777,12 @@ func recordServable(role string, o query.Options) bool {
 			return false
 		}
 	}
+	// Hashes are never served, even under --role: there is nothing in a line of
+	// hex for a person to read, and blame reads them through the record log
+	// rather than through a query.
+	if role == roleWrote {
+		return false
+	}
 	return true
 }
 
@@ -2625,6 +2631,12 @@ const roleToolOutput = "tool-output"
 // roleEdit mirrors sources.RoleEdit.
 const roleEdit = "edit"
 
+// roleWrote mirrors sources.RoleWrote: hashes of the lines a session wrote,
+// under the path they went into. Never served — a reader asking about a file
+// has no use for a line of hex, and it is not speech, not a command and not
+// something anyone said.
+const roleWrote = "wrote"
+
 // roleSummary is a harness's digest of what it compacted away. Not speech, and
 // not work either — but it belongs on this side of the line for the same reason
 // the others do: a per-session read bound has to spend its budget on what
@@ -2637,7 +2649,7 @@ const roleSummary = "summary"
 // and the per-session bound has to spend its budget on speech first.
 func isToolRole(role string) bool {
 	return role == roleFiles || role == roleCommand || role == roleToolOutput ||
-		role == roleEdit || role == roleSummary
+		role == roleEdit || role == roleSummary || role == roleWrote
 }
 
 func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []int64, variants map[string][]string) ([]model.Session, error) {

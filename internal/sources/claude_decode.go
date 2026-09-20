@@ -166,6 +166,11 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: t})
 				}
 			}
+			if IndexWrites() {
+				for _, w := range claudeWroteRecords(v.Message.Content) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
+				}
+			}
 			if IndexCommands() {
 				for _, cmd := range claudeCommands(v.Message.Content) {
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
@@ -523,6 +528,58 @@ func claudeEditSpans(raw json.RawMessage) []string {
 				span = span[:editSpanMax]
 			}
 			out = append(out, path+"\n"+span)
+		}
+	}
+	return out
+}
+
+// claudeWroteRecords returns "path\n<line hashes>" for every write in a turn:
+// the new side of an Edit, of each sub-edit of a MultiEdit, and the whole
+// content of a Write. The mirror of claudeEditSpans, which takes the old side.
+func claudeWroteRecords(raw json.RawMessage) []string {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 || raw[0] != '[' {
+		return nil
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return nil
+	}
+	var out []string
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var part struct {
+			Type  string `json:"type"`
+			Input struct {
+				FilePath  string `json:"file_path"`
+				NewString string `json:"new_string"`
+				// A Write hands over the whole file, which is how a new file
+				// enters a repository — and a commit that adds a file is the
+				// case the replaced side can say nothing at all about.
+				Content string `json:"content"`
+				Edits   []struct {
+					NewString string `json:"new_string"`
+				} `json:"edits"`
+			} `json:"input"`
+		}
+		if json.Unmarshal(item, &part) != nil || part.Type != "tool_use" {
+			continue
+		}
+		path := part.Input.FilePath
+		if path == "" {
+			continue
+		}
+		written := []string{part.Input.NewString, part.Input.Content}
+		for _, e := range part.Input.Edits {
+			written = append(written, e.NewString)
+		}
+		for _, w := range written {
+			if rec := WroteRecord(path, w); rec != "" {
+				out = append(out, rec)
+			}
 		}
 	}
 	return out

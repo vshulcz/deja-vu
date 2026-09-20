@@ -192,7 +192,7 @@ func TestBlameLineNamesTheSessionBehindTheLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "no indexed session wrote the lines this commit replaced") {
+	if !strings.Contains(out, "no indexed session wrote this line or the lines this commit replaced") {
 		t.Fatalf("a commit deja never saw must attribute to nothing:\n%s", out)
 	}
 }

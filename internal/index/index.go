@@ -277,7 +277,14 @@ import (
 // verbatim, so `deja show` and `deja ctx` read it back in the clear. Redaction
 // runs at ingest, so a store built before this keeps the text until it
 // re-reads its sources (#3729).
-const version = 49
+// 50 records the written side of an edit, as hashes. The replaced side answers
+// for 7.3% of committed lines because 71% of commits delete nothing at all, and
+// a line a commit added has no replaced text to match — what a session wrote is
+// the only evidence such a line was ever in a session. One 64-bit hash per
+// written line of 24 runes or more, so no new user text enters the index. A
+// store built before this has no written side until it re-reads its sources
+// (#3773).
+const version = 50
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

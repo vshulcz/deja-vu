@@ -514,6 +514,15 @@ type toolDialect struct {
 	// one loses the only record of what stopped existing. Empty means
 	// old_string.
 	oldKey string
+	// newKey names the argument holding the text an edit wrote, the mirror of
+	// oldKey: cline calls it new_text, Copilot new_str. Empty means
+	// new_string. A dialect whose key is not set records no written side —
+	// nothing wrong, just nothing to attribute from.
+	newKey string
+	// contentKey names the argument of a whole-file write. Empty means
+	// "content". A commit that adds a file has no replaced text at all, so
+	// this is the only evidence such a line was ever in a session.
+	contentKey string
 	// commandKey names the argument holding the command. Empty means
 	// "command"; cline's run_commands takes "commands", a list.
 	commandKey string
@@ -538,6 +547,20 @@ func (d toolDialect) oldSpanKey() string {
 		return "old_string"
 	}
 	return d.oldKey
+}
+
+func (d toolDialect) newSpanKey() string {
+	if d.newKey == "" {
+		return "new_string"
+	}
+	return d.newKey
+}
+
+func (d toolDialect) contentSpanKey() string {
+	if d.contentKey == "" {
+		return "content"
+	}
+	return d.contentKey
 }
 
 var claudeDialect = toolDialect{
@@ -668,6 +691,50 @@ func editSpansIn(v any, d toolDialect) []string {
 				span = span[:editSpanMax]
 			}
 			out = append(out, path+"\n"+span)
+		}
+	}
+	return out
+}
+
+// wroteRecordsFromContent is claudeWroteRecords for the reference parser: the
+// written side of the same calls editSpansIn reads the replaced side of.
+func wroteRecordsFromContent(v any) []string { return wroteRecordsIn(v, claudeDialect) }
+
+func wroteRecordsIn(v any, d toolDialect) []string {
+	items, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, it := range items {
+		name, in, ok := toolPart(it, d)
+		if !ok {
+			continue
+		}
+		if len(d.editTools) > 0 && !d.editTools[name] {
+			continue
+		}
+		path, _ := in[d.pathKey].(string)
+		if path == "" {
+			continue
+		}
+		newText, _ := in[d.newSpanKey()].(string)
+		content, _ := in[d.contentSpanKey()].(string)
+		written := []string{newText, content}
+		if edits, ok := in["edits"].([]any); ok {
+			for _, e := range edits {
+				em, ok := e.(map[string]any)
+				if !ok {
+					continue
+				}
+				n, _ := em[d.newSpanKey()].(string)
+				written = append(written, n)
+			}
+		}
+		for _, w := range written {
+			if rec := WroteRecord(path, w); rec != "" {
+				out = append(out, rec)
+			}
 		}
 	}
 	return out

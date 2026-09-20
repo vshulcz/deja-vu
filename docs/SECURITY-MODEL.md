@@ -25,8 +25,14 @@ verbatim source from the user's own files, kept so a lost change can be handed
 back. All of it goes through the same redaction pass as conversation text, which
 matters more here than elsewhere: command output carries credentials far more
 often than prose does. `DEJA_INDEX_PATHS=0`, `DEJA_INDEX_COMMANDS=0`,
-`DEJA_INDEX_EDITS=0` and `DEJA_INDEX_TOOL_OUTPUT=0` each disable one of these at
-ingest.
+`DEJA_INDEX_EDITS=0`, `DEJA_INDEX_WRITES=0` and `DEJA_INDEX_TOOL_OUTPUT=0` each
+disable one of these at ingest.
+
+The written side of an edit — what the agent typed into the file, which is what
+`deja blame` attributes a line by — is stored as one 64-bit hash per line of 24
+characters or more, never as text. Attribution needs equality, not the bytes, so
+this is the one class of content the index holds without being able to hand it
+back: a hash cannot be read, quoted or searched for.
 
 ### Local writes
 

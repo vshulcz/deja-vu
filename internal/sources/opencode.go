@@ -314,11 +314,22 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 			}
 			continue
 		}
-		if patch := str(r["patch"]); patch != "" && IndexEdits() {
+		if patch := str(r["patch"]); patch != "" {
 			t := partTime(r)
-			for _, span := range patchSpans(patch) {
-				s.Touch(t)
-				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+			if IndexEdits() {
+				for _, span := range patchSpans(patch) {
+					s.Touch(t)
+					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+				}
+			}
+			// apply_patch is opencode's main editing tool, and the payload it
+			// already ships carries both sides of the change — so the written
+			// side costs nothing more to read.
+			if IndexWrites() {
+				for _, rec := range addedLinesOfPatch(patch) {
+					s.Touch(t)
+					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
+				}
 			}
 			continue
 		}

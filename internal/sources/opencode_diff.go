@@ -103,11 +103,21 @@ func ParseOpencodeDiff(path string) ([]model.Session, error) {
 			continue
 		}
 		files = append(files, e.File)
-		if !IndexEdits() || e.Patch == "" {
+		if e.Patch == "" {
 			continue
 		}
-		for _, span := range unifiedDiffSpans(e.File, e.Patch) {
-			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: at})
+		if IndexEdits() {
+			for _, span := range unifiedDiffSpans(e.File, e.Patch) {
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: at})
+			}
+		}
+		// The added side of the same diff. For most opencode sessions this
+		// store is the only record of what they changed, and a commit that
+		// adds a line has no replaced text to match at all (#3773).
+		if IndexWrites() {
+			if rec := WroteRecord(e.File, addedLinesOfUnifiedDiff(e.Patch)); rec != "" {
+				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: at})
+			}
 		}
 	}
 	if IndexToolPaths() && len(files) > 0 {
@@ -120,11 +130,25 @@ func ParseOpencodeDiff(path string) ([]model.Session, error) {
 	return []model.Session{s}, nil
 }
 
+// addedLinesOfUnifiedDiff is the written side of a unified diff: the lines it
+// adds, in order, for hashing under the file they went into.
+func addedLinesOfUnifiedDiff(patch string) string {
+	var added []string
+	for _, line := range strings.Split(patch, "\n") {
+		switch {
+		case strings.HasPrefix(line, "+++"):
+			// A file header, not content.
+		case strings.HasPrefix(line, "+"):
+			added = append(added, line[1:])
+		}
+	}
+	return strings.Join(added, "\n")
+}
+
 // unifiedDiffSpans turns a unified diff into the "path\nreplaced bytes" records
 // an edit produces everywhere else, so `deja restore` and `deja blame` do not
-// have to know which harness wrote them. Only removed lines: that is what the
-// rest of the index stores, and what the added side is for is a decision of its
-// own (#3773).
+// have to know which harness wrote them. Only removed lines: the added side is
+// hashed into a RoleWrote record instead, by addedLinesOfUnifiedDiff.
 func unifiedDiffSpans(file, patch string) []string {
 	var out []string
 	var removed []string

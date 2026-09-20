@@ -1648,9 +1648,12 @@ func dateTokens(when time.Time) []string {
 // Nobody searches for the body of a span — `deja restore` finds it by path —
 // and indexing 1 MB of source code puts every `func` and `return` in it into
 // the postings, which cost the median query 0.5 ms for nothing.
+//
+// A written side is the same shape and the argument is stronger: its body is
+// 200,000 lines of hex on this machine, and no query will ever be a hash.
 func tokenizedPart(role, text string) string {
 	switch role {
-	case roleEdit:
+	case roleEdit, roleWrote:
 		if i := strings.IndexByte(text, '\n'); i >= 0 {
 			return text[:i]
 		}
