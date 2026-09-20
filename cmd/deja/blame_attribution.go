@@ -41,7 +41,12 @@ type lineAnswerJSON struct {
 	Rule          string           `json:"rule,omitempty"`
 	Matched       string           `json:"matched,omitempty"`
 	Session       *lineSessionJSON `json:"session,omitempty"`
-	Why           string           `json:"why,omitempty"`
+	// SaidBefore is the session's own words in the turn the edit sits in. It
+	// is not called the reason: about half of these turns carry one and half
+	// say what is about to be done, which is why the field, the prose label
+	// and the docs all say what it literally is (#3723).
+	SaidBefore string `json:"said_before,omitempty"`
+	Why        string `json:"why,omitempty"`
 }
 
 type lineCommitJSON struct {
@@ -102,6 +107,7 @@ func buildLineAnswer(target search.BlameTarget, c lineCommit, a lineAuthor, foun
 		out.Rule = lineRuleWrote
 	}
 	out.Matched = search.SafeLine(a.Matched)
+	out.SaidBefore = search.SafeLine(a.Said)
 	out.Session = &lineSessionJSON{
 		Harness: search.SafeLine(a.Session.Harness),
 		ID:      a.Session.ID,

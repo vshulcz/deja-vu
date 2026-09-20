@@ -955,7 +955,7 @@ one line, and the array above is unchanged — a consumer reading
 `deja blame <path> --json` sees nothing new.
 
 ```json
-{"kind":"deja.blame-line","schema_version":2,"file":"pool.go","line":42,"commit":{"sha":"33ec9160c1","subject":"fix: one pool per shard","author":"someone","when":"2026-09-18T09:12:00Z"},"attributed":true,"rule":"wrote","matched":"cfg.MaxConns = int32(size)","session":{"harness":"claude","id":"2915986c","project":"myapp","asked":"make the pool size configurable","ctx":"deja ctx 2915986c"}}
+{"kind":"deja.blame-line","schema_version":2,"file":"pool.go","line":42,"commit":{"sha":"33ec9160c1","subject":"fix: one pool per shard","author":"someone","when":"2026-09-18T09:12:00Z"},"attributed":true,"rule":"wrote","matched":"cfg.MaxConns = int32(size)","said_before":"the pool was one per shard and the shard count moved at runtime, so the size has to come from config","session":{"harness":"claude","id":"2915986c","project":"myapp","asked":"make the pool size configurable","ctx":"deja ctx 2915986c"}}
 ```
 
 `rule` says which rule answered, and the two are not equally strong.
@@ -963,6 +963,16 @@ one line, and the array above is unchanged — a consumer reading
 made this change. `wrote` means the session wrote this line, into this file,
 before the commit — a line written in twenty sessions attributes to the last of
 them. A consumer that wants only the strong claim reads `rule == "replaced"`.
+
+`said_before` is what the session said in the turn the edit sits in, bounded to
+220 characters. It is deliberately not called the reason: measured over 41
+attributed lines here, that turn existed for 40 of them and, read by eye, 16 of
+33 distinct turns carried a reason — a finding, a constraint, a diagnosis —
+while the rest said what was about to be done. Turns shorter than 60 characters
+are dropped, which is where most of that half sits; the field is absent when
+nothing clears it. A consumer must not present it as a rationale deja stands
+behind. (The session's conclusion was measured for the same purpose and
+overlapped the change 0 times in 81 lines, which is why it is not this field.)
 
 `attributed` is false when git named the commit and no indexed session answers
 for the line; `session`, `rule` and `matched` are then absent. `why` carries

@@ -39,6 +39,14 @@ func TestBlameDoesNotQuoteTheShapesThatCameAfterTheFirstPass(t *testing.T) {
 			mark: "deja.blame-line",
 		},
 		{
+			// The quoted turn under a line answer: the label is deja's, the
+			// sentence after it is a transcript's, and a session that ran
+			// blame keeps both.
+			name: "the turn the line answer quotes",
+			own:  "pool.go:3 written in claude · 2915986c · app\n  said just before this edit: internal/pool.go opened a connection per shard and the shard count moves at runtime",
+			mark: "said just before this edit",
+		},
+		{
 			name: "the note git log prints",
 			own:  "deja: pool.go:3 written in claude · 2915986c · app (rule: replaced)\nwhy, in full: deja ctx 2915986c",
 			mark: "written in claude",

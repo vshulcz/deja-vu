@@ -115,6 +115,11 @@ func dejaLineAnswerLine(l string) bool {
 	if strings.Contains(l, `"kind":"deja.blame-line"`) {
 		return true
 	}
+	// The turn the line answer quotes, which is transcript text: the label in
+	// front of it is the only part that is deja's, so it is what this keys on.
+	if strings.HasPrefix(l, "said just before this edit: ") {
+		return true
+	}
 	return dejaLineHeader.MatchString(l) || dejaGitNoteLine.MatchString(l)
 }
 
@@ -138,8 +143,17 @@ var dejaGitNoteLine = regexp.MustCompile(`^deja: [^\s:]+:\d+ written in `)
 func mayHoldOwnReport(text string) bool {
 	return strings.Contains(text, "deja") ||
 		strings.Contains(text, "last changed in") ||
-		strings.Contains(text, "no indexed session")
+		strings.Contains(text, "no indexed session") ||
+		// The quoted turn under a line answer says nothing about deja either:
+		// the label is deja's and the sentence after it is someone's own words
+		// (#3723).
+		strings.Contains(text, "said just before this edit")
 }
+
+// WithoutOwnReport is withoutOwnReport for a caller outside this package:
+// `blame --attribution` quotes the turn an edit sits in, and that turn can be
+// a session running deja and reading its answer back (#3723).
+func WithoutOwnReport(text string) string { return withoutOwnReport(text) }
 
 // withoutOwnReport drops those lines, leaving everything a person wrote.
 func withoutOwnReport(text string) string {

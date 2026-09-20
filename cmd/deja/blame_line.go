@@ -181,7 +181,68 @@ type lineAuthor struct {
 	// this file, before the commit is weaker — a line written in twenty
 	// sessions attributes to the last of them rather than to all.
 	Wrote bool
+	// Said is what the session said in the turn this edit sits in, which is
+	// the closest thing to a reason the transcript holds — see saidBefore.
+	Said string
 }
+
+// saidBefore is what the session said in the turn the edit sits in: the
+// nearest thing it wrote before the record, in its own words.
+//
+// It is not called the reason, because it is not always one. #3722 measured
+// the session's conclusion against the change and found no overlap at all — 0
+// of 81 — and concluded no single line lifted out of a session is the why. The
+// turn holding the edit is a different question and a better one. Measured
+// over 41 attributed lines on this repository, the turn immediately before the
+// record was there for 40 of them, and read by eye 16 of 33 distinct turns
+// carried an actual reason: a finding, a constraint, a diagnosis. The other
+// half say what is about to be done and nothing about why ("now the shared
+// writer"). The lexical test #3722 used — the file name, or two content words
+// of the commit subject — caught 1 of those 40, so it is the wrong bar: a
+// reason written in another language than the commit subject shares no words
+// with it (#3723).
+//
+// So the output says exactly what this is, and the floor below drops the
+// shortest half, which is where the pure narration sits.
+func saidBefore(s model.Session, at int) string {
+	for i := at - 1; i >= 0 && i > at-saidBeforeLookback; i-- {
+		m := s.Messages[i]
+		if m.Role != "assistant" && m.Role != "developer" {
+			continue
+		}
+		// deja's own output must not come back as the reason for a line: a
+		// session that ran deja keeps what it printed, and this reads the
+		// messages around an edit rather than the ones blame already filters
+		// (#1330, #3723).
+		text := strings.Join(strings.Fields(search.WithoutOwnReport(m.Text)), " ")
+		r := []rune(text)
+		if len(r) < saidBeforeFloor {
+			continue
+		}
+		if len(r) > saidBeforeMax {
+			return string(r[:saidBeforeMax]) + "…"
+		}
+		return text
+	}
+	return ""
+}
+
+const (
+	// saidBeforeLookback bounds how far back the turn can be. A record sits
+	// among the tool calls of its own turn, and beyond a few dozen messages
+	// the text belongs to earlier work.
+	saidBeforeLookback = 40
+	// saidBeforeFloor is the length below which a turn is a handover line
+	// rather than a reason. Of the 16 turns that carried no reason in the
+	// measurement above, 9 are shorter than this; of the 16 that carried one,
+	// none is.
+	saidBeforeFloor = 60
+	saidBeforeMax   = 220
+)
+
+// saidBeforePrefix labels the line for what it is, in both renderings, and is
+// what the own-output recogniser in internal/search keys on.
+const saidBeforePrefix = "said just before this edit: "
 
 // attributeLine picks the session that replaced the text the commit deleted —
 // the session that made this change, and so wrote the line being read. Failing
@@ -210,7 +271,7 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 	best := lineAuthor{}
 	var bestAt time.Time
 	for _, s := range sessions {
-		for _, m := range s.Messages {
+		for i, m := range s.Messages {
 			if m.Role != sources.RoleWrote {
 				continue
 			}
@@ -229,6 +290,7 @@ func attributeByWritten(sessions []model.Session, target search.BlameTarget, c l
 					Matched: blameSpanKey(line),
 					Asked:   search.SessionTitle(s),
 					Wrote:   true,
+					Said:    saidBefore(s, i),
 				}
 				bestAt = m.Time
 			}
@@ -267,7 +329,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 	best := lineAuthor{}
 	var bestAt time.Time
 	for _, s := range sessions {
-		for _, m := range s.Messages {
+		for i, m := range s.Messages {
 			if m.Role != sources.RoleEdit {
 				continue
 			}
@@ -290,7 +352,7 @@ func attributeByReplaced(sessions []model.Session, target search.BlameTarget, c 
 				// a second candidate. The last one to write it before the
 				// commit is the one the commit carried (#3723).
 				if best.Matched == "" || m.Time.After(bestAt) {
-					best = lineAuthor{Session: s, Matched: key, Asked: search.SessionTitle(s)}
+					best = lineAuthor{Session: s, Matched: key, Asked: search.SessionTitle(s), Said: saidBefore(s, i)}
 					bestAt = m.Time
 				}
 				break
@@ -364,6 +426,9 @@ func printLineAuthor(w io.Writer, target search.BlameTarget, c lineCommit, a lin
 	}
 	if a.Asked != "" {
 		fmt.Fprintf(w, "  asked: %s\n", search.SafeLine(trunc80(a.Asked)))
+	}
+	if a.Said != "" {
+		fmt.Fprintf(w, "  %s%s\n", saidBeforePrefix, search.SafeLine(a.Said))
 	}
 	fmt.Fprintf(w, "  why, in full: deja ctx %s\n", shortID(s.ID))
 }
