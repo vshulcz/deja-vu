@@ -151,6 +151,33 @@ func TestTheStrictHeadIsCountedAndNamedUnderTheRelevanceLabel(t *testing.T) {
 	}
 }
 
+// A quoted phrase that matches nothing is retried without its quotes, and the
+// retry is published under the relevance label so the loosening is visible.
+// The words can all be there — only the phrase was not — and then the label
+// says nothing matched about an answer that did (#3815).
+func TestAQuotedQueryRetriedWithoutItsQuotesSaysWhatMatched(t *testing.T) {
+	dir := seedStore(t, 3)
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: `courier bikes "downtown routes"`, All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Tier != query.TierRelevance {
+		t.Fatalf("tier = %q, want the relabelled retry this is about", r.Tier)
+	}
+	if len(r.Sessions) == 0 {
+		t.Fatal("the retry found nothing, so there is nothing to label")
+	}
+	if r.Strict != len(r.Sessions) {
+		t.Fatalf("strict = %d over %d sessions, want every one of them", r.Strict, len(r.Sessions))
+	}
+	for _, s := range r.Sessions {
+		if !r.IsStrict(s) {
+			t.Fatalf("%q matched the loosened query but is not named as a match", s.ID)
+		}
+	}
+}
+
 func TestWordFormFallbackKeepsItsAnnotationUnderTheTail(t *testing.T) {
 	dir := seedStore(t, relevanceWindow+10)
 

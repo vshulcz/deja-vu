@@ -50,6 +50,13 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 			o2.Query = strings.ReplaceAll(o.Query, "\"", " ")
 			r2, err2 := searchDetailedOnce(dir, o2)
 			if err2 == nil && len(r2.Sessions) > 0 {
+				// The retry can land on the exact tier — the words are all
+				// there, only the phrase was not — and the label about to be
+				// put on it means nothing matched. Say how many did, the same
+				// way a thin strict answer does (#3815).
+				if r2.Strict == 0 && r2.Tier != query.TierRelevance {
+					r2.Strict, r2.StrictIDs = len(r2.Sessions), sessionKeySet(r2.Sessions)
+				}
 				r2.Tier = query.TierRelevance
 				return r2, nil
 			}
@@ -252,6 +259,16 @@ func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 		return SearchResult{}, err
 	}
 	return withRelevanceTail(dir, m, o, SearchResult{Sessions: ss, Tier: fallbackTier, Variants: fallbackVariants})
+}
+
+// sessionKeySet keys sessions the way StrictIDs is keyed, for the paths that
+// know every session they hand back matched.
+func sessionKeySet(ss []model.Session) map[string]bool {
+	out := make(map[string]bool, len(ss))
+	for _, s := range ss {
+		out[s.Harness+":"+s.ID] = true
+	}
+	return out
 }
 
 // thinAND is how few sessions an AND has to return before its own strictness
