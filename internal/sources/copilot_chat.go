@@ -671,6 +671,8 @@ func copilotChatWalkPart(part any, t time.Time, speech *[]string, extras *[]mode
 		return
 	case "toolInvocationSerialized":
 		copilotChatTool(m, t, extras)
+	case "textEditGroup":
+		copilotChatEdits(m, t, extras)
 	case "inlineReference":
 		if !IndexToolPaths() {
 			return
@@ -678,6 +680,45 @@ func copilotChatWalkPart(part any, t time.Time, speech *[]string, extras *[]mode
 		if p := copilotChatRefPath(m["inlineReference"]); p != "" {
 			*extras = append(*extras, model.Message{Role: RoleFiles, Text: p, Time: t})
 		}
+	}
+}
+
+// copilotChatEdits reads the written side of a Copilot Chat edit.
+//
+// A `textEditGroup` part carries the file as a uri and the edits as ranges
+// plus the text that replaced each one. The new text is there in full; the old
+// text is not — the range is all that says what was there — so this is the
+// written side only, and there is nothing in the store for the replaced rule
+// to read. Counted on a local store: 655 edit groups across 34 session files,
+// none of which reached the index, so `deja files`, `restore` and line-level
+// blame were silent for every Copilot Chat user (#595).
+func copilotChatEdits(m map[string]any, t time.Time, extras *[]model.Message) {
+	path := copilotChatRefPath(m["uri"])
+	if path == "" {
+		return
+	}
+	if IndexToolPaths() {
+		*extras = append(*extras, model.Message{Role: RoleFiles, Text: path, Time: t})
+	}
+	if !IndexWrites() {
+		return
+	}
+	// The edits arrive as a list of lists — one inner list per revision of the
+	// same group, and the empty one that closes it.
+	var written []string
+	for _, group := range copilotChatSlice(m["edits"]) {
+		for _, e := range copilotChatSlice(group) {
+			edit, ok := e.(map[string]any)
+			if !ok {
+				continue
+			}
+			if s, _ := edit["text"].(string); s != "" {
+				written = append(written, s)
+			}
+		}
+	}
+	if rec := WroteRecord(path, strings.Join(written, "\n")); rec != "" {
+		*extras = append(*extras, model.Message{Role: RoleWrote, Text: rec, Time: t})
 	}
 }
 

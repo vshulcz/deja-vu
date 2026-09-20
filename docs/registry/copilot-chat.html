@@ -47,6 +47,7 @@
 <p><code>globalStorage/github.copilot-chat/session-store.db</code> is a third store and is not read: every id in it also exists as a transcript, so it adds the session&#39;s <code>cwd</code> rather than history, and on the reporter&#39;s machine it covered the last two days against the transcripts&#39; eleven weeks.</p>
 <p><code>workspace.json</code> beside the storage directory holds <code>{&#34;folder&#34;:&#34;file:///…&#34;}</code> (or <code>workspace</code> for a multi-root <code>.code-workspace</code>); the project name is the last path segment. Empty-window sessions take <code>workingDirectory</code> the same way, or <code>-</code>. <code>inputState</code> is not read (it carries the GitHub account label).</p>
 <p>User turns are <code>message</code> as a string or <code>{text}</code>. Assistant speech is bare <code>{value}</code> markdown chunks (and a plain string in old files); <code>thinking</code> and UI chrome (<code>progressMessage</code>, <code>warning</code>, <code>info</code>, <code>systemNotification</code>) are skipped. Tool paths come from <code>toolInvocationSerialized.resultDetails</code> and <code>inlineReference</code>; terminal commands from <code>toolSpecificData.commandLine</code>.</p>
+<p>Edits are <code>textEditGroup</code> parts: a <code>uri</code> and a list of lists of <code>{text, range}</code>, where the text is what replaced the range. Only the written side is there — the range says where the old text was, not what it said — so the file and hashes of the written lines are recorded and no replaced span is. Counted on one machine&#39;s store: 655 edit groups across 34 session files, which became 624 written records over 6 sessions and 23,141 hashed lines.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install vscode</code> writes the user <code>mcp.json</code> VS Code reads in agent mode (top-level <code>servers</code>, <code>type: stdio</code>). Verified on VS Code 1.134.0: Copilot Chat started the server and called the <code>deja</code> tool with <code>mode: recall</code>.</li>
 <li><strong>Skill</strong>: the same install writes <code>&lt;User&gt;/prompts/deja.instructions.md</code> with <code>applyTo: &#34;**&#34;</code>, VS Code&#39;s custom instructions, which are in front of the model on every chat. Verified on 1.134.0: with that file and no mention of deja in the question, Copilot Chat called <code>recall</code> on its own.</li>
@@ -64,7 +65,7 @@
 <li><strong>Resume</strong>: Chat: Show Chats… in the editor, not a command.</li>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-18</p>
+<p><strong>Last verified:</strong> 2026-09-20</p>
 
 <hr>
 <p>deja reads this format and thirty-three others, and turns what it finds into memory your

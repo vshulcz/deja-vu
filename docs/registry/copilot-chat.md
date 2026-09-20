@@ -13,6 +13,8 @@ On VS Code Server 1.137 there is no `chatSessions` directory at all: the machine
 
 User turns are `message` as a string or `{text}`. Assistant speech is bare `{value}` markdown chunks (and a plain string in old files); `thinking` and UI chrome (`progressMessage`, `warning`, `info`, `systemNotification`) are skipped. Tool paths come from `toolInvocationSerialized.resultDetails` and `inlineReference`; terminal commands from `toolSpecificData.commandLine`.
 
+Edits are `textEditGroup` parts: a `uri` and a list of lists of `{text, range}`, where the text is what replaced the range. Only the written side is there — the range says where the old text was, not what it said — so the file and hashes of the written lines are recorded and no replaced span is. Counted on one machine's store: 655 edit groups across 34 session files, which became 624 written records over 6 sessions and 23,141 hashed lines.
+
 - **MCP**: `deja install vscode` writes the user `mcp.json` VS Code reads in agent mode (top-level `servers`, `type: stdio`). Verified on VS Code 1.134.0: Copilot Chat started the server and called the `deja` tool with `mode: recall`.
 - **Skill**: the same install writes `<User>/prompts/deja.instructions.md` with `applyTo: "**"`, VS Code's custom instructions, which are in front of the model on every chat. Verified on 1.134.0: with that file and no mention of deja in the question, Copilot Chat called `recall` on its own.
 - **Command**: a prompt file. `deja install vscode` writes
@@ -27,4 +29,4 @@ User turns are `message` as a string or `{text}`. Assistant speech is bare `{val
 - **Resume**: Chat: Show Chats… in the editor, not a command.
 - **Handoff**: paste.
 
-**Last verified:** 2026-09-18
+**Last verified:** 2026-09-20

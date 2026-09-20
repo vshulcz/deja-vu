@@ -222,7 +222,7 @@
         "fixtures/registry/copilot-chat/workspaceStorage/a1b2c3d4e5f6/GitHub.copilot-chat/transcripts/7c9e2d2c-0000-4000-8000-000000000000.jsonl"
       ],
       "parser_source": "internal/sources/copilot_chat.go",
-      "last_verified": "2026-09-18",
+      "last_verified": "2026-09-20",
       "display_name": "VS Code Copilot Chat",
       "capabilities": {
         "mcp": true,

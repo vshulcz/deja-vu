@@ -290,7 +290,11 @@ import (
 // Antigravity had the replaced side but not the written one. Both sides come
 // from a unified diff either way. A store built before this holds neither until
 // it re-reads its sources (#595, #3773).
-const version = 51
+// 52 reads the written side of a Copilot Chat edit. Its store keeps each edit
+// as a range plus the text that replaced it, so the new text is there in full
+// and the old text is not there at all — 655 edit groups on this store, and
+// nothing about any of them was indexed (#595).
+const version = 52
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
