@@ -1105,11 +1105,22 @@ func doctorCursorDetail(sqlite bool) string {
 		}
 		parts = append(parts, seg)
 	}
+	// Cursor CLI writes a second, content-addressed store per chat and nothing
+	// reads it. While a transcript sits beside every chat that has one, that
+	// costs nothing and this stays quiet; if a release stops writing
+	// transcripts, this is the only thing that would say so (#3772).
+	if n := sources.CursorChatsWithoutTranscript(); n > 0 {
+		parts = append(parts, fmt.Sprintf("%s with no transcript — contents not readable yet", doctorCount(n, "CLI chat")))
+	}
 	return strings.Join(parts, ", ")
 }
 
 func doctorCursorPresent() bool {
-	return len(sources.CursorTranscripts()) > 0 || len(sources.CursorDBs()) > 0
+	// Chats count as present even though nothing parses them: a machine whose
+	// Cursor writes only the new store would otherwise drop the row, and the
+	// row is where the warning above lives.
+	return len(sources.CursorTranscripts()) > 0 || len(sources.CursorDBs()) > 0 ||
+		len(sources.CursorChatStores()) > 0
 }
 
 func doctorCursorLocation() string {

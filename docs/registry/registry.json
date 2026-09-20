@@ -258,7 +258,7 @@
         "fixtures/registry/cursor/projects/registry-demo/agent-transcripts/registry-cursor.jsonl"
       ],
       "parser_source": "internal/sources/cursor.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-21",
       "display_name": "Cursor",
       "capabilities": {
         "mcp": true,

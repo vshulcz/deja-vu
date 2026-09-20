@@ -31,6 +31,19 @@ Tool calls follow the Anthropic `tool_use` shape with Cursor's own names: `path`
 
 Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. The transcript has no message timestamps, so deja uses file modification time.
 
+## The second CLI store, and why it is unread
+
+Cursor CLI also writes one SQLite store per chat:
+
+```
+~/.cursor/chats/<workspace-hash>/<chat-uuid>/meta.json
+~/.cursor/chats/<workspace-hash>/<chat-uuid>/store.db
+```
+
+`store.db` holds `blobs(id TEXT, data BLOB)` and `meta(key, value)`. The blobs are content-addressed and the tree needs no schema to walk: `meta`'s single value is hex-encoded JSON naming `latestRootBlobId`, that blob is protobuf whose repeated field 1 is a list of 32-byte child digests in message order, and each child is plain JSON in the Vercel AI SDK shape — `{"role","content"}` with `text`, `reasoning`, `tool-call` and `tool-result` parts, the calls named as above but keyed `toolName`/`args`.
+
+deja does not read it, because on the machine where it was decoded reading it added nothing: all 19 stores walked, and of the 67 turns they held, 51 were already in the JSONL transcript and the remaining 16 were the `<user_info>` environment preamble the transcript omits. Every chat with a `store.db` had a transcript beside it. What `deja doctor` reports instead is the count of chats with no transcript beside them, which is silent today and is the only signal if a release stops writing `agent-transcripts`.
+
 ## Resume
 
 CLI chats only. A transcript is named after the chat id `cursor-agent --resume`
@@ -47,5 +60,6 @@ take, so those still reopen only in the editor.
 - SQLite values are JSON inside a key-value table and malformed or null entries occur.
 - CLI project path encoding has the same separator-versus-hyphen ambiguity as Claude Code.
 - SQLite text is capped at 64 KiB. CLI subagent duplication is opt-in.
+- Both CLI layouts are written by `cursor-agent 2026.09.02-c22c1a3`, minutes apart in the same session.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-21
