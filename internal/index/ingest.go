@@ -3777,11 +3777,13 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			//
 			// Whether the kind can *resume* a parse does not matter here, only
 			// whether deja can parse it at all: a new file is read from its
-			// first byte either way. Requiring an offset parser sent any batch
-			// holding one such file down the replacement path, and on a
-			// hook-driven machine nothing takes that path — five senpi
-			// transcripts and five Copilot Chat ones sat unread for eight
-			// weeks with every pass seeing them (#3747).
+			// first byte either way. Requiring an offset parser refused the
+			// whole batch over one such file, and an inline caller hands
+			// rewrite-grade work to a detached warmup rather than doing it —
+			// so the live index on the machine this was found on had never
+			// read 1,013 of the files its own loaders list: five senpi
+			// transcripts, five Copilot Chat ones, and a thousand opencode
+			// session diffs, a kind that gains a file per session (#3747).
 			if _, ok := kindForPath(p); !ok {
 				return false
 			}
@@ -3887,17 +3889,21 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// Sorted, not map order: two sessions can claim the same harness:id, and
 	// which one wins decided the project a whole conversation was filed under
 	// — differently on every run (#698).
+	// A file deja has never read is read whole here, not resumed, so its counts
+	// start over the way the full paths start them. Leaving it out of the
+	// parsed set added this pass's bad lines to a count the file never had.
+	newFiles := map[string]FileState{}
+	for p, f := range changed {
+		if _, ok := old.Files[p]; !ok {
+			newFiles[p] = f
+		}
+	}
+	parsedThisPass(newFiles)
 	for _, p := range sortedKeys(changed) {
 		of, known := old.Files[p]
 		ss, err := parseAppendedFile(harness, p, of, !known)
-		if !known {
-			// Read whole, not resumed, so its counts start over the way the
-			// full paths start them. Leaving it out of the parsed set added
-			// this pass's bad lines to a count the file never had.
-			parsedThisPass(map[string]FileState{p: changed[p]})
-		}
 		if err != nil {
-			if of, ok := old.Files[p]; ok {
+			if known {
 				m.Files[p] = of // retry this file on the next pass
 			} else {
 				delete(m.Files, p)
