@@ -2942,6 +2942,26 @@ func OtherWordForms(dir string, terms []string) map[string][]string {
 // direction and empty in content — the reader has to guess which of their words
 // to drop, while deja already read these counts to decide there was none (#826).
 func TermSessionCounts(dir string, terms []string) map[string]int {
+	return termSessionCounts(dir, terms, false)
+}
+
+// TermSessionCountsSpoken counts only the sessions where a term appears in
+// something said rather than in something a tool printed.
+//
+// The caller is the word-forms note, and the difference is what that note is
+// for. deja prints the note into a terminal; a session that ran deja keeps
+// what it printed; the next index reads that transcript. So a form deja
+// generated to search for — "pgbouncereds", "retriesed" — comes back as a form
+// the store holds, and the note names it as a word somebody wrote. Measured on
+// a 2,739-session store: every generated form sat in one or two sessions and in
+// zero spoken ones, while the rarest real form was in three spoken sessions
+// (#3820). The tool bit already rides in the posting, so this costs no extra
+// read.
+func TermSessionCountsSpoken(dir string, terms []string) map[string]int {
+	return termSessionCounts(dir, terms, true)
+}
+
+func termSessionCounts(dir string, terms []string, spokenOnly bool) map[string]int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -2965,6 +2985,9 @@ func TermSessionCounts(dir string, terms []string) map[string]int {
 		seen := map[uint32]bool{}
 		for _, p := range posts {
 			if servable != nil && !servable[p.Sid] {
+				continue
+			}
+			if spokenOnly && p.Tool {
 				continue
 			}
 			seen[p.Sid] = true

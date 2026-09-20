@@ -1676,7 +1676,10 @@ func otherWordFormsNote(dir string, o query.Options, hits []search.Hit) string {
 	for _, list := range forms {
 		flat = append(flat, list...)
 	}
-	counts := index.TermSessionCounts(dir, flat)
+	// Spoken sessions only: deja prints this very note into terminals, the
+	// transcripts keep it, and the next index reads the forms deja generated
+	// back as forms the store holds (#3820).
+	counts := index.TermSessionCountsSpoken(dir, flat)
 	var parts []string
 	for _, term := range terms {
 		for _, form := range forms[term] {
