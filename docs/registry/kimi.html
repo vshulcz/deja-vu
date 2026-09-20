@@ -43,6 +43,7 @@
 <li><strong>Read override</strong>: <code>DEJA_KIMI_ROOT</code> (takes precedence over <code>KIMI_CODE_HOME</code> for reads)</li>
 <li><strong>Format</strong>: append-only JSONL wire protocol (observed <code>protocol_version</code> 1.1–1.4)</li>
 </ul>
+<p>Tool calls are <code>tool.call</code> events with <code>name</code> and <code>args</code>: <code>path</code> for the file tools, <code>old_string</code>/<code>new_string</code> on <code>Edit</code>, and the whole file as <code>content</code> on <code>Write</code>, which is the only record a created file&#39;s lines were ever in a session.</p>
 <p><code>state.json</code> next to each session supplies title, workDir (project) and</p>
 <p>timestamps. User turns arrive as <code>context.append_message</code>; streamed assistant</p>
 <p>turns are reconstructed from <code>step.begin</code> → <code>content.part</code> (type <code>text</code> only;</p>

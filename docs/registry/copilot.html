@@ -50,7 +50,9 @@
 <p>The work is filed outside the message stream. <code>tool.execution_start</code> carries</p>
 <p><code>toolName</code> and <code>arguments</code> — <code>path</code> for the file tools, <code>command</code> for <code>bash</code>,</p>
 <p>and <code>old_str</code>/<code>new_str</code> for an edit, which is the one place the replaced text</p>
-<p>survives. <code>tool.execution_complete</code> carries <code>data.result.content</code> and a</p>
+<p>survives. <code>create</code> hands over the whole file as <code>file_text</code>, and that is the</p>
+<p>only record a created file&#39;s lines were ever in a session — a commit that adds</p>
+<p>them deletes nothing for the replaced side to match. <code>tool.execution_complete</code> carries <code>data.result.content</code> and a</p>
 <p><code>success</code> flag; failed results are indexed on purpose, because the error a</p>
 <p>command hit is what a later search reaches for. <code>session.shutdown</code> also lists</p>
 <p><code>codeChanges.filesModified</code>, the only harness that hands over a modified-file</p>

@@ -13,7 +13,9 @@ both with `data.content` as a plain string.
 The work is filed outside the message stream. `tool.execution_start` carries
 `toolName` and `arguments` — `path` for the file tools, `command` for `bash`,
 and `old_str`/`new_str` for an edit, which is the one place the replaced text
-survives. `tool.execution_complete` carries `data.result.content` and a
+survives. `create` hands over the whole file as `file_text`, and that is the
+only record a created file's lines were ever in a session — a commit that adds
+them deletes nothing for the replaced side to match. `tool.execution_complete` carries `data.result.content` and a
 `success` flag; failed results are indexed on purpose, because the error a
 command hit is what a later search reaches for. `session.shutdown` also lists
 `codeChanges.filesModified`, the only harness that hands over a modified-file

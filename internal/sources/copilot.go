@@ -68,9 +68,13 @@ var copilotDialect = toolDialect{
 	pathKey:   "path",
 	pathTools: map[string]bool{"edit": true, "read": true, "write": true, "create": true},
 	shellTool: "bash",
-	editTools: map[string]bool{"edit": true},
-	oldKey:    "old_str",
-	newKey:    "new_str",
+	// The whole-file writes belong here too, or nothing a created file holds
+	// is evidence it was ever in a session — and a commit that only adds
+	// lines has no replaced side to fall back on (#595).
+	editTools:  map[string]bool{"edit": true, "create": true, "write": true},
+	oldKey:     "old_str",
+	newKey:     "new_str",
+	contentKey: "file_text",
 }
 
 func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, error) {

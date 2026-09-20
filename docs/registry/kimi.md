@@ -5,6 +5,8 @@
 - **Read override**: `DEJA_KIMI_ROOT` (takes precedence over `KIMI_CODE_HOME` for reads)
 - **Format**: append-only JSONL wire protocol (observed `protocol_version` 1.1–1.4)
 
+Tool calls are `tool.call` events with `name` and `args`: `path` for the file tools, `old_string`/`new_string` on `Edit`, and the whole file as `content` on `Write`, which is the only record a created file's lines were ever in a session.
+
 `state.json` next to each session supplies title, workDir (project) and
 timestamps. User turns arrive as `context.append_message`; streamed assistant
 turns are reconstructed from `step.begin` → `content.part` (type `text` only;

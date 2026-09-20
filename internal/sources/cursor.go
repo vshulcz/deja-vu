@@ -338,7 +338,11 @@ var cursorDialect = toolDialect{
 	pathKey:   "path",
 	pathTools: map[string]bool{"Read": true, "Write": true, "StrReplace": true, "Delete": true},
 	shellTool: "Shell",
-	editTools: map[string]bool{"StrReplace": true},
+	// Write is an edit as far as the written side is concerned: its content
+	// is the only record that a created file's lines were ever in a session
+	// (#595).
+	editTools:  map[string]bool{"StrReplace": true, "Write": true},
+	contentKey: "contents",
 }
 
 // ParseCursorTranscript reads a CLI agent transcript: Anthropic wire-shaped

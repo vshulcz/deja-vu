@@ -64,7 +64,10 @@ var kimiDialect = toolDialect{
 	pathKey:   "path",
 	pathTools: map[string]bool{"Read": true, "Edit": true, "Write": true, "ReadMediaFile": true},
 	shellTool: "Bash",
-	editTools: map[string]bool{"Edit": true},
+	// Write carries the whole file under `content`, which is the default
+	// key — it only had to be counted as an edit for the written side to
+	// reach the index (#595).
+	editTools: map[string]bool{"Edit": true, "Write": true},
 }
 
 // kimiState is the slice of state.json deja cares about.

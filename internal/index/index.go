@@ -293,7 +293,10 @@ import (
 // 52 reads the written side of a Copilot Chat edit. Its store keeps each edit
 // as a range plus the text that replaced it, so the new text is there in full
 // and the old text is not there at all — 655 edit groups on this store, and
-// nothing about any of them was indexed (#595).
+// nothing about any of them was indexed (#595). It also records the whole-file
+// writes Copilot CLI, Cursor and Kimi dropped: each counted its replace tool as
+// an edit and its write tool as a path only, so a file created wholesale left
+// nothing to attribute from.
 const version = 52
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

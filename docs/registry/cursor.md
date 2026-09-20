@@ -27,6 +27,8 @@ Bubble `type: 1` maps to `user`; other numeric types map to `assistant`. Text us
 {"role":"assistant","message":{"content":[{"type":"text","text":"The cache key omitted the locale."}]}}
 ```
 
+Tool calls follow the Anthropic `tool_use` shape with Cursor's own names: `path` rather than `file_path`, `Shell` rather than `Bash`, `old_string`/`new_string` on `StrReplace`, and the whole file as `contents` on `Write` — the last of these is the only record a created file's lines were ever in a session.
+
 Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. The transcript has no message timestamps, so deja uses file modification time.
 
 ## Resume
