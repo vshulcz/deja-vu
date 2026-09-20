@@ -12,7 +12,7 @@ import (
 
 func TestParseBlame(t *testing.T) {
 	path, options, jsonOutput, err := parseBlame([]string{"--json", "--all", "--harness", "claude", "--project", "api", "--since", "30d", "main.go"})
-	if err != nil || path != "main.go" || !jsonOutput || !options.All || options.Harness != "claude" || options.Project != "api" || options.Since <= 0 {
+	if err != nil || path != "main.go" || !jsonOutput.JSON || !options.All || options.Harness != "claude" || options.Project != "api" || options.Since <= 0 {
 		t.Fatalf("parse path=%q options=%#v json=%v err=%v", path, options, jsonOutput, err)
 	}
 	for _, args := range [][]string{{}, {"--harness"}, {"--bad", "main.go"}, {"a.go", "b.go"}} {

@@ -102,18 +102,48 @@ func dejaLineAnswerLine(l string) bool {
 	if strings.HasPrefix(l, "why, in full: deja ctx ") {
 		return true
 	}
-	if strings.HasPrefix(l, "no indexed session wrote the lines this commit replaced") {
+	// The silence sentence, by its opening rather than in full: it was
+	// rewritten when the written side landed and this pinned the old wording
+	// word for word (#3773). Nothing measurable was lost while it did — the
+	// sentence names no file, so it is never picked as evidence about one on
+	// its own — but the opening is what the rule is about, and the header above
+	// it does name the file.
+	if strings.HasPrefix(l, "no indexed session wrote ") {
 		return true
 	}
-	return dejaLineHeader.MatchString(l)
+	// The line answer as JSON is one line and names itself on it (#3723).
+	if strings.Contains(l, `"kind":"deja.blame-line"`) {
+		return true
+	}
+	return dejaLineHeader.MatchString(l) || dejaGitNoteLine.MatchString(l)
 }
 
 // dejaLineHeader is the answer's first line: `pool.go:3 last changed in abc1234`.
 var dejaLineHeader = regexp.MustCompile(`^[^\s:]+:\d+ last changed in [0-9a-f]{7,40}\b`)
 
+// dejaGitNoteLine is the note `blame --git-note` writes on a commit, which
+// reaches a transcript the moment someone runs `git log --notes=deja` in a
+// session — the same loop as the answer itself, one remove further out.
+var dejaGitNoteLine = regexp.MustCompile(`^deja: [^\s:]+:\d+ written in `)
+
+// mayHoldOwnReport is the cheap check that decides whether a message is worth
+// splitting into lines at all — blame runs this over every message of every
+// candidate session.
+//
+// It used to be "does the text contain deja", which is true of most of deja's
+// output and false of one shape: the line answer for a line nothing is
+// attributed to is a header and a sentence, and neither says "deja". So that
+// answer was never filtered, and it is the answer that names the file twice
+// (#3723).
+func mayHoldOwnReport(text string) bool {
+	return strings.Contains(text, "deja") ||
+		strings.Contains(text, "last changed in") ||
+		strings.Contains(text, "no indexed session")
+}
+
 // withoutOwnReport drops those lines, leaving everything a person wrote.
 func withoutOwnReport(text string) string {
-	if !strings.Contains(text, "deja") {
+	if !mayHoldOwnReport(text) {
 		return text
 	}
 	lines := strings.Split(text, "\n")

@@ -2714,9 +2714,18 @@ func nearestSearchFlag(a string) string {
 	return nearestKnownFlag(a, searchFlags)
 }
 
-func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
+// blameMode is what the caller asked for beyond the hits: the line answer on
+// its own (`--attribution`), as JSON, and whether to record it in
+// refs/notes/deja (#3723).
+type blameMode struct {
+	JSON        bool
+	Attribution bool
+	GitNote     bool
+}
+
+func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 	o := search.BlameOptions{}
-	jsonOutput := false
+	mode := blameMode{}
 	var path string
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -2728,23 +2737,30 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 			// nobody has ever touched.
 			if i+1 < len(args) {
 				if path != "" {
-					return "", o, false, fmt.Errorf("blame accepts one path")
+					return "", o, mode, fmt.Errorf("blame accepts one path")
 				}
 				path = args[i+1]
 			}
 			i++
 		case "--json":
-			jsonOutput = true
+			mode.JSON = true
+		case "--attribution":
+			// The line answer on its own, without the file's listing under it:
+			// a caller asking about a line wants one answer, and --json turns
+			// it into the object that answer needs (#3723).
+			mode.Attribution = true
+		case "--git-note":
+			mode.GitNote = true
 		case "--all":
 			o.All = true
 		case "--harness", "--project", "--since":
 			if i+1 >= len(args) {
-				return "", o, false, fmt.Errorf("%s needs value", a)
+				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			i++
 			if strings.TrimSpace(args[i]) == "" {
 				// Empty is how "no filter" is spelled inside deja (#1612).
-				return "", o, false, fmt.Errorf("%s needs value", a)
+				return "", o, mode, fmt.Errorf("%s needs value", a)
 			}
 			switch a {
 			case "--harness":
@@ -2754,7 +2770,7 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 			case "--since":
 				d, err := parseDur(args[i])
 				if err != nil {
-					return "", o, false, err
+					return "", o, mode, err
 				}
 				o.Since = d
 			}
@@ -2762,27 +2778,28 @@ func parseBlame(args []string) (string, search.BlameOptions, bool, error) {
 			if strings.HasPrefix(a, "-") {
 				if flagName(a) == "--limit" {
 					// blame widens with --all rather than a count (#3405).
-					return "", o, false, fmt.Errorf("blame: unknown flag %q — it takes --all to show every session", a)
+					return "", o, mode, fmt.Errorf("blame: unknown flag %q — it takes --all to show every session", a)
 				}
-				return "", o, false, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
+				return "", o, mode, fmt.Errorf("blame: unknown flag %q; a path or question that starts with a dash goes after `--`", a)
 			}
 			if path != "" {
-				return "", o, false, fmt.Errorf("blame accepts one path")
+				return "", o, mode, fmt.Errorf("blame accepts one path")
 			}
 			path = a
 		}
 	}
 	if path == "" {
-		return "", o, false, fmt.Errorf("blame needs a path — `deja blame internal/index/sync.go` says who last worked on it")
+		return "", o, mode, fmt.Errorf("blame needs a path — `deja blame internal/index/sync.go` says who last worked on it")
 	}
-	return path, o, jsonOutput, nil
+	return path, o, mode, nil
 }
 
 func runBlame(dir string, args []string) error {
-	path, o, jsonOutput, err := parseBlame(args)
+	path, o, mode, err := parseBlame(args)
 	if err != nil {
 		return err
 	}
+	jsonOutput := mode.JSON
 	// A typo'd harness must name the mistake, not read as "nobody touched this
 	// file under harness X" — the same reason search and the MCP blame validate
 	// it (#1113). blame has no --role to check.
@@ -2793,6 +2810,19 @@ func runBlame(dir string, args []string) error {
 	if err != nil {
 		return err
 	}
+	// Both of the line-level flags answer about a line and have nothing to say
+	// about a file. Refusing here, by name, beats answering about the whole
+	// file and leaving the caller to notice their `:42` went nowhere (#3726).
+	if (mode.Attribution || mode.GitNote) && target.Line <= 0 {
+		flag := "--attribution"
+		if mode.GitNote {
+			flag = "--git-note"
+		}
+		if target.LineNote != "" {
+			return fmt.Errorf("blame %s: %s", flag, target.LineNote)
+		}
+		return fmt.Errorf("blame %s answers about one line — `deja blame %s:42 %s`", flag, path, flag)
+	}
 	// Before the answer, because the answer is about the file and the reader
 	// asked about a line: said afterwards it reads as a footnote to a result
 	// they think is line-level (#3738).
@@ -2802,6 +2832,11 @@ func runBlame(dir string, args []string) error {
 	hits, hidden, total, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
+	}
+	// The line answer alone, in either rendering, and nothing about the file
+	// under it: that is what was asked for.
+	if mode.Attribution || mode.GitNote {
+		return blameLineOnly(os.Stdout, dir, target, hits, mode)
 	}
 	// A line was asked about, so answer about the line first: git says which
 	// commit wrote it, and the store says which session wrote the text that
@@ -3902,6 +3937,7 @@ Usage:
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
   deja ctx <query|id-prefix>
   deja blame <path>[:line] [--all] [--json] [--project name] [--harness name] [--since 30d]
+  deja blame <path>:<line> --attribution [--json] [--git-note]  (the line answer alone)
   deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]

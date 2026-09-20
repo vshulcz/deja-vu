@@ -388,10 +388,23 @@ func shortSHA(s string) string {
 // is not there, when the file is not in a repository, or when the line is
 // uncommitted — none of those is a fact about the store.
 func lineBlame(w io.Writer, dir string, target search.BlameTarget, hits []search.BlameHit) {
-	c, why := gitLineCommit(target.FullPath, target.Line)
+	c, author, found, why := lineAttribution(dir, target, hits)
 	if why != "" {
 		fmt.Fprintf(w, "%s:%d — %s\n\n", target.Base, target.Line, why)
 		return
+	}
+	printLineAuthor(w, target, c, author, found)
+	fmt.Fprintln(w)
+}
+
+// lineAttribution is the whole line-level answer as data: the commit git names,
+// the session the rules attribute it to, and — when nothing can be said at all
+// — the sentence saying which silence this is. The prose answer and the JSON
+// one are two renderings of this, so neither can drift from the other (#3723).
+func lineAttribution(dir string, target search.BlameTarget, hits []search.BlameHit) (lineCommit, lineAuthor, bool, string) {
+	c, why := gitLineCommit(target.FullPath, target.Line)
+	if why != "" {
+		return lineCommit{}, lineAuthor{}, false, why
 	}
 	// A blame hit carries only the messages that mention the file, and an edit
 	// record is not one of them — the span is what was replaced, which does not
@@ -403,9 +416,8 @@ func lineBlame(w io.Writer, dir string, target search.BlameTarget, hits []search
 	}
 	sessions, err := index.FindManyByIdentity(dir, ids)
 	if err != nil {
-		return
+		return c, lineAuthor{}, false, ""
 	}
 	author, found := attributeLine(sessions, target, c, gitRemovedLines(target.FullPath, c.SHA))
-	printLineAuthor(w, target, c, author, found)
-	fmt.Fprintln(w)
+	return c, author, found, ""
 }

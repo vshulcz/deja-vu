@@ -120,7 +120,7 @@ func TestBlameTakesAPathBehindTheTerminator(t *testing.T) {
 	if path != "-report.md" {
 		t.Errorf("path = %q, want -report.md", path)
 	}
-	if !jsonOut {
+	if !jsonOut.JSON {
 		t.Error("--json before the terminator was dropped")
 	}
 	if o.All {

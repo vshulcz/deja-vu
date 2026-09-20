@@ -947,6 +947,37 @@ with it. A consumer reading its presence as "this was withdrawn" wants
 
 The MCP `blame` tool returns the same array shape.
 
+## `deja blame <path>:<line> --attribution --json`
+
+The line-level answer, which is a different question: not which sessions
+discussed a file but which session wrote one line of it. It is one object, on
+one line, and the array above is unchanged — a consumer reading
+`deja blame <path> --json` sees nothing new.
+
+```json
+{"kind":"deja.blame-line","schema_version":2,"file":"pool.go","line":42,"commit":{"sha":"33ec9160c1","subject":"fix: one pool per shard","author":"someone","when":"2026-09-18T09:12:00Z"},"attributed":true,"rule":"wrote","matched":"cfg.MaxConns = int32(size)","session":{"harness":"claude","id":"2915986c","project":"myapp","asked":"make the pool size configurable","ctx":"deja ctx 2915986c"}}
+```
+
+`rule` says which rule answered, and the two are not equally strong.
+`replaced` means the session replaced the exact text this commit deleted, so it
+made this change. `wrote` means the session wrote this line, into this file,
+before the commit — a line written in twenty sessions attributes to the last of
+them. A consumer that wants only the strong claim reads `rule == "replaced"`.
+
+`attributed` is false when git named the commit and no indexed session answers
+for the line; `session`, `rule` and `matched` are then absent. `why` carries
+the one sentence saying why nothing can be said at all — an uncommitted line, a
+file outside a repository, no git — and `commit` is absent with it.
+
+It is one line rather than the indented shape the envelopes use because
+anything deja prints that names a file becomes evidence about that file in the
+next session's transcript, and blame has to recognise its own answer to avoid
+quoting it back. One line is one thing to recognise.
+
+`--attribution` without `--json` prints the same answer as prose, and
+`--git-note` records it on the commit in `refs/notes/deja`, which is opt-in
+because a note is a public claim.
+
 ## `deja wip --json`
 
 What the last session in this directory was doing, derived from that session's

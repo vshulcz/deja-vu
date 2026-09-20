@@ -131,6 +131,12 @@ count when the line is past the end of the file. No reason is printed with it: o
 line lifted out of a session would read as the reason for a change it has nothing to
 do with.
 
+`--attribution` serves that answer alone, and with `--json` as one object naming the
+rule that answered (`replaced` or `wrote`); `--git-note` writes it to
+`refs/notes/deja`, idempotently and only where a session is named. Every shape deja
+prints that names a file arrives with its recogniser in `internal/search`, since a
+transcript keeps what deja printed and blame reads transcripts.
+
 ## Sync format
 
 `deja sync export <dir>` reads `records.bin` and writes JSONL batch files named `deja-sync-<source-hash>-<timestamp>.jsonl`. Each line is one object:
