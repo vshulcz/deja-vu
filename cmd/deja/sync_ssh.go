@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,6 +24,13 @@ var sshRunner = func(name string, args ...string) (string, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	if sink := currentLineSink(); sink != nil {
+		// The caller wants the remote's own progress as it happens rather than
+		// after the command exits. Both streams are still collected in full: the
+		// error path quotes them, and a line already shown is not shown twice.
+		cmd.Stdout = io.MultiWriter(&stdout, newLineWriter(sink))
+		cmd.Stderr = io.MultiWriter(&stderr, newLineWriter(sink))
+	}
 	err := cmd.Run()
 	if err != nil && strings.TrimSpace(stderr.String()) != "" {
 		// The comment above says what stderr holds — host-key notices and
@@ -164,7 +172,19 @@ func runSyncAll(dir string, full bool) error {
 	return nil
 }
 
-func syncSSHPush(dir, host string, full bool) error {
+func syncSSHPush(dir, host string, full bool) (err error) {
+	phases := newSyncPhases(os.Stderr)
+	// A phase left running has to be stopped whichever way this returns, and
+	// the report is only true of an exchange that finished: "pushed to mini in
+	// 3m" above a failure would be a lie about the thing that just failed.
+	defer func() {
+		if err == nil {
+			phases.summary("pushed to " + hostForEcho(host))
+			return
+		}
+		phases.finishPhase()
+	}()
+	phases.start("indexing what changed")
 	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 		return err
 	}
@@ -173,6 +193,7 @@ func syncSSHPush(dir, host string, full bool) error {
 		return err
 	}
 	defer os.RemoveAll(tmp)
+	phases.start("exporting records")
 	// Watermarks advance only after the remote import succeeds: acknowledged
 	// delivery, so a failed scp or remote error cannot silently drop records
 	// from every later push.
@@ -203,6 +224,8 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err != nil {
 		return err
 	}
+	phases.start("transferring to %s", hostForEcho(host))
+	phases.note("%s in %d batch%s", humanBytes(totalFileBytes(batches)), len(batches), pluralS(len(batches)))
 	// One scp per batch of paths, not one for all of them. Export writes a file
 	// per source transcript, so a machine with tens of thousands of records
 	// hands scp thousands of paths — and Windows refuses a command line over
@@ -217,7 +240,14 @@ func syncSSHPush(dir, host string, full bool) error {
 	}
 	remote := fmt.Sprintf(`d=$(command -v deja || echo "$HOME/.local/bin/deja"); "$d" sync import %s; rc=$?; rm -rf %s; exit $rc`,
 		shellQuote(rtmp), shellQuote(rtmp))
+	phases.start("importing on %s", hostForEcho(host))
+	// The import is the phase that used to be silent longest: the remote's own
+	// progress was buffered until the command exited. Streamed, it arrives while
+	// it happens — bounded and sanitised per line, since it is text a machine at
+	// the other end writes (#1833).
+	restore := streamRemoteLines(host)
 	out, err := sshRunner("ssh", append(sshOpts(), host, "sh -lc "+shellQuote(remote))...)
+	streamed := restore()
 	out = strings.TrimSpace(out)
 	if err != nil {
 		return fmt.Errorf("remote import: %v: %s", err, remoteOutputForEcho(out))
@@ -225,17 +255,40 @@ func syncSSHPush(dir, host string, full bool) error {
 	if err := commit(); err != nil {
 		return fmt.Errorf("delivered, but recording watermarks failed (next push may resend; harmless — import dedupes): %w", err)
 	}
-	if out != "" {
+	// Printed once: a line already shown as it arrived is not repeated at the
+	// end, or every remote sentence lands twice.
+	if out != "" && !streamed {
 		fmt.Fprintf(os.Stdout, "%s: %s\n", hostForEcho(host), remoteOutputForEcho(out))
 	}
 	return nil
 }
 
-func syncSSHPull(dir, host string, full bool) error {
+// totalFileBytes is how much the transfer has to carry, which is the one
+// number that makes a long scp legible.
+func totalFileBytes(paths []string) int64 {
+	var n int64
+	for _, p := range paths {
+		if fi, err := os.Stat(p); err == nil {
+			n += fi.Size()
+		}
+	}
+	return n
+}
+
+func syncSSHPull(dir, host string, full bool) (err error) {
+	phases := newSyncPhases(os.Stderr)
+	defer func() {
+		if err == nil {
+			phases.summary("pulled from " + hostForEcho(host))
+			return
+		}
+		phases.finishPhase()
+	}()
 	rtmp, err := sshCapture(host, "mktemp -d")
 	if err != nil {
 		return err
 	}
+	phases.start("exporting on %s", hostForEcho(host))
 	exportCmd := "sync export"
 	if full {
 		exportCmd += " --full"
@@ -281,6 +334,7 @@ func syncSSHPull(dir, host string, full bool) error {
 		return err
 	}
 	defer os.RemoveAll(ltmp)
+	phases.start("transferring from %s", hostForEcho(host))
 	if out, err := sshRunner("scp", append(sshOpts(), "-q", host+":"+rtmp+"/*.jsonl", ltmp+"/")...); err != nil {
 		cleanup()
 		// The host stays as written here: the sentence hands over a command to
@@ -293,6 +347,7 @@ func syncSSHPull(dir, host string, full bool) error {
 	// Taken before the import so only what this exchange brings is attributed
 	// to this host (#1887).
 	before := importsByPeerName(dir)
+	phases.start("importing what arrived")
 	n, err := index.Import(dir, ltmp)
 	if err != nil {
 		return fmt.Errorf("%w — the remote already advanced its watermark for this batch; recover it with `deja sync ssh %s --pull --full`", err, pasteSafe(host))

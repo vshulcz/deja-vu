@@ -155,6 +155,8 @@ The name a machine calls itself is not the alias you type at it, and an imported
 
 `deja sync ssh <host>` wraps the same export/import in one command: export to a temp dir, scp the batches, run the remote import (system ssh/scp, remote binary from PATH or `~/.local/bin/deja`).
 
+Each of those phases names itself on stderr before it starts, repeats every ten seconds while it runs, and the run ends with where the time went; the remote's own output is echoed line by line as it arrives rather than after the ssh command exits, bounded and sanitised per line the way every other remote sentence is. Plain lines rather than a bar, because this output is read from a launchd log as often as from a terminal. Transfer says how many bytes in how many batches; nothing says anything per record or per path.
+
 ## Incremental algorithm
 
 `currentFiles` records path, size, and mtime for known stores.
