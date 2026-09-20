@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -94,8 +95,10 @@ func TestCodexRecordsBothSidesOfAPatch(t *testing.T) {
 		t.Errorf("the written record does not hold the added line: %q", gotWrote)
 	}
 	// Paths in a Codex patch are relative to the session's cwd, and blame
-	// compares the tail of the path it is given.
-	if path != "/w/internal/pool/pool.go" {
+	// compares the tail of the path it is given. The record keeps the host's
+	// separator, and recordNamesFile folds them before comparing, so this
+	// folds them too rather than pinning the reader to one platform.
+	if filepath.ToSlash(path) != "/w/internal/pool/pool.go" {
 		t.Errorf("the record is filed under %q", path)
 	}
 	if old, _ := HashWrittenLine(removed); func() bool { _, ok := WroteRecordHas(gotWrote, old); return ok }() {
