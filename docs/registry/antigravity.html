@@ -44,6 +44,13 @@
 <pre><code class="language-json">{&#34;source&#34;:&#34;USER_EXPLICIT&#34;,&#34;created_at&#34;:&#34;2026-07-17T09:00:00Z&#34;,&#34;content&#34;:&#34;&lt;USER_REQUEST&gt;Check the build.&lt;ADDITIONAL_METADATA&gt;{\&#34;cwd\&#34;:\&#34;/work/api\&#34;}&lt;/ADDITIONAL_METADATA&gt;&lt;/USER_REQUEST&gt;&#34;}</code></pre>
 <p><code>USER_EXPLICIT</code> maps to <code>user</code> and <code>MODEL</code> maps to <code>assistant</code>. Other sources are ignored. <code>created_at</code> is RFC 3339. The directory below <code>brain</code> is the session ID; the transcript does not currently provide project metadata, so deja records <code>-</code>.</p>
 <p>Before indexing user text, deja removes the outer <code>&lt;USER_REQUEST&gt;</code> wrapper and complete <code>&lt;ADDITIONAL_METADATA&gt;</code> and <code>&lt;USER_SETTINGS_CHANGE&gt;</code> blocks. Assistant content is retained as written. Content is capped at 64 KiB.</p>
+<p>A tool step names its file in a sentence (&#34;The following changes were made by</p>
+<p>the replace_file_content tool to: <code>&lt;path&gt;</code>&#34;), not on a labelled line, and</p>
+<p>carries the change as a <code>[diff_block_start]</code> … <code>[diff_block_end]</code> block. Both</p>
+<p>sides of that block are read: the removed lines are the replaced span, the added</p>
+<p>lines are the written side <code>deja blame</code> attributes a line by. Some blocks carry</p>
+<p>unified <code>--- a/x</code> / <code>+++ b/x</code> headers, which are not lines of the file and are</p>
+<p>skipped.</p>
 <h2 id="handoff">Handoff</h2>
 <p>Antigravity&#39;s terminal client is <code>agy</code>, and <code>agy -i &lt;prompt&gt;</code> opens an</p>
 <p>interactive session on it, so <code>deja handoff --to agy</code> — or <code>--to antigravity</code>,</p>
@@ -55,7 +62,7 @@
 <li>A malformed or partially written JSONL line is skipped.</li>
 <li>If a timestamp is absent, later messages fall back to the session start when one has already been observed.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-07-17</p>
+<p><strong>Last verified:</strong> 2026-09-20</p>
 
 <hr>
 <p>deja reads this format and thirty-three others, and turns what it finds into memory your

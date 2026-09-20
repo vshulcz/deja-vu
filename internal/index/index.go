@@ -284,7 +284,13 @@ import (
 // written line of 24 runes or more, so no new user text enters the index. A
 // store built before this has no written side until it re-reads its sources
 // (#3773).
-const version = 50
+// 51 reads the edits Zed and Antigravity make. Zed keeps an edit on the tool
+// result rather than the call — the call holds a path and a sentence of intent —
+// so 783 spans across 29 of 30 sessions on this store were never read, and
+// Antigravity had the replaced side but not the written one. Both sides come
+// from a unified diff either way. A store built before this holds neither until
+// it re-reads its sources (#595, #3773).
+const version = 51
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

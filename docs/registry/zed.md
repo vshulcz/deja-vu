@@ -60,6 +60,16 @@ Both matter. Zed rewrites a thread in the current shape only when that thread is
 
 A `ToolUse` block is read for the work it did: a `terminal` call becomes a command record, and the path arguments of the file tools become a files record. An `Agent` message's `tool_results` map — keyed by tool use id, so it is emitted in id order to keep a rebuild stable — becomes tool-output records, taking `content.Text` and falling back to `output` when it is a string. That is where a failed terminal run's exit code and error text live, which is what `deja fix` pairs a command with. Each of the three follows its own switch (`DEJA_INDEX_COMMANDS`, `DEJA_INDEX_PATHS`, `DEJA_INDEX_TOOL_OUTPUT`).
 
+An edit is the exception: it is on the result, not on the call. An `edit_file`
+call's input carries a path, a mode and a sentence of intent — on the store this
+was read against, 684 of them, of which 23 held any text at all — while the
+result that comes back carries `input_path`, the whole file before and after,
+and a unified `diff`. 589 of the 684 have it. deja reads the diff: its removed
+lines become the replaced spans `deja restore` hands back, and its added lines
+become the written side `deja blame` attributes a line by. The whole-file texts
+beside it are up to 67 KB each and are not what stopped existing at any one
+line, so they are left alone.
+
 `folder_paths` is a serialized `PathList`: the workspace roots newline-joined in lexicographic order, with `folder_paths_order` holding comma-joined display indices. The first path names the project.
 
 ## Known quirks and drift
@@ -84,4 +94,4 @@ editor runs nothing before a prompt is sent, so there is no point to inject at.
 
 Checked against Zed 1.16.1.
 
-**Last verified:** 2026-08-21
+**Last verified:** 2026-09-20

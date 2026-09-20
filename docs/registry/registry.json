@@ -83,7 +83,7 @@
         "fixtures/registry/antigravity/brain/registry-antigravity/.system_generated/logs/transcript.jsonl"
       ],
       "parser_source": "internal/sources/antigravity.go",
-      "last_verified": "2026-07-17",
+      "last_verified": "2026-09-20",
       "display_name": "Antigravity",
       "capabilities": {
         "mcp": true,
@@ -964,7 +964,7 @@
         "fixtures/registry/zed/zed.sql"
       ],
       "parser_source": "internal/sources/zed.go",
-      "last_verified": "2026-08-21",
+      "last_verified": "2026-09-20",
       "display_name": "Zed",
       "capabilities": {
         "mcp": true,

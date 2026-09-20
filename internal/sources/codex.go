@@ -510,6 +510,7 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 	var files []string
 	seen := map[string]bool{}
 	removed := map[string][]string{}
+	added := map[string][]string{}
 	current := ""
 	for _, line := range strings.Split(body, "\n") {
 		if m := codexPatchFile.FindStringSubmatch(line); m != nil {
@@ -528,12 +529,25 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 		if current != "" && strings.HasPrefix(line, "-") {
 			removed[current] = append(removed[current], strings.TrimPrefix(line, "-"))
 		}
+		// And the written side, which is what attribution needs: this format
+		// has no "+++ b/x" header either, so a single leading plus is a line
+		// the patch adds (#3773).
+		if current != "" && strings.HasPrefix(line, "+") {
+			added[current] = append(added[current], strings.TrimPrefix(line, "+"))
+		}
 	}
 	if len(files) == 0 {
 		return
 	}
 	if IndexToolPaths() {
 		s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(files, "\n"), Time: t})
+	}
+	if IndexWrites() {
+		for _, f := range files {
+			if rec := WroteRecord(f, strings.Join(added[f], "\n")); rec != "" {
+				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
+			}
+		}
 	}
 	if !IndexEdits() {
 		return

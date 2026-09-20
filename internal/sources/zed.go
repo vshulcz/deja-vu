@@ -456,7 +456,12 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 			} `json:"ToolUse"`
 		} `json:"content"`
 		ToolResults map[string]struct {
-			Content struct {
+			// The tool this result belongs to. An edit_file result carries the
+			// change itself, which the call that asked for it does not: its
+			// input is a path, a mode and a sentence of intent (684 calls on
+			// the store this was read against, 23 of which carried any text).
+			ToolName string `json:"tool_name"`
+			Content  struct {
 				Text string `json:"Text"`
 			} `json:"content"`
 			Output json.RawMessage `json:"output"`
@@ -486,6 +491,40 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 			}
 			if text != "" {
 				out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: t})
+			}
+		}
+	}
+	if IndexEdits() || IndexWrites() {
+		ids := make([]string, 0, len(msg.ToolResults))
+		for id := range msg.ToolResults {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		for _, id := range ids {
+			r := msg.ToolResults[id]
+			if r.ToolName != "edit_file" {
+				continue
+			}
+			var res struct {
+				Path string `json:"input_path"`
+				Diff string `json:"diff"`
+			}
+			if json.Unmarshal(r.Output, &res) != nil || res.Path == "" || res.Diff == "" {
+				continue
+			}
+			// The diff rather than the whole-file old_text and new_text beside
+			// it: those run to 67 KB each on this store and the diff is the
+			// part that changed, in the same unified form opencode's diff
+			// store uses.
+			if IndexEdits() {
+				for _, span := range unifiedDiffSpans(res.Path, res.Diff) {
+					out = append(out, model.Message{Role: RoleEdit, Text: span, Time: t})
+				}
+			}
+			if IndexWrites() {
+				if rec := WroteRecord(res.Path, addedLinesOfUnifiedDiff(res.Diff)); rec != "" {
+					out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: t})
+				}
 			}
 		}
 	}

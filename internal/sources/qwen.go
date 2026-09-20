@@ -181,6 +181,11 @@ func qwenWorkRecords(v any, t time.Time) []model.Message {
 				recs = append(recs, model.Message{Role: RoleFiles, Text: p, Time: t})
 			}
 		}
+		if IndexWrites() {
+			for _, w := range wroteRecordsIn(calls, qwenDialect) {
+				recs = append(recs, model.Message{Role: RoleWrote, Text: w, Time: t})
+			}
+		}
 		if IndexEdits() {
 			for _, span := range editSpansIn(calls, qwenDialect) {
 				recs = append(recs, model.Message{Role: RoleEdit, Text: span, Time: t})

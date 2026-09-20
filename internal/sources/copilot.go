@@ -70,6 +70,7 @@ var copilotDialect = toolDialect{
 	shellTool: "bash",
 	editTools: map[string]bool{"edit": true},
 	oldKey:    "old_str",
+	newKey:    "new_str",
 }
 
 func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, error) {
@@ -133,6 +134,11 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			if IndexToolPaths() {
 				if p := toolPathsIn(part, copilotDialect); p != "" {
 					records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
+				}
+			}
+			if IndexWrites() {
+				for _, w := range wroteRecordsIn(part, copilotDialect) {
+					records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
 				}
 			}
 			if IndexEdits() {

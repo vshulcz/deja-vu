@@ -392,6 +392,11 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: e, Time: at})
 			}
 		}
+		if IndexWrites() {
+			for _, w := range wroteRecordsIn(msg["content"], cursorDialect) {
+				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: at})
+			}
+		}
 		if IndexCommands() {
 			for _, cmd := range commandsIn(msg["content"], cursorDialect) {
 				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: at})

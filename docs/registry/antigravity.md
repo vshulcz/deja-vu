@@ -16,6 +16,14 @@ Each line has a source, content, and creation time:
 
 Before indexing user text, deja removes the outer `<USER_REQUEST>` wrapper and complete `<ADDITIONAL_METADATA>` and `<USER_SETTINGS_CHANGE>` blocks. Assistant content is retained as written. Content is capped at 64 KiB.
 
+A tool step names its file in a sentence ("The following changes were made by
+the replace_file_content tool to: `<path>`"), not on a labelled line, and
+carries the change as a `[diff_block_start]` … `[diff_block_end]` block. Both
+sides of that block are read: the removed lines are the replaced span, the added
+lines are the written side `deja blame` attributes a line by. Some blocks carry
+unified `--- a/x` / `+++ b/x` headers, which are not lines of the file and are
+skipped.
+
 ## Handoff
 
 Antigravity's terminal client is `agy`, and `agy -i <prompt>` opens an
@@ -29,4 +37,4 @@ the same target — starts it directly. Verified on agy 1.1.7.
 - A malformed or partially written JSONL line is skipped.
 - If a timestamp is absent, later messages fall back to the session start when one has already been observed.
 
-**Last verified:** 2026-07-17
+**Last verified:** 2026-09-20

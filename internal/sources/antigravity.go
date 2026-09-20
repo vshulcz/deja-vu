@@ -210,6 +210,14 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 				out = append(out, model.Message{Role: RoleEdit, Text: p + "\n" + span, Time: t})
 			}
 		}
+		// The added lines of the same block are the written side, which is what
+		// attribution reads: a step that only adds lines has no removed side at
+		// all (#3773).
+		if p != "" && IndexWrites() {
+			if rec := WroteRecord(p, antigravityAddedLines(text)); rec != "" {
+				out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: t})
+			}
+		}
 	}
 	if IndexToolOutput() {
 		if body := antigravityBody(text); body != "" {
@@ -235,6 +243,24 @@ func antigravityField(text, label string) string {
 // — a sentence, not a labelled line, so the label list never saw an edit
 // (#3279).
 var antigravityEditSentence = regexp.MustCompile(`changes were made by the \S+ tool to: (\S+?)\.?(?:\s|$)`)
+
+// antigravityAddedLines is the written side of the same block: its "+" lines,
+// minus the "+++ b/x" header, which is not a line of the file.
+func antigravityAddedLines(text string) string {
+	var lines []string
+	in := false
+	for _, line := range strings.Split(text, "\n") {
+		switch {
+		case strings.HasPrefix(line, "[diff_block_start]"):
+			in = true
+		case strings.HasPrefix(line, "[diff_block_end]"):
+			in = false
+		case in && strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+			lines = append(lines, line[1:])
+		}
+	}
+	return strings.Join(lines, "\n")
+}
 
 // antigravityRemovedLines is the span an edit took out: the "-" lines of the
 // step's diff block, without the hunk headers, bounded like every edit span.

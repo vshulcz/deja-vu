@@ -74,6 +74,15 @@
 <p>Both matter. Zed rewrites a thread in the current shape only when that thread is next saved, so a store mixes generations indefinitely.</p>
 <p><code>User</code> maps to <code>user</code> and <code>Agent</code> to <code>assistant</code>; a legacy document&#39;s <code>role</code> is already lowercase (<code>user</code>, <code>assistant</code>, <code>system</code>), and <code>system</code> is dropped as harness-authored. <code>Text</code> blocks are indexed and joined with newlines, and a <code>Mention</code>&#39;s inlined <code>content</code> is indexed because that is the text Zed put in front of the model. Thinking, redacted thinking, images and the <code>Resume</code> control marker are skipped.</p>
 <p>A <code>ToolUse</code> block is read for the work it did: a <code>terminal</code> call becomes a command record, and the path arguments of the file tools become a files record. An <code>Agent</code> message&#39;s <code>tool_results</code> map — keyed by tool use id, so it is emitted in id order to keep a rebuild stable — becomes tool-output records, taking <code>content.Text</code> and falling back to <code>output</code> when it is a string. That is where a failed terminal run&#39;s exit code and error text live, which is what <code>deja fix</code> pairs a command with. Each of the three follows its own switch (<code>DEJA_INDEX_COMMANDS</code>, <code>DEJA_INDEX_PATHS</code>, <code>DEJA_INDEX_TOOL_OUTPUT</code>).</p>
+<p>An edit is the exception: it is on the result, not on the call. An <code>edit_file</code></p>
+<p>call&#39;s input carries a path, a mode and a sentence of intent — on the store this</p>
+<p>was read against, 684 of them, of which 23 held any text at all — while the</p>
+<p>result that comes back carries <code>input_path</code>, the whole file before and after,</p>
+<p>and a unified <code>diff</code>. 589 of the 684 have it. deja reads the diff: its removed</p>
+<p>lines become the replaced spans <code>deja restore</code> hands back, and its added lines</p>
+<p>become the written side <code>deja blame</code> attributes a line by. The whole-file texts</p>
+<p>beside it are up to 67 KB each and are not what stopped existing at any one</p>
+<p>line, so they are left alone.</p>
 <p><code>folder_paths</code> is a serialized <code>PathList</code>: the workspace roots newline-joined in lexicographic order, with <code>folder_paths_order</code> holding comma-joined display indices. The first path names the project.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
@@ -93,7 +102,7 @@
 <p>Auto-recall stays out of reach for a different reason than a missing file: the</p>
 <p>editor runs nothing before a prompt is sent, so there is no point to inject at.</p>
 <p>Checked against Zed 1.16.1.</p>
-<p><strong>Last verified:</strong> 2026-08-21</p>
+<p><strong>Last verified:</strong> 2026-09-20</p>
 
 <hr>
 <p>deja reads this format and thirty-three others, and turns what it finds into memory your

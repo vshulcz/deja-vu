@@ -400,6 +400,11 @@ func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
 		}
 	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(blocks, clineDialect) {
+			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: ts})
+		}
+	}
 	if IndexEdits() {
 		for _, span := range editSpansIn(blocks, clineDialect) {
 			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})

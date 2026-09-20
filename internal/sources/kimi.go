@@ -198,6 +198,11 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 						records = append(records, model.Message{Role: RoleFiles, Text: p, Time: t})
 					}
 				}
+				if IndexWrites() {
+					for _, w := range wroteRecordsIn(part, kimiDialect) {
+						records = append(records, model.Message{Role: RoleWrote, Text: w, Time: t})
+					}
+				}
 				if IndexEdits() {
 					for _, span := range editSpansIn(part, kimiDialect) {
 						records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
