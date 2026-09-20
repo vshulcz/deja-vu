@@ -1,7 +1,7 @@
 // Command genregistry renders the session-format registry into pages a search
 // engine can read.
 //
-// The registry documents where eighteen coding agents keep their history and
+// The registry documents where thirty-three coding agents keep their history and
 // what is in those files. That is the one question people put to a search
 // engine in their own words — "where does Claude Code store conversations" —
 // and the answer sat in docs/registry as raw .md, which GitHub Pages serves as
@@ -161,7 +161,7 @@ func pageFor(id, display, h1 string) meta {
 	if id == "README" {
 		return meta{
 			Title:       "Where coding agents store their history — session format registry",
-			Description: "Where Claude Code, Codex, Cursor, opencode and fourteen more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
+			Description: "Where Claude Code, Codex, Cursor, opencode and twenty-nine more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
 			Heading:     h1,
 			Slug:        "README",
 		}
@@ -224,7 +224,9 @@ agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> 
 wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
 history.</p>
 </article>
-</div></div>
+</div>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+</div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
 <script src="../assets/guide.js" defer></script>
 </body>

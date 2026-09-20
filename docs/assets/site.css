@@ -72,6 +72,11 @@ footer{border-top:1px solid var(--line);margin-top:96px;padding:32px 0 56px;
   color:var(--faint);font:12.5px var(--mono)}
 footer a{color:var(--faint)}
 footer a:hover{color:var(--ph-hi)}
+.star-cta{margin:48px 0 0;padding:14px 18px;background:var(--panel);
+  border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:0 10px 10px 0;
+  color:var(--body);font:13px/1.5 var(--mono)}
+.star-cta a{color:var(--amber);font-weight:600}
+.star-cta a:hover{color:var(--ink)}
 
 /* ── the doc layout ───────────────────────────────────────────────────── */
 .doc{display:grid;grid-template-columns:224px 1fr;gap:56px;padding:40px 0 0}
