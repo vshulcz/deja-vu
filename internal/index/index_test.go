@@ -541,7 +541,7 @@ func TestIndexRecentFindRecordsAndBranches(t *testing.T) {
 	if err != nil || len(recs) != 2 {
 		t.Fatalf("records=%#v err=%v", recs, err)
 	}
-	if got, err := parseAppendedFile("", p, FileState{Size: int64(len(line1))}); err != nil || len(got) != 1 || got[0].Messages[0].Text != "beta answer" {
+	if got, err := parseAppendedFile("", p, FileState{Size: int64(len(line1))}, false); err != nil || len(got) != 1 || got[0].Messages[0].Text != "beta answer" {
 		t.Fatalf("parse appended=%#v err=%v", got, err)
 	}
 	if got, err := parseChangedFile("", p, FileState{}); err != nil || len(got) != 1 {
@@ -637,7 +637,7 @@ func TestIndexHelperBranchCoverage(t *testing.T) {
 		if got, err := parseChangedFile("", p, FileState{}); err != nil || len(got) != 1 {
 			t.Fatalf("parseChanged %s=%#v %v", p, got, err)
 		}
-		if got, err := parseAppendedFile("", p, FileState{Size: 0}); err != nil || len(got) != 1 {
+		if got, err := parseAppendedFile("", p, FileState{Size: 0}, false); err != nil || len(got) != 1 {
 			t.Fatalf("parseAppended %s=%#v %v", p, got, err)
 		}
 	}
@@ -646,7 +646,7 @@ func TestIndexHelperBranchCoverage(t *testing.T) {
 	if got, err := parseChangedFile("", db, FileState{LastUpdated: time.Now().UnixNano()}); err != nil || got != nil {
 		t.Fatalf("opencode changed missing=%#v %v", got, err)
 	}
-	if got, err := parseAppendedFile("", db, FileState{}); err != nil || got != nil {
+	if got, err := parseAppendedFile("", db, FileState{}, false); err != nil || got != nil {
 		t.Fatalf("opencode appended missing=%#v %v", got, err)
 	}
 	if got, err := parseChangedFile("", filepath.Join(tmp, "unknown.txt"), FileState{}); err != nil || got != nil {

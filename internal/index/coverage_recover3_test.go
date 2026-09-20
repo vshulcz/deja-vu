@@ -136,10 +136,10 @@ func TestParseOpencodeFallbackWithoutLastUpdated(t *testing.T) {
 	if _, err := parseChangedFile("", db, FileState{}); err != nil {
 		t.Fatalf("parseChangedFile opencode fallback err=%v", err)
 	}
-	if _, err := parseAppendedFile("", db, FileState{}); err != nil {
+	if _, err := parseAppendedFile("", db, FileState{}, false); err != nil {
 		t.Fatalf("parseAppendedFile opencode fallback err=%v", err)
 	}
-	if _, err := parseAppendedFile("", db, FileState{LastUpdated: time.Now().UnixNano()}); err != nil {
+	if _, err := parseAppendedFile("", db, FileState{LastUpdated: time.Now().UnixNano()}, false); err != nil {
 		t.Fatalf("parseAppendedFile opencode since-branch err=%v", err)
 	}
 }

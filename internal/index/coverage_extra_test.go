@@ -407,7 +407,7 @@ func TestLowLevelIndexHelpers(t *testing.T) {
 	if _, err := parseChangedFile("", filepath.Join(tmp, "unknown.txt"), FileState{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := parseAppendedFile("", filepath.Join(tmp, "unknown.txt"), FileState{SafeSize: 10, Size: 1}); err != nil {
+	if _, err := parseAppendedFile("", filepath.Join(tmp, "unknown.txt"), FileState{SafeSize: 10, Size: 1}, false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -754,7 +754,7 @@ func TestRequestedPureCheapIndexCoverageBranches(t *testing.T) {
 		{name: "unknown default", path: unknown},
 	} {
 		t.Run("appended "+tc.name, func(t *testing.T) {
-			got, err := parseAppendedFile("", tc.path, tc.old)
+			got, err := parseAppendedFile("", tc.path, tc.old, false)
 			if err != nil || got != nil {
 				t.Fatalf("parseAppendedFile got=%#v err=%v", got, err)
 			}
@@ -1014,7 +1014,7 @@ func TestIndexErrorBranches(t *testing.T) {
 	if got, err := parseChangedFile("", os.Getenv("DEJA_OPENCODE_DB"), FileState{LastUpdated: time.Now().UnixNano()}); err != nil || got != nil {
 		t.Fatalf("opencode lastupdated parse=%#v err=%v", got, err)
 	}
-	if got, err := parseAppendedFile("", filepath.Join(os.Getenv("DEJA_CURSOR_ROOT"), "state.vscdb"), FileState{LastUpdated: time.Now().UnixNano()}); err != nil || got != nil {
+	if got, err := parseAppendedFile("", filepath.Join(os.Getenv("DEJA_CURSOR_ROOT"), "state.vscdb"), FileState{LastUpdated: time.Now().UnixNano()}, false); err != nil || got != nil {
 		t.Fatalf("cursor lastupdated parse=%#v err=%v", got, err)
 	}
 }

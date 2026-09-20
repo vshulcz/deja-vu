@@ -181,6 +181,13 @@ turns in the index for good. The recorded prefix hash is what tells the two
 apart, so a live transcript that only grew is read from its last safe offset
 rather than reparsed whole.
 
+A file deja has never read has no prefix to check and no offset to resume from,
+so it takes the append path whatever its kind: read whole, its sessions new, the
+records already on file untouched. The gate used to demand a resume parser even
+there, and because it applies to the whole batch, one new file of a kind without
+one — a Copilot Chat transcript, an opencode session diff — sent every other
+changed file down the rewrite branch too.
+
 Search does not wait for the rewrite branch. `EnsureForSearchStale` runs the
 cheap half inline and reports that the rest is outstanding; the caller refreshes
 in a detached warmup and answers from the index it already has. Both the MCP

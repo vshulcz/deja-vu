@@ -76,17 +76,27 @@ func TestANewTranscriptIsAppendedNotRewritten(t *testing.T) {
 	}
 }
 
-// The append path reads a file from an offset, which only a kind with a resume
-// parser can do. A new file of any other kind has to keep taking the
-// replacement path: appending it would mark the file read and index none of
-// its sessions.
-func TestANewFileOfAKindThatCannotResumeIsRewritten(t *testing.T) {
+// Resuming a parse is what a kind without an offset parser cannot do, and a
+// file deja has never read needs no resuming — so it takes the append path
+// too, read whole from its first byte.
+//
+// This used to be refused, and the refusal was not free: it applied to the
+// whole batch, so one new file of such a kind sent every other changed file
+// down the replacement path as well. The only surfaces that take that path are
+// a CLI search, an MCP recall and `deja index`; a machine driven by hooks takes
+// none of them, and ten transcripts — five senpi, five Copilot Chat — sat
+// unread there for eight weeks while every pass saw them (#3747).
+func TestANewFileOfAKindThatCannotResumeIsAppendedWhole(t *testing.T) {
 	tmp := hermeticIndexEnv(t)
 	claude := os.Getenv("DEJA_CLAUDE_ROOT")
 	write(t, filepath.Join(claude, "p", "first.jsonl"),
 		claudeLine("s-first", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
 	dir := filepath.Join(tmp, "idx")
 	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	recordsBefore, err := os.ReadFile(filepath.Join(dir, "records.bin"))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -97,14 +107,29 @@ func TestANewFileOfAKindThatCannotResumeIsRewritten(t *testing.T) {
 	if err := Ensure(dir, "", false, &progress); err != nil {
 		t.Fatal(err)
 	}
-	if got := progress.String(); strings.Contains(got, "updated 1 file") {
-		t.Errorf("a kind with no resume parser took the append path: %q", got)
+	if got := progress.String(); !strings.Contains(got, "updated 1 file") {
+		t.Errorf("a new file of a kind that cannot resume took the replacement path: %q", got)
 	}
-	ss, err := Search(dir, search.Options{Query: "invoice job hammers", All: true})
+	recordsAfter, err := os.ReadFile(filepath.Join(dir, "records.bin"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].ID != "g-new" {
-		t.Fatalf("the new gemini session is not indexed: %#v", ss)
+	if !bytes.Equal(recordsAfter[:len(recordsBefore)], recordsBefore) {
+		t.Error("the records already on file were rewritten, so the pass paid for the whole store")
+	}
+	// The point of the old refusal: a file marked read whose sessions were
+	// never indexed. Both halves are checked — the session answers a query,
+	// and the one already there still does.
+	for query, want := range map[string]string{
+		"invoice job hammers": "g-new",
+		"exporter retries":    "s-first",
+	} {
+		ss, err := Search(dir, search.Options{Query: query, All: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ss) != 1 || ss[0].ID != want {
+			t.Fatalf("%q found %#v, want the session %s", query, ss, want)
+		}
 	}
 }

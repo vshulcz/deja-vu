@@ -22,7 +22,7 @@ func TestQwenChangedAndAppendedFiles(t *testing.T) {
 	if got, err := parseChangedFile("qwen", path, FileState{}); err != nil || len(got) != 1 {
 		t.Fatalf("changed qwen = %#v, %v", got, err)
 	}
-	if got, err := parseAppendedFile("qwen", path, FileState{}); err != nil || len(got) != 1 {
+	if got, err := parseAppendedFile("qwen", path, FileState{}, false); err != nil || len(got) != 1 {
 		t.Fatalf("appended qwen = %#v, %v", got, err)
 	}
 }
