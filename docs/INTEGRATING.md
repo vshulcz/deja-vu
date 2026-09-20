@@ -89,6 +89,9 @@ The commands are `deja hook-context` (session start, once per session),
 `deja hook-tool-after` (after one failed) and `deja hook-plan` (before a plan is
 accepted). Each reads its harness's JSON event on stdin and writes at most a
 bounded block on stdout — 1,536 bytes for a prompt, about 4 KB for a tool call.
+There is one harness-shaped exception, `deja hook-antigravity`, because
+Antigravity fires a single PreInvocation event and nothing else; if your hook
+model does not fit the five above, that is the shape to copy.
 `docs/compaction.md` covers the compaction half, which is the one with a payoff
 nobody expects.
 
@@ -114,7 +117,7 @@ store root somewhere empty:
 export DEJA_INDEX_DIR="$tmp/index.db"
 export DEJA_CLAUDE_ROOT="$tmp/claude"      # the store you are exercising
 # Every other store, pointed at nothing. The names live in the format
-# registry, which is published: 44 of them today, and the list grows with
+# registry, which is published: 45 of them today, and the list grows with
 # every harness.
 for v in $(curl -fsSL https://vshulcz.github.io/deja-vu/registry/registry.json |
              grep -o 'DEJA_[A-Z0-9_]*' | sort -u); do
