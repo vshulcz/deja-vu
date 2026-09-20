@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where CodeWhale stores its history — session format</title>
+<meta name="description" content="Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/codewhale.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where CodeWhale stores its history — session format">
+<meta property="og:description" content="Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/codewhale.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where CodeWhale stores its history — session format">
+<meta name="twitter:description" content="Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"CodeWhale","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/codewhale.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/codewhale.html","name":"CodeWhale","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codewhale.html" aria-current="page">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>CodeWhale</h1>
+<ul>
+<li><strong>ID</strong>: <code>codewhale</code></li>
+<li><strong>Store</strong>: <code>${CODEWHALE_HOME:-~/.codewhale}/sessions/&lt;id&gt;.json</code> — one file per session</li>
+<li><strong>Store (pre-rebrand)</strong>: <code>~/.deepseek/sessions/&lt;id&gt;.json</code>, which CodeWhale migrates into the current root on first access</li>
+<li><strong>Read overrides</strong>: <code>DEJA_CODEWHALE_ROOT</code> replaces the session directory; <code>CODEWHALE_HOME</code> moves the whole store</li>
+<li><strong>Format</strong>: JSON — <code>{schema_version, metadata, messages}</code>, pretty-printed</li>
+<li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: <code>codewhale --resume &lt;id&gt;</code>, run in the workspace the session was worked in — <code>--session-id</code> is its alias and <code>codewhale exec</code> takes both (checked against 0.9.13)</li>
+</ul>
+<p>CodeWhale is a terminal agent written in Rust. It shipped as <code>deepseek-tui</code></p>
+<p>until v0.8.41 and under its own name since; the provider integration did not</p>
+<p>change with the name. It is not the DeepSeek Harness deja reads as <code>deepseek</code> —</p>
+<p>a different program with a different store, which is why both entries exist.</p>
+<p><code>metadata</code> carries the id, the title CodeWhale derived itself, <code>created_at</code>,</p>
+<p><code>updated_at</code>, the <code>workspace</code> the session was worked in, and</p>
+<p><code>parent_session_id</code> when the session came from a fork. A message is</p>
+<p><code>{role, content}</code>, where content is the block list Anthropic&#39;s API uses —</p>
+<p><code>text</code>, <code>thinking</code>, <code>tool_use</code>, <code>tool_result</code> — so the decoding the Cline and</p>
+<p>Claude readers already do applies here: a call becomes a command or a file</p>
+<p>record, a <code>tool_result</code> becomes tool output, error runs included.</p>
+<p><code>thinking</code> blocks are dropped. So are the <code>system</code> and <code>developer</code> roles:</p>
+<p>CodeWhale&#39;s own documentation names them as where it puts compaction summaries,</p>
+<p>branch summaries and sub-agent framing, which is the harness talking to itself</p>
+<p>rather than anything either side said.</p>
+<p><code>$CODEWHALE_HOME</code> is an isolation boundary in CodeWhale&#39;s own resolver — with it</p>
+<p>set, the legacy root is not consulted — and deja does not reach outside it</p>
+<p>either.</p>
+<p><strong>Last verified:</strong> 2026-09-20</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>No per-message timestamps.</strong> The file stores <code>created_at</code> and <code>updated_at</code></li>
+</ul>
+<p>for the session and nothing per message. The session&#39;s own start is the clock,</p>
+<p>one millisecond per record, so two identical turns stay two records rather</p>
+<p>than collapsing into one the way they did for Zed (#3333).</p>
+<ul>
+<li><strong>Bookkeeping sits beside the transcripts.</strong> <code>offline_queue.json</code>,</li>
+</ul>
+<p><code>owners.json</code> and the <code>checkpoints/</code> slot share the sessions directory; they</p>
+<p>are named rather than counted, so drift in the store still shows up as an</p>
+<p>unread file.</p>
+<ul>
+<li><strong>The shapes come from the source, not from a running install.</strong> The store</li>
+</ul>
+<p>layout, the role list and the tool names are read out of CodeWhale&#39;s own</p>
+<p>crates — <code>session_manager.rs</code>, <code>core/src/request.rs</code>, <code>core/src/role.rs</code>,</p>
+<p><code>tui/src/tools/registry.rs</code> — and its <code>docs/REBRAND.md</code>. Nothing here has been</p>
+<p>checked against a live CodeWhale on this machine.</p>
+<ul>
+<li><strong>Resume is real, the store shape is not checked live.</strong> <code>codewhale --help</code> on</li>
+</ul>
+<p>0.9.13 lists <code>--resume</code>, <code>--session-id</code> and <code>--continue</code>, and <code>--continue</code></p>
+<p>refuses in a directory with no saved session, which is how the per-workspace</p>
+<p>scoping shows. <code>codewhale exec</code> does not persist a session at all — the TUI</p>
+<p>writes them — so the file layout above is still read from the source rather</p>
+<p>than from one the binary wrote here.</p>
+<ul>
+<li><strong>Nothing is wired.</strong> deja reads this store and writes nothing into CodeWhale.</li>
+</ul>
+<p>Its MCP server map, its hook block and its plugin marketplace are each a</p>
+<p>channel an install could use; none is written yet.</p>
+
+<hr>
+<p>deja reads this format and thirty-three others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+</article>
+</div></div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

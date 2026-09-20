@@ -241,6 +241,12 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("zed threads reopen from the editor's own history — no zed flag takes a thread id")
 	case "deepseek":
 		return "", "", fmt.Errorf("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
+	case "codewhale":
+		// Its sessions are per-workspace — `--continue` refuses in a directory
+		// that has none — so the command goes with the workspace it was worked
+		// in. `--session-id` is the alias of `--resume` on both the TUI and
+		// `codewhale exec` (verified against 0.9.13's own --help).
+		return s.Project, "codewhale --resume " + s.ID, nil
 	case "qwen":
 		return qwenProjectDirFor(s), "qwen -r " + s.ID, nil
 	case "openclaw":

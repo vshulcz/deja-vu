@@ -35,6 +35,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Kimchi Coding](kimchi.md) | pi's session JSONL, flat root |
 | [Command Code](commandcode.md) | flat role/content JSONL per session |
 | [ZCode](zcode.md) | flat role/content JSONL per session |
+| [CodeWhale](codewhale.md) | one JSON document per session, Anthropic-shaped content blocks |
 | [Cherry Studio](cherrystudio.md) | Claude Code transcripts under the desktop app's data, one snapshot per stream chunk |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |

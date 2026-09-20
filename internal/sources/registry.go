@@ -541,6 +541,17 @@ func Registry() []Harness {
 			}},
 		},
 		{
+			// CodeWhale, the Rust TUI that shipped as deepseek-tui until
+			// v0.8.41. A different store from the DeepSeek Harness below: one
+			// pretty-printed JSON file per session, no zstd.
+			Name: "codewhale", Load: LoadCodeWhale, Files: CodeWhaleSessionFiles,
+			Kinds: []FileKind{{
+				Name:  "codewhale",
+				Match: isCodeWhaleSession,
+				Parse: fullParse(ParseCodeWhaleFile),
+			}},
+		},
+		{
 			// DeepSeek Harness writes one log per session, zstd-framed by
 			// default, so a machine without the zstd CLI sees the files and
 			// reads nothing out of them (SkipReason says so).

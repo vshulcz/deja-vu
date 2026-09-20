@@ -104,3 +104,4 @@ https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html
 https://vshulcz.github.io/deja-vu/zh/guide/privacy.html
 https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html
 https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html
+https://vshulcz.github.io/deja-vu/registry/codewhale.html

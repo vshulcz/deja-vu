@@ -144,7 +144,7 @@ rm -rf ~/Library/Application\ Support/Code/User/workspaceStorage/*/chatSessions 
 <p>The other cost is search. Copilot Chat has no search across workspaces; the list is per project, and a question you worked out in March is answerable only while March still exists somewhere.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Copilot Chat stores — and the other thirty-two agents' histories on the same machine — into one local index you can search from the shell, and that the agents can search themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Copilot Chat stores — and the other thirty-three agents' histories on the same machine — into one local index you can search from the shell, and that the agents can search themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "copilot chat refactor of the retry loop"</pre>
 <p>Nothing to switch on first: the files are already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> removes a session from the index for good when you do want it gone.</p>

@@ -1,0 +1,52 @@
+{
+  "schema_version": 3,
+  "metadata": {
+    "id": "registry-codewhale",
+    "title": "the retry loop drops the last attempt",
+    "created_at": "2026-09-19T08:00:00Z",
+    "updated_at": "2026-09-19T08:04:00Z",
+    "message_count": 3,
+    "total_tokens": 1840,
+    "model": "deepseek-chat",
+    "model_provider": "deepseek",
+    "workspace": "/workspace/codewhale-demo",
+    "mode": "agent",
+    "cumulative_turn_secs": 42
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "why does the retry loop drop the last attempt when the deadline is already past"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "call_1",
+          "content": "retry_test.go:41: want 3 attempts, got 2",
+          "is_error": true
+        }
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "the deadline is checked before the attempt is counted"
+        },
+        {
+          "type": "text",
+          "text": "The deadline is checked before the attempt is counted, so the last one never runs."
+        }
+      ]
+    }
+  ],
+  "system_prompt": "You are CodeWhale."
+}

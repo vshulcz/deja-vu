@@ -126,7 +126,7 @@ rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks</pre>
 <p>A task directory is the record of what the agent read, changed and ran, and Kilo has no search across tasks: the list is the only way in. Once the directory is gone, the reasoning behind every file that task touched is gone with it.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kilo stores — the extension's task JSON and the CLI database — and the other thirty-two agents on the machine, into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kilo stores — the extension's task JSON and the CLI database — and the other thirty-three agents on the machine, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "kilo task about the migration"</pre>
 <p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone.</p>

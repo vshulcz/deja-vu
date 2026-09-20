@@ -124,7 +124,7 @@ ${XDG_DATA_HOME}/opencode/opencode.db</pre>
 <p>The sessions are the record of what was tried and what worked. opencode's own list is the only way back into them, and it reads the same database — so the answer to a question you solved in June exists only while that file does.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other thirty-two agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other thirty-three agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "opencode session about the retry budget"</pre>
 <p>Nothing to switch on first: the database is already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>

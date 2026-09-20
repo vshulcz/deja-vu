@@ -147,7 +147,7 @@ rm -rf ~/.gemini/tmp/*</pre>
 <p>The chats are the record of what was tried and what worked. Gemini CLI has no search across projects, so a decision from two months ago is reachable only while its chat file exists — and a sub-agent's run, nested one directory deeper, is often the only place a piece of work was described at all.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> indexes both Gemini chat shapes, the sub-agent runs and the other thirty-two agents on the machine into one local index — searchable from the shell, and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> indexes both Gemini chat shapes, the sub-agent runs and the other thirty-three agents on the machine into one local index — searchable from the shell, and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "gemini retry budget"</pre>
 <p>Nothing to switch on first: the files are already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good when you do want it gone.</p>

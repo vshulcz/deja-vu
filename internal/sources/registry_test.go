@@ -180,6 +180,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseGjcFile(path)
 	case "kimchi":
 		sessions, err = ParseKimchiFile(path)
+	case "codewhale":
+		sessions, err = ParseCodeWhaleFile(path)
 	case "commandcode":
 		sessions, err = ParseCommandCodeFile(path)
 	case "zcode":

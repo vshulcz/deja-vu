@@ -277,6 +277,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "codewhale",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.codewhale/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deepseek",
       "state": "missing",
       "paths": [

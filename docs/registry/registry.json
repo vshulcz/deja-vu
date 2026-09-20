@@ -540,7 +540,7 @@
       "gaps": {
         "auto": {
           "state": "blocked",
-          "why": "Continue's CLI carries a Claude-shaped hooks system \u2014 Claude's own event set, additionalContext, settings read from ~/.continue/settings.json \u2014 and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (\"Hooks loaded: 8 handler(s)\" in its own log) and no handler ran, while the same run's tool call went through. Becomes work the day a release fires them",
+          "why": "Continue's CLI carries a Claude-shaped hooks system — Claude's own event set, additionalContext, settings read from ~/.continue/settings.json — and nothing fires it in the published release: measured on @continuedev/cli 1.5.47, hooks written for every event loaded (\"Hooks loaded: 8 handler(s)\" in its own log) and no handler ran, while the same run's tool call went through. Becomes work the day a release fires them",
           "source": "https://github.com/continuedev/continue/tree/main/extensions/cli/src/hooks"
         }
       }
@@ -729,7 +729,7 @@
       "gaps": {
         "auto": {
           "state": "todo",
-          "why": "Settled against the loader rather than the docs, which disagree: `resolveScopePaths` in packages/coding-agent/src/customization/types.ts puts the user-scope hooks at `<getAgentDir()>/hooks/<pre|post>`, so `~/.gjc/agent/hooks/pre` is the path and docs/hooks.md's `~/.gjc/hooks` is stale. What stops a hook being written there is the shape: a directory hook is a TypeScript module exporting `default (api) => api.on(\"tool_call\", \u2026)`, and the only documented return is `{block, reason}` \u2014 allow or refuse, with no channel for adding context, which is what deja's tool hook exists to do. The lifecycle events (`session_start`, `before_agent_start`) come from the in-process HookAPI, which is the plugin surface rather than the directory, so auto-recall here is a gjc plugin and not a file (#3651).",
+          "why": "Settled against the loader rather than the docs, which disagree: `resolveScopePaths` in packages/coding-agent/src/customization/types.ts puts the user-scope hooks at `<getAgentDir()>/hooks/<pre|post>`, so `~/.gjc/agent/hooks/pre` is the path and docs/hooks.md's `~/.gjc/hooks` is stale. What stops a hook being written there is the shape: a directory hook is a TypeScript module exporting `default (api) => api.on(\"tool_call\", …)`, and the only documented return is `{block, reason}` — allow or refuse, with no channel for adding context, which is what deja's tool hook exists to do. The lifecycle events (`session_start`, `before_agent_start`) come from the in-process HookAPI, which is the plugin surface rather than the directory, so auto-recall here is a gjc plugin and not a file (#3651).",
           "source": "https://github.com/Yeachan-Heo/gajae-code/blob/main/docs/examples/gjc-hooks/pre/bash.ts"
         }
       }
@@ -764,12 +764,12 @@
         },
         "skill": {
           "state": "blocked",
-          "why": "Same shape: `extensions.claude-code-skills` loads ~/.claude/skills \u2014 where deja already writes \u2014 and also ships disabled (#3651).",
+          "why": "Same shape: `extensions.claude-code-skills` loads ~/.claude/skills — where deja already writes — and also ships disabled (#3651).",
           "source": "https://github.com/getkimchi/kimchi/blob/main/docs/hooks.md"
         },
         "command": {
           "state": "blocked",
-          "why": "In Kimchi a skill is the command: `extensions.claude-code-skills` contributes skills through Pi resource discovery so `/skill:<name>` works, and it ships disabled. So this is not a second file to write \u2014 it is the same switch the skill waits on, and a command file of our own would add an entry nothing reads (#3651).",
+          "why": "In Kimchi a skill is the command: `extensions.claude-code-skills` contributes skills through Pi resource discovery so `/skill:<name>` works, and it ships disabled. So this is not a second file to write — it is the same switch the skill waits on, and a command file of our own would add an entry nothing reads (#3651).",
           "source": "https://github.com/getkimchi/kimchi/blob/main/docs/hooks.md"
         }
       }
@@ -839,7 +839,7 @@
         },
         "resume": {
           "state": "unknown",
-          "why": "The flag is real \u2014 `--resume <SESSION_ID>` appears in ZCode's headless contract, and the session id it takes is the one its JSON summary reports \u2014 but every documented invocation runs the app bundle's own Electron runtime with a mandatory `--prompt`, which is a turn rather than reopening a session for a person to continue. Whether the `zcode` launcher on PATH accepts the same flag on its own is unverified, and printing a command that needs a prompt would be worse than the paste (#3651).",
+          "why": "The flag is real — `--resume <SESSION_ID>` appears in ZCode's headless contract, and the session id it takes is the one its JSON summary reports — but every documented invocation runs the app bundle's own Electron runtime with a mandatory `--prompt`, which is a turn rather than reopening a session for a person to continue. Whether the `zcode` launcher on PATH accepts the same flag on its own is unverified, and printing a command that needs a prompt would be worse than the paste (#3651).",
           "source": "https://github.com/Q00/ouroboros/blob/main/docs/runtime-guides/zcode.md"
         }
       }
@@ -876,12 +876,12 @@
         },
         "skill": {
           "state": "impossible",
-          "why": "Kiro has a user-level guidance channel and deja writes it \u2014 `~/.kiro/steering/deja.md`, the global half of steering, scanned for every project \u2014 but it is not a skill and calling it one would misdescribe what it costs. A steering document declares an inclusion mode, and the only mode measured as loaded by kiro-cli is `always`: `manual` is not loaded and cannot be invoked from a session, `fileMatch` was withheld (KiroCrew's steering reference, measured against 2.19.1). So the text rides in front of every turn whether it is wanted or not, which is why deja's file there is four lines rather than the skill it writes where one is loaded on demand \u2014 the same call aider's entry makes (#3651).",
+          "why": "Kiro has a user-level guidance channel and deja writes it — `~/.kiro/steering/deja.md`, the global half of steering, scanned for every project — but it is not a skill and calling it one would misdescribe what it costs. A steering document declares an inclusion mode, and the only mode measured as loaded by kiro-cli is `always`: `manual` is not loaded and cannot be invoked from a session, `fileMatch` was withheld (KiroCrew's steering reference, measured against 2.19.1). So the text rides in front of every turn whether it is wanted or not, which is why deja's file there is four lines rather than the skill it writes where one is loaded on demand — the same call aider's entry makes (#3651).",
           "source": "https://github.com/kirodotdev/KiroCrew/blob/main/docs/reference/kiro-cli/steering.md"
         },
         "command": {
           "state": "unknown",
-          "why": "Kiro's upstream \u2014 Amazon Q Developer CLI \u2014 keeps user-level custom prompts in `~/.aws/amazonq/prompts` (`crates/chat-cli/src/util/paths.rs`), but Kiro renamed its config tree rather than moving it wholesale: its server file is `~/.kiro/settings/mcp.json`, not the Q path. So the location of Kiro's equivalent cannot be inferred from the fork, and writing a guessed directory would leave a command nothing lists (#3651)."
+          "why": "Kiro's upstream — Amazon Q Developer CLI — keeps user-level custom prompts in `~/.aws/amazonq/prompts` (`crates/chat-cli/src/util/paths.rs`), but Kiro renamed its config tree rather than moving it wholesale: its server file is `~/.kiro/settings/mcp.json`, not the Q path. So the location of Kiro's equivalent cannot be inferred from the fork, and writing a guessed directory would leave a command nothing lists (#3651)."
         }
       }
     },
@@ -985,6 +985,50 @@
           "state": "impossible",
           "why": "The agent lives in the editor and no zed CLI flag reopens a thread by id, so there is nothing for deja to print. Reopening a thread is a thing the editor does, not a command",
           "source": "no thread flag in the zed CLI of 1.16.1"
+        }
+      }
+    },
+    {
+      "id": "codewhale",
+      "store_paths": [
+        "${CODEWHALE_HOME:-~/.codewhale}/sessions/<id>.json",
+        "~/.deepseek/sessions/<id>.json",
+        "${DEJA_CODEWHALE_ROOT}/<id>.json"
+      ],
+      "format_kind": "json",
+      "fixture_paths": [
+        "fixtures/registry/codewhale/sessions/registry-codewhale.json"
+      ],
+      "parser_source": "internal/sources/codewhale.go",
+      "last_verified": "2026-09-20",
+      "display_name": "CodeWhale",
+      "capabilities": {
+        "mcp": false,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": true,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "mcp": {
+          "state": "todo",
+          "why": "CodeWhale reads an MCP server map and a hook block out of its own config, and it has a plugin marketplace besides; none of it is written yet — this release reads the store and wires nothing (#3794)."
+        },
+        "auto": {
+          "state": "todo",
+          "why": "Its hook events are documented (tool_call_before, tool_call_after, session_busy, session_idle, turn_end, subagent_spawn) and a session-start channel is what an -auto target needs; not written yet (#3794)."
+        },
+        "skill": {
+          "state": "unknown",
+          "why": "Nothing found names a user-level skill directory for CodeWhale. Guidance would reach the model through the MCP tool descriptions once the server is wired.",
+          "source": "https://github.com/Hmbown/CodeWhale/blob/main/docs/HOOKS.md"
+        },
+        "command": {
+          "state": "unknown",
+          "why": "Custom commands come from its plugin marketplace rather than a directory deja can write; not checked against a live install.",
+          "source": "https://github.com/Hmbown/CodeWhale/blob/main/docs/TOOL_LIFECYCLE.md"
         }
       }
     }

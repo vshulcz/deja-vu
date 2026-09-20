@@ -500,6 +500,11 @@ type toolDialect struct {
 	pathKey   string
 	pathTools map[string]bool
 	shellTool string
+	// shellTools names every alias the shell tool answers to, when a harness
+	// has more than one. CodeWhale's canonical name is exec_shell and it also
+	// takes bash and Bash, so a run recorded under an alias was no command at
+	// all. Empty means shellTool alone.
+	shellTools map[string]bool
 	// editTools bounds which calls carry a replaced span. Empty means any call
 	// with a path and an old_string, which is how the Claude decoder has always
 	// read MultiEdit's sub-edits.
@@ -516,6 +521,15 @@ type toolDialect struct {
 	// read_files takes "files", whose elements each name a path under pathKey.
 	// Empty means a call names at most one file.
 	pathListKey string
+}
+
+// isShellTool reports whether a call is the shell, under any name the harness
+// gives it.
+func (d toolDialect) isShellTool(name string) bool {
+	if len(d.shellTools) > 0 {
+		return d.shellTools[name]
+	}
+	return name == d.shellTool
 }
 
 // oldSpanKey is oldKey with its default applied.
@@ -670,7 +684,7 @@ func commandsIn(v any, d toolDialect) []string {
 	var out []string
 	for _, it := range items {
 		name, in, ok := toolPart(it, d)
-		if !ok || name != d.shellTool {
+		if !ok || !d.isShellTool(name) {
 			continue
 		}
 		// One call can carry a list rather than a single command: cline's

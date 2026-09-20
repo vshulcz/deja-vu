@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
-<meta name="description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<meta name="description" content="三十四个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="article">
 <meta property="og:locale" content="zh_CN">
 <meta property="og:title" content="每个编程智能体把会话历史存在哪里">
-<meta property="og:description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<meta property="og:description" content="三十四个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -22,7 +22,7 @@
 <meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <meta name="twitter:title" content="每个编程智能体把会话历史存在哪里">
-<meta name="twitter:description" content="三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
+<meta name="twitter:description" content="三十四个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
@@ -34,7 +34,7 @@
 <meta property="og:site_name" content="deja-vu">
 <link rel="apple-touch-icon" href="../../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "每个编程智能体把会话历史存在哪里", "description": "三十三个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "每个编程智能体把会话历史存在哪里", "description": "三十四个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "历史文件在哪里", "item": "https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Claude Code 的会话记录在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "默认在 ~/.claude/projects 下，每个工作目录一个子目录，每个会话一个 .jsonl 文件，一行一条记录。CLAUDE_CONFIG_DIR 可以改这个位置。"}}, {"@type": "Question", "name": "这些文件可以直接删掉吗？", "acceptedAnswer": {"@type": "Answer", "text": "可以，它们是各个工具自己写的日志。删掉之后那次会话就没有记录了；deja 的索引是可重建的缓存，删掉源文件也不会把它们找回来。"}}, {"@type": "Question", "name": "为什么有的工具用的是数据库而不是文件？", "acceptedAnswer": {"@type": "Answer", "text": "opencode、Hermes、Zed 和 Goose 把会话放进 SQLite；Zed 还把每条正文压成 zstd 帧，所以只用 sqlite3 看到的是二进制。Cursor 更麻烦：老版本把内容塞在 state.vscdb 的键值里，命令行版才是 JSONL。"}}]}</script>
 </head>
@@ -63,7 +63,7 @@
 <article>
 
 <h1>每个编程智能体把会话历史存在哪里</h1>
-<p class="pagelede">三十三个智能体，一张表<span class="mins" data-mins></span></p>
+<p class="pagelede">三十四个智能体，一张表<span class="mins" data-mins></span></p>
 
 <p>每一个编程智能体都会把你说过的话、它做过的事写到本机的文件里。格式各不相同，位置各不相同，而且没有任何一处把它们写在一起——所以这里就是那一处。表格来自 deja 的解析器所依据的同一份格式登记表。</p>
 

@@ -988,6 +988,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	printFiles("prime", primeRoot, doctorExists(primeRoot), sources.PrimeSessionFiles())
 	ampRoot := sources.AmpRoot()
 	printFiles("amp", ampRoot, doctorExists(ampRoot), sources.AmpThreadFiles())
+	// CodeWhale keeps its transcripts beside its own bookkeeping — the offline
+	// queue, the ownership ledger, the checkpoint slot — so those are placed
+	// rather than counted as transcripts deja could not read.
+	cwRoots := sources.CodeWhaleRoots()
+	printFilesBesideIn("codewhale", sources.CodeWhaleRoot(), cwRoots, false, doctorExists(sources.CodeWhaleRoot()),
+		sources.CodeWhaleSessionFiles(), sources.CodeWhaleSidecarFiles()...)
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()
