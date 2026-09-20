@@ -28,6 +28,9 @@ type syncPhases struct {
 	beat  time.Duration
 	floor time.Duration
 
+	// wmu serialises writes: the heartbeat runs in its own goroutine, so the
+	// phase lines and the beats land on the same writer from two places.
+	wmu     sync.Mutex
 	mu      sync.Mutex
 	name    string
 	started time.Time
@@ -62,7 +65,7 @@ func (p *syncPhases) start(format string, args ...any) {
 	p.stop = make(chan struct{})
 	stop := p.stop
 	p.mu.Unlock()
-	fmt.Fprintf(p.w, "deja: %s…\n", name)
+	p.writef("deja: %s…\n", name)
 	p.done.Add(1)
 	go func() {
 		defer p.done.Done()
@@ -77,7 +80,7 @@ func (p *syncPhases) start(format string, args ...any) {
 				since := time.Since(p.started)
 				still := p.name
 				p.mu.Unlock()
-				fmt.Fprintf(p.w, "deja: still %s… %s\n", still, roundSecs(since))
+				p.writef("deja: still %s… %s\n", still, roundSecs(since))
 			}
 		}
 	}()
@@ -86,7 +89,14 @@ func (p *syncPhases) start(format string, args ...any) {
 // note is one line inside the current phase — a batch count, a byte total —
 // without ending it.
 func (p *syncPhases) note(format string, args ...any) {
-	fmt.Fprintf(p.w, "deja:   %s\n", fmt.Sprintf(format, args...))
+	p.writef("deja:   %s\n", fmt.Sprintf(format, args...))
+}
+
+// writef is the only way anything here writes.
+func (p *syncPhases) writef(format string, args ...any) {
+	p.wmu.Lock()
+	defer p.wmu.Unlock()
+	fmt.Fprintf(p.w, format, args...)
 }
 
 func (p *syncPhases) finishPhase() {
@@ -129,7 +139,7 @@ func (p *syncPhases) summary(what string) {
 	if len(parts) == 0 {
 		return
 	}
-	fmt.Fprintf(p.w, "deja: %s in %s — %s\n", what, roundSecs(total), strings.Join(parts, ", "))
+	p.writef("deja: %s in %s — %s\n", what, roundSecs(total), strings.Join(parts, ", "))
 }
 
 // roundSecs is a duration a person reads at a glance: 42s, 3m12s. Milliseconds

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -10,8 +11,8 @@ import (
 // A sync that says nothing for minutes reads as a hang, and the report at the
 // end is what a later performance question is answered from (#3801).
 func TestSyncPhasesSayWhatIsRunningAndWhereTheTimeWent(t *testing.T) {
-	var buf bytes.Buffer
-	p := newSyncPhases(&buf)
+	buf := &lockedBuffer{}
+	p := newSyncPhases(buf)
 	p.beat = 20 * time.Millisecond
 	p.floor = time.Millisecond
 
@@ -48,18 +49,18 @@ func TestSyncPhasesSayWhatIsRunningAndWhereTheTimeWent(t *testing.T) {
 		t.Errorf("the report is not in phase order:\n%s", got)
 	}
 	// Nothing keeps printing after the run ends.
-	before := buf.Len()
+	before := len(buf.String())
 	time.Sleep(60 * time.Millisecond)
-	if buf.Len() != before {
-		t.Errorf("a heartbeat outlived the phase: %q", buf.String()[before:])
+	if got := buf.String(); len(got) != before {
+		t.Errorf("a heartbeat outlived the phase: %q", got[before:])
 	}
 }
 
 // A quick exchange gets no report at all: two lines about two seconds is noise
 // on the one path that runs from launchd every hour.
 func TestAQuickSyncPrintsNoReport(t *testing.T) {
-	var buf bytes.Buffer
-	p := newSyncPhases(&buf)
+	buf := &lockedBuffer{}
+	p := newSyncPhases(buf)
 	p.start("exporting records")
 	p.summary("pushed to mini")
 	if strings.Contains(buf.String(), "pushed to mini in") {
@@ -134,4 +135,23 @@ func TestStreamedRemoteLinesAreBoundedAndCounted(t *testing.T) {
 	if strings.Contains(got, "mini: \n") {
 		t.Errorf("a blank remote line was echoed: %q", got)
 	}
+}
+
+// lockedBuffer is a buffer this test can read while the heartbeat goroutine
+// writes to it.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
