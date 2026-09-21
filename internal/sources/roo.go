@@ -23,8 +23,9 @@ import (
 // Verified against Roo-Code source (src/shared/globalFileNames.ts,
 // src/core/task-persistence) — the transcript format matches Cline's legacy
 // store, but metadata is per-task history_item.json instead of a global
-// taskHistory.json. Text-only turns are indexed; the same envelope
-// unwrapping applies.
+// taskHistory.json. The turns are indexed for their text and their calls
+// alike — a command, the files a call named, and both sides of an edit — and
+// the same envelope unwrapping applies.
 
 // RooExtensionID is the publisher and name of the VS Code extension, which is
 // also the directory its settings live in.
