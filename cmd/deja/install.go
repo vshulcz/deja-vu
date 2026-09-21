@@ -906,9 +906,13 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installPrimeMCP(exe, uninstall)
 	case "prime-auto":
 		return installPrimeAuto(exe, uninstall)
-	case "deepseek":
+	// The tool's own binary, its plugin comments and its guide page all call
+	// it dsh; the registry id is deepseek. Both names resolve, the way
+	// `claude` resolves to claude-code, because the page said `deja install
+	// dsh-auto` and that refused.
+	case "deepseek", "dsh":
 		return installDeepSeekMCP(exe, uninstall)
-	case "deepseek-auto":
+	case "deepseek-auto", "dsh-auto":
 		return installDeepSeekAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)

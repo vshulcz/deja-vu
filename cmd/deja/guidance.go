@@ -670,8 +670,14 @@ func guidanceMarkerLines(s string) (start, end int) {
 // same guidance — stripped generally rather than listed, because the three that
 // were listed were the only three that ever got it (#1199).
 func guidanceHarness(harness string) string {
-	if harness == "claude-auto" {
+	switch harness {
+	case "claude-auto":
 		return "claude-code"
+	// dsh is the DeepSeek Harness under the name its own binary and its guide
+	// page use. Without this the alias installed the wiring and skipped the
+	// skill, which is the one difference a target name must not make.
+	case "dsh", "dsh-auto":
+		return "deepseek"
 	}
 	return strings.TrimSuffix(harness, "-auto")
 }
