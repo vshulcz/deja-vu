@@ -209,17 +209,20 @@ Supported methods:
 - `tools/list`
 - `tools/call`
 
-Tools:
+One tool, `deja`, with a required `mode`:
 
 - `recall`: compact snippets for matching sessions.
-- `recall_context`: the markdown digest `deja ctx` prints.
+- `context`: the markdown digest `deja ctx` prints.
 - `blame`: the sessions that discussed a file, and what was decided.
 - `fix`: what this machine ran after the same error last time.
 - `how`: the real invocation for a tool here, from what agents ran.
 - `remember`: stores one durable decision for later recall.
 
-Each carries an annotation naming what it is for, so an agent can choose between
-them without reading the descriptions in full.
+Six tools were six envelopes declaring the same arguments, and six descriptions
+each arguing they were the entry point — a question about a command went to
+search instead of the capability that answers it (#1298). The old names still
+answer a client that has them wired; `tools/list` does not carry them, so they
+cost nothing per session.
 
 The MCP server calls the same index/search code as the CLI. It writes protocol responses to stdout and keeps logs/progress off stdout so agents receive valid JSON-RPC.
 

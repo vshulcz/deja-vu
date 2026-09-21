@@ -37,8 +37,8 @@ func TestWarmupWritesTheCLISkill(t *testing.T) {
 // door — otherwise an agent holding one of them reaches for an API this machine
 // does not have.
 func TestTheTwoSkillsPointAtEachOther(t *testing.T) {
-	if !strings.Contains(cliSkillBody, "MCP tools") {
-		t.Error("the CLI skill never mentions the MCP tools it defers to")
+	if !strings.Contains(cliSkillBody, "MCP tool") {
+		t.Error("the CLI skill never mentions the MCP tool it defers to")
 	}
 	if !strings.Contains(skillBody, "deja search --json") {
 		t.Error("the MCP skill never names the shell path for a session without the tools")

@@ -181,7 +181,7 @@ func TestClaudeGuidanceIsOwnedAndOptOutWorks(t *testing.T) {
 		t.Fatalf("unsupported output = %q", got)
 	}
 	b, _ := os.ReadFile(path)
-	if !strings.Contains(string(b), "deja-history") || !strings.Contains(string(b), "recall_context") {
+	if !strings.Contains(string(b), "deja-history") || !strings.Contains(string(b), "modes of the one deja tool") {
 		t.Fatalf("skill content incomplete: %s", b)
 	}
 	if r, err = installGuidance("claude-code", false); err != nil || r.Action != "unchanged" {

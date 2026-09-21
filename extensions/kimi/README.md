@@ -40,8 +40,8 @@ Plugins load from the managed copy, so run `/reload` or `/new` after installing.
 
 - **Recall on every prompt.** A `UserPromptSubmit` hook runs `deja hook-prompt`
   and Kimi appends what it finds to the turn. Silent when nothing matches.
-- **Tools.** The plugin declares `deja mcp` as an MCP server: `recall`,
-  `recall_context`, `blame` and `remember`.
+- **Tools.** The plugin declares `deja mcp` as an MCP server: one `deja` tool
+  with a mode of `recall`, `context`, `blame`, `fix`, `how` or `remember`.
 - **`/deja:recall <query>`** to search history directly.
 - **The `deja-history` skill**, loaded at session start, so the agent knows to
   look before re-debugging something.

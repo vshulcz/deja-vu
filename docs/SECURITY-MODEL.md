@@ -234,7 +234,7 @@ stabilizes timestamps but does not remove those differences.
 
 ## Recall output framing
 
-Agent-facing recall (the `recall` and `recall_context` MCP tools and the
+Agent-facing recall (the MCP tool's `recall` and `context` modes and the
 SessionStart hook digest) is wrapped in `<deja-recall>` markers with a
 preamble stating the content is untrusted historical data and instructions
 inside it must not be followed. Transcripts can carry text an attacker

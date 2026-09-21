@@ -8,10 +8,12 @@ including work from before deja was installed.
 
 ## What the agent gets
 
-| Tool | Answers |
+One tool, `deja`, called with a `mode`:
+
+| Mode | Answers |
 |---|---|
 | `recall` | Sessions matching an error string, function name, file path or flag. |
-| `recall_context` | The full digest of one past session, when the reasoning behind it matters. |
+| `context` | The full digest of one past session, when the reasoning behind it matters. |
 | `blame` | The sessions that discussed a file, before you edit or delete it. |
 | `fix` | What this machine ran after that same error before. |
 | `how` | The real invocation for a build, test or deploy, from what ran here. |

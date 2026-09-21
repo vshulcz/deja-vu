@@ -18,7 +18,7 @@ metadata:
 
 Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.
 
-This skill drives the `deja` binary through the shell. If the deja MCP tools (recall, recall_context, blame, fix, how, remember) are available in this session, use those instead — same index, one less hop. They appear only when `deja install` has wired this harness.
+This skill drives the `deja` binary through the shell. If the deja MCP tool is available in this session — one tool with a mode of recall, context, blame, fix, how or remember — use that instead: same index, one less hop. It appears only when `deja install` has wired this harness.
 
 ## Finding something
 

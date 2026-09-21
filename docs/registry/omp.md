@@ -110,8 +110,7 @@ segment (`-Code-pleasure-course` would otherwise decode to `pleasure/course`).
 
 `deja install omp` writes `~/.omp/agent/mcp.json` with the standard `mcpServers`
 shape — the file upstream documents as the primary user-scope MCP config. After
-it, omp lists deja's tools itself (`mcp__deja_recall`, `recall_context`,
-`remember`, `blame`, `fix`, `how`).
+it, omp lists the tool itself, under its own `mcp__deja` prefix.
 
 The skill is the shared `~/.agents/skills/deja-history/SKILL.md`: omp's `agents`
 provider reads that directory, so it needs no file of its own. Checked by asking

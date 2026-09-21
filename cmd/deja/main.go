@@ -4047,7 +4047,7 @@ Search flags (the bare "deja [flags] <query>" form above):
 Examples:
   deja "jwt refresh token bug"
   deja '"connection pool exhausted"'
-  deja "exhaustd"  # zero exact results try close spellings
+  deja "exhaustd"  # a typo: with no exact hit, close spellings are tried
   deja --harness claude --since 30d "panic in indexer"
   deja --all "connection pool"  # every match, not just the first 15
   deja last 20 --harness codex

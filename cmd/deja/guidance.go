@@ -15,12 +15,12 @@ const (
 	guidanceEnd   = "<!-- deja guidance:end -->"
 )
 
-const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before. Use the deja MCP tools:
+const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before. Use the deja MCP tool and pick a mode:
 
 - recall: search history with a specific error, function, or decision.
-- recall_context: get a concise digest of the best matching session.
+- context: get a concise digest of the best matching session.
 
-Example: for "what did we decide about token refresh?", call recall with query "token refresh decision", then call recall_context if the result needs more detail.
+Example: for "what did we decide about token refresh?", call deja with mode recall and query "token refresh decision", then mode context if the result needs more detail.
 
 When recalled history helps — a reused fix, a skipped re-debug, a hint that changed your approach — open your reply with that one line: "déjà vu: <what it said> — reusing it (deja:<session id>)". One line, at the start, and nothing about recalls that did not help.`
 
@@ -31,12 +31,14 @@ When recalled history helps — a reused fix, a skipped re-debug, a hint that ch
 // sits in context all session, belongs here instead.
 const skillBody = `Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.
 
-If these tools are not available in this session, the same index is reachable through the shell: ` + "`deja search --json \"<query>\"`" + `, ` + "`deja ctx <query>`" + `, ` + "`deja blame <path> --json`" + `.
+If the deja tool is not available in this session, the same index is reachable through the shell: ` + "`deja search --json \"<query>\"`" + `, ` + "`deja ctx <query>`" + `, ` + "`deja blame <path> --json`" + `.
 
 ## Finding something
 
+These are the modes of the one deja tool, passed as ` + "`mode`" + `.
+
 - recall: search with the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Not for library docs or general knowledge; only this user's own sessions.
-- recall_context: a full digest of the single best-matching session, once a recall hit looks right and the reasoning behind it matters.
+- context: a full digest of the single best-matching session, once a recall hit looks right and the reasoning behind it matters.
 - blame: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
 - fix: paste a failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
 - how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
