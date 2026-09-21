@@ -127,7 +127,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             else
-                COMPREPLY=( $(compgen -W "--json --impact --html --redaction --card --harness --project --since --role" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--json --impact --year --html --redaction --card --harness --project --since --role" -- "$cur") )
             fi
             ;;
         sync)
@@ -262,7 +262,7 @@ _deja() {
       _arguments '--exec[launch the native harness]' '1:session ID prefix:'
       ;;
     stats)
-      _arguments '--json[print JSON]' '--impact[measured impact report]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
+      _arguments '--json[print JSON]' '--impact[measured impact report]' '--year[your last twelve months in one screen]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
       ;;
     sync)
       if (( CURRENT == 3 )); then
@@ -351,6 +351,7 @@ complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
 complete -c deja -n '__fish_seen_subcommand_from stats' -l impact
+complete -c deja -n '__fish_seen_subcommand_from stats' -l year
 complete -c deja -n '__fish_seen_subcommand_from stats' -l html -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l redaction
 complete -c deja -n '__fish_seen_subcommand_from stats' -l card -r

@@ -978,6 +978,61 @@ rewrite that would leave nothing keeps the newest few hundred events instead of
 emptying the file. It is absent only when the log holds nothing at all, which is
 the one case where the counts are all zero anyway.
 
+## `deja stats --year --json`
+
+The last twelve months of one person's work with agents, which is the same
+material the screen prints:
+
+```json
+{
+  "kind": "deja.stats.year",
+  "schema_version": 2,
+  "from": "2025-09-21",
+  "to": "2026-09-21",
+  "sessions": 2437,
+  "messages": 215690,
+  "harnesses": [{ "harness": "opencode", "sessions": 1176 }],
+  "projects": [{ "project": "acme/api", "sessions": 753 }],
+  "work": {
+    "records": { "files": 48053, "command": 51296, "edit": 17120 },
+    "files": 20989,
+    "commands": 42031,
+    "spans": 17120,
+    "span_files": 1899,
+    "undated": 0
+  },
+  "questions": { "distinct": 838, "repeated": 28 },
+  "friction": [{ "line": "command not found: timeout", "sessions": 32 }],
+  "busiest_day": "2026-09-17",
+  "busiest_day_turns": 7409,
+  "longest_session": "the payout retries fire twice",
+  "longest_session_messages": 4102,
+  "masked": { "home-path": 3 },
+  "sessions_outside_window": 289
+}
+```
+
+Every count has its arithmetic in the shape rather than in prose. `work.records`
+is how many records of each kind fall inside the window; `work.files` and
+`work.commands` are the distinct paths and command lines those records name, so
+forty records naming one file are one file. `questions.repeated` is how many
+distinct questions were asked in more than one session, and
+`questions.distinct` is the population it is a fraction of — a repeat count
+without its denominator is not a figure about anything. `work.undated` is the
+work records that carry no timestamp, which some stores do not write: they are
+in none of the other counts rather than assumed recent.
+
+`masked` is what the outbound redaction pass removed on the way out, by class.
+This output is meant to be shown to other people, so quoted material — project
+names, the session title, the error lines — takes that pass whatever the index
+holds, the same rule `deja recap --json` follows. `sessions_outside_window`
+counts indexed sessions older than `from`, or carrying no date at all, so a
+small report over a large index says why.
+
+The window is the last twelve months ending now, not a calendar year, and the
+report takes no filters: `--harness`, `--project`, `--since` and `--role` are
+refused rather than narrowing the sessions and leaving the record counts whole.
+
 ## `deja log --json`
 
 What deja actually fed the agents, newest first:

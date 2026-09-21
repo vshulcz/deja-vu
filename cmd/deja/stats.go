@@ -37,6 +37,7 @@ type redactionReport struct {
 func runStats(dir string, args []string) error {
 	jsonOut := false
 	impact := false
+	year := false
 	cardPath := ""
 	card := false
 	htmlPath := ""
@@ -65,6 +66,8 @@ func runStats(dir string, args []string) error {
 			redaction = true
 		case "--impact":
 			impact = true
+		case "--year":
+			year = true
 		case "--card":
 			if card {
 				return fmt.Errorf("stats: --card specified twice")
@@ -120,8 +123,26 @@ func runStats(dir string, args []string) error {
 	if err := checkRole(options.Role); err != nil {
 		return fmt.Errorf("stats: %w", err)
 	}
+	if impact && year {
+		return fmt.Errorf("stats: --impact and --year are two reports — ask for one")
+	}
 	if impact {
 		return runStatsImpact(os.Stdout, dir, jsonOut)
+	}
+	if year {
+		// The year report is its own window and its own arithmetic, so a
+		// filter passed with it would narrow some figures (the sessions) and
+		// not others (the records) and the screen would not add up.
+		if options.Harness != "" || options.Project != "" || options.Since > 0 || options.Role != "" {
+			return fmt.Errorf("stats: --year takes no filters — it is the whole of the last twelve months, on purpose")
+		}
+		if card || html || redaction {
+			return fmt.Errorf("stats: choose one output")
+		}
+		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+			return ensureError(dir, err)
+		}
+		return runStatsYear(os.Stdout, dir, jsonOut)
 	}
 	if redaction && card {
 		return fmt.Errorf("stats: --redaction cannot combine with --card")

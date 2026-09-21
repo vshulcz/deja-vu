@@ -2733,7 +2733,7 @@ var (
 		"--session", "--project", "--before", "--unforget",
 	}
 	statsFlags = []string{
-		"--json", "--html", "--redaction", "--impact", "--card",
+		"--json", "--html", "--redaction", "--impact", "--card", "--year",
 		"--harness", "--project", "--since", "--role",
 	}
 	doctorFlags   = []string{"--json", "--offline", "--deep"}
@@ -4009,7 +4009,7 @@ Usage:
   deja brief         (the screen a bare deja prints on a terminal)
   deja log [n] [--last] [--json]
   deja statusline
-  deja stats [--json] [--impact] [--redaction] [--card [path]] [--html [path]]
+  deja stats [--json] [--impact] [--year] [--redaction] [--card [path]] [--html [path]]
              [--project name] [--harness name] [--since 30d] [--role name]
   deja remember "text" [--project name] [--tag name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]

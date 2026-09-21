@@ -496,6 +496,41 @@ func RepeatQuestionExample(ss []model.Session) (example string, repeated int) {
 	return TrimRunes(texts[best], 72), repeated
 }
 
+// QuestionSpread is how many distinct questions the corpus holds and how many
+// of them were asked in more than one session. RepeatQuestions is the second
+// number; the first is the denominator it needs — a repeat count without one
+// is a figure nobody can size ("91 repeats" of 200 questions and of 20,000 are
+// different stories).
+func QuestionSpread(ss []model.Session) (distinct, repeated int) {
+	counts := map[string]int{}
+	for _, s := range ss {
+		seen := map[string]bool{}
+		for _, m := range s.Messages {
+			if m.Role != "user" || !AskedByAPerson(m.Text) {
+				continue
+			}
+			stem := questionStemFor(m.Text)
+			if stem == "" || seen[stem] {
+				continue
+			}
+			// The same floor RepeatQuestionExample uses, so the two numbers
+			// are over one population: an acknowledgement is not a question.
+			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
+				continue
+			}
+			seen[stem] = true
+			counts[stem]++
+		}
+	}
+	for _, n := range counts {
+		distinct++
+		if n > 1 {
+			repeated++
+		}
+	}
+	return distinct, repeated
+}
+
 func questionStemFor(text string) string {
 	if Noise(text) {
 		return ""
