@@ -27,6 +27,22 @@ type SecretFinding struct {
 	Count   int       `json:"count"`
 }
 
+// databaseStorePath reports whether a session's path is a database holding
+// every other session too, rather than that session's own file.
+//
+// The test used to be "the extension is .jsonl", which withheld the file from
+// three harnesses that do write one file per session: Cline and half of VS Code
+// Copilot Chat write `.json`, and the DeepSeek Harness writes `.zstd`. On this
+// machine that was 69 sessions told to look in a store deja would not name,
+// where the answer was a single file they could open.
+func databaseStorePath(p string) bool {
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".db", ".sqlite", ".sqlite3", ".vscdb":
+		return true
+	}
+	return false
+}
+
 // SecretScan is what one pass over the store found.
 type SecretScan struct {
 	// Findings are the shapes worth naming to a person, newest first.
@@ -143,7 +159,7 @@ func ScanSecrets(dir string) (SecretScan, error) {
 				// naming it as the file to look in would be a wrong answer
 				// four sessions out of five. The harness is the location
 				// there, and the screen says so.
-				if p := meta.Path; p != "" && strings.EqualFold(filepath.Ext(p), ".jsonl") {
+				if p := meta.Path; p != "" && !databaseStorePath(p) {
 					f.Path = p
 				}
 				seen[k] = f

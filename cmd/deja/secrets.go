@@ -161,7 +161,28 @@ func printSecrets(w io.Writer, scan index.SecretScan, limit int) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "these values are in the source transcripts, not in deja's copy — deja redacted its own.")
 	fmt.Fprintln(w, "rotate the live ones; the files above are yours to edit or delete.")
+	// The rows with no file are the ones the closing line does not cover, and
+	// saying nothing left them looking like rows deja simply knew less about.
+	// A database store holds every session in one file, so editing it is not
+	// the answer — the harness's own history screen is. Measured on this
+	// machine's store, 12 of the 41 sessions the report lists are in one, and
+	// they carry 36 of the 83 findings (#3823).
+	if n := groupsWithoutAFile(shown); n > 0 {
+		fmt.Fprintf(w, "%d of the sessions above keep their history in a database with every other session in it, so there is no file to edit — clear those in the harness itself.\n", n)
+	}
 	printSecretsTail(w, scan)
+}
+
+// groupsWithoutAFile counts the shown sessions whose store is a database, which
+// is exactly the set the closing line about files does not speak for.
+func groupsWithoutAFile(groups []secretsGroup) int {
+	n := 0
+	for _, g := range groups {
+		if g.head.Path == "" {
+			n++
+		}
+	}
+	return n
 }
 
 // secretsKindList names a session's kinds, biggest first, with the number of
