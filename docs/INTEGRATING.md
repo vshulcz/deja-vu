@@ -4,11 +4,9 @@ This is the page for somebody shipping an agent toolkit, a harness, a dotfiles
 installer or a CI job that wants session memory in it, rather than for somebody
 installing deja for themselves.
 
-It exists because of what happened on 5 August 2026: another project —
-`pacphi/agentic-kit` — added deja as an optional cross-host session memory, and
-that single integration brought more people here in a day than any release has.
-Nothing in this repository told them how; they worked it out. This is that
-missing page.
+It exists because `pacphi/agentic-kit` added deja as an optional cross-host
+session memory on 5 August 2026 and had to work out how on their own — nothing
+in this repository told them. This is that missing page.
 
 ## What you are integrating
 

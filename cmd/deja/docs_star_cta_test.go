@@ -7,11 +7,10 @@ import (
 	"testing"
 )
 
-// The star line asks the one thing a reader of these pages can do for the
-// project, and it has to be on all of them: the guide and registry pages are
-// where search traffic lands, and a new one added without the line is the
-// silent way the ask disappears. Four of the seven delete-* pages carried it
-// and three did not, which is how this started.
+// Every guide and registry page closes with the same line, so a reader who
+// arrives at one of them directly still finds the way back to the project.
+// Four of the seven delete-* pages carried it and three did not, which is how
+// this started: a page added later is the one that quietly differs.
 //
 // Placement is the other half. The line lives inside <article>, which is the
 // content column of the .doc grid; below the grid it stretches the full width

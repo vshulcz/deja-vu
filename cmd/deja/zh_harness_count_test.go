@@ -43,11 +43,10 @@ func TestChineseDocsCountTheHarnessesTheRegistryHas(t *testing.T) {
 	// its line said 三十三个智能体 while the English lines in the same file said
 	// thirty-four.
 	files := []string{"README.zh.md", filepath.ToSlash(filepath.Join("docs", "llms.txt"))}
-	// docs/zh was the whole list, and the count went stale where the readers
-	// actually are: `extensions/dsh/docs/zh.md` said twenty-one agents, twelve
-	// releases out of date, on the third most visited page in the repository
-	// (145 unique readers in fourteen days, against 146 for README.zh.md). A
-	// Chinese page under extensions/ is a Chinese page.
+	// docs/zh was the whole list, so the count went stale outside it:
+	// `extensions/dsh/docs/zh.md` said twenty-one agents, twelve releases out
+	// of date. A Chinese page under extensions/ is a Chinese page, and the
+	// walk covers both trees.
 	for _, dir := range []string{filepath.Join(root, "docs", "zh"), filepath.Join(root, "extensions")} {
 		err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
 			if err != nil || d.IsDir() {
