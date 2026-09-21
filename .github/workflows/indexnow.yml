@@ -1,0 +1,133 @@
+name: IndexNow
+
+# IndexNow is the only way to tell Bing, Yandex and the assistants built on them
+# that a page changed; Google does not participate, and nothing here reaches it.
+# The protocol is for pages that changed, so this submits what a push touched
+# rather than the whole sitemap.
+on:
+  push:
+    branches: [main]
+    paths: ['docs/**']
+  workflow_dispatch:
+    inputs:
+      all:
+        description: Submit every URL in the sitemap instead of the pages a push changed
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: read
+
+# Two runs submitting at once say nothing new and count against the same host.
+concurrency:
+  group: indexnow
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: tell the crawlers what changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25.x'
+          cache: false
+
+      - name: Which pages this push changed
+        id: changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          ALL: ${{ inputs.all }}
+        run: |
+          set -euo pipefail
+          site=https://vshulcz.github.io/deja-vu
+          if [ "${ALL:-false}" = "true" ]; then
+            echo "asked for the whole sitemap"
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # A first push to a branch, or a force-push, carries no usable before.
+          if [ -z "${BEFORE:-}" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "no previous commit on this push; falling back to the whole sitemap"
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          gh api "repos/$REPO/compare/$BEFORE...$SHA" --jq '.files[].filename' > files.txt
+          # The compare endpoint stops at three hundred files, and a truncated
+          # diff would silently leave pages out.
+          if [ "$(wc -l < files.txt)" -ge 300 ]; then
+            echo "the diff is at the compare limit; falling back to the whole sitemap"
+            echo "mode=all" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          : > urls.txt
+          while read -r f; do
+            case "$f" in
+              docs/*.html) ;;
+              *) continue ;;
+            esac
+            p="${f#docs/}"
+            case "$p" in
+              index.html) echo "$site/" >> urls.txt ;;
+              */index.html) echo "$site/${p%index.html}" >> urls.txt ;;
+              *) echo "$site/$p" >> urls.txt ;;
+            esac
+          done < files.txt
+          if [ ! -s urls.txt ]; then
+            echo "no page changed, only files beside them"
+            echo "mode=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sort -u -o urls.txt urls.txt
+          echo "mode=only" >> "$GITHUB_OUTPUT"
+          cat urls.txt
+
+      - name: Wait for Pages to serve this commit
+        if: steps.changed.outputs.mode != 'none'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # The site is served straight from main:/docs, so the build that
+          # publishes this commit finishes after the push rather than with it.
+          # Announcing a URL before then sends the crawler to the old page and
+          # spends the one signal we get for it.
+          for _ in $(seq 1 40); do
+            out=$(gh api "repos/$REPO/pages/builds/latest" --jq '.status + " " + .commit')
+            if [ "$out" = "built $SHA" ]; then
+              echo "pages built $SHA"
+              exit 0
+            fi
+            echo "pages: $out — waiting"
+            sleep 15
+          done
+          echo "the Pages build for $SHA did not finish within ten minutes" >&2
+          exit 1
+
+      - name: Submit
+        if: steps.changed.outputs.mode != 'none'
+        env:
+          LIVE: ${{ vars.INDEXNOW }}
+          MODE: ${{ steps.changed.outputs.mode }}
+        run: |
+          set -euo pipefail
+          # Nothing leaves the runner until INDEXNOW is set to `on` in the
+          # repository variables. Until then the step prints the batch it would
+          # have sent, which is the part worth reading in a log anyway.
+          args=()
+          if [ "${LIVE:-}" != "on" ]; then
+            args+=(-dry-run)
+            echo "INDEXNOW is not on; printing the batch instead of sending it"
+          fi
+          if [ "$MODE" = "only" ]; then
+            args+=(-only urls.txt)
+          fi
+          go run ./scripts/indexnow "${args[@]}"
