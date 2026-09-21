@@ -13,7 +13,7 @@ import (
 func TestForgetTakesTheMachineNameToo(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "peers.json")
 	t.Setenv("DEJA_PEERS_FILE", path)
-	body := `{"peers":[{"host":"vlad@10.0.0.7","machine":"quicksilver"},{"host":"mini"}]}`
+	body := `{"peers":[{"host":"dev@192.0.2.7","machine":"quicksilver"},{"host":"mini"}]}`
 	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

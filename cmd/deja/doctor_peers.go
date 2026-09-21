@@ -133,7 +133,7 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 	// A peer has two names — the ssh host it was added under, which heads this
 	// row, and the name it calls itself, which is what `deja last` and the
 	// recall lines print for work that came from it. Nothing joined them, so
-	// the row about quicksilver's sessions was headed vlad@10.0.0.7 (#2415).
+	// the row about quicksilver's sessions was headed dev@192.0.2.7 (#2415).
 	// Said once: a machine added under the name it calls itself repeats
 	// nothing.
 	if m := strings.TrimSpace(p.Machine); m != "" && !sameMachineName(m, p.Host) {
@@ -149,7 +149,7 @@ func peerLine(p peers.Peer, sessions int, now time.Time) string {
 
 // sameMachineName reports whether a machine's own name is already what the
 // host says. The user part of an ssh target is not part of the name — a peer
-// added as vlad@quicksilver that calls itself quicksilver has one name, not
+// added as dev@quicksilver that calls itself quicksilver has one name, not
 // two, and saying it twice is noise.
 func sameMachineName(machine, host string) bool {
 	host = strings.TrimSpace(host)

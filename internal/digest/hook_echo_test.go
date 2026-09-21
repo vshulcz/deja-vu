@@ -30,7 +30,7 @@ func TestHookEchoesAreNotWhatThePersonSaid(t *testing.T) {
 	// a name in front of "says:", a quotation mid-sentence, and a message that
 	// merely talks about the hook.
 	mine := []string{
-		"Vlad says: rebase first, then push",
+		"Dana says: rebase first, then push",
 		"the reviewer says: this needs a test",
 		"he says: no, and I think he is right",
 		"why does UserPromptSubmit fire on a task notification",

@@ -17,7 +17,7 @@ func TestDoctorJSONPeerCarriesTheMachineName(t *testing.T) {
 	tmp := hermeticEnv(t)
 	peersFile := filepath.Join(tmp, "peers.json")
 	t.Setenv("DEJA_PEERS_FILE", peersFile)
-	body := `{"peers":[{"host":"vlad@10.0.0.7","machine":"quicksilver","last_pull":"2026-08-28T10:00:00Z"},` +
+	body := `{"peers":[{"host":"dev@192.0.2.7","machine":"quicksilver","last_pull":"2026-08-28T10:00:00Z"},` +
 		`{"host":"mini","last_pull":"2026-08-28T09:00:00Z"}]}`
 	if err := os.WriteFile(peersFile, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
@@ -40,7 +40,7 @@ func TestDoctorJSONPeerCarriesTheMachineName(t *testing.T) {
 	}
 	for _, p := range report.Sync.Peers {
 		switch p["host"] {
-		case "vlad@10.0.0.7":
+		case "dev@192.0.2.7":
 			if p["machine"] != "quicksilver" {
 				t.Errorf("the row does not say which machine that host is: %v", p)
 			}

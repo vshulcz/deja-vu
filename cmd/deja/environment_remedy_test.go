@@ -25,7 +25,7 @@ func TestTheEnvironmentBlockNamesTheRemedyItKnows(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fail := `psql: error: connection to server at "db.internal.example.com" (10.42.0.7), port 5432 failed: Connection refused`
+	fail := `psql: error: connection to server at "db.internal.example.com" (198.51.100.7), port 5432 failed: Connection refused`
 	for k := 0; k < 4; k++ {
 		var lines []string
 		at := func(m int) string {

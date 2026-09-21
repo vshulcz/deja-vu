@@ -695,7 +695,7 @@ func IsCompactionSummary(t string) bool {
 // hookStatusLineRE is the shape Claude Code uses to record what a hook said
 // in its systemMessage: `UserPromptSubmit says: …`, `SessionStart:compact
 // says: …`, sometimes behind the tree glyph. Only the host's event names
-// count — "Vlad says: no" is a person. The line is deja's own status
+// count — "Dana says: no" is a person. The line is deja's own status
 // bar coming back through the transcript under the user role, and it was
 // quoted as a session title: "you have been here: 'UserPromptSubmit says:
 // deja-vu — you have been h…'" (#3168).

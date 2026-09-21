@@ -6,11 +6,11 @@ import "testing"
 // different wall: friction never reaches its floor, no fix pair is confirmed
 // twice, and search's error tier matches nothing (#2369).
 func TestOneErrorIsOneWallAcrossHostsAndPorts(t *testing.T) {
-	first, ok := FrictionLine("dial tcp 10.0.0.7:5432: connect: connection refused")
+	first, ok := FrictionLine("dial tcp 192.0.2.7:5432: connect: connection refused")
 	if !ok {
 		t.Fatal("the line is not friction at all, so this measures nothing")
 	}
-	second, ok := FrictionLine("dial tcp 10.0.0.9:5433: connect: connection refused")
+	second, ok := FrictionLine("dial tcp 192.0.2.9:5433: connect: connection refused")
 	if !ok {
 		t.Fatal("the second line is not friction")
 	}

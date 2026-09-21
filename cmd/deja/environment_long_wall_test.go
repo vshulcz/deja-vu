@@ -24,7 +24,7 @@ func TestALongWallKeepsWhatNamesIt(t *testing.T) {
 	if err := os.MkdirAll(store, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	wall := `psql: error: connection to server at "db.internal.example.com" (10.42.0.7), port 5432 failed: Connection refused`
+	wall := `psql: error: connection to server at "db.internal.example.com" (198.51.100.7), port 5432 failed: Connection refused`
 	for k := 0; k < 4; k++ {
 		sid := fmt.Sprintf("s%d", k)
 		at := time.Now().Add(-time.Duration(200-20*k) * time.Minute).UTC().Format(time.RFC3339)
