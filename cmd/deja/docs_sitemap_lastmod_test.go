@@ -48,8 +48,10 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 		if served == "" || strings.HasSuffix(served, "/") {
 			served += "index.html"
 		}
-		rel := filepath.Join("docs", filepath.FromSlash(served))
-		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
+		// git wants forward slashes in a pathspec on every platform; only the
+		// stat below goes through the OS separator.
+		rel := "docs/" + served
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
 			continue // served from somewhere this test cannot see
 		}
 		if lastmod == "" {

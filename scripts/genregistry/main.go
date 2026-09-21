@@ -360,13 +360,14 @@ func refreshLastmod(text string) (string, error) {
 	return out, first
 }
 
-// sitemapFile maps a sitemap path to the file docs/ serves for it. The site root
-// and a directory URL both come from an index.html.
+// sitemapFile maps a sitemap path to the file docs/ serves for it, with the
+// slashes git wants in a pathspec on every platform. The site root and a
+// directory URL both come from an index.html.
 func sitemapFile(loc string) string {
 	if loc == "" || strings.HasSuffix(loc, "/") {
 		loc += "index.html"
 	}
-	return filepath.Join("docs", filepath.FromSlash(loc))
+	return "docs/" + loc
 }
 
 // lastChanged is the author date of the last commit that touched the file, or
@@ -374,7 +375,7 @@ func sitemapFile(loc string) string {
 // will carry them does not exist, and the alternative is to publish the date of
 // the change before this one.
 func lastChanged(file string) (string, error) {
-	if _, err := os.Stat(file); err != nil {
+	if _, err := os.Stat(filepath.FromSlash(file)); err != nil {
 		return "", nil
 	}
 	dirty, err := exec.Command("git", "status", "--porcelain", "--", file).Output()
