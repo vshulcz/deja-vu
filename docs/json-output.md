@@ -625,6 +625,49 @@ rule emptied the store, and a script cannot branch on prose.
 
 `last` is omitted rather than zero-valued when a row carries no recorded time.
 
+## `deja secrets --json`
+
+Which credentials the source transcripts are carrying, one entry per session and
+kind:
+
+```json
+{
+  "kind": "deja.secrets",
+  "schema_version": 2,
+  "findings": [
+    {
+      "kind": "url-credentials",
+      "harness": "claude",
+      "id": "8a41c2f0-1d2e-4c3b-9f77-0a1b2c3d4e5f",
+      "project": "api",
+      "path": "/home/me/.claude/projects/-home-me-api/8a41c2f0.jsonl",
+      "when": "2026-07-03T18:42:11Z",
+      "count": 3
+    }
+  ],
+  "counted": { "entropy": 1911, "credential": 1234, "quoted-secret": 320 },
+  "sessions": 40
+}
+```
+
+The value is never in this document, and cannot be: redaction runs at ingest, so
+every finding was read back out of a `[redacted:<kind>]` marker rather than out
+of a credential. `count` is how many turns of that session held that kind.
+
+`findings` holds only the rules that name a provider or a protocol shape —
+provider keys, `private-key`, `jwt`, `bearer-token`, `cookie`,
+`url-credentials`, the command and netrc password shapes. `counted` is every
+other rule as a number, because the assignment and entropy rules fire on the
+value side of `key=` as often for a digest or an identifier as for a secret: on
+the store this was measured against they were 3,465 markers against 82
+findings. A consumer that wants those has the counts and should not present
+them as credentials.
+
+`path` is the transcript still holding the value and is omitted for a
+database-backed store, where one file holds every session in it. `withheld` is
+present when the ignore rule kept sessions out of the scan. `findings` is an
+empty array, never null, on a clean machine.
+
 ## `deja fix <error> --json`
 
 The commands sessions on this machine ran after that error:
