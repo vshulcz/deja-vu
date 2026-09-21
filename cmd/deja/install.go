@@ -709,14 +709,32 @@ func existingTargets() []string {
 	return out
 }
 
+// installTargetAliases are the other names a target answers to. Each is a name
+// something already prints: `claude` is what the plugin pages and half the
+// harness notes call Claude Code, and `dsh` is what the DeepSeek Harness calls
+// itself in its own binary, its plugin and its guide page — which printed
+// `deja install dsh-auto` while only `deepseek-auto` resolved.
+//
+// One map rather than an extra case label per target, because the name has to
+// reach `guidanceHarness` too: aliasing only the wiring installed the server
+// and skipped the skill.
+var installTargetAliases = map[string]string{
+	"claude":   "claude-code",
+	"dsh":      "deepseek",
+	"dsh-auto": "deepseek-auto",
+}
+
 func installTarget(target, exe string, uninstall bool) (installResult, error) {
+	if canonical, ok := installTargetAliases[target]; ok {
+		target = canonical
+	}
 	switch target {
 	case "claude-auto":
 		if err := readableStrictJSON(filepath.Join(sources.ClaudeConfigDir(), "settings.json")); err != nil {
 			return installResult{}, err
 		}
 		return installClaudeAuto(exe, uninstall)
-	case "claude-code", "claude":
+	case "claude-code":
 		return installClaude(exe, uninstall)
 	case "codex":
 		return installCodex(exe, uninstall)
@@ -906,13 +924,9 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installPrimeMCP(exe, uninstall)
 	case "prime-auto":
 		return installPrimeAuto(exe, uninstall)
-	// The tool's own binary, its plugin comments and its guide page all call
-	// it dsh; the registry id is deepseek. Both names resolve, the way
-	// `claude` resolves to claude-code, because the page said `deja install
-	// dsh-auto` and that refused.
-	case "deepseek", "dsh":
+	case "deepseek":
 		return installDeepSeekMCP(exe, uninstall)
-	case "deepseek-auto", "dsh-auto":
+	case "deepseek-auto":
 		return installDeepSeekAuto(exe, uninstall)
 	case "openclaw":
 		return installOpenClawMCP(exe, uninstall)
