@@ -430,7 +430,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 			// Last, after anything that needs acting on: what the build
 			// found, once (#3073), then once a week what the week looked
 			// like (#3065).
-			resp.SystemMessage = joinNotes(resp.SystemMessage, joinNotes(builtNote(dir), weekNote(dir)))
+			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
 			emitHookResponse(resp)
 			return nil
 		}
@@ -589,7 +589,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	}
 	// What the build found, once (#3073), then once a week what the week
 	// looked like (#3065) — after everything that needs acting on.
-	resp.SystemMessage = joinNotes(resp.SystemMessage, joinNotes(builtNote(dir), weekNote(dir)))
+	resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
 	// An index that is behind and cannot be written stays behind. "the agent
 	// starts already knowing them" was printed over a picture missing today's
 	// work, and this path said nothing — search names the same state (#1005).

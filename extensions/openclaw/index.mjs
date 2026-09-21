@@ -188,6 +188,28 @@ export default {
       )
     }
 
+    // /deja answers the person directly. The hooks above only reach the
+    // model, so this reply is also where deja's own notes reach them.
+    try {
+      if (typeof api.registerCommand === "function") {
+        api.registerCommand({
+          name: "deja",
+          description: "Search this machine's past AI coding sessions",
+          acceptsArgs: true,
+          async handler(ctx) {
+            const query = String((ctx && ctx.args) || "").trim()
+            if (!query) return { text: "Say what to look for: /deja <error, file, or decision>" }
+            const out = await ask(argv("search", [], query), undefined, 120000)
+            // Asked here rather than read from installed: the startup check may
+            // not have answered yet, and an empty search reads as no history.
+            if (!out && !(await run(bin, ["--version"]))) return { text: MISSING }
+            const notes = await ask(["hook-context", "--notes"], undefined, 10000)
+            return { text: notes ? (out || NOTHING) + "\n\n" + notes : out || NOTHING }
+          },
+        })
+      }
+    } catch {}
+
     // A missing binary is reported once, through the host, not on every turn.
     run(bin, ["--version"]).then((v) => {
       if (v) return

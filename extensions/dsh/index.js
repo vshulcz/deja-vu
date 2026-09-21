@@ -230,7 +230,11 @@ function command(ctx) {
       // printed a version number and `/deja index` rebuilt the index, and one
       // of the words people most want history about is `install`.
       const out = run(argv("search", [], query));
-      return { kind: INSTALLED ? "success" : "error", text: answer(out) };
+      if (!INSTALLED) return { kind: "error", text: MISSING };
+      // dsh shows a person nothing the hooks print — the digest goes to the
+      // model — so the reply to /deja is where deja's own notes reach them.
+      const notes = run(["hook-context", "--notes"]);
+      return { kind: "success", text: notes ? answer(out) + "\n\n" + notes : answer(out) };
     },
   }));
 }

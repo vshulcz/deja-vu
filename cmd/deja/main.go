@@ -626,6 +626,15 @@ func cmdHookContext(dir string, rest []string) error {
 		// line and keeps the context (see hook_strict.go).
 		case "--strict", "-strict":
 			strictHookOutput = true
+		// --notes is for a host that shows a person nothing from its hooks —
+		// dsh and OpenClaw put the plain digest in front of the model only. It
+		// prints the notes meant for the person, and nothing else, for the
+		// plugin to add to a reply the person does read.
+		case "--notes", "-notes":
+			if notes := humanNotes(dir); notes != "" {
+				fmt.Fprintln(os.Stdout, notes)
+			}
+			return nil
 		}
 	}
 	_ = runHookContextMode(dir, plain, once)
@@ -3972,7 +3981,7 @@ Usage:
   deja wip [--json]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
-  deja hook-context [--plain] [--once] [--strict]  (session start: the project digest, once per session)
+  deja hook-context [--plain] [--once] [--strict] [--notes]  (session start: the project digest, once per session)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
   deja hook-tool [--plain] [--crush]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)

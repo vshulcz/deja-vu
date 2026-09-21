@@ -31,6 +31,7 @@ what is missing.
 - **Tools**: `deja_recall` (search the history), `deja_fix` (what was run after
   this error before), `deja_blame` (which sessions touched a file and what they
   concluded).
+- **`/deja <query>`**: the same search, answered to you rather than the model.
 
 ## Config
 

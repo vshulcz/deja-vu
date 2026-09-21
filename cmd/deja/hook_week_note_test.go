@@ -49,3 +49,24 @@ func TestWeekNoteKeepsQuietOnAnEmptyWeek(t *testing.T) {
 		t.Fatalf("an empty week was reported: %q", got)
 	}
 }
+
+// dsh and OpenClaw show a person nothing a hook prints, so their plugins ask
+// for the notes on their own and add them to a /deja reply.
+func TestHookContextNotesPrintsTheDueWeekNoteOnceAndNoDigest(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	usage.RecordResult(dir, usage.KindHook, 900, 2, false)
+	week := strconv.FormatInt(time.Now().Add(-8*24*time.Hour).Unix(), 10)
+	if err := os.WriteFile(dir+".weeknote", []byte(week), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got := captureStdout(t, func() { _ = cmdHookContext(dir, []string{"--notes"}) })
+	if strings.TrimSpace(got) == "" || !strings.HasPrefix(got, "deja this week: ") {
+		t.Fatalf("--notes = %q, want only the week note", got)
+	}
+	if again := captureStdout(t, func() { _ = cmdHookContext(dir, []string{"--notes"}) }); again != "" {
+		t.Fatalf("--notes spoke twice: %q", again)
+	}
+}
