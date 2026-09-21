@@ -75,7 +75,11 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 		if err != nil {
 			t.Fatalf("git returned %q for %s", day, loc)
 		}
-		if changed.Sub(said) > slack {
+		// Both directions: a date behind the file is the drift this catches, and
+		// a date ahead of it is the same lie told the other way round — a page
+		// that says it changed tomorrow is one a crawler is told to come back
+		// for and finds nothing new.
+		if drift := changed.Sub(said); drift > slack || drift < -slack {
 			t.Errorf("%s says lastmod %s but last changed %s — run `go run ./scripts/genregistry`", named, lastmod, day)
 		}
 	}
