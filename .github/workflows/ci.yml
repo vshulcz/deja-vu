@@ -133,7 +133,10 @@ jobs:
     # others under 24s), so 21 minutes of the 89 is tests and the rest is the
     # compiler and the linker again. So the cap is 120 — a real hang is still
     # bounded by the go -timeout below, which kills one with a stack long
-    # before this.
+    # before this. The run that raised it came in at 1h28m43s, so 120 is about
+    # a third of headroom rather than a comfortable margin; the lever left is
+    # splitting the leg across runners, which halves the compile as well as the
+    # tests but renames a required check.
     timeout-minutes: 120
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
@@ -217,16 +220,15 @@ jobs:
       # runner now. The job's own 120m cap is what bounds a real hang, and the go
       # timeout still dies with every goroutine's stack well inside it.
       #
-      # `./cmd/... ./internal/...` rather than `./...`: the 31 packages under
-      # scripts/ are build tooling — the generators, the benchmark drivers, the
-      # release helpers — and every one of them runs on the linux leg, in the
-      # jobs below, or on a maintainer's machine. None of them is why this leg
-      # exists, and compiling them is not free: a cold `go test -run <nothing>`
-      # over every package takes 22s here against 16s for cmd and internal
-      # alone, so a quarter of the compile work this step does is for code that
-      # never runs on windows. The paths, the file locking and the case rules
-      # this leg is here for are all in cmd/deja and internal/.
-      - run: go test -timeout 25m ./cmd/... ./internal/...
+      # Narrowing this to `./cmd/... ./internal/...` was tried and reverted.
+      # The 31 packages under scripts/ are build tooling that never runs on
+      # windows, and locally they are a quarter of the compile work — a cold
+      # `go test -run <nothing>` is 22s over every package against 16s without
+      # them. On the runner that quarter does not exist: 5358s for the step with
+      # them against 5259s without, one run each, which is inside a leg whose
+      # identical runs have come in at 49m, 57m and 62m. Not worth a narrower
+      # leg, and not worth measuring again.
+      - run: go test -timeout 25m ./...
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
       - run: go build ./cmd/deja
