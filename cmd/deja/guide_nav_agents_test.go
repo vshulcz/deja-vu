@@ -37,7 +37,7 @@ func TestEveryGuidePageListsEveryPerAgentGuide(t *testing.T) {
 		t.Fatal("no per-agent guides on disk, so this checks nothing")
 	}
 
-	block := regexp.MustCompile(`(?s)<details class="grpfold"[^>]*>.*?</details>`)
+	block := regexp.MustCompile(`(?s)<details class="grpfold"[^>]*><summary>Per-agent guides .*?</details>`)
 	count := regexp.MustCompile(`Per-agent guides <span class="n">(\d+)</span>`)
 	for _, name := range pages {
 		b, err := os.ReadFile(filepath.Join(dir, name))
@@ -96,5 +96,43 @@ func TestAPerAgentPageCountsTheOtherAgentsCorrectly(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Skip("no page counts the other agents")
+	}
+}
+
+// The sidebar is written by scripts/gennav. A page edited by hand, or added
+// without rerunning it, drifts from the rest; before the generator there were
+// three versions across 68 pages. Apart from which link is current and which
+// group is open, every page must carry the same one.
+func TestEveryGuidePageCarriesTheGeneratedSidebar(t *testing.T) {
+	dir := filepath.Join("..", "..", "docs", "guide")
+	pages, err := filepath.Glob(filepath.Join(dir, "*.html"))
+	if err != nil || len(pages) == 0 {
+		t.Fatalf("no guide pages: %v", err)
+	}
+	aside := regexp.MustCompile(`(?s)<aside>.*?</aside>`)
+	norm := strings.NewReplacer(` aria-current="page"`, "", `<details class="grpfold" open>`, `<details class="grpfold">`)
+	var first, firstName string
+	for _, p := range pages {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		side := aside.Find(b)
+		if side == nil {
+			t.Errorf("%s has no sidebar", filepath.Base(p))
+			continue
+		}
+		s := string(side)
+		if n := strings.Count(s, "<details class=\"grpfold\" open>"); n > 1 {
+			t.Errorf("%s opens %d sidebar groups, want at most one", filepath.Base(p), n)
+		}
+		s = norm.Replace(s)
+		if first == "" {
+			first, firstName = s, filepath.Base(p)
+			continue
+		}
+		if s != first {
+			t.Errorf("%s has a different sidebar from %s; run go run ./scripts/gennav", filepath.Base(p), firstName)
+		}
 	}
 }

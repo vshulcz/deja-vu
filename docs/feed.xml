@@ -74,6 +74,13 @@
     <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
   <entry>
+    <title>Delete Cline task history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
+    <updated>2026-09-21T00:00:00Z</updated>
+    <summary>Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.</summary>
+  </entry>
+  <entry>
     <title>How to delete Codex CLI sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
     <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its extension, server, skill and command, and indexes every agent.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Goose: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Goose keeps sessions in a local database and reads .goosehints at start. deja adds MCP recall, a session-start hook and a per-turn channel per turn.</summary>
   </entry>
 </feed>

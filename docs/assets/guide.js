@@ -114,7 +114,10 @@
     var box=document.createElement('details');
     box.className='sidefold';
     var head=document.createElement('summary');
-    head.innerHTML='<span>Guide</span><b>'+(here?here.textContent.trim():'contents')+'</b>';
+    /* "Codex" alone could be the delete page or the memory one */
+    var grp=here&&here.closest('details.grpfold');
+    var where=grp?grp.querySelector('summary').firstChild.textContent.trim()+' · ':'';
+    head.innerHTML='<span>Guide</span><b>'+(here?where+here.textContent.trim():'contents')+'</b>';
     box.appendChild(head);
     while(side.firstChild)box.appendChild(side.firstChild);
     side.appendChild(box);
