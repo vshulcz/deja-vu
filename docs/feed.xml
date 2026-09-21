@@ -18,6 +18,13 @@
     <summary>One memory shared by Claude Code, Codex and 32 more agents, built from the sessions they already wrote to disk — including everything from before you installed it.</summary>
   </entry>
   <entry>
+    <title>Turn your deja stats card into a PNG — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/card/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/card/"></link>
+    <updated>2026-09-21T00:00:00Z</updated>
+    <summary>deja stats --card writes an SVG. Drop it here to get a PNG you can post. The conversion happens in your browser; the file is never uploaded.</summary>
+  </entry>
+  <entry>
     <title>What compaction drops, and how to get it back — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html"></link>
@@ -151,7 +158,7 @@
     <summary>Why coding agents start from scratch every session, what compaction keeps, and how to read the history Claude Code, Codex and Cursor already wrote.</summary>
   </entry>
   <entry>
-    <title>Search your Claude Code and Codex history — deja-vu</title>
+    <title>Install deja and index your agent history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
     <summary>How to give Gemini CLI recall over every coding agent&#39;s sessions on this machine — one extension install, and what the CLI install adds on top.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to gjc: recall past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its extension, server, skill and command, and indexes every agent.</summary>
   </entry>
 </feed>

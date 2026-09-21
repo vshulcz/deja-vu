@@ -10,7 +10,7 @@ import (
 
 // The other shape the count is written in: "thirty-four coding agents", or
 // "thirty-three other coding agents" in a file that ships inside one of them.
-// The "named + N more" tests cannot see it, and it is in eleven files —
+// The "named + N more" tests cannot see it, and it is in twelve files —
 // including the two plugin READMEs, which had said twenty-five since the
 // registry held twenty-five.
 func TestEveryCodingAgentCountMatchesTheRegistry(t *testing.T) {
@@ -30,6 +30,9 @@ func TestEveryCodingAgentCountMatchesTheRegistry(t *testing.T) {
 		"extensions/opencode/README.md",
 		"extensions/opencode/package.json",
 		"extensions/pi/README.md",
+		// The generator's own doc comment, which said thirty-three while it
+		// was rendering thirty-four pages.
+		"scripts/genregistry/main.go",
 	}
 	checked := 0
 	for _, f := range files {

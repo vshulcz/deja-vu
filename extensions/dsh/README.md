@@ -74,7 +74,7 @@ reading the requests dsh 0.1.1-rc.2 actually sent.
 
 ## What it does not do
 
-No LLM, no embeddings, no network. The index is a local BM25 store over files
+No LLM, no embeddings. The index is a local BM25 store over files
 that already exist, so a query answers in about a millisecond, with no network
 path unless you ask for one. Secrets are redacted at index time.
 

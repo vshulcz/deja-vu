@@ -83,13 +83,21 @@ func TestChineseDocsCountTheHarnessesTheRegistryHas(t *testing.T) {
 		}
 		text := string(b)
 		for _, re := range zhHarnessClaims {
-			for _, m := range re.FindAllStringSubmatch(text, -1) {
-				if !knownZhNumeral(m[1]) {
+			for _, loc := range re.FindAllStringSubmatchIndex(text, -1) {
+				num := text[loc[2]:loc[3]]
+				if !knownZhNumeral(num) {
 					continue
 				}
 				claims++
-				if m[1] != want {
-					t.Errorf("%s says %q; the registry has %d (%s)", name, m[0], n, want)
+				// 其他 is the Chinese "other": a document shipping inside one
+				// harness counts the rest, the same relative shape the English
+				// test allows. It moves with the total without equalling it.
+				expect := want
+				if before := text[max(0, loc[2]-len("其他")):loc[2]]; before == "其他" {
+					expect = zhCountWords[n-1]
+				}
+				if num != expect {
+					t.Errorf("%s says %q; the registry has %d, so it is %s", name, text[loc[0]:loc[1]], n, expect)
 				}
 			}
 		}
