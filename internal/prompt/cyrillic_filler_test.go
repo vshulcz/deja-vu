@@ -87,8 +87,8 @@ func TestTermsTrimSentencePunctuationButKeepPaths(t *testing.T) {
 			// The dot inside is what makes these one word, and trimming the
 			// edges must not reach them.
 			name:   "an address keeps its dots",
-			prompt: "4 поду подняли 109.120.139.223 подключай ее в кластер",
-			want:   []string{"109.120.139.223"},
+			prompt: "4 поды подняли 203.0.113.223 подключай ее в кластер",
+			want:   []string{"203.0.113.223"},
 		},
 		{
 			// A directory named mid-sentence keeps a trailing separator, and a
