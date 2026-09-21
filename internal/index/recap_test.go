@@ -1,6 +1,9 @@
 package index
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -167,6 +170,175 @@ func TestAHomeDirectoryIsNotAProjectName(t *testing.T) {
 	}
 	if RecapProjectIsHome("goprojects/deja-vu") {
 		t.Error("a real project was called a home directory")
+	}
+}
+
+// A line too long to print is cut, and where it is cut decides whether the
+// result reads as a sentence or as a bug. Three shapes reach this: a sentence
+// end late enough to keep, none at all, and a single token with no space to
+// fall back to — the last one is a URL or a path, which a real week prints.
+func TestALineTooLongIsCutWhereItCanBe(t *testing.T) {
+	long := strings.Repeat("token ", 60) // 360 runes, no sentence end
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "cut at the sentence end",
+			in:   strings.Repeat("a", 150) + ". " + strings.Repeat("b", 120),
+			want: strings.Repeat("a", 150) + ".",
+		},
+		{
+			name: "no sentence end, so the last word and an ellipsis",
+			in:   long,
+			want: strings.TrimSpace(long[:215]) + "…",
+		},
+		{
+			name: "one long token has no word to cut at",
+			in:   strings.Repeat("x", 300),
+			want: strings.Repeat("x", 220) + "…",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := cutAtSentence(c.in, recapLineMax)
+			if got != c.want {
+				t.Errorf("cut to %d runes:\n got %q\nwant %q", recapLineMax, got, c.want)
+			}
+		})
+	}
+}
+
+// The CLI passes its own default through, and a caller that passes none — a
+// script, or the MCP surface — must not get a session with no lines at all.
+func TestAskingForNoLinesPerSessionStillGivesSome(t *testing.T) {
+	dir := t.TempDir() + "/index.db"
+	at := time.Now().Add(-time.Hour)
+	writeStore(t, dir, []model.Session{{
+		ID: "s3", Harness: "claude", Project: "work/app", Path: "/tmp/s3.jsonl", Updated: at,
+		Messages: []model.Message{
+			{Role: "user", Text: "the queue drains before the worker exits", Time: at},
+			{Role: "assistant", Time: at.Add(time.Minute),
+				Text: "decided: the worker waits for the queue to drain, because a dropped job costs more than a slow shutdown"},
+		},
+	}})
+	r, err := ScanRecap(dir, 24*time.Hour, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Sessions) != 1 || len(r.Sessions[0].Lines) == 0 {
+		t.Fatalf("a zero budget produced nothing: %+v", r.Sessions)
+	}
+}
+
+// A wide window on a busy machine is thousands of sessions, and reading them
+// all to print twelve is wasted work — so the scan stops at the cap. What the
+// cap must not do is stay quiet about it: the counts above the lines are the
+// window, and a reader comparing them has to know only the newest were read.
+func TestAWideWindowStopsAtTheCapAndSaysSo(t *testing.T) {
+	dir := t.TempDir() + "/index.db"
+	now := time.Now()
+	sessions := make([]model.Session, 0, recapSessionCap+20)
+	for i := range recapSessionCap + 20 {
+		at := now.Add(-time.Duration(i) * time.Minute)
+		sessions = append(sessions, model.Session{
+			ID:      fmt.Sprintf("s%03d", i),
+			Harness: "claude", Project: "work/app",
+			Path:    fmt.Sprintf("/tmp/s%03d.jsonl", i),
+			Updated: at,
+			Messages: []model.Message{
+				{Role: "user", Text: "the worker stalls on the third batch", Time: at},
+				{Role: "assistant", Time: at,
+					Text: fmt.Sprintf("decided: batch %d keeps its own cursor, because one shared cursor rewound every retry", i)},
+			},
+		})
+	}
+	writeStore(t, dir, sessions)
+
+	r, err := ScanRecap(dir, 24*time.Hour, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Considered != recapSessionCap+20 {
+		t.Errorf("considered=%d, want the whole window %d", r.Considered, recapSessionCap+20)
+	}
+	if r.Read != recapSessionCap {
+		t.Errorf("read=%d, want the cap %d named out loud", r.Read, recapSessionCap)
+	}
+	if r.Spoke > recapSessionCap {
+		t.Errorf("spoke=%d, which is more sessions than were read", r.Spoke)
+	}
+	// The newest end of the window, not an arbitrary slice of it: session s000
+	// is the most recent one.
+	if len(r.Sessions) == 0 || r.Sessions[0].ID != "s000" {
+		t.Errorf("the newest session is not first: %+v", r.Sessions[:min(2, len(r.Sessions))])
+	}
+}
+
+// A recap is text for other people, so an ignored project must not reach it —
+// and the count has to say one was held back, otherwise the window looks
+// smaller than it is for no stated reason.
+func TestAnIgnoredProjectIsWithheldAndCounted(t *testing.T) {
+	dir := t.TempDir() + "/index.db"
+	pol := filepath.Join(t.TempDir(), "policy.json")
+	if err := os.WriteFile(pol, []byte(`{"ignore":["*/secret-client/*","secret-client"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_POLICY_FILE", pol)
+
+	at := time.Now().Add(-time.Hour)
+	say := func(text string) model.Message {
+		return model.Message{Role: "assistant", Text: text, Time: at.Add(time.Minute)}
+	}
+	writeStore(t, dir, []model.Session{
+		{
+			ID: "open", Harness: "claude", Project: "work/app", Path: "/tmp/open.jsonl", Updated: at,
+			Messages: []model.Message{
+				{Role: "user", Text: "the upload retries forever", Time: at},
+				say("decided: the upload gives up after four attempts, because a stuck job blocks the queue behind it"),
+			},
+		},
+		{
+			ID: "closed", Harness: "claude", Project: "secret-client", Path: "/tmp/secret-client/s.jsonl", Updated: at,
+			Messages: []model.Message{
+				{Role: "user", Text: "the invoice total is off by a cent", Time: at},
+				say("root cause: the rounding happened twice, once per currency conversion in the invoice path"),
+			},
+		},
+	})
+
+	r, err := ScanRecap(dir, 24*time.Hour, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Withheld != 1 {
+		t.Errorf("withheld=%d, want the ignored project counted once", r.Withheld)
+	}
+	if r.Considered != 1 {
+		t.Errorf("considered=%d, want only the session that is not ignored", r.Considered)
+	}
+	all := strings.Join(allRecapLines(r), "\n")
+	if all == "" {
+		t.Fatal("the fixture produced no lines at all, so this test proves nothing")
+	}
+	if strings.Contains(all, "invoice") {
+		t.Errorf("the ignored project's text reached the recap:\n%s", all)
+	}
+}
+
+// The other spelling of a home directory in the manifest: not the path, the
+// bare base name, which is an account name with nothing around it.
+func TestTheBareHomeDirectoryNameIsAlsoNotAProject(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skip("no home directory to compare against")
+	}
+	if base := filepath.Base(home); !RecapProjectIsHome(base) {
+		t.Errorf("%q is the home directory's own name and was treated as a project", base)
+	}
+	if RecapProjectIsHome("") {
+		t.Error("a session with no project at all was called a home directory")
 	}
 }
 
