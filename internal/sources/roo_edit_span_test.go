@@ -127,14 +127,14 @@ func TestRooEditRecordEdges(t *testing.T) {
 
 	spans, wrote := rooEditRecords(call("search_and_replace", map[string]any{
 		"path": "a/b.go", "search": "attempt([0-9]+)", "replace": "attempt_$1", "use_regex": "true",
-	}))
+	}), "")
 	if len(spans) != 0 || len(wrote) != 0 {
 		t.Errorf("a string use_regex was read as a literal: %q %q", spans, wrote)
 	}
 
 	spans, wrote = rooEditRecords(call("apply_diff", map[string]any{
 		"path": "a\nb.go", "diff": "<<<<<<< SEARCH\nold enough to be evidence\n=======\nnew enough to be evidence\n>>>>>>> REPLACE",
-	}))
+	}), "")
 	if len(spans) != 0 || len(wrote) != 0 {
 		t.Errorf("a path with a newline produced a record: %q %q", spans, wrote)
 	}
@@ -142,12 +142,67 @@ func TestRooEditRecordEdges(t *testing.T) {
 	long := strings.Repeat("x", editSpanMax+500)
 	spans, _ = rooEditRecords(call("apply_diff", map[string]any{
 		"path": "a/b.go", "diff": "<<<<<<< SEARCH\n" + long + "\n=======\nshort\n>>>>>>> REPLACE",
-	}))
+	}), "")
 	if len(spans) != 1 {
 		t.Fatalf("an oversized span produced %d records, want 1", len(spans))
 	}
 	if got := len(spans[0]) - len("a/b.go\n"); got != editSpanMax {
 		t.Errorf("span kept %d bytes, want the %d-byte cap", got, editSpanMax)
+	}
+}
+
+// Roo's tools take a path relative to the workspace, and the surfaces compare
+// absolute ones: line-level blame matches a record to a file by their last two
+// segments, so an edit at the root of a checkout — recorded as `loop.go` —
+// could never match the file it changed. The workspace is in the task's own
+// metadata, so the records carry the full path.
+func TestRooRecordsResolveAgainstTheTaskWorkspace(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "tasks", "1788845325720")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `[
+	 {"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"apply_diff","input":{"path":"loop.go","diff":"<<<<<<< SEARCH\n\tfor i := 0; i < attempts; i++ {\n=======\n\tfor i := 0; i <= attempts; i++ {\n>>>>>>> REPLACE"}}]}
+	]`
+	if err := os.WriteFile(filepath.Join(dir, "api_conversation_history.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	meta := `{"id":"1788845325720","ts":1788845325718,"task":"fix the retry loop","workspace":"/checkout/retry"}`
+	if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(meta), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ss, err := ParseRooTask(filepath.Join(dir, "api_conversation_history.json"))
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v, %d sessions", err, len(ss))
+	}
+	kinds := map[string]bool{}
+	for _, m := range ss[0].Messages {
+		switch m.Role {
+		case RoleEdit, RoleWrote, RoleFiles:
+			kinds[m.Role] = true
+			if !strings.HasPrefix(m.Text, "/checkout/retry/loop.go") {
+				t.Errorf("%s record = %q, want the workspace in front of it", m.Role, m.Text)
+			}
+		}
+	}
+	for _, want := range []string{RoleEdit, RoleWrote, RoleFiles} {
+		if !kinds[want] {
+			t.Errorf("no %s record at all", want)
+		}
+	}
+
+	// An absolute path is left alone, whichever machine's convention it is in.
+	for _, p := range []string{"/already/abs.go", `C:\checkout\abs.go`} {
+		if got := rooAbsPath(p, "/checkout/retry"); got != p {
+			t.Errorf("rooAbsPath(%q) = %q, want it untouched", p, got)
+		}
+	}
+	// And without a workspace the path stays as it was recorded rather than
+	// being resolved against the wrong root.
+	if got := rooAbsPath("loop.go", ""); got != "loop.go" {
+		t.Errorf("rooAbsPath with no workspace = %q, want the recorded path", got)
 	}
 }
 

@@ -22,6 +22,12 @@ REPLACE body becomes the hashed written lines line-level blame matches. A
 not text the file held, and a block whose closing marker never arrives records
 nothing rather than guessing where it ended.
 
+A call names its file relative to the workspace, so the path is resolved against
+the `workspace` in `history_item.json` before it is recorded — a one-segment
+path like `loop.go` matches no file on any machine otherwise. A task without
+that metadata keeps the path as it was recorded rather than resolving it against
+the wrong root.
+
 - **MCP**: `deja install roo` writes the server into `mcp_settings.json` for
   every host Roo has run in, and names deja's own tool in that entry's
   `alwaysAllow` — without it Roo asks before every recall.

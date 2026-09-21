@@ -330,7 +330,7 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, tool...)
 			}
-		} else if work := rooWorkRecords(m.Content, ts); len(work) > 0 {
+		} else if work := rooWorkRecords(m.Content, ts, item.Workspace); len(work) > 0 {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, work...)
 		}

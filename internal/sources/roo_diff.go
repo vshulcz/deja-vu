@@ -84,10 +84,38 @@ func rooCollect(lines []string, i int, marker string) (body []string, at int, ok
 	return nil, i, false
 }
 
+// rooAbsPath puts a recorded path in the form the surfaces compare. Roo's
+// tools take a path relative to the workspace, so an edit at the root of a
+// checkout was recorded as `loop.go` — and line-level blame matches a record
+// against a file by their last two segments, which a one-segment path can
+// never have. The workspace comes from the task's own metadata
+// (`history_item.json`, `cwdOnTaskInitialization`); without it the path stays
+// as it was recorded rather than being resolved against the wrong root.
+func rooAbsPath(p, workspace string) string {
+	if p == "" || workspace == "" || isAbsolutePath(p) {
+		return p
+	}
+	rel := strings.TrimPrefix(slashed(p), "./")
+	return strings.TrimSuffix(slashed(workspace), "/") + "/" + rel
+}
+
+// rooResolvePaths is rooAbsPath over a files record, which is one path per
+// line.
+func rooResolvePaths(record, workspace string) string {
+	if record == "" || workspace == "" {
+		return record
+	}
+	lines := strings.Split(record, "\n")
+	for i, p := range lines {
+		lines[i] = rooAbsPath(p, workspace)
+	}
+	return strings.Join(lines, "\n")
+}
+
 // rooEditRecords turns the edit calls in one message into the replaced side
 // ("path\nspan") and the written side (WroteRecord), in the order the calls
 // were made.
-func rooEditRecords(blocks []any) (spans, wrote []string) {
+func rooEditRecords(blocks []any, workspace string) (spans, wrote []string) {
 	for _, it := range blocks {
 		name, in, ok := toolPart(it, rooDialect)
 		if !ok || !rooEditTools[name] {
@@ -99,6 +127,7 @@ func rooEditRecords(blocks []any) (spans, wrote []string) {
 		if path == "" || strings.ContainsAny(path, "\n\r") {
 			continue
 		}
+		path = rooAbsPath(path, workspace)
 		replaced, written := rooCallSides(name, in)
 		for _, span := range replaced {
 			if span == "" {

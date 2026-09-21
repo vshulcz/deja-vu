@@ -45,10 +45,15 @@
 <li><strong>Read overrides</strong>: <code>DEJA_CLINE_ROOT</code> (modern sessions dir), <code>DEJA_CLINE_ROOTS</code> (path list of legacy extension roots)</li>
 <li><strong>Format</strong>: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets</li>
 </ul>
-<p>Only <code>user</code>/<code>assistant</code> turns with string content or <code>type:&#34;text&#34;</code> blocks are</p>
-<p>indexed. Tool payloads, thinking, files, images, compaction artifacts and</p>
-<p>non-lead agents are skipped by design. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user</p>
-<p>envelope is unwrapped so the tags are not indexed.</p>
+<p><code>user</code>/<code>assistant</code> turns are indexed for their text, from string content or</p>
+<p><code>type:&#34;text&#34;</code> blocks; thinking, images, compaction artifacts and non-lead agents</p>
+<p>are skipped by design. Tool calls are read as well: <code>run_commands</code> becomes a</p>
+<p>command record, the file tools a files record, and the editor&#39;s two sides the</p>
+<p>replaced span and the hashed written lines. The legacy extension&#39;s store takes</p>
+<p>the Roo path for those, since its tools are Roo&#39;s — see</p>
+<p><a href="roo.html">Roo Code</a> for the SEARCH/REPLACE shape and the workspace-relative</p>
+<p>paths. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user envelope is unwrapped so the tags are</p>
+<p>not indexed.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install cline</code> writes <code>mcpServers.deja</code> into</li>
 </ul>

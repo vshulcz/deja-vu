@@ -58,6 +58,11 @@
 <p><code>search_and_replace</code> with <code>use_regex</code> records neither side, because a pattern is</p>
 <p>not text the file held, and a block whose closing marker never arrives records</p>
 <p>nothing rather than guessing where it ended.</p>
+<p>A call names its file relative to the workspace, so the path is resolved against</p>
+<p>the <code>workspace</code> in <code>history_item.json</code> before it is recorded — a one-segment</p>
+<p>path like <code>loop.go</code> matches no file on any machine otherwise. A task without</p>
+<p>that metadata keeps the path as it was recorded rather than resolving it against</p>
+<p>the wrong root.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install roo</code> writes the server into <code>mcp_settings.json</code> for</li>
 </ul>
