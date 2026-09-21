@@ -70,7 +70,7 @@
 <p>在 Claude Code 和 Codex 上，索引还会保留压缩前那一刻的一小包工作上下文——任务、结论、涉及的文件和命令，同样脱敏，最多 32 个会话/工作区组合。它放在索引清单里，不进 sync 导出，遵守被排除的项目和 <code>DEJA_RECALL=off</code>，而且即使那个会话还没被索引，<code>deja forget</code> 也能把它删掉。</p>
 
 <h2>默认只在本地</h2>
-<p>建索引和检索没有网络路径，索引及其使用日志不离开这台机器。只有三种情况会联网：<code>deja update</code>、<code>deja sync ssh</code>，以及 <code>doctor</code> 里的版本检查（用 <code>--offline</code> 可以关掉）。</p>
+<p>建索引和检索没有网络路径，索引及其使用日志不离开这台机器。只有四种情况会联网：<code>deja update</code>、<code>deja sync ssh</code>，<code>doctor</code> 里的版本检查（用 <code>--offline</code> 可以关掉），以及 <code>deja embed</code>——它会把文本发给你自己配置的嵌入服务，下面有详细说明。</p>
 
 <h2>脱敏</h2>
 <p>密钥在建索引时就被剥掉：API key、JWT、PEM/PGP 私钥块、bearer 与 HTTP Basic、各家提供商的令牌、<code>scheme://user:pass@host</code> 形式的 URL，（自 0.14.2 起）处在密钥位置上的裸高熵值——赋值右侧，或单独占一行的令牌——以及（自 0.20.2 起）写在散文里、名字和值之间没有任何分隔符的口令，比如「the admin password is …」。最后这条要求值里带数字或符号，所以「the password is wrong」这样的句子不会被动。</p>
