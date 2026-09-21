@@ -1,7 +1,7 @@
 deja indexes the session files your other coding agents already wrote to disk —
 Claude Code, Codex, Cursor, opencode and more — and answers from them over MCP,
-including sessions from before it was installed. No LLM, no embeddings, nothing
-leaves the machine.
+including sessions from before it was installed. No LLM, no embeddings, and no
+network path unless you ask for one.
 
 If deja is already installed — the install script, Homebrew, `go install` — name
 it under `binary` below and the extension runs that one, which you keep current
