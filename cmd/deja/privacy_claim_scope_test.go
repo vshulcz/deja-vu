@@ -56,13 +56,23 @@ func sentenceAround(prose string, from, to int) string {
 
 func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 	root := filepath.Join("..", "..")
-	claim := regexp.MustCompile(`(?i)(nothing|nothing else|no data) (ever )?leaves (your|the|this) (machine|laptop|computer)`)
+	// Three ways the same promise gets written. "nothing is sent anywhere" was
+	// the one that slipped past a rule written for "leaves the machine" only.
+	claim := regexp.MustCompile(`(?i)(nothing|nothing else|no data) (ever )?` +
+		`(leaves (your|the|this) (machine|laptop|computer)` +
+		`|is (ever )?(sent|uploaded)( anywhere| to anyone)?` +
+		`|gets (sent|uploaded))`)
 	// What makes the sentence true: a stated exception, or a subject narrow
 	// enough to be accurate on its own.
 	scopes := []string{
 		"unless you ask", "unless asked", "except", "exception",
 		"no network path", "indexing and search", "index and its usage sidecar",
-		"without being asked", "the file never leaves",
+		"without being asked", "the file never leaves", "in your browser",
+		"on your disk", "no server", "filereader",
+		// Two sentences whose own subject is the scope: the semantic path with
+		// no endpoint configured, and the read that parses a store where it
+		// lies.
+		"the semantic path is off", "in place",
 	}
 	var checked int
 	err := filepath.WalkDir(filepath.Join(root), func(p string, d os.DirEntry, err error) error {

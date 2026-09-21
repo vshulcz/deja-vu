@@ -43,7 +43,7 @@ rather than beside it. `deja uninstall zed` removes what the CLI wrote.
 }
 ```
 
-Indexing and search are local. Nothing is sent anywhere, and credentials are
-redacted as the index is built.
+Indexing and search are local: no network calls, and credentials are redacted
+as the index is built.
 
 MIT, same as deja.

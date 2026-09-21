@@ -223,7 +223,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
 agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
 wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
 history.</p>
-<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>
 </div>
 </div>

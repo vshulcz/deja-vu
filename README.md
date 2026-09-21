@@ -37,7 +37,7 @@ the index is built, so what reaches the model is safe to send.</p>
 <p align="center">English | <a href="README.zh.md">中文</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
-<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> so other developers can find it.</sub></p>
+<p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
 
 ## Install
 
@@ -426,7 +426,7 @@ transcripts:
 
 | Measurement | Result |
 | --- | --- |
-| Lookup, in process | **~0.7 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
+| Lookup, in process | **0.7–0.8 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
 | `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
 | Freshness check alone | ~50 ms when nothing changed |
 | Index size | 200 MB, ~10% of corpus |
@@ -458,7 +458,7 @@ is not secret detection: a shape it does not know can pass through. See the
 [security model](docs/SECURITY-MODEL.md#redaction).
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
-~0.7 ms median, and nothing waits on a model. A hook adds the process start and a
+0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a
 freshness check over your stores on top of that — tens of milliseconds on a store of
 a few gigabytes.
 

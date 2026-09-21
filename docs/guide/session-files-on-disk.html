@@ -207,10 +207,10 @@ rm -rf ~/.claude/projects/-Users-you-old-project</pre>
 <p>The files are already a complete record of every problem you have solved. What they lack is a way in: opening the right 300 KB file out of 875 is not a thing anyone does by hand.</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> builds a local index over those transcripts — every agent on the machine, including the sessions from before it was installed — and answers from them in milliseconds. Indexing a few gigabytes takes about ten seconds. Nothing is uploaded and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). On the machine measured above the index is 204 MB against 1.6 GB of transcripts; <a href="token-cost.html">what memory costs</a> has the token side of it.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> builds a local index over those transcripts — every agent on the machine, including the sessions from before it was installed — and answers from them in milliseconds. Indexing a few gigabytes takes about ten seconds. Indexing and search make no network calls, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). On the machine measured above the index is 204 MB against 1.6 GB of transcripts; <a href="token-cost.html">what memory costs</a> has the token side of it.</p>
 
 <p><a href="does-my-agent-remember.html">Does your agent remember previous conversations?</a> · <a href="find-a-session.html">Finding a session</a> · <a href="getting-started.html">Getting started</a></p>
-<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>
 </div>
 <footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
