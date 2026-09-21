@@ -12,6 +12,16 @@ Format verified against Roo-Code source (`src/shared/globalFileNames.ts`,
 drives the same extension against a VS Code shim and writes the same files
 under `~/.vscode-mock/global-storage`.
 
+An edit call carries no `old_string`. `apply_diff`, and `replace_in_file` in the
+legacy shape, pass a SEARCH/REPLACE block under `diff`; `search_and_replace`
+names the two sides `search` and `replace`; `write_to_file` and `insert_content`
+carry the written side alone under `content`. Both sides are read where both are
+there — the SEARCH body is the replaced span `deja restore` hands back, the
+REPLACE body becomes the hashed written lines line-level blame matches. A
+`search_and_replace` with `use_regex` records neither side, because a pattern is
+not text the file held, and a block whose closing marker never arrives records
+nothing rather than guessing where it ended.
+
 - **MCP**: `deja install roo` writes the server into `mcp_settings.json` for
   every host Roo has run in, and names deja's own tool in that entry's
   `alwaysAllow` — without it Roo asks before every recall.

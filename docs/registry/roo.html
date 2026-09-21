@@ -49,6 +49,15 @@
 <p><code>src/core/task-persistence</code>) and against a live run of the Roo CLI, which</p>
 <p>drives the same extension against a VS Code shim and writes the same files</p>
 <p>under <code>~/.vscode-mock/global-storage</code>.</p>
+<p>An edit call carries no <code>old_string</code>. <code>apply_diff</code>, and <code>replace_in_file</code> in the</p>
+<p>legacy shape, pass a SEARCH/REPLACE block under <code>diff</code>; <code>search_and_replace</code></p>
+<p>names the two sides <code>search</code> and <code>replace</code>; <code>write_to_file</code> and <code>insert_content</code></p>
+<p>carry the written side alone under <code>content</code>. Both sides are read where both are</p>
+<p>there — the SEARCH body is the replaced span <code>deja restore</code> hands back, the</p>
+<p>REPLACE body becomes the hashed written lines line-level blame matches. A</p>
+<p><code>search_and_replace</code> with <code>use_regex</code> records neither side, because a pattern is</p>
+<p>not text the file held, and a block whose closing marker never arrives records</p>
+<p>nothing rather than guessing where it ended.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install roo</code> writes the server into <code>mcp_settings.json</code> for</li>
 </ul>

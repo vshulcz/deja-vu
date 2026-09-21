@@ -357,8 +357,9 @@ var clineDialect = toolDialect{
 // tools: execute_command with `command`, and `path` on the file tools —
 // read_file, write_to_file, apply_diff, insert_content, search_and_replace,
 // replace_in_file. Neither reader emitted a call as a work record before
-// #3295. The edit span is not read: apply_diff carries a SEARCH/REPLACE
-// block, not an old_string.
+// #3295. The two sides of an edit come out of rooEditRecords rather than the
+// shared helper: apply_diff carries a SEARCH/REPLACE block, not an
+// old_string.
 var rooDialect = toolDialect{
 	pathKey: "path",
 	pathTools: map[string]bool{"read_file": true, "write_to_file": true, "apply_diff": true,
@@ -378,6 +379,19 @@ func rooWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 	if IndexToolPaths() {
 		if p := toolPathsIn(blocks, rooDialect); p != "" {
 			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
+		}
+	}
+	if IndexWrites() || IndexEdits() {
+		spans, wrote := rooEditRecords(blocks)
+		if IndexWrites() {
+			for _, w := range wrote {
+				out = append(out, model.Message{Role: RoleWrote, Text: w, Time: ts})
+			}
+		}
+		if IndexEdits() {
+			for _, span := range spans {
+				out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
+			}
 		}
 	}
 	if IndexCommands() {
