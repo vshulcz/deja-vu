@@ -205,6 +205,12 @@ var processNoise = []string{
 var instructionOpeners = []string{
 	"verify ", "read ", "use ", "make sure", "note that", "remember to",
 	"do not ", "don't ", "always ", "never ", "you must", "you should",
+	// The agent announcing its next step rather than concluding anything.
+	// Three of seven candidate lines for the busiest directory of a real
+	// repository were these: "Now let me verify one more potential issue -",
+	// "Now let me compile my findings by examining each specific concern".
+	"now let me", "let me ", "i'll now", "i will now", "first, let me",
+	"next, let me", "i'm going to",
 }
 
 // recapLayoutRunes are the characters a line can only start with because of

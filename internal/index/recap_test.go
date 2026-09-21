@@ -52,6 +52,11 @@ func TestARecapLineIsTrimmedNotRewritten(t *testing.T) {
 			want: "",
 		},
 		{
+			name: "the agent announcing its next step",
+			in:   "Now let me verify one more potential issue — whether the append path can have kept files",
+			want: "",
+		},
+		{
 			name: "deja's own recall, quoted back",
 			in:   "déjà vu: tokscale was already configured for local usage — reusing it (deja:ses_f45a9)",
 			want: "",
