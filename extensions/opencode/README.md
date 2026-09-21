@@ -7,7 +7,7 @@ installed anything.
 
 It runs [deja](https://github.com/vshulcz/deja-vu), a local Go binary that
 indexes the transcripts those agents already wrote to disk. No LLM, no
-embeddings, nothing leaves the machine.
+embeddings, no network path unless you ask for one.
 
 ## Install
 

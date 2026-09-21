@@ -9,19 +9,12 @@ body:
       value: >-
         Do not include credentials, private source code, or an unreviewed session
         file. Replace identifying values in all pasted output.
-  - type: dropdown
+  - type: input
     id: harness
     attributes:
       label: Harness
-      options:
-        - Claude Code
-        - Codex CLI
-        - opencode
-        - aider
-        - Gemini CLI
-        - Cursor
-        - Antigravity
-        - Grok Build
+      description: The name `deja sources` prints for it.
+      placeholder: claude
     validations:
       required: true
   - type: input

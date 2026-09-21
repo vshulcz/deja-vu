@@ -61,14 +61,14 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 	words := countWords
 	want := countWord(t, n)
 
-	// Both READMEs. The npm one is a separate, shorter file that nobody
-	// re-reads when the main one changes — it was still leading with the
-	// previous tagline months later, on a page that gets five hundred installs
-	// a week. Third-party write-ups were quoting a count from before July.
-	// Seven files spell the count and only two were checked, so when Zed made it
-	// eighteen the other five stayed on seventeen — including the two manifest
-	// descriptions, which is the line the MCP registry shows next to the name,
-	// and the harnesses page, which says it in the lede and in three meta tags.
+	// Every file that spells the count, not the one that is easiest to
+	// remember. The npm README is a separate, shorter file that nobody
+	// re-reads when the main one changes, and it stayed on an old tagline for
+	// months; the two manifest descriptions are the line a registry shows next
+	// to the name; the harnesses page says it in the lede and in three meta
+	// tags; and the two plugin-bundle READMEs are what a marketplace renders —
+	// both stood at twenty-five through nine harnesses landing, because
+	// nothing read them on the way past.
 	for _, name := range []string{
 		"README.md",
 		"npm/README.md",
@@ -77,6 +77,8 @@ func TestReadmeSpellsTheHarnessCountTheRegistryHas(t *testing.T) {
 		"server.json",
 		"packaging/mcpb/manifest.json",
 		"docs/guide/harnesses.html",
+		"claude-plugin/README.md",
+		"codex-plugin/README.md",
 	} {
 		b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(name)))
 		if err != nil {

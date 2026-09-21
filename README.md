@@ -15,7 +15,7 @@ already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Two genuine runs, a real model and a real tool call, against a synthetic corpus: nobody's history is published.</em></sub></p>
 
-<p align="center"><b>deja starts full: the history 34 agents already wrote, indexed in seconds, with no model and no capture step.</b></p>
+<p align="center"><b>deja starts full: the history 34 agents already wrote, searchable while it indexes, with no model and no capture step.</b></p>
 
 <p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
 before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
@@ -207,7 +207,7 @@ $ deja "jwt refresh token"
 | Command | What it does |
 | --- | --- |
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
-| `deja view` | Your whole memory as one local HTML file. No server, nothing leaves the machine. |
+| `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |

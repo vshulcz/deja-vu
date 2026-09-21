@@ -51,7 +51,15 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 			if from < 0 {
 				from = 0
 			}
-			named := len(names.FindAllString(text[from:loc[0]], -1))
+			// One agent named twice in the same sentence — a listing whose
+			// own harness appears in its title and again in the list — is
+			// still one agent, and counting it twice made the sentence look
+			// one short.
+			seen := map[string]bool{}
+			for _, name := range names.FindAllString(text[from:loc[0]], -1) {
+				seen[name] = true
+			}
+			named := len(seen)
 			if named == 0 {
 				continue
 			}

@@ -129,7 +129,7 @@
 
 <h1>Getting started</h1>
 <p class="pagelede">install it, wire it in, ask your first question<span class="mins" data-mins></span></p>
-<p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP. Nothing leaves your machine.</p>
+<p>deja is a single zero-dependency binary. It reads the session logs your coding agents already write, builds a local search index, and serves that memory back to the agents over MCP. Indexing and search have no network path; what does reach the network is a command you run — <code>deja update</code>, <code>deja sync ssh</code>, the <code>doctor</code> version check and <code>deja embed</code> — and <a href="privacy.html">privacy</a> covers each one.</p>
 <div class="term-shot"><img src="../assets/demo.gif" alt="deja demo: one question put to the same agent twice — without memory it has no record, with deja it answers with the decision from eight months earlier" loading="lazy"><p class="cap">the same question, the same agent, once without memory and once with deja — two genuine runs against a synthetic corpus, so nobody's history is in the frame</p></div>
 <h2>Install</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh

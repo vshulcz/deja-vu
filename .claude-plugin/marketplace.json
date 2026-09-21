@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "deja-vu",
-      "description": "Your agent starts already knowing what you did before — recall across Claude Code, Codex, Cursor, opencode and a dozen others.",
+      "description": "Your agent starts already knowing what you did before — recall across Claude Code, Codex, Cursor, opencode and thirty more agents.",
       "source": "./claude-plugin",
       "category": "productivity"
     }

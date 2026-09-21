@@ -134,7 +134,7 @@
 <p>You solved something in March. In August the same agent, in the same repository, proposes the approach you already tried and backed out of. Nothing is broken — the session that held the answer ended, and its context window went with it.</p>
 
 <h2>What actually happens at the end of a session</h2>
-<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and a dozen others each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
+<p>An agent's memory during a session is its context window. When the session ends the window is discarded. What survives is a transcript file, written by the harness itself: Claude Code keeps JSONL under <code>~/.claude/projects</code>, Codex under <code>~/.codex</code>, opencode in a local database, Cursor, Gemini CLI, Zed and twenty-eight more agents each in their own format. The <a href="../registry/README.html">session format registry</a> documents where each one writes and what its records look like.</p>
 <p>So the work is not lost. It is unread. Nothing in the default setup opens yesterday's transcript when you ask today's question.</p>
 
 <h2>Compaction is not memory</h2>

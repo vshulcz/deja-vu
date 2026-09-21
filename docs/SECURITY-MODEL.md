@@ -9,10 +9,10 @@ artifacts available for verification.
 ### Local reads
 
 deja discovers and parses the session stores documented in the
-[source parser table](ARCHITECTURE.md#source-parsers): JSON, JSONL, Markdown, and
-SQLite data written by Claude Code, Codex CLI, opencode, aider, Gemini CLI,
-Cursor, Antigravity, and Grok Build. For opencode and Cursor IDE stores it runs
-the local `sqlite3` executable rather than opening a network connection.
+[source parser table](ARCHITECTURE.md#source-parsers) — JSON, JSONL, Markdown
+and SQLite written by the coding agents listed there. SQLite stores are read by
+running the local `sqlite3` executable rather than opening a network
+connection.
 
 Indexing reads session messages and metadata needed for search, including
 session IDs, project paths, titles, roles, and timestamps. It does not modify

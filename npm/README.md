@@ -18,7 +18,7 @@ Goose, Qwen Code, Kimi Code, Antigravity, Grok Build, OpenClaw, pi, omp,
 DeepSeek Harness, Hermes and Zed.
 deja turns those files into one memory layer that all of them can read.
 
-One Go binary. No LLM, no embeddings, no API key, nothing leaves the machine.
+One Go binary. No LLM, no embeddings, no API key, and no network path unless you ask for one.
 **85.3% hit@1** on LongMemEval-S (470-question cleaned set), **millisecond** lookups over gigabytes of history.
 
 ```sh

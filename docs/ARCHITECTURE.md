@@ -5,7 +5,8 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-the thirty-four the loader registers; `docs/registry/` describes each store's
+what the loader registers: the thirty-four coding agents plus deja's own notes,
+which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
 
@@ -33,6 +34,7 @@ against the loader list.
 | omp (Oh My Pi) | `omp.go` | JSONL transcripts under `~/.omp/agent/sessions` and each profile beside it |
 | prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
 | DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
+| CodeWhale | `codewhale.go` | one JSON document per session under `${CODEWHALE_HOME:-~/.codewhale}/sessions`, and the pre-rebrand `~/.deepseek` root |
 | Zed | `zed.go` | threads in the SQLite store at `Zed/threads/threads.db` |
 | Crush | `crush.go` | SQLite databases named by `projects.json`, plus `<project>/.crush/crush.db` |
 | Cherry Studio | `cherrystudio.go` | Claude-format JSONL under the app's `Data/Agents/.claude/projects` |
@@ -48,7 +50,7 @@ against the loader list.
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
 
-opencode and Cursor IDE state are read through the local `sqlite3` command. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency.
+Every SQLite store above is read through the local `sqlite3` command — opencode's and the schemas that borrow it, Cursor IDE state, Goose, Zed, Crush, Kiro, Hermes, and the databases Grok and OpenClaw keep beside their JSONL. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency.
 
 Every one of those reads carries a wall-clock budget, ten minutes by default. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself, and nothing in the tree set a deadline, so the run looked hung rather than slow. A store that runs out is an ordinary read error: the harness reports as unreadable, `deja doctor` names it, and the rest of the index still builds. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the cap off for someone who would rather wait than lose a store.
 
