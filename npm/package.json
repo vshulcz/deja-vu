@@ -18,7 +18,19 @@
     "opencode",
     "memory",
     "agent",
-    "cli"
+    "cli",
+    "copilot",
+    "agent-memory",
+    "ai-memory",
+    "coding-agent",
+    "claude-code-memory",
+    "cursor",
+    "gemini-cli",
+    "mcp-server",
+    "session-history",
+    "session-search",
+    "recall",
+    "local-first"
   ],
   "engines": {
     "node": ">=18"

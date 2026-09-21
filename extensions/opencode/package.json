@@ -30,7 +30,20 @@
     "memory",
     "recall",
     "session-history",
-    "agent"
+    "agent",
+    "opencode-memory",
+    "agent-memory",
+    "ai-memory",
+    "coding-agent",
+    "claude-code",
+    "claude-code-memory",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "mcp",
+    "mcp-server",
+    "session-search",
+    "local-first"
   ],
   "engines": {
     "node": ">=18"

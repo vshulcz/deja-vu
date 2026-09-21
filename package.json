@@ -30,7 +30,20 @@
     "deepseek-harness",
     "memory",
     "recall",
-    "session-history"
+    "session-history",
+    "migration",
+    "agent-memory",
+    "ai-memory",
+    "coding-agent",
+    "claude-code",
+    "claude-code-memory",
+    "codex",
+    "cursor",
+    "gemini-cli",
+    "mcp",
+    "mcp-server",
+    "session-search",
+    "local-first"
   ],
   "engines": {
     "node": ">=18"
