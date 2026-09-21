@@ -20,7 +20,7 @@ func TestDayZeroLinksEveryToolItCompares(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	row := regexp.MustCompile(`(?s)<tr><th></th><th class="us">deja-vu</th>(.*?)</tr>`).FindSubmatch(page)
+	row := regexp.MustCompile(`(?s)<tr[^>]*><th[^>]*></th><th[^>]*class="us"[^>]*>deja-vu</th>(.*?)</tr>`).FindSubmatch(page)
 	if row == nil {
 		t.Fatalf("no comparison-table header row in %s", path)
 	}
@@ -36,7 +36,8 @@ func TestDayZeroLinksEveryToolItCompares(t *testing.T) {
 			t.Errorf("column %q does not link a github repository", strings.TrimSpace(string(cell[1])))
 			continue
 		}
-		if strings.Count(strings.TrimPrefix(string(got[1]), "https://github.com/"), "/") != 1 {
+		repo := strings.Trim(strings.TrimPrefix(string(got[1]), "https://github.com/"), "/")
+		if strings.Count(repo, "/") != 1 {
 			t.Errorf("%s is not an owner/repo url", got[1])
 		}
 	}
