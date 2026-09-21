@@ -61,13 +61,33 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		text := string(raw)
-		found := claim.FindAllStringSubmatch(text, -1)
-		if len(found) == 0 {
-			t.Errorf("%s no longer says how many harnesses resume — the phrasing changed and this stopped checking it", page)
-			continue
-		}
-		for _, m := range found {
+		text := proseOf(string(raw))
+		found := claim.FindAllStringSubmatchIndex(text, -1)
+		counted := 0
+		for _, loc := range found {
+			// Only the claims that are about resuming: a page is entitled to
+			// say "three of the thirty-four harnesses" about something else,
+			// and that is not this number. The word can be in the sentence
+			// before — the FAQ answer names `deja resume` and then counts the
+			// harnesses that "support it" — so the lookback is a paragraph's
+			// worth rather than one sentence.
+			from := loc[0] - 250
+			if from < 0 {
+				from = 0
+			}
+			to := loc[1] + 120 // "…can also be reopened with deja resume."
+			if to > len(text) {
+				to = len(text)
+			}
+			if !strings.Contains(strings.ToLower(text[from:to]), "resume") {
+				continue
+			}
+			counted++
+			m := []string{
+				text[loc[0]:loc[1]],
+				text[loc[2]:loc[3]],
+				text[loc[4]:loc[5]],
+			}
 			if got := strings.ToLower(m[1]); got != yes {
 				t.Errorf("%s says %q of the harnesses resume; the registry has %d, so it is %q",
 					page, got, resumable, yes)
@@ -76,6 +96,9 @@ func TestTheResumeCountFollowsTheRegistry(t *testing.T) {
 				t.Errorf("%s counts %q harnesses; the registry has %d, so it is %q",
 					page, got, len(reg.Harnesses), total)
 			}
+		}
+		if counted == 0 {
+			t.Errorf("%s no longer says how many harnesses resume — the phrasing changed and this stopped checking it", page)
 		}
 	}
 
