@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Add memory to pi and omp: every agent's sessions — deja-vu</title>
-<meta name="description" content="pi and omp have no hooks but extension APIs. One auto-discovered file under the extensions directory puts this machine's history before the model.">
+<title>Add memory to pi: every agent's sessions — deja-vu</title>
+<meta name="description" content="pi has no hooks but an extension API. One auto-discovered file under the extensions directory puts this machine's history before the model.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Add memory to pi and omp: every agent's sessions">
-<meta property="og:description" content="pi and omp have no hooks but extension APIs. One auto-discovered file under the extensions directory puts this machine's history before the model.">
+<meta property="og:title" content="Add memory to pi: every agent's sessions">
+<meta property="og:description" content="pi has no hooks but an extension API. One auto-discovered file under the extensions directory puts this machine's history before the model.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,15 +25,15 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Add memory to pi and omp: every agent's sessions">
-<meta name="twitter:description" content="pi and omp have no hooks but extension APIs. One auto-discovered file under the extensions directory puts this machine's history before the model.">
+<meta name="twitter:title" content="Add memory to pi: every agent's sessions">
+<meta name="twitter:description" content="pi has no hooks but an extension API. One auto-discovered file under the extensions directory puts this machine's history before the model.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to pi and omp", "description": "pi and omp have no hooks; they have extension APIs. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-09-15"}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for pi and omp", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to pi", "description": "pi has no hooks; it has an extension API. One file under the agent's extensions directory, auto-discovered, puts this machine's history in front of the model on every prompt.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for pi", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does pi remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps a JSONL log per session under ~/.pi/agent/sessions and can resume one; a new session does not read the others. omp is the same lineage and keeps the same shape under ~/.omp."}}, {"@type": "Question", "name": "How do I add memory to pi or omp?", "acceptedAnswer": {"@type": "Answer", "text": "deja install pi-auto or deja install omp-auto writes one extension file into the agent's extensions directory, which is auto-discovered — no settings edit. On pi it answers before_agent_start with the prompt in hand; on omp it answers the context event and before_agent_start. Both also answer tool_result, so a failed command gets the repair beside the error."}}, {"@type": "Question", "name": "Can pi see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of thirty-four agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
 <body>
@@ -58,7 +58,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold" open><summary>Per-agent guides <span class="n">25</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -74,7 +74,8 @@
 <a href="memory-for-openclaw.html">Memory for OpenClaw</a>
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
-<a href="memory-for-pi.html" aria-current="page">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-pi.html" aria-current="page">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
@@ -83,6 +84,15 @@
 <a href="memory-for-kiro.html">Memory for Kiro</a>
 <a href="memory-for-kilocode.html">Memory for Kilo Code</a>
 <a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
 </details>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
@@ -106,10 +116,10 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>Adding memory to pi and omp</h1>
+<h1>Adding memory to pi</h1>
 <p class="pagelede">no hooks, an extension API — and one file is the whole install<span class="mins" data-mins></span></p>
 
-<p>pi writes a JSONL log per session under <code>~/.pi/agent/sessions</code> and can resume one; omp (Oh My Pi) is the same lineage and keeps the same shape under <code>~/.omp</code>. A new session in either reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
+<p>pi writes a JSONL log per session under <code>~/.pi/agent/sessions</code> and can resume one; omp (Oh My Pi) is the same lineage and keeps the same shape under <code>~/.omp</code>, with <a href="memory-for-omp.html">a page of its own</a>. A new session in either reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
 
 <h2>What they already have</h2>
 <p>Neither has hooks. Both have an extension API, and extensions under the agent's <code>extensions/</code> directory are auto-discovered — so installing is one file and no settings edit, and removing it is deleting the file.</p>

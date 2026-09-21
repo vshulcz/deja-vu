@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to aider: its read-only context — deja-vu</title>
+<meta name="description" content="aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to aider: its read-only context">
+<meta property="og:description" content="aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to aider: its read-only context">
+<meta name="twitter:description" content="aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to aider", "description": "aider appends every message to a markdown log and reads none of it back into a new chat. deja keeps a read-only context file current and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-09-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for aider", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does aider remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It appends every message to ~/.aider.chat.history.md and reads none of it back into a new chat, and it has no session id to resume by — --chat-history-file names a transcript it appends to, not a session it reopens. deja indexes that log with every other agent's on the machine and keeps a read-only context file aider loads on every message."}}, {"@type": "Question", "name": "How do I add memory to aider?", "acceptedAnswer": {"@type": "Answer", "text": "deja install aider adds ~/.config/deja/aider-context.md to the read: list in ~/.aider.conf.yml, writes that file and installs the shared skill. Start aider as `deja aider` afterwards: read-only files are re-read from disk on every message, but only the wrapper refreshes what is in them."}}, {"@type": "Question", "name": "Can aider see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of thirty-four agents on the same machine, including sessions from before deja was installed, so a fix found in Claude Code answers a question asked in aider."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
+<a href="delete-opencode-session-history.html">Delete opencode session history</a>
+<a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html" aria-current="page">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to aider</h1>
+<p class="pagelede">it appends every message to one log and reads none of it back<span class="mins" data-mins></span></p>
+
+<p>aider appends every message to a markdown log — <code>~/.aider.chat.history.md</code>, or whatever <code>$AIDER_CHAT_HISTORY_FILE</code> points at — and that is the whole of what it keeps. A new chat starts from nothing, and nothing in it knows about the Claude Code session in the same repo yesterday. This page is about adding that.</p>
+
+<h2>What aider already has</h2>
+<p>The log, and read-only files. There is no session to resume: <code>--chat-history-file</code> names a transcript aider appends to rather than a conversation it reopens, so there is no id to hand back. There is no MCP client either — there are open requests and <a href="https://github.com/Aider-AI/aider/pull/5539">an open PR</a> adding one, which is the day this page gains a paragraph — and no catalogue a model picks a skill out of. What aider does have is the useful part: a file passed with <code>--read</code> is re-read from disk on every message, so a file deja keeps current is live context for the whole session.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install aider</pre>
+<p>Three things, all reversible with <code>deja uninstall aider</code>:</p>
+<ul>
+<li><b>An entry under <code>read:</code></b> in <code>~/.aider.conf.yml</code>, pointing at <code>~/.config/deja/aider-context.md</code>. Whatever was already in that list stays, including the scalar and flow spellings of it.</li>
+<li><b>The context file itself</b>, written during the install rather than on first use: aider refuses to start when a configured read file is missing, and the first session should not be the one that finds that out.</li>
+<li><b>The shared skill</b> at <code>~/.agents/skills/deja-search/SKILL.md</code>, which the other agents on this machine read.</li>
+</ul>
+<p>Then start aider through deja, with the arguments you would have given it:</p>
+<pre>deja aider --model sonnet src/api.py</pre>
+<p>It refreshes the context file, says what it put there — <code>deja: recalled 7 past sessions into aider's read-only context</code> — and hands over to aider. The wrapper exists because nothing inside aider can do the refresh: <code>/run</code> stops on <code>Add 0.0k tokens of command output to the chat?</code> even when the output is empty, so wiring it to startup would cost a keystroke every session. Plain <code>aider</code> still reads the file; it reads whatever the last <code>deja aider</code> left in it, and that is what <code>deja doctor</code> says on the row for it.</p>
+
+<h2>What arrives</h2>
+<p>A digest of what this machine already knows about the project — the decisions, the commands that worked, the errors that came back — as one read-only file in every message of the session. When there is no history yet the file says so, rather than being absent and stopping aider from starting. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about aider</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-four of them, each in its own format — so a fix found in Claude Code answers a question asked in aider, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/aider.html">The aider session format</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
