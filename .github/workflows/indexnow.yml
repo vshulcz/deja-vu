@@ -43,7 +43,7 @@ jobs:
           REPO: ${{ github.repository }}
           BEFORE: ${{ github.event.before }}
           SHA: ${{ github.sha }}
-          ALL: ${{ inputs.all }}
+          ALL: ${{ inputs.all || 'false' }}
         run: |
           set -euo pipefail
           site=https://vshulcz.github.io/deja-vu
@@ -61,13 +61,17 @@ jobs:
           gh api "repos/$REPO/compare/$BEFORE...$SHA" --jq '.files[].filename' > files.txt
           # The compare endpoint stops at three hundred files, and a truncated
           # diff would silently leave pages out.
-          if [ "$(wc -l < files.txt)" -ge 300 ]; then
+          # grep -c '' counts a final line with no newline; wc -l does not, and
+          # at exactly the limit that is the difference between catching a
+          # truncated diff and processing it.
+          if [ "$(grep -c '' files.txt)" -ge 300 ]; then
             echo "the diff is at the compare limit; falling back to the whole sitemap"
             echo "mode=all" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           : > urls.txt
-          while read -r f; do
+          # `|| [ -n "$f" ]` keeps a last line that has no newline after it.
+          while read -r f || [ -n "$f" ]; do
             case "$f" in
               docs/*.html) ;;
               *) continue ;;
@@ -100,13 +104,28 @@ jobs:
           # publishes this commit finishes after the push rather than with it.
           # Announcing a URL before then sends the crawler to the old page and
           # spends the one signal we get for it.
+          #
+          # The wait is for content that contains this commit, not for a build of
+          # this commit: two docs pushes close together can leave the second one
+          # as the latest build, and waiting for our own sha would then time out
+          # with the pages already live. compare says identical or ahead when the
+          # built commit has ours in it.
           for _ in $(seq 1 40); do
-            out=$(gh api "repos/$REPO/pages/builds/latest" --jq '.status + " " + .commit')
-            if [ "$out" = "built $SHA" ]; then
-              echo "pages built $SHA"
-              exit 0
+            built=$(gh api "repos/$REPO/pages/builds/latest" --jq '.status + " " + .commit')
+            state=${built%% *}
+            commit=${built##* }
+            if [ "$state" = "built" ] && [ -n "$commit" ]; then
+              rel=$(gh api "repos/$REPO/compare/$SHA...$commit" --jq .status 2>/dev/null || echo unknown)
+              case "$rel" in
+                identical|ahead)
+                  echo "pages serving $commit, which contains $SHA"
+                  exit 0
+                  ;;
+              esac
+              echo "pages built $commit, which is $rel of $SHA — waiting"
+            else
+              echo "pages: $built — waiting"
             fi
-            echo "pages: $out — waiting"
             sleep 15
           done
           echo "the Pages build for $SHA did not finish within ten minutes" >&2
