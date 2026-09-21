@@ -44,8 +44,9 @@ the place to discuss design.
   `ExitPlanMode`. No installer wires it yet: the measurement that would justify
   it — does an agent change a plan it is about to run — has not been made.
 - **Line-level attribution past the terminal.** `deja blame <path>:<line>` names
-  the session that replaced the text a commit deleted, which answers for about a
-  quarter of lines and says which silence the rest are. What is open is the shape
+  the session that replaced the text a commit deleted, or wrote the line before
+  the commit carried it — 40% of 150 random lines on this repository, and it
+  says which silence the rest are. What is open is the shape
   a tool reads it in, whether the answer belongs in `refs/notes/deja` so a
   reviewer sees it without deja, and whether a *why* can be derived at all —
   today it cannot, and the measurement behind that is in
@@ -56,7 +57,8 @@ the place to discuss design.
   both stronger and precise without lifting an off-topic session.
 - **Point-of-action in the harnesses that still refuse it.** The repair beside a
   failed command and the file's prior decision now reach Claude Code, Codex,
-  Cursor, Gemini, Qwen, Cline, Amp, Antigravity, pi and omp. What is left is
+  Cursor, opencode, Gemini, Qwen, Cline, Amp, Antigravity, Crush, Grok,
+  Command Code, omp, and pi with its descendants. What is left is
   where the harness itself drops what a hook returns — Kimi's post-tool events,
   prime-agent's tool events, Roo until its hooks ship — and each is recorded in
   the registry with the measurement behind it.

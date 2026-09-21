@@ -17,5 +17,6 @@ ships no binary and downloads nothing at run time. With no `deja` on the
 machine, the hook stays silent and the MCP server reports what is missing.
 
 Everything deja reads is already on your disk, and the index it builds stays
-there: no network calls, no telemetry. Credentials are redacted as the index is
+there. The hooks and the MCP server make no network calls of their own, and
+nothing here reports usage anywhere. Credentials are redacted as the index is
 built. Full policy: [the repository's SECURITY.md](https://github.com/vshulcz/deja-vu/blob/main/SECURITY.md).
