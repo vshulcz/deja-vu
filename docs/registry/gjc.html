@@ -77,20 +77,25 @@
 <p>Codex&#39;s are import candidates it does not read, so a skill written there</p>
 <p>would be a file no session ever sees.</p>
 <ul>
-<li>Auto-recall is the next step rather than a config line. gjc&#39;s native hooks</li>
+<li>Auto-recall is <code>deja install gjc-auto</code>, and it is pi&#39;s extension unchanged:</li>
 </ul>
-<p>carry pi&#39;s event names — <code>session_start</code>, <code>before_agent_start</code>, <code>tool_call</code></p>
-<p>— but they are TypeScript modules loaded with Bun <code>import()</code>, so this is</p>
-<p>pi&#39;s extension ported. Its two documents also disagree on the directory</p>
-<p>(<code>~/.gjc/hooks/{pre,post}</code> against <code>~/.gjc/agent/hooks/{pre,post}</code>), which</p>
-<p>is settled now, and against the loader rather than either document:</p>
+<p><code>loadExtensionModules</code> in <code>src/discovery/builtin.ts</code> discovers modules in</p>
+<p><code>&lt;agent dir&gt;/extensions</code> (native <code>.gjc</code>/<code>.pi</code> only, a <code>*.ts</code> file or a</p>
+<p>directory with an index), and the events in</p>
+<p><code>src/extensibility/extensions/types.ts</code> are pi&#39;s — <code>session_start</code>,</p>
+<p><code>before_agent_start</code>, <code>context</code>, <code>tool_result</code>, <code>session_compact</code> — with the</p>
+<p>same result shapes.</p>
+<ul>
+<li>The directory hooks stay unwired, and not for want of a path. gjc&#39;s two</li>
+</ul>
+<p>documents disagree on it (<code>~/.gjc/hooks/{pre,post}</code> against</p>
+<p><code>~/.gjc/agent/hooks/{pre,post}</code>), and the loader settles it:</p>
 <p><code>resolveScopePaths</code> puts the user-scope hooks at <code>&lt;agent dir&gt;/hooks/&lt;pre|post&gt;</code>,</p>
-<p>so <code>docs/hooks.md</code>&#39;s <code>~/.gjc/hooks</code> is stale. What still stops a hook being</p>
-<p>written there is the shape: a directory hook is a module exporting</p>
+<p>so <code>docs/hooks.md</code>&#39;s <code>~/.gjc/hooks</code> is stale. What stops a hook being written</p>
+<p>there is the shape: a directory hook is a module exporting</p>
 <p><code>default (api) =&gt; api.on(&#34;tool_call&#34;, …)</code> whose only documented return is</p>
 <p><code>{block, reason}</code> — allow or refuse, with no channel for adding context. The</p>
-<p>lifecycle events come from the in-process API, which is the plugin surface,</p>
-<p>so auto-recall here is a gjc plugin rather than a file.</p>
+<p>extension has that channel, so that is where recall goes.</p>
 <h2 id="measured-on-a-live-install">Measured on a live install</h2>
 <p><code>gajae-code</code> 0.17.1 (which wraps <code>@gajae-code/coding-agent</code>), in a hermetic</p>
 <p>HOME:</p>
@@ -106,13 +111,30 @@
 <p>project .gjc/mcp.json registrations)&#34; — and <code>-r, --resume[=&lt;value&gt;]</code> takes an</p>
 <p>ID prefix, a path, or opens a picker.</p>
 <ul>
-<li>Its screens could not be read: on this version every entry point, `gjc mcp</li>
+<li>On 0.17.1 its screens could not be read: every entry point, <code>gjc mcp list</code></li>
 </ul>
-<p>list<code> and </code>gjc -p<code> included, exits with </code>Cannot find module</p>
-<p>&#39;../../../../node_modules/mupdf/dist/mupdf-wasm.wasm&#39;`. The relative path</p>
-<p>resolves only in a global install layout, and providing the module at each</p>
-<p>candidate location did not satisfy it. That is gjc&#39;s packaging, not deja&#39;s,</p>
-<p>and it is why the capability rows here still rest on its documentation.</p>
+<p>and <code>gjc -p</code> included, exited with `Cannot find module</p>
+<p>&#39;../../../../node_modules/mupdf/dist/mupdf-wasm.wasm&#39;`.</p>
+<p>0.17.2 runs (it wants Bun 1.4 and says so), and the rows above are its own</p>
+<p>screens rather than its documentation:</p>
+<ul>
+<li><code>gjc customize doctor</code> reports <code>~/.gjc/agent/extensions/deja.ts</code> as &#34;a</li>
+</ul>
+<p>trusted filesystem extension module discovered for session-start loading&#34;,</p>
+<p>and <code>~/.gjc/agent/commands/deja.md</code> as a loaded slash command.</p>
+<ul>
+<li>The same screen is where the skill location proves itself: a copy under</li>
+</ul>
+<p><code>~/.agents/skills</code> is listed <code>source-ignored</code>, &#34;GJC loads skills only from</p>
+<p>.gjc (native) locations&#34;, which is why <code>deja install gjc</code> writes gjc&#39;s own</p>
+<p>directory.</p>
+<ul>
+<li><code>gjc -p</code> against a mock provider carried deja&#39;s <code>&lt;deja-recall&gt;</code> block into</li>
+</ul>
+<p>the request — the past session, the question it answered and the conclusion —</p>
+<p>on both the OpenAI (<code>/v1/responses</code>) and Anthropic (<code>/v1/messages</code>) paths,</p>
+<p>and the server in <code>mcp.json</code> was connected in the same run: the tool</p>
+<p>inventory in the system prompt lists <code>deja/deja: mcp__deja_deja</code>.</p>
 
 <hr>
 <p>deja reads this format and thirty-three others, and turns what it finds into memory your

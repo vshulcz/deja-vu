@@ -287,7 +287,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| gajae-code | ✅ | — | ✅ | ✅ | ✅ | paste | none |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | paste | none |
 | Command Code | ✅ | ✅ | ✅ | ✅ | ? | paste | none |
 | ZCode | ✅ | ✅ | ? | ? | ? | paste | sqlite3 for the CLI database |

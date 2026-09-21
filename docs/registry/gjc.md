@@ -33,19 +33,22 @@ project directory names the project, and the header's cwd wins when it is there.
   location matters: gjc loads its native skills directory, while Claude's and
   Codex's are import candidates it does not read, so a skill written there
   would be a file no session ever sees.
-- Auto-recall is the next step rather than a config line. gjc's native hooks
-  carry pi's event names — `session_start`, `before_agent_start`, `tool_call`
-  — but they are TypeScript modules loaded with Bun `import()`, so this is
-  pi's extension ported. Its two documents also disagree on the directory
-  (`~/.gjc/hooks/{pre,post}` against `~/.gjc/agent/hooks/{pre,post}`), which
-  is settled now, and against the loader rather than either document:
+- Auto-recall is `deja install gjc-auto`, and it is pi's extension unchanged:
+  `loadExtensionModules` in `src/discovery/builtin.ts` discovers modules in
+  `<agent dir>/extensions` (native `.gjc`/`.pi` only, a `*.ts` file or a
+  directory with an index), and the events in
+  `src/extensibility/extensions/types.ts` are pi's — `session_start`,
+  `before_agent_start`, `context`, `tool_result`, `session_compact` — with the
+  same result shapes.
+- The directory hooks stay unwired, and not for want of a path. gjc's two
+  documents disagree on it (`~/.gjc/hooks/{pre,post}` against
+  `~/.gjc/agent/hooks/{pre,post}`), and the loader settles it:
   `resolveScopePaths` puts the user-scope hooks at `<agent dir>/hooks/<pre|post>`,
-  so `docs/hooks.md`'s `~/.gjc/hooks` is stale. What still stops a hook being
-  written there is the shape: a directory hook is a module exporting
+  so `docs/hooks.md`'s `~/.gjc/hooks` is stale. What stops a hook being written
+  there is the shape: a directory hook is a module exporting
   `default (api) => api.on("tool_call", …)` whose only documented return is
   `{block, reason}` — allow or refuse, with no channel for adding context. The
-  lifecycle events come from the in-process API, which is the plugin surface,
-  so auto-recall here is a gjc plugin rather than a file.
+  extension has that channel, so that is where recall goes.
 
 ## Measured on a live install
 
@@ -59,9 +62,22 @@ HOME:
   disables "conventional MCP autoload (native user ~/.gjc/agent/mcp.json and
   project .gjc/mcp.json registrations)" — and `-r, --resume[=<value>]` takes an
   ID prefix, a path, or opens a picker.
-- Its screens could not be read: on this version every entry point, `gjc mcp
-  list` and `gjc -p` included, exits with `Cannot find module
-  '../../../../node_modules/mupdf/dist/mupdf-wasm.wasm'`. The relative path
-  resolves only in a global install layout, and providing the module at each
-  candidate location did not satisfy it. That is gjc's packaging, not deja's,
-  and it is why the capability rows here still rest on its documentation.
+- On 0.17.1 its screens could not be read: every entry point, `gjc mcp list`
+  and `gjc -p` included, exited with `Cannot find module
+  '../../../../node_modules/mupdf/dist/mupdf-wasm.wasm'`.
+
+0.17.2 runs (it wants Bun 1.4 and says so), and the rows above are its own
+screens rather than its documentation:
+
+- `gjc customize doctor` reports `~/.gjc/agent/extensions/deja.ts` as "a
+  trusted filesystem extension module discovered for session-start loading",
+  and `~/.gjc/agent/commands/deja.md` as a loaded slash command.
+- The same screen is where the skill location proves itself: a copy under
+  `~/.agents/skills` is listed `source-ignored`, "GJC loads skills only from
+  .gjc (native) locations", which is why `deja install gjc` writes gjc's own
+  directory.
+- `gjc -p` against a mock provider carried deja's `<deja-recall>` block into
+  the request — the past session, the question it answered and the conclusion —
+  on both the OpenAI (`/v1/responses`) and Anthropic (`/v1/messages`) paths,
+  and the server in `mcp.json` was connected in the same run: the tool
+  inventory in the system prompt lists `deja/deja: mcp__deja_deja`.

@@ -18,12 +18,27 @@ import (
 //     docs/customization.md surface table, which also gives it native skills
 //     at `~/.gjc/agent/skills/<name>/SKILL.md`.
 //
-// What each of them does about auto-recall is their own switch, and the
-// registry records it rather than this file pretending to it: Kimchi runs
-// deja's Claude Code hooks through a compatibility extension that ships
-// disabled (`kimchi resources enable extensions.claude-code-hook-adapter`),
-// and gjc's native hooks are TypeScript modules with pi's event names, which
-// is a second piece of work rather than a config line.
+// What Kimchi does about auto-recall is its own switch, and the registry
+// records it rather than this file pretending to it: it runs deja's Claude Code
+// hooks through a compatibility extension that ships disabled
+// (`kimchi resources enable extensions.claude-code-hook-adapter`).
+//
+// gjc's directory hooks stay unwired for the reason they always were — a
+// TypeScript module whose only documented return is `{block, reason}` has no
+// channel for adding context — but its extension loader is pi's, and that is
+// where recall goes. Read out of gjc 0.17.2 rather than assumed:
+//
+//   - `loadExtensionModules` in src/discovery/builtin.ts discovers modules in
+//     `<agent dir>/extensions`, native `.gjc`/`.pi` only, and its own
+//     `customize doctor` calls the file "a trusted filesystem extension module
+//     discovered for session-start loading".
+//   - The events in src/extensibility/extensions/types.ts are pi's:
+//     `session_start`, `before_agent_start`, `context`, `tool_result`,
+//     `session_compact`, with the same result shapes.
+//
+// Verified rather than inferred: with the extension in place, a print-mode
+// session against a mock provider carried deja's `<deja-recall>` block into
+// the request on both the OpenAI and Anthropic paths.
 
 // Senpi (OmO Native) was read-only for want of anything to read its config
 // surface against: the registry had every one of its capabilities as `unknown`,
@@ -111,4 +126,21 @@ func installGjc(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, cmdErr
 	}
 	return wroteAll(res, skill, command), nil
+}
+
+// installGjcAuto adds the extension, which is where recall arrives without
+// being asked. The server and the rest go first, as in every other -auto
+// target: `deja install --auto` installs the -auto target alone, and an
+// extension with no tool behind it leaves the model unable to follow up on
+// what it was just told.
+func installGjcAuto(exe string, uninstall bool) (installResult, error) {
+	base, err := installGjc(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	ext, err := installPiShapedExtension(sources.GjcConfigDir(), exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(base, ext), nil
 }

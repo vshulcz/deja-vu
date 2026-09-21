@@ -281,7 +281,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
-    <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its MCP server, skill and slash command, and indexes every agent.</summary>
+    <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its extension, server, skill and command, and indexes every agent.</summary>
   </entry>
   <entry>
     <title>Add memory to Goose: every agent&#39;s sessions — deja-vu</title>

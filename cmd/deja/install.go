@@ -834,6 +834,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installKimchi(exe, uninstall)
 	case "gjc":
 		return installGjc(exe, uninstall)
+	case "gjc-auto":
+		return installGjcAuto(exe, uninstall)
 	case "zcode":
 		return installZCode(exe, uninstall)
 	case "commandcode":
@@ -4230,7 +4232,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "senpi", "senpi-auto", "kimchi", "gjc", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
+		"grok", "grok-auto", "copilot", "roo", "kilocode", "cherrystudio", "kiro", "senpi", "senpi-auto", "kimchi", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).

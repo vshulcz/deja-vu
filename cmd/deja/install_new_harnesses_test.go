@@ -140,6 +140,52 @@ func TestInstallGjcWritesTheServerAndTheNativeSkill(t *testing.T) {
 	}
 }
 
+// gjc's extension loader is pi's, so the -auto target writes pi's extension
+// into gjc's own agent directory — and it has to keep the plain target's three
+// files, because the extension alone leaves the model told something it cannot
+// follow up on. The skill is the part to watch: senpi moves the same file to
+// the shared directory, which gjc reports as source-ignored (#3651).
+func TestInstallGjcAutoAddsTheExtensionAndKeepsTheNativeSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("GJC_CODING_AGENT_DIR", "")
+
+	if _, err := installGjcAuto("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	ext := filepath.Join(home, ".gjc", "agent", "extensions", "deja.ts")
+	b, err := os.ReadFile(ext)
+	if err != nil {
+		t.Fatalf("extension: %v", err)
+	}
+	// The events gjc's own loader hands an extension module, not a guess at
+	// them: an extension answering something else is loaded and silent.
+	for _, event := range []string{"before_agent_start", "tool_result", "session_compact"} {
+		if !strings.Contains(string(b), event) {
+			t.Errorf("the extension answers no %s event", event)
+		}
+	}
+	skill := filepath.Join(home, ".gjc", "agent", "skills", "deja-history", "SKILL.md")
+	if _, err := os.Stat(skill); err != nil {
+		t.Errorf("the native skill is not there: %v", err)
+	}
+	assertMCPServerEntry(t, filepath.Join(home, ".gjc", "agent", "mcp.json"))
+
+	if again, err := installGjcAuto("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	} else if again.Action != "unchanged" {
+		t.Errorf("second install = %q, want unchanged", again.Action)
+	}
+
+	if _, err := installGjcAuto("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ext); err == nil {
+		t.Errorf("the extension survived uninstall: %s", ext)
+	}
+}
+
 // assertMCPServerEntry is the shape every client here reads: a `mcpServers`
 // block with deja in it, ending in `mcp`. windows gets the `cmd /c` shim, so
 // the binary may be an argument rather than the command.

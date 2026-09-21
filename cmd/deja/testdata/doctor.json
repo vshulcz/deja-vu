@@ -533,6 +533,11 @@
       "path": "<tmp>/home/.senpi/agent/extensions/deja.ts"
     },
     {
+      "name": "gjc",
+      "state": "missing",
+      "path": "<tmp>/home/.gjc/agent/extensions/deja.ts"
+    },
+    {
       "name": "hermes",
       "state": "missing",
       "path": "<tmp>/home/.hermes/plugins/deja/__init__.py"

@@ -53,6 +53,11 @@ func autoWirings() []autoWiring {
 		// measured live: the session it starts records what `deja hook-context`
 		// returned as a `deja-recall` custom_message (#3670).
 		{"senpi", func() string { return filepath.Join(sources.SenpiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
+		// gajae-code discovers the same extension in its own agent directory —
+		// its `customize doctor` calls the file a trusted module discovered for
+		// session-start loading, and a print-mode run carried the recall block
+		// into the request (#3651).
+		{"gjc", func() string { return filepath.Join(sources.GjcConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
 		{"hermes", func() string {
 			return filepath.Join(sources.HermesHome(), "plugins", "deja", "__init__.py")
 		}, "hook-context", ""},
