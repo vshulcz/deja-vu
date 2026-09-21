@@ -4323,10 +4323,6 @@ func tomlBlockOwnedBy(found, key string) bool {
 	return found == key || strings.HasPrefix(found, key+".")
 }
 
-// existingTargetChecks is what says a harness is on this machine: one path the
-// harness itself creates, per install target. Named rather than inline so the
-// test that holds it to the target list can ask for a path instead of
-// repeating the platform switches (#3192).
 // noAgentConfigHere answers the machine that has never run one of these agents.
 //
 // Every other empty answer in this binary says what it looked for and what to do
@@ -4345,6 +4341,10 @@ func noAgentConfigHere(uninstall bool) {
 	fmt.Println("nothing to wire yet: run this again once an agent has written its first session, or name one now to wire it ahead of time — `deja install claude`")
 }
 
+// existingTargetChecks is what says a harness is on this machine: one path the
+// harness itself creates, per install target. Named rather than inline so the
+// test that holds it to the target list can ask for a path instead of
+// repeating the platform switches (#3192).
 func existingTargetChecks() map[string]string {
 	return map[string]string{
 		"claude-code": sources.ClaudeConfigDir(),
