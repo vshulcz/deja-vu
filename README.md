@@ -431,6 +431,11 @@ transcripts:
 | Freshness check alone | ~50 ms when nothing changed |
 | Index size | 200 MB, ~10% of corpus |
 
+The same store has since grown to 2,754 sessions, 358k messages and 5.7 GB.
+A cold full build over it takes 71 s and writes a 232 MB index — 4% of the
+corpus, because the share falls as transcripts repeat themselves — and the
+end-to-end median is unchanged at 0.25 s.
+
 The index is incremental. When a session file grows, only that file is re-read.
 
 ## How it works
