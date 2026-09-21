@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -72,6 +73,36 @@ func TestCompareLinksEveryProjectItNames(t *testing.T) {
 	for name := range want {
 		if !seen[name] {
 			t.Errorf("the tables no longer have a %s column", name)
+		}
+	}
+}
+
+// compare.html put our own harness count in a cell of its own, with the noun
+// ("Agents read", "Coding agents") in the row label next to it, so
+// TestPagesCountHarnessesInDigitsCorrectly — which matches a number followed by
+// "agents" or "harnesses" in one run of text — could never see it. It said 24
+// and 25 while the registry held 34, on the page where the column beside ours
+// says "25 providers" (#3855).
+func TestCompareCountsTheHarnessesTheRegistryHas(t *testing.T) {
+	root := filepath.Join("..", "..")
+	n := registryHarnessCount(t, root)
+
+	page, err := os.ReadFile(filepath.Join(root, "docs", "guide", "compare.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows := regexp.MustCompile(`<tr><td>(Agents read|Coding agents)</td><td class="us">(\d+)`).FindAllSubmatch(page, -1)
+	if len(rows) != 2 {
+		t.Fatalf("found %d rows stating deja's own agent count, want 2", len(rows))
+	}
+	for _, row := range rows {
+		got, err := strconv.Atoi(string(row[2]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != n {
+			t.Errorf("the %q row says %d; the registry has %d harnesses", row[1], got, n)
 		}
 	}
 }
