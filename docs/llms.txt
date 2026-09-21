@@ -41,7 +41,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
 - [找回被删掉的会话](https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html)：claude --resume 里找不到那次会话时，四种原因里有三种不是删除，真正还能找回的是什么
 - [找回解决问题的那次会话](https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html)：按记得的词在所有智能体里同时搜历史，然后继续那次对话
-- [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么都不出这台机器，以及怎么控制留下什么
+- [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么永远不出这台机器，以及怎么控制留下什么
 
 ## Per-harness setup
 
