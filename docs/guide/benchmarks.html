@@ -50,6 +50,7 @@
 <a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
 <a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
 <a href="delete-opencode-session-history.html">Delete opencode session history</a>
+<a href="delete-cline-task-history.html">Delete Cline task history</a>
 <a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="find-a-session.html">Finding a session</a>
@@ -57,7 +58,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">25</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -73,7 +74,8 @@
 <a href="memory-for-openclaw.html">Memory for OpenClaw</a>
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
-<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-pi.html">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
@@ -82,6 +84,15 @@
 <a href="memory-for-kiro.html">Memory for Kiro</a>
 <a href="memory-for-kilocode.html">Memory for Kilo Code</a>
 <a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
 </details>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
@@ -141,7 +152,7 @@ go run ./scripts/locomo -data locomo10.json -out docs/benchmarks/locomo.json</pr
 <p>Two published long-term-memory benchmarks run through the exact production path: haystack sessions are written as real transcript files, indexed by the normal pipeline (parsing, redaction, tokenization), and queried with the verbatim question text. No LLM, no embeddings, no question rewriting. Both harnesses ship in the repo and finish in minutes on the public datasets.</p>
 <p><b>LongMemEval-S</b> (session-level retrieval, 470 questions on the cleaned set): <b>hit@1 85.3%</b>, hit@5 95.5%, hit@10 96.4%, hit@20 97.2%, MRR 0.898, median search ~19&nbsp;ms. hit@k credits a question when any of its evidence sessions ranks in the top&nbsp;k; the stricter official per-evidence metric is reported alongside: evidence-recall@1 55.1%, @5 86.3%, @10 89.0%, @20 91.5%. Weakest slice: preference questions (36.7% hit@1 — pure paraphrase is where lexical retrieval loses to semantic indexes, by design; hit@20 reaches 100%). Full-set numbers (500 questions, abstention included): hit@1 84.8%, MRR 0.894 — <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/benchmarks/longmemeval-s-full.json">that run is committed too</a>.</p>
 <p><b>LoCoMo</b> (session-level retrieval, 1,982 questions): hit@1 69.7%, hit@5 85.6%, MRR 0.767, median search ~4&nbsp;ms; evidence sessions carry their real dates, questions anchor relative time at their question date. Note: most published LoCoMo numbers are end-to-end QA accuracy with an answering LLM — a different metric; deja reports retrieval only.</p>
-<p class="mut">Both re-measured on 0.20.2, against the public datasets, on an M-series laptop.</p>
+<p class="mut">Both re-measured on 0.20.2, against the public datasets, on an M-series laptop. Each LongMemEval question is asked against its own haystack of about fifty sessions; asked against all 19,195 at once, the same kind of question lands at 19% hit@1, and the <a href="day-zero.html">day-zero page</a> runs that.</p>
 <div class="note">Read these honestly: LongMemEval is lexically tractable — strong lexical retrievers cluster in the mid-90s at hit@5, so deep ranks do not differentiate systems there. deja's ranking is top-1-oriented and gates single-word noise.</div>
 
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>

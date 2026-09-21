@@ -1033,7 +1033,7 @@ func TestRunInstallAllExistingAndJSONCEdges(t *testing.T) {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)
-	if out, err := captureRun(t, "install", "--all"); err != nil || !strings.Contains(out, "no known agent") {
+	if out, err := captureRun(t, "install", "--all"); err != nil || !strings.Contains(out, "no agent config found") {
 		t.Fatalf("empty --all out=%q err=%v", out, err)
 	}
 	if err := os.WriteFile(filepath.Join(h, ".claude.json"), []byte(`{}`), 0o644); err != nil {

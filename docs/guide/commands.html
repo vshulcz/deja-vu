@@ -50,6 +50,7 @@
 <a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
 <a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
 <a href="delete-opencode-session-history.html">Delete opencode session history</a>
+<a href="delete-cline-task-history.html">Delete Cline task history</a>
 <a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
 <a href="find-a-session.html">Finding a session</a>
@@ -57,7 +58,7 @@
 <a href="repeated-mistakes.html">Repeated mistakes</a>
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
-<details class="grpfold"><summary>Per-agent guides <span class="n">25</span></summary>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
 <a href="memory-for-opencode.html">Memory for opencode</a>
 <a href="memory-for-dsh.html">Memory for dsh</a>
 <a href="memory-for-kimi.html">Memory for Kimi Code</a>
@@ -73,7 +74,8 @@
 <a href="memory-for-openclaw.html">Memory for OpenClaw</a>
 <a href="memory-for-goose.html">Memory for Goose</a>
 <a href="memory-for-cline.html">Memory for Cline</a>
-<a href="memory-for-pi.html">Memory for pi and omp</a><a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-pi.html">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
 <a href="memory-for-roo.html">Memory for Roo Code</a>
 <a href="memory-for-prime.html">Memory for prime-agent</a>
 <a href="memory-for-continue.html">Memory for Continue</a>
@@ -82,6 +84,15 @@
 <a href="memory-for-kiro.html">Memory for Kiro</a>
 <a href="memory-for-kilocode.html">Memory for Kilo Code</a>
 <a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
 </details>
 <a href="lost-context.html">Lost context</a>
 <a href="context-window-full.html">Context window full</a>
@@ -114,6 +125,7 @@
 <tr><td><code>deja blame &lt;path&gt;[:&lt;line&gt;]</code></td><td>Sessions that discussed a file, most specific first. With a line: the commit that last changed it and the session whose edit replaced the text that commit deleted, or one sentence saying why that cannot be answered.</td></tr>
 <tr><td><code>deja files &lt;topic&gt;</code></td><td>Which files were opened or edited while that subject was being worked on, ranked by how specific each one is to it. Answers from the project of the working directory; <code>--project</code> asks about another one, <code>--all-projects</code> asks the whole machine. <code>--limit</code> bounds the list. Reads the file and command records deja extracts from Claude Code, opencode, Cursor and Codex transcripts.</td></tr>
 <tr><td><code>deja secrets</code></td><td>Which credentials your agent transcripts are carrying, from deja’s own redaction markers — provider keys, private keys, connection strings, session cookies — with the harness, project, date and the file still holding each one. Never the value: deja’s copy is redacted. The assignment and entropy rules are a count at the bottom rather than a list. <code>--limit</code>, <code>--json</code>.</td></tr>
+<tr><td><code>deja tests</code></td><td>Your build and test runs as a series, week by week, from the commands and output already in the transcripts — nothing new is captured. A run counts as failed or passed only when the runner&rsquo;s own verdict line says so; the third band is the runs whose verdict was filtered out of the pipeline before the output was recorded. Then the tests that failed on more than one day, which is the cut that separates one afternoon&rsquo;s fixing from a test that keeps coming back. <code>--limit</code>, <code>--json</code>.</td></tr>
 <tr><td><code>deja recap</code></td><td>What the last week settled, quoted from the sessions themselves and grouped by project, with the harness, date and session id behind every line. Writes no prose of its own. Because the output is meant for a PR description or a standup message, every line goes through a second redaction pass on top of the index&rsquo;s — addresses, internal hostnames, emails and home paths — and the screen says what that removed. <code>--since</code>, <code>--limit</code>, <code>--json</code>.</td></tr>
 <tr><td><code>deja friction</code></td><td>Errors that recur across three or more separate sessions, with the harnesses that hit them and the newest occurrence. Specific failures only — a missing binary, an uninstalled module — not generic <code>Traceback</code> lines. <code>--limit</code>.</td></tr>
 <tr><td><code>deja fix "&lt;error&gt;"</code></td><td>The command this machine ran after that same error before, when the error did not come back. Paste the failing output or pipe it in; matched on the error itself, not its words. Evidence from your own history, not a guaranteed fix. <code>--limit</code>.</td></tr>
@@ -121,7 +133,7 @@
 <tr><td><code>deja restore &lt;path&gt;</code></td><td>Spans an agent replaced in that file, newest first; <code>--span n</code> prints one and <code>-o file</code> writes it. Never writes over the original, and flags a span that passed through redaction.</td></tr>
 <tr><td><code>deja remember "text"</code></td><td>Store a durable note. <code>--project</code> optional; <code>--tag</code> (repeatable) attaches keywords that boost matching queries.</td></tr>
 <tr><td><code>deja forget</code></td><td>Remove sessions by <code>--session</code>/<code>--project</code>/<code>--before</code>; <code>--dry-run</code>, <code>--list</code>, <code>--unforget &lt;id&gt;</code>.</td></tr>
-<tr><td><code>deja stats</code></td><td>Totals, top projects, activity, and how many replaced spans <code>deja restore</code> could hand back. <code>--card</code> (SVG), <code>--html</code> (timeline), <code>--redaction</code>, <code>--json</code>. <code>--impact</code> prints the measured impact report (recalls, reuse, distillation ratio) with the arithmetic labeled.</td></tr>
+<tr><td><code>deja stats</code></td><td>Totals, top projects, activity, and how many replaced spans <code>deja restore</code> could hand back. <code>--card</code> (SVG, <a href="../card/">PNG in the browser</a>), <code>--html</code> (timeline), <code>--redaction</code>, <code>--json</code>. <code>--impact</code> prints the measured impact report (recalls, reuse, distillation ratio) with the arithmetic labeled.</td></tr>
 <tr><td><code>deja</code></td><td>Bare, on a terminal: the living brief — today's activity, recalls served, déjà vu moments, a question asked in more than one session, the piece of work agents have re-used most, an error several sessions hit, a suggested search from your own history.</td></tr>
 <tr><td><code>deja log</code></td><td>Audit trail: recent recalls and injections; <code>--last</code> prints the most recent injected digest verbatim; <code>--json</code>.</td></tr>
 <tr><td><code>deja last [n]</code></td><td>Recent sessions. <code>--project</code>, <code>--harness</code>, <code>--since</code>, <code>--role</code>, <code>--json</code>.</td></tr>

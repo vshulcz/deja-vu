@@ -6,7 +6,7 @@ rule, so the numbers on the site's day-zero page can be reproduced end to end.
 
 1. Lay the corpus down once, in the real on-disk layouts:
 
-       go run ./scripts/day0bench -data longmemeval_s_cleaned.json -limit 100 -keep /tmp/day0
+       go run ./scripts/day0bench -data longmemeval_s_cleaned.json -limit 100 -corpus 500 -keep /tmp/day0
 
    `/tmp/day0/home` then holds `~/.claude/projects` and `~/.codex/sessions`
    trees (19,195 sessions), and `/tmp/day0/questions.json` the 100 scored

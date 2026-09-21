@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to gjc: recall past sessions — deja-vu</title>
+<meta name="description" content="gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its MCP server, skill and slash command, and indexes every agent.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to gjc: recall past sessions">
+<meta property="og:description" content="gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its MCP server, skill and slash command, and indexes every agent.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to gjc: recall past sessions">
+<meta name="twitter:description" content="gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its MCP server, skill and slash command, and indexes every agent.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to gjc (gajae-code)", "description": "gajae-code keeps a session log per project and can reopen one; nothing reads the others back. deja wires its MCP server, skill and slash command, and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-09-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for gjc (gajae-code)", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does gjc (gajae-code) remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps a JSONL session log under ~/.gjc/agent/sessions and can reopen one, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine and gives the model a tool to search them."}}, {"@type": "Question", "name": "How do I add memory to gjc?", "acceptedAnswer": {"@type": "Answer", "text": "deja install gjc writes the MCP server to ~/.gjc/agent/mcp.json, a skill to skills/deja-history/SKILL.md and a /deja slash command to commands/deja.md. There is no hook yet: a gjc directory hook can only allow or refuse a tool call, so it has no channel for adding context."}}, {"@type": "Question", "name": "Can gjc see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of thirty-four agents on the same machine, including sessions from before deja was installed, so a fix found in Claude Code answers a question asked in gjc."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
+<a href="delete-opencode-session-history.html">Delete opencode session history</a>
+<a href="delete-cline-task-history.html">Delete Cline task history</a>
+<a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html" aria-current="page">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to gjc (gajae-code)</h1>
+<p class="pagelede">it can reopen one session; nothing reads the others back<span class="mins" data-mins></span></p>
+
+<p>gajae-code — <code>gjc</code> on the command line — writes a JSONL session log under <code>~/.gjc/agent/sessions/</code>, honouring <code>$GJC_CODING_AGENT_DIR</code>, and can reopen one. A new session reads none of the others, and nothing in it knows about the Claude Code session in the same repo yesterday. This page is about adding that.</p>
+
+<h2>What gjc already has</h2>
+<p>The session logs, a way back into one, and its own customization surfaces: <code>mcp.json</code> in the agent directory for servers, native skills at <code>skills/&lt;name&gt;/SKILL.md</code>, and slash commands. Claude's and Codex's skill directories are import candidates in gjc rather than directories it loads, so a skill written there would be one no session reads.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install gjc</pre>
+<p>Three files, all reversible with <code>deja uninstall gjc</code>:</p>
+<ul>
+<li><b>The MCP server</b> in <code>~/.gjc/agent/mcp.json</code> — the path out of gjc's own surface table, not assumed from its pi lineage.</li>
+<li><b>The skill</b> at <code>~/.gjc/agent/skills/deja-history/SKILL.md</code>, which is the directory gjc actually loads.</li>
+<li><b>The slash command</b> at <code>~/.gjc/agent/commands/deja.md</code>, so <code>/deja &lt;question&gt;</code> works whether or not the model decides to look.</li>
+</ul>
+<p>There is no auto-recall here yet, and the reason is the hook shape rather than the paths. User-scope hooks resolve to <code>&lt;agent dir&gt;/hooks/pre</code> and <code>…/post</code> — settled against <code>resolveScopePaths</code> in the loader, because <code>docs/hooks.md</code>'s <code>~/.gjc/hooks</code> is stale — and a directory hook is a TypeScript module whose only documented return is <code>{block, reason}</code>: allow the call or refuse it, with no channel for adding context, which is the whole point of deja's tool hook. The lifecycle events that would carry a digest live on the in-process HookAPI instead, so auto-recall here is a gjc plugin rather than a file, and it is not written.</p>
+
+<h2>What arrives</h2>
+<p>What you or the model asks for. The tool is in front of it — search past sessions, read one in full, see a file's history, ask what fixed an error — and <code>/deja &lt;question&gt;</code> is the version that does not depend on the model choosing to reach for it. Recall that arrives unasked is the one thing gjc is still missing, and <a href="../registry/gjc.html">the registry entry</a> tracks it.</p>
+
+<h2>The part that is not about gajae-code</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-four of them, each in its own format — so a fix found in Claude Code answers a question asked in gajae-code, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/gjc.html">The gajae-code session format</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

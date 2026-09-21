@@ -1,5 +1,4 @@
 import json, subprocess, time, os, sys
-import sys
 S=sys.argv[1]  # the -keep directory from day0bench
 env=dict(os.environ, HOME=f'{S}/day0/home', CASS_DATA_DIR=os.environ.get('CASS_DATA_DIR', os.path.join(S, 'cass-data')), CODING_AGENT_SEARCH_NO_UPDATE_PROMPT='1', TUI_HEADLESS='1')
 cass=os.environ.get('CASS', 'cass')

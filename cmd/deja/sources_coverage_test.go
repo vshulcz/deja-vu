@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -36,5 +37,28 @@ func TestSourcesListsEveryHarnessInTheRegistry(t *testing.T) {
 		if !strings.Contains(out, h.Name) {
 			t.Errorf("deja sources never mentions %q, so nobody can tell whether deja looked there", h.Name)
 		}
+	}
+
+	// The security model tells a reader that an exclude line has to name one of
+	// the stores this command prints, and it spells that count in words. It said
+	// twenty-five while the command printed thirty-five — ten stores a reader
+	// would not know they could exclude. The number is the row count, not the
+	// registry's: deja prints its own store too.
+	rows := 0
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if strings.TrimSpace(line) != "" {
+			rows++
+		}
+	}
+	word, ok := countWords[rows]
+	if !ok {
+		t.Fatalf("deja sources prints %d rows and this test has no word for it; add one", rows)
+	}
+	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "SECURITY-MODEL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "the " + word + " `deja sources` prints"; !strings.Contains(string(b), want) {
+		t.Errorf("docs/SECURITY-MODEL.md does not say %q — deja sources prints %d rows", want, rows)
 	}
 }

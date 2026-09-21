@@ -11,8 +11,12 @@ import (
 // remedy already applied (#3697).
 func TestRepeatedInjectionsIgnoresWhatIsOlderThanTheWindow(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "index.db")
-	old := time.Now().Add(-48 * time.Hour)
-	fresh := time.Now()
+	// A repeat is two events in the same second (repeats.go), so the pairs below
+	// have to sit inside one, not straddle its edge: from a bare time.Now() the
+	// run that starts in the last millisecond of a second saw no repeats at all
+	// (#3849).
+	fresh := time.Now().Truncate(time.Second).Add(100 * time.Millisecond)
+	old := fresh.Add(-48 * time.Hour)
 	writeEvents(t, dir,
 		Event{Time: old, Kind: KindDejaVu, Bytes: 800, Into: "s1"},
 		Event{Time: old.Add(time.Millisecond), Kind: KindDejaVu, Bytes: 800, Into: "s1"},
