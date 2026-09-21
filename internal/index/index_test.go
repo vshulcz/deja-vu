@@ -16,7 +16,7 @@ import (
 func TestIndexIngestSkipAndSearch(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestSyncImportBadJSONAndEmptyExport(t *testing.T) {
 func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestMultiWordSearchUsesAllPostingsAndDoesNotFullScan(t *testing.T) {
 func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -425,7 +425,7 @@ func TestIncrementalOnlyReingestsChangedFile(t *testing.T) {
 func TestIncrementalAppendOneFileBenchmarkStyle(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-large")
+	proj := filepath.Join(claudeRoot, "-Users-me-large")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +665,7 @@ func modelSession(texts ...string) model.Session {
 func BenchmarkColdEnsureSynthetic(b *testing.B) {
 	tmp := b.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-synthetic")
+	proj := filepath.Join(claudeRoot, "-Users-me-synthetic")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		b.Fatal(err)
 	}
@@ -701,7 +701,7 @@ func BenchmarkColdEnsureSynthetic(b *testing.B) {
 func BenchmarkWarmSearchSynthetic(b *testing.B) {
 	tmp := b.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-warm")
+	proj := filepath.Join(claudeRoot, "-Users-me-warm")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		b.Fatal(err)
 	}

@@ -213,7 +213,7 @@ func TestEntropyLeavesOrdinaryContentAlone(t *testing.T) {
 	for _, in := range []string{
 		"the function getUserAccountByIdentifier handles retries",
 		"commit 3f1a9c27e4b8d6015a2f3c4d5e6f7a8b9c0d1e2f fixed it",
-		"file=/private/tmp/claude-501/-users-shulcz/scratchpad/notes.txt",
+		"file=/private/tmp/claude-501/-users-me/scratchpad/notes.txt",
 		"moved to: L3Zhci9mb2xkZXJzL2puL2NsYXVkZS41MDEvLXVzZXJz",
 		"id: 550e8400-e29b-41d4-a716-446655440000",
 		"see https://github.com/vshulcz/deja-vu/releases/download/v0.14.1",

@@ -171,7 +171,7 @@ insert into part values('p3','m3','{"type":"text","text":"other text","time":{"s
 
 func TestParseClaudeProjectFromEncodedDirectory(t *testing.T) {
 	tmp := t.TempDir()
-	dir := filepath.Join(tmp, "-Users-shulcz-deja-vu")
+	dir := filepath.Join(tmp, "-Users-me-deja-vu")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestParseClaudeProjectFromEncodedDirectory(t *testing.T) {
 func TestParseClaudeProjectFromNestedSubagentPath(t *testing.T) {
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude")
-	project := filepath.Join(root, "-Users-shulcz-deja-vu")
+	project := filepath.Join(root, "-Users-me-deja-vu")
 	dir := filepath.Join(project, "a7fa", "subagents")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

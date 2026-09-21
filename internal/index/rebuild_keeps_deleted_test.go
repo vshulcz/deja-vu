@@ -14,7 +14,7 @@ func seedTwoTranscripts(t *testing.T) (dir, claudeRoot, s1, s2 string) {
 	t.Helper()
 	tmp := t.TempDir()
 	claudeRoot = filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,7 @@ import (
 // `pwd` — the whole message became `[redacted:entropy]`.
 func TestAPathIsNotRedactedAsASecret(t *testing.T) {
 	for _, path := range []string{
-		"/private/tmp/claude-501/-Users-shulcz/9f0aa059-0c09-41f3-96a5-755b7b560be5/scratchpad/codexprobe",
+		"/private/tmp/claude-501/-Users-me/b3f0a17c-0000-4000-8000-000000000000/scratchpad/codexprobe",
 		"/Users/Alice/Library/Application Support/Code/User/globalStorage",
 		"~/Projects/Acme-Gateway/internal/db/pool.go",
 		"./build/Release-iphoneos/App.app/Contents/MacOS/App",

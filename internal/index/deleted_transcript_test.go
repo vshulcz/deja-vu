@@ -19,7 +19,7 @@ import (
 func TestADeletedTranscriptStaysInTheIndex(t *testing.T) {
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestADeletedTranscriptStaysInTheIndex(t *testing.T) {
 	}
 	// A session with the same id arriving from another project is a collision
 	// (#699), not the kept transcript being renamed: both stay.
-	other := filepath.Join(claudeRoot, "-Users-shulcz-other")
+	other := filepath.Join(claudeRoot, "-Users-me-other")
 	if err := os.MkdirAll(other, 0o755); err != nil {
 		t.Fatal(err)
 	}

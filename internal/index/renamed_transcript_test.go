@@ -14,7 +14,7 @@ func seedOneTranscript(t *testing.T, name, text string) (dir, path string) {
 	t.Helper()
 	tmp := t.TempDir()
 	claudeRoot := filepath.Join(tmp, "claude")
-	proj := filepath.Join(claudeRoot, "-Users-shulcz-deja-vu")
+	proj := filepath.Join(claudeRoot, "-Users-me-deja-vu")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		t.Fatal(err)
 	}
