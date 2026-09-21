@@ -37,6 +37,7 @@ func TestDayZeroLinksEveryToolItCompares(t *testing.T) {
 		"funes":       "huggingface/funes",
 		"ctx":         "ctxrs/ctx",
 		"CASS":        "Dicklesworthstone/coding_agent_session_search",
+		"agentsview":  "kenn-io/agentsview",
 		"agentmemory": "rohitg00/agentmemory",
 		"MemPalace":   "MemPalace/mempalace",
 		"claude-mem":  "thedotmack/claude-mem",

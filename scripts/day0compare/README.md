@@ -17,6 +17,7 @@ rule, so the numbers on the site's day-zero page can be reproduced end to end.
    the history and nothing else:
 
        CASS=/path/to/cass python3 scripts/day0compare/cass.py /tmp/day0
+       AGENTSVIEW=agentsview KEYWORDS=1 python3 scripts/day0compare/agentsview.py /tmp/day0 --fts
        AGENTMEMORY=/path/to/agentmemory python3 scripts/day0compare/agentmemory.py /tmp/day0
        MEMPALACE=mempalace python3 scripts/day0compare/mempalace.py /tmp/day0
        FUNES=funes python3 scripts/day0compare/funes.py /tmp/day0 [--half-life 0]
@@ -26,7 +27,9 @@ rule, so the numbers on the site's day-zero page can be reproduced end to end.
    ~1.1 GB of models, and the header shortens session ids, so the driver reads
    the full id from the `→ get` line. agentmemory needs its worker running first (`agentmemory` with
    `HOME`/`AGENTMEMORY_DATA_DIR` set) and imports in batches of at most 1000
-   files, its own cap; the driver builds the batches. MemPalace mines the
+   files, its own cap; the driver builds the batches. agentsview searches through
+   its daemon; the driver starts it after `agentsview sync` and stops it at the
+   end. MemPalace mines the
    Claude layout only — the sessions are the same files under both roots.
 
 The rule is one line: a question scores at rank k when the session holding its
