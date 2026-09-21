@@ -1293,7 +1293,10 @@ var betweenManifestAndRecords func()
 
 // manifestStamp identifies the generation of the store on disk. mtime and size
 // rather than Manifest.Generation: it is the pair readManifestCached already
-// keys its cache on, it needs no decode, and it changes on any rewrite.
+// keys its cache on and it needs no decode. It changes on almost any rewrite —
+// a rewrite that keeps the size and lands inside one tick of the filesystem's
+// timestamp resolution does not move it, which is why the writer drops the
+// manifest cache rather than trusting this to notice.
 func manifestStamp(dir string) string {
 	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
 	if err != nil {

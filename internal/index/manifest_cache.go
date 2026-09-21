@@ -16,7 +16,11 @@ import (
 // Long-lived processes (the MCP server foremost) call read-only retrieval
 // dozens of times per session; decoding the manifest and a thousand session
 // metas on every call is pure waste. The cache is keyed by manifest.gob's
-// mtime+size, which the atomic index swap always changes.
+// mtime+size — which the atomic swap usually changes, and not always: a
+// rewrite that keeps the size and lands inside one tick of the filesystem's
+// timestamp resolution leaves the pair identical. So a writer in this process
+// drops the entry itself (writeManifest), and the stamp is what catches a
+// rewrite by another process.
 //
 // Contract: the cached Manifest is shared — read-only paths must not mutate
 // it. Ingestion keeps using readManifest directly.

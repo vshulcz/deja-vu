@@ -434,7 +434,9 @@ func writeManifestOnly(dir string, m Manifest) error {
 		core.RecordsSize = fi.Size()
 	}
 	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
-	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	invalidateManifestCache(dir)
+	return err
 }
 
 // writeManifest commits the two-file manifest crash-safely. sessions.gob is
@@ -453,7 +455,15 @@ func writeManifest(dir string, m Manifest) error {
 	if err := writeGobAtomic(filepath.Join(dir, "sessions.gob"), m.Sessions); err != nil {
 		return err
 	}
-	return writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	// The cache this process holds is keyed on manifest.gob's mtime and size,
+	// and the comment there claimed the atomic swap always changes that pair.
+	// It does not: a rewrite that keeps the size and lands inside one tick of
+	// the filesystem's timestamp resolution is invisible to it, and the reader
+	// then answers from the manifest before this one. The writer knows, so it
+	// says so.
+	invalidateManifestCache(dir)
+	return err
 }
 
 // ExclusionsChanged reports whether the exclude patterns in force differ from
