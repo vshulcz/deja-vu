@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -67,6 +68,13 @@ func TestEveryInstallTargetTheDocsPrintResolves(t *testing.T) {
 	}
 	for alias := range installTargetAliases {
 		known[alias] = true
+	}
+	// A target deja offers only where it can schedule something is still a
+	// real target, and the page naming it is right on the platforms that
+	// have a service manager. Without this the Windows leg refused
+	// `sync-timer`, which sync-across-machines.html correctly prints.
+	if !syncTimerSchedulable(runtime.GOOS) {
+		known["sync-timer"] = true
 	}
 
 	names := make([]string, 0, len(named))
