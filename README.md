@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo.svg" width="330" alt="deja-vu">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
   </picture>
 </p>
 
@@ -11,7 +11,7 @@
 deja indexes the sessions Claude Code, Codex, Cursor and every other agent on this machine
 already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
-<p align="center"><img src="assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
 <p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></sub></p>
 
@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-<p align="center"><img src="assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
 
 Ten seconds to install, about ten to index, and it is useful. The second command wires MCP
 recall into every agent it finds, turns on session-start recall where the agent supports
@@ -140,7 +140,7 @@ SVG for a profile README. To post it anywhere else, [turn it into a
 PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
 browser.
 
-<p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
 
 The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu/).
 
