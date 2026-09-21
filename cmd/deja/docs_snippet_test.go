@@ -43,6 +43,12 @@ func TestGuideSnippetsFitWhatSearchShows(t *testing.T) {
 		t.Fatalf("found %d guide pages, expected the whole guide", len(pages))
 	}
 
+	// Third rule: a title belongs to one page. getting-started.html and
+	// search.html both said "Search your Claude Code and Codex history", so
+	// one of them was named after the other's subject — and two pages under
+	// one title is what a doorway page looks like from outside.
+	titleOwner := map[string]string{}
+
 	for _, p := range pages {
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -63,6 +69,13 @@ func TestGuideSnippetsFitWhatSearchShows(t *testing.T) {
 		}
 		if n := utf8.RuneCountInString(desc); n > descBudget {
 			t.Errorf("%s: description is %d characters, over %d", name, n, descBudget)
+		}
+
+		if other, ok := titleOwner[title]; ok {
+			t.Errorf("%s and %s share the title %q — one of them is named after the other's subject",
+				other, name, title)
+		} else {
+			titleOwner[title] = name
 		}
 
 		// og:title may carry the title with or without the site suffix; what it
