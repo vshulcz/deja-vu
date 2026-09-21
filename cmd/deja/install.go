@@ -138,14 +138,14 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			targets = append(targets, autoTargetFor(t))
 		}
 		if len(targets) == 0 {
-			fmt.Println("no known agent config directories found")
+			noAgentConfigHere(uninstall)
 			return nil
 		}
 	}
 	if targetArgs[0] == "--all" {
 		targets = existingTargets()
 		if len(targets) == 0 {
-			fmt.Println("no known agent config directories found")
+			noAgentConfigHere(uninstall)
 			return nil
 		}
 		if !uninstall {
@@ -4327,6 +4327,24 @@ func tomlBlockOwnedBy(found, key string) bool {
 // harness itself creates, per install target. Named rather than inline so the
 // test that holds it to the target list can ask for a path instead of
 // repeating the platform switches (#3192).
+// noAgentConfigHere answers the machine that has never run one of these agents.
+//
+// Every other empty answer in this binary says what it looked for and what to do
+// next — a bare word someone has to go look up is the worst possible answer in
+// this position (#830), and `deja last` on the same machine prints "no agent
+// history was found on this machine; `deja sources` shows where deja looked".
+// `--auto` and `--all` printed one line, "no known agent config directories
+// found", and stopped. It is the second command the README hands someone, so
+// that line was read as a failure with nothing after it.
+func noAgentConfigHere(uninstall bool) {
+	fmt.Printf("no agent config found on this machine — deja looked for the config of all %d agents it can wire; `deja sources` lists every store it reads\n", len(existingTargetChecks()))
+	if uninstall {
+		fmt.Println("nothing to remove.")
+		return
+	}
+	fmt.Println("nothing to wire yet: run this again once an agent has written its first session, or name one now to wire it ahead of time — `deja install claude`")
+}
+
 func existingTargetChecks() map[string]string {
 	return map[string]string{
 		"claude-code": sources.ClaudeConfigDir(),
