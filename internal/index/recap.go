@@ -75,6 +75,9 @@ type Recap struct {
 	Spoke      int
 	Sessions   []RecapSession
 	Projects   []string
+	// Read is set only when the window held more sessions than one command can
+	// read, and is how many of the newest were.
+	Read int
 	// Masked is what the outbound pass removed, by kind.
 	Masked   redact.Counts
 	Withheld int
@@ -111,6 +114,10 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 	out.Considered = len(metas)
 	if len(metas) > recapSessionCap {
 		metas = metas[:recapSessionCap]
+		// Said out loud rather than silently: the counts above are the window,
+		// and a reader comparing them with the lines below has to know that
+		// only the newest of them were read.
+		out.Read = recapSessionCap
 	}
 	ss, err := sessionsForMetas(dir, metas)
 	if err != nil {

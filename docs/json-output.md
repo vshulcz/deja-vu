@@ -665,7 +665,9 @@ account name in a home path, which becomes `~`. Public hostnames, ports,
 repository and branch names are left alone: a rule that fired on every dotted
 name would mask half the import paths in a week's work.
 
-`withheld` is present when the ignore rule kept sessions out of the window.
+`withheld` is present when the ignore rule kept sessions out of the window, and
+`sessions_read` when the window held more sessions than one command reads — it
+is how many of the newest were, and its absence means all of them.
 
 ## `deja fix <error> --json`
 

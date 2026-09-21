@@ -45,6 +45,7 @@ type recapJSON struct {
 	Spoke      int                  `json:"sessions_with_lines"`
 	Projects   []string             `json:"projects"`
 	Sessions   []index.RecapSession `json:"sessions"`
+	Read       int                  `json:"sessions_read,omitempty"`
 	Masked     map[string]int       `json:"masked,omitempty"`
 	Withheld   int                  `json:"withheld,omitempty"`
 }
@@ -96,7 +97,7 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 		enc.SetIndent("", "  ")
 		out := recapJSON{
 			Kind: recapJSONKind, Schema: jsonout.Version, Since: sinceText,
-			Considered: r.Considered, Spoke: r.Spoke, Projects: r.Projects,
+			Considered: r.Considered, Spoke: r.Spoke, Read: r.Read, Projects: r.Projects,
 			Sessions: r.Sessions, Masked: r.Masked, Withheld: r.Withheld,
 		}
 		if out.Projects == nil {
@@ -129,6 +130,9 @@ func printRecap(w io.Writer, r index.Recap, since string, limit int) {
 		fmt.Fprintf(w, ", across %d projects", n)
 	}
 	fmt.Fprintln(w)
+	if r.Read > 0 {
+		fmt.Fprintf(w, "(the newest %d of them were read — ask for a shorter window for the rest)\n", r.Read)
+	}
 	shown := r.Sessions
 	if limit > 0 && len(shown) > limit {
 		shown = shown[:limit]
