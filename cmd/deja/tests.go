@@ -119,6 +119,10 @@ func printTests(w io.Writer, h index.TestHistory, limit int) {
 	weeks := h.Weeks
 	if len(weeks) > testsWeeks {
 		weeks = weeks[len(weeks)-testsWeeks:]
+		// Otherwise the headline spans ten months and the rows span two, with
+		// nothing saying which is which.
+		fmt.Fprintf(w, "the last %d of %d weeks, newest last — `deja tests --json` for the whole series\n",
+			len(weeks), len(h.Weeks))
 	}
 	for _, k := range weeks {
 		fmt.Fprintf(w, "\n  week of %s  %4d run%s  %4d failed  %4d passed", k.Start.Format("2006-01-02"),
