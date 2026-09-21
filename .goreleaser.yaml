@@ -139,9 +139,10 @@ release:
 # The tap repository (github.com/vshulcz/homebrew-tap) must exist before tagged releases run.
 brews:
   - name: deja-vu
-    # Publishing the formula needs a PAT with access to vshulcz/homebrew-tap
-    # (workflow GITHUB_TOKEN is repo-scoped). Flip to false at public launch
-    # after adding the TAP_GITHUB_TOKEN secret and token: ... here.
+    # Publishing the formula needs a PAT with access to vshulcz/homebrew-tap,
+    # because the workflow GITHUB_TOKEN is scoped to this repository. It comes
+    # from the TAP_GITHUB_TOKEN secret below. `brew install deja-vu` resolves
+    # through homebrew-core; the tap is the fallback and stays in step with it.
     repository:
       owner: vshulcz
       name: homebrew-tap

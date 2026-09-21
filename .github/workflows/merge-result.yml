@@ -101,6 +101,9 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          gh pr comment "$PR" --repo "$REPO" --body "main moved to \`${SHA}\` and the suite fails when this branch is merged into it — [the run](${RUN_URL}).
-
-          Both sides are green on their own, which is the shape #3433 is about: rebase on main and the failure will be visible on this pull request's own checks."
+          # The two paragraphs are joined with $'\n\n' rather than written
+          # across two lines: the second line's YAML indentation travels into
+          # the comment, and four leading spaces after a blank line is a code
+          # block on GitHub.
+          body="main moved to \`${SHA}\` and the suite fails when this branch is merged into it — [the run](${RUN_URL})."$'\n\n'"Both sides are green on their own, which is the shape #3433 is about: rebase on main and the failure will be visible on this pull request's own checks."
+          gh pr comment "$PR" --repo "$REPO" --body "$body"
