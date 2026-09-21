@@ -4,12 +4,12 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How deja compares — coding-agent memory systems</title>
-<meta name="description" content="Feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory: capture model, storage, retrieval, benchmarks.">
+<title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
+<meta name="description" content="deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/compare.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="How deja compares — coding-agent memory systems">
-<meta property="og:description" content="Feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory: capture model, storage, retrieval, benchmarks.">
+<meta property="og:title" content="Memory plugins for Claude Code, Codex and Cursor, compared">
+<meta property="og:description" content="deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/compare.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -25,14 +25,14 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="How deja compares — coding-agent memory systems">
-<meta name="twitter:description" content="Feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory: capture model, storage, retrieval, benchmarks.">
+<meta name="twitter:title" content="Memory plugins for Claude Code, Codex and Cursor, compared">
+<meta name="twitter:description" content="deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How deja compares", "description": "An honest feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory.", "url": "https://vshulcz.github.io/deja-vu/guide/compare.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/compare.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-23", "dateModified": "2026-09-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Memory plugins for Claude Code, Codex and Cursor, compared", "description": "deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.", "url": "https://vshulcz.github.io/deja-vu/guide/compare.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/compare.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-07-23", "dateModified": "2026-09-21"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Compare","item":"https://vshulcz.github.io/deja-vu/guide/compare.html"}]}</script>
 <style>
 /* Full-width page: the matrix needs every pixel, so the sidebar folds into a top strip. */
@@ -147,7 +147,7 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>How deja compares</h1>
+<h1>Memory plugins for coding agents, compared</h1>
 <p class="pagelede">where deja sits among the memory tools<span class="mins" data-mins></span></p>
 <p>There are a lot of AI memory systems. Most solve a different problem than deja: they give <em>applications</em> a memory API you call from code, or wrap an agent runtime around their own store. deja is narrower — it makes the transcripts your coding agents <em>already write to disk</em> searchable, and serves them back to those agents. That one difference (retroactive indexing vs forward capture) drives most of the table below.</p>
 

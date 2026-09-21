@@ -53,11 +53,11 @@
     <summary>Every deja subcommand: search, recall, ctx, blame, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
-    <title>How deja compares — coding-agent memory systems</title>
+    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
     <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Feature-by-feature comparison of deja-vu with Mem0, Letta, memU, Memori, claude-mem and agentmemory: capture model, storage, retrieval, benchmarks.</summary>
+    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
   </entry>
   <entry>
     <title>Claude Code context window full: what it drops — deja-vu</title>
