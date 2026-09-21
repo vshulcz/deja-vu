@@ -124,9 +124,17 @@ jobs:
     # tests themselves (cmd/deja 612s, internal/index 124s, every other package
     # under 40s) and 35m is compiling and linking test binaries. Caching the
     # build and excluding it from Defender were both measured and neither helped
-    # (#1229). So the cap is 90 — a real hang is still bounded by the go
-    # -timeout below, which kills one with a stack long before this.
-    timeout-minutes: 90
+    # (#1229). 90 lasted nine days: on 2026-09-21 main passed at 1h26m00s with
+    # the test step at 5096s, and the pull request behind it was cancelled at
+    # 1h30m14s with the step at 5358s — the same commit range, four minutes
+    # apart, one on either side of the cap. That run's own numbers say where the
+    # time is not: every package reported ok, and the test seconds add up to
+    # 1252s (cmd/deja 941s, internal/index 193s, internal/usage 51s, all 25
+    # others under 24s), so 21 minutes of the 89 is tests and the rest is the
+    # compiler and the linker again. So the cap is 120 — a real hang is still
+    # bounded by the go -timeout below, which kills one with a stack long
+    # before this.
+    timeout-minutes: 120
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
       # minutes for a job the others finish in two, and it varies by a third
@@ -206,9 +214,19 @@ jobs:
       # hang detector and started cutting honest work: run 34663347144 killed
       # cmd/deja at 720.087s with the test it had just entered at 0s, so nothing
       # was stuck — the package simply needs more than twelve minutes on a slow
-      # runner now. The job's own 60m cap is what bounds a real hang, and the go
+      # runner now. The job's own 120m cap is what bounds a real hang, and the go
       # timeout still dies with every goroutine's stack well inside it.
-      - run: go test -timeout 25m ./...
+      #
+      # `./cmd/... ./internal/...` rather than `./...`: the 31 packages under
+      # scripts/ are build tooling — the generators, the benchmark drivers, the
+      # release helpers — and every one of them runs on the linux leg, in the
+      # jobs below, or on a maintainer's machine. None of them is why this leg
+      # exists, and compiling them is not free: a cold `go test -run <nothing>`
+      # over every package takes 22s here against 16s for cmd and internal
+      # alone, so a quarter of the compile work this step does is for code that
+      # never runs on windows. The paths, the file locking and the case rules
+      # this leg is here for are all in cmd/deja and internal/.
+      - run: go test -timeout 25m ./cmd/... ./internal/...
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
       - run: go build ./cmd/deja
