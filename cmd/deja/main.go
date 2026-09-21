@@ -291,6 +291,7 @@ var commands = map[string]command{
 	"files":           func(dir string, rest []string) error { return runFiles(dir, rest, os.Stdout) },
 	"restore":         func(dir string, rest []string) error { return runRestore(dir, rest, os.Stdout) },
 	"friction":        func(dir string, rest []string) error { return runFriction(dir, rest, os.Stdout) },
+	"tests":           func(dir string, rest []string) error { return runTests(dir, rest, os.Stdout) },
 	"fix":             func(dir string, rest []string) error { return runFix(dir, rest, os.Stdout) },
 	"how":             func(dir string, rest []string) error { return runHow(dir, rest, os.Stdout) },
 	"log":             runLog,
@@ -3982,6 +3983,7 @@ Usage:
   deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]
+  deja tests [--limit n] [--json]    (your build and test runs, week by week)
   deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
   deja how <what> [--project name] [--all-projects] [--limit n] [--json]
              (commands this project actually ran; --all-projects for the machine)
