@@ -150,3 +150,21 @@ jobs:
             args+=(-only urls.txt)
           fi
           go run ./scripts/indexnow "${args[@]}"
+
+      # Google takes neither a ping nor IndexNow. Of the four ways it documents
+      # for hearing that a page changed, WebSub over the Atom feed is the only
+      # one that is a push, and this is the hub its own documentation points
+      # publishers at. Same switch: INDEXNOW is what says "tell them".
+      - name: Publish the docs feed to the WebSub hub
+        if: steps.changed.outputs.mode != 'none'
+        env:
+          LIVE: ${{ vars.INDEXNOW }}
+        run: |
+          set -euo pipefail
+          hub=https://pubsubhubbub.appspot.com/
+          feed=https://vshulcz.github.io/deja-vu/feed.xml
+          if [ "${LIVE:-}" != "on" ]; then
+            echo "INDEXNOW is not on; would publish $feed to $hub"
+            exit 0
+          fi
+          curl -fsS -X POST "$hub" -d hub.mode=publish -d "hub.url=$feed" -o /dev/null -w 'hub returned %{http_code}\n'
