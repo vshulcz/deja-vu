@@ -410,8 +410,8 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   "git": {"state": "ok"},
   "version": {
     "state": "ok",
-    "current": "0.14.1",
-    "latest": "0.14.1"
+    "current": "0.20.2",
+    "latest": "0.20.2"
   },
   "embed": {
     "state": "reachable",
@@ -667,6 +667,98 @@ them as credentials.
 database-backed store, where one file holds every session in it. `withheld` is
 present when the ignore rule kept sessions out of the scan. `findings` is an
 empty array, never null, on a clean machine.
+## `deja tests --json`
+
+The build and test runs in the transcripts, as a weekly series plus the tests
+that failed on more than one day:
+
+```json
+{
+  "kind": "deja.tests",
+  "schema_version": 2,
+  "runs": 18645,
+  "failed": 4974,
+  "passed": 8155,
+  "no_verdict": 5516,
+  "days": 107,
+  "first": "2025-11-21",
+  "last": "2026-09-21",
+  "tools": { "go test": 8398, "go build": 3065, "go vet": 1005 },
+  "weeks": [
+    { "start": "2026-09-14T00:00:00+03:00", "runs": 2856, "failed": 763, "passed": 1364, "no_verdict": 729 }
+  ],
+  "repeat_failures": [
+    {
+      "name": "TestDocCommentsNameWhatTheyDocument",
+      "project": "deja-vu",
+      "failures": 150,
+      "days": 33,
+      "last_failure": "2026-09-21T14:02:11+03:00"
+    }
+  ]
+}
+```
+
+Three bands, not two. `failed` and `passed` count only the runs whose output
+carried the runner's own verdict line — `--- FAIL:`, `FAIL\tpkg\t0.4s`,
+`ok\tpkg\t1.2s`, pytest's summary, a compiler error. `no_verdict` is the rest,
+and it is large because an agent usually pipes its own run through a filter
+(`grep -E '^FAIL'`) and prints a sentinel of its own, so nothing the runner said
+reached the transcript. A consumer computing a failure rate should divide by
+`failed + passed`; dividing by `runs` answers a different question and reads a
+third lower.
+
+`weeks` holds every week in the series, oldest first, and the screen shows the
+last eight of them. `repeat_failures` is cut on days rather than on failures: a
+test that failed twelve times in one afternoon was being fixed, and one that
+failed on twelve separate days is the one worth knowing about. `withheld` is
+present when the ignore rule kept sessions out of the scan.
+
+Nothing here needs a hook or a wrapper — it is read out of the command and
+output records deja already extracts.
+## `deja recap --json`
+
+What the window settled, one entry per session, newest first:
+
+```json
+{
+  "kind": "deja.recap",
+  "schema_version": 2,
+  "since": "7d",
+  "sessions_in_window": 28,
+  "sessions_with_lines": 15,
+  "projects": ["goprojects/api", "goprojects/net"],
+  "sessions": [
+    {
+      "harness": "claude",
+      "id": "8a41c2f0-1d2e-4c3b-9f77-0a1b2c3d4e5f",
+      "project": "goprojects/net",
+      "when": "2026-09-20T21:14:03Z",
+      "lines": [
+        "root cause: the default route moved to a new gateway while the source address stayed on the old subnet"
+      ]
+    }
+  ],
+  "masked": { "ip": 2, "home-path": 2 }
+}
+```
+
+Every line is a sentence from the session, trimmed but never rewritten, and
+`sessions_in_window` against `sessions_with_lines` is the honest part: a week of
+28 sessions where 15 concluded something is not a week of 15.
+
+`masked` is the second redaction pass, and it is not optional. The index masks
+what looks like a credential, which is the right bar for a local store and the
+wrong one for text going into a PR description — so a recap also removes IP
+addresses (except loopback and the RFC 5737 documentation ranges), internal
+hostnames (`.local`, `.internal`, `.svc` and friends), email addresses, and the
+account name in a home path, which becomes `~`. Public hostnames, ports,
+repository and branch names are left alone: a rule that fired on every dotted
+name would mask half the import paths in a week's work.
+
+`withheld` is present when the ignore rule kept sessions out of the window, and
+`sessions_read` when the window held more sessions than one command reads — it
+is how many of the newest were, and its absence means all of them.
 
 ## `deja fix <error> --json`
 

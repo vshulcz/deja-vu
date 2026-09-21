@@ -17,7 +17,7 @@ func TestFrictionGroupsOneFailureAcrossItsNumbers(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"user","sessionId":"s%d","cwd":"/w/p","timestamp":"2026-07-2%dT10:00:00Z",`+
-				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 10.0.0.%d:%d: connect: connection refused"}]}}`,
+				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 192.0.2.%d:%d: connect: connection refused"}]}}`,
 			i, i+1, 7+i, 5432+i))
 	}
 	seedFrictionStore(t, lines)
@@ -34,7 +34,7 @@ func TestFrictionGroupsOneFailureAcrossItsNumbers(t *testing.T) {
 		t.Errorf("one failure is listed more than once:\n%s", got)
 	}
 	// The newest occurrence is what a reader can act on.
-	if !strings.Contains(got, "10.0.0.10:5435") {
+	if !strings.Contains(got, "192.0.2.10:5435") {
 		t.Errorf("the row does not show the newest of the four:\n%s", got)
 	}
 }
@@ -45,7 +45,7 @@ func TestFrictionKeepsDifferentFailuresApart(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"user","sessionId":"a%d","cwd":"/w/p","timestamp":"2026-07-2%dT10:00:00Z",`+
-				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 10.0.0.%d:5432: connect: connection refused"}]}}`,
+				`"message":{"role":"user","content":[{"type":"tool_result","content":"dial tcp 192.0.2.%d:5432: connect: connection refused"}]}}`,
 			i, i+1, 7+i))
 		lines = append(lines, fmt.Sprintf(
 			`{"type":"user","sessionId":"b%d","cwd":"/w/p","timestamp":"2026-07-2%dT11:00:00Z",`+

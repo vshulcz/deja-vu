@@ -37,7 +37,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [快速开始](https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html)：安装、接上智能体、第一次查询
 - [智能体记得之前的对话吗](https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html)：各个工具跨会话留下了什么
 - [为什么会忘事](https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html)：会话结束时消失的是什么，磁盘上留下的是什么
-- [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：三十三个智能体各自把会话写在磁盘的哪里，用什么格式
+- [历史文件在哪里](https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html)：三十四个智能体各自把会话写在磁盘的哪里，用什么格式
 - [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
 - [找回被删掉的会话](https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html)：claude --resume 里找不到那次会话时，四种原因里有三种不是删除，真正还能找回的是什么
 - [找回解决问题的那次会话](https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html)：按记得的词在所有智能体里同时搜历史，然后继续那次对话
@@ -81,7 +81,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 ## Evidence
 
 - [Building deja into your own tool](https://github.com/vshulcz/deja-vu/blob/main/docs/INTEGRATING.md): the MCP server, the JSON surfaces, the hook commands, what is a contract and what is not, and how to isolate it in tests
-- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S, 69.7% on LoCoMo, both harnesses in the repository
+- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 85.3% hit@1 on LongMemEval-S (470-question cleaned set), 69.7% on LoCoMo, both harnesses in the repository
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem and agentmemory
 - [Day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html): seven memory tools installed on one machine that already held 19,195 sessions, then asked 100 questions only that history answers — build time, first answer, search latency, hit@1; the driver for every row is in the repository
 - [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the thirty-four agents stores its sessions, with fixtures

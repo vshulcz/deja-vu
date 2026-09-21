@@ -1,0 +1,138 @@
+package main
+
+import (
+	"os"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"testing"
+)
+
+// compare.html names ten other projects and used to link two of them (#3854).
+// Pinning the pair means a column cannot quietly end up pointing at a
+// neighbouring project the way CASS did on the day-zero page (#3845) — several of
+// these names are taken more than once on GitHub.
+func TestCompareLinksEveryProjectItNames(t *testing.T) {
+	page, err := os.ReadFile(filepath.Join("..", "..", "docs", "guide", "compare.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[string]string{
+		"Mem0":           "mem0ai/mem0",
+		"Letta":          "letta-ai/letta",
+		"memU":           "NevaMind-AI/memU",
+		"Memori":         "MemoriLabs/Memori",
+		"claude-mem":     "thedotmack/claude-mem",
+		"agentmemory":    "rohitg00/agentmemory",
+		"MemPalace":      "MemPalace/mempalace",
+		"cognee":         "topoteretes/cognee",
+		"Graphiti / Zep": "getzep/graphiti",
+		"Hindsight":      "vectorize-io/hindsight",
+
+		"cass":            "Dicklesworthstone/coding_agent_session_search",
+		"Agent Sessions":  "jazzyalex/agent-sessions",
+		"agent-historian": "adlternative/agent-historian",
+		"casr":            "Dicklesworthstone/cross_agent_session_resumer",
+		// The column was "Agent Session Viewer", archived in February before
+		// the table was written; this is its Go rewrite (#3865).
+		"agentsview": "kenn-io/agentsview",
+	}
+
+	rows := regexp.MustCompile(`(?s)<tr[^>]*><th[^>]*></th><th[^>]*class="us"[^>]*>deja-vu</th>(.*?)</tr>`).FindAllSubmatch(page, -1)
+	if len(rows) != 3 {
+		t.Fatalf("found %d comparison-table header rows, want 3", len(rows))
+	}
+
+	cell := regexp.MustCompile(`(?s)<th[^>]*>(.*?)</th>`)
+	href := regexp.MustCompile(`<a href="https://github\.com/([^"]+)"[^>]*>(.*?)</a>`)
+	seen := map[string]bool{}
+	for _, row := range rows {
+		for _, c := range cell.FindAllSubmatch(row[1], -1) {
+			got := href.FindSubmatch(c[1])
+			if got == nil {
+				t.Errorf("column %q does not link a github repository", strings.TrimSpace(string(c[1])))
+				continue
+			}
+			name := strings.TrimSpace(string(got[2]))
+			repo := strings.Trim(string(got[1]), "/")
+			seen[name] = true
+			if w, ok := want[name]; !ok {
+				t.Errorf("column %q is new here; add the repository it belongs to", name)
+			} else if repo != w {
+				t.Errorf("%s links %s, want %s", name, repo, w)
+			}
+		}
+	}
+	for name := range want {
+		if !seen[name] {
+			t.Errorf("the tables no longer have a %s column", name)
+		}
+	}
+}
+
+// compare.html put our own harness count in a cell of its own, with the noun
+// ("Agents read", "Coding agents") in the row label next to it, so
+// TestPagesCountHarnessesInDigitsCorrectly — which matches a number followed by
+// "agents" or "harnesses" in one run of text — could never see it. It said 24
+// and 25 while the registry held 34, on the page where the column beside ours
+// says "25 providers" (#3855).
+func TestCompareCountsTheHarnessesTheRegistryHas(t *testing.T) {
+	root := filepath.Join("..", "..")
+	n := registryHarnessCount(t, root)
+
+	page, err := os.ReadFile(filepath.Join(root, "docs", "guide", "compare.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows := regexp.MustCompile(`<tr><td>(Agents read|Coding agents)</td><td class="us">(\d+)`).FindAllSubmatch(page, -1)
+	if len(rows) != 2 {
+		t.Fatalf("found %d rows stating deja's own agent count, want 2", len(rows))
+	}
+	for _, row := range rows {
+		got, err := strconv.Atoi(string(row[2]))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != n {
+			t.Errorf("the %q row says %d; the registry has %d harnesses", row[1], got, n)
+		}
+	}
+}
+
+// The prose under the third table quotes funes and ctx figures from the
+// day-zero page. When day-zero moved to funes 1.3.2 and ctx 1.4.12 (#3858) the
+// copies here kept the old versions' numbers, including a funes lead at rank
+// five that the new measurement does not have (#3865). The quotes are read
+// against the day-zero table rather than hard-coded.
+func TestCompareQuotesTheDayZeroTable(t *testing.T) {
+	read := func(name string) string {
+		b, err := os.ReadFile(filepath.Join("..", "..", "docs", "guide", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	day, cmp := read("day-zero.html"), read("compare.html")
+
+	// columns: deja, funes, ctx
+	cells := func(label string) []string {
+		m := regexp.MustCompile(`<tr><td>` + regexp.QuoteMeta(label) + `</td><td class="us y">(\d+)</td><td>(\d+)[^<]*?(?:\((\d+)[^)]*\))?</td><td>(\d+)</td>`).FindStringSubmatch(day)
+		if m == nil {
+			t.Fatalf("day-zero.html has no %q row in the expected shape", label)
+		}
+		return m[1:]
+	}
+	hit1, hit5, found := cells("hit@1 / 100"), cells("hit@5 / 100"), cells("found@50 / 100")
+
+	for _, want := range []string{
+		"hit@1 " + hit1[3] + ", found@50 " + found[3],
+		hit5[2] + " against " + hit5[0] + " at rank five",
+	} {
+		if !strings.Contains(cmp, want) {
+			t.Errorf("compare.html should say %q, from the day-zero table", want)
+		}
+	}
+}

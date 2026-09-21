@@ -11,11 +11,11 @@ import (
 // A peer has two names: the ssh host it was added under, and the name the
 // machine calls itself. Recall lines and `deja last` print the second; doctor
 // printed only the first, so the row about "quicksilver" was headed
-// "vlad@10.0.0.7" and nothing on any surface joined them (#2415).
+// "dev@192.0.2.7" and nothing on any surface joined them (#2415).
 func TestThePeerRowNamesTheMachineToo(t *testing.T) {
 	now := time.Now()
 	p := peers.Peer{
-		Host:     "vlad@10.0.0.7",
+		Host:     "dev@192.0.2.7",
 		Machine:  "quicksilver",
 		LastPull: now.Add(-2 * time.Hour),
 	}
@@ -31,7 +31,7 @@ func TestThePeerRowNamesTheMachineToo(t *testing.T) {
 	}
 
 	// The user part of an ssh target is not part of the name.
-	prefixed := peers.Peer{Host: "vlad@mini", Machine: "mini", LastPull: now.Add(-time.Hour)}
+	prefixed := peers.Peer{Host: "dev@mini", Machine: "mini", LastPull: now.Add(-time.Hour)}
 	if got := peerLine(prefixed, 1, now); strings.Contains(got, "calls itself") {
 		t.Errorf("the row says a name twice: %q", got)
 	}

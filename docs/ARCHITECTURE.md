@@ -157,7 +157,7 @@ A host is matched the way ssh matches it: case-insensitively, but only after the
 
 A run uses the spelling already stored for a host rather than the one typed, for the same reason.
 
-The name a machine calls itself is not the alias you type at it, and an imported session is stamped with the former. A pull learns the pairing and records it on the peer's row, and `deja doctor` then counts what arrived from a machine under either name. A machine only ever pushed to has nothing to learn from, so it counts nothing — which is honest: nothing has arrived from it.
+The name a machine calls itself is its hostname, and an imported session is stamped with it rather than with the alias you type at it. `DEJA_MACHINE` replaces it, for a hostname you would rather not have on every record that leaves. A pull learns the pairing and records it on the peer's row, and `deja doctor` then counts what arrived from a machine under either name. A machine only ever pushed to has nothing to learn from, so it counts nothing — which is honest: nothing has arrived from it.
 
 `deja sync ssh <host>` wraps the same export/import in one command: export to a temp dir, scp the batches, run the remote import (system ssh/scp, remote binary from PATH or `~/.local/bin/deja`).
 

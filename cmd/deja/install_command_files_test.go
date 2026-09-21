@@ -14,7 +14,7 @@ func TestCommandFilesMatchEachHarnessShape(t *testing.T) {
 	// A Windows path is run through as well: it is the shape that broke the
 	// TOML file Gemini used to get, and the markdown ones have to survive it
 	// too.
-	for _, exe := range []string{"/bin/deja", `C:\Users\vlad\deja.exe`} {
+	for _, exe := range []string{"/bin/deja", `C:\Users\dev\deja.exe`} {
 		for _, h := range []string{"opencode", "cursor", "roo", "kilocode"} {
 			r, err := installCommandFile(h, exe, false)
 			if err != nil || r.Path == "" {

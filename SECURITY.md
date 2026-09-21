@@ -32,9 +32,12 @@ Nightly builds are prereleases and are not signed. `deja update` follows
 ## Scope notes
 
 deja-vu reads coding-agent session logs from the local disk and builds a local
-index. It has no network listener; the only network operations are `deja
-update` (fetches releases from GitHub) and `deja sync ssh` (your own SSH
-connection). Reports about secrets surviving redaction in indexed or shared
+index. It has no network listener and no background traffic; network access
+happens only in `deja update` and `deja doctor` (release metadata from GitHub,
+no session data), `deja sync ssh` (your own SSH connection), and `deja embed`
+and hybrid search, which send text to the embedding endpoint you configured —
+normally Ollama or LM Studio on localhost, and off entirely when you configure
+none. Reports about secrets surviving redaction in indexed, embedded or shared
 output are in scope and appreciated.
 
 See the [security model](docs/SECURITY-MODEL.md) for data flows, redaction

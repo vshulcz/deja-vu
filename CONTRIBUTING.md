@@ -6,10 +6,9 @@ Issues labelled [good first issue](https://github.com/vshulcz/deja-vu/labels/goo
 are bounded, and each one names the case it is wrong on, so you can reproduce
 before you change anything.
 
-Every pull request from outside the project so far has been answered the same
-day: 31 merged of 35, median four hours from opening to merge, the slowest 15
-hours, none left waiting. If yours sits longer than that, something went wrong
-on our side — say so in the thread.
+Outside pull requests so far: 45 merged of 50, median 3.5 hours from opening to
+merge, the slowest two days, none left open. If yours sits longer than that,
+something went wrong on our side — say so in the thread.
 
 ## Build and test
 

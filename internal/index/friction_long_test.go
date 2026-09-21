@@ -14,7 +14,7 @@ func TestALongErrorIsStillAWall(t *testing.T) {
 	walls := []string{
 		`/Users/someone/code/service/internal/handler/orders.go:118:24: undefined: repository.FindOrderByExternalReference in the orders package`,
 		`docker: Error response from daemon: pull access denied for registry.example.internal/team/service, repository does not exist or may require authorisation`,
-		`psql: error: connection to server at "db.internal.example.com" (10.42.0.7), port 5432 failed: Connection refused — is the server running there?`,
+		`psql: error: connection to server at "db.internal.example.com" (198.51.100.7), port 5432 failed: Connection refused — is the server running there?`,
 	}
 	for _, l := range walls {
 		// Longer than the bound these were dropped by, so each case still

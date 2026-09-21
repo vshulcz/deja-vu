@@ -36,7 +36,7 @@ func TestHookStatusLinesAreTheHosts(t *testing.T) {
 	}
 	no := []string{
 		"the changelog says: nothing about hooks, so where is it documented?",
-		"Vlad says: ship it without the retry",
+		"Dana says: ship it without the retry",
 		"Codex says: the lock is held by the daemon, is that right?",
 		"Says who? the test passes locally",
 	}

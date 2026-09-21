@@ -278,11 +278,11 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 }
 
 // The two npm pages count what a plugin brings its host: every harness except
-// the host itself. Between them they are installed a couple of thousand times a
-// week — more people than the site sees — and both were describing nineteen
-// agents months after there were twenty, because the count was written relative
-// to whatever the sentence had just listed ("and ten more") and nothing could
-// check that against anything.
+// the host itself. Both were describing nineteen agents months after there were
+// twenty, because the count was written relative to whatever the sentence had
+// just listed ("and ten more") and nothing could check that against anything.
+// These pages are read where the plugin is installed rather than on the site,
+// so nothing else would have caught it.
 func TestPluginPagesCountTheOtherHarnesses(t *testing.T) {
 	root := filepath.Join("..", "..")
 	want, words := harnessCountWords(t, root, -1)

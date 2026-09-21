@@ -145,8 +145,8 @@ const volatileDigits = 4
 
 // maskIPv4 replaces a dotted quad with a placeholder. The digit-run rule below
 // cannot reach it: an octet is one to three digits, which is the length an exit
-// code has, so `10.0.0.7` and `10.0.0.9` would stay two different walls for one
-// service being unreachable (#2369).
+// code has, so `192.0.2.7` and `192.0.2.9` would stay two different walls for
+// one service being unreachable (#2369).
 func maskIPv4(l string) string {
 	var b strings.Builder
 	b.Grow(len(l))
@@ -217,7 +217,7 @@ func maskFilePosition(l string) string {
 
 // maskVolatileNumbers replaces long digit runs with a placeholder, so one
 // failure is one wall across the numbers a machine hands out: a port, a pid, an
-// epoch, a goroutine id. Without it `dial tcp 10.0.0.7:5432: connect:
+// epoch, a goroutine id. Without it `dial tcp 192.0.2.7:5432: connect:
 // connection refused` and the same failure on another port are two signatures
 // — one wall each, below the three-session floor `deja friction` needs, below
 // the second sighting a fix pair needs, and invisible to search's error tier,
