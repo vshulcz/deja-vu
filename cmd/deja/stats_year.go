@@ -21,9 +21,9 @@ import (
 // `deja stats --year` is the twelve months of somebody's own work with agents,
 // in one screen (#578).
 //
-// Counts describe a store; this describes a person's year, and deja is the
-// only place that material exists in one piece because it spans every harness
-// they used. Two rules it has to keep:
+// Counts describe a store; this describes a person's year, across every
+// harness on the machine rather than one report per tool. Two rules it has to
+// keep:
 //
 //   - Every number says the arithmetic that produced it, the way `--impact`
 //     does. "7% redone" is a figure that falls apart under the first question;
