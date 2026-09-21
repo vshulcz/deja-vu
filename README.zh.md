@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img src="assets/logo.svg" width="330" alt="deja-vu">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
   </picture>
 </p>
 
@@ -10,7 +10,7 @@
 <p align="center">你的智能体正准备重新调试一个你三月份就修好的问题——当时是在另一个智能体里修的。deja 索引 Claude Code、Codex、Cursor
 以及这台机器上其他所有智能体本来就写在磁盘上的会话，无论哪个智能体来问，都把对的那一条交回来。</p>
 
-<p align="center"><img src="assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
 
 <p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。每一行都引自两个真实会话。</em></sub></p>
 
@@ -108,7 +108,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 
 `deja stats --card` 直接画在终端里；给它一个文件名，它会写出一张 SVG，可以放进个人主页的 README。要发到别处，就把它[转成 PNG](https://vshulcz.github.io/deja-vu/card/)——那个页面在你自己的浏览器里完成转换。
 
-<p align="center"><img src="docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 统计卡片：一年的会话热力图、它们来自哪些智能体、以及最长的一次"></p>
 
 完整的功能参考在[文档站](https://vshulcz.github.io/deja-vu/)。
 
