@@ -8,6 +8,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/query"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -470,6 +471,19 @@ func Text(s string) (string, Counts) {
 	if strings.Contains(s, "AKIA") || strings.Contains(s, "ASIA") {
 		s = replaceWhole(s, awsAccessKeyRE, "aws-access-key", counts)
 	}
+	// Before the assignment rules, not after them. A provider prefix says what
+	// a value is; sitting next to `token=` only says that something was
+	// assigned, and the generic rule got there first — so the commonest way a
+	// key appears, `GITHUB_TOKEN=ghp_…`, was masked as `credential`. Measured
+	// over the 54,269 windows holding a provider prefix in one machine's
+	// transcripts: `credential` fell from 171 to 49 and `bearer-token` from 32
+	// to 20, while openai-key rose 137→189, github-token 87→123,
+	// anthropic-key 16→36 and stripe-key 22→34. The same values are masked
+	// either way; this is about being able to tell someone which key leaked
+	// (#536).
+	if containsAnyFold(s, providerHints) {
+		s = replaceProvider(s, counts)
+	}
 	// The gate has to admit every spelling the pattern accepts, and it did not:
 	// `api_key "…"` and `apikey "…"` were masked while `api-key "…"`,
 	// `API-KEY: "…"` and `x-api-key: "…"` went through in the clear, because
@@ -593,9 +607,6 @@ func Text(s string) (string, Counts) {
 	}
 	if strings.Contains(lower, "cookie:") {
 		s = replaceGroup(s, cookieRE, 1, "cookie", counts, nil)
-	}
-	if containsAnyFold(s, providerHints) {
-		s = replaceProvider(s, counts)
 	}
 	s = redactEntropy(s, counts)
 	return s, counts
@@ -730,6 +741,36 @@ func closingQuote(open, close string) string {
 // how much of a document was already scrubbed at index time, since a later
 // pass over redacted text finds nothing left to replace.
 const Marker = "[redacted:"
+
+// kinds is every rule name this package writes into a marker.
+//
+// A reader needs the list because text can hold something that only looks like
+// a marker: deja's own documentation of the format, a test fixture, a message
+// quoting an earlier answer. Counting those as redactions invented rules
+// called `<kind>` and `…` on a real store (#536).
+var kinds = map[string]bool{
+	"anthropic-key": true, "aws-access-key": true, "aws-key": true, "aws-secret": true,
+	"bearer-token": true, "command-password": true, "cookie": true, "credential": true,
+	"entropy": true, "github-token": true, "gitlab-token": true, "google-api-key": true,
+	"groq-key": true, "huggingface-token": true, "jwt": true, "npm-token": true,
+	"openai-key": true, "password": true, "private-key": true, "provider-token": true,
+	"quoted-secret": true, "slack-token": true, "stripe-key": true, "url-credentials": true,
+	"xai-key": true,
+}
+
+// IsKind reports whether a name is a rule this package can write, so a caller
+// reading markers back out of text can tell one from a mention of the format.
+func IsKind(name string) bool { return kinds[name] }
+
+// Kinds lists those rule names.
+func Kinds() []string {
+	out := make([]string, 0, len(kinds))
+	for k := range kinds {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 const (
 	entropyMinBits       = 4.5

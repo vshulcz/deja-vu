@@ -49,7 +49,7 @@ func TestScoopManifest(t *testing.T) {
 	if !semverRE.MatchString(manifest.Version) {
 		t.Errorf("version = %q, want stable semantic version", manifest.Version)
 	}
-	if manifest.Description == "" || manifest.Homepage != "https://github.com/vshulcz/deja-vu" || manifest.License != "MIT" {
+	if manifest.Description == "" || manifest.Homepage != "https://vshulcz.github.io/deja-vu/" || manifest.License != "MIT" {
 		t.Error("description, homepage, or license is missing")
 	}
 	if manifest.Bin != "deja.exe" || manifest.Checkver != "github" {

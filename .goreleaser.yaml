@@ -147,7 +147,7 @@ brews:
       name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: https://github.com/vshulcz/deja-vu
+    homepage: https://vshulcz.github.io/deja-vu/
     # What people type into `brew search`, which matches names and
     # descriptions: the old line said neither the agents nor the thing it
     # searches, so `brew search claude` and `brew search session history`

@@ -297,7 +297,15 @@ import (
 // writes Copilot CLI, Cursor and Kimi dropped: each counted its replace tool as
 // an edit and its write tool as a path only, so a file created wholesale left
 // nothing to attribute from.
-const version = 52
+// 53 labels a provider key by its provider even when it arrives as the value
+// of an assignment, which is how a key actually appears. The provider pass ran
+// after the generic key-value rules, so `GITHUB_TOKEN=ghp_…` was masked as
+// `credential` and deja could say a session had pasted something but not what.
+// Measured over the 54,269 windows holding a provider prefix in one machine's
+// transcripts: `credential` 171→49, openai-key 137→189, github-token 87→123.
+// The same values were masked before and after; a store built before this
+// keeps the old labels until it re-reads its sources (#536).
+const version = 53
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
