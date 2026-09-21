@@ -625,6 +625,48 @@ rule emptied the store, and a script cannot branch on prose.
 
 `last` is omitted rather than zero-valued when a row carries no recorded time.
 
+## `deja recap --json`
+
+What the window settled, one entry per session, newest first:
+
+```json
+{
+  "kind": "deja.recap",
+  "schema_version": 2,
+  "since": "7d",
+  "sessions_in_window": 28,
+  "sessions_with_lines": 15,
+  "projects": ["goprojects/api", "goprojects/net"],
+  "sessions": [
+    {
+      "harness": "claude",
+      "id": "8a41c2f0-1d2e-4c3b-9f77-0a1b2c3d4e5f",
+      "project": "goprojects/net",
+      "when": "2026-09-20T21:14:03Z",
+      "lines": [
+        "root cause: the default route moved to a new gateway while the source address stayed on the old subnet"
+      ]
+    }
+  ],
+  "masked": { "ip": 2, "home-path": 2 }
+}
+```
+
+Every line is a sentence from the session, trimmed but never rewritten, and
+`sessions_in_window` against `sessions_with_lines` is the honest part: a week of
+28 sessions where 15 concluded something is not a week of 15.
+
+`masked` is the second redaction pass, and it is not optional. The index masks
+what looks like a credential, which is the right bar for a local store and the
+wrong one for text going into a PR description — so a recap also removes IP
+addresses (except loopback and the RFC 5737 documentation ranges), internal
+hostnames (`.local`, `.internal`, `.svc` and friends), email addresses, and the
+account name in a home path, which becomes `~`. Public hostnames, ports,
+repository and branch names are left alone: a rule that fired on every dotted
+name would mask half the import paths in a week's work.
+
+`withheld` is present when the ignore rule kept sessions out of the window.
+
 ## `deja fix <error> --json`
 
 The commands sessions on this machine ran after that error:

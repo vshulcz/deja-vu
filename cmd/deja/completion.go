@@ -54,7 +54,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]-}"
     action="${COMP_WORDS[2]-}"
 
-    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip"
+    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote recap remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip"
     local harnesses="%HARNESSES%"
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
@@ -176,6 +176,7 @@ _deja() {
     'files:which files the work on a topic touched'
     'fix:what was run after this error before'
     'friction:errors this machine keeps hitting across sessions'
+    'recap:what the last week settled, with receipts'
     'how:commands this machine actually ran for a thing'
     'doctor:diagnose local stores and wiring'
     'promote:distill a session into a curated note'
@@ -289,7 +290,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip'
+complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote recap remember restore resume search share show sources stats statusline sync uninstall update version view warmup wip'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
@@ -368,7 +369,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
     $commands = @(
         'blame', 'bench', 'brief', 'check', 'completion', 'ctx', 'doctor', 'embed',
         'files', 'fix', 'forget', 'friction', 'handoff', 'help', 'how',
-        'index', 'install', 'last', 'log', 'mcp', 'promote', 'remember',
+        'index', 'install', 'last', 'log', 'mcp', 'promote', 'recap', 'remember',
         'restore', 'resume', 'search', 'share', 'show', 'sources', 'stats',
         'statusline', 'sync', 'uninstall', 'update', 'version', 'view', 'warmup', 'wip'
     )
