@@ -13,9 +13,9 @@ already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
 
-<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Every line is quoted from two real sessions.</em></sub></p>
+<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Two genuine runs, a real model and a real tool call, against a synthetic corpus: nobody's history is published.</em></sub></p>
 
-<p align="center"><b>Every memory tool starts empty and records forward. deja starts full.</b></p>
+<p align="center"><b>deja starts full: the history 34 agents already wrote, indexed in seconds, with no model and no capture step.</b></p>
 
 <p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
 before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as

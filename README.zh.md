@@ -12,9 +12,9 @@
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
 
-<p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。每一行都引自两个真实会话。</em></sub></p>
+<p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
 
-<p align="center"><b>其他记忆工具都从空白开始，往后记录。deja 一开始就是满的。</b></p>
+<p align="center"><b>deja 一开始就是满的：34 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <p align="center">
 LongMemEval-S 上 <b>85.3% hit@1</b> &middot; LoCoMo 上 <b>69.7%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
