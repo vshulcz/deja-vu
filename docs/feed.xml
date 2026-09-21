@@ -6,10 +6,87 @@
   <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
   <link rel="self" type="application/atom+xml" href="https://vshulcz.github.io/deja-vu/feed.xml"></link>
   <link rel="hub" href="https://pubsubhubbub.appspot.com/"></link>
-  <updated>2026-09-21T00:00:00Z</updated>
+  <updated>2026-09-22T00:00:00Z</updated>
   <author>
     <name>vshulcz</name>
   </author>
+  <entry>
+    <title>Claude Code 记得之前的对话吗？ — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>Claude Code、Codex、Cursor、Gemini CLI 都不会跨会话记忆。这篇讲清楚每个工具在磁盘上留下了什么、压缩到底保住了多少，以及把历史找回来的三种办法。</summary>
+  </entry>
+  <entry>
+    <title>找回解决问题的那次会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>怎么在整台机器的所有智能体里同时搜聊天记录：按你记得的那个词搜，而不是按你记不清的话题搜，然后用会话 id 继续那次对话。</summary>
+  </entry>
+  <entry>
+    <title>为什么智能体在会话之间会忘事 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>会话结束时上下文窗口被丢弃，但会话记录还在磁盘上。这篇讲压缩到底保住了什么、丢掉了什么，以及为什么直接 grep 日志代价高得多。</summary>
+  </entry>
+  <entry>
+    <title>deja 快速开始：让编程智能体能搜自己的会话历史 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>安装 deja、确认它认出了哪些工具、在 Claude Code 与 Codex 的历史里搜索，并把自动召回接到智能体上。索引与搜索不走网络，也不需要账号。</summary>
+  </entry>
+  <entry>
+    <title>给 DeepSeek Harness 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>如何让 dsh 能查到这台机器上每个编程智能体已经写下的会话记录：插件怎么装、装完多了哪些工具，以及它和 CLI 安装并存时的行为。</summary>
+  </entry>
+  <entry>
+    <title>给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。</summary>
+  </entry>
+  <entry>
+    <title>给 Qwen Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>如何让 Qwen Code 查到这台机器上每个编程智能体的会话：走 Gemini 扩展格式，也走 Claude 格式的插件市场。</summary>
+  </entry>
+  <entry>
+    <title>隐私：索引什么、脱敏什么、什么都不外传 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。</summary>
+  </entry>
+  <entry>
+    <title>怎么找回被删掉的 Claude Code 会话 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>claude --resume 里找不到那次会话：文件去了哪里，四种原因里有三种并不是删除，以及真正还能找回的是什么。</summary>
+  </entry>
+  <entry>
+    <title>怎么删 Claude Code 的会话文件 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>Claude Code 的会话记录在 ~/.claude/projects 下：怎么删一个、删一个项目、全删，cleanupPeriodDays 会自动删掉什么，以及删掉之后失去什么。</summary>
+  </entry>
+  <entry>
+    <title>每个编程智能体把会话历史存在哪里 — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html"></link>
+    <updated>2026-09-22T00:00:00Z</updated>
+    <summary>三十四个编程智能体各自把会话记录写在磁盘的哪个位置、用的是什么格式，以及怎么自己读它们。表格来自 deja 解析器所依据的同一份格式登记表。</summary>
+  </entry>
   <entry>
     <title>deja-vu — the one memory your coding agents share</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
@@ -212,82 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-claude-code.html"></link>
     <updated>2026-09-21T00:00:00Z</updated>
     <summary>How to give Claude Code recall over every coding agent&#39;s sessions on this machine — the MCP server, the SessionStart hook and the plugin marketplace.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Cline: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Cline&#39;s hooks cannot carry context, so deja arrives as a plugin: a rule resolved as instructions are built, a message builder, and a /deja command.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to CodeWhale: search old sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>CodeWhale keeps one JSON file per session and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Codex CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give Codex CLI recall over every coding agent&#39;s sessions on this machine — the MCP server, the hook it has to approve, and the plugin marketplace.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Command Code: past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Command Code logs a session per project and starts each one cold. deja wires its MCP server, hooks, skill and command, and indexes every agent here.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Continue: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to VS Code Copilot Chat — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give VS Code Copilot Chat recall over every agent&#39;s sessions on the machine, the mcp.json shape VS Code actually reads, and the hook it lacks.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Copilot CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give GitHub Copilot CLI recall over every coding agent&#39;s sessions on this machine — where its events live, and the MCP entry it needs.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Crush: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Cursor: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give Cursor recall over every coding agent&#39;s sessions on this machine — where its SQLite chat store lives, and what deja install cursor-auto writes.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Gemini CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html"></link>
-    <updated>2026-09-21T00:00:00Z</updated>
-    <summary>How to give Gemini CLI recall over every coding agent&#39;s sessions on this machine — one extension install, and what the CLI install adds on top.</summary>
   </entry>
 </feed>

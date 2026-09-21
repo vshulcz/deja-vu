@@ -58,10 +58,16 @@ func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 	root := filepath.Join("..", "..")
 	// Three ways the same promise gets written. "nothing is sent anywhere" was
 	// the one that slipped past a rule written for "leaves the machine" only.
+	// The fourth shape is the shortest and outlived the others: "fully local",
+	// which said the whole program where the sentence above it said one path.
+	// It sat in the page footer on 103 pages and in the Chinese footer on 11,
+	// where nobody re-reads anything.
 	claim := regexp.MustCompile(`(?i)(nothing|nothing else|no data) (ever )?` +
 		`(leaves (your|the|this) (machine|laptop|computer)` +
 		`|is (ever )?(sent|uploaded)( anywhere| to anyone)?` +
-		`|gets (sent|uploaded))`)
+		`|gets (sent|uploaded))` +
+		`|(?i)(fully|entirely|completely|100%) local` +
+		`|全部在本地|完全本地`)
 	// What makes the sentence true: a stated exception, or a subject narrow
 	// enough to be accurate on its own.
 	scopes := []string{

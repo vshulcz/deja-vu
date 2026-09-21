@@ -83,17 +83,17 @@
   <url><loc>https://vshulcz.github.io/deja-vu/registry/deepseek.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/omp.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/prime.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/getting-started.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/does-my-agent-remember.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/forgetting.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/card/</loc><lastmod>2026-09-21</lastmod><changefreq>yearly</changefreq><priority>0.5</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/amp.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/copilot-chat.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/continue.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/crush.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
@@ -110,10 +110,10 @@
   <url><loc>https://vshulcz.github.io/deja-vu/registry/senpi.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/zcode.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/gjc.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</loc><lastmod>2026-09-20</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</loc><lastmod>2026-09-19</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/privacy.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html</loc><lastmod>2026-09-22</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://vshulcz.github.io/deja-vu/registry/codewhale.html</loc><lastmod>2026-09-21</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
 </urlset>
