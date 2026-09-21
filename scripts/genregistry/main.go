@@ -18,9 +18,12 @@ import (
 	"html"
 	"html/template"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 const site = "https://vshulcz.github.io/deja-vu"
@@ -52,15 +55,12 @@ func run() error {
 		return err
 	}
 	name := map[string]string{}
-	verified := map[string]string{}
 	for _, h := range reg.Harnesses {
 		name[h.ID] = h.DisplayName
-		verified[h.ID] = h.LastVerified
 	}
 	// One page is filed under a different name than its registry entry.
 	// Everything else matches, and the check below keeps it that way.
 	name["claude-code"] = name["claude"]
-	verified["claude-code"] = verified["claude"]
 
 	paths, err := filepath.Glob(filepath.Join("docs", "registry", "*.md"))
 	if err != nil {
@@ -113,7 +113,7 @@ func run() error {
 		}
 		written = append(written, "registry/"+id+".html")
 	}
-	if err := writeSitemap(written, verified); err != nil {
+	if err := writeSitemap(written); err != nil {
 		return err
 	}
 	fmt.Printf("wrote %d registry pages and the sitemap\n", len(written))
@@ -295,10 +295,14 @@ func render(m meta, body string, others []link) string {
 	return b.String()
 }
 
-// writeSitemap adds the registry pages to the sitemap, keeping every entry
-// already in it as it stands. The lastmod and priority on the existing pages
-// are hand-set; regenerating the file would quietly drop them.
-func writeSitemap(registryPages []string, verified map[string]string) error {
+// writeSitemap adds the registry pages to the sitemap and brings every entry's
+// lastmod up to the day its file last changed. The loc, changefreq and priority
+// already in the file stay as they stand — those are hand-set.
+//
+// A crawler reads lastmod as the day the page changed and schedules the next
+// fetch from it, so the date has to follow the file rather than the day the
+// entry was written.
+func writeSitemap(registryPages []string) error {
 	path := filepath.Join("docs", "sitemap.xml")
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -313,22 +317,77 @@ func writeSitemap(registryPages []string, verified map[string]string) error {
 		}
 		// A format page changes when the harness changes its files, which is
 		// rare and unannounced; monthly is what the guide pages use. The date
-		// is the registry's own last_verified — the day someone last checked
-		// that page against a real store, which is what lastmod means.
-		id := strings.TrimSuffix(strings.TrimPrefix(p, "registry/"), ".html")
-		lastmod := ""
-		if d := verified[id]; d != "" {
-			lastmod = "<lastmod>" + d + "</lastmod>"
+		// is filled in below, from the page itself.
+		add.WriteString("  <url><loc>" + loc + "</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>\n")
+	}
+	if add.Len() > 0 {
+		const closing = "</urlset>"
+		i := strings.LastIndex(text, closing)
+		if i < 0 {
+			return fmt.Errorf("docs/sitemap.xml has no %s", closing)
 		}
-		add.WriteString("  <url><loc>" + loc + "</loc>" + lastmod + "<changefreq>monthly</changefreq><priority>0.6</priority></url>\n")
+		text = text[:i] + add.String() + text[i:]
 	}
-	if add.Len() == 0 {
-		return nil
+	text, err = refreshLastmod(text)
+	if err != nil {
+		return err
 	}
-	const close = "</urlset>"
-	i := strings.LastIndex(text, close)
-	if i < 0 {
-		return fmt.Errorf("docs/sitemap.xml has no %s", close)
+	return os.WriteFile(path, []byte(text), 0o644)
+}
+
+var locRe = regexp.MustCompile(`<loc>` + regexp.QuoteMeta(site) + `/([^<]*)</loc>(?:<lastmod>[^<]*</lastmod>)?`)
+
+// refreshLastmod rewrites each entry's lastmod from the day its file last
+// changed. An entry whose file is not there is left alone: the page may be
+// served from somewhere this generator cannot see, and dropping the date is
+// worse than leaving the one a person put in.
+func refreshLastmod(text string) (string, error) {
+	var first error
+	out := locRe.ReplaceAllStringFunc(text, func(m string) string {
+		loc := locRe.FindStringSubmatch(m)[1]
+		day, err := lastChanged(sitemapFile(loc))
+		if err != nil {
+			if first == nil {
+				first = err
+			}
+			return m
+		}
+		if day == "" {
+			return m
+		}
+		return "<loc>" + site + "/" + loc + "</loc><lastmod>" + day + "</lastmod>"
+	})
+	return out, first
+}
+
+// sitemapFile maps a sitemap path to the file docs/ serves for it, with the
+// slashes git wants in a pathspec on every platform. The site root and a
+// directory URL both come from an index.html.
+func sitemapFile(loc string) string {
+	if loc == "" || strings.HasSuffix(loc, "/") {
+		loc += "index.html"
 	}
-	return os.WriteFile(path, []byte(text[:i]+add.String()+text[i:]), 0o644)
+	return "docs/" + loc
+}
+
+// lastChanged is the author date of the last commit that touched the file, or
+// today when the file has edits that are not committed yet: the commit that
+// will carry them does not exist, and the alternative is to publish the date of
+// the change before this one.
+func lastChanged(file string) (string, error) {
+	if _, err := os.Stat(filepath.FromSlash(file)); err != nil {
+		return "", nil
+	}
+	dirty, err := exec.Command("git", "status", "--porcelain", "--", file).Output()
+	if err != nil {
+		return "", fmt.Errorf("git status %s: %w", file, err)
+	}
+	if len(strings.TrimSpace(string(dirty))) > 0 {
+		return time.Now().UTC().Format("2006-01-02"), nil
+	}
+	out, err := exec.Command("git", "log", "-1", "--format=%as", "--", file).Output()
+	if err != nil {
+		return "", fmt.Errorf("git log %s: %w", file, err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }

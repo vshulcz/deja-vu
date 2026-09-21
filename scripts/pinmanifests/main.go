@@ -223,7 +223,7 @@ func renderScoop(p pins) ([]byte, error) {
 	m := scoopManifest{
 		Version:     p.version,
 		Description: "Search Claude Code, Codex and Cursor session history locally",
-		Homepage:    "https://github.com/vshulcz/deja-vu",
+		Homepage:    "https://vshulcz.github.io/deja-vu/",
 		License:     "MIT",
 		Architecture: map[string]scoopArch{
 			"64bit": {

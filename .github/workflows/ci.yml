@@ -422,6 +422,23 @@ jobs:
           git fetch --no-tags origin "${{ github.event.pull_request.base.ref }}"
           go run ./scripts/staleoverlap -base "origin/${{ github.event.pull_request.base.ref }}" -head HEAD
 
+  sitemap:
+    name: sitemap dates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # The check reads the commit that last touched each page. The test
+          # matrix clones sixty deep, where a page older than that looks
+          # untouched and the check passes by seeing nothing.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Sitemap lastmod follows the pages
+        run: go test ./cmd/deja -run TestSitemapLastmodFollowsThePages -count 1
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

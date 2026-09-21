@@ -1,7 +1,7 @@
 {
     "version": "0.20.2",
     "description": "Search Claude Code, Codex and Cursor session history locally",
-    "homepage": "https://github.com/vshulcz/deja-vu",
+    "homepage": "https://vshulcz.github.io/deja-vu/",
     "license": "MIT",
     "architecture": {
         "64bit": {
