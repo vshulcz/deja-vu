@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to Kimchi Coding: past sessions — deja-vu</title>
+<meta name="description" content="Kimchi keeps a session log per directory and reads none of it back. deja wires its MCP server, and its Claude-compatible extensions pick up the rest.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to Kimchi Coding: past sessions">
+<meta property="og:description" content="Kimchi keeps a session log per directory and reads none of it back. deja wires its MCP server, and its Claude-compatible extensions pick up the rest.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to Kimchi Coding: past sessions">
+<meta name="twitter:description" content="Kimchi keeps a session log per directory and reads none of it back. deja wires its MCP server, and its Claude-compatible extensions pick up the rest.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Kimchi Coding", "description": "Kimchi Coding keeps a session log per working directory and reads none of it back. deja wires its MCP server and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-09-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Kimchi Coding", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Kimchi Coding remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps a JSONL log per working directory under ~/.config/kimchi/harness/sessions and can resume one, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine and gives the model a tool to search them."}}, {"@type": "Question", "name": "How do I add memory to Kimchi Coding?", "acceptedAnswer": {"@type": "Answer", "text": "deja install kimchi writes the MCP server to the agent directory's mcp.json and installs the shared skill. For recall without asking, enable Kimchi's compatibility extensions: kimchi resources enable extensions.claude-code-hook-adapter picks up the hooks deja install claude writes, and extensions.claude-code-skills picks up the skill."}}, {"@type": "Question", "name": "Can Kimchi see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of thirty-four agents on the same machine, including sessions from before deja was installed, so a fix found in Claude Code answers a question asked in Kimchi."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a><div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="session-files-on-disk.html">Session files on disk</a>
+<a href="delete-codex-sessions.html">Delete Codex sessions</a>
+<a href="delete-cursor-chat-history.html">Delete Cursor chat history</a>
+<a href="delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="delete-gemini-cli-history.html">Delete Gemini CLI chat history</a>
+<a href="delete-opencode-session-history.html">Delete opencode session history</a>
+<a href="delete-kilo-code-task-history.html">Delete Kilo Code task history</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">34</span></summary>
+<a href="memory-for-opencode.html">Memory for opencode</a>
+<a href="memory-for-dsh.html">Memory for dsh</a>
+<a href="memory-for-kimi.html">Memory for Kimi Code</a>
+<a href="memory-for-zed.html">Memory for Zed</a>
+<a href="memory-for-grok.html">Memory for Grok Build</a>
+<a href="memory-for-gemini.html">Memory for Gemini CLI</a>
+<a href="memory-for-qwen.html">Memory for Qwen Code</a>
+<a href="memory-for-claude-code.html">Memory for Claude Code</a>
+<a href="memory-for-codex.html">Memory for Codex</a>
+<a href="memory-for-cursor.html">Memory for Cursor</a>
+<a href="memory-for-copilot.html">Memory for Copilot CLI</a>
+<a href="memory-for-copilot-chat.html">Memory for VS Code Copilot Chat</a>
+<a href="memory-for-openclaw.html">Memory for OpenClaw</a>
+<a href="memory-for-goose.html">Memory for Goose</a>
+<a href="memory-for-cline.html">Memory for Cline</a>
+<a href="memory-for-pi.html">Memory for pi</a>
+<a href="memory-for-amp.html">Memory for Amp</a>
+<a href="memory-for-roo.html">Memory for Roo Code</a>
+<a href="memory-for-prime.html">Memory for prime-agent</a>
+<a href="memory-for-continue.html">Memory for Continue</a>
+<a href="memory-for-crush.html">Memory for Crush</a>
+<a href="memory-for-hermes.html">Memory for Hermes</a>
+<a href="memory-for-kiro.html">Memory for Kiro</a>
+<a href="memory-for-kilocode.html">Memory for Kilo Code</a>
+<a href="memory-for-cherrystudio.html">Memory for Cherry Studio</a>
+<a href="memory-for-aider.html">Memory for aider</a>
+<a href="memory-for-antigravity.html">Memory for Antigravity</a>
+<a href="memory-for-codewhale.html">Memory for CodeWhale</a>
+<a href="memory-for-commandcode.html">Memory for Command Code</a>
+<a href="memory-for-gjc.html">Memory for gajae-code</a>
+<a href="memory-for-kimchi.html" aria-current="page">Memory for Kimchi Coding</a>
+<a href="memory-for-omp.html">Memory for omp</a>
+<a href="memory-for-senpi.html">Memory for Senpi</a>
+<a href="memory-for-zcode.html">Memory for ZCode</a>
+</details>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="token-cost.html">What memory costs</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Kimchi Coding</h1>
+<p class="pagelede">a pi descendant that kept pi's transcript and pi's wiring<span class="mins" data-mins></span></p>
+
+<p>Kimchi Coding is a pi descendant, and it kept pi's transcript as well as pi's wiring: a JSONL log per working directory under <code>${KIMCHI_CODING_AGENT_DIR:-~/.config/kimchi/harness}/sessions/</code>, with the directory encoded into the folder name between double dashes. It can resume one of those; a new session reads none of the others, and none of them knows what you did in Claude Code or Codex in the same repo. This page is about adding that.</p>
+
+<h2>What Kimchi already has</h2>
+<p>The session logs, resumption by session, and two compatibility extensions that read Claude Code's surfaces — both shipped disabled, which is the whole story of this page.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install kimchi</pre>
+<p>Two files, reversible with <code>deja uninstall kimchi</code>: the MCP server in the agent directory's <code>mcp.json</code> — the path read out of Kimchi's <code>mcp-adapter</code> config rather than assumed from the lineage, and it honours <code>$KIMCHI_CODING_AGENT_DIR</code> the same way the reader does — and the shared skill under <code>~/.agents/skills/</code>.</p>
+<p>The rest is a switch that is yours to throw, which is why deja prints it instead of claiming auto-recall:</p>
+<pre>kimchi resources enable extensions.claude-code-hook-adapter
+kimchi resources enable extensions.claude-code-skills</pre>
+<p>The first picks up the hooks <code>deja install claude</code> writes, so the digest arrives at session start and a failing command gets answered where it failed. The second loads <code>~/.claude/skills</code>, where deja already writes; in Kimchi a skill is also the command, since that extension contributes skills through resource discovery and <code>/skill:&lt;name&gt;</code> comes with it. Neither is a second file to install — both are the same two lines above.</p>
+<p><code>deja doctor</code> prints <code>guidance unsupported</code> on the Kimchi row. That is this: there is no guidance file of Kimchi's own to write, so the tool descriptions and the Claude-shaped skill are what the model gets.</p>
+
+<h2>What arrives</h2>
+<p>With the server alone: what the model asks for, through the tool. With the hook adapter enabled: a short digest of the project's history at session start, and the fix beside a failing command. An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+
+<h2>The part that is not about Kimchi Coding</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-four of them, each in its own format — so a fix found in Claude Code answers a question asked in Kimchi Coding, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/kimchi.html">The Kimchi Coding session format</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a> — it helps other developers find it.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and fully local. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

@@ -39,6 +39,15 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html
 https://vshulcz.github.io/deja-vu/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/guide/context-window-full.html
 https://vshulcz.github.io/deja-vu/guide/resume-a-session.html

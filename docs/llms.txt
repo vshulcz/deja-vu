@@ -65,9 +65,18 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html)
 - [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html)
 - [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html)
-- [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html)
+- [pi](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html)
+- [omp (Oh My Pi)](https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html)
 - [Amp](https://vshulcz.github.io/deja-vu/guide/memory-for-amp.html): plugin API modelled on pi's, plus MCP
 - [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+- [aider](https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html): no MCP and no hooks, recall through the read-only context file
+- [Antigravity](https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html)
+- [Senpi](https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html)
+- [Kimchi Coding](https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html)
+- [gajae-code](https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html)
+- [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html)
+- [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html)
+- [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html): read-only, nothing to install yet
 
 ## Evidence
 

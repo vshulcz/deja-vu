@@ -661,7 +661,7 @@ func TestMoreErrorBranches(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	if out, err := captureRun(t, "install", "--auto"); err != nil || !strings.Contains(out, "no known agent") {
+	if out, err := captureRun(t, "install", "--auto"); err != nil || !strings.Contains(out, "no agent config found") {
 		t.Fatalf("install --auto none out=%q err=%v", out, err)
 	}
 	if err := os.WriteFile(filepath.Join(home, ".codex"), []byte("x"), 0o644); err != nil {
