@@ -309,6 +309,24 @@ func TestTheTailOnASmallStoreIsAFifthOfIt(t *testing.T) {
 	}
 }
 
+// A LoCoMo conversation holds nineteen sessions, and two of them do. Under the
+// old floor of twenty those 302 questions got the strict answer alone, so the
+// session that answered was never returned at all.
+func TestAStoreOfNineteenSessionsGetsATail(t *testing.T) {
+	dir := seedStore(t, 17) // plus the two named sessions
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many bikes do I own", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range r.Sessions {
+		if s.ID == "answer" {
+			return
+		}
+	}
+	t.Fatalf("the session that answers the question never came back: %v", sessionIDs(r.Sessions))
+}
+
 // Below the floor the tail stands down: on a handful of sessions the one it
 // would add arrives on filler words, not on the subject.
 func TestBelowTheFloorThereIsNoTail(t *testing.T) {
