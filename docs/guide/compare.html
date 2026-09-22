@@ -173,7 +173,7 @@
 <tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>your DB</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
-<tr><td>Benchmark, harness in repo</td><td class="us">87.2% hit@1 LME-S (470q cleaned) · <a href="benchmarks.html">measured</a> · <a href="day-zero.html">day zero vs four tools</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
+<tr><td>Benchmark, harness in repo</td><td class="us">88.1% hit@1 LME-S (470q cleaned) · <a href="benchmarks.html">measured</a> · <a href="day-zero.html">day zero vs four tools</a></td><td>self-reported</td><td>research lineage</td><td>self-reported</td><td>self-reported</td><td class="n">—</td><td class="n">—</td></tr>
 <tr><td>Install</td><td class="us">one binary</td><td>pip + keys</td><td>docker</td><td>pip / server</td><td>pip</td><td>npm + Claude</td><td>installer + deps</td></tr>
 <tr><td>License</td><td class="us">MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td><td>MIT</td></tr>
 </table>
@@ -196,13 +196,13 @@
 <tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td class="y">no — ships a local model (~300&nbsp;MB)</td><td>yes</td><td>yes</td><td>yes</td></tr>
 <tr><td>Background process</td><td class="us y">none</td><td>none; a vector store backend (ChromaDB by default)</td><td>Postgres + pgvector, or Neo4j</td><td>Neo4j, FalkorDB or Neptune</td><td>Docker service, or embedded</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>semantic, optional keyword and recency boosts, optional LLM rerank</td><td>graph + vector, strategy picked for you</td><td>embeddings + BM25 + graph traversal</td><td>hybrid sparse/dense over memory banks</td></tr>
-<tr><td>Published retrieval numbers</td><td class="us">87.2% hit@1 / 95.5% hit@5 LME-S on the 470-question cleaned set, 86.4% hit@1 on all 500, <a href="benchmarks.html">harness in repo</a></td><td><a href="https://github.com/MemPalace/mempalace/blob/main/README.md#benchmarks" rel="noopener">96.6% R@5 LongMemEval (500q, no LLM); 88.9% R@10 LoCoMo</a></td><td>0.79 on BEAM at 100k tokens</td><td>none in README; a Zep paper reports separately</td><td class="n">—</td></tr>
+<tr><td>Published retrieval numbers</td><td class="us">88.1% hit@1 / 97.4% hit@5 LME-S on the 470-question cleaned set, 87.4% / 97.2% on all 500, LoCoMo 70.6% hit@1 / 94.9% R@10, <a href="benchmarks.html">harness in repo</a></td><td><a href="https://github.com/MemPalace/mempalace/blob/main/README.md#benchmarks" rel="noopener">96.6% R@5 LongMemEval (500q, no LLM); 88.9% R@10 LoCoMo</a></td><td>0.79 on BEAM at 100k tokens</td><td>none in README; a Zep paper reports separately</td><td class="n">—</td></tr>
 <tr><td>Install</td><td class="us">one binary</td><td><code>uv tool install</code></td><td><code>uv pip install</code> + a database</td><td>pip + a graph database</td><td>docker</td></tr>
 <tr><td>License</td><td class="us">MIT</td><td>MIT</td><td>Apache-2.0</td><td>Apache-2.0</td><td>MIT</td></tr>
 </table>
 </div>
 
-<div class="note">On that benchmark row, plainly: <b>MemPalace publishes a higher LongMemEval number than we do</b> — 96.6% R@5 against our 95.4% hit@5 on the same 500-question set. The metrics are defined slightly differently and neither of us has rerun the other's harness, so treat the gap as unresolved rather than as either of us winning. What we can say about our own is that the harness is in this repo and you can run it.</div>
+<div class="note">On that benchmark row: MemPalace publishes <b>96.6% R@5</b> on LongMemEval (500 questions, semantic search, no LLM) and <b>88.9% R@10</b> on LoCoMo. Our harness scores 97.2% hit@5 and 98.6% hit@10 on the same 500 questions, and 94.9% R@10 on LoCoMo. The metrics are defined slightly differently and neither of us has rerun the other's harness, so read those as close rather than settled. What we can say about ours is that it is in this repo and you can run it.</div>
 
 <h2>The other tools that read the same files</h2>
 <p>A second group is closer to deja than any memory system: tools that also read the session files coding agents leave on disk. They are built for a person doing the looking — a window or a terminal you open when you want to find something. Cells are from each project's own README, read on 26 August 2026; the agentsview column, which replaces its archived predecessor agent-session-viewer, on 21 September.</p>
