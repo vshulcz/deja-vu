@@ -8,35 +8,26 @@ import (
 	"time"
 )
 
-// opencode is moving its conversation out of the `message` and `part` tables
-// into one `session_message` table, whose `type` column carries what the role
-// used to be and whose `data` blob carries an assistant turn's parts. The new
-// table is created and empty in the dev build of 2026-09-21; the turns are
-// still in the old pair there, and `select name from sqlite_master` on that
-// build lists both.
+// opencode 2.0 renamed the tables deja reads. Its migration runs `ALTER TABLE
+// session RENAME TO session_v2`, and a session's turns move out of `message`
+// and `part` into one `session_message` table, whose `type` column carries what
+// the role used to be and whose `data` blob carries an assistant turn's parts.
 //
-// Read before the switch is thrown, because of how a store that has moved
-// fails: the old query finds the old tables gone and every read of the harness
-// errors with `no such table: session` (#3924), or finds them present and empty
-// and reports a store with no sessions at all, which nothing would complain
-// about. Both halves are covered by asking where the turns actually are.
+// Both layouts are read, because of how a store that has moved fails: every
+// query finds the old tables gone and the harness errors with `no such table:
+// session` (#3924), or — on a build mid-migration, where the old tables are
+// still there and empty — it reports a store with no sessions at all, which
+// nothing would complain about. Both halves are covered by asking where the
+// turns actually are rather than which tables exist.
 //
-// The store in the report also had the sessions in `session_v2` rather than
-// `session`. No build here writes that name, so it is accepted and not
-// insisted on.
+// Measured against opencode 2.0.12 (`@opencode/cli`) run in a throwaway home:
+// the store has `session_v2`, `session_message`, `session_inbox` and
+// `session_pending`, and no `session`, `message` or `part`.
 
-// opencodeSchemaOf reads which tables a store actually has, and which of them
-// hold the conversation. Measured against the dev build of 2026-09-21: the
-// session table is still `session`, `session_message` is created and empty, and
-// `message`/`part` carry the turns — so the question cannot be "does a table
-// exist". A store where the old tables are still there but empty would read as
-// a store with no sessions, which is the quiet half of #3924.
-//
-// The report that opened the issue had `session_v2` and no `session` at all, so
-// both names are accepted for the sessions themselves.
+// opencodeSchema says where a store keeps its sessions and its turns.
 type opencodeSchema struct {
 	v2           bool   // the conversation is in session_message
-	sessionTable string // session, or session_v2 where a store has that
+	sessionTable string // session_v2 on a 2.0 store, session before it
 }
 
 // opencodeSchemaCache keeps one answer per store file, because the schema is
@@ -46,6 +37,7 @@ type opencodeSchema struct {
 // a long-running process is asked again.
 var opencodeSchemaCache sync.Map
 
+// opencodeSchemaOf answers that question once per store file.
 func opencodeSchemaOf(db string) opencodeSchema {
 	key := db
 	if fi, err := os.Stat(db); err == nil {
