@@ -82,7 +82,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 ## Evidence
 
 - [Building deja into your own tool](https://github.com/vshulcz/deja-vu/blob/main/docs/INTEGRATING.md): the MCP server, the JSON surfaces, the hook commands, what is a contract and what is not, and how to isolate it in tests
-- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 88.1% hit@1 on LongMemEval-S (470-question cleaned set), 70.6% on LoCoMo, both harnesses in the repository
+- [Benchmarks](https://vshulcz.github.io/deja-vu/guide/benchmarks.html): 88.1% hit@1 on LongMemEval-S (470-question cleaned set), 70.5% on LoCoMo, both harnesses in the repository
 - [How it compares](https://vshulcz.github.io/deja-vu/guide/compare.html): next to Mem0, Letta, memU, Memori, claude-mem and agentmemory
 - [Day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html): eight tools installed on one machine that already held 19,195 sessions, then asked 100 questions only that history answers — build time, first answer, search latency, hit@1; the driver for every row is in the repository
 - [Session format registry](https://vshulcz.github.io/deja-vu/registry/README.html): where each of the thirty-four agents stores its sessions, with fixtures
