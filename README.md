@@ -22,7 +22,7 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built, so what reaches the model is safe to send.</p>
 
 <p align="center">
-<b>85.3% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>69.7% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<b>86.6% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>69.9% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
