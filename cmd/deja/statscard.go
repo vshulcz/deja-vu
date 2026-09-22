@@ -99,7 +99,7 @@ func renderStatsCard(r stats.Report) string {
 			"text-anchor=\"end\"")
 	case r.RepeatQuestions > 0 && formatStatNumber(r.RepeatQuestions) != hero:
 		cardText(&b, w-pad, rowY, 12, "400",
-			formatStatNumber(r.RepeatQuestions)+" questions asked more than once", "#8b989a",
+			formatStatNumber(r.RepeatQuestions)+" question"+pluralS(r.RepeatQuestions)+" asked more than once", "#8b989a",
 			"text-anchor=\"end\"")
 	}
 

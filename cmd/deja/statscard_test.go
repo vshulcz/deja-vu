@@ -127,6 +127,9 @@ func TestStatsHeadlineAndRepeatQuestions(t *testing.T) {
 	if got := statsHeadline(stats.Report{TotalSessions: 1240, RepeatQuestions: 17}); got != "1,240 sessions indexed · 17 questions asked more than once" {
 		t.Fatalf("headline = %q", got)
 	}
+	if got := statsHeadline(stats.Report{TotalSessions: 3, RepeatQuestions: 1}); got != "3 sessions indexed · 1 question asked more than once" {
+		t.Fatalf("headline for one repeat = %q", got)
+	}
 	if got := statsHeadline(stats.Report{}); got != "" {
 		t.Fatalf("empty headline = %q", got)
 	}

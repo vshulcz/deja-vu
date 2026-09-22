@@ -23,7 +23,7 @@ func statsHeadline(r stats.Report) string {
 		parts = append(parts, fmt.Sprintf("memory served %s %s", formatStatNumber(handed), served))
 	}
 	if r.RepeatQuestions > 0 {
-		parts = append(parts, fmt.Sprintf("%s questions asked more than once", formatStatNumber(r.RepeatQuestions)))
+		parts = append(parts, fmt.Sprintf("%s question%s asked more than once", formatStatNumber(r.RepeatQuestions), pluralS(r.RepeatQuestions)))
 	}
 	return strings.Join(parts, " · ")
 }

@@ -131,9 +131,11 @@ func yearFixture(t *testing.T) string {
 	t.Helper()
 	withStatsStores(t)
 	claudeRoot := os.Getenv("DEJA_CLAUDE_ROOT")
-	ts := time.Now().Add(-48 * time.Hour).UTC().Format(time.RFC3339)
 	fail := `make: *** [build] Error 1 in /Users/dana/src/app, reported by build.internal`
-	for _, id := range []string{"y1", "y2", "y3"} {
+	for i, id := range []string{"y1", "y2", "y3"} {
+		// Each session asks at its own time: the same question at the same
+		// moment in two sessions is one conversation copied, not a repeat.
+		ts := time.Now().Add(-48*time.Hour + time.Duration(i)*time.Hour).UTC().Format(time.RFC3339)
 		lines := []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/app","timestamp":"` + ts +
 				`","message":{"role":"user","content":"why does the payout retry fire twice in a row"}}`,

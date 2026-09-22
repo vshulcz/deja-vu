@@ -450,35 +450,7 @@ func RepeatQuestions(ss []model.Session) int {
 // time — the line the install opens with (#3064). "" and 0 when nothing
 // repeats.
 func RepeatQuestionExample(ss []model.Session) (example string, repeated int) {
-	// Exact stem match only: questionStemFor already folds case and
-	// punctuation, and a pairwise similarity pass is quadratic in corpora
-	// with tens of thousands of user messages.
-	counts := map[string]int{}
-	texts := map[string]string{}
-	for _, s := range ss {
-		seen := map[string]bool{}
-		for _, m := range s.Messages {
-			if m.Role != "user" || !AskedByAPerson(m.Text) {
-				continue
-			}
-			stem := questionStemFor(m.Text)
-			// Short acknowledgements ("ok", "continue") repeat across every
-			// session; only substantial messages count as questions. Chinese,
-			// Japanese and Korean write no separator between words, so such a
-			// question is one field however much it asks and this figure read
-			// zero for anyone working in them (#1348) — their characters are the
-			// words, as the index counts them for the same purpose.
-			if stem == "" || seen[stem] {
-				continue
-			}
-			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
-				continue
-			}
-			seen[stem] = true
-			counts[stem]++
-			texts[stem] = strings.TrimSpace(m.Text)
-		}
-	}
+	counts, texts := askings(ss)
 	best := ""
 	for stem, n := range counts {
 		if n > 1 {
@@ -502,26 +474,7 @@ func RepeatQuestionExample(ss []model.Session) (example string, repeated int) {
 // is a figure nobody can size ("91 repeats" of 200 questions and of 20,000 are
 // different stories).
 func QuestionSpread(ss []model.Session) (distinct, repeated int) {
-	counts := map[string]int{}
-	for _, s := range ss {
-		seen := map[string]bool{}
-		for _, m := range s.Messages {
-			if m.Role != "user" || !AskedByAPerson(m.Text) {
-				continue
-			}
-			stem := questionStemFor(m.Text)
-			if stem == "" || seen[stem] {
-				continue
-			}
-			// The same floor RepeatQuestionExample uses, so the two numbers
-			// are over one population: an acknowledgement is not a question.
-			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
-				continue
-			}
-			seen[stem] = true
-			counts[stem]++
-		}
-	}
+	counts, _ := askings(ss)
 	for _, n := range counts {
 		distinct++
 		if n > 1 {
@@ -529,6 +482,59 @@ func QuestionSpread(ss []model.Session) (distinct, repeated int) {
 		}
 	}
 	return distinct, repeated
+}
+
+// askings is how many sessions asked each question, and the question as it was
+// typed the last time. Exact stem match only: questionStemFor already folds
+// case and punctuation, and a pairwise similarity pass is quadratic in corpora
+// with tens of thousands of user messages.
+//
+// A resume, a fork or a share writes the conversation again under a new
+// session, carrying each message with the time it was first sent. The same
+// question at the same moment in two sessions is therefore one asking copied,
+// not the question asked twice, and counting it made a machine's own resumed
+// conversations the bulk of "questions you asked more than once" (#3711 found
+// the same on the brief's side). A message the transcript never stamped cannot
+// be told apart and counts as before.
+func askings(ss []model.Session) (counts map[string]int, texts map[string]string) {
+	counts = map[string]int{}
+	texts = map[string]string{}
+	sent := map[string]map[int64]bool{}
+	for _, s := range ss {
+		seen := map[string]bool{}
+		for _, m := range s.Messages {
+			if m.Role != "user" || !AskedByAPerson(m.Text) {
+				continue
+			}
+			stem := questionStemFor(m.Text)
+			// Short acknowledgements ("ok", "continue") repeat across every
+			// session; only substantial messages count as questions. Chinese,
+			// Japanese and Korean write no separator between words, so such a
+			// question is one field however much it asks and this figure read
+			// zero for anyone working in them (#1348) — their characters are the
+			// words, as the index counts them for the same purpose.
+			if stem == "" || seen[stem] {
+				continue
+			}
+			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
+				continue
+			}
+			if !m.Time.IsZero() {
+				at := m.Time.UnixNano()
+				if sent[stem][at] {
+					continue
+				}
+				if sent[stem] == nil {
+					sent[stem] = map[int64]bool{}
+				}
+				sent[stem][at] = true
+			}
+			seen[stem] = true
+			counts[stem]++
+			texts[stem] = strings.TrimSpace(m.Text)
+		}
+	}
+	return counts, texts
 }
 
 func questionStemFor(text string) string {

@@ -43,3 +43,23 @@ func TestBuiltSummaryIsZeroWithoutAManifest(t *testing.T) {
 		t.Fatalf("default dir under an empty home, yet %d/%d/%d", s, h, r)
 	}
 }
+
+// A resumed conversation is written again under a new key and carries every
+// question the original did. The built note's count is the brief's rule: one
+// conversation written twice is not a question asked twice.
+func TestBuiltSummarySkipsAResumedConversation(t *testing.T) {
+	q := "why does the retry loop drop the last attempt"
+	rest := []string{"where does the scheduler read its failover timeout", "how do I run the integration tests here"}
+	dir := askedFixture(t, map[string][]string{
+		"orig":   append([]string{q}, rest...),
+		"resume": append([]string{q}, rest...),
+		"other":  {"what is the deploy command for staging here"},
+	}, map[string]string{
+		"orig":   "2026-03-01T10:00:00Z",
+		"resume": "2026-03-04T10:00:00Z",
+		"other":  "2026-06-01T10:00:00Z",
+	})
+	if _, _, repeated := BuiltSummary(dir, nil); repeated != 0 {
+		t.Fatalf("a resumed conversation counted as %d repeated question(s)", repeated)
+	}
+}

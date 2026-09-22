@@ -469,7 +469,7 @@ func longestLine(r stats.Report) []string {
 	}
 	// The number that is evidence rather than volume: a question asked twice is
 	// the reader having re-solved something.
-	right := formatStatNumber(r.RepeatQuestions) + " questions asked more than once"
+	right := formatStatNumber(r.RepeatQuestions) + " question" + pluralS(r.RepeatQuestions) + " asked more than once"
 	if gap := cardInner - visibleLen(left) - visibleLen(right); gap >= 2 {
 		return []string{paint(cardDim, left) + strings.Repeat(" ", gap) + paint(cardBright, right)}
 	}
