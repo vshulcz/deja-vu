@@ -68,6 +68,7 @@ func main() {
 	gateSignals := flag.Int("gate-signals", 0, "compare the gate's inputs on haystacks that hold the answer and haystacks that do not (0 = off)")
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
+	runnerUp := flag.Int("runner-up", 0, "over the first N questions, ask whether the line beside each of the top five is enough to pick the one holding the answer (0 = off)")
 	out := flag.String("out", "", "write the run's numbers as JSON to this path")
 	score := flag.String("score", "", "score a ranking another system produced instead of running deja: a JSON file mapping question_id to the session ids it ranked, best first")
 	flag.Parse()
@@ -117,6 +118,10 @@ func main() {
 	}
 	if *agentCases > 0 {
 		runAgentCases(questions, *agentCases)
+		return
+	}
+	if *runnerUp > 0 {
+		runRunnerUp(questions, *runnerUp)
 		return
 	}
 	// Somebody else's ranking, scored by this file's arithmetic rather than by
@@ -182,6 +187,7 @@ func main() {
 				"tier":        detail.tier,
 				"answer_ids":  q.AnswerSessionIDs,
 				"top10":       detail.top10,
+				"scores":      detail.scores,
 			}
 			b, _ := json.Marshal(rec)
 			_, _ = missFile.Write(append(b, '\n'))
@@ -274,6 +280,14 @@ type questionDetail struct {
 	top10    []string
 	topCount int
 	cands    []map[string]any
+	// scores holds the ranking score of the first five hits, in order. The
+	// context surface prints one session, so the gap between the first two is
+	// what a "hand over the runner-up as well" rule would key on — and it
+	// cannot: the relative gap is 0.028 where the top hit is the answer, 0.026
+	// where the answer is at rank 2-5 and 0.030 where it is lost, so no
+	// threshold on it reaches a precision of 0.08. The number is here so the
+	// next person can see that rather than re-derive it.
+	scores []float64
 	// evidence recall: how many of the question's answer sessions appear in
 	// the top-k, divided by how many exist — LongMemEval's official metric,
 	// stricter than any-hit on multi-evidence questions.
@@ -385,7 +399,12 @@ func runQuestion(q lmeQuestion) (int, questionDetail, time.Duration, error) {
 		if len(hits[i].Snippets) > 0 {
 			snip = hits[i].Snippets[0]
 		}
-		detail.cands = append(detail.cands, map[string]any{"n": i + 1, "id": hits[i].Session.ID, "is_answer": want[hits[i].Session.ID], "snippet": snip})
+		detail.cands = append(detail.cands, map[string]any{"n": i + 1, "id": hits[i].Session.ID, "is_answer": want[hits[i].Session.ID],
+			// snippet is the first excerpt; snippets is every excerpt the
+			// recall listing would print under that hit, which is what a
+			// reader choosing between candidates actually sees.
+			"snippet": snip, "snippets": hits[i].Snippets})
+		detail.scores = append(detail.scores, hits[i].Score)
 	}
 	detail.evRecall = map[int]float64{}
 	for _, k := range []int{1, 5, 10, 20} {
@@ -503,6 +522,100 @@ func runPrecision(questions []lmeQuestion) {
 // among the excerpts. Each case prints the question and the five candidate
 // snippets (unlabelled), plus the 1-based position of the true answer for
 // scoring. This is the raw material for the "let the agent pick" A/B.
+// runRunnerUp asks whether the line beside a hit is enough to choose it.
+//
+// The context surface prints one session and a count of the others; recall
+// prints five sessions with a line each. So for the questions where the answer
+// sits at rank 2-5 — 48 of 470, the whole distance between hit@1 85.3% and
+// hit@5 95.5% — the question is whether a reader with those five lines in front
+// of it could tell which one holds the answer. Scored the way -answer-carry
+// scores a block: the answer's words that the question does not already carry.
+//
+// Measured: 31 of the 48 have an answer that contributes words at all, and over
+// every excerpt the listing prints, the gold candidate's lines alone carry the
+// most in 15, tie in 3, carry fewer in 3 and carry none in 10. So half that
+// population is choosable from the listing as it stands and a third is
+// invisible in it, because the excerpts are the passages matching the query.
+func runRunnerUp(questions []lmeQuestion, limit int) {
+	if limit > 0 && limit < len(questions) {
+		questions = questions[:limit]
+	}
+	cases, goldBest, goldTied, goldWorse, goldBlank := 0, 0, 0, 0, 0
+	for _, q := range questions {
+		rank, detail, _, err := runQuestion(q)
+		if err != nil || rank < 2 || rank > 5 {
+			continue
+		}
+		asked := carryWords(q.Question)
+		want := carryWords(string(q.Answer))
+		unasked := map[string]bool{}
+		for w := range want {
+			if !asked[w] {
+				unasked[w] = true
+			}
+		}
+		if len(unasked) == 0 {
+			continue
+		}
+		cases++
+		switch whereGoldLineLands(detail.cands, unasked) {
+		case "blank":
+			goldBlank++
+		case "best":
+			goldBest++
+		case "tied":
+			goldTied++
+		default:
+			goldWorse++
+		}
+	}
+	fmt.Printf("rank2-5 cases with answer words the question lacks: %d\n", cases)
+	fmt.Printf("  gold line alone carries the most: %d\n", goldBest)
+	fmt.Printf("  gold line tied for the most:      %d\n", goldTied)
+	fmt.Printf("  gold line carries fewer:          %d\n", goldWorse)
+	fmt.Printf("  gold line carries none:           %d\n", goldBlank)
+}
+
+// whereGoldLineLands scores every candidate's excerpts by how many of the
+// answer's unasked words they hold, and says where the one holding the answer
+// came out: "best" alone, "tied" with a rival, "worse" than one, or "blank"
+// when its lines carry none of those words at all. Blank comes first: a
+// candidate that carries nothing is not tied for anything, however the rivals
+// scored.
+func whereGoldLineLands(cands []map[string]any, unasked map[string]bool) string {
+	score := func(c map[string]any) int {
+		sn, _ := c["snippets"].([]string)
+		hit := 0
+		for w := range carryWords(strings.Join(sn, " ")) {
+			if unasked[w] {
+				hit++
+			}
+		}
+		return hit
+	}
+	gold, best, bestN := -1, 0, 0
+	for _, c := range cands {
+		s := score(c)
+		if c["is_answer"] == true {
+			gold = s
+		}
+		if s > best {
+			best, bestN = s, 1
+		} else if s == best {
+			bestN++
+		}
+	}
+	switch {
+	case gold <= 0:
+		return "blank"
+	case gold == best && bestN == 1:
+		return "best"
+	case gold == best:
+		return "tied"
+	}
+	return "worse"
+}
+
 func runAgentCases(questions []lmeQuestion, n int) {
 	dumped := 0
 	for _, q := range questions {
