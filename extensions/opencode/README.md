@@ -76,3 +76,5 @@ and the hooks stay quiet.
 ## License
 
 MIT
+
+Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

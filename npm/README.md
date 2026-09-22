@@ -36,3 +36,5 @@ Full documentation, the harness matrix and the benchmarks:
 [vshulcz.github.io/deja-vu](https://vshulcz.github.io/deja-vu/)
 
 MIT
+
+Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

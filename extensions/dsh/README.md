@@ -2,6 +2,8 @@
 
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/dsh/docs/zh.md)
 
+Part of [deja-vu](https://github.com/vshulcz/deja-vu). Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).
+
 DeepSeek Harness can already search its own sessions — that is what the built-in
 `session-query` subsystem does. This plugin answers the other question: what you
 did in the *other* agents on this machine.
