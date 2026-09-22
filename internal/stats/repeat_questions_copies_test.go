@@ -35,3 +35,22 @@ func TestRepeatQuestionsSkipsACopiedConversation(t *testing.T) {
 		t.Fatalf("QuestionSpread disagrees with RepeatQuestions: %d", repeated)
 	}
 }
+
+// A session that asked the question twice is copied with both askings; the
+// copy matches on either and still is not a repeat.
+func TestRepeatQuestionsSkipsACopyOfATwiceAskedSession(t *testing.T) {
+	q := "why does the connection pool exhaust under load?"
+	t1 := time.Date(2026, 3, 2, 10, 0, 0, 0, time.UTC)
+	t2 := t1.Add(time.Hour)
+	copyOf := func(id string, times ...time.Time) model.Session {
+		s := model.Session{ID: id, Harness: "claude"}
+		for _, at := range times {
+			s.Messages = append(s.Messages, model.Message{Role: "user", Text: q, Time: at})
+		}
+		return s
+	}
+	ss := []model.Session{copyOf("orig", t1, t2), copyOf("fork", t2)}
+	if got := RepeatQuestions(ss); got != 0 {
+		t.Fatalf("a fork holding the second asking counted as %d repeat(s)", got)
+	}
+}

@@ -513,21 +513,25 @@ func askings(ss []model.Session) (counts map[string]int, texts map[string]string
 			// question is one field however much it asks and this figure read
 			// zero for anyone working in them (#1348) — their characters are the
 			// words, as the index counts them for the same purpose.
-			if stem == "" || seen[stem] {
+			if stem == "" {
 				continue
 			}
 			if len(strings.Fields(stem)) < 4 && cjkfold.CountCJK(stem) < 4 {
 				continue
 			}
+			// Every stamped asking is recorded, including a second one in the
+			// same session, so a copy of that session matches on both.
+			copied := false
 			if !m.Time.IsZero() {
 				at := m.Time.UnixNano()
-				if sent[stem][at] {
-					continue
-				}
+				copied = sent[stem][at]
 				if sent[stem] == nil {
 					sent[stem] = map[int64]bool{}
 				}
 				sent[stem][at] = true
+			}
+			if copied || seen[stem] {
+				continue
 			}
 			seen[stem] = true
 			counts[stem]++
