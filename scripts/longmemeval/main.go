@@ -69,6 +69,7 @@ func main() {
 	precision := flag.Bool("precision", false, "measure false-positive recalls: pair each question's prompt with another question's haystack (no answer present) and report how often anything surfaces")
 	agentCases := flag.Int("agent-cases", 0, "dump N cases where the answer is in top-5 but not rank-1, for an agent-choice A/B")
 	runnerUp := flag.Int("runner-up", 0, "over the first N questions, ask whether the line beside each of the top five is enough to pick the one holding the answer (0 = off)")
+	termWeights := flag.String("term-weights", "", "for questions of this type, print each query term with its IDF and whether the gold session and the top-ranked one matched it")
 	out := flag.String("out", "", "write the run's numbers as JSON to this path")
 	score := flag.String("score", "", "score a ranking another system produced instead of running deja: a JSON file mapping question_id to the session ids it ranked, best first")
 	flag.Parse()
@@ -122,6 +123,10 @@ func main() {
 	}
 	if *runnerUp > 0 {
 		runRunnerUp(questions, *runnerUp)
+		return
+	}
+	if *termWeights != "" {
+		runTermWeights(questions, *termWeights)
 		return
 	}
 	// Somebody else's ranking, scored by this file's arithmetic rather than by
@@ -574,6 +579,164 @@ func runRunnerUp(questions []lmeQuestion, limit int) {
 	fmt.Printf("  gold line tied for the most:      %d\n", goldTied)
 	fmt.Printf("  gold line carries fewer:          %d\n", goldWorse)
 	fmt.Printf("  gold line carries none:           %d\n", goldBlank)
+}
+
+// runTermWeights asks where a question's ranking weight actually goes. For
+// every question of one type that is not ranked first, it prints each query
+// term with the IDF the ranking gave it and whether the gold session and the
+// session that beat it hold that term. The question it answers: is the top
+// place bought by the words that name the subject, or by the words that frame
+// the request ("suggest", "recommend", "tips")?
+//
+// Read on the preference slice, the frame words turned out not to be the
+// problem — they score 1.2 to 3.1 against 4 to 5.5 for the subject — and the
+// losing shape is the gold session holding the one rarest word while the winner
+// holds more middling ones. "count" then measured whether preferring the holder
+// of the rarest word would pay: 10 of the 60 losses are reachable that way and
+// 91 of the 410 wins sit where only a rival holds it, so it would trade ten
+// answers for up to ninety-one. Not built.
+func runTermWeights(questions []lmeQuestion, kind string) {
+	held := func(q lmeQuestion, id string, forms []string) map[string]bool {
+		var text strings.Builder
+		for si, turns := range q.HaystackSessions {
+			if q.HaystackSessionID[si] != id {
+				continue
+			}
+			for _, t := range turns {
+				text.WriteString(strings.ToLower(t.Content))
+				text.WriteByte(' ')
+			}
+		}
+		words := map[string]bool{}
+		for _, w := range strings.FieldsFunc(text.String(), func(r rune) bool {
+			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+		}) {
+			words[w] = true
+		}
+		out := map[string]bool{}
+		for _, f := range forms {
+			if words[f] {
+				out[f] = true
+			}
+		}
+		return out
+	}
+	// With "-term-weights count" the probe stops printing cases and counts the
+	// one statistic the cases suggested: does the gold session hold the query's
+	// rarest word while the session that outranked it does not?
+	counting := kind == "count"
+	var rightGold, rightBoth, rightNeither, wrongGold, wrongTop, wrongBoth, wrongNeither int
+	for _, q := range questions {
+		if !counting && q.QuestionType != kind {
+			continue
+		}
+		rank, detail, _, err := runQuestion(q)
+		if err != nil || (!counting && rank == 1) {
+			continue
+		}
+		if counting {
+			dir, cleanup, err := buildHaystackIndex(q)
+			if err != nil {
+				cleanup()
+				fatal(err)
+			}
+			terms := index.RelevanceTerms(q.Question)
+			_, _, _, idf, err := index.ProjectRelevant(dir, nil, terms, 50)
+			cleanup()
+			if err != nil {
+				fatal(err)
+			}
+			rarest, best := "", 0.0
+			for _, t := range terms {
+				if w := idf[strings.ToLower(t)]; w > best {
+					rarest, best = t, w
+				}
+			}
+			if rarest == "" {
+				continue
+			}
+			forms := append([]string{rarest}, index.RelevanceMatchTerms(rarest)...)
+			inGold := false
+			for _, g := range q.AnswerSessionIDs {
+				if len(held(q, g, forms)) > 0 {
+					inGold = true
+				}
+			}
+			gold := map[string]bool{}
+			for _, g := range q.AnswerSessionIDs {
+				gold[g] = true
+			}
+			// A rule that prefers the holder of the rarest word can only help
+			// where a gold session holds it and no rival above it does, and can
+			// only hurt where a rival holds it and no gold session does.
+			rivalHolds := false
+			for _, id := range detail.top10 {
+				if gold[id] {
+					continue
+				}
+				if len(held(q, id, forms)) > 0 {
+					rivalHolds = true
+					break
+				}
+			}
+			switch {
+			case rank == 1 && inGold:
+				rightGold++
+			case rank == 1 && rivalHolds:
+				rightBoth++ // at risk: only a rival holds the rarest word
+			case rank == 1:
+				rightNeither++
+			case inGold && !rivalHolds:
+				wrongGold++
+			case inGold && rivalHolds:
+				wrongBoth++
+			case rivalHolds:
+				wrongTop++
+			default:
+				wrongNeither++
+			}
+			continue
+		}
+		dir, cleanup, err := buildHaystackIndex(q)
+		if err != nil {
+			cleanup()
+			fatal(err)
+		}
+		terms := index.RelevanceTerms(q.Question)
+		_, _, _, idf, err := index.ProjectRelevant(dir, nil, terms, 50)
+		cleanup()
+		if err != nil {
+			fatal(err)
+		}
+		top := ""
+		if len(detail.top10) > 0 {
+			top = detail.top10[0]
+		}
+		fmt.Printf("\n[rank %d] %s\n", rank, q.Question)
+		for _, t := range terms {
+			forms := append([]string{t}, index.RelevanceMatchTerms(t)...)
+			inGold := false
+			for _, g := range q.AnswerSessionIDs {
+				if len(held(q, g, forms)) > 0 {
+					inGold = true
+				}
+			}
+			inTop := len(held(q, top, forms)) > 0
+			mark := func(b bool) string {
+				if b {
+					return "yes"
+				}
+				return " no"
+			}
+			fmt.Printf("   %-18s idf %5.2f  gold %s  top1 %s\n", t, idf[strings.ToLower(t)], mark(inGold), mark(inTop))
+		}
+	}
+	if counting {
+		fmt.Printf("ranked first (%d): gold holds the rarest word %d; only a rival does %d (at risk); nobody %d\n",
+			rightGold+rightBoth+rightNeither, rightGold, rightBoth, rightNeither)
+		fmt.Printf("ranked worse (%d): gold holds it and no rival does %d (reachable); gold and a rival %d; only a rival %d; nobody %d\n",
+			wrongGold+wrongTop+wrongBoth+wrongNeither, wrongGold, wrongBoth, wrongTop, wrongNeither)
+	}
 }
 
 // whereGoldLineLands scores every candidate's excerpts by how many of the
