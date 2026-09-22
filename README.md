@@ -156,6 +156,11 @@ URLs, high-entropy values for shapes no pattern knows, and a password stated in 
 value becomes `[redacted:<kind>]` and the surrounding text stays searchable. `deja share` and
 `deja sync export` re-apply redaction on the way out.
 
+The source transcripts are not redacted: agents write command output there verbatim, so a
+`cat .env` or a pasted connection string stays in plaintext. `deja secrets` lists which
+sessions carry one and of what kind, from the markers redaction left; it never prints a
+value. One machine held 84 in 42 sessions ([credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html)).
+
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later
 `deja index` cannot restore them from the source history. `--unforget` lifts a tombstone.
 Project exclusions are one pattern per line in `~/.config/deja/exclude`; a line prefixed
@@ -209,6 +214,7 @@ $ deja "jwt refresh token"
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
+| `deja secrets` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
@@ -451,7 +457,8 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 [data flows](docs/SECURITY-MODEL.md#data-flows).
 
 **What about secrets already in my logs?** They stay in the original harness files, which
-are your agent's data. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
+are your agent's data; `deja secrets` names the sessions that carry them so you can rotate
+and delete. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
 tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
 the index is built, so they do not reach digests, shares or sync exports. Pattern matching
 is not secret detection: a shape it does not know can pass through. See the
