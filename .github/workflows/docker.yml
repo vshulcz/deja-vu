@@ -1,0 +1,63 @@
+# The Dockerfile is the one dependency nothing here builds: CI compiles the
+# binary directly, govulncheck reads Go modules, and the image is never made.
+# It went four alpine releases out of date without a word (3.20 against 3.24,
+# #3896), and now that dependabot proposes those bumps, something has to say
+# whether the image it proposes still builds and still answers.
+name: Docker image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker.yml'
+  # A base image ages on its own schedule, not on ours.
+  schedule:
+    - cron: '23 4 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    name: the image builds and answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Build
+        run: docker build -t deja-image-check .
+
+      # The entry point is `deja mcp`, so a plain run would sit on stdio
+      # waiting for a client. These two say the binary starts and the store
+      # reader it needs is in the image — the two things the Dockerfile is
+      # responsible for.
+      - name: The binary runs
+        run: docker run --rm deja-image-check version
+
+      - name: sqlite3 is in the image
+        run: docker run --rm --entrypoint sqlite3 deja-image-check -version
+
+      # A handshake over stdio, which is what the image is for: the server has
+      # to answer `initialize` and then list its tool.
+      - name: The MCP server answers a handshake
+        run: |
+          set -euo pipefail
+          printf '%s\n%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"0"}}}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | docker run --rm -i deja-image-check mcp > out.json
+          grep -q '"serverInfo"' out.json
+          grep -q '"name":"deja"' out.json
