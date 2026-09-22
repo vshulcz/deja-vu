@@ -52,8 +52,15 @@ func TestTheFirstSessionAfterTheBuildHearsWhatWasIndexed(t *testing.T) {
 	if !strings.Contains(first, "1 question asked more than once") {
 		t.Fatalf("the repeat count is missing: %q", first)
 	}
-	if second := read(); strings.Contains(second, "deja indexed") {
+	if !strings.Contains(first, starText) {
+		t.Fatalf("the install proof of a marketplace install left out the one line deja says about itself: %q", first)
+	}
+	second := read()
+	if strings.Contains(second, "deja indexed") {
 		t.Fatalf("the built note repeated: %q", second)
+	}
+	if strings.Contains(second, starText) {
+		t.Fatalf("the star line repeated: %q", second)
 	}
 }
 

@@ -3,8 +3,8 @@ package main
 import "os"
 
 // starText is the one sentence deja says about itself, once per index: after
-// the install proof, or in the first week note if the install never printed
-// it. deja has no telemetry and no account, so a star is the only signal that
+// the install proof — the CLI's, or the built note a marketplace install gets —
+// or in the first week note if neither printed it. deja has no telemetry and no account, so a star is the only signal that
 // reaches the project from a machine that uses it — and the install proof is
 // the moment the reader has just been shown something real. Once, because the
 // second time it is a nag, and a nag costs more than a star is worth.

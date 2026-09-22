@@ -44,5 +44,11 @@ func builtNote(dir string) string {
 	if where := whereToLook(dir); where != "" {
 		line += "\n" + where
 	}
+	// This is the install proof for a marketplace install, the moment starText
+	// was written for; waiting for the first week note meant a week of use
+	// with recalls before it could be said at all.
+	if star := starLine(dir); star != "" {
+		line += "\n" + star
+	}
 	return line
 }
