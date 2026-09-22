@@ -1,6 +1,6 @@
 {
   "name": "@vshulcz/openclaw-deja",
-  "version": "0.20.2",
+  "version": "0.21.0",
   "description": "deja-vu memory for OpenClaw: the coding sessions already on this machine — OpenClaw, Claude Code, Codex, Cursor and 30 more — recalled before each turn and searchable as tools. A local index, no LLM.",
   "type": "module",
   "main": "index.mjs",
@@ -45,7 +45,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.20.2"
+    "@vshulcz/deja-vu": "^0.21.0"
   },
   "peerDependencies": {
     "openclaw": ">=2026.7.1"
