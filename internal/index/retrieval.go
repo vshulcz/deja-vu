@@ -527,6 +527,9 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	if err != nil {
 		return SearchResult{}, err
 	}
+	if day, ok := pointInTime(o.Query, o.Now); ok {
+		ss = rerankByDayProximity(ss, day)
+	}
 	return relevanceResult(ss, matched, rank.idf), nil
 }
 
@@ -4761,6 +4764,80 @@ func parallelForRanked(n int, fn func(i int)) {
 		}()
 	}
 	wg.Wait()
+}
+
+// dayInsideRange says whether the resolved day falls inside the span the pool
+// itself covers. Outside it the hint separates nothing — every candidate is
+// equally far away, so the order becomes "newest first", which is not what the
+// question asked.
+func dayInsideRange(ss []model.Session, day time.Time) bool {
+	var oldest, newest time.Time
+	for _, s := range ss {
+		t := s.Started
+		if t.IsZero() {
+			t = s.Updated
+		}
+		if t.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || t.Before(oldest) {
+			oldest = t
+		}
+		if newest.IsZero() || t.After(newest) {
+			newest = t
+		}
+	}
+	if oldest.IsZero() {
+		return false
+	}
+	return !day.Before(oldest.AddDate(0, 0, -1)) && !day.After(newest.AddDate(0, 0, 1))
+}
+
+// rerankByDayProximity fuses the pool's order with how close each session sits
+// to the day the question named. Fusion rather than a sort: the nearest session
+// is a hint, and the words are still the evidence.
+func rerankByDayProximity(ss []model.Session, day time.Time) []model.Session {
+	if len(ss) < 2 || !dayInsideRange(ss, day) {
+		return ss
+	}
+	near := make([]int, len(ss))
+	for i := range near {
+		near[i] = i
+	}
+	dist := func(s model.Session) time.Duration {
+		t := s.Started
+		if t.IsZero() {
+			t = s.Updated
+		}
+		if t.IsZero() {
+			return time.Duration(1 << 62)
+		}
+		d := t.Sub(day)
+		if d < 0 {
+			d = -d
+		}
+		return d
+	}
+	sort.SliceStable(near, func(a, b int) bool { return dist(ss[near[a]]) < dist(ss[near[b]]) })
+	nearRank := make([]int, len(ss))
+	for r, i := range near {
+		nearRank[i] = r
+	}
+	const k = 5.0
+	idx := make([]int, len(ss))
+	for i := range idx {
+		idx[i] = i
+	}
+	fused := make([]float64, len(ss))
+	for i := range ss {
+		fused[i] = 1/(k+float64(i)) + 1/(k+float64(nearRank[i]))
+	}
+	sort.SliceStable(idx, func(a, b int) bool { return fused[idx[a]] > fused[idx[b]] })
+	out := make([]model.Session, len(ss))
+	for i, j := range idx {
+		out[i] = ss[j]
+	}
+	return out
 }
 
 // rerankWorkers is a variable so a test can force the single-core path and

@@ -8,8 +8,8 @@
     "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4"
   },
   "questions": 1982,
-  "wall_seconds": 10.164978458,
-  "median_search_ms": 4.317,
+  "wall_seconds": 9.772479208,
+  "median_search_ms": 4.324,
   "rows": [
     {
       "name": "multi-hop",
