@@ -118,4 +118,74 @@ func RelevanceTermsWithTime(q string, now time.Time) []string {
 	return append(RelevanceTerms(q), relativeTimeTerms(q, now)...)
 }
 
+// pointRE matches the phrases that name a single day rather than a span. "last
+// week" is deliberately absent: people ask aggregates about it ("how many hours
+// of jogging last week"), and there the nearest session is not the answer.
+var pointRE = regexp.MustCompile(`(?i)\b(?:(a|an|one|two|three|four|five|six|seven|eight|nine|ten|couple\s+of|\d{1,3})\s+(day|week|month)s?\s+ago|(yesterday)|last\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday))\b`)
+
+// spanRE marks a question that asks about a stretch of time, or counts over one.
+var spanRE = regexp.MustCompile(`(?i)\blast\s+(?:week|month|year)\b|\bsince\b|\bhow\s+(?:many|much|long)\b`)
+
+var weekdays = map[string]time.Weekday{
+	"sunday": time.Sunday, "monday": time.Monday, "tuesday": time.Tuesday,
+	"wednesday": time.Wednesday, "thursday": time.Thursday,
+	"friday": time.Friday, "saturday": time.Saturday,
+}
+
+// lastWeekday is the most recent day before now that fell on that weekday.
+// "last friday" on a Friday means the Friday before, not today.
+func lastWeekday(now time.Time, name string) time.Time {
+	want, ok := weekdays[strings.ToLower(name)]
+	if !ok {
+		return now.AddDate(0, 0, -7)
+	}
+	back := int(now.Weekday()-want+7) % 7
+	if back == 0 {
+		back = 7
+	}
+	return now.AddDate(0, 0, -back)
+}
+
+// pointInTime resolves a phrase that names one day. A question asking about a
+// span, or counting over one, resolves to nothing: the rule is for "what did I
+// buy ten days ago", not "how much did I spend last month".
+func pointInTime(q string, now time.Time) (time.Time, bool) {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if spanRE.MatchString(q) {
+		return time.Time{}, false
+	}
+	m := pointRE.FindStringSubmatch(q)
+	if m == nil {
+		return time.Time{}, false
+	}
+	switch {
+	case m[3] != "":
+		return now.AddDate(0, 0, -1), true
+	case m[4] != "":
+		return lastWeekday(now, m[4]), true
+	}
+	word := strings.ToLower(strings.Fields(m[1])[0])
+	n := relTimeNums[word]
+	if word == "couple" {
+		n = 2
+	}
+	if n == 0 {
+		n, _ = strconv.Atoi(m[1])
+	}
+	if n == 0 {
+		return time.Time{}, false
+	}
+	switch strings.ToLower(m[2]) {
+	case "day":
+		return now.AddDate(0, 0, -n), true
+	case "week":
+		return now.AddDate(0, 0, -7*n), true
+	case "month":
+		return now.AddDate(0, -n, 0), true
+	}
+	return time.Time{}, false
+}
+
 var _ = query.TierRelevance
