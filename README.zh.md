@@ -17,7 +17,7 @@
 <p align="center"><b>deja 一开始就是满的：34 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <p align="center">
-LongMemEval-S（470 题清理集）上 <b>87.2% hit@1</b> &middot; LoCoMo 上 <b>69.9%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.6%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>两套评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
 </p>

@@ -111,7 +111,7 @@ def main():
     line2 = "deja finds it."
     ed.text(((W - ed.textlength(line1, font=big)) / 2, cy - 150), line1, font=big, fill=TEXT)
     ed.text(((W - ed.textlength(line2, font=big)) / 2, cy - 100), line2, font=big, fill=ACCENT)
-    facts = "thirty-four coding agents · 87.2% hit@1 · no LLM, no embeddings"
+    facts = "thirty-four coding agents · 88.1% hit@1 · no LLM, no embeddings"
     ed.text(((W - ed.textlength(facts, font=small)) / 2, cy - 20), facts, font=small, fill=MUTED)
     # The real one. An invented short URL on a card people screenshot is a lie
     # with a long half-life.

@@ -279,6 +279,14 @@ func sessionKeySet(ss []model.Session) map[string]bool {
 // is describing a real cluster and needs no help.
 const thinAND = 10
 
+// tailFloor is the smallest store that gets a relevance tail under a thin
+// strict answer. Below it the tail is a handful of sessions out of a handful,
+// and the one it would add arrives on filler words rather than on the subject:
+// on a five-session store a precise query came back with an unrelated session
+// attached. Twenty sessions is where a fifth of the store is four places, which
+// is a tail rather than the store itself.
+const tailFloor = 20
+
 // strictPromotion is what satisfying the strict AND is worth, counted in places
 // on the relevance ranking.
 //
@@ -321,14 +329,11 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	if len(ss) == 0 || len(ss) >= thinAND {
 		return res, nil
 	}
-	// A store smaller than the window the tail is drawn from has nothing to
-	// rank: relevance would hand back most of it, which is a dump rather than
-	// a ranking, and a precise query would come back with the rest of the
-	// store attached. Few results out of few sessions is an answer, not a
-	// symptom; the case this exists for is a handful out of thousands.
-	if len(m.Sessions) <= relevanceWindow {
-		return res, nil
-	}
+	// A store no bigger than the window the tail is drawn from used to get no
+	// tail at all, on the reading that ranking a store that size hands back
+	// most of it rather than ranking it. The tail is bounded there instead —
+	// see tailCap below.
+	small := len(m.Sessions) <= relevanceWindow
 	// relevanceSearch declines quoted phrases, regex, and queries with fewer
 	// than two informative words, which is exactly the set that wants its
 	// strict answer left alone.
@@ -367,9 +372,27 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	}
 	merged := append([]model.Session(nil), ss...)
 	added := 0
+	// How many ranked sessions may hang under the strict head on a small
+	// store, as a share of the store: a fifth of it, and never more than the
+	// thin-AND bound. On a store of two sessions that is nothing, which is
+	// right — ranking two sessions is not a ranking, and the other one would
+	// arrive on filler words. On the fifty a LongMemEval haystack holds, or a
+	// store a few weeks after an install, it is ten places, and those ten are
+	// worth 1.8pp of hit@5 there and 5.2pp on LoCoMo. An unbounded tail scored
+	// the same, so this is the bounded version of the same win.
+	tailCap := 0
+	if small {
+		if len(m.Sessions) < tailFloor {
+			return res, nil
+		}
+		tailCap = min(thinAND, len(m.Sessions)/5)
+	}
 	for _, r := range rel.Sessions {
 		if seen[r.Harness+":"+r.ID] {
 			continue
+		}
+		if tailCap > 0 && added >= tailCap {
+			break
 		}
 		merged = append(merged, r)
 		added++

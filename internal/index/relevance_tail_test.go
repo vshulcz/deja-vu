@@ -236,3 +236,91 @@ func TestWideANDIsLeftAlone(t *testing.T) {
 		}
 	}
 }
+
+// A store of fifty sessions is the size a LongMemEval haystack has, and the
+// size a real store has for the first weeks after an install. It used to get no
+// tail at all: the strict answer came back alone, and the session that actually
+// answered the question was never returned. That cost 1.8pp of hit@5 on
+// LongMemEval-S and 5.2pp on LoCoMo.
+func TestAStoreTheSizeOfAHaystackGetsATail(t *testing.T) {
+	dir := seedStore(t, relevanceWindow-5)
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many bikes do I own", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Sessions[0].ID != "incidental" {
+		t.Fatalf("strict hit lost the top spot to %q", r.Sessions[0].ID)
+	}
+	found := false
+	for _, s := range r.Sessions {
+		if s.ID == "answer" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the session that answers the question never came back: %v", sessionIDs(r.Sessions))
+	}
+}
+
+// The tail is a handful of places, not the store: a fifth of it, capped. Without
+// a cap a precise query on a small store comes back with most of the history
+// attached, which is what the old all-or-nothing guard was protecting against.
+func TestTheTailOnASmallStoreIsAFifthOfIt(t *testing.T) {
+	const (
+		unrelated = 35
+		rivals    = 12
+	)
+	tmp := t.TempDir()
+	claudeRoot := filepath.Join(tmp, "claude")
+	setHome(t, filepath.Join(tmp, "home"))
+	t.Setenv("DEJA_CLAUDE_ROOT", claudeRoot)
+	dir := filepath.Join(tmp, "index.db")
+	t.Setenv("DEJA_INDEX_DIR", dir)
+	proj := filepath.Join(claudeRoot, "-w-app")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSession(t, proj, "incidental", "many courier bikes own their routes downtown")
+	// Sessions the ranking will score: each carries two of the question's
+	// words, and there are more of them than the cap allows, so the cap is the
+	// only thing deciding how much of the pool is served.
+	for i := range rivals {
+		writeSession(t, proj, fmt.Sprintf("rival-%d", i),
+			fmt.Sprintf("the bikes i own live in hallway number %d", i))
+	}
+	seedFiller(t, proj, unrelated)
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many bikes do I own", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := unrelated + rivals + 1
+	want := 1 + min(thinAND, store/5) // the strict head plus its tail
+	if len(r.Sessions) > want {
+		t.Errorf("tail of %d sessions over a store of %d, want at most %d",
+			len(r.Sessions)-1, store, want-1)
+	}
+	if len(r.Sessions) < 2 {
+		t.Errorf("no tail at all over a store of %d", store)
+	}
+}
+
+// Below the floor the tail stands down: on a handful of sessions the one it
+// would add arrives on filler words, not on the subject.
+func TestBelowTheFloorThereIsNoTail(t *testing.T) {
+	dir := seedStore(t, tailFloor-4) // plus the two named sessions: under the floor
+
+	r, err := SearchWithRecoveryDetailed(dir, query.Options{Query: "how many bikes do I own", All: true}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range r.Sessions {
+		if s.ID != "incidental" {
+			t.Fatalf("a store under the floor got a tail: %q came back", s.ID)
+		}
+	}
+}

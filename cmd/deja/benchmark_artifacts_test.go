@@ -170,8 +170,11 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 
 	// In these files hit@1 is only ever ours — the comparison table quotes the
 	// neighbours' own metrics under their own names (R@5, BEAM) and never a
-	// hit@1. If that changes, this check needs the cell, not the file.
-	quoted := regexp.MustCompile(`([0-9]+\.[0-9])%\s*hit@1`)
+	// hit@1. Which of our runs a quote belongs to is read off the words beside
+	// it: the full set's denominator, or the name of the other dataset.
+	// "hit@1" must not match inside "hit@10", which is a different depth and a
+	// different number.
+	quoted := regexp.MustCompile(`([0-9]+\.[0-9])%\s*hit@1([^0-9]|$)`)
 	for _, name := range []string{
 		"README.md",
 		"README.zh.md",
@@ -198,7 +201,10 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 			// cell states its own 500-question denominator and a row where
 			// only one side says what it counted is not a comparison.
 			want := wantHit1
-			if namesTheFullSet(text, m[0], m[1], full.Total.N) {
+			switch {
+			case namesBefore(text, m[0], "LoCoMo"):
+				want = wantLoCoMo
+			case namesTheFullSet(text, m[0], m[1], full.Total.N):
 				want = wantFull
 			}
 			if got != want {
@@ -231,6 +237,19 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 
 // namesTheFullSet reports whether a quoted figure says, within the sentence
 // around it, that it counted every question rather than the cleaned set.
+// namesBefore reports whether a word introduces a quoted figure — within the
+// few characters in front of it, never after. The comparison row states our
+// LoCoMo hit@1 beside our LongMemEval one and the two come from different runs;
+// looking after the figure as well would read the READMEs' "88.1% hit@1 ·
+// LoCoMo 70.6%" as one claim about LoCoMo.
+func namesBefore(text string, start int, word string) bool {
+	lo := start - 25
+	if lo < 0 {
+		lo = 0
+	}
+	return strings.Contains(text[lo:start], word)
+}
+
 func namesTheFullSet(text string, start, end, n int) bool {
 	// A narrow window on purpose: one cell states both runs, so a wide one
 	// reads the full set's denominator as the cleaned figure's too.

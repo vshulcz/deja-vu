@@ -67,8 +67,8 @@ func main() {
 	}
 
 	type bucket struct {
-		n, r1, r5, miss int
-		mrr             float64
+		n, r1, r5, r10, r20, miss int
+		mrr                       float64
 	}
 	byCat := map[string]*bucket{}
 	total := &bucket{}
@@ -127,6 +127,15 @@ func main() {
 					if rank <= 5 {
 						bb.r5++
 					}
+					// R@10 is the depth MemPalace publishes for this dataset,
+					// and R@20 is what LongMemEval's own tables report, so both
+					// are here rather than left to be recomputed by hand.
+					if rank <= 10 {
+						bb.r10++
+					}
+					if rank <= 20 {
+						bb.r20++
+					}
 				}
 			}
 		}
@@ -137,7 +146,7 @@ func main() {
 	fmt.Printf("\nLoCoMo · deja production retrieval path (session-level, lexical ladder, no LLM)\n")
 	fmt.Printf("questions: %d · wall: %s · median search: %s\n\n", total.n, time.Since(start).Round(time.Second), searchTimes[len(searchTimes)/2].Round(time.Microsecond))
 	names := map[string]string{"1": "multi-hop", "2": "temporal", "3": "open-domain", "4": "single-hop", "5": "adversarial*"}
-	fmt.Printf("%-18s %6s %8s %8s %8s\n", "category", "n", "R@1", "R@5", "MRR")
+	fmt.Printf("%-18s %6s %8s %8s %8s %8s %8s\n", "category", "n", "R@1", "R@5", "R@10", "R@20", "MRR")
 	cats := make([]string, 0, len(byCat))
 	for c := range byCat {
 		cats = append(cats, c)
@@ -145,9 +154,12 @@ func main() {
 	sort.Strings(cats)
 	for _, c := range cats {
 		b := byCat[c]
-		fmt.Printf("%-18s %6d %7.1f%% %7.1f%%   %.3f\n", names[c], b.n, pct(b.r1, b.n), pct(b.r5, b.n), b.mrr/float64(b.n))
+		fmt.Printf("%-18s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", names[c], b.n,
+			pct(b.r1, b.n), pct(b.r5, b.n), pct(b.r10, b.n), pct(b.r20, b.n), b.mrr/float64(b.n))
 	}
-	fmt.Printf("%-18s %6d %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), total.mrr/float64(total.n))
+	fmt.Printf("%-18s %6d %7.1f%% %7.1f%% %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n,
+		pct(total.r1, total.n), pct(total.r5, total.n), pct(total.r10, total.n), pct(total.r20, total.n),
+		total.mrr/float64(total.n))
 	fmt.Println("* adversarial questions are unanswerable by design; retrieval still locates the referenced session")
 
 	if *out == "" {
@@ -165,7 +177,8 @@ func main() {
 		WallSeconds:    time.Since(start).Seconds(),
 		MedianSearchMS: float64(searchTimes[len(searchTimes)/2].Microseconds()) / 1000,
 		Total: benchresult.Row{Name: "TOTAL", N: total.n, Hit1: pct(total.r1, total.n),
-			Hit5: pct(total.r5, total.n), MRR: total.mrr / float64(total.n)},
+			Hit5: pct(total.r5, total.n), Hit10: ptr(pct(total.r10, total.n)),
+			Hit20: ptr(pct(total.r20, total.n)), MRR: total.mrr / float64(total.n)},
 		Notes: map[string]string{
 			"metric":      "session-level retrieval through the production search ladder; no LLM answers a question",
 			"adversarial": "category 5 is unanswerable by design and is reported as its own row",
@@ -174,7 +187,8 @@ func main() {
 	for _, c := range cats {
 		b := byCat[c]
 		res.Rows = append(res.Rows, benchresult.Row{Name: names[c], N: b.n,
-			Hit1: pct(b.r1, b.n), Hit5: pct(b.r5, b.n), MRR: b.mrr / float64(b.n)})
+			Hit1: pct(b.r1, b.n), Hit5: pct(b.r5, b.n), Hit10: ptr(pct(b.r10, b.n)),
+			Hit20: ptr(pct(b.r20, b.n)), MRR: b.mrr / float64(b.n)})
 	}
 	if err := benchresult.Write(*out, res); err != nil {
 		fatal(err)
@@ -305,6 +319,10 @@ func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, t
 	}
 	return 0, detail, elapsed, nil
 }
+
+// ptr is for benchresult's optional depths, which are pointers so an older
+// harness can leave them out rather than publish a zero.
+func ptr(v float64) *float64 { return &v }
 
 func pct(a, n int) float64 {
 	if n == 0 {
