@@ -45,6 +45,7 @@ var evidenceRE = regexp.MustCompile(`D(\d+):\d+`)
 func main() {
 	dataPath := flag.String("data", "locomo10.json", "path to locomo10.json")
 	dumpMisses := flag.String("dump-misses", "", "write a JSONL miss report (rank!=1) to this path")
+	dumpAll := flag.Bool("dump-all", false, "with -dump-misses, write every question rather than only the ones ranked worse than 1")
 	out := flag.String("out", "", "write the run's numbers as JSON to this path")
 	flag.Parse()
 	var missFile *os.File
@@ -91,7 +92,7 @@ func main() {
 			if err != nil {
 				fatal(err)
 			}
-			if missFile != nil && rank != 1 {
+			if missFile != nil && (rank != 1 || *dumpAll) {
 				goldIDs := make([]string, 0, len(gold))
 				for g := range gold {
 					goldIDs = append(goldIDs, g)
@@ -100,7 +101,7 @@ func main() {
 				rec := map[string]any{
 					"sample": sample.SampleID, "category": fmt.Sprint(qa.Category),
 					"question": qa.Question, "rank": rank, "tier": detail.tier,
-					"gold": goldIDs, "top5": detail.top5,
+					"gold": goldIDs, "top5": detail.top5, "scores": detail.scores,
 				}
 				bb, _ := json.Marshal(rec)
 				_, _ = missFile.Write(append(bb, 10))
@@ -256,6 +257,13 @@ func buildDialogIndex(sample locomoSample) (string, func(), error) {
 type dialogDetail struct {
 	tier string
 	top5 []string
+	// scores are the ranking scores behind top5, so the question the
+	// LongMemEval dump answers can be asked on a second dataset: does the
+	// distance between the first two hits say anything about whether the first
+	// one is right? Here it says less — the relative gap is 0.034 where the top
+	// hit is the answer, 0.034 where the answer is at rank 2-5 and 0.036 where
+	// it is lost, over 1,982 questions.
+	scores []float64
 }
 
 func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, time.Duration, error) {
@@ -285,6 +293,7 @@ func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, t
 			break
 		}
 		detail.top5 = append(detail.top5, h.Session.ID)
+		detail.scores = append(detail.scores, h.Score)
 	}
 	for i, h := range hits {
 		if i >= 20 {
