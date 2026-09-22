@@ -147,7 +147,7 @@ The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
-and the version check in `deja doctor`.
+the version check in `deja doctor`, and `deja embed` against an endpoint you set.
 
 Credentials are redacted at index time: AWS keys, `api_key=` and `token=` assignments,
 bearer tokens and raw JWTs, PEM private key blocks, provider tokens, `scheme://user:pass@host`

@@ -146,7 +146,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 ## プライバシー
 
 インデックス作成と検索はローカルで完結します。ネットワークを使うのは `deja update`、`deja sync ssh`、
-`deja doctor` のバージョンチェックだけです。
+`deja doctor` のバージョンチェック、そして自分で設定したエンドポイントに対する `deja embed` だけです。
 
 認証情報はインデックス作成時に秘匿化されます：AWS キー、`api_key=` や `token=` の代入、
 Bearer トークンや生の JWT、PEM 秘密鍵ブロック、各プロバイダーのトークン、`scheme://user:pass@host`

@@ -115,7 +115,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 
 ## 隐私
 
-建索引和搜索都在本地。只有 `deja update`、`deja sync ssh` 和 `deja doctor` 里的版本检查会用到网络。
+建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查，以及指向你所配置端点的 `deja embed` 会用到网络。
 
 凭据在建索引时脱敏：AWS 密钥、`api_key=` 与 `token=` 赋值、bearer 令牌与裸 JWT、PEM 私钥块、
 各家提供商的令牌、`scheme://user:pass@host` 形式的 URL、没有规则能匹配的高熵值，
