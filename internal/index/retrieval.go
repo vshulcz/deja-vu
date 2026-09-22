@@ -521,7 +521,7 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	keep = append(keep, weak...)
 	ss, err := sessionsAtOffsets(dir, m, o, keep, rank.offsets)
-	if err == nil && len(m.Sessions) >= bestMessageStore {
+	if err == nil && (len(m.Sessions) >= bestMessageStore || rankingIsDoubtful(rank)) {
 		ss = rerankByBestMessage(ss, terms, rank.idf)
 	}
 	if err != nil {
@@ -872,6 +872,10 @@ type relevanceRanking struct {
 	// to show can weigh it the same way the ranking weighed the session rather
 	// than approximating it.
 	idf map[string]float64
+	// scores is the whole-query score the ranking gave each kept session, in
+	// the order of metas. The focused view is not here: what reads this is the
+	// doubt gate, and the two views already meet in fuseFocus.
+	scores []float64
 	// offsets are the records that matched, per session ordinal. The ranking
 	// collects them anyway — the per-message signals are keyed by offset — and
 	// they are what lets the tier read and fold the messages that matched
@@ -1455,8 +1459,10 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	anyMatched := make([]int, 0, len(ranked))
 	strong := make([]int, 0, len(ranked))
 	naming := make([]int, 0, len(ranked))
+	scores := make([]float64, 0, len(ranked))
 	for _, r := range ranked {
 		metas = append(metas, r.meta)
+		scores = append(scores, r.score)
 		matched = append(matched, r.matched)
 		anyMatched = append(anyMatched, r.any)
 		strong = append(strong, r.strong)
@@ -1486,6 +1492,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		total:       matchedTotal,
 		idf:         idfOf,
 		offsets:     offsets,
+		scores:      scores,
 	}, readErr
 }
 
@@ -4661,6 +4668,47 @@ func consonantY(word string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSuffix(word, "y"), true
+}
+
+// doubtRerankGap is how crowded the top of the ranking has to be before the
+// per-message reading below is paid for on a store too small for it otherwise.
+//
+// The ranking's own score says when its first place is in question. Measured on
+// LoCoMo's relevance tier, 1,317 questions: where the answer ended at rank 1 the
+// median relative distance between the first two scores is 0.523, where it
+// ended at rank 2-5 it is 0.114, and a distance under 0.05 covers 165 questions
+// of which only 27% were answered right, against 94% for 0.60 or more.
+//
+// Swept on both public benchmarks (hit@1, and the same runs the records in
+// docs/benchmarks hold):
+//
+//	gap   LongMemEval   LoCoMo
+//	off   85.3%         69.7%
+//	0.10  85.3%         70.1%
+//	0.20  85.7%         70.0%
+//	0.30  86.6%         69.9%
+//	0.40  86.8%         69.7%
+//	0.60  86.6%         69.5%
+//	1.00  86.4%         69.0%
+//
+// Both have an interior optimum, which is what says the gate is selecting and
+// not standing in for "fuse everywhere": at 1.00 — the fusion applied to every
+// question — LongMemEval is 0.4 points below its best and LoCoMo 1.1 below.
+// 0.30 is the middle of the plateau where neither is under its baseline, rather
+// than the peak of either.
+const doubtRerankGap = 0.30
+
+// rankingIsDoubtful reports whether the ranking's top place is crowded enough
+// to be worth a second reading.
+func rankingIsDoubtful(rank relevanceRanking) bool {
+	if len(rank.scores) < 2 {
+		return false
+	}
+	first, second := rank.scores[0], rank.scores[1]
+	if first <= 0 {
+		return false
+	}
+	return (first-second)/first < doubtRerankGap
 }
 
 // bestMessageStore is the store size from which the relevance pool is fused
