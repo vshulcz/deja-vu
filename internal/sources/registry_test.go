@@ -211,7 +211,10 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
-		db := filepath.Join(work, "opencode.db")
+		// Named after the fixture: the 1.x and 2.x fixtures are two stores,
+		// and one file holding both schemas is a store neither reader
+		// describes.
+		db := filepath.Join(work, strings.TrimSuffix(filepath.Base(path), ".sql")+".db")
 		if out, runErr := exec.Command("sqlite3", db, string(sql)).CombinedOutput(); runErr != nil {
 			t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
 		}

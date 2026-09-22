@@ -14,27 +14,31 @@ database gives, by id; `DEJA_OPENCODE_DIFFS` overrides where it looks.
 
 ## Schema
 
-opencode 2.0 renamed these tables. A 2.x store keeps sessions in `session_v2`, and folds messages and their parts into one `session_message` table whose `type` column carries the role:
+opencode is moving the conversation into one table. `session_message` holds a turn per row, with the role in its `type` column and the parts of an assistant turn inside its `data` blob:
 
 ```sql
-session_v2(id, project_id, parent_id, directory, title, time_created, time_updated)
+session(id, project_id, workspace_id, parent_id, slug, directory, title, ...)
 session_message(id, session_id, type, seq, time_created, time_updated, data)
 ```
 
-`session_message.data` is JSON. A user row keeps its text at the top level; an assistant row holds its parts under `$.content`:
+Measured on the dev build of 2026-09-21 (`0.0.0-dev-202609212252`): `session_message` is created and empty, and a session's turns are still written to `message` and `part`. One report of a store where the turns had moved — and where the sessions were in a `session_v2` table rather than `session` — is [#3924](https://github.com/vshulcz/deja-vu/issues/3924); no build available here writes that table name.
+
+A user row keeps its text at the top level; an assistant row holds its parts under `$.content`:
 
 ```json
 {"metadata":{},"time":{"created":1789841584567},"text":"why does TestRetry flake"}
 {"time":{"created":1789841585000},"content":[{"type":"text","text":"the timeout is too short"},{"type":"tool","id":"call_1","name":"bash","state":{"status":"completed","input":{"command":"go test ./pkg/"},"content":[{"type":"text","text":"--- FAIL"}],"metadata":{"exit":1}}}]}
 ```
 
-Two renames matter for the parts: a tool names itself under `$.name` where 1.x wrote `$.tool`, and what it printed is the block list `$.state.content` where 1.x wrote the string `$.state.output`. Times are epoch milliseconds. The `type` values seen on a 2.0.12 store are `user`, `assistant`, `synthetic`, `system`, `idle`, `shell`, `skill`, `compaction`, `model-switched`, `agent-switched` and `location-switched`; deja reads the first two, and the rest are opencode talking to itself.
+Two renames matter inside a turn: a tool names itself under `$.name` where the old parts wrote `$.tool`, and what it printed is the block list `$.state.content` where the old parts wrote the string `$.state.output`. Times are epoch milliseconds.
 
-deja reads both schemas and picks by asking `sqlite_master` for `session_v2`.
+deja reads both layouts and picks by asking where the turns are: `session_message` when it holds rows, the old `message` and `part` otherwise.
+
+### The older layout
 
 ### opencode 1.x
 
-The 1.x parser joins three tables:
+The parser joins three tables:
 
 ```sql
 session(id, directory, time_created, time_updated)

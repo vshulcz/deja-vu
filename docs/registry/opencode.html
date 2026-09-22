@@ -47,16 +47,18 @@
 <p>the session touched. deja reads it and folds the records into the session the</p>
 <p>database gives, by id; <code>DEJA_OPENCODE_DIFFS</code> overrides where it looks.</p>
 <h2 id="schema">Schema</h2>
-<p>opencode 2.0 renamed these tables. A 2.x store keeps sessions in <code>session_v2</code>, and folds messages and their parts into one <code>session_message</code> table whose <code>type</code> column carries the role:</p>
-<pre><code class="language-sql">session_v2(id, project_id, parent_id, directory, title, time_created, time_updated)
+<p>opencode is moving the conversation into one table. <code>session_message</code> holds a turn per row, with the role in its <code>type</code> column and the parts of an assistant turn inside its <code>data</code> blob:</p>
+<pre><code class="language-sql">session(id, project_id, workspace_id, parent_id, slug, directory, title, ...)
 session_message(id, session_id, type, seq, time_created, time_updated, data)</code></pre>
-<p><code>session_message.data</code> is JSON. A user row keeps its text at the top level; an assistant row holds its parts under <code>$.content</code>:</p>
+<p>Measured on the dev build of 2026-09-21 (<code>0.0.0-dev-202609212252</code>): <code>session_message</code> is created and empty, and a session&#39;s turns are still written to <code>message</code> and <code>part</code>. One report of a store where the turns had moved — and where the sessions were in a <code>session_v2</code> table rather than <code>session</code> — is <a href="https://github.com/vshulcz/deja-vu/issues/3924">#3924</a>; no build available here writes that table name.</p>
+<p>A user row keeps its text at the top level; an assistant row holds its parts under <code>$.content</code>:</p>
 <pre><code class="language-json">{&#34;metadata&#34;:{},&#34;time&#34;:{&#34;created&#34;:1789841584567},&#34;text&#34;:&#34;why does TestRetry flake&#34;}
 {&#34;time&#34;:{&#34;created&#34;:1789841585000},&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;the timeout is too short&#34;},{&#34;type&#34;:&#34;tool&#34;,&#34;id&#34;:&#34;call_1&#34;,&#34;name&#34;:&#34;bash&#34;,&#34;state&#34;:{&#34;status&#34;:&#34;completed&#34;,&#34;input&#34;:{&#34;command&#34;:&#34;go test ./pkg/&#34;},&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;--- FAIL&#34;}],&#34;metadata&#34;:{&#34;exit&#34;:1}}}]}</code></pre>
-<p>Two renames matter for the parts: a tool names itself under <code>$.name</code> where 1.x wrote <code>$.tool</code>, and what it printed is the block list <code>$.state.content</code> where 1.x wrote the string <code>$.state.output</code>. Times are epoch milliseconds. The <code>type</code> values seen on a 2.0.12 store are <code>user</code>, <code>assistant</code>, <code>synthetic</code>, <code>system</code>, <code>idle</code>, <code>shell</code>, <code>skill</code>, <code>compaction</code>, <code>model-switched</code>, <code>agent-switched</code> and <code>location-switched</code>; deja reads the first two, and the rest are opencode talking to itself.</p>
-<p>deja reads both schemas and picks by asking <code>sqlite_master</code> for <code>session_v2</code>.</p>
+<p>Two renames matter inside a turn: a tool names itself under <code>$.name</code> where the old parts wrote <code>$.tool</code>, and what it printed is the block list <code>$.state.content</code> where the old parts wrote the string <code>$.state.output</code>. Times are epoch milliseconds.</p>
+<p>deja reads both layouts and picks by asking where the turns are: <code>session_message</code> when it holds rows, the old <code>message</code> and <code>part</code> otherwise.</p>
+<h3 id="the-older-layout">The older layout</h3>
 <h3 id="opencode-1-x">opencode 1.x</h3>
-<p>The 1.x parser joins three tables:</p>
+<p>The parser joins three tables:</p>
 <pre><code class="language-sql">session(id, directory, time_created, time_updated)
 message(id, session_id, time_created, data)
 part(id, message_id, data)</code></pre>

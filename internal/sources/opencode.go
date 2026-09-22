@@ -163,7 +163,7 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
 	}
-	v2 := opencodeV2(db)
+	schema := opencodeSchemaOf(db)
 	// Narrow projection: shipping full m.data/p.data JSON blobs through the
 	// sqlite3 pipe on multi-GB stores takes minutes; extracting just the
 	// needed scalars keeps the dump to tens of MB and seconds.
@@ -244,8 +244,8 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	if v2 {
-		q = opencodeV2Query(where, limit)
+	if schema.v2 {
+		q = opencodeV2Query(schema.sessionTable, where, limit)
 	}
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
@@ -447,7 +447,8 @@ func OpencodeCounts() (sessions, messages int, err error) {
 	if opencodeV2(OpencodeDB()) {
 		// A 2.x turn holds its parts in its own blob, so the second figure is
 		// the turns that carry words rather than the text parts under them.
-		q = "select (select count(*) from session_v2),(select count(*) from session_message where type in ('user','assistant'))"
+		q = "select (select count(*) from " + opencodeSessionTable(OpencodeDB()) +
+			"),(select count(*) from session_message where type in ('user','assistant'))"
 	}
 	cmd, stopRead := sqliteReadCmd(OpencodeDB(), q)
 	defer stopRead()

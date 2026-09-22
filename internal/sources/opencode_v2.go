@@ -2,32 +2,92 @@ package sources
 
 import (
 	"fmt"
+	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
-// opencode 2.0 renamed the tables deja reads. `session` became `session_v2`,
-// and `message` and `part` were folded into one `session_message` table whose
-// `type` column carries what the role used to be and whose `data` blob carries
-// the parts an assistant turn used to keep in rows of its own. A store on the
-// new schema answered every query with `no such table: session`, so the whole
-// harness read as unreadable and none of its sessions reached the index
-// (#3924).
+// opencode is moving its conversation out of the `message` and `part` tables
+// into one `session_message` table, whose `type` column carries what the role
+// used to be and whose `data` blob carries an assistant turn's parts. The new
+// table is created and empty in the dev build of 2026-09-21; the turns are
+// still in the old pair there, and `select name from sqlite_master` on that
+// build lists both.
 //
-// Both schemas are read. opencode 1.x is still what most machines have, and a
-// store migrated in place keeps neither set of tables around for long.
+// Read before the switch is thrown, because of how a store that has moved
+// fails: the old query finds the old tables gone and every read of the harness
+// errors with `no such table: session` (#3924), or finds them present and empty
+// and reports a store with no sessions at all, which nothing would complain
+// about. Both halves are covered by asking where the turns actually are.
+//
+// The store in the report also had the sessions in `session_v2` rather than
+// `session`. No build here writes that name, so it is accepted and not
+// insisted on.
 
-// opencodeV2 reports whether a store is on opencode 2.x's schema. The question
-// is asked of sqlite_master rather than by trying a query and reading the
-// error, because a query that fails for another reason — a locked store, a
-// truncated file — would answer it wrong.
-func opencodeV2(db string) bool {
-	b, err := sqliteOutput(db, `select count(*) from sqlite_master where type='table' and name='session_v2'`)
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(b)) == "1"
+// opencodeSchemaOf reads which tables a store actually has, and which of them
+// hold the conversation. Measured against the dev build of 2026-09-21: the
+// session table is still `session`, `session_message` is created and empty, and
+// `message`/`part` carry the turns — so the question cannot be "does a table
+// exist". A store where the old tables are still there but empty would read as
+// a store with no sessions, which is the quiet half of #3924.
+//
+// The report that opened the issue had `session_v2` and no `session` at all, so
+// both names are accepted for the sessions themselves.
+type opencodeSchema struct {
+	v2           bool   // the conversation is in session_message
+	sessionTable string // session, or session_v2 where a store has that
 }
+
+// opencodeSchemaCache keeps one answer per store file, because the schema is
+// asked for again by every read beside the main projection — the newest id, the
+// parents, the titles, the counts — and each answer costs a sqlite3 process.
+// Keyed on the file's size and modification time, so a store that changes under
+// a long-running process is asked again.
+var opencodeSchemaCache sync.Map
+
+func opencodeSchemaOf(db string) opencodeSchema {
+	key := db
+	if fi, err := os.Stat(db); err == nil {
+		key = fmt.Sprintf("%s|%d|%d", db, fi.Size(), fi.ModTime().UnixNano())
+	}
+	if v, ok := opencodeSchemaCache.Load(key); ok {
+		return v.(opencodeSchema)
+	}
+	got := readOpencodeSchema(db)
+	opencodeSchemaCache.Store(key, got)
+	return got
+}
+
+func readOpencodeSchema(db string) opencodeSchema {
+	out := opencodeSchema{sessionTable: "session"}
+	b, err := sqliteOutput(db, `select group_concat(name) from sqlite_master where type='table' `+
+		`and name in ('session','session_v2','session_message')`)
+	if err != nil {
+		return out
+	}
+	have := map[string]bool{}
+	for _, name := range strings.Split(strings.TrimSpace(string(b)), ",") {
+		have[name] = true
+	}
+	if have["session_v2"] && !have["session"] {
+		out.sessionTable = "session_v2"
+	}
+	if !have["session_message"] {
+		return out
+	}
+	// The table exists in a store that has never used it. What decides is
+	// whether the turns are in there.
+	n, err := sqliteOutput(db, `select count(*) from session_message`)
+	if err != nil {
+		return out
+	}
+	out.v2 = strings.TrimSpace(string(n)) != "0"
+	return out
+}
+
+// opencodeV2 reports whether the conversation in a store is kept the 2.x way.
+func opencodeV2(db string) bool { return opencodeSchemaOf(db).v2 }
 
 // opencodeV2Parts is the shape the rest of the parser already reads: one row
 // per part, with the message's own columns beside it.
@@ -47,11 +107,18 @@ const opencodeV2Parts = `with parts as (` +
 	`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
 	`json_object('type','text','text',json_extract(sm.data,'$.text'),'time',json_extract(sm.data,'$.time')), 0 ` +
 	`from session_message sm ` +
-	`where sm.type='user' and json_extract(sm.data,'$.text') is not null) `
+	`where sm.type='user' and json_extract(sm.data,'$.text') is not null ` +
+	`union all ` +
+	// What opencode compacted away, kept the way the old schema's summary
+	// message is: searchable, and not the agent talking.
+	`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
+	`json_object('type','text','text',json_extract(sm.data,'$.summary'),'time',json_extract(sm.data,'$.time')), 0 ` +
+	`from session_message sm ` +
+	`where sm.type='compaction' and json_extract(sm.data,'$.summary') is not null) `
 
 // opencodeV2Query returns the 2.x reader, emitting the same row object the 1.x
 // projection does so one loop reads both.
-func opencodeV2Query(where string, limit int) string {
+func opencodeV2Query(sessionTable, where string, limit int) string {
 	lim := ""
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
@@ -61,8 +128,9 @@ func opencodeV2Query(where string, limit int) string {
 		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
 		`'role',case p.role when 'assistant' then 'assistant' else 'user' end,` +
+		`'summary',case p.role when 'compaction' then 1 end,` +
 		`'text',json_extract(p.data,'$.text'),` +
-		`'path',json_extract(p.data,'$.state.input.filePath'),` +
+		`'path',coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')),` +
 		`'cmd',json_extract(p.data,'$.state.input.command'),` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
 		// What a command printed moved from `$.state.output`, a string, to
@@ -72,11 +140,11 @@ func opencodeV2Query(where string, limit int) string {
 		`'out',case when json_extract(p.data,'$.name')='bash' then (` +
 		`select group_concat(json_extract(c.value,'$.text'),char(10)) from json_each(p.data,'$.state.content') c ` +
 		`where json_extract(c.value,'$.type')='text') end,` +
-		`'exit',json_extract(p.data,'$.state.metadata.exit'),` +
+		`'exit',coalesce(json_extract(p.data,'$.state.structured.exit'),json_extract(p.data,'$.state.metadata.exit')),` +
 		`'pt',coalesce(json_extract(p.data,'$.time.start'),json_extract(p.data,'$.time.created')),` +
 		`'mt',json_extract(p.mdata,'$.time.created'),` +
 		`'mc',p.mc) ` +
-		`from session_v2 s join parts p on p.sid=s.id ` +
+		`from ` + sessionTable + ` s join parts p on p.sid=s.id ` +
 		`where (json_extract(p.data,'$.type')='text' ` +
 		// A tool call names itself under `$.name` now, where 1.x wrote
 		// `$.tool`. The same three are read: what was opened, what was run,
@@ -98,9 +166,4 @@ func opencodeV2SinceWhere(t time.Time) string {
 
 // opencodeSessionTable is the table sessions live in, for the reads beside the
 // main projection — the newest id, the parents, the titles, the counts.
-func opencodeSessionTable(db string) string {
-	if opencodeV2(db) {
-		return "session_v2"
-	}
-	return "session"
-}
+func opencodeSessionTable(db string) string { return opencodeSchemaOf(db).sessionTable }
