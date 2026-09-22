@@ -22,7 +22,7 @@ LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | 中文</p>
+<p align="center"><a href="README.md">English</a> | 中文 | <a href="README.ja.md">日本語</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
 <p align="center"><sub>觉得有用的话，欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上给 deja-vu 点个 Star。</sub></p>
