@@ -321,6 +321,27 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 			}
 			continue
 		}
+		// An `edit` call hands back the text it replaced and the text it wrote,
+		// so both sides are recorded the way every other harness's edit is.
+		if old, nw := str(r["old"]), str(r["new"]); old != "" || nw != "" {
+			path := str(r["editpath"])
+			t := partTime(r)
+			if path != "" && old != "" && IndexEdits() {
+				span := old
+				if len(span) > editSpanMax {
+					span = span[:editSpanMax]
+				}
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: path + "\n" + span, Time: t})
+			}
+			if path != "" && nw != "" && IndexWrites() {
+				if rec := WroteRecord(path, nw); rec != "" {
+					s.Touch(t)
+					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: t})
+				}
+			}
+			continue
+		}
 		if patch := str(r["patch"]); patch != "" {
 			t := partTime(r)
 			if IndexEdits() {

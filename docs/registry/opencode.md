@@ -14,25 +14,37 @@ database gives, by id; `DEJA_OPENCODE_DIFFS` overrides where it looks.
 
 ## Schema
 
-opencode is moving the conversation into one table. `session_message` holds a turn per row, with the role in its `type` column and the parts of an assistant turn inside its `data` blob:
+opencode 2.0 renamed the tables. The migration in the 2.0 binary runs `ALTER TABLE session RENAME TO session_v2`, and a session's turns move out of `message` and `part` into one `session_message` table — one row per turn, the role in its `type` column, an assistant turn's parts inside its `data` blob:
 
 ```sql
-session(id, project_id, workspace_id, parent_id, slug, directory, title, ...)
+session_v2(id, project_id, workspace_id, parent_id, slug, directory, path, title, version, ...)
 session_message(id, session_id, type, seq, time_created, time_updated, data)
 ```
 
-Measured on the dev build of 2026-09-21 (`0.0.0-dev-202609212252`): `session_message` is created and empty, and a session's turns are still written to `message` and `part`. One report of a store where the turns had moved — and where the sessions were in a `session_v2` table rather than `session` — is [#3924](https://github.com/vshulcz/deja-vu/issues/3924); no build available here writes that table name.
+A 2.0 store has no `session`, `message` or `part` table at all. Measured on opencode 2.0.12 (`@opencode/cli`), run in a throwaway HOME: the tables are `session_v2`, `session_message`, `session_inbox`, `session_pending` and the rest of the 2.0 set.
 
 A user row keeps its text at the top level; an assistant row holds its parts under `$.content`:
 
 ```json
-{"metadata":{},"time":{"created":1789841584567},"text":"why does TestRetry flake"}
-{"time":{"created":1789841585000},"content":[{"type":"text","text":"the timeout is too short"},{"type":"tool","id":"call_1","name":"bash","state":{"status":"completed","input":{"command":"go test ./pkg/"},"content":[{"type":"text","text":"--- FAIL"}],"metadata":{"exit":1}}}]}
+{"time":{"created":1790102971000},"text":"edit main.go so add returns a+b+1"}
+{"time":{"created":1790102977894},"agent":"build","content":[{"type":"reasoning","text":"…"},{"type":"tool","id":"call_565d…","name":"shell","state":{"status":"completed","input":{"command":"go vet ./..."},"content":[{"type":"text","text":"pattern ./...: directory prefix . does not contain main module"}],"metadata":{"exit":1}},"time":{"created":1790102980000}},{"type":"text","text":"add now returns a+b+1"}]}
 ```
 
-Two renames matter inside a turn: a tool names itself under `$.name` where the old parts wrote `$.tool`, and what it printed is the block list `$.state.content` where the old parts wrote the string `$.state.output`. Times are epoch milliseconds.
+What changed inside a turn, measured on the same store:
 
-deja reads both layouts and picks by asking where the turns are: `session_message` when it holds rows, the old `message` and `part` otherwise.
+- a tool names itself under `$.name`; `bash` is now `shell` and `apply_patch` is now `patch`
+- what a tool printed is the block list `$.state.content`, where 1.x wrote the string `$.state.output`
+- the file a `read`, `edit` or `write` names is `$.state.input.path`, where 1.x wrote `filePath`; it can be relative to the session directory
+- `edit` is the editing tool, and it carries both sides: `oldString` and `newString`
+- times are epoch milliseconds
+
+The message types on a 2.0 store are `user`, `assistant`, `synthetic`, `system`, `idle`, `shell`, `skill`, `compaction`, `model-switched`, `agent-switched` and `location-switched`. deja reads the first two and a compaction's summary; the rest are opencode talking to itself.
+
+deja reads both layouts and picks by asking where the turns are: `session_message` when it holds rows, `message` and `part` otherwise. The sessions come from `session_v2`, or from `session` on a store that has no `session_v2`.
+
+The per-session diff store (`storage/session_diff/`) is a 1.x store; a 2.0 home does not write it.
+
+### The 1.x layout
 
 ### The older layout
 

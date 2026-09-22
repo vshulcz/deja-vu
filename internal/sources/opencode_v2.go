@@ -130,14 +130,22 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		`'role',case p.role when 'assistant' then 'assistant' else 'user' end,` +
 		`'summary',case p.role when 'compaction' then 1 end,` +
 		`'text',json_extract(p.data,'$.text'),` +
-		`'path',coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')),` +
+		`'path',case when json_extract(p.data,'$.name') in ('read') then ` +
+		`coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')) end,` +
+		`'editpath',coalesce(json_extract(p.data,'$.state.input.filePath'),json_extract(p.data,'$.state.input.path')),` +
 		`'cmd',json_extract(p.data,'$.state.input.command'),` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
+		// 2.0's main editing tool is `edit`, and it carries both sides of the
+		// change. The 1.x reader only ever saw `apply_patch`, so a store where
+		// the edits came through this tool had nothing for `deja restore`,
+		// `deja files` or blame.
+		`'old',json_extract(p.data,'$.state.input.oldString'),` +
+		`'new',json_extract(p.data,'$.state.input.newString'),` +
 		// What a command printed moved from `$.state.output`, a string, to
 		// `$.state.content`, the list of blocks the tool returned. Only the text
 		// ones, and only for bash, for the reason the 1.x reader gives: a file
 		// read is the bulk of a store and the weakest thing in it.
-		`'out',case when json_extract(p.data,'$.name')='bash' then (` +
+		`'out',case when json_extract(p.data,'$.name') in ('bash','shell') then (` +
 		`select group_concat(json_extract(c.value,'$.text'),char(10)) from json_each(p.data,'$.state.content') c ` +
 		`where json_extract(c.value,'$.type')='text') end,` +
 		`'exit',coalesce(json_extract(p.data,'$.state.structured.exit'),json_extract(p.data,'$.state.metadata.exit')),` +
@@ -150,7 +158,10 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		// `$.tool`. The same three are read: what was opened, what was run,
 		// what was changed.
 		`or (json_extract(p.data,'$.type')='tool' ` +
-		`and json_extract(p.data,'$.name') in ('read','bash','apply_patch')))` +
+		// 2.0 renamed two of the three: `bash` is `shell` and `apply_patch` is
+		// `patch`. Both spellings are read, because a store written before the
+		// rename keeps the old ones.
+		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit')))` +
 		where + ` order by s.id,p.mc,p.ord` + lim
 }
 

@@ -278,3 +278,59 @@ insert into session_message values('m2','s1','compaction',2,1767409203000,176740
 		t.Errorf("summaries = %v — a compaction is the only record of what it compacted", summaries)
 	}
 }
+
+// The rows of a real 2.0.12 store, written by opencode itself in a throwaway
+// HOME: the tools are `read`, `shell` and `edit` — `bash` and `apply_patch`
+// were renamed — the file is `path`, the exit status is on the tool's
+// metadata, and an edit carries both sides of the change.
+func TestOpencodeReadsAnOpencode2Store(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	db := filepath.Join(t.TempDir(), "opencode.db")
+	script := `create table session_v2(id text primary key, project_id text, parent_id text, directory text, title text, time_created integer, time_updated integer);
+create table session_message(id text primary key, session_id text, type text, seq integer, time_created integer, time_updated integer, data text);
+insert into session_v2 values('s1','p1',null,'/w','Modify add to return a+b+1',1790102970000,1790102990000);
+insert into session_message values('m1','s1','user',1,1790102971000,1790102971000,'{"time":{"created":1790102971000},"text":"edit main.go so add returns a+b+1, then run go vet"}');
+insert into session_message values('m2','s1','assistant',2,1790102977894,1790102982344,'{"time":{"created":1790102977894},"agent":"build","content":[` +
+		`{"type":"reasoning","text":"go vet failed because there is no go module"},` +
+		`{"type":"tool","id":"c1","name":"read","executed":false,"state":{"status":"completed","input":{"path":"main.go"},"content":[{"type":"text","text":"package main"}]},"time":{"created":1790102978000}},` +
+		`{"type":"tool","id":"c2","name":"edit","executed":false,"state":{"status":"completed","input":{"path":"/w/main.go","oldString":"func add(a, b int) int { return a + b }","newString":"func add(a, b int) int { return a + b + 1 }"},"content":[{"type":"text","text":"Edited main.go (1 replacement)"}]},"time":{"created":1790102979000}},` +
+		`{"type":"tool","id":"c3","name":"shell","state":{"status":"completed","input":{"command":"go vet ./..."},"content":[{"type":"text","text":"pattern ./...: directory prefix . does not contain main module"}],"metadata":{"exit":1}},"time":{"created":1790102980000}},` +
+		`{"type":"text","text":"add now returns a+b+1"}` +
+		`]}');
+insert into session_message values('m3','s1','idle',3,1790102983000,1790102983000,'{"time":{"created":1790102983000}}');`
+	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite setup: %v %s", err, out)
+	}
+	ss, err := ParseOpencodeDB(db)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("len=%d err=%v", len(ss), err)
+	}
+	got := map[string][]string{}
+	for _, m := range ss[0].Messages {
+		got[m.Role] = append(got[m.Role], m.Text)
+	}
+	if len(got["user"]) != 1 || len(got["assistant"]) != 1 {
+		t.Errorf("turns = %v / %v", got["user"], got["assistant"])
+	}
+	if len(got[RoleFiles]) != 1 || got[RoleFiles][0] != "main.go" {
+		t.Errorf("files = %v — `read` names the file under `path` now", got[RoleFiles])
+	}
+	if len(got[RoleCommand]) != 1 || !strings.Contains(got[RoleCommand][0], "go vet ./...") ||
+		!strings.Contains(got[RoleCommand][0], "→ exit 1") {
+		t.Errorf("commands = %v — `bash` is `shell` here, and its status is on the metadata", got[RoleCommand])
+	}
+	if len(got[RoleToolOutput]) != 1 || !strings.Contains(got[RoleToolOutput][0], "does not contain main module") {
+		t.Errorf("tool output = %v", got[RoleToolOutput])
+	}
+	// `edit` is 2.0's editing tool, and it hands back what it replaced and what
+	// it wrote — both sides, the way every other harness's edit is recorded.
+	if len(got[RoleEdit]) != 1 || !strings.HasPrefix(got[RoleEdit][0], "/w/main.go\n") ||
+		!strings.Contains(got[RoleEdit][0], "return a + b }") {
+		t.Errorf("edits = %v", got[RoleEdit])
+	}
+	if len(got[RoleWrote]) != 1 || !strings.HasPrefix(got[RoleWrote][0], "/w/main.go\n") {
+		t.Errorf("wrote = %v", got[RoleWrote])
+	}
+}
