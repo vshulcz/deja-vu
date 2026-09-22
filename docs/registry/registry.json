@@ -500,10 +500,11 @@
       ],
       "format_kind": "sqlite + json",
       "fixture_paths": [
-        "fixtures/registry/opencode/opencode.sql"
+        "fixtures/registry/opencode/opencode.sql",
+        "fixtures/registry/opencode/opencode-v2.sql"
       ],
       "parser_source": "internal/sources/opencode.go",
-      "last_verified": "2026-09-19",
+      "last_verified": "2026-09-22",
       "display_name": "opencode",
       "capabilities": {
         "mcp": true,

@@ -47,7 +47,16 @@
 <p>the session touched. deja reads it and folds the records into the session the</p>
 <p>database gives, by id; <code>DEJA_OPENCODE_DIFFS</code> overrides where it looks.</p>
 <h2 id="schema">Schema</h2>
-<p>The parser joins three tables:</p>
+<p>opencode 2.0 renamed these tables. A 2.x store keeps sessions in <code>session_v2</code>, and folds messages and their parts into one <code>session_message</code> table whose <code>type</code> column carries the role:</p>
+<pre><code class="language-sql">session_v2(id, project_id, parent_id, directory, title, time_created, time_updated)
+session_message(id, session_id, type, seq, time_created, time_updated, data)</code></pre>
+<p><code>session_message.data</code> is JSON. A user row keeps its text at the top level; an assistant row holds its parts under <code>$.content</code>:</p>
+<pre><code class="language-json">{&#34;metadata&#34;:{},&#34;time&#34;:{&#34;created&#34;:1789841584567},&#34;text&#34;:&#34;why does TestRetry flake&#34;}
+{&#34;time&#34;:{&#34;created&#34;:1789841585000},&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;the timeout is too short&#34;},{&#34;type&#34;:&#34;tool&#34;,&#34;id&#34;:&#34;call_1&#34;,&#34;name&#34;:&#34;bash&#34;,&#34;state&#34;:{&#34;status&#34;:&#34;completed&#34;,&#34;input&#34;:{&#34;command&#34;:&#34;go test ./pkg/&#34;},&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;--- FAIL&#34;}],&#34;metadata&#34;:{&#34;exit&#34;:1}}}]}</code></pre>
+<p>Two renames matter for the parts: a tool names itself under <code>$.name</code> where 1.x wrote <code>$.tool</code>, and what it printed is the block list <code>$.state.content</code> where 1.x wrote the string <code>$.state.output</code>. Times are epoch milliseconds. The <code>type</code> values seen on a 2.0.12 store are <code>user</code>, <code>assistant</code>, <code>synthetic</code>, <code>system</code>, <code>idle</code>, <code>shell</code>, <code>skill</code>, <code>compaction</code>, <code>model-switched</code>, <code>agent-switched</code> and <code>location-switched</code>; deja reads the first two, and the rest are opencode talking to itself.</p>
+<p>deja reads both schemas and picks by asking <code>sqlite_master</code> for <code>session_v2</code>.</p>
+<h3 id="opencode-1-x">opencode 1.x</h3>
+<p>The 1.x parser joins three tables:</p>
 <pre><code class="language-sql">session(id, directory, time_created, time_updated)
 message(id, session_id, time_created, data)
 part(id, message_id, data)</code></pre>
@@ -63,7 +72,7 @@ part(id, message_id, data)</code></pre>
 <li>A missing database must not be passed to SQLite because the CLI would create it.</li>
 <li>The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-19</p>
+<p><strong>Last verified:</strong> 2026-09-22</p>
 
 <hr>
 <p>deja reads this format and thirty-three others, and turns what it finds into memory your
