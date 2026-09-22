@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The release publishes the OpenClaw plugin to ClawHub again. The job ran on Node 20 against a CLI that wants 22, and it ended on `Not logged in` — the one message the CLI gives both for a missing OIDC token and for a refused one. It now runs on 22 and says which of the two happened. 0.21.0's plugin was published by hand.
+
 ## [0.21.0] - 2026-09-22
 
 `deja secrets` lists the sessions whose transcripts still hold an API key, a
