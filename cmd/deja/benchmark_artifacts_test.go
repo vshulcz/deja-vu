@@ -30,6 +30,13 @@ type benchArtifact struct {
 	Total benchRow   `json:"total"`
 	Extra struct {
 		EvidenceRecall map[string]float64 `json:"evidence_recall"`
+		// LoCoMo's own shape: how many questions name evidence in more than
+		// one session, and how often the two-session ones have both in the
+		// five. On this dataset the hit@k headline is generous by
+		// construction, so the page has to carry these too.
+		MultiEvidence   int     `json:"multi_evidence_questions"`
+		TwoSession      int     `json:"two_session_questions"`
+		TwoSessionBoth5 float64 `json:"two_session_both_in_top5"`
 	} `json:"extra"`
 }
 
@@ -125,6 +132,21 @@ func TestBenchmarkPageMatchesTheCommittedRuns(t *testing.T) {
 	} {
 		if !strings.Contains(html, want.text) {
 			t.Errorf("benchmarks.html does not state evidence recall %s as recorded: %q", want.at, want.text)
+		}
+	}
+
+	// A LoCoMo question often names two conversations, and hit@1 credits it for
+	// finding either one. The strict numbers are in the record, so the page has
+	// to state them rather than leave the generous ones standing alone.
+	for _, want := range []struct{ what, text string }{
+		{"evidence-recall@1", "evidence-recall@1 " + pct1(locomo.Extra.EvidenceRecall["@1"])},
+		{"evidence-recall@5", "@5 " + pct1(locomo.Extra.EvidenceRecall["@5"])},
+		{"multi-evidence questions", fmt.Sprintf("%d of these questions name evidence in more than one session", locomo.Extra.MultiEvidence)},
+		{"two-session questions", fmt.Sprintf("Of the %d that name exactly two sessions", locomo.Extra.TwoSession)},
+		{"both in the top five", "both are in the top five " + pct1(locomo.Extra.TwoSessionBoth5)},
+	} {
+		if !strings.Contains(html, want.text) {
+			t.Errorf("benchmarks.html does not state LoCoMo's %s as recorded: %q", want.what, want.text)
 		}
 	}
 }

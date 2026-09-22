@@ -1,15 +1,15 @@
 {
   "benchmark": "LoCoMo",
   "harness": "scripts/locomo",
-  "run_at": "2026-09-15",
+  "run_at": "2026-09-22",
   "dataset": {
     "name": "locomo10.json",
     "bytes": 2805274,
     "sha256": "79fa87e90f04081343b8c8debecb80a9a6842b76a7aa537dc9fdf651ea698ff4"
   },
   "questions": 1982,
-  "wall_seconds": 8.853070834,
-  "median_search_ms": 3.858,
+  "wall_seconds": 12.33698675,
+  "median_search_ms": 4.776,
   "rows": [
     {
       "name": "multi-hop",
@@ -54,8 +54,18 @@
     "hit@5": 85.62058526740665,
     "mrr": 0.7670881932644322
   },
+  "extra": {
+    "evidence_recall": {
+      "@1": 64.88860057982157,
+      "@5": 80.41428411256862
+    },
+    "multi_evidence_questions": 333,
+    "two_session_both_in_top5": 27.053140096618357,
+    "two_session_questions": 207
+  },
   "notes": {
     "adversarial": "category 5 is unanswerable by design and is reported as its own row",
+    "evidence": "evidence_recall is the share of a question's gold sessions the top k holds, averaged over questions — the strict metric for a dataset whose multi-hop questions name several sessions",
     "metric": "session-level retrieval through the production search ladder; no LLM answers a question"
   }
 }

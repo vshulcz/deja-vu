@@ -72,6 +72,13 @@ func main() {
 	}
 	byCat := map[string]*bucket{}
 	total := &bucket{}
+	evSum := map[int]float64{}
+	evN := 0
+	// A multi-hop question usually names two sessions, and "one of them ranked
+	// first" is not the same as "the evidence is in front of you". These two
+	// counters are the honest shape of that: how many questions need more than
+	// one session, and how often a two-session question has both in the five.
+	multiEvidence, pairs, pairsBoth := 0, 0, 0
 	start := time.Now()
 	var searchTimes []time.Duration
 
@@ -105,6 +112,25 @@ func main() {
 				}
 				bb, _ := json.Marshal(rec)
 				_, _ = missFile.Write(append(bb, 10))
+			}
+			for k, v := range detail.evRecall {
+				evSum[k] += v
+			}
+			evN++
+			if len(gold) > 1 {
+				multiEvidence++
+			}
+			if len(gold) == 2 {
+				pairs++
+				got := 0
+				for _, id := range detail.top5 {
+					if gold[id] {
+						got++
+					}
+				}
+				if got == 2 {
+					pairsBoth++
+				}
 			}
 			searchTimes = append(searchTimes, elapsed)
 			cat := fmt.Sprint(qa.Category)
@@ -148,6 +174,10 @@ func main() {
 		fmt.Printf("%-18s %6d %7.1f%% %7.1f%%   %.3f\n", names[c], b.n, pct(b.r1, b.n), pct(b.r5, b.n), b.mrr/float64(b.n))
 	}
 	fmt.Printf("%-18s %6d %7.1f%% %7.1f%%   %.3f\n", "TOTAL", total.n, pct(total.r1, total.n), pct(total.r5, total.n), total.mrr/float64(total.n))
+	fmt.Printf("evidence-recall (per gold session)     %7.1f%% %7.1f%%\n",
+		pct1f(evSum[1], evN), pct1f(evSum[5], evN))
+	fmt.Printf("questions naming more than one session: %d; of the %d naming exactly two, both in the top five: %.1f%%\n",
+		multiEvidence, pairs, pct(pairsBoth, pairs))
 	fmt.Println("* adversarial questions are unanswerable by design; retrieval still locates the referenced session")
 
 	if *out == "" {
@@ -166,8 +196,17 @@ func main() {
 		MedianSearchMS: float64(searchTimes[len(searchTimes)/2].Microseconds()) / 1000,
 		Total: benchresult.Row{Name: "TOTAL", N: total.n, Hit1: pct(total.r1, total.n),
 			Hit5: pct(total.r5, total.n), MRR: total.mrr / float64(total.n)},
+		Extra: map[string]any{
+			"evidence_recall": map[string]float64{
+				"@1": pct1f(evSum[1], evN), "@5": pct1f(evSum[5], evN),
+			},
+			"multi_evidence_questions": multiEvidence,
+			"two_session_questions":    pairs,
+			"two_session_both_in_top5": pct(pairsBoth, pairs),
+		},
 		Notes: map[string]string{
 			"metric":      "session-level retrieval through the production search ladder; no LLM answers a question",
+			"evidence":    "evidence_recall is the share of a question's gold sessions the top k holds, averaged over questions — the strict metric for a dataset whose multi-hop questions name several sessions",
 			"adversarial": "category 5 is unanswerable by design and is reported as its own row",
 		},
 	}
@@ -264,6 +303,12 @@ type dialogDetail struct {
 	// hit is the answer, 0.034 where the answer is at rank 2-5 and 0.036 where
 	// it is lost, over 1,982 questions.
 	scores []float64
+	// evRecall is the share of this question's gold sessions the top k holds,
+	// the stricter metric the LongMemEval record already reports. LoCoMo needs
+	// it more, not less: 270 of its 282 multi-hop questions name evidence in
+	// more than one session, so "some gold session ranked first" and "the
+	// question's evidence is in front of you" are far apart here.
+	evRecall map[int]float64
 }
 
 func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, time.Duration, error) {
@@ -287,13 +332,25 @@ func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, t
 		return 0, dialogDetail{}, 0, err
 	}
 	elapsed := time.Since(t0)
-	detail := dialogDetail{tier: string(result.Tier)}
+	detail := dialogDetail{tier: string(result.Tier), evRecall: map[int]float64{}}
 	for i, h := range hits {
 		if i >= 5 {
 			break
 		}
 		detail.top5 = append(detail.top5, h.Session.ID)
 		detail.scores = append(detail.scores, h.Score)
+	}
+	for _, k := range []int{1, 5} {
+		got := 0
+		for i, h := range hits {
+			if i >= k {
+				break
+			}
+			if gold[h.Session.ID] {
+				got++
+			}
+		}
+		detail.evRecall[k] = float64(got) / float64(len(gold))
 	}
 	for i, h := range hits {
 		if i >= 20 {
@@ -304,6 +361,14 @@ func askDialog(dir, question string, gold map[string]bool) (int, dialogDetail, t
 		}
 	}
 	return 0, detail, elapsed, nil
+}
+
+// pct1f is pct for a sum of shares rather than a count.
+func pct1f(sum float64, n int) float64 {
+	if n == 0 {
+		return 0
+	}
+	return 100 * sum / float64(n)
 }
 
 func pct(a, n int) float64 {
