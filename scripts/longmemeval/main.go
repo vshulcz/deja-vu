@@ -526,8 +526,8 @@ func runPrecision(questions []lmeQuestion) {
 //
 // The context surface prints one session and a count of the others; recall
 // prints five sessions with a line each. So for the questions where the answer
-// sits at rank 2-5 — 48 of 470, the whole distance between hit@1 85.3% and
-// hit@5 95.5% — the question is whether a reader with those five lines in front
+// sits at rank 2-5 — 48 of 470 when this was measured, the whole distance
+// between hit@1 85.3% and hit@5 95.5% then — the question is whether a reader with those five lines in front
 // of it could tell which one holds the answer. Scored the way -answer-carry
 // scores a block: the answer's words that the question does not already carry.
 //
