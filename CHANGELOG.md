@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The Zed extension is `deja-mcp-server` and carries the context server only. Zed's registry takes an MCP extension under a `*-mcp-server` id and no longer takes slash commands, so the `/deja` slash command is gone; the server key stays `deja-context-server`, so a `deja install zed` entry and the extension still resolve to one server.
+
 ### Fixed
 - A manifest rewrite is visible to the process that made it. The read-only manifest cache is keyed on `manifest.gob`'s mtime and size, and its own comment said that is a pair the atomic swap always changes — it is not. A rewrite that keeps the size and lands inside one tick of the filesystem's timestamp resolution leaves both identical, and every surface that reads through the cache — doctor's read state, the session count, friction, the brief — then answers from the manifest before it. It surfaced as a test that failed on CI and passed on every developer machine, which is the honest shape of a clock-resolution bug; the writer now drops the cache entry itself, and the stamp stays as what catches a rewrite by another process. A test reproduces the collision deterministically by putting the second write back on the first one's timestamp, and fails when the invalidation is taken out.
 

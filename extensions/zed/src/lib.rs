@@ -14,8 +14,7 @@ use serde::Deserialize;
 use zed::settings::ContextServerSettings;
 use zed_extension_api::{
     self as zed, Architecture, Command, ContextServerConfiguration, ContextServerId,
-    DownloadedFileType, GithubReleaseOptions, Os, Project, Result, SlashCommand,
-    SlashCommandOutput, SlashCommandOutputSection, Worktree,
+    DownloadedFileType, GithubReleaseOptions, Os, Project, Result,
 };
 
 const REPOSITORY: &str = "vshulcz/deja-vu";
@@ -290,64 +289,6 @@ impl zed::Extension for DejaExtension {
             command: self.binary_path(project)?,
             args: vec!["mcp".into()],
             env: vec![],
-        })
-    }
-
-    /// `/deja <query>` — the same search the terminal gives, dropped into the
-    /// thread. Unlike the context server this runs in the extension itself, so
-    /// it can ask the worktree where `deja` is before falling back to the copy
-    /// downloaded for the server.
-    fn run_slash_command(
-        &self,
-        _command: SlashCommand,
-        args: Vec<String>,
-        worktree: Option<&Worktree>,
-    ) -> Result<SlashCommandOutput> {
-        let query = args.join(" ");
-        if query.trim().is_empty() {
-            return Err("say what to look for: /deja <error, file or decision>".into());
-        }
-
-        let binary = worktree
-            .and_then(|worktree| worktree.which(BINARY))
-            .or_else(downloaded_binary)
-            .ok_or_else(|| {
-                "deja is not on PATH and this extension has not downloaded a copy yet. Open the \
-                 agent panel once so the context server fetches one, or install deja: curl -fsSL \
-                 https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh"
-                    .to_string()
-            })?;
-
-        // `search` is named rather than handed over as deja's first word: the
-        // bare-query path dispatches a first word that happens to be a
-        // command, so `/deja version` printed a version number and `/deja
-        // index` rebuilt the index. `--` then keeps a query that names one of
-        // deja's own flags out of its flag parsing, where it would exit and
-        // come back to the reader as an empty history.
-        let mut args = vec!["search".to_string()];
-        if query.starts_with('-') {
-            args.push("--".to_string());
-        }
-        args.push(query.clone());
-
-        let output = zed::process::Command::new(binary)
-            .args(args)
-            .envs(worktree.map(|worktree| worktree.shell_env()).unwrap_or_default())
-            .output()?;
-
-        let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let text = if text.is_empty() {
-            "Nothing in this machine's history matches that.".to_string()
-        } else {
-            text
-        };
-
-        Ok(SlashCommandOutput {
-            sections: vec![SlashCommandOutputSection {
-                range: (0..text.len() as u32).into(),
-                label: format!("deja: {query}"),
-            }],
-            text,
         })
     }
 

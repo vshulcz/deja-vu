@@ -11,7 +11,7 @@ same local index.
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | [`openclaw/`](openclaw) | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | [`pi/`](pi) | npm `@vshulcz/pi-deja` (`pi-package`, also read by omp) | `pi install npm:@vshulcz/pi-deja` |
-| [`zed/`](zed) | Zed extension `deja-context-server` | Zed → Extensions → deja |
+| [`zed/`](zed) | Zed extension `deja-mcp-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
 

@@ -1,14 +1,10 @@
-id = "deja-context-server"
+id = "deja-mcp-server"
 name = "deja"
 description = "deja-vu memory for Zed: search and recall the sessions your other coding agents already wrote, from inside Zed"
-version = "0.1.3"
+version = "0.1.4"
 schema_version = 1
 authors = ["vshulcz <vshulcz@gmail.com>"]
 repository = "https://github.com/vshulcz/deja-vu"
 
 [context_servers.deja-context-server]
 name = "deja"
-
-[slash_commands.deja]
-description = "deja-vu memory for Zed: search and recall the sessions your other coding agents already wrote, from inside Zed"
-requires_argument = true

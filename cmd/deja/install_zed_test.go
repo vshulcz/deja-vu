@@ -595,12 +595,13 @@ func TestZedInstallLeavesTheExtensionEntryAlone(t *testing.T) {
 	}
 }
 
-// The id deja writes and the id the extension declares have to be the same
-// string — that is the whole reason the two cannot become two servers. They
-// live in different files, edited months apart.
+// The server id deja writes and the one the extension registers have to be the
+// same string — that is the whole reason the two cannot become two servers.
+// They live in different files, edited months apart. The extension's own id is
+// a different thing: Zed's registry wants an MCP extension named *-mcp-server.
 func TestZedServerIDMatchesTheExtensionManifest(t *testing.T) {
 	manifest := string(repoFile(t, "extensions/zed/extension.toml"))
-	if want := "id = \"" + zedServerID + "\""; !strings.Contains(manifest, want) {
+	if want := `id = "deja-mcp-server"`; !strings.Contains(manifest, want) {
 		t.Fatalf("extension.toml does not declare %s:\n%s", want, manifest)
 	}
 	if !strings.Contains(manifest, "[context_servers."+zedServerID+"]") {

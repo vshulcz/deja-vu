@@ -184,8 +184,8 @@ jobs:
       - name: The id in extension.toml must match what the registry lists
         run: |
           id=$(grep -m1 '^id = ' extension.toml | cut -d'"' -f2)
-          test "$id" = "deja-context-server" || {
-            echo "extension.toml id is '$id'; zed-industries/extensions lists it as deja-context-server"
+          test "$id" = "deja-mcp-server" || {
+            echo "extension.toml id is '$id'; zed-industries/extensions lists it as deja-mcp-server"
             exit 1
           }
 
