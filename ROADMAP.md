@@ -43,14 +43,6 @@ the place to discuss design.
   machine already knows about it, and `hook-plan` delivers the same thing at
   `ExitPlanMode`. No installer wires it yet: the measurement that would justify
   it — does an agent change a plan it is about to run — has not been made.
-- **Line-level attribution past the terminal.** `deja blame <path>:<line>` names
-  the session that replaced the text a commit deleted, or wrote the line before
-  the commit carried it — 40% of 150 random lines on this repository, and it
-  says which silence the rest are. What is open is the shape
-  a tool reads it in, whether the answer belongs in `refs/notes/deja` so a
-  reviewer sees it without deja, and whether a *why* can be derived at all —
-  today it cannot, and the measurement behind that is in
-  [#3723](https://github.com/vshulcz/deja-vu/issues/3723).
 - **Deepen curation past a single boost.** Reuse is a global signal today: a
   session pulled for one query is lifted for every query. A per-query signal —
   recording what a recall was for, not only that it happened — would let reuse be
