@@ -128,3 +128,47 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/release-npm.mjs "${GITHUB_REF_NAME#v}" dist
+
+  clawhub:
+    name: ClawHub package
+    runs-on: ubuntu-latest
+    needs: npm
+    permissions:
+      contents: read
+      # ClawHub trusted publishing: the CLI trades the workflow's OIDC token for
+      # a one-package, one-version publish token, so no secret is stored. The
+      # package's trusted-publisher config names this repo and release.yml.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+
+      # Same version npm was just given for this package — release-npm.mjs may
+      # have moved it to the next patch of its own line — and the same pinned
+      # binary dependency, so the two registries serve one artifact.
+      - name: Publish the OpenClaw plugin
+        run: |
+          set -euo pipefail
+          version="$(npm view @vshulcz/openclaw-deja version)"
+          out="$(mktemp -d)/openclaw"
+          cp -R extensions/openclaw "$out"
+          node -e '
+            const fs = require("fs"), [p, v, d] = process.argv.slice(1);
+            const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
+            pkg.version = v;
+            if (pkg.dependencies?.["@vshulcz/deja-vu"]) pkg.dependencies["@vshulcz/deja-vu"] = "^" + d;
+            fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");
+          ' "$out/package.json" "$version" "${GITHUB_REF_NAME#v}"
+          npx -y clawhub@0.23.3 package publish "$out" \
+            --family code-plugin \
+            --name @vshulcz/openclaw-deja \
+            --version "$version" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF_NAME" \
+            --source-path extensions/openclaw \
+            --changelog "deja-vu $GITHUB_REF_NAME" \
+            --no-input
