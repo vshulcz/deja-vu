@@ -1103,13 +1103,19 @@ func installCodexAuto(exe string, uninstall bool) (installResult, error) {
 }
 
 func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
-	mcp, err := installOpencode(exe, uninstall)
-	if err != nil {
-		return installResult{}, err
-	}
+	mcp, mcpErr := installOpencode(exe, uninstall)
+	// The two halves are independent: the plugin shells out to the hook
+	// launcher and reads nothing from the config. A config deja declines to
+	// edit — one that keeps its servers under `mcp.servers`, say — used to end
+	// the whole target, so the machine was left with no digest and no
+	// per-prompt recall either, and running the install again after adding the
+	// server by hand was the only way out (#3937).
 	plugin, err := installOpencodePlugin(exe, uninstall)
 	if err != nil {
 		return installResult{}, err
+	}
+	if mcpErr != nil {
+		return plugin, mcpErr
 	}
 	return wroteAll(mcp, plugin), nil
 }

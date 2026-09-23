@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- `deja install opencode-auto` writes the plugin the installed opencode can load. OpenCode 2.0 reads only a module's default export and 1.x refuses any default export without `server()`, so one file cannot serve both: the shape now comes from the version on PATH, then from the store, and `deja doctor` reads the other major's file as stale rather than wired.
+- A config deja declines to edit no longer costs the plugin too. An opencode config that keeps its servers under `mcp.servers` is still refused, but the plugin beside it is written, so the machine keeps its auto-recall.
 - A forked Codex rollout keeps its own thread. It carries the parent's `session_meta` along with the history it branched from, and the later record used to win, so the child's turns were filed under the parent and `deja show <child>` answered "no session matches".
 - A message repeated verbatim in one rollout is indexed once whether the file was appended to or rebuilt. The append path had no dedupe, so the same file held three records incrementally and two after a rebuild.
 - The README stops promising that what reaches the model is safe to send. Redaction is pattern matching, the security model says so on its own page, and the hero paragraph said the opposite in English and Japanese.
