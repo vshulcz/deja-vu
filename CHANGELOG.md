@@ -8,10 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A forked Codex rollout keeps its own thread. It carries the parent's `session_meta` along with the history it branched from, and the later record used to win, so the child's turns were filed under the parent and `deja show <child>` answered "no session matches".
+- A message repeated verbatim in one rollout is indexed once whether the file was appended to or rebuilt. The append path had no dedupe, so the same file held three records incrementally and two after a rebuild.
 - The README stops promising that what reaches the model is safe to send. Redaction is pattern matching, the security model says so on its own page, and the hero paragraph said the opposite in English and Japanese.
 - The comparison page gets three facts right: claude-mem and agentmemory are Apache-2.0, not MIT; `deja blame` is no longer listed as having no equivalent, because ctx ships one this page already mentions; and retroactive indexing is no longer "nine of the ten cannot do it" — agentmemory imports old Claude Code transcripts now.
-
-### Fixed
 - The release publishes the OpenClaw plugin to ClawHub again. The job ran on Node 20 against a CLI that wants 22, and it ended on `Not logged in` — the one message the CLI gives both for a missing OIDC token and for a refused one. It now runs on 22 and says which of the two happened. 0.21.0's plugin was published by hand.
 
 ## [0.21.0] - 2026-09-22
