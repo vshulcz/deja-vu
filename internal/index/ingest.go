@@ -3856,6 +3856,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	}
 	defer func() { _ = rw.Close() }()
 	buckets := bucketPostings{}
+	// The same rule the two full builds apply: a message repeated verbatim in
+	// one pass is written once. Without it the same rollout held one record or
+	// two depending on whether it was appended or rebuilt, so an index compared
+	// against a rebuilt copy of itself came out unequal (#3934).
+	seenMsgs := msgSeen{}
 	// Every session this pass read, for the sidecars at the end.
 	var appended []model.Session
 	loadBucket := func(tok string) (map[string][]posting, error) {
@@ -3995,6 +4000,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				// (#551). Writing it would store a record with no content and give
 				// it a posting.
 				if strings.TrimSpace(text) == "" {
+					continue
+				}
+				if seenMsgs.dup(key, msg.Role, msg.Time, text) {
 					continue
 				}
 				off, err := rw.write(Record{Key: key, SourcePath: s.Path, Role: msg.Role, Text: text, Time: msg.Time})
