@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-09-23
+
+A point release for OpenCode 2.0, reported by its users the day after 0.21.0.
+The plugin 0.21.0 wrote does not load on 2.0 at all, and a config that keeps
+its servers under `mcp.servers` was rewritten in place rather than left alone.
+Codex forks stop losing their turns to the parent thread.
+
 ### Fixed
 - `deja install opencode-auto` writes the plugin the installed opencode can load. OpenCode 2.0 reads only a module's default export and 1.x refuses any default export without `server()`, so one file cannot serve both: the shape now comes from the version on PATH, then from the store, and `deja doctor` reads the other major's file as stale rather than wired.
 - A config deja declines to edit no longer costs the plugin too. An opencode config that keeps its servers under `mcp.servers` is still refused, but the plugin beside it is written, so the machine keeps its auto-recall.
@@ -1499,7 +1506,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/vshulcz/deja-vu/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/vshulcz/deja-vu/compare/v0.20.2...v0.21.0
 [0.20.2]: https://github.com/vshulcz/deja-vu/compare/v0.20.1...v0.20.2
 [0.20.1]: https://github.com/vshulcz/deja-vu/compare/v0.20.0...v0.20.1
