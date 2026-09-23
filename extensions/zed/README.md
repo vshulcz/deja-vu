@@ -17,6 +17,7 @@ One tool, `deja`, called with a `mode`:
 | `blame` | The sessions that discussed a file, before you edit or delete it. |
 | `fix` | What this machine ran after that same error before. |
 | `how` | The real invocation for a build, test or deploy, from what ran here. |
+| `orient` | The commands past sessions ran in this project and the files they worked in. |
 | `remember` | Stores one durable decision for later recall. |
 
 ## Install

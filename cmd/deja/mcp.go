@@ -307,6 +307,7 @@ func dejaTool() map[string]any {
 			"- blame: why a file is the way it is, before you edit or delete it. Sessions, not git authorship.\n" +
 			"- fix: you just hit an error — what this machine ran after that same error. Pass the output verbatim.\n" +
 			"- how: the command and flags this user really runs for a thing, instead of a guessed one.\n" +
+			"- orient: the commands past sessions ran in this project and the files they worked in, before you go reading.\n" +
 			"- remember: store one settled decision for a later session.\n" +
 			"A bracketed marker on a result is the user's own later judgement; act on what it says. " +
 			"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
@@ -314,7 +315,7 @@ func dejaTool() map[string]any {
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}},
+				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember"}},
 				"q":       map[string]any{"type": "string", "description": "What to ask about: the question or exact token; for blame a path, for fix the failing output verbatim, for remember the fact."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
@@ -336,6 +337,7 @@ var dispatcherModes = map[string]string{
 	"blame":    "blame",
 	"fix":      "fix",
 	"how":      "how",
+	"orient":   "orient",
 	"remember": "remember",
 }
 
@@ -350,6 +352,7 @@ var qField = map[string]string{
 	"blame":    "path",
 	"fix":      "error",
 	"how":      "what",
+	"orient":   "",
 	"remember": "text",
 }
 
@@ -357,7 +360,7 @@ var qField = map[string]string{
 // named that field itself.
 func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
 	field, ok := qField[mode]
-	if !ok {
+	if !ok || field == "" {
 		return raw
 	}
 	var args map[string]json.RawMessage
@@ -512,6 +515,8 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		return recordedMCPAnswer(dir, usage.KindFix, func() (string, int, error) { return mcpFix(dir, name, raw) })
 	case "how":
 		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpHow(dir, name, raw) })
+	case "orient":
+		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpOrient(dir, name, raw) })
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`

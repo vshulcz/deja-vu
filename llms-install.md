@@ -52,6 +52,7 @@ One MCP tool, `deja`, with a `mode` argument (the six names below still work as 
 - `blame` — which sessions discussed a file, and what was decided.
 - `fix` — what this machine ran after the same error last time.
 - `how` — the real invocation for a tool here, with its real flags.
+- `orient` — the commands past sessions ran in this project and the files they worked in, before reading the tree.
 - `remember` — store one durable decision for a later session to recall.
 
 No API keys and no configuration. Indexing, search and every tool above are

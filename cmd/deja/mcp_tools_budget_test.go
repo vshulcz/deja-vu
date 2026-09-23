@@ -23,9 +23,10 @@ import (
 // Then the description lost the prose the server instructions already carry
 // and the five per-mode payload fields collapsed into one declared `q`:
 // 3,196 chars became 1,689, which is 828 tokens down to 444 on o200k_base.
+// A seventh mode, orient, put back 100 of those chars.
 // The budget is set just above what that costs, because the point of it is to
 // notice growth rather than to leave room for it.
-const mcpToolsListCharBudget = 1800
+const mcpToolsListCharBudget = 1850
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)

@@ -216,6 +216,7 @@ One tool, `deja`, with a required `mode`:
 - `blame`: the sessions that discussed a file, and what was decided.
 - `fix`: what this machine ran after the same error last time.
 - `how`: the real invocation for a tool here, from what agents ran.
+- `orient`: the project's recurring commands and the files its sessions open, for an agent that would otherwise find them by reading.
 - `remember`: stores one durable decision for later recall.
 
 Six tools were six envelopes declaring the same arguments, and six descriptions

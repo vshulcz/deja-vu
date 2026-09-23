@@ -249,6 +249,7 @@ whether or not the tool is called.
 | `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
 | `fix` | the failing output, verbatim | `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
+| `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
 | `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
 
 </details>
