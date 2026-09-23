@@ -277,7 +277,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	case "codex":
 		sessions, err = parseCodexRolloutWithScanner(model.Session{
 			Harness: "codex", Project: projectName(filepath.Dir(originalPath)), Path: originalPath,
-		}, false, compactionMapScanner(originalPath, data))
+		}, false, "", compactionMapScanner(originalPath, data))
 	default:
 		return model.Session{}, ErrUnsupportedCompactionTranscript
 	}

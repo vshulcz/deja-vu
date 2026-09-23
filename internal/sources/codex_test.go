@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -556,5 +557,38 @@ func TestCodexForkKeepsItsIdentityOnAppend(t *testing.T) {
 	}
 	if inc[0].ID != "child" {
 		t.Errorf("append moved the session to %q", inc[0].ID)
+	}
+}
+
+// A patch names its files relative to the session's directory, and on an append
+// the record that says which directory that is sits before the offset. Without
+// carrying it in, the appended patch resolved to a bare relative path and blame
+// had nothing to match against.
+func TestCodexAppendResolvesPatchPathsAgainstTheHeadCWD(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "rollout-2026-06-01T02-00-00-child.jsonl")
+	head := `{"timestamp":"2026-06-01T02:00:00Z","type":"session_meta","payload":{"id":"child","cwd":"/w/child"}}` + "\n"
+	if err := os.WriteFile(p, []byte(head), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	patch := "*** Begin Patch\n*** Update File: app/main.go\n-old\n+new\n*** End Patch"
+	line := `{"timestamp":"2026-06-01T02:00:01Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","input":` +
+		strconv.Quote(patch) + "}}\n"
+	if err := os.WriteFile(p, []byte(head+line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseCodexRolloutFromOffset(p, int64(len(head)))
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("offset parse: %v %#v", err, ss)
+	}
+	want := filepath.Join("/w/child", "app/main.go")
+	found := false
+	for _, msg := range ss[0].Messages {
+		if msg.Role == RoleFiles && strings.Contains(msg.Text, want) {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("appended patch recorded %#v, want a file resolved to %q", ss[0].Messages, want)
 	}
 }
