@@ -311,7 +311,10 @@ func parseCodexRolloutPath(path string, offset int64, id, project string) ([]mod
 			}
 		}
 	}
-	return parseCodexRolloutWithScanner(s, func(fn func(map[string]any)) error {
+	// An append is parsed from an offset, so the head above already settled the
+	// identity; a parent's session_meta sitting in the new bytes must not take
+	// it over (#3933).
+	return parseCodexRolloutWithScanner(s, offset > 0, func(fn func(map[string]any)) error {
 		return scanJSONLFromOffset(path, offset, fn)
 	})
 }
@@ -319,12 +322,17 @@ func parseCodexRolloutPath(path string, offset int64, id, project string) ([]mod
 // parseCodexRolloutWithScanner normalizes a rollout supplied by the ordinary
 // file scanner or by a bounded in-memory capture. Keeping the latter in memory
 // avoids writing raw transcript content to a temporary file on compaction.
-func parseCodexRolloutWithScanner(s model.Session, scan func(func(map[string]any)) error) ([]model.Session, error) {
+func parseCodexRolloutWithScanner(s model.Session, idSettled bool, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	// A command and its exit code arrive in separate records joined by call_id,
 	// so the command line is annotated after the fact — the same shape opencode
 	// gets for free from a column.
 	calls := map[string]int{}
 	cwd := ""
+	// A fork copies the history it branched from, the parent's session_meta
+	// included, so a rollout can carry more than one identity. The first one is
+	// the file's own; the rest are inherited. Letting a later record win filed
+	// a child's turns under its parent and left the child unreachable (#3933).
+	metaSeen := idSettled
 	var events []model.Message
 	err := scan(func(m map[string]any) {
 		t := parseTimeAny(m["timestamp"])
@@ -334,6 +342,10 @@ func parseCodexRolloutWithScanner(s model.Session, scan func(func(map[string]any
 			return
 		}
 		if typ, _ := m["type"].(string); typ == "session_meta" {
+			if metaSeen {
+				return
+			}
+			metaSeen = true
 			// The ThreadId, not the SessionId. One rollout file is one thread;
 			// a session groups every thread that branched from it, so keying on
 			// session_id merges the whole fork tree into a single deja session
