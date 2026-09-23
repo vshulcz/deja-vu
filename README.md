@@ -19,7 +19,8 @@ already wrote to disk, and hands the right one back in whichever agent asks.</p>
 
 <p align="center">And nobody has to ask for it: recall arrives at session start, on every prompt,
 before a file is edited or a command runs, and after one fails. Keys and tokens are stripped as
-the index is built, so what reaches the model is safe to send.</p>
+the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says what that catches
+and what it cannot.</p>
 
 <p align="center">
 <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
