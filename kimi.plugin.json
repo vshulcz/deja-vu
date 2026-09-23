@@ -1,6 +1,6 @@
 {
   "name": "deja",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "deja-vu memory for Kimi Code: recall the sessions your other coding agents already wrote — Claude Code, Codex, Cursor, opencode and thirty more, including work from before it was installed.",
   "keywords": [
     "memory",
