@@ -1112,6 +1112,14 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 		}
 	}
 	mark("environment")
+	// Where the work is, not what was said about it: the digest above is
+	// sessions, and an agent opening a repository it does not know spends its
+	// first turns finding the command and the files instead. Same read as the
+	// environment block, from tables the build already wrote.
+	if om := orientDigestBlock(dir, cwd, allowedNames, policy.ActivationAuto); om != "" {
+		text += "\n" + om
+	}
+	mark("orient")
 	// The project's standing decisions lead the block: they are the user's own
 	// settled choices, and an agent should read them before the session digest,
 	// not after. Query-independent, so a convention surfaces even when nothing

@@ -35,6 +35,10 @@ const (
 	// orientCommandMax is where a line stops being a command and starts being a
 	// paragraph the reader skips.
 	orientCommandMax = 72
+	// What the session-start digest shows, which is less than the mode does:
+	// it arrives in every session whether or not it is wanted.
+	orientDigestCommands = 3
+	orientDigestFiles    = 4
 )
 
 func mcpOrient(dir, name string, raw json.RawMessage) (string, int, error) {
@@ -131,7 +135,10 @@ func orientCommand(cmd string) string {
 }
 
 // orientPath is the path as the reader's editor would name it: relative to the
-// directory the question was asked from, when it is under it.
+// directory the question was asked from, when it is under it. Outside it the
+// path is not this project's map at all — the top two entries on the machine
+// this was written on were the user's own memory files, edited from every
+// project — so the caller drops what comes back unchanged.
 func orientPath(p, cwd string) string {
 	if cwd == "" {
 		return p
@@ -189,7 +196,12 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 		if len(a.sessions) < 2 {
 			continue
 		}
-		out = append(out, orientFile{Path: orientPath(p, cwd), Sessions: len(a.sessions), Last: a.last})
+		named := orientPath(p, cwd)
+		// A path the cwd could not shorten is outside this project.
+		if cwd != "" && named == p && filepath.IsAbs(p) {
+			continue
+		}
+		out = append(out, orientFile{Path: named, Sessions: len(a.sessions), Last: a.last})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Sessions != out[j].Sessions {
@@ -201,4 +213,60 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 		return out[i].Path < out[j].Path
 	})
 	return out
+}
+
+// orientDigestBlock is the same map, shortened for the session-start digest.
+// The mode is only reached when a model decides to call it, and measured over
+// six runs on a 325-file repository it decided to five times out of six — it
+// reached for recall with the task's own words instead, which answers what was
+// said and not where the work is. The map is cheap enough to arrive unasked:
+// three commands and four files, against the five to ten file reads that open
+// a session in a repository the agent has not seen.
+//
+// Empty when the project has nothing recurring, because a map of one session's
+// keystrokes is noise sitting in every prompt of every session after it.
+func orientDigestBlock(dir, cwd string, projects []string, activation string) string {
+	if cwd == "" {
+		// The hook is handed the project by the harness and not always the
+		// directory; without one every path stays absolute and the list fills
+		// with files from outside the project.
+		cwd = howCwd()
+	}
+	cmds, _, _, err := howEntries(dir, nil, projects, activation)
+	if err != nil {
+		return ""
+	}
+	files := orientFiles(dir, projects, cwd)
+	var recurring []howEntry
+	for _, e := range cmds {
+		// Two sessions is what makes a command this project's practice rather
+		// than one session's typing; the mode applies the same bar by ranking,
+		// and a block that arrives unasked has to apply it outright.
+		if len(e.Sessions) >= 2 {
+			recurring = append(recurring, e)
+		}
+	}
+	if len(recurring) == 0 && len(files) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	b.WriteString("What work looks like in this project, from its past sessions:\n")
+	for i, e := range recurring {
+		if i >= orientDigestCommands {
+			break
+		}
+		fmt.Fprintf(&b, "- %s · %s\n", orientCommand(e.Command), pluralSessions(len(e.Sessions)))
+	}
+	if len(files) > 0 {
+		var shown []string
+		for i, f := range files {
+			if i >= orientDigestFiles {
+				break
+			}
+			shown = append(shown, f.Path)
+		}
+		fmt.Fprintf(&b, "- the files its sessions keep opening: %s\n", strings.Join(shown, ", "))
+	}
+	b.WriteString("Check a command still fits before running it.\n")
+	return b.String()
 }

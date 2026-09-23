@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/policy"
 )
 
 // The command as it was run carries the way one machine reached the directory,
@@ -78,5 +80,15 @@ func TestOrientIsReachableWithoutAnArgument(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("the declared modes are %v, without orient", modes)
+	}
+}
+
+// The map arrives unasked in the session-start digest, so the bar it applies
+// has to be outright rather than by ranking: a project with nothing recurring
+// gets nothing, because an empty map still costs every prompt of the session.
+func TestTheDigestMapSaysNothingWhenThereIsNoPractice(t *testing.T) {
+	hermeticEnv(t)
+	if got := orientDigestBlock(t.TempDir(), t.TempDir(), []string{"nowhere"}, policy.ActivationAuto); got != "" {
+		t.Errorf("an empty store produced a map block:\n%s", got)
 	}
 }
