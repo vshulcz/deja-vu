@@ -284,7 +284,7 @@ func harnessFilterDescription() string {
 	if len(names) <= 4 {
 		return "Optional filter: " + strings.Join(names, ", ") + "."
 	}
-	return fmt.Sprintf("Optional filter, the agent that wrote the session: %s and %d more — `deja sources` lists them.",
+	return fmt.Sprintf("Optional filter, the agent that wrote it: %s and %d more (`deja sources`).",
 		strings.Join(names[:4], ", "), len(names)-4)
 }
 
@@ -301,33 +301,24 @@ func harnessFilterDescription() string {
 func dejaTool() map[string]any {
 	return map[string]any{
 		"name": "deja",
-		"description": "This user's own past coding sessions, across every AI tool they use (Claude Code, Codex, Cursor, opencode, aider, gemini and others). " +
-			"Not general knowledge and not library docs — only what happened on this machine. Pick a mode:\n" +
-			"- recall: search past sessions. The moment the user implies work already happened (\"didn't we fix this?\", \"what was that error\", \"what did we decide about X\"), and always before debugging an error or re-implementing something. An exact error string, function name or path is the strongest query; a question in your own words works too.\n" +
-			"- context: the full story of the single best-matching session — problem, decisions, outcome — when a recall hit is not enough.\n" +
-			"- blame: why a file is the way it is, before you edit, refactor or delete it. Session history, not git authorship.\n" +
-			"- fix: you just hit an error. What this machine ran, or changed, after that same error before. Pass the failing output verbatim.\n" +
-			"- how: the real command with the real flags this user runs for a thing — build, test, deploy — instead of a guessed one.\n" +
-			"- remember: store one durable decision so a later session can recall it. Only after something is settled.\n" +
-			"A bracketed marker on a result is the user's own later judgement on that session; act on what it says. " +
-			"When a result genuinely helps, tell the user in one short line at the start of your reply: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
+		"description": "This user's own past sessions from every AI coding tool on this machine — not general knowledge, not library docs. Modes:\n" +
+			"- recall: search past sessions. An exact error string, name or path is the strongest query; your own words work too.\n" +
+			"- context: the full story of one session, when a recall hit is not enough.\n" +
+			"- blame: why a file is the way it is, before you edit or delete it. Sessions, not git authorship.\n" +
+			"- fix: you just hit an error — what this machine ran after that same error. Pass the output verbatim.\n" +
+			"- how: the command and flags this user really runs for a thing, instead of a guessed one.\n" +
+			"- remember: store one settled decision for a later session.\n" +
+			"A bracketed marker on a result is the user's own later judgement; act on what it says. " +
+			"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
 		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}, "description": "Which capability to use."},
-				"query":   map[string]any{"type": "string", "description": "recall and context: an exact token — error string, function name, flag — or the question in your own words."},
-				"path":    map[string]any{"type": "string", "description": "blame: absolute, relative, or bare filename."},
-				"error":   map[string]any{"type": "string", "description": "fix: the failing output, verbatim. Multi-line pastes are fine."},
-				"what":    map[string]any{"type": "string", "description": "how: tool or target, e.g. 'go test', 'docker compose', a script name."},
-				"text":    map[string]any{"type": "string", "description": "remember: one durable fact, decision or conclusion."},
-				"tags":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "remember: optional navigation tags, searchable as #tag."},
+				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "remember"}},
+				"q":       map[string]any{"type": "string", "description": "What to ask about: the question or exact token; for blame a path, for fix the failing output verbatim, for remember the fact."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
-				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where the note is filed (default notes)."},
-				"since":   map[string]any{"type": "string", "description": "blame: age such as 30d or 24h."},
+				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
 				"limit":   map[string]any{"type": "number", "description": "Max results."},
-				"offset":  map[string]any{"type": "number", "description": "recall: skip this many ranked matches, to page without re-ranking."},
-				"all":     map[string]any{"type": "boolean", "description": "blame: every project, not just this one."},
 			},
 			"required": []string{"mode"},
 		},
@@ -348,6 +339,46 @@ var dispatcherModes = map[string]string{
 	"remember": "remember",
 }
 
+// qField is the argument each mode reads its subject from. One declared `q`
+// stands for all of them: five per-mode strings in the schema cost more than
+// the description does, and the model still has to pick the right one after
+// picking the mode. The old names keep working — they are accepted here and
+// simply not listed, the same way the pre-#1298 tool names still answer.
+var qField = map[string]string{
+	"recall":   "query",
+	"context":  "query",
+	"blame":    "path",
+	"fix":      "error",
+	"how":      "what",
+	"remember": "text",
+}
+
+// spreadQ copies q into the field the mode reads, unless the caller already
+// named that field itself.
+func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
+	field, ok := qField[mode]
+	if !ok {
+		return raw
+	}
+	var args map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &args); err != nil {
+		return raw
+	}
+	q, ok := args["q"]
+	if !ok {
+		return raw
+	}
+	if cur, taken := args[field]; taken && len(bytes.TrimSpace(cur)) > 0 && string(cur) != `""` {
+		return raw
+	}
+	args[field] = q
+	out, err := json.Marshal(args)
+	if err != nil {
+		return raw
+	}
+	return out
+}
+
 func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	if name == "deja" {
 		var a struct {
@@ -363,7 +394,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// rather than an empty answer it will read as "no history".
 			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
 		}
-		return callMCPTool(dir, target, raw)
+		return callMCPTool(dir, target, spreadQ(mode, raw))
 	}
 	switch name {
 	case "recall":
@@ -1981,10 +2012,19 @@ func contextOthersNote(hits int) string {
 // store, four of five questions about that same day's work were headed "No
 // session is about this" while the session below was exactly about it (#657).
 //
-// A session that speaks every word of the question the store knows is about it
-// as far as deja can tell. A page where the words are spread across different
-// sessions — one holds half, another the other half — is not, and keeps the
-// warning it earned in #2074.
+// A session that speaks the words identifying the question is about it as far
+// as deja can tell. Every word was the bar before, and an agent's own phrasing
+// rarely clears it: "make test failing repository test suite command" was
+// headed "No session is about this" above the session that answers it verbatim,
+// because that session says "fails" and never says "command". The question's
+// filler decided the warning.
+//
+// The identifying words are the ones the ranking already judges a session on —
+// the rarest leadTermsKept of them, ordered by what the index says each is
+// worth. A page where those are spread across different sessions — one holds
+// half, another the other half — is still not about it, and keeps the warning
+// it earned in #2074, as does a question carrying a word the store has never
+// held: the caller decides that one before this (#657).
 func relevanceHitsAreAboutIt(hits []search.Hit, terms []string, idf map[string]float64) bool {
 	if len(hits) == 0 || len(terms) == 0 || idf == nil {
 		return false
@@ -1995,14 +2035,15 @@ func relevanceHitsAreAboutIt(hits []search.Hit, terms []string, idf map[string]f
 			known = append(known, t)
 		}
 	}
-	// A word the store does not hold at all is the #657 case and is decided by
-	// the caller before this; here it only means the question is not fully
-	// known, so nothing can hold all of it.
-	if len(known) == 0 || len(known) != len(terms) {
+	if len(known) == 0 {
 		return false
 	}
+	lead := byIdentifying(known, idf)
+	if len(lead) > leadTermsKept {
+		lead = lead[:leadTermsKept]
+	}
 	for _, h := range hits {
-		if sessionSpeaksEvery(h.Session, known) {
+		if sessionSpeaksEvery(h.Session, lead) {
 			return true
 		}
 	}

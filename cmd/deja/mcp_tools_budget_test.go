@@ -19,10 +19,13 @@ import (
 // all — `instructions` is read once, resources/list costs nothing here, and a
 // hook already fires at the point of action.
 // One tool with modes, so the six envelopes and their six repetitions of
-// query/harness/project/limit are gone: 7,145 chars became 3,112. The budget
-// is set just above what that costs, because the point of it is to notice
-// growth rather than to leave room for it (#1298).
-const mcpToolsListCharBudget = 3400
+// query/harness/project/limit are gone: 7,145 chars became 3,112 (#1298).
+// Then the description lost the prose the server instructions already carry
+// and the five per-mode payload fields collapsed into one declared `q`:
+// 3,196 chars became 1,689, which is 828 tokens down to 444 on o200k_base.
+// The budget is set just above what that costs, because the point of it is to
+// notice growth rather than to leave room for it.
+const mcpToolsListCharBudget = 1800
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)

@@ -236,16 +236,20 @@ anything already wired to them.
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `deja` | `mode`, plus `query`, `path`, `error`, `what`, `text`, `tags?`, `harness?`, `project?`, `since?`, `limit?`, `offset?`, `all?` | Depends on the mode, below. |
+| `deja` | `mode`, `q`, `harness?`, `project?`, `limit?` | Depends on the mode, below. |
 
-| Mode | Arguments it reads | Returns |
-| --- | --- | --- |
-| `recall` | `query`, `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
-| `context` | `query`, `harness?` | Markdown digest of the best-matching session. |
-| `blame` | `path`, `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
-| `fix` | `error`, `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
-| `how` | `what`, `project?`, `limit?` | The real invocation, from what agents ran here. |
-| `remember` | `text`, `project?`, `tags?` | Stores a durable decision for later recall. |
+`q` carries whatever the mode asks about. The per-mode names below are still
+accepted; they are no longer declared, because the schema is read every turn
+whether or not the tool is called.
+
+| Mode | `q` is | Also reads | Returns |
+| --- | --- | --- | --- |
+| `recall` | the question, or an exact error string, name or flag | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
+| `context` | the same as recall | `harness?` | Markdown digest of the best-matching session. |
+| `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
+| `fix` | the failing output, verbatim | `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
+| `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
+| `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
 
 </details>
 
