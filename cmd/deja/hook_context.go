@@ -1411,4 +1411,8 @@ func dropHookCaches(dir string) {
 		_ = os.Remove(p)
 		_ = os.Remove(p + ".refreshing")
 	}
+	// The marks for the sessions being written go with them: a forget that left
+	// them behind would keep hiding whatever they name for the rest of the
+	// window, and after a forget there is nothing left to hide.
+	_ = os.Remove(liveSessionsPath(dir))
 }

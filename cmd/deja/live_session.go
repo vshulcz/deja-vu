@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -48,6 +49,10 @@ func liveSessionsPath(dir string) string { return dir + liveSessionsFile }
 // read that fails, a write that fails or a disk that is full costs the caller
 // nothing. The file is rewritten rather than appended to, because what is
 // wanted is the newest stamp per session and not a log of every action.
+// The key is the session id alone, because a hook payload names the session
+// and not the harness that sent it. Ids are uuids, `ses_`-prefixed strings
+// and the like, so a collision across two harnesses would cost one unrelated
+// session twenty minutes of silence rather than anything worse.
 func markSessionLive(dir, id string) {
 	id = strings.TrimSpace(id)
 	if dir == "" || id == "" || !hookseenField(id) {
@@ -115,7 +120,11 @@ func writeLiveSessions(dir string, rows map[string]time.Time) {
 		_ = os.Remove(liveSessionsPath(dir))
 		return
 	}
-	_ = os.WriteFile(liveSessionsPath(dir), []byte(b.String()), 0o600)
+	// Atomic, like the injection log and the warmup status beside it: two hooks
+	// fire at once often enough — a prompt and the action it leads to — and a
+	// reader that catches a half-written file would read a truncated id as a
+	// live session and hide the wrong one.
+	_ = atomicfile.Write(liveSessionsPath(dir), []byte(b.String()), 0o600)
 }
 
 // liveSessionIDs is the sessions an agent is inside right now: stamped inside

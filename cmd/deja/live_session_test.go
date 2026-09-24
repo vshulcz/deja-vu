@@ -151,3 +151,44 @@ func TestWithNoMarksNothingIsDropped(t *testing.T) {
 		t.Errorf("a session nothing marked live was dropped anyway:\n%s", got)
 	}
 }
+
+// Asked for a session by its id, recall still answers with it — including a
+// live one. The id is the caller naming what it wants, where a query is the
+// caller describing it, and the two are not the same ask: #3945 is about a
+// question whose best lexical match is itself.
+func TestAnIDStillResolvesToTheSessionBeingWritten(t *testing.T) {
+	dir, liveID := liveAndPriorStore(t)
+	markSessionLive(dir, liveID)
+
+	got, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"`+liveID+`"}`))
+	if err != nil {
+		t.Fatalf("recall: %v", err)
+	}
+	if !strings.Contains(got, liveID) {
+		t.Errorf("an id the agent asked for by name answered with something else:\n%s", got)
+	}
+}
+
+// A file half-written, hand-edited or left by an older build must not take a
+// surface down with it, and must not hide a session on the strength of a line
+// nothing can read.
+func TestAnUnreadableMarkFileHidesNothing(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(liveSessionsPath(dir), []byte("live-9\nlive-8 not-a-time\n\x00\x00 \nlive-7 "), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if ids := liveSessionIDs(dir); len(ids) != 0 {
+		t.Errorf("garbage read as live sessions: %v", ids)
+	}
+}
+
+// Forgetting drops the marks with everything else: after a forget there is
+// nothing left for them to hide.
+func TestForgettingDropsTheMarks(t *testing.T) {
+	dir := t.TempDir()
+	markSessionLive(dir, "live-9")
+	dropHookCaches(dir)
+	if ids := liveSessionIDs(dir); len(ids) != 0 {
+		t.Errorf("the marks survived a forget: %v", ids)
+	}
+}
