@@ -11,7 +11,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
-	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // orient answers the question an agent otherwise answers by reading: how is
@@ -156,44 +155,51 @@ type orientFile struct {
 	Last     time.Time
 }
 
-// orientFiles ranks what this project's sessions opened or edited. The paths
-// come from tool inputs rather than from prose, which is the only reliable
-// answer to which file a session was about (#542).
+// orientFiles ranks what this project's sessions worked on, from the manifest
+// rather than the record log. The manifest already keeps the few files each
+// session worked on most (SessionMeta.Touched, #3605 put it there for the
+// point-of-action hook), and it is read from a cache; walking the records for
+// the same answer cost a full pass over a 125 MB log on a surface that fires at
+// every session start.
 func orientFiles(dir string, projects []string, cwd string) []orientFile {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return nil
+	}
 	pol := policy.Load()
 	type acc struct {
-		sessions map[string]bool
+		sessions int
 		last     time.Time
 	}
 	byPath := map[string]*acc{}
-	_ = index.EachRecordOfRole(dir, sources.RoleFiles, func(meta index.SessionMeta, r index.Record) {
-		if !howProjectMatches(meta.Project, projects) {
-			return
+	for _, m := range metas {
+		if !howProjectMatches(m.Project, projects) {
+			continue
 		}
-		if !pol.Allows(policy.ActivationMCP, meta.Project) || pol.Ignored(meta.Path, meta.Project) {
-			return
+		if !pol.Allows(policy.ActivationMCP, m.Project) || pol.Ignored(m.Path, m.Project) {
+			continue
 		}
-		for _, line := range strings.Split(r.Text, "\n") {
-			p := strings.TrimSpace(line)
+		for _, p := range m.Touched {
+			p = strings.TrimSpace(p)
 			if p == "" || len(p) > orientPathMax {
 				continue
 			}
 			a := byPath[p]
 			if a == nil {
-				a = &acc{sessions: map[string]bool{}}
+				a = &acc{}
 				byPath[p] = a
 			}
-			a.sessions[r.Key] = true
-			if r.Time.After(a.last) {
-				a.last = r.Time
+			a.sessions++
+			if m.Updated.After(a.last) {
+				a.last = m.Updated
 			}
 		}
-	})
+	}
 	out := make([]orientFile, 0, len(byPath))
 	for p, a := range byPath {
 		// One session opening a file says nothing about the project; the point
 		// of the list is where work keeps landing.
-		if len(a.sessions) < 2 {
+		if a.sessions < 2 {
 			continue
 		}
 		named := orientPath(p, cwd)
@@ -201,7 +207,7 @@ func orientFiles(dir string, projects []string, cwd string) []orientFile {
 		if cwd != "" && named == p && filepath.IsAbs(p) {
 			continue
 		}
-		out = append(out, orientFile{Path: named, Sessions: len(a.sessions), Last: a.last})
+		out = append(out, orientFile{Path: named, Sessions: a.sessions, Last: a.last})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Sessions != out[j].Sessions {
@@ -232,30 +238,18 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 		// with files from outside the project.
 		cwd = howCwd()
 	}
-	cmds, _, _, err := howEntries(dir, nil, projects, activation)
-	if err != nil {
-		return ""
-	}
+	recurring := orientRecurringCommands(dir, projects, activation)
 	files := orientFiles(dir, projects, cwd)
-	var recurring []howEntry
-	for _, e := range cmds {
-		// Two sessions is what makes a command this project's practice rather
-		// than one session's typing; the mode applies the same bar by ranking,
-		// and a block that arrives unasked has to apply it outright.
-		if len(e.Sessions) >= 2 {
-			recurring = append(recurring, e)
-		}
-	}
 	if len(recurring) == 0 && len(files) == 0 {
 		return ""
 	}
 	var b strings.Builder
 	b.WriteString("What work looks like in this project, from its past sessions:\n")
-	for i, e := range recurring {
+	for i, c := range recurring {
 		if i >= orientDigestCommands {
 			break
 		}
-		fmt.Fprintf(&b, "- %s · %s\n", orientCommand(e.Command), pluralSessions(len(e.Sessions)))
+		fmt.Fprintf(&b, "- %s · %s\n", orientCommand(c.Text), pluralSessions(c.Sessions))
 	}
 	if len(files) > 0 {
 		var shown []string
@@ -269,4 +263,52 @@ func orientDigestBlock(dir, cwd string, projects []string, activation string) st
 	}
 	b.WriteString("Check a command still fits before running it.\n")
 	return b.String()
+}
+
+// orientCommandUse is one recurring command and how many of this project's
+// sessions ran it.
+type orientCommandUse struct {
+	Text     string
+	Sessions int
+	Last     time.Time
+}
+
+// orientRecurringCommands reads the table the build already writes, not the
+// record log. `deja how` scans the log because it answers a question someone
+// typed and can spend the seconds; this block goes out at session start, where
+// the rule is that the hook stays in milliseconds.
+//
+// Two sessions is what makes a command this project's practice rather than one
+// session's typing — the same bar the table itself applies before keeping a
+// command at all.
+func orientRecurringCommands(dir string, projects []string, activation string) []orientCommandUse {
+	pol := policy.Load()
+	var out []orientCommandUse
+	for _, cu := range index.ReadCommands(dir) {
+		n := 0
+		var last time.Time
+		for proj, use := range cu.ByProject {
+			if !howProjectMatches(proj, projects) || !pol.Allows(activation, proj) {
+				continue
+			}
+			n += use.Sessions
+			if use.Last.After(last) {
+				last = use.Last
+			}
+		}
+		if n < 2 {
+			continue
+		}
+		out = append(out, orientCommandUse{Text: cu.Command, Sessions: n, Last: last})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Sessions != out[j].Sessions {
+			return out[i].Sessions > out[j].Sessions
+		}
+		if !out[i].Last.Equal(out[j].Last) {
+			return out[i].Last.After(out[j].Last)
+		}
+		return out[i].Text < out[j].Text
+	})
+	return out
 }
