@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -166,5 +168,81 @@ func TestOpencodeJSONCUninstallsFromV2NestedServers(t *testing.T) {
 	}
 	if _, ok := servers["theirs"]; !ok || !strings.Contains(string(out), "// keep this server") {
 		t.Fatalf("the unrelated server or comment was lost:\n%s", out)
+	}
+}
+
+// `deja doctor` reads the config back, and it read only the 1.x shape: a 2.x
+// config the installer had just wired was reported `not-wired`, so the fix
+// above sent the user round the install again with nothing left to do.
+func TestDoctorReadsTheNestedShapeTheInstallerWrites(t *testing.T) {
+	seed := []byte(`{"mcp":{"servers":{"deja":{"type":"local","command":["/bin/deja","mcp"]},"theirs":{"command":["other"]}}}}`)
+	path := filepath.Join(t.TempDir(), "opencode.json")
+	if err := os.WriteFile(path, seed, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !doctorJSONWiredIn(doctorOpencodeServers)(path) {
+		t.Error("a wired 2.x config reads as not-wired")
+	}
+	if got := doctorJSONDejaKeysIn(doctorOpencodeServers)(path); !reflect.DeepEqual(got, []string{"deja"}) {
+		t.Errorf("the entry under mcp.servers counts as %v", got)
+	}
+}
+
+// A config with both shapes is a 1.x file that happens to have a server called
+// `servers`, and the writer stays on the direct entry there. Doctor reads the
+// same one, and the duplicate line still names a hand-named server beside it.
+func TestDoctorAndInstallAgreeOnAMixedConfig(t *testing.T) {
+	seed := []byte(`{"mcp":{"deja":{"type":"local","command":["/old/deja","mcp"]},"deja-vu":{"command":["/old/deja","mcp"]},"servers":{"command":["other"]}}}`)
+	out, _, err := updateOpencodeJSON(seed, "opencode.json", "/bin/deja", false)
+	if err != nil {
+		t.Fatalf("mixed config was refused: %v", err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(out, &root); err != nil {
+		t.Fatalf("output no longer parses: %v\n%s", err, out)
+	}
+	mcp := root["mcp"].(map[string]any)
+	entry, ok := mcp["deja"].(map[string]any)
+	if !ok {
+		t.Fatalf("the direct entry was abandoned:\n%s", out)
+	}
+	if got, want := entry["command"], []any{"/bin/deja", "mcp"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("command = %#v, want %#v", got, want)
+	}
+	path := filepath.Join(t.TempDir(), "opencode.json")
+	if err := os.WriteFile(path, out, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !doctorJSONWiredIn(doctorOpencodeServers)(path) {
+		t.Error("the config the installer just wrote reads as not-wired")
+	}
+	if got, want := doctorJSONDejaKeysIn(doctorOpencodeServers)(path), []string{"deja", "deja-vu"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("deja keys = %v, want %v", got, want)
+	}
+}
+
+// Installing twice is the ordinary case — every release runs `deja install`
+// again — and the second pass must leave the file it already wrote alone.
+func TestASecondInstallLeavesTheNestedConfigAlone(t *testing.T) {
+	seed := "{\n  \"mcp\": {\n    \"servers\": {\n      \"theirs\": {\"command\": [\"other\"]}\n    }\n  }\n}\n"
+	once, _, err := updateOpencodeJSONC([]byte(seed), "/bin/deja", false)
+	if err != nil {
+		t.Fatalf("first install failed: %v", err)
+	}
+	twice, _, err := updateOpencodeJSONC(once, "/bin/deja", false)
+	if err != nil {
+		t.Fatalf("second install failed: %v", err)
+	}
+	if string(twice) != string(once) {
+		t.Errorf("the second install rewrote the file:\n%s\n---\n%s", once, twice)
+	}
+	got := jsoncValue(t, twice)
+	mcp := got["mcp"].(map[string]any)
+	servers := mcp["servers"].(map[string]any)
+	if _, ok := mcp["deja"]; ok {
+		t.Errorf("the second install added a sibling at mcp.deja:\n%s", twice)
+	}
+	if len(servers) != 2 {
+		t.Errorf("mcp.servers holds %d entries: %v", len(servers), servers)
 	}
 }

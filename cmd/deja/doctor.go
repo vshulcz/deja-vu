@@ -1701,7 +1701,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 	return []doctorMCPConfig{
 		{"claude-code", sources.ClaudeJSONPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"codex", filepath.Join(sources.CodexHome(), "config.toml"), doctorTOMLWired, doctorTOMLDejaKeys},
-		{"opencode", doctorOpencodeConfigPath(), doctorJSONWired("mcp"), doctorJSONDejaKeys("mcp")},
+		{"opencode", doctorOpencodeConfigPath(), doctorJSONWiredIn(doctorOpencodeServers), doctorJSONDejaKeysIn(doctorOpencodeServers)},
 		{"cursor", filepath.Join(sources.CursorCLIHome(), "mcp.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gemini", filepath.Join(sources.GeminiHome(), "settings.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"antigravity", filepath.Join(antigravityConfigHome(), "mcp_config.json"), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
@@ -1890,7 +1890,36 @@ func doctorOpenClawWired(path string) bool {
 	return ok
 }
 
+// doctorJSONBlock picks the server map out of a config that keeps it under one
+// top-level key.
+func doctorJSONBlock(key string) func(map[string]any) map[string]any {
+	return func(root map[string]any) map[string]any {
+		m, _ := root[key].(map[string]any)
+		return m
+	}
+}
+
+// doctorOpencodeServers is the same for opencode, which has two shapes: 1.x
+// files the servers directly under `mcp`, 2.x one level down under
+// `mcp.servers`, and the installer writes into whichever the config already
+// uses. Doctor has to read both, or it reports a wired 2.x config as unwired
+// and the user re-runs an install that had nothing left to do.
+func doctorOpencodeServers(root map[string]any) map[string]any {
+	m, _ := root["mcp"].(map[string]any)
+	if m == nil {
+		return nil
+	}
+	if nested, ok := opencodeNestedServers(m); ok {
+		return nested
+	}
+	return m
+}
+
 func doctorJSONWired(key string) func(string) bool {
+	return doctorJSONWiredIn(doctorJSONBlock(key))
+}
+
+func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bool {
 	return func(path string) bool {
 		b, err := os.ReadFile(path)
 		if err != nil {
@@ -1901,7 +1930,7 @@ func doctorJSONWired(key string) func(string) bool {
 			// jsonc or otherwise unparseable — fall back to a substring probe.
 			return strings.Contains(string(b), `"deja"`)
 		}
-		m, _ := root[key].(map[string]any)
+		m := pick(root)
 		if _, ok := m["deja"]; ok {
 			return true
 		}
@@ -1924,6 +1953,10 @@ func doctorJSONWired(key string) func(string) bool {
 // will not parse — the substring fallback above can say "wired", but it
 // cannot count.
 func doctorJSONDejaKeys(key string) func(string) []string {
+	return doctorJSONDejaKeysIn(doctorJSONBlock(key))
+}
+
+func doctorJSONDejaKeysIn(pick func(map[string]any) map[string]any) func(string) []string {
 	return func(path string) []string {
 		b, err := os.ReadFile(path)
 		if err != nil {
@@ -1935,7 +1968,7 @@ func doctorJSONDejaKeys(key string) func(string) []string {
 		if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 			return nil
 		}
-		m, _ := root[key].(map[string]any)
+		m := pick(root)
 		if m == nil {
 			return nil
 		}
