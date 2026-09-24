@@ -395,19 +395,6 @@ func generic(s string) bool {
 	return true
 }
 
-// rarest picks the question's heaviest word by the weights the ranking used,
-// so "which word identifies this" is the ranking's judgement rather than a
-// second one invented here.
-func rarest(terms []string, idf map[string]float64) string {
-	best, bestIDF := "", 0.0
-	for _, t := range terms {
-		if w, ok := idf[t]; ok && w > bestIDF {
-			best, bestIDF = t, w
-		}
-	}
-	return best
-}
-
 // identifying keeps the words of the question that name something, by the rule
 // the recall gate already uses. A denial about "that" cannot be judged.
 func identifying(terms []string) []string {
