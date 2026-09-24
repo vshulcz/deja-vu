@@ -758,6 +758,9 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		// guidance stays and the accusation goes: the sentence says what is
 		// true either way, and what to do if it really was a summary.
 		if !index.LooksLikeError(a.Error) {
+			if text, n := fixFallsBackToRecall(dir, a.Error); n > 0 {
+				return text, n, nil
+			}
 			return "No session on this machine ran a command after that error. If that was a summary rather than the failing output, pass the output itself." + emptyStoreNote(dir), 0, nil
 		}
 		// Held-but-unconfirmed is not never-seen, and the agent asking is
@@ -766,6 +769,9 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 			return pol.Allows(policy.ActivationMCP, project)
 		}) {
 			return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", 0, nil
+		}
+		if text, n := fixFallsBackToRecall(dir, a.Error); n > 0 {
+			return text, n, nil
 		}
 		return "No session on this machine ran a command after that error." + emptyStoreNote(dir), 0, nil
 	}

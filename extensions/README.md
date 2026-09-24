@@ -111,6 +111,13 @@ two files the Gemini install uses.
   one profile, Zed reads both context servers. Whatever the installer writes
   wins, because it is the copy `deja install` keeps current: each package looks
   for those files and drops the part they already cover.
+- **A host's seams decide when a line can arrive.** opencode 1.18 has no seam
+  that reaches the model before a tool runs: `tool.execute.before` may only
+  rewrite the arguments, and `permission.ask` answers `allow` or `deny` with no
+  text (`@opencode-ai/plugin` 1.18.32, `dist/index.d.ts`). So the point-of-action
+  line goes out from `tool.execute.after`, folded into the tool's own output —
+  a command that was always going to fail runs once first, and the docs for that
+  harness say so rather than implying the Claude Code timing (#3957).
 - **Verify by running.** Each of these had a failure that was invisible in the
   source and obvious the moment the real host executed it — a peer dependency
   the host does not install, a hook that accepts input and drops it, a 60-second
