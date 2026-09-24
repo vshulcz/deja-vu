@@ -81,7 +81,7 @@ func TestANamedPassNeverWritesACountedMarker(t *testing.T) {
 func TestANamedPassStillRedactsWhatItNames(t *testing.T) {
 	named := map[string]bool{"url-credentials": true, "jwt": true, "github-token": true}
 	cases := map[string]string{
-		"psql postgres://svc:hunter2@db.internal:5432/app": "url-credentials",
+		"psql postgres://svc:hunter2@db.internal:5432/app":      "url-credentials",
 		"GITHUB_TOKEN=ghp_16C7e42F292c6912E7710c838347Ae178B4a": "github-token",
 	}
 	for in, kind := range cases {
