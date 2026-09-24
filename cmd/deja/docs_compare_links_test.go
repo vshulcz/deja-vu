@@ -30,6 +30,8 @@ func TestCompareLinksEveryProjectItNames(t *testing.T) {
 		"cognee":         "topoteretes/cognee",
 		"Graphiti / Zep": "getzep/graphiti",
 		"Hindsight":      "vectorize-io/hindsight",
+		"ai-memory":      "akitaonrails/ai-memory",
+		"basic-memory":   "basicmachines-co/basic-memory",
 
 		"cass":            "Dicklesworthstone/coding_agent_session_search",
 		"Agent Sessions":  "jazzyalex/agent-sessions",
