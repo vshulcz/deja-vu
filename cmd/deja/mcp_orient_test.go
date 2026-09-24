@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -34,8 +35,11 @@ func TestOrientShowsTheCommandWithoutTheWayItGotThere(t *testing.T) {
 // it. One outside it keeps its full name, because a bare "MEMORY.md" the
 // reader cannot find is worse than a long path.
 func TestOrientNamesPathsFromWhereTheQuestionWasAsked(t *testing.T) {
-	if got := orientPath("/w/svc/internal/store/store.go", "/w/svc"); got != "internal/store/store.go" {
-		t.Errorf("path under the cwd = %q", got)
+	// Named the way the reader's editor names it, which on Windows means
+	// backslashes: the separator is the platform's, not the transcript's.
+	want := filepath.Join("internal", "store", "store.go")
+	if got := orientPath("/w/svc/internal/store/store.go", "/w/svc"); got != want {
+		t.Errorf("path under the cwd = %q, want %q", got, want)
 	}
 	if got := orientPath("/other/place/notes.md", "/w/svc"); got != "/other/place/notes.md" {
 		t.Errorf("path outside the cwd was rewritten to %q", got)
