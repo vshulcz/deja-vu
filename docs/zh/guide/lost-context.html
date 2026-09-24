@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code 丢了上下文：怎么找回来 — deja-vu</title>
+<meta name="description" content="崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="Claude Code 丢了上下文：怎么找回来">
+<meta property="og:description" content="崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="Claude Code 丢了上下文：怎么找回来">
+<meta name="twitter:description" content="崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code 丢了上下文：怎么找回来", "description": "崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-24", "dateModified": "2026-09-24"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "上下文丢了", "item": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "编程智能体把上下文弄丢了怎么办？", "acceptedAnswer": {"@type": "Answer", "text": "用 deja 加上一个你记得的词，去搜它已经写在磁盘上的会话记录；或者用 deja ctx 拿最匹配那次会话的摘要。三十四个智能体里有二十七个还可以用 deja resume 重新打开。"}}, {"@type": "Question", "name": "崩溃之后上下文还能找回来吗？", "acceptedAnswer": {"@type": "Answer", "text": "会话记录可以。智能体在进行中就把每一轮写到磁盘上。崩溃毁掉的是模型正在用的上下文，不是那个文件。"}}, {"@type": "Question", "name": "怎么让它不再丢？", "acceptedAnswer": {"@type": "Answer", "text": "deja install --auto 会在会话开始时和每次提问时接上召回，所以新开的窗口已经知道这个项目最近的决定。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="lost-context.html" aria-current="page">上下文丢了</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="recover-a-deleted-session.html">找回被删掉的会话</a>
+<a href="find-a-session.html">找到一次会话</a>
+<a href="privacy.html">隐私</a>
+<div class="grp">English</div>
+<a href="../../guide/lost-context.html">Lost context</a>
+<a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
+<a href="../../guide/find-a-session.html">Finding a session</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>智能体把上下文弄丢了</h1>
+<p class="pagelede">崩溃、清空、重连——工作还在磁盘上<span class="mins" data-mins></span></p>
+
+<p>这发生在任务做到一半，不是换任务的间隙：窗口被清空，命令行被重启，会话恢复出来却是空的，标签页不是你关的。一小时前还在做的工作，智能体现在自信得像是完全没参与过。</p>
+
+<h2>上下文没丢，丢的是回到它的路</h2>
+<p>几乎每个编程智能体都会在进行中把每一轮写到磁盘上——<a href="where-sessions-are-stored.html">三十四个智能体，二十五种历史记录格式</a>。崩溃或清空毁掉的是模型正在用的上下文，不是那份会话记录。文件还在 <code>~/.claude/projects</code>、<code>~/.codex/sessions</code>、<code>~/.qwen/projects</code>，或者你的智能体自己放记录的地方，你现在想不起来的那个决定就在里面。</p>
+
+<h2>拿回你正在用的这次会话</h2>
+<pre>deja wip
+deja "你正在做的那件事"</pre>
+<p><code>deja wip</code> 回答的是一次接不上前文的会话的第一个问题：我刚才在做什么。答案来自这个目录里上一次会话自己的记录——任务是什么、定下了什么、进行中的文件有哪些、最后跑的是哪条命令、它失败了没有。这些都没有单独存过，每次都是从那份记录里算出来的。</p>
+<p>搜索覆盖这台机器上每个智能体的历史，所以上下文原来在哪个工具里并不重要，那个工具是不是还在，也不重要。<code>deja ctx &lt;query&gt;</code> 把最匹配的一次会话收成一份摘要，而不是一整面记录。要贴进新窗口的，就是这份摘要。</p>
+<p>如果丢掉上下文的那个工具支持，<code>deja resume &lt;id&gt;</code> 会打印重新打开那次对话的确切命令，而且是在那次对话所属的目录里。三十四个智能体里，有二十七个支持。</p>
+
+<h2>让下一次不再丢</h2>
+<pre>deja install --auto</pre>
+<p>装上之后，找回这件事不用你记着去做。会话开始时就会召回，所以新开的窗口已经知道这个项目最近的决定；每次提问时也会召回，关于旧工作的问题就从会话记录里回答，而不是靠猜。Claude Code 和 Codex 还会在压缩开始时把当时的工作上下文留下，压缩结束后交还一次。窗口被清空一次，代价是一段上下文，而不是一下午。</p>
+
+<h2>它做不到的</h2>
+<p>智能体从没写下来的，找不回来，deja 也不假装可以：它索引的是文件，不是模型当时脑子里有什么。崩溃前来不及写到磁盘的会话——有的工具按轮次边界写，不是每个 token 都写——会丢掉最后一轮。你记得的，通常恰恰是这一轮。</p>
+
+<h2>索引覆盖的范围</h2>
+<p>索引覆盖这台机器上每个智能体的会话记录——<a href="where-sessions-are-stored.html">各有各的格式</a>——包括装上 deja 之前的那些。建索引和检索都在本地：对会话记录做 BM25，没有模型，也不做 embedding，凭据在建索引时就被脱敏（<a href="privacy.html">隐私</a>）。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="find-a-session.html">找到一次会话</a> · <a href="../../guide/after-compaction.html">压缩丢掉了什么</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

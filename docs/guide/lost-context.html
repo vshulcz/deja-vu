@@ -7,6 +7,9 @@
 <title>Claude Code lost your context: how to get it back — deja-vu</title>
 <meta name="description" content="A crash, a cleared window or a restart takes the agent's context but not the transcript — how to get the work back and stop paying for it next time.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Claude Code lost your context: how to get it back">
 <meta property="og:description" content="A crash, a cleared window or a restart takes the agent's context but not the transcript — how to get the work back and stop paying for it next time.">
@@ -132,7 +135,7 @@
 <p>It happens mid-task, not between tasks: the window is cleared, the CLI is restarted, a session is resumed and comes back empty, the tab is closed by something that is not you. The agent is now confidently a stranger to work you did an hour ago.</p>
 
 <h2>The context is not gone, the pointer to it is</h2>
-<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty-five formats, one per tool</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
+<p>Almost every coding agent writes each turn to disk as it happens — <a href="where-sessions-are-stored.html">twenty-five formats across thirty-four tools</a>. What a crash or a clear destroys is the model's working set, not the transcript. The file is still sitting under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, <code>~/.qwen/projects</code> or wherever your agent keeps it, with the decision you now cannot recall.</p>
 
 <h2>Getting it back into the session you are in</h2>
 <pre>deja wip

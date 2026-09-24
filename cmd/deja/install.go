@@ -2360,10 +2360,12 @@ func tomlHeadersClose(text string) error {
 		if !strings.HasPrefix(t, "[") {
 			continue
 		}
-		// A header may carry a trailing comment: [a.b]  # why.
-		if at := strings.Index(t, "#"); at >= 0 {
-			t = strings.TrimSpace(t[:at])
-		}
+		// A header may carry a trailing comment: [a.b]  # why. tomlCode cuts
+		// it without mistaking a `#` inside a quoted key for its start —
+		// codex's hook trust tables are spelled
+		// [hooks.state."...plugin.json#hooks[0]:subagent_stop:0:0"], and
+		// cutting at the internal `#` made every such config look broken.
+		t = tomlCode(t)
 		if !strings.HasSuffix(t, "]") {
 			return fmt.Errorf("line %d is a table header that never closes: %s", i+1, strings.TrimSpace(line))
 		}
@@ -3443,23 +3445,96 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 		m = map[string]any{}
 		root["mcp"] = m
 	}
+	// OpenCode 2.x accepts the MCP servers one level below the 1.x `mcp`
+	// block. Keep the entry in the shape the reader already uses instead of
+	// creating a second, invisible server beside it.
+	servers := m
+	blockKey := "mcp"
+	if nested, ok := opencodeNestedServers(m); ok {
+		servers = nested
+		blockKey = "mcp.servers"
+	}
 	if uninstall {
-		delete(m, "deja")
-		removeAdoptedDejaEntries(path, "mcp", m)
-		note = leftDejaEntriesNote(m)
+		delete(servers, "deja")
+		removeAdoptedDejaEntries(path, blockKey, servers)
+		note = leftDejaEntriesNote(servers)
 	} else {
-		key := dejaEntryKey(m)
+		key := dejaEntryKey(servers)
 		if key != "deja" {
-			noteBlockAdded(path, "mcp."+key)
+			noteBlockAdded(path, blockKey+"."+key)
 		}
-		m[key], note = mergeDejaEntry(m[key], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
-		note = withOtherDejaEntries(note, m, key)
+		servers[key], note = mergeDejaEntry(servers[key], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
+		note = withOtherDejaEntries(note, servers, key)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return nil, "", err
 	}
 	return append(next, '\n'), note, nil
+}
+
+// opencodeNestedServers reports the OpenCode 2.x shape only when the config
+// has no direct MCP entry that already owns deja. A mixed config can be a
+// deliberate 1.x setup with a server named `servers`; keeping the direct
+// entry in that case preserves the behaviour of the older writer.
+func opencodeNestedServers(m map[string]any) (map[string]any, bool) {
+	servers, ok := m["servers"].(map[string]any)
+	if !ok || servers == nil {
+		return nil, false
+	}
+	for key, value := range m {
+		if key == "servers" {
+			continue
+		}
+		if key == "deja" || mcpEntryRunsDeja(value) {
+			return nil, false
+		}
+	}
+	return servers, true
+}
+
+// updateOpencodeJSONCNested edits an existing `mcp.servers` object while
+// retaining JSONC comments and the fields already present on deja's entry.
+// The generic JSONC writer is used here because it already handles dotted
+// object paths, comments, trailing commas, aliases and nested indentation.
+func updateOpencodeJSONCNested(old []byte, exe string, uninstall bool) ([]byte, string, error) {
+	text := string(old)
+	var root map[string]any
+	if err := json.Unmarshal([]byte(jsoncToJSON(text)), &root); err != nil {
+		return nil, "", err
+	}
+	mcp, ok := root["mcp"].(map[string]any)
+	if !ok {
+		return nil, "", errors.New(`"mcp" is not an object`)
+	}
+	servers, ok := opencodeNestedServers(mcp)
+	if !ok {
+		return nil, "", errors.New(`"mcp.servers" is not an object`)
+	}
+	key := dejaEntryKey(servers)
+	var note string
+	var next string
+	if uninstall {
+		delete(servers, key)
+		note = leftDejaEntriesNote(servers)
+		var err error
+		next, err = jsoncSetEntry(text, "mcp.servers", key, "", true, 2)
+		if err != nil {
+			return nil, "", err
+		}
+	} else {
+		merged, mergeNote := mergeDejaEntry(servers[key], map[string]any{"type": "local", "command": []string{exe, "mcp"}})
+		note = withOtherDejaEntries(mergeNote, servers, key)
+		entry, err := jsoncEntryText(merged)
+		if err != nil {
+			return nil, "", err
+		}
+		next, err = jsoncSetEntry(text, "mcp.servers", key, entry, false, 2)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+	return []byte(next), note, nil
 }
 
 // dropJSONCEntry takes one entry out of an "mcp" block written as lines, and
@@ -3896,6 +3971,12 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		}
 		return []byte("{\n  \"mcp\": {\n" + line + "\n  }\n}\n"), "", nil
 	}
+	// OpenCode 2.x stores servers under `mcp.servers`. Route that shape through
+	// the dotted JSONC writer before the legacy line editor can mistake a nested
+	// entry for one at the top of `mcp`.
+	if opencodeJSONCNestedServers(old) {
+		return updateOpencodeJSONCNested(old, exe, uninstall)
+	}
 	lines := strings.Split(strings.TrimRight(s, "\n"), "\n")
 	// A block that opens and closes on one line has no end line to find, so
 	// the insert landed after its closing brace and the config stopped
@@ -4081,6 +4162,19 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	out = append(out, mcp...)
 	out = append(out, lines[insert:]...)
 	return []byte(strings.Join(out, "\n") + "\n"), "", nil
+}
+
+func opencodeJSONCNestedServers(old []byte) bool {
+	var root map[string]any
+	if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
+		return false
+	}
+	mcp, ok := root["mcp"].(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = opencodeNestedServers(mcp)
+	return ok
 }
 
 // replacedJSONCLineNote names the deja entry a line-editing write dropped.

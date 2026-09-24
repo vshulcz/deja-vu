@@ -47,6 +47,12 @@ func TestTheTOMLCheckLeavesOrdinaryConfigsAlone(t *testing.T) {
 		"[mcp_servers.deja]  # the one deja wrote\ncommand = \"deja\"\n",
 		"[[servers]]\nname = \"a\"\n\n[[servers]]\nname = \"b\"\n",
 		"[tools.\"weird.name\"]\nenabled = true\n",
+		// codex writes hook trust headers whose quoted key carries a `#`
+		// (the plugin json path and the hook index). A comment-stripper that
+		// cuts at every `#` refuses them, so a real codex config could not
+		// be installed into at all.
+		"[hooks.state.\"browser@openai-bundled:plugin.json#hooks[0]:subagent_stop:0:0\"]\nenabled = true\n",
+		"[hooks.state.\"unified-computer-use@openai-bundled:plugin.json#hooks[0]:post_tool_use:0:0\"]\nenabled = true\n",
 		"# [commented.out]\nvalue = 1\n",
 		"",
 	} {
@@ -62,6 +68,8 @@ func TestTheTOMLCheckCatchesAHeaderThatNeverCloses(t *testing.T) {
 		"[mcp_servers.theirs\ncommand = \"x\"\n",
 		"model = \"gpt-5\"\n\n[tools\n",
 		"[a]\nx = 1\n[b\ny = 2\n",
+		// the `#` inside the quoted key must not hide a missing closing bracket
+		"[hooks.state.\"browser@openai-bundled:plugin.json#hooks[0]:subagent_stop:0:0\nenabled = true\n",
 	} {
 		if err := tomlHeadersClose(text); err == nil {
 			t.Errorf("a broken header was accepted: %q", text)
