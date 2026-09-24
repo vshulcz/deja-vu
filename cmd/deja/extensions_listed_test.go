@@ -44,7 +44,7 @@ func TestEveryExtensionIsListedWhereItIsInstalledFrom(t *testing.T) {
 
 	pages := map[string]string{
 		"README.md":                       string(repoFile(t, "README.md")),
-		"README.zh.md":                    string(repoFile(t, "README.zh.md")),
+		"docs/readme/README.zh.md":        string(repoFile(t, "docs/readme/README.zh.md")),
 		"docs/guide/getting-started.html": html.UnescapeString(string(repoFile(t, "docs/guide/getting-started.html"))),
 	}
 

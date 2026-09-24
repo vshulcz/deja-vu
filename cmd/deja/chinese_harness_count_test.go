@@ -52,7 +52,7 @@ func TestTheChinesePagesCountTheRegistry(t *testing.T) {
 		}
 	}
 
-	pages := []string{filepath.Join(root, "README.zh.md")}
+	pages := []string{filepath.Join(root, "docs", "readme", "README.zh.md")}
 	err := filepath.WalkDir(filepath.Join(root, "docs", "zh"), func(p string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err

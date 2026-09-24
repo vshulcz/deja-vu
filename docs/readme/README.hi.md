@@ -25,7 +25,7 @@ deja उन सेशन्स को इंडेक्स करता है 
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">आँकड़े खुद जाँचिए</a></sub>
 </p>
 
-<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">दस्तावेज़</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
 <p align="center"><sub>काम आए तो <a href="https://github.com/vshulcz/deja-vu">GitHub</a> पर deja-vu को स्टार दीजिए।</sub></p>

@@ -25,7 +25,7 @@ func TestTheJapanesePageCountsTheRegistry(t *testing.T) {
 	root := filepath.Join("..", "..")
 	n := registryHarnessCount(t, root)
 
-	page := filepath.Join(root, "README.ja.md")
+	page := filepath.Join(root, "docs", "readme", "README.ja.md")
 	b, err := os.ReadFile(page)
 	if err != nil {
 		t.Fatalf("README.ja.md: %v", err)

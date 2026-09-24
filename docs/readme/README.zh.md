@@ -24,7 +24,7 @@
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | 简体中文 | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">文档</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">评测</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">与同类对比</a></p>
 <p align="center"><sub>觉得有用的话，欢迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上给 deja-vu 点个 Star。</sub></p>
@@ -68,7 +68,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
 `deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
-[`extensions/`](extensions)。
+[`extensions/`](../../extensions)。
 
 同一套搜索也是一个 skill，任何会读 `SKILL.md` 的智能体都能装：
 
@@ -127,7 +127,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 值会变成 `[redacted:<kind>]`，周围的文本仍然可搜。`deja share` 和 `deja sync export` 在导出时再做一次脱敏。模式匹配不是密钥检测：规则不认识的形态可能原样通过，见安全模型。
 
 `deja forget` 把会话从重建后的索引里移除并写下墓碑，之后的 `deja index` 无法从原始历史里把它们恢复回来。
-[安全模型](docs/SECURITY-MODEL.md)记录了数据流向、脱敏的边界、信任假设与发布验证。
+[安全模型](../../docs/SECURITY-MODEL.md)记录了数据流向、脱敏的边界、信任假设与发布验证。
 
 ## 命令行
 
@@ -168,7 +168,7 @@ $ deja "jwt refresh token"
 任务、结论、文件、每条命令跑成了什么、以及还剩什么没做完。同一个会话、同一个工作目录下的下一个钩子
 会把这些一次性交回，总量不超过 4 KB，并附一行说明仓库此后有没有变动。
 `deja stats` 统计压缩之后到第一次编辑之间的工具调用次数，这个功能就是拿它来衡量的。
-细节见[压缩后自动恢复](docs/compaction.md)。
+细节见[压缩后自动恢复](../../docs/compaction.md)。
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -177,7 +177,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed。
 
 每个工具分别支持 MCP 召回、自动召回、技能、命令、resume 和 handoff 中的哪些，见
-[英文 README 的能力矩阵](README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`
+[英文 README 的能力矩阵](../../README.md#supported-harnesses)。自定义存储位置通过 `DEJA_*_ROOT`
 变量指定，各家自己的迁移变量也会被尊重。
 
 ### 自带插件包的智能体
@@ -246,11 +246,11 @@ deja bench ingest     # 一次索引更新的代价：没有变化、追加一�
 `~/.cache/deja` 里的本地倒排索引：解析 JSONL 与 SQLite 存储、脱敏凭据、写出 `records.bin`
 和词桶，并在 `manifest.gob` 里记录每个文件的状态，因此重复运行只摄入变化的部分。
 MCP 服务端、统计、分享和同步都读这一份索引。细节见
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)。
 
 ## 常见问题
 
-**有东西离开我的机器吗？** 没有，除非你主动要求。见[数据流向](docs/SECURITY-MODEL.md#data-flows)。
+**有东西离开我的机器吗？** 没有，除非你主动要求。见[数据流向](../../docs/SECURITY-MODEL.md#data-flows)。
 
 **日志里已经有的密钥怎么办？** 它们留在原本的工具文件里，那是你的智能体的数据。
 它们不会进入 deja 的索引、摘要、分享或同步导出。
@@ -314,9 +314,9 @@ deja install --auto
 
 ## 参与开发
 
-`make build test lint`，然后看 [CONTRIBUTING.md](CONTRIBUTING.md)。
-新增一个工具从[解析器注册表](docs/ARCHITECTURE.md#source-parsers)开始。
-优先级与非目标见 [ROADMAP.md](ROADMAP.md)。
+`make build test lint`，然后看 [CONTRIBUTING.md](../../CONTRIBUTING.md)。
+新增一个工具从[解析器注册表](../../docs/ARCHITECTURE.md#source-parsers)开始。
+优先级与非目标见 [ROADMAP.md](../../ROADMAP.md)。
 
 ## 许可
 

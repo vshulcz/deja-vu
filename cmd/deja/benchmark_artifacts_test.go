@@ -177,7 +177,7 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 	quoted := regexp.MustCompile(`([0-9]+\.[0-9])%\s*hit@1([^0-9]|$)`)
 	for _, name := range []string{
 		"README.md",
-		"README.zh.md",
+		"docs/readme/README.zh.md",
 		"npm/README.md",
 		"docs/llms.txt",
 		"docs/guide/compare.html",

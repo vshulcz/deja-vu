@@ -23,18 +23,18 @@ import (
 // current (#3100). Comparing the roster against the registry catches that in
 // any language, because the names are the same everywhere even when nothing
 // around them is.
-// Three of these live in the root because the outside world already links them
-// by that path — the site, the plugin listings, the directory submissions — and
-// the nine added later live under docs/readme so the root stays readable. The
-// switcher therefore has to be written relative to whichever file carries it,
-// which is one more thing to get wrong by hand and the reason this is a test.
+//
+// Only the English one is in the root; the other eleven live under docs/readme,
+// because twelve README files at the top of the listing is the first thing a
+// visitor reads. That is why the switcher is relative to whichever file carries
+// it, and why a link correct in the root is wrong one directory down.
 var readmeLanguages = []struct {
 	file, name string
 }{
 	{"README.md", "English"},
-	{"README.zh.md", "简体中文"},
+	{"docs/readme/README.zh.md", "简体中文"},
 	{"docs/readme/README.zh-TW.md", "繁體中文"},
-	{"README.ja.md", "日本語"},
+	{"docs/readme/README.ja.md", "日本語"},
 	{"docs/readme/README.ko.md", "한국어"},
 	{"docs/readme/README.es.md", "Español"},
 	{"docs/readme/README.pt.md", "Português"},
