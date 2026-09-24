@@ -50,7 +50,7 @@
   },
   "dependencies": {
     "@opencode-ai/plugin": ">=1.0.0",
-    "@vshulcz/deja-vu": "^0.21.1"
+    "@vshulcz/deja-vu": "^0.21.2"
   },
   "scripts": {
     "test": "node --test test/*.test.js"
