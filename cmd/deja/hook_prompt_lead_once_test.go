@@ -53,8 +53,15 @@ func TestTheBlockExplainsItselfOncePerSession(t *testing.T) {
 	if strings.Contains(second, "deja found sessions whose wording matches this request") {
 		t.Errorf("the second block repeats the whole explanation:\n%s", second)
 	}
-	if !strings.Contains(second, "matched on wording, not meaning") {
-		t.Errorf("the second block dropped the caveat that still applies:\n%s", second)
+	// The caveat that used to be kept here is gone, and this pins that rather
+	// than the other way round. It was kept to stop a wording match being taken
+	// for an answer, and measured against exactly that on the local 9B: a later
+	// block whose history is about a sibling subject and carries a value nothing
+	// else holds, quoted unhedged as the answer 12 times of 40 with the line and
+	// 10 of 40 without it. It cost 78 bytes on every block after the first and
+	// bought no care.
+	if strings.Contains(second, "matched on wording, not meaning") {
+		t.Errorf("the caution came back; 40 cases say it changes nothing:\n%s", second)
 	}
 	// What must survive on every block: the untrusted-data line and the line
 	// that asks for the citation.

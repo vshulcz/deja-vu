@@ -489,8 +489,20 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		// block ends with. Measured on a real store: a session receives a median
 		// of 23 per-prompt blocks, the lead is 301 bytes of a 1439-byte block,
 		// so 22 of those blocks carried 6.6 KB of the same sentences.
+		//
+		// The one line that survived the first cut does not survive this one. It
+		// was kept as a caution against taking a wording match for an answer, and
+		// measured against exactly that: a later block whose history is about a
+		// sibling subject and carries a value nothing else holds, quoted as the
+		// answer with no hedge. On the local 9B, 40 such cases: false trust 12/40
+		// with the caution and 10/40 without it. It is not buying the care it was
+		// there for, and it is 78 bytes on every block after the first.
+		//
+		// The untrusted-data frame is a different matter and stays on every
+		// block: dropping its sentence doubled how often a directive planted in
+		// the recalled text was obeyed (8/48 against 19/48).
 		if blockAlreadySentThisSession(dir, input.SessionID) {
-			lead = promptHookLeadShort
+			lead = ""
 		}
 		// A repeat of the question itself is a different claim than a session
 		// about the subject, and a stronger one: the agent does not have to
@@ -1540,11 +1552,12 @@ func sessionIDs(ss []model.Session) []string {
 // for the one check that catches it.
 const promptHookLead = "deja found sessions whose wording matches this request — not a judgement that they answer it. Check that the session describes what is happening now before acting on it. If one genuinely helps, use it and tell the user in one short line, as the last line of this block asks; otherwise ignore silently.\n"
 
-// promptHookLeadShort is the lead every block after the first one carries: the
-// caveat that still applies each time, without the sentences the session has
-// already been told and without the citation instruction the block ends with
-// anyway.
-const promptHookLeadShort = "deja matched on wording, not meaning — check the session fits before acting on it.\n"
+// The short lead that blocks after the first used to carry — "deja matched on
+// wording, not meaning — check the session fits before acting on it." — is
+// gone. Measured on the local 9B over 40 cases where the recalled history is
+// about a sibling subject and holds a value nothing else does: quoting it as
+// the answer, unhedged, happened 12 times of 40 with that line and 10 of 40
+// without it. The care it asked for is not care the line produces.
 
 // blockAlreadySentThisSession reports whether this agent session has had a
 // per-prompt block before. The seen list is written after every block that goes
