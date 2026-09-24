@@ -25,7 +25,7 @@ her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerin
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">sayıları kendiniz doğrulayın</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Belgeler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Ölçümler</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Karşılaştırma</a></p>
 <p align="center"><sub>İşinize yaradıysa <a href="https://github.com/vshulcz/deja-vu">GitHub</a>'da deja-vu'ya bir yıldız bırakın.</sub></p>
@@ -71,7 +71,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto` yukarıdakilerin hepsini zaten bağlıyor, yani iki yoldan biri yeter. İkisi birden de
 sorun çıkarmaz: her paket `deja install`'ın yazdığını okur ve yalnızca eksik olanı tamamlar; araçlar iki kez
-kaydedilmez, geri çağırma iki kez çalışmaz. Ayrıntılar [`extensions/`](extensions) altında.
+kaydedilmez, geri çağırma iki kez çalışmaz. Ayrıntılar [`extensions/`](../../extensions) altında.
 
 Aynı arama bir skill olarak da var; `SKILL.md` okuyan her ajan kurabilir:
 
@@ -138,7 +138,7 @@ olduğu gibi geçebilir, güvenlik modeline bakın.
 
 `deja forget` oturumları yeniden kurulan indeksten çıkarır ve bir mezar taşı bırakır; böylece sonraki
 `deja index` onları özgün geçmişten geri getiremez.
-[Güvenlik modeli](docs/SECURITY-MODEL.md) veri akışlarını, temizliğin sınırlarını, güven varsayımlarını ve
+[Güvenlik modeli](../../docs/SECURITY-MODEL.md) veri akışlarını, temizliğin sınırlarını, güven varsayımlarını ve
 sürüm doğrulamasını belgeler.
 
 ## Komut satırı
@@ -187,7 +187,7 @@ Otomatik geri çağırma açıkken Claude Code ve Codex, sıkıştırma başlad�
 kaldığını. Aynı oturumdaki ve aynı çalışma dizinindeki sonraki kanca bunu tek seferde, 4 KB'ı aşmadan geri
 verir ve deponun o zamandan beri değişip değişmediğini bir satırla ekler. `deja stats`, sıkıştırma ile ilk
 düzenleme arasındaki araç çağrısı sayısını sayar; bu özellik onunla ölçüldü.
-Ayrıntılar [sıkıştırma sonrası kurtarma](docs/compaction.md) belgesinde.
+Ayrıntılar [sıkıştırma sonrası kurtarma](../../docs/compaction.md) belgesinde.
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -196,7 +196,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
 
 Her birinin neyi desteklediği — MCP geri çağırma, otomatik geri çağırma, skill'ler, komutlar, resume, handoff —
-[İngilizce README'deki yetenek tablosunda](README.md#supported-harnesses). Özel depolama konumları `DEJA_*_ROOT`
+[İngilizce README'deki yetenek tablosunda](../../README.md#supported-harnesses). Özel depolama konumları `DEJA_*_ROOT`
 değişkenleriyle belirtilir; araçların kendi geçiş değişkenlerine de uyulur.
 
 ### Kendi paketi olan ajanlar
@@ -268,12 +268,12 @@ Gerçek bir depoda ölçüldü: 2,419 oturum, 179k mesaj, 1.9 GB kayıt.
 `~/.cache/deja` içinde yerel bir ters indeks: JSONL ve SQLite depolarını ayrıştırır, kimlik bilgilerini
 temizler, `records.bin` ile sözcük kovalarını yazar ve her dosyanın durumunu `manifest.gob` içinde tutar;
 böylece ikinci çalıştırma yalnızca değişeni alır. MCP sunucusu, istatistikler, share ve sync aynı indeksi
-okur. Ayrıntılar [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) dosyasında.
+okur. Ayrıntılar [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) dosyasında.
 
 ## Sık sorulanlar
 
 **Makinemden bir şey çıkıyor mu?** Siz istemedikçe hayır.
-[Veri akışları](docs/SECURITY-MODEL.md#data-flows) bölümüne bakın.
+[Veri akışları](../../docs/SECURITY-MODEL.md#data-flows) bölümüne bakın.
 
 **Günlüklerde zaten duran sırlar ne olacak?** Onlar özgün aracın dosyalarında kalır, sizin ajanınızın
 verisidir. deja'nın indeksine, özetlerine, share'ine veya sync dışa aktarımına girmezler.
@@ -343,9 +343,9 @@ Kurulum on saniye, indeksleme on saniye kadar. Bir ajan bir sonraki oturumu açt
 
 ## Geliştirme
 
-`make build test lint`, ardından [CONTRIBUTING.md](CONTRIBUTING.md).
-Yeni bir araç [ayrıştırıcı kaydından](docs/ARCHITECTURE.md#source-parsers) başlar.
-Öncelikler ve yapmayacaklarımız [ROADMAP.md](ROADMAP.md) dosyasında.
+`make build test lint`, ardından [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Yeni bir araç [ayrıştırıcı kaydından](../../docs/ARCHITECTURE.md#source-parsers) başlar.
+Öncelikler ve yapmayacaklarımız [ROADMAP.md](../../ROADMAP.md) dosyasında.
 
 ## Lisans
 

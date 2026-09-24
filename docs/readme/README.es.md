@@ -25,7 +25,7 @@ los dos harnesses de recuperación están en este repositorio y corren sobre dat
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">comprueba los números tú mismo</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentación</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
 <p align="center"><sub>Si te resulta útil, dale una estrella a deja-vu en <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>
@@ -71,7 +71,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto` ya conecta todo lo anterior, así que cualquiera de los dos caminos basta. Los dos juntos
 tampoco estorban: cada paquete lee lo que escribió `deja install` y solo completa lo que falta, sin registrar
-herramientas por duplicado ni hacer el recall dos veces. Los detalles están en [`extensions/`](extensions).
+herramientas por duplicado ni hacer el recall dos veces. Los detalles están en [`extensions/`](../../extensions).
 
 La misma búsqueda existe como skill, instalable por cualquier agente que lea `SKILL.md`:
 
@@ -138,7 +138,7 @@ tal cual, ver el modelo de seguridad.
 
 `deja forget` saca sesiones del índice reconstruido y deja una lápida, así que el siguiente `deja index` no
 puede recuperarlas del historial original.
-El [modelo de seguridad](docs/SECURITY-MODEL.md) documenta los flujos de datos, los límites del borrado, los
+El [modelo de seguridad](../../docs/SECURITY-MODEL.md) documenta los flujos de datos, los límites del borrado, los
 supuestos de confianza y la verificación de releases.
 
 ## Línea de comandos
@@ -188,7 +188,7 @@ archivos, en qué terminó cada comando y qué queda sin hacer. El siguiente hoo
 directorio lo devuelve de una vez, sin pasar de 4 KB, con una línea sobre si el repositorio cambió desde
 entonces. `deja stats` cuenta las llamadas a herramientas entre la compactación y la primera edición, que es
 con lo que se midió esto.
-Los detalles están en [recuperación tras la compactación](docs/compaction.md).
+Los detalles están en [recuperación tras la compactación](../../docs/compaction.md).
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -197,7 +197,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
 
 Qué soporta cada uno —recall por MCP, recall automático, skills, comandos, resume, handoff— está en la
-[matriz de capacidades del README en inglés](README.md#supported-harnesses). Las rutas de almacenamiento
+[matriz de capacidades del README en inglés](../../README.md#supported-harnesses). Las rutas de almacenamiento
 personalizadas se indican con variables `DEJA_*_ROOT`, y también se respetan las variables de migración de
 cada herramienta.
 
@@ -271,12 +271,12 @@ El índice es incremental. Cuando un archivo de sesión crece, se vuelve a leer 
 Un índice invertido local en `~/.cache/deja`: parsea almacenes JSONL y SQLite, limpia credenciales, escribe
 `records.bin` y cubos de palabras, y guarda el estado de cada archivo en `manifest.gob`, de modo que una
 segunda ejecución solo ingiere lo que cambió. El servidor MCP, las estadísticas, share y sync leen ese mismo
-índice. Los detalles están en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+índice. Los detalles están en [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 
 ## Preguntas frecuentes
 
 **¿Sale algo de mi máquina?** No, a menos que lo pidas. Ver
-[flujos de datos](docs/SECURITY-MODEL.md#data-flows).
+[flujos de datos](../../docs/SECURITY-MODEL.md#data-flows).
 
 **¿Y los secretos que ya están en los logs?** Se quedan en los archivos de la herramienta original, que son
 datos de tu agente. No entran en el índice de deja, ni en los resúmenes, ni en share, ni en el export de sync.
@@ -346,9 +346,9 @@ has resuelto en este proyecto, incluido lo de antes de instalar deja.
 
 ## Desarrollo
 
-`make build test lint`, y luego [CONTRIBUTING.md](CONTRIBUTING.md).
-Un agente nuevo empieza por el [registro de parsers](docs/ARCHITECTURE.md#source-parsers).
-Las prioridades y lo que no vamos a hacer están en [ROADMAP.md](ROADMAP.md).
+`make build test lint`, y luego [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Un agente nuevo empieza por el [registro de parsers](../../docs/ARCHITECTURE.md#source-parsers).
+Las prioridades y lo que no vamos a hacer están en [ROADMAP.md](../../ROADMAP.md).
 
 ## Licencia
 

@@ -25,7 +25,7 @@ deja는 Claude Code, Codex, Cursor를 비롯해 이 컴퓨터의 모든 에이�
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">숫자를 직접 확인하세요</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">문서</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">벤치마크</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">비교</a></p>
 <p align="center"><sub>쓸 만하다면 <a href="https://github.com/vshulcz/deja-vu">GitHub</a>에서 deja-vu에 별을 눌러 주세요.</sub></p>
@@ -70,7 +70,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto`가 위의 것들을 알아서 연결하므로 두 경로 중 하나면 충분합니다. 둘 다 써도
 문제없습니다. 각 패키지는 `deja install`이 써 둔 것을 읽고 빠진 부분만 채우므로, 도구가 중복 등록되거나
-회상이 두 번 일어나지 않습니다. 자세한 내용은 [`extensions/`](extensions)에 있습니다.
+회상이 두 번 일어나지 않습니다. 자세한 내용은 [`extensions/`](../../extensions)에 있습니다.
 
 같은 검색이 skill로도 존재해서, `SKILL.md`를 읽는 에이전트라면 어디든 설치할 수 있습니다:
 
@@ -136,7 +136,7 @@ PEM 개인 키 블록, 각 제공자의 토큰, `scheme://user:pass@host` 형태
 
 `deja forget`은 세션을 재구축된 색인에서 빼고 묘비를 남기므로, 이후의 `deja index`가 원본 기록에서
 되살리지 못합니다.
-[보안 모델](docs/SECURITY-MODEL.md)에 데이터 흐름, 제거의 경계, 신뢰 가정, 릴리스 검증이 적혀 있습니다.
+[보안 모델](../../docs/SECURITY-MODEL.md)에 데이터 흐름, 제거의 경계, 신뢰 가정, 릴리스 검증이 적혀 있습니다.
 
 ## 명령줄
 
@@ -182,7 +182,7 @@ $ deja "jwt refresh token"
 것을 남깁니다. 작업, 결론, 파일, 각 명령이 어떻게 끝났는지, 무엇이 아직 남았는지. 같은 세션, 같은 작업
 디렉터리의 다음 훅이 그것을 4 KB를 넘지 않는 한 덩어리로 돌려주고, 저장소가 그 뒤 바뀌었는지 한 줄로
 덧붙입니다. `deja stats`는 압축과 첫 편집 사이의 도구 호출 수를 세는데, 이 기능은 그것으로 측정했습니다.
-자세한 내용은 [압축 이후 자동 복구](docs/compaction.md)에 있습니다.
+자세한 내용은 [압축 이후 자동 복구](../../docs/compaction.md)에 있습니다.
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -191,7 +191,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
-[영문 README의 기능 표](README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`
+[영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`
 변수로 지정하고, 각 도구 자체의 마이그레이션 변수도 존중합니다.
 
 ### 자체 패키지가 있는 에이전트
@@ -261,12 +261,12 @@ deja bench ingest     # 색인 갱신 한 번의 비용: 변화 없음, 한 턴 
 `~/.cache/deja`에 있는 로컬 역색인입니다. JSONL과 SQLite 저장소를 파싱하고, 자격 증명을 제거하고,
 `records.bin`과 단어 버킷을 쓰고, 각 파일의 상태를 `manifest.gob`에 기록하므로 다시 실행하면 바뀐 것만
 가져옵니다. MCP 서버, 통계, share, sync가 모두 같은 색인을 읽습니다. 자세한 내용은
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)에 있습니다.
+[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)에 있습니다.
 
 ## 자주 묻는 질문
 
 **뭔가 내 컴퓨터를 떠나나요?** 직접 요청하지 않는 한 아닙니다.
-[데이터 흐름](docs/SECURITY-MODEL.md#data-flows)을 보세요.
+[데이터 흐름](../../docs/SECURITY-MODEL.md#data-flows)을 보세요.
 
 **이미 로그에 있는 비밀정보는요?** 그건 원래 도구의 파일에 남습니다. 여러분 에이전트의 데이터니까요.
 deja의 색인, 요약, share, sync 내보내기에는 들어가지 않습니다.
@@ -335,9 +335,9 @@ deja install --auto
 
 ## 개발
 
-`make build test lint` 다음 [CONTRIBUTING.md](CONTRIBUTING.md)를 보세요.
-새 도구는 [파서 레지스트리](docs/ARCHITECTURE.md#source-parsers)에서 시작합니다.
-우선순위와 하지 않을 일은 [ROADMAP.md](ROADMAP.md)에 있습니다.
+`make build test lint` 다음 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 보세요.
+새 도구는 [파서 레지스트리](../../docs/ARCHITECTURE.md#source-parsers)에서 시작합니다.
+우선순위와 하지 않을 일은 [ROADMAP.md](../../ROADMAP.md)에 있습니다.
 
 ## 라이선스
 

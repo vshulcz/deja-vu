@@ -25,7 +25,7 @@ deja индексирует сессии, которые Claude Code, Codex, Cur
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">проверьте цифры сами</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | Русский | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Документация</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Замеры</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Сравнение</a></p>
 <p align="center"><sub>Если пригодилось — поставьте deja-vu звезду на <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>
@@ -71,7 +71,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto` подключает всё перечисленное само, так что любого из двух путей достаточно. Оба сразу
 тоже не сломаются: пакет смотрит, что написал `deja install`, и дописывает только недостающее — без дублей
-инструментов и без второго recall. Подробности в [`extensions/`](extensions).
+инструментов и без второго recall. Подробности в [`extensions/`](../../extensions).
 
 Тот же поиск существует как skill, который поставит любой агент, читающий `SKILL.md`:
 
@@ -137,7 +137,7 @@ is …», где опереться не на что. Значение стан�
 
 `deja forget` убирает сессии из перестроенного индекса и оставляет надгробие, так что следующий
 `deja index` не поднимет их обратно из исходной истории.
-[Модель безопасности](docs/SECURITY-MODEL.md) описывает потоки данных, границы вычистки, допущения о
+[Модель безопасности](../../docs/SECURITY-MODEL.md) описывает потоки данных, границы вычистки, допущения о
 доверии и проверку релизов.
 
 ## Командная строка
@@ -186,7 +186,7 @@ deja было 828, пока схему не свели к одному инст�
 осталось недоделанным. Следующий хук в той же сессии и том же рабочем каталоге возвращает это одним куском,
 не больше 4 КБ, со строкой о том, менялся ли репозиторий с тех пор. `deja stats` считает количество вызовов
 инструментов между компактацией и первой правкой — этим и меряли.
-Подробности во [восстановлении после компактации](docs/compaction.md).
+Подробности во [восстановлении после компактации](../../docs/compaction.md).
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -195,7 +195,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
 
 Что именно каждый из них поддерживает — MCP-recall, авто-recall, skills, команды, resume, handoff — см. в
-[матрице возможностей в английском README](README.md#supported-harnesses). Нестандартные пути к хранилищам
+[матрице возможностей в английском README](../../README.md#supported-harnesses). Нестандартные пути к хранилищам
 задаются переменными `DEJA_*_ROOT`, переменные миграции самих инструментов тоже учитываются.
 
 ### Агенты со своим пакетом
@@ -268,12 +268,12 @@ deja bench ingest     # цена одного обновления индекс�
 Локальный инвертированный индекс в `~/.cache/deja`: разбирает JSONL- и SQLite-хранилища, вычищает секреты,
 пишет `records.bin` и словарные корзины и держит состояние каждого файла в `manifest.gob`, поэтому повторный
 запуск забирает только изменившееся. MCP-сервер, статистика, share и sync читают этот же индекс. Подробности
-в [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+в [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md).
 
 ## Частые вопросы
 
 **Что-нибудь уходит с моей машины?** Нет, пока вы сами не попросите. См.
-[потоки данных](docs/SECURITY-MODEL.md#data-flows).
+[потоки данных](../../docs/SECURITY-MODEL.md#data-flows).
 
 **А секреты, которые уже лежат в логах?** Они остаются в файлах самих инструментов, это данные вашего
 агента. В индекс deja, в выжимки, в share и в экспорт sync они не попадают.
@@ -342,9 +342,9 @@ deja install --auto
 
 ## Разработка
 
-`make build test lint`, дальше [CONTRIBUTING.md](CONTRIBUTING.md).
-Новый инструмент начинается с [реестра парсеров](docs/ARCHITECTURE.md#source-parsers).
-Приоритеты и то, чего мы делать не собираемся, — в [ROADMAP.md](ROADMAP.md).
+`make build test lint`, дальше [CONTRIBUTING.md](../../CONTRIBUTING.md).
+Новый инструмент начинается с [реестра парсеров](../../docs/ARCHITECTURE.md#source-parsers).
+Приоритеты и то, чего мы делать не собираемся, — в [ROADMAP.md](../../ROADMAP.md).
 
 ## Лицензия
 

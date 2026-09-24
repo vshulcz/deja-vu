@@ -25,7 +25,7 @@ deja उन सेशन्स को इंडेक्स करता है 
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">आँकड़े खुद जाँचिए</a></sub>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
+<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">दस्तावेज़</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">बेंचमार्क</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">तुलना</a></p>
 <p align="center"><sub>काम आए तो <a href="https://github.com/vshulcz/deja-vu">GitHub</a> पर deja-vu को स्टार दीजिए।</sub></p>
@@ -71,7 +71,7 @@ pi install npm:@vshulcz/pi-deja
 
 `deja install --auto` ऊपर वाला सब कुछ पहले ही जोड़ देता है, इसलिए दोनों में से कोई एक रास्ता काफ़ी है। दोनों साथ
 में भी दिक्कत नहीं करते: हर पैकेज पढ़ता है कि `deja install` ने क्या लिखा और सिर्फ़ छूटा हुआ हिस्सा भरता है — न टूल
-दो बार रजिस्टर होते हैं, न रिकॉल दो बार चलता है। विवरण [`extensions/`](extensions) में है।
+दो बार रजिस्टर होते हैं, न रिकॉल दो बार चलता है। विवरण [`extensions/`](../../extensions) में है।
 
 यही खोज एक skill के रूप में भी है, जिसे `SKILL.md` पढ़ने वाला कोई भी एजेंट लगा सकता है:
 
@@ -137,7 +137,7 @@ JWT, PEM प्राइवेट की ब्लॉक, अलग-अलग �
 
 `deja forget` सेशन्स को दोबारा बने इंडेक्स से हटा देता है और एक समाधि-चिह्न छोड़ता है, ताकि अगला `deja index` उन्हें
 मूल इतिहास से वापस न ला सके।
-[सुरक्षा मॉडल](docs/SECURITY-MODEL.md) में डेटा प्रवाह, सफ़ाई की सीमाएँ, भरोसे की धारणाएँ और रिलीज़ सत्यापन दर्ज हैं।
+[सुरक्षा मॉडल](../../docs/SECURITY-MODEL.md) में डेटा प्रवाह, सफ़ाई की सीमाएँ, भरोसे की धारणाएँ और रिलीज़ सत्यापन दर्ज हैं।
 
 ## कमांड लाइन
 
@@ -185,7 +185,7 @@ deja वह रख लेता है जो सारांश अभी ख�
 सेशन और उसी वर्किंग डायरेक्टरी का अगला हुक इसे एक साथ लौटाता है, 4 KB से ज़्यादा नहीं, और एक पंक्ति में बताता है कि
 रिपॉज़िटरी तब से बदली या नहीं। `deja stats` कॉम्पैक्शन और पहली एडिट के बीच टूल कॉल्स गिनता है — इसी से यह मापा
 गया था।
-विवरण [कॉम्पैक्शन के बाद रिकवरी](docs/compaction.md) में है।
+विवरण [कॉम्पैक्शन के बाद रिकवरी](../../docs/compaction.md) में है।
 
 Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor · Antigravity ·
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
@@ -194,7 +194,7 @@ Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code ·
 Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
 
 इनमें से हर एक क्या समर्थन करता है — MCP रिकॉल, ऑटोमैटिक रिकॉल, skills, कमांड, resume, handoff — यह
-[अंग्रेज़ी README की क्षमता तालिका](README.md#supported-harnesses) में है। अलग स्टोरेज जगहें `DEJA_*_ROOT`
+[अंग्रेज़ी README की क्षमता तालिका](../../README.md#supported-harnesses) में है। अलग स्टोरेज जगहें `DEJA_*_ROOT`
 वेरिएबल्स से बताई जाती हैं, और टूल्स के अपने माइग्रेशन वेरिएबल्स का भी सम्मान किया जाता है।
 
 ### अपना पैकेज रखने वाले एजेंट
@@ -266,12 +266,12 @@ deja bench ingest     # एक इंडेक्स अपडेट की ल�
 `~/.cache/deja` में एक लोकल इनवर्टेड इंडेक्स: JSONL और SQLite स्टोर पार्स करता है, क्रेडेंशियल साफ़ करता है,
 `records.bin` और शब्द-बकेट लिखता है, और हर फ़ाइल की स्थिति `manifest.gob` में रखता है — इसलिए दोबारा चलाने पर
 सिर्फ़ बदला हुआ हिस्सा लिया जाता है। MCP सर्वर, स्टैट्स, share और sync सब यही इंडेक्स पढ़ते हैं। विवरण
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) में है।
+[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) में है।
 
 ## अक्सर पूछे जाने वाले सवाल
 
 **क्या कुछ भी मेरी मशीन से बाहर जाता है?** नहीं, जब तक आप खुद न कहें।
-[डेटा प्रवाह](docs/SECURITY-MODEL.md#data-flows) देखिए।
+[डेटा प्रवाह](../../docs/SECURITY-MODEL.md#data-flows) देखिए।
 
 **लॉग में जो सीक्रेट पहले से हैं उनका क्या?** वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है। वे deja
 के इंडेक्स, सारांश, share या sync निर्यात में नहीं जाते।
@@ -340,9 +340,9 @@ deja install --auto
 
 ## विकास
 
-`make build test lint`, फिर [CONTRIBUTING.md](CONTRIBUTING.md)।
-नया टूल [पार्सर रजिस्ट्री](docs/ARCHITECTURE.md#source-parsers) से शुरू होता है।
-प्राथमिकताएँ और जो हम नहीं करेंगे, वह [ROADMAP.md](ROADMAP.md) में है।
+`make build test lint`, फिर [CONTRIBUTING.md](../../CONTRIBUTING.md)।
+नया टूल [पार्सर रजिस्ट्री](../../docs/ARCHITECTURE.md#source-parsers) से शुरू होता है।
+प्राथमिकताएँ और जो हम नहीं करेंगे, वह [ROADMAP.md](../../ROADMAP.md) में है।
 
 ## लाइसेंस
 

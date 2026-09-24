@@ -23,25 +23,30 @@ import (
 // current (#3100). Comparing the roster against the registry catches that in
 // any language, because the names are the same everywhere even when nothing
 // around them is.
+// Three of these live in the root because the outside world already links them
+// by that path — the site, the plugin listings, the directory submissions — and
+// the nine added later live under docs/readme so the root stays readable. The
+// switcher therefore has to be written relative to whichever file carries it,
+// which is one more thing to get wrong by hand and the reason this is a test.
 var readmeLanguages = []struct {
 	file, name string
 }{
 	{"README.md", "English"},
 	{"README.zh.md", "简体中文"},
-	{"README.zh-TW.md", "繁體中文"},
+	{"docs/readme/README.zh-TW.md", "繁體中文"},
 	{"README.ja.md", "日本語"},
-	{"README.ko.md", "한국어"},
-	{"README.es.md", "Español"},
-	{"README.pt.md", "Português"},
-	{"README.fr.md", "Français"},
-	{"README.de.md", "Deutsch"},
-	{"README.ru.md", "Русский"},
-	{"README.tr.md", "Türkçe"},
-	{"README.hi.md", "हिन्दी"},
+	{"docs/readme/README.ko.md", "한국어"},
+	{"docs/readme/README.es.md", "Español"},
+	{"docs/readme/README.pt.md", "Português"},
+	{"docs/readme/README.fr.md", "Français"},
+	{"docs/readme/README.de.md", "Deutsch"},
+	{"docs/readme/README.ru.md", "Русский"},
+	{"docs/readme/README.tr.md", "Türkçe"},
+	{"docs/readme/README.hi.md", "हिन्दी"},
 }
 
 // switcherFor is the line the file at current must contain: every language
-// linked, its own name plain.
+// linked from where current sits, its own name plain.
 func switcherFor(current string) string {
 	var b strings.Builder
 	b.WriteString(`<p align="center">`)
@@ -53,10 +58,20 @@ func switcherFor(current string) string {
 			b.WriteString(l.name)
 			continue
 		}
-		b.WriteString(`<a href="` + l.file + `">` + l.name + `</a>`)
+		b.WriteString(`<a href="` + readmeHref(current, l.file) + `">` + l.name + `</a>`)
 	}
 	b.WriteString("</p>")
 	return b.String()
+}
+
+// readmeHref is the path from one README to another, as a browser reading the
+// first one would resolve it.
+func readmeHref(from, to string) string {
+	up := strings.Repeat("../", strings.Count(from, "/"))
+	if strings.Contains(from, "/") && filepath.Dir(from) == filepath.Dir(to) {
+		return filepath.Base(to)
+	}
+	return up + to
 }
 
 func TestEveryTranslatedReadmeExistsAndSwitchesToAllTheOthers(t *testing.T) {
@@ -71,6 +86,51 @@ func TestEveryTranslatedReadmeExistsAndSwitchesToAllTheOthers(t *testing.T) {
 			t.Errorf("%s does not carry the language switcher every other README carries:\nwant %s", l.file, want)
 		}
 	}
+
+	// The check above compares the file against a line this test builds, so it
+	// only ever proves the file agrees with the formula. This one reads the
+	// hrefs back out of the file and resolves each one from where that file
+	// sits, which is what a reader's browser does — so a hand-edited link is
+	// caught even if the formula that produced it was wrong.
+	for _, l := range readmeLanguages {
+		b, err := os.ReadFile(filepath.Join(root, l.file))
+		if err != nil {
+			continue
+		}
+		line := switcherLine(string(b))
+		if line == "" {
+			t.Errorf("%s has no line naming every language", l.file)
+			continue
+		}
+		dir := filepath.Dir(filepath.Join(root, l.file))
+		links := 0
+		for _, m := range hrefPattern.FindAllStringSubmatch(line, -1) {
+			if strings.HasPrefix(m[1], "http") {
+				continue
+			}
+			links++
+			if _, err := os.Stat(filepath.Join(dir, m[1])); err != nil {
+				t.Errorf("the switcher in %s points at %q, which does not resolve from there: %v", l.file, m[1], err)
+			}
+		}
+		if links != len(readmeLanguages)-1 {
+			t.Errorf("the switcher in %s carries %d links; there are %d other languages", l.file, links, len(readmeLanguages)-1)
+		}
+	}
+}
+
+var hrefPattern = regexp.MustCompile(`href="([^"]+)"`)
+
+// switcherLine is the one line that names the last language in the list, which
+// is the switcher wherever it has been moved to in the file.
+func switcherLine(text string) string {
+	last := readmeLanguages[len(readmeLanguages)-1].name
+	for _, line := range strings.Split(text, "\n") {
+		if strings.Contains(line, last) && strings.Contains(line, "href=") {
+			return line
+		}
+	}
+	return ""
 }
 
 // rosterHead is where the list starts. It is the same three names in every
