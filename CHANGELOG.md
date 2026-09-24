@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - opencode gets the point-of-action line at all. Both plugin shapes wired their tool seams to a tool name, so a read produced nothing there; the file action now goes out from `tool.execute.after`, which is the only seam opencode has that reaches the model. Measured on a 325-file fixture: the same task cost 40k tokens against 70k with deja and no line, and 136k with no memory.
 
 ### Fixed
+- `deja install codex` no longer refuses a stock Codex config. Codex writes hook trust tables as `[hooks.state."browser@openai-bundled:plugin.json#hooks[0]:subagent_stop:0:0"]`, and the header check cut the line at that `#` as if it began a comment, so the header read as never closed and nothing was written (#3969). Reported and fixed by @h4ckm1n-dev.
 - The getting-started page lists every package under `extensions/`. It said "three more" and named opencode, dsh and Zed while the directory grew to seven, and README.md's table stopped at six; OpenClaw, pi, Grok and Kimi Code are now on both, in the install lines `extensions/README.md` already gives, and neither page counts its lists in prose any more. A test fails the next time a package lands without them.
 
 ## [0.21.1] - 2026-09-23
