@@ -225,7 +225,11 @@ func TestPagesCountHarnessesInDigitsCorrectly(t *testing.T) {
 // "other" and a following "more", because both make the number relative: one
 // counts every harness but this page's own, the other counts the ones not yet
 // named.
-var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents)\b`)
+//
+// `formats` and `tools` are in the noun list because the same number is written
+// with them: "twenty-five formats" outlived eight harnesses on three pages
+// while every sentence that said `agents` was kept current by this test.
+var spelled = regexp.MustCompile(`(?i)\b(other\s+)?((?:twenty|thirty|forty)(?:-(?:one|two|three|four|five|six|seven|eight|nine))?)\s+(more\s+)?(?:coding\s+)?(?:harnesses|agents|formats|tools)\b`)
 
 // registryHarnessCount is how many harnesses deja reads, from the one file that
 // decides it. deja itself is in the registry as the reader, not as something it

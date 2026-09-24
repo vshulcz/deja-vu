@@ -20,7 +20,7 @@ Three ways in, in order of how little work they are:
 | way | what it gives | cost to you |
 |---|---|---|
 | `deja install --auto` | wires MCP and session-start recall into every agent found on the machine | one command |
-| `deja mcp` | an MCP server on stdio: one tool, six modes | one config entry |
+| `deja mcp` | an MCP server on stdio: one tool, seven modes | one config entry |
 | `deja <command> --json` | search, blame, fix, how, files, wip as JSON | a subprocess |
 
 ## Detecting it, and installing it if missing
@@ -50,7 +50,7 @@ deja mcp        # stdio
 ```
 
 One tool, `deja`, with a `mode` argument: `recall`, `context`, `blame`, `fix`,
-`how`, `remember`. The older per-capability tool names still work, so a client
+`how`, `orient`, `remember`. The older per-capability tool names still work, so a client
 wired to them keeps working.
 
 Whatever writes the config, **name the server `deja`**. Every manifest we ship

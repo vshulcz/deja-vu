@@ -466,6 +466,44 @@ jobs:
       - name: Sitemap lastmod follows the pages
         run: go test ./cmd/deja -run TestSitemapLastmodFollowsThePages -count 1
 
+  generated:
+    name: generated docs are current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # genregistry dates every page from the commit that last touched it,
+          # and refuses a shallow clone rather than stamping the boundary
+          # commit's date on all of them.
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25.x'
+          cache: false
+      # The nav, the support matrix, the registry pages and the feed are
+      # generated and committed. Nothing asserted the committed copy was what
+      # the generator writes today, so a stale one stayed green: docs/feed.xml
+      # went two days without a page the sitemap listed, and docs/sitemap.xml
+      # carried a date a day behind the commit it names (#3984). The tests
+      # beside these check properties, not bytes.
+      - name: The generators write what is committed
+        run: |
+          go run ./scripts/gennav
+          go run ./scripts/genmatrix
+          go run ./scripts/genregistry
+          go run ./scripts/genfeed
+          # --porcelain rather than `git diff`, because a generator that adds a
+          # page writes an untracked file and a diff of tracked files does not
+          # see it: genregistry writes one per harness, so the first run after a
+          # parser lands is exactly the case this has to catch.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::A generated file is not what its generator writes. Run:"
+            echo "::error::  go run ./scripts/gennav && go run ./scripts/genmatrix && go run ./scripts/genregistry && go run ./scripts/genfeed"
+            git --no-pager status --short
+            git --no-pager diff --stat
+            exit 1
+          fi
+
   vuln:
     name: govulncheck
     runs-on: ubuntu-latest

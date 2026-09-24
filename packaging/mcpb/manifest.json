@@ -39,7 +39,7 @@
   "tools": [
     {
       "name": "deja",
-      "description": "This user's own past coding sessions across every AI tool they use, in modes: recall (search), context (one session in full), blame (why a file is like this), fix (what was run or changed after this error), how (the real command for a thing here), remember (store a decision)."
+      "description": "This user's own past coding sessions across every AI tool they use, in modes: recall (search), context (one session in full), blame (why a file is like this), fix (what was run or changed after this error), how (the real command for a thing here), orient (what past sessions ran in this project), remember (store a decision)."
     }
   ],
   "compatibility": {

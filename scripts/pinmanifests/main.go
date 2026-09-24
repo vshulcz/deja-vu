@@ -53,6 +53,12 @@ const (
 	// straight from the default branch, so its version is the one a
 	// listing shows.
 	agentPlugin = "plugin.json"
+	// The MCP registry entry. `mcp-registry.yml` stamps the release version
+	// into this file inside its own checkout at publish time and never commits
+	// it back, so the committed value drifts on its own: it sat at 0.13.0
+	// through eight minors while the registry served the right one. Pinned
+	// here so the file in the repository reads like the entry it produces.
+	serverJSON = "server.json"
 
 	// The Kimi Code plugin is packed into the release archive, so the version
 	// in its manifest is the one a Kimi user reads. It sat at 0.1.0 from the
@@ -160,6 +166,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		kimiPacked:        renderPluginVersion(kimiPacked),
 		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:       renderPluginVersion(agentPlugin),
+		serverJSON:        renderPluginVersion(serverJSON),
 	}
 	// The harness packages depend on the deja binary package. The pin is a
 	// caret on a 0.x version, which npm reads as "this minor and no further",

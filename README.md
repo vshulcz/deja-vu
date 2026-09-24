@@ -161,6 +161,10 @@ The source transcripts are not redacted: agents write command output there verba
 `cat .env` or a pasted connection string stays in plaintext. `deja secrets` lists which
 sessions carry one and of what kind, from the markers redaction left; it never prints a
 value. One machine held 84 in 42 sessions ([credentials in transcripts](https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html)).
+`deja secrets --scrub` rewrites the transcripts that still hold one, putting the same
+`[redacted:<kind>]` marker where the value was and keeping the original beside the file. It
+touches only the kinds the report names, refuses a session an agent is in, and says how many
+findings it could not reach: a store with no per-session file cannot be rewritten at all.
 
 `deja forget` removes sessions from a rebuilt index and writes tombstones, so a later
 `deja index` cannot restore them from the source history. `--unforget` lifts a tombstone.
@@ -215,7 +219,7 @@ $ deja "jwt refresh token"
 | `deja sync export/import/ssh` | Move memory between machines. Watermarked, append-only, idempotent. |
 | `deja view` | Your whole memory as one local HTML file. No server, and the file never leaves the machine. |
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
-| `deja secrets` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. |
+| `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 
@@ -467,7 +471,7 @@ sync all read that one index. Details in [docs/ARCHITECTURE.md](docs/ARCHITECTUR
 
 **What about secrets already in my logs?** They stay in the original harness files, which
 are your agent's data; `deja secrets` names the sessions that carry them so you can rotate
-and delete. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
+and delete, and `--scrub` rewrites the transcripts it can reach. Known shapes — AWS keys, `api_key=`/`token=` assignments, bearer
 tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
 the index is built, so they do not reach digests, shares or sync exports. Pattern matching
 is not secret detection: a shape it does not know can pass through. See the
@@ -493,7 +497,7 @@ auto-recall it already knows the project's prior decisions when the session open
 [engram](https://github.com/Gentleman-Programming/engram) is the strongest of the
 record-forward tools and worth your time if that model fits you; it still starts empty and
 knows only what an agent chose to save. The
-[full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers eleven of them.
+[full comparison](https://vshulcz.github.io/deja-vu/guide/compare.html) covers 15 of them.
 
 **Where is Claude Code session history stored, and can I search it?** Under
 `~/.claude/projects`, one JSONL file per session; Codex keeps `~/.codex/sessions`, Cursor a

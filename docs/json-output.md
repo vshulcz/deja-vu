@@ -410,8 +410,8 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   "git": {"state": "ok"},
   "version": {
     "state": "ok",
-    "current": "0.20.2",
-    "latest": "0.20.2"
+    "current": "0.21.2",
+    "latest": "0.21.2"
   },
   "embed": {
     "state": "reachable",

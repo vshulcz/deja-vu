@@ -1068,7 +1068,6 @@ rebuild is the only way to re-derive them.
 - `deja index` said nothing when there was nothing to do, when it skipped a whole harness for a missing tool, or when a directory refused to be read. (#824, #794, #818)
 - Wiring repair only triggered on a version change, so a moved binary left every config pointing at a path that no longer exists. `deja update` now defers to Homebrew, npm, scoop, Nix and winget instead of writing into their trees. (#773, #775)
 - Answers that could not be acted on: `try fewer words` for a query whose every word was too short, or for two words that never co-occur (deja now names each word's own count), and query advice on a machine with no history at all — in search, `files`, `ctx` and `restore`. (#828, #826, #832, #834)
-- `deja install` with no target named none of the targets it knows, on the first command a new machine runs. (#830)
 - A command that landed in the window where a rebuild recreates the index directory reported a missing `manifest.gob`. (#822)
 - Notes without a project, and promoted notes without a state, were dropped at index time — the one class of content deja cannot re-derive from anywhere else. A promoted note with no source session is still dropped, but now counted. (#771, #814)
 - Relative dates used the timestamp's zone rather than the reader's, `deja last` printed `0001-01-01` for a session with no time, and the brief's `covering` line started from the earliest *last* activity, hiding the early history of long-running sessions. (#767, #765, #786)
@@ -1543,11 +1542,46 @@ See the release notes: Antigravity harness, share redaction hardening.
 [0.19.1]: https://github.com/vshulcz/deja-vu/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/vshulcz/deja-vu/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/vshulcz/deja-vu/compare/v0.17.3...v0.18.0
+[0.17.3]: https://github.com/vshulcz/deja-vu/compare/v0.17.2...v0.17.3
+[0.17.2]: https://github.com/vshulcz/deja-vu/compare/v0.17.1...v0.17.2
 [0.17.1]: https://github.com/vshulcz/deja-vu/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/vshulcz/deja-vu/compare/v0.16.9...v0.17.0
+[0.16.9]: https://github.com/vshulcz/deja-vu/compare/v0.16.8...v0.16.9
+[0.16.8]: https://github.com/vshulcz/deja-vu/compare/v0.16.7...v0.16.8
 [0.16.7]: https://github.com/vshulcz/deja-vu/compare/v0.16.6...v0.16.7
+[0.16.6]: https://github.com/vshulcz/deja-vu/compare/v0.16.5...v0.16.6
+[0.16.5]: https://github.com/vshulcz/deja-vu/compare/v0.16.4...v0.16.5
+[0.16.4]: https://github.com/vshulcz/deja-vu/compare/v0.16.3...v0.16.4
+[0.16.3]: https://github.com/vshulcz/deja-vu/compare/v0.16.2...v0.16.3
+[0.16.2]: https://github.com/vshulcz/deja-vu/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/vshulcz/deja-vu/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/vshulcz/deja-vu/compare/v0.15.7...v0.16.0
+[0.15.7]: https://github.com/vshulcz/deja-vu/compare/v0.15.6...v0.15.7
+[0.15.6]: https://github.com/vshulcz/deja-vu/compare/v0.15.5...v0.15.6
+[0.15.5]: https://github.com/vshulcz/deja-vu/compare/v0.15.4...v0.15.5
+[0.15.4]: https://github.com/vshulcz/deja-vu/compare/v0.15.3...v0.15.4
+[0.15.3]: https://github.com/vshulcz/deja-vu/compare/v0.15.2...v0.15.3
+[0.15.2]: https://github.com/vshulcz/deja-vu/compare/v0.15.1...v0.15.2
+[0.15.1]: https://github.com/vshulcz/deja-vu/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/vshulcz/deja-vu/compare/v0.14.4...v0.15.0
+[0.14.4]: https://github.com/vshulcz/deja-vu/compare/v0.14.3...v0.14.4
+[0.14.3]: https://github.com/vshulcz/deja-vu/compare/v0.14.2...v0.14.3
+[0.14.2]: https://github.com/vshulcz/deja-vu/compare/v0.14.1...v0.14.2
+[0.14.1]: https://github.com/vshulcz/deja-vu/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/vshulcz/deja-vu/compare/v0.13.1...v0.14.0
+[0.13.1]: https://github.com/vshulcz/deja-vu/compare/v0.13.0...v0.13.1
+[0.13.0]: https://github.com/vshulcz/deja-vu/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/vshulcz/deja-vu/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/vshulcz/deja-vu/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/vshulcz/deja-vu/compare/v0.9.2...v0.10.0
+[0.9.2]: https://github.com/vshulcz/deja-vu/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/vshulcz/deja-vu/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/vshulcz/deja-vu/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/vshulcz/deja-vu/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/vshulcz/deja-vu/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/vshulcz/deja-vu/compare/v0.5.2...v0.6.0
+[0.5.2]: https://github.com/vshulcz/deja-vu/compare/v0.5.1...v0.5.2
+[0.5.1]: https://github.com/vshulcz/deja-vu/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/vshulcz/deja-vu/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vshulcz/deja-vu/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vshulcz/deja-vu/compare/v0.2.0...v0.3.0

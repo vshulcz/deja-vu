@@ -328,6 +328,9 @@ func writeSitemap(registryPages []string) error {
 		}
 		text = text[:i] + add.String() + text[i:]
 	}
+	if err := requireFullHistory(); err != nil {
+		return err
+	}
 	text, err = refreshLastmod(text)
 	if err != nil {
 		return err
@@ -382,6 +385,8 @@ func lastChanged(file string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git status %s: %w", file, err)
 	}
+	// Both a modified file and one git has never seen come back here, and both
+	// want today: neither has a commit carrying its current contents.
 	if len(strings.TrimSpace(string(dirty))) > 0 {
 		return time.Now().UTC().Format("2006-01-02"), nil
 	}
@@ -389,5 +394,52 @@ func lastChanged(file string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git log %s: %w", file, err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	day := strings.TrimSpace(string(out))
+	if day == "" {
+		// A clean, tracked file with no commit behind it means the history is
+		// not here. `git log` says so by printing nothing and exiting 0, so
+		// this used to leave every date untouched and report success — a run
+		// that changes nothing looks exactly like a tree that is already
+		// current, and a drift gate built on it passes without reading
+		// anything (#3984).
+		return "", fmt.Errorf("no commit in this clone touched %s: %s", file, shallowHint())
+	}
+	return day, nil
+}
+
+// shallowHint says which of the two ways to have no history this is, because
+// the fix differs: deepen the clone, or run the generator inside the
+// repository rather than an export of it.
+func shallowHint() string {
+	if shallow, err := isShallow(); err == nil && shallow {
+		return "the clone is shallow — check out with fetch-depth: 0"
+	}
+	return "the file is tracked and has no commit, which a git archive export looks like"
+}
+
+// requireFullHistory refuses to date a page from a clone that does not have the
+// commits to do it with.
+//
+// A shallow clone does not report this by failing. Git treats the boundary
+// commit as a root, so `git log -1 -- <page>` answers with the boundary's own
+// date for every page that existed before it, and the generator rewrites the
+// whole sitemap to one wrong day and exits 0. Measured on a `--depth 1` clone:
+// 30 of the entries moved, 9 of them to the boundary commit's date (#3984).
+func requireFullHistory() error {
+	shallow, err := isShallow()
+	if err != nil {
+		return err
+	}
+	if shallow {
+		return fmt.Errorf("this clone is shallow, so every page's date would come out as the boundary commit's — check out with fetch-depth: 0")
+	}
+	return nil
+}
+
+func isShallow() (bool, error) {
+	out, err := exec.Command("git", "rev-parse", "--is-shallow-repository").Output()
+	if err != nil {
+		return false, fmt.Errorf("git rev-parse --is-shallow-repository: %w", err)
+	}
+	return strings.TrimSpace(string(out)) == "true", nil
 }
