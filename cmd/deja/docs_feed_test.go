@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -143,7 +144,13 @@ func TestTheFeedIsTheNewestPagesTheSitemapLists(t *testing.T) {
 			rel += "index.html"
 		}
 		b, err := os.ReadFile(filepath.Join(root, "docs", filepath.FromSlash(rel)))
-		if err != nil || !strings.Contains(string(b), "<title>") {
+		if err != nil {
+			continue
+		}
+		// The same test genfeed applies: the title's content, not the tag.
+		// An empty <title></title> is a page it drops and this would keep.
+		m := feedTitle.FindSubmatch(b)
+		if m == nil || strings.TrimSpace(string(m[1])) == "" {
 			continue
 		}
 		served = append(served, page{loc, day})
@@ -177,3 +184,6 @@ func TestTheFeedIsTheNewestPagesTheSitemapLists(t *testing.T) {
 		}
 	}
 }
+
+// feedTitle is scripts/genfeed's own title expression.
+var feedTitle = regexp.MustCompile(`(?s)<title>(.*?)</title>`)
