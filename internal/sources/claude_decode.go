@@ -97,7 +97,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	snapshotAt := map[string]int{}
 	// Where each Bash call's record landed, so the result that arrives later
 	// can stamp its outcome onto it.
-	commandAt := map[string]int{}
+	commandAt := map[string][]int{}
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
@@ -177,7 +177,10 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			if IndexCommands() {
 				for _, cmd := range claudeCommands(v.Message.Content) {
 					if cmd.ID != "" {
-						commandAt[cmd.ID] = len(s.Messages)
+						// One call can carry a batch of commands, and the
+						// filter drops some of them, so the indexes under one
+						// id are neither one nor contiguous.
+						commandAt[cmd.ID] = append(commandAt[cmd.ID], len(s.Messages))
 					}
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 				}
@@ -186,12 +189,17 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 				// stated, in the marker every other harness writes — nothing is
 				// invented for a failure whose code nobody recorded.
 				for _, res := range claudeToolOutcomes(v.Message.Content) {
-					i, ok := commandAt[res.ID]
-					if !ok || res.Error || i >= len(s.Messages) {
+					at, ok := commandAt[res.ID]
+					if !ok || res.Error {
 						continue
 					}
-					if !strings.Contains(s.Messages[i].Text, "  → exit ") {
-						s.Messages[i].Text += "  → exit 0"
+					for _, i := range at {
+						if i >= len(s.Messages) {
+							continue
+						}
+						if !strings.Contains(s.Messages[i].Text, "  → exit ") {
+							s.Messages[i].Text += "  → exit 0"
+						}
 					}
 					delete(commandAt, res.ID)
 				}

@@ -66,3 +66,42 @@ func TestAClaudeCommandCarriesTheOutcomeItsResultRecorded(t *testing.T) {
 		}
 	}
 }
+
+// One call can carry a batch of commands under one result, which is what the
+// reference parser accepts an array of commands for. The stamp kept a single
+// record index per call id, so only the last command of a batch was given the
+// outcome the call recorded and the ones before it read as unknown.
+func TestEveryCommandOfOneCallCarriesTheCallsOutcome(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	dir := filepath.Join(root, "-work-batch")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "b1.jsonl")
+	lines := []string{
+		`{"type":"assistant","sessionId":"b1","timestamp":"2026-09-02T10:00:00Z","cwd":"/work/batch","message":{"role":"assistant","content":[{"type":"tool_use","id":"call_batch","name":"Bash","input":{"command":["go build ./...","go vet ./..."]}}]}}`,
+		`{"type":"user","sessionId":"b1","timestamp":"2026-09-02T10:00:30Z","cwd":"/work/batch","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_batch","content":"ok"}]}}`,
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := parseClaudeGenericFromOffset(path, 0)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("sessions = %d, err = %v", len(ss), err)
+	}
+	var cmds []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand {
+			cmds = append(cmds, m.Text)
+		}
+	}
+	if len(cmds) != 2 {
+		t.Fatalf("the batch produced %v", cmds)
+	}
+	for _, c := range cmds {
+		if !strings.HasSuffix(c, "  → exit 0") {
+			t.Errorf("a command of a clean batch reads %q", c)
+		}
+	}
+}
