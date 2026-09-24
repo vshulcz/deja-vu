@@ -36,7 +36,7 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">中文</a> | 日本語</p>
+<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
 <p align="center"><sub>役に立ったら、<a href="https://github.com/vshulcz/deja-vu">GitHub で deja-vu にスター</a>をお願いします。</sub></p>
