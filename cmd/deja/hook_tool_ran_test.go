@@ -105,3 +105,19 @@ func TestBelowTheCountBarTheCommandStandsInForADecision(t *testing.T) {
 		t.Errorf("a file with no decision and no evidence still produced a line:\n  %s", line)
 	}
 }
+
+// The number in the line is sessions, and the manifest is matched on a
+// basename — a session that touched two files with the same name comes back
+// twice, and counting it twice would put a second session in a sentence that
+// has one.
+func TestOneSessionIsCountedOnceHoweverOftenItIsHandedOver(t *testing.T) {
+	dir := ranStoreFor(t, "go test -tags golden ./internal/store", true, 2)
+	metas := index.FileSessions(dir, "/work/app/internal/store/store.go")
+	if len(metas) != 2 {
+		t.Fatalf("the fixture produced %d sessions", len(metas))
+	}
+	doubled := append(append([]index.SessionMeta{}, metas...), metas...)
+	if got := fileHookRanLine(dir, doubled); !strings.Contains(got, "(2 sessions)") {
+		t.Errorf("a doubled list of the same two sessions reads %q", got)
+	}
+}

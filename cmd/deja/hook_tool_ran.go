@@ -75,8 +75,17 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 		return ""
 	}
 	by := map[string]*ranCandidate{}
+	// One row per session, whatever the caller handed over: the manifest is
+	// matched on a basename, so a session that touched two files of the same
+	// name arrives twice, and the number in the line is sessions.
+	counted := map[string]bool{}
 	for _, m := range metas {
-		f, ok := facts[m.Harness+":"+m.ID]
+		key := m.Harness + ":" + m.ID
+		if counted[key] {
+			continue
+		}
+		counted[key] = true
+		f, ok := facts[key]
 		if !ok {
 			continue
 		}
@@ -94,15 +103,15 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 			if cmd == "" || index.InspectionCommand(cmd) {
 				continue
 			}
-			key := normalizedCommandText(cmd)
-			if key == "" || seen[key] {
+			ck := normalizedCommandText(cmd)
+			if ck == "" || seen[ck] {
 				continue
 			}
-			seen[key] = true
-			a := by[key]
+			seen[ck] = true
+			a := by[ck]
 			if a == nil {
 				a = &ranCandidate{text: cmd, rank: pos}
-				by[key] = a
+				by[ck] = a
 			}
 			a.sessions++
 			if pos < a.rank {
