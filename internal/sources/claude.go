@@ -208,6 +208,9 @@ func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 // where the shapes nobody thought of live.
 func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, error) {
 	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(claudeProjectDir(path)), Path: path}
+	// Where each Bash call's record landed, so the result that arrives in a
+	// later record can stamp its outcome onto it.
+	commandAt := map[string]int{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		if typ != "user" && typ != "assistant" {
@@ -264,8 +267,24 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 				}
 			}
 			if IndexCommands() {
-				for _, cmd := range commandsFromContent(msg["content"]) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+				for _, cmd := range commandCallsFromContent(msg["content"]) {
+					if cmd.ID != "" {
+						commandAt[cmd.ID] = len(s.Messages)
+					}
+					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
+				}
+				// The same stamp the typed parser writes, from the same two
+				// fields: a transcript records no exit code, so only the clean
+				// case is stated.
+				for _, res := range toolOutcomesFromContent(msg["content"]) {
+					i, ok := commandAt[res.ID]
+					if !ok || res.Error || i >= len(s.Messages) {
+						continue
+					}
+					if !strings.Contains(s.Messages[i].Text, "  → exit ") {
+						s.Messages[i].Text += "  → exit 0"
+					}
+					delete(commandAt, res.ID)
 				}
 			}
 		}

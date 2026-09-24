@@ -95,6 +95,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	}
 	// index of the message a request id last wrote, for the collapse
 	snapshotAt := map[string]int{}
+	// Where each Bash call's record landed, so the result that arrives later
+	// can stamp its outcome onto it.
+	commandAt := map[string]int{}
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
@@ -173,7 +176,24 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			}
 			if IndexCommands() {
 				for _, cmd := range claudeCommands(v.Message.Content) {
-					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+					if cmd.ID != "" {
+						commandAt[cmd.ID] = len(s.Messages)
+					}
+					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
+				}
+				// The result arrives in a later record and names the call. A
+				// transcript carries no exit code, so only the clean case is
+				// stated, in the marker every other harness writes — nothing is
+				// invented for a failure whose code nobody recorded.
+				for _, res := range claudeToolOutcomes(v.Message.Content) {
+					i, ok := commandAt[res.ID]
+					if !ok || res.Error || i >= len(s.Messages) {
+						continue
+					}
+					if !strings.Contains(s.Messages[i].Text, "  → exit ") {
+						s.Messages[i].Text += "  → exit 0"
+					}
+					delete(commandAt, res.ID)
 				}
 			}
 		}
@@ -690,8 +710,13 @@ var taskRunner = regexp.MustCompile(`^\s*(just|task|mise)\s`)
 // logs and splitting on them at worst keeps one more command than it should.
 var commandChain = regexp.MustCompile(`&&|\|\||;|\|`)
 
+// claudeCommand is one Bash invocation and the call id its result will name.
+type claudeCommand struct {
+	ID, Text string
+}
+
 // claudeCommands pulls the shell commands worth keeping out of a message.
-func claudeCommands(raw json.RawMessage) []string {
+func claudeCommands(raw json.RawMessage) []claudeCommand {
 	raw = trimJSONSpace(raw)
 	if len(raw) == 0 || raw[0] != '[' {
 		return nil
@@ -700,7 +725,7 @@ func claudeCommands(raw json.RawMessage) []string {
 	if json.Unmarshal(raw, &items) != nil {
 		return nil
 	}
-	var out []string
+	var out []claudeCommand
 	for _, item := range items {
 		item = trimJSONSpace(item)
 		if len(item) == 0 || item[0] != '{' {
@@ -708,6 +733,7 @@ func claudeCommands(raw json.RawMessage) []string {
 		}
 		var part struct {
 			Type  string `json:"type"`
+			ID    string `json:"id"`
 			Name  string `json:"name"`
 			Input struct {
 				Command string `json:"command"`
@@ -722,7 +748,45 @@ func claudeCommands(raw json.RawMessage) []string {
 		if !worthIndexing(part.Input.Command) {
 			continue
 		}
-		out = append(out, "$ "+part.Input.Command)
+		out = append(out, claudeCommand{ID: part.ID, Text: "$ " + part.Input.Command})
+	}
+	return out
+}
+
+// claudeToolOutcome is one tool_result and whether the harness marked it a
+// failure. A Claude transcript records no exit code — `is_error` is all there
+// is — so a result that is not an error is the only outcome that can be stated,
+// and it is the one worth stating: it turns "this session ran X" into evidence
+// that X worked here.
+type claudeToolOutcome struct {
+	ID    string
+	Error bool
+}
+
+func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
+	raw = trimJSONSpace(raw)
+	if len(raw) == 0 || raw[0] != '[' {
+		return nil
+	}
+	var items []json.RawMessage
+	if json.Unmarshal(raw, &items) != nil {
+		return nil
+	}
+	var out []claudeToolOutcome
+	for _, item := range items {
+		item = trimJSONSpace(item)
+		if len(item) == 0 || item[0] != '{' {
+			continue
+		}
+		var part struct {
+			Type      string `json:"type"`
+			ToolUseID string `json:"tool_use_id"`
+			IsError   bool   `json:"is_error"`
+		}
+		if json.Unmarshal(item, &part) != nil || part.Type != "tool_result" || part.ToolUseID == "" {
+			continue
+		}
+		out = append(out, claudeToolOutcome{ID: part.ToolUseID, Error: part.IsError})
 	}
 	return out
 }

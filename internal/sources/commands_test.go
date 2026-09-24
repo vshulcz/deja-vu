@@ -84,7 +84,7 @@ func TestClaudeCommandsExtractsAndFilters(t *testing.T) {
 	  {"type":"tool_result","content":"ok"}
 	]`)
 	got := claudeCommands(raw)
-	if len(got) != 1 || got[0] != "$ go test ./internal/index/" {
+	if len(got) != 1 || got[0].Text != "$ go test ./internal/index/" {
 		t.Fatalf("commands = %#v", got)
 	}
 }
@@ -97,7 +97,7 @@ func TestBothParsersAgreeOnCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, b := commandsFromContent(v), claudeCommands(json.RawMessage(body))
-	if len(a) != len(b) || len(a) != 1 || a[0] != b[0] {
+	if len(a) != len(b) || len(a) != 1 || a[0] != b[0].Text {
 		t.Fatalf("generic=%#v typed=%#v", a, b)
 	}
 }
