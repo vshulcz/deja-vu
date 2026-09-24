@@ -47,11 +47,16 @@ const secretsJSONKind = "deja.secrets"
 
 func runSecrets(dir string, args []string, stdout io.Writer) error {
 	asJSON := false
+	scrub, dryRun := false, false
 	limit := secretsDefaultLimit
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--json":
 			asJSON = true
+		case "--scrub":
+			scrub = true
+		case "--dry-run":
+			dryRun = true
 		case "--limit":
 			if i+1 >= len(args) {
 				return fmt.Errorf("secrets: --limit needs value")
@@ -63,8 +68,17 @@ func runSecrets(dir string, args []string, stdout io.Writer) error {
 			}
 			limit = n
 		default:
-			return fmt.Errorf("secrets: unknown flag %q — it takes --limit n and --json", args[i])
+			return fmt.Errorf("secrets: unknown flag %q — it takes --limit n, --json, --scrub and --dry-run", args[i])
 		}
+	}
+	if scrub {
+		if asJSON {
+			return fmt.Errorf("secrets: --scrub rewrites files and reports what it did; it has no --json form")
+		}
+		return runSecretsScrub(dir, dryRun, stdout)
+	}
+	if dryRun {
+		return fmt.Errorf("secrets: --dry-run belongs to --scrub; the report changes nothing on its own")
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)

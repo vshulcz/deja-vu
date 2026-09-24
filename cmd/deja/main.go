@@ -4066,7 +4066,7 @@ Usage:
   deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]
   deja friction [--limit n] [--json]
-  deja secrets [--limit n] [--json]  (credentials your agent transcripts are carrying)
+  deja secrets [--limit n] [--json] [--scrub [--dry-run]]  (credentials your agent transcripts are carrying; --scrub rewrites the files that hold one)
   deja tests [--limit n] [--json]    (your build and test runs, week by week)
   deja recap [--since 7d] [--limit n] [--json]  (what the week settled, with the session behind each line)
   deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
