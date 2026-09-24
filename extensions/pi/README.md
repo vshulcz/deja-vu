@@ -1,5 +1,7 @@
 # @vshulcz/pi-deja
 
+English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/pi/docs/zh.md)
+
 pi remembers its own sessions. This extension answers the other question: what
 was done in the thirty-three other coding agents on this machine — Claude Code,
 Codex, Cursor, Gemini, OpenClaw and Hermes among them — including the months

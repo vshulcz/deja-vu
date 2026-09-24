@@ -1,5 +1,7 @@
 # deja for Grok Build
 
+English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/grok/docs/zh.md)
+
 Grok remembers its own sessions. This plugin answers the other question: what
 you did in Claude Code, Codex, Cursor, opencode, Zed and twenty-nine more agents on
 this machine — including the months before you installed anything.

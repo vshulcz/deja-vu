@@ -1,5 +1,7 @@
 # deja for Zed
 
+English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/zed/docs/zh.md)
+
 [deja](https://github.com/vshulcz/deja-vu) indexes the session files that
 coding agents already write to disk — Claude Code, Codex, Cursor, opencode and
 thirty more — and answers from them. This extension serves that index to Zed's
