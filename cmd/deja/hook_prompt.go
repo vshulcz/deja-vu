@@ -174,6 +174,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if plain {
 		shape = hookToolPlain
 	}
+	// Written down for the surfaces that are told no session id: this hook drops
+	// the caller's own session by hand below, and the MCP tool cannot (#3945).
+	markSessionLive(dir, input.SessionID)
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "UserPromptSubmit", shape, stdout); delivered {
 		return err
 	}

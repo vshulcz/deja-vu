@@ -2896,6 +2896,9 @@ func fromMatches(sessionFrom, want string) bool {
 }
 
 func sessionMetaMatches(meta SessionMeta, o query.Options) bool {
+	if o.ExcludeSessions[meta.ID] {
+		return false
+	}
 	if o.Harness != "" && !harnessMatches(meta.Harness, o.Harness) {
 		return false
 	}

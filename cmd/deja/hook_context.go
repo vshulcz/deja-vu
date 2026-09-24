@@ -381,6 +381,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if plain {
 		shape = hookToolPlain
 	}
+	// The first moment this session exists, so the first recall of it — the one
+	// an agent plans against — already knows whose transcript to leave out.
+	markSessionLive(dir, input.SessionID)
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "SessionStart", shape, os.Stdout); delivered {
 		return err
 	}
@@ -1408,4 +1411,8 @@ func dropHookCaches(dir string) {
 		_ = os.Remove(p)
 		_ = os.Remove(p + ".refreshing")
 	}
+	// The marks for the sessions being written go with them: a forget that left
+	// them behind would keep hiding whatever they name for the rest of the
+	// window, and after a forget there is nothing left to hide.
+	_ = os.Remove(liveSessionsPath(dir))
 }
