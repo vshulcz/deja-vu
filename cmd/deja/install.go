@@ -2360,10 +2360,12 @@ func tomlHeadersClose(text string) error {
 		if !strings.HasPrefix(t, "[") {
 			continue
 		}
-		// A header may carry a trailing comment: [a.b]  # why.
-		if at := strings.Index(t, "#"); at >= 0 {
-			t = strings.TrimSpace(t[:at])
-		}
+		// A header may carry a trailing comment: [a.b]  # why. tomlCode cuts
+		// it without mistaking a `#` inside a quoted key for its start —
+		// codex's hook trust tables are spelled
+		// [hooks.state."...plugin.json#hooks[0]:subagent_stop:0:0"], and
+		// cutting at the internal `#` made every such config look broken.
+		t = tomlCode(t)
 		if !strings.HasSuffix(t, "]") {
 			return fmt.Errorf("line %d is a table header that never closes: %s", i+1, strings.TrimSpace(line))
 		}
