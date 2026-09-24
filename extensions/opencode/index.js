@@ -347,6 +347,33 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // which the next request carries as the tool result.
   hooks["tool.execute.after"] = async (input, output) => {
     try {
+      // A file's history, at the read before the edit. opencode has no seam
+      // that can inject before a file action — tool.execute.before can only
+      // rewrite the arguments — so the line goes out the way the failure line
+      // does: appended to the tool's own output, which the next request
+      // carries as the tool result. Without this, what deja knows at the
+      // point of an action reached every harness except this one.
+      //
+      // Matched on the argument rather than the tool name: a tool carrying a
+      // file path is a file action whatever this version calls it, and a name
+      // deja does not recognise is answered with silence.
+      const fpath = input?.args?.filePath || input?.args?.path || ""
+      if (fpath && input?.tool !== "bash") {
+        const ftext = output?.output
+        if (!ftext) return
+        const fpayload = {
+          hook_event_name: "PostToolUse",
+          tool_name: input?.tool || "read",
+          tool_input: { file_path: fpath },
+          session_id: input.sessionID || "",
+          cwd,
+        }
+        const fraw = await ask(["hook-tool"], JSON.stringify(fpayload))
+        if (!fraw) return
+        const fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext
+        if (fextra) output.output = ftext + "\n\n" + fextra
+        return
+      }
       if (input?.tool !== "bash") return
       const text = output?.output
       if (!text) return

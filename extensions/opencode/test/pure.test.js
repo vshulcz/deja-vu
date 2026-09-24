@@ -262,3 +262,19 @@ test("an empty answer is not cached for the life of the session", () => {
   // another's retries.
   assert.match(compact, /empties\.set\(key,asks\)/, "the count is not kept per session")
 })
+
+// Everything deja says at the point of an action reached every harness except
+// this one: both tool seams were scoped to a tool name, so a read produced
+// nothing and the file's history never arrived. Measured on the fixture it was
+// built for, the line at the read took a task from 19 tool calls to 7.
+test("the after-tool hook carries a file's history back from a read", () => {
+  const source = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  const body = source.slice(source.indexOf('"tool.execute.after"'))
+  assert.ok(body.includes("args?.filePath"), "does not read the path opencode passes")
+  assert.ok(body.includes("hook-tool"), "does not call the point-of-action hook")
+  assert.ok(
+    body.indexOf("const fpath") < body.indexOf('if (input?.tool !== "bash") return'),
+    "the file branch is behind the bash gate, so a read never reaches it",
+  )
+  assert.ok(body.includes("output.output = ftext"), "the line is not folded into the tool result")
+})

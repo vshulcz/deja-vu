@@ -387,6 +387,27 @@ export default {
     // status.
     await ctx.tool.hook("execute.after", async (event) => {
       try {
+        // A file's history, at the read before the edit: the before-seam can
+        // only rewrite arguments, so this is where the line can reach the
+        // model. Matched on the argument, because the tool that carries a file
+        // path is a file action whatever this version calls it.
+        const fpath = event.input?.filePath || event.input?.path || ""
+        if (fpath && event.tool !== "shell" && event.status === "completed") {
+          const fres = event.result || {}
+          const fcontent = Array.isArray(fres.content) ? fres.content : []
+          const fpayload = {
+            hook_event_name: "PostToolUse",
+            tool_name: event.tool || "read",
+            tool_input: { file_path: fpath },
+            session_id: event.sessionID || "",
+            cwd,
+          }
+          const fraw = await runHook("hook-tool", JSON.stringify(fpayload))
+          if (!fraw.trim()) return
+          const fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext
+          if (fextra) event.result = { ...fres, content: [...fcontent, { type: "text", text: fextra }] }
+          return
+        }
         if (event.tool !== "shell" || event.status !== "completed") return
         const result = event.result || {}
         const content = Array.isArray(result.content)
@@ -627,6 +648,29 @@ export const DejaRecall = async ({ $, client, directory }) => {
     // in the tool message of the following request.
     "tool.execute.after": async (input, output) => {
       try {
+        // A file's history, at the read before the edit. opencode's
+        // before-seam can only rewrite a tool's arguments, so the line goes
+        // out the way the failure line does: appended to the tool's own
+        // output, which the next request carries as the tool result. Matched
+        // on the argument rather than the tool name — a tool carrying a file
+        // path is a file action whatever this version calls it.
+        const fpath = input?.args?.filePath || input?.args?.path || ""
+        if (fpath && input?.tool !== "bash") {
+          const ftext = output?.output
+          if (!ftext) return
+          const fpayload = {
+            hook_event_name: "PostToolUse",
+            tool_name: input?.tool || "read",
+            tool_input: { file_path: fpath },
+            session_id: input.sessionID || "",
+            cwd,
+          }
+          const fraw = await $%secho ${JSON.stringify(fpayload)} | %s%q hook-tool%s.text()
+          if (!fraw.trim()) return
+          const fextra = JSON.parse(fraw)?.hookSpecificOutput?.additionalContext
+          if (fextra) output.output = ftext + "\n\n" + fextra
+          return
+        }
         if (input?.tool !== "bash") return
         const text = output?.output
         if (!text) return
@@ -648,7 +692,7 @@ export const DejaRecall = async ({ $, client, directory }) => {
     },
   }
 }
-`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
+`, "`", exe, "hook-context", "`", "`", exe, "warmup-status", "`", "`", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`", "`", "", exe, "`")
 }
 
 // Gemini CLI and Qwen Code both run a command before the agent loop, which is

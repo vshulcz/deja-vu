@@ -81,3 +81,32 @@ func TestDoctorCallsTheWrongShapeStale(t *testing.T) {
 		t.Errorf("the 1.x plugin on a 2.x machine reads %q, want stale", got)
 	}
 }
+
+// Both shapes have to carry the file line, and they are two separate templates:
+// the 1.x hook table and the 2.x ctx.tool domain. The seam was scoped to a tool
+// name in both, so on opencode a read produced nothing and everything deja
+// knows at the point of an action reached every harness except this one.
+func TestBothOpencodePluginsCarryTheFileLineBackFromARead(t *testing.T) {
+	t.Cleanup(func() { opencodeVersionMajor = opencodeVersionMajorReal })
+	for name, js := range map[string]string{
+		"1.x": opencodeLegacyPluginJS("/bin/deja"),
+		"2.x": opencodePluginJS("/bin/deja"),
+	} {
+		after := js[strings.Index(js, "execute.after"):]
+		if !strings.Contains(after, "filePath") {
+			t.Errorf("%s: the after-seam does not read the path the tool was given", name)
+		}
+		if !strings.Contains(after, "hook-tool") {
+			t.Errorf("%s: the after-seam never calls the point-of-action hook", name)
+		}
+		// Ahead of the gate that keeps the rest of the seam for the shell: the
+		// whole failure of this channel was that a file action never got past it.
+		shell := strings.Index(after, `!== "bash") return`)
+		if shell < 0 {
+			shell = strings.Index(after, `!== "shell" ||`)
+		}
+		if at := strings.Index(after, "fpath"); at < 0 || (shell >= 0 && at > shell) {
+			t.Errorf("%s: the file branch sits behind the command gate", name)
+		}
+	}
+}
