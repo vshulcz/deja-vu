@@ -104,10 +104,10 @@ two files the Gemini install uses.
   `brew upgrade` has to win over whatever we bundled.
 - **Recall is optional.** A harness must never lose a turn because history was
   unavailable: every call is wrapped, every failure is silent.
-- **Assume the other install is there too.** `deja install` wires these four
-  harnesses as well, so a user can end up with both at once — opencode loads the
-  package and the installer's plugin file side by side, Kimi runs a plugin hook
-  next to the one in `config.toml`, dsh composes both into
+- **Assume the other install is there too.** `deja install` wires every one of
+  these harnesses as well, so a user can end up with both at once — opencode
+  loads the package and the installer's plugin file side by side, Kimi runs a
+  plugin hook next to the one in `config.toml`, dsh composes both into
   one profile, Zed reads both context servers. Whatever the installer writes
   wins, because it is the copy `deja install` keeps current: each package looks
   for those files and drops the part they already cover.

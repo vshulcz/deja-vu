@@ -260,6 +260,26 @@ func HarnessSessionCounts(dir string) map[string]int {
 	return out
 }
 
+// IndexedSessionKeys reports the harness:id of every session the index holds.
+// `forget --list` uses it to tell a tombstone still standing between a
+// session and search from one whose session is gone everywhere: a tombstone
+// only does anything while a store or the index still has the session it
+// names (#3753). Nil when there is no index yet.
+func IndexedSessionKeys(dir string) map[string]bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	out := make(map[string]bool, len(m.Sessions))
+	for _, meta := range m.Sessions {
+		out[meta.Harness+":"+meta.ID] = true
+	}
+	return out
+}
+
 // HarnessUnreadCounts reports, per harness, how many transcripts the store
 // holds that the index has no state for at all — not read once, not partly,
 // never.

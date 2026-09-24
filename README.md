@@ -322,7 +322,7 @@ keeping those descriptions checked against the parsers.
 
 ### Harnesses with a package of their own
 
-`deja install --auto` wires all six of these like every other harness, and
+`deja install --auto` wires every one of these like every other harness, and
 that stays the shortest path. They also have a package in their own ecosystem,
 for people who install extensions there rather than from a CLI:
 
@@ -334,10 +334,13 @@ for people who install extensions there rather than from a CLI:
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
 | Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
+| OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
+| pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 
-Either path is enough on its own, and having both is not a problem: the
-opencode, dsh, Kimi, Grok and Codex packages read what `deja install` wrote and
-contribute only what is missing, and in Zed both halves use one server id, so
+Either path is enough on its own, and having both is not a problem: every
+package reads what `deja install` wrote first. opencode, dsh and OpenClaw
+contribute only what is missing; Kimi, Grok, Codex and pi stand down where the
+installer already wired the harness; in Zed both halves use one server id. So
 there is nothing to have twice whichever order you install in.
 
 Each uses the deja you already have; the copy it bundles is only the fallback.

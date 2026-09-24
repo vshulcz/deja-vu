@@ -50,7 +50,7 @@ deja install --auto
 
 也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。
 
-opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI 和 Grok Build 也有各自生态里的包，习惯在那边装扩展的人
+opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw 和 pi 也有各自生态里的包，习惯在那边装扩展的人
 可以直接用：
 
 ```sh
@@ -60,9 +60,11 @@ dsh plugin --profile web add dsh-deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI：codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
 # Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
+openclaw plugins install clawhub:@vshulcz/openclaw-deja
+pi install npm:@vshulcz/pi-deja
 ```
 
-`deja install --auto` 已经把这六个接好了，两条路走哪条都够。两边都装也没问题：包会看
+`deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
 `deja install` 写了什么，只补上缺的部分，不会重复注册工具、也不会重复召回。详见
 [`extensions/`](extensions)。
 
@@ -189,10 +191,12 @@ Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed。
 | Kimi Code | 插件 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | 插件 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`，然后 `codex plugin add deja-vu@deja-vu` |
 | Grok Build | 插件 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`，然后 `grok plugin install deja` |
+| OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
+| pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 
-两条路各自都够用，两条都走也不会出问题：opencode、dsh、Kimi、Grok 和 Codex 的包会读
-`deja install` 写下的配置，只补上缺的那部分；在 Zed 里两边用的是同一个 server id，
-所以无论先装哪个都不会重复。
+两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
+opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时
+直接让位；在 Zed 里两边用的是同一个 server id。所以无论先装哪个都不会重复。
 
 它们用的都是你已经装好的 deja，包里自带的那份只是兜底。
 

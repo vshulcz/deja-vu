@@ -3218,6 +3218,19 @@ func printSources(dir string) {
 	if red, err := index.Redactions(dir); err == nil {
 		redactions = red.Files
 	}
+	// Transcripts a store holds that the index has never read. doctor has said
+	// so since #3747, but `deja sources` is the command people run first, and
+	// its session count reads as "nothing written yet" rather than "files never
+	// opened" — which is exactly how ten unread transcripts, five of them eight
+	// weeks old, went unnoticed on a real store (#3752). Nil before the first
+	// index, and then there is nothing to say.
+	neverRead := index.HarnessUnreadCounts(dir)
+	unreadNote := func(name string) string {
+		if u := neverRead[name]; u > 0 {
+			return "\t(" + doctorCount(u, "transcript") + " never read — `deja index`)"
+		}
+		return ""
+	}
 	antigravityRoots := sources.AntigravityRoots()
 	antigravityLocation := strings.Join(antigravityRoots, string(os.PathListSeparator))
 	if antigravityLocation == "" {
@@ -3334,6 +3347,7 @@ func printSources(dir string) {
 		if excluded > 0 {
 			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
+		note += unreadNote(it.name)
 		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	// The two rows below are written by hand rather than driven by the table
@@ -3379,6 +3393,7 @@ func printSources(dir string) {
 	if excluded := len(rawAiderSessions) - len(aiderSessions); excluded > 0 {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
+	note += unreadNote("aider")
 	if !skipAider {
 		fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	}
@@ -3437,7 +3452,54 @@ func printSources(dir string) {
 		}
 		note = "\t(cannot be read — " + reason + ")" + note
 	}
+	note += unreadNote("opencode")
 	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
+}
+
+// orphanedTombstones reports which tombstones name a session that exists
+// nowhere: not in the index and not in any store on disk.
+//
+// Only a positive answer is ever given. A tombstone whose harness this build
+// does not know, or whose store cannot be loaded, is left unmarked — calling a
+// tombstone useless on a guess would invite someone to lift one that is still
+// hiding a transcript.
+func orphanedTombstones(dir string, keys []string) map[string]bool {
+	if len(keys) == 0 {
+		return nil
+	}
+	indexed := index.IndexedSessionKeys(dir)
+	// Load each harness a tombstone names once, however many tombstones name it.
+	onDisk := map[string]map[string]bool{}
+	live := func(harness string) (map[string]bool, bool) {
+		if seen, ok := onDisk[harness]; ok {
+			return seen, seen != nil
+		}
+		var found map[string]bool
+		for _, h := range sources.Registry() {
+			if h.Name != harness || h.Load == nil {
+				continue
+			}
+			found = map[string]bool{}
+			for _, s := range h.Load() {
+				found[s.Harness+":"+s.ID] = true
+			}
+		}
+		onDisk[harness] = found
+		return found, found != nil
+	}
+	out := map[string]bool{}
+	for _, key := range keys {
+		harness, _, ok := strings.Cut(key, ":")
+		if !ok || indexed[key] {
+			continue
+		}
+		stored, known := live(harness)
+		if !known || stored[key] {
+			continue
+		}
+		out[key] = true
+	}
+	return out
 }
 
 // forgetScopeRefusal stops a destructive run whose selector reaches further
@@ -3546,7 +3608,17 @@ func runForget(dir string, args []string) error {
 	}
 	if list {
 		keys := index.Tombstones()
+		// A tombstone whose session is in neither the index nor any store
+		// suppresses nothing: it is left over from a session deleted on disk
+		// since, and nothing told it apart from one somebody forgot yesterday
+		// (#3753). Marked after a tab, so each row still starts with its id and
+		// the list is still one line per tombstone.
+		orphaned := orphanedTombstones(dir, keys)
 		for _, key := range keys {
+			if orphaned[key] {
+				fmt.Fprintln(os.Stdout, key+"\t(no session left — the tombstone suppresses nothing)")
+				continue
+			}
 			fmt.Fprintln(os.Stdout, key)
 		}
 		// The list is where someone who dropped more than they meant to lands,

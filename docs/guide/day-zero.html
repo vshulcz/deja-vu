@@ -194,6 +194,37 @@
 <p>The absolute hit@1 is low for every tool because these are LongMemEval questions asked against nineteen thousand sessions rather than the fifty or so the benchmark ships per question — on that standard setup deja's hit@1 is 88.1%, and the <a href="benchmarks.html">benchmarks page</a> runs it — and a third of them are the kinds it is built to be hard on — preferences, multi-session aggregation. What separates the rows is not the ceiling. deja and agentmemory are the two plain BM25 rows with no model, and they finish level at found@50 — 65 each — two apart at rank five and five apart at rank one; deja gets there in under twenty seconds with nothing else running, agentmemory in a minute and a half with a worker and an engine up. funes is the vector index with a reranker, and on this pile it does not rank ahead of deja at any depth: with its recency weighting switched off it finds the session at rank five for 17 questions against 36, and it pays 31 minutes of embedding and eight and a half seconds a query for that. It puts 52,371 of the 311,583 chunks it computes into the index. On a machine that has none, the first recall downloads 1.2 GB of models and then reports that there is no index; the budgeted run it offers instead takes 933 of the 19,195 sessions and answers none of the hundred. ctx is the other tool built on deja's idea — a lexical index over every agent's files, thirty-nine providers — and on this pile it finds a little over a third of deja's hits at rank one and rank five and about half at fifty, with a query ten times slower; its automatic setup still gives up on the directory and needs an explicit import, and the semantic mode it added embedded nothing here. MemPalace is a semantic store and pays for it twice here: an afternoon of mining with a model, and two and a half seconds a query, for fewer hits. CASS's main build — the released 0.7.1 cannot answer on this index — takes 56 minutes to index, longer than anything but MemPalace, and it is a keyword tool that wants the question rewritten. agentsview is an archive with a web UI over sixty-two agents' files; as a search over this pile it syncs in four minutes, and with the question cut to its keywords it finds the session at rank one for 7 and within fifty for 19, against deja's 19 and 65. claude-mem never gets there from this history; it starts recording at the first session after install.</p>
 <p>CASS and deja are the closest pair in intent — both index every agent's files, no model — and they split on what happens after the search: CASS is a search tool with a robot interface, deja hands the session to the agent on its own, at session start, before a file is edited, after a command fails. If you want a TUI over your history, CASS is the TUI. If you want the agent to already know, that is the part deja was built for.</p>
 
+<h2>What finishing one piece of work costs</h2>
+<p>The table above is about answering a question. The other half of day zero is
+doing something: on a machine whose history holds the answer, what does it cost
+an agent to finish a task it would otherwise work out from the repository?</p>
+<p>The stand is in <code>scripts/taskcost</code>. A 329-file Go repository where
+the answer is in two places nothing points at — a build tag and an environment
+variable — with a document naming the wrong variable; two prior sessions on the
+machine that did this work here and recorded the command that passed; and the
+task "find the exact command that runs the golden test and makes it pass,
+without modifying any file, and show the proof". Each arm is the same
+repository, the same model (opencode 1.18.32, <code>openai/gpt-5.6-luna</code>),
+the same history, and a different memory wired the way its own installer wires
+it. Eleven runs an arm, every run solved, no run modified the tree.</p>
+<table>
+<tr><th></th><th>tool calls</th><th>median tokens</th><th>mean</th><th>cache read</th><th>wall</th></tr>
+<tr><td>nothing wired</td><td>17.9</td><td>126,222</td><td>119,140</td><td>87,645</td><td>67 s</td></tr>
+<tr><td>agentmemory 0.9.29</td><td>15.9</td><td>104,974</td><td>124,960</td><td>90,950</td><td>70 s</td></tr>
+<tr><td class="us">deja-vu</td><td class="us y">9.8</td><td class="us y">53,558</td><td class="us y">59,167</td><td class="us y">35,700</td><td class="us y">45 s</td></tr>
+</table>
+<p>The spread inside each arm is wide — deja's runs ran from 24k to 92k, and
+what decides is whether the agent reads a file before it starts globbing, since
+that is when the history reaches it. The ranking is the part that held: deja's
+most expensive run cost less than either other arm's median.</p>
+<p>Two things about the other arm are worth saying rather than leaving in the
+number. agentmemory was given the same two sessions through its own
+<code>import-jsonl</code> and it found them — its recall returns the matching
+observations by id and title, and the agent then goes and reads the repository
+anyway, which is where its 15.9 tool calls go. And it runs keyless here, which
+is its documented no-key mode; with a model attached it summarises, and that is
+a different arm this page does not measure.</p>
+
 <h2>What is not measured</h2>
 <p>Quality of memory a tool writes for itself over weeks; semantic recall with a model attached (deja has it as an option, MemPalace and agentmemory have it on by default with a model); ranking on paraphrased questions, where every lexical tool including deja loses ground and the <a href="benchmarks.html">warm benchmark</a> puts numbers on it. This page is only the first minute.</p>
 
