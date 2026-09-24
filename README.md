@@ -23,8 +23,10 @@ the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says
 and what it cannot.</p>
 
 <p align="center">
-<b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
-<sub>Both harnesses ship in this repo and run on the public datasets in minutes &middot;
+<b>58% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<sub>Eleven runs an arm: 53,558 tokens against 126,222 with nothing wired, and 71% off on a later run of the same stand &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">what it costs to finish one task</a> &middot;
+both retrieval harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>
 </p>
 
@@ -234,6 +236,13 @@ The server exposes one tool, `deja`, with a `mode`. `deja install` wires it in, 
 this is only needed to configure an agent by hand. The six older tool names
 (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer for
 anything already wired to them.
+
+One tool rather than seven is a cost, not a style choice. A wired-in MCP server
+ships its tool definitions with every request, so you pay for them each turn
+whether the agent calls anything or not: 477 tokens here, against 8,283 for the
+largest of the eight servers measured in
+[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html). deja's own
+number was 828 until the schema was cut to one tool with modes.
 
 <details>
 <summary>Arguments and return shapes</summary>
