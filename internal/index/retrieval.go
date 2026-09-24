@@ -1900,11 +1900,21 @@ func sessionsServable(dir string, metas []SessionMeta, o query.Options) ([]model
 // manifest entry into a session it can serve.
 func ignoredByPolicy(ss []model.Session) []model.Session {
 	pol := policy.Load()
-	if len(pol.IgnorePatterns()) == 0 {
+	// A harness the reader excluded is excluded from the answers too, not only
+	// from the next build. The list was applied at ingest alone, so a store
+	// that was already indexed when the line was added kept being served —
+	// and the case that matters is the harness the reader is sitting in: its
+	// live transcript is in the index, and a recall answered with the session
+	// that was asking (#3965).
+	excluded := sources.ExcludedHarnesses()
+	if len(pol.IgnorePatterns()) == 0 && len(excluded) == 0 {
 		return ss
 	}
 	out := ss[:0:0]
 	for _, s := range ss {
+		if excluded[strings.ToLower(s.Harness)] {
+			continue
+		}
 		if pol.Ignored(s.Path, s.Project) {
 			continue
 		}
