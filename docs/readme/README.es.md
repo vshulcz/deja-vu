@@ -25,7 +25,7 @@ los dos harnesses de recuperación están en este repositorio y corren sobre dat
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">comprueba los números tú mismo</a></sub>
 </p>
 
-<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Documentación</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Comparación</a></p>
 <p align="center"><sub>Si te resulta útil, dale una estrella a deja-vu en <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>

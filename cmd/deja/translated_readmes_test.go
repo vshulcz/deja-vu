@@ -32,9 +32,9 @@ var readmeLanguages = []struct {
 	file, name string
 }{
 	{"README.md", "English"},
-	{"README.zh.md", "简体中文"},
+	{"docs/readme/README.zh.md", "简体中文"},
 	{"docs/readme/README.zh-TW.md", "繁體中文"},
-	{"README.ja.md", "日本語"},
+	{"docs/readme/README.ja.md", "日本語"},
 	{"docs/readme/README.ko.md", "한국어"},
 	{"docs/readme/README.es.md", "Español"},
 	{"docs/readme/README.pt.md", "Português"},

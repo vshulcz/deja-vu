@@ -19,7 +19,7 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
 
 <p align="center">しかも、誰かが頼む必要もありません。リコールはセッション開始時、プロンプトごと、
 ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
-何が取り除かれ、何は取り除けないのかは[セキュリティモデル](docs/SECURITY-MODEL.md)に書いてあります。</p>
+何が取り除かれ、何は取り除けないのかは[セキュリティモデル](../../docs/SECURITY-MODEL.md)に書いてあります。</p>
 
 <p align="center">
 このマシンが一度解いた作業では <b>token が 58% 少ない</b> &middot; LongMemEval-S（470 問のクリーン版）で <b>88.1% hit@1</b> &middot; LoCoMo で <b>70.5% retrieval hit@1</b> &middot; 数 GB の履歴に対して<b>ミリ秒</b>単位の検索<br>
@@ -33,12 +33,12 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
   <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+  <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
-<p align="center"><a href="README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | 日本語 | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | 日本語 | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
-<p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
+<p align="center"><a href="https://vshulcz.github.io/deja-vu/">ドキュメント</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ベンチマーク</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">他ツールとの比較</a> &middot; <a href="../../docs/INTEGRATING.md">自分のツールへの組み込み</a></p>
 <p align="center"><sub>役に立ったら、<a href="https://github.com/vshulcz/deja-vu">GitHub で deja-vu にスター</a>をお願いします。</sub></p>
 
 ## インストール
@@ -94,7 +94,7 @@ scoop install deja-vu
 動作です。`deja warmup` は `~/.agents/skills/deja-search/SKILL.md` にスキルも配置します。このスキルは
 エージェントに CLI の使い方——`deja search --json`、`ctx`、`blame`、`tier` と `total` の読み方——を教えるので、
 MCP なしでも履歴を検索できることをエージェントが理解できます。リポジトリ内のコピーは
-[`skills/deja-search/SKILL.md`](skills/deja-search/SKILL.md) です。
+[`skills/deja-search/SKILL.md`](../../skills/deja-search/SKILL.md) です。
 
 `deja install --all` は、セッション開始時のリコールを除いた `--auto` です。エージェントは各セッションを
 記憶とともに始めるのではなく、自分で呼び出すと判断したときに記憶から答えます。
@@ -171,7 +171,7 @@ Bearer トークンや生の JWT、PEM 秘密鍵ブロック、各プロバイ�
 プロジェクトの除外は `~/.config/deja/exclude` に 1 行 1 パターンで記述します。`harness:` で始まる行は
 ストアを指定します——`harness:opencode` のように——deja はそのストアを走査せず、読み取りに必要なツールも要求しません。
 
-[セキュリティモデル](docs/SECURITY-MODEL.md)に、データフロー、秘匿化の限界、信頼の前提、
+[セキュリティモデル](../../docs/SECURITY-MODEL.md)に、データフロー、秘匿化の限界、信頼の前提、
 リリースの検証方法をまとめています。
 
 ## CLI
@@ -225,7 +225,7 @@ $ deja "jwt refresh token"
 </details>
 
 完全なリファレンス：[コマンド](https://vshulcz.github.io/deja-vu/guide/commands.html)と
-[JSON 出力](docs/json-output.md)。
+[JSON 出力](../../docs/json-output.md)。
 
 ### MCP ツール
 
@@ -259,7 +259,7 @@ $ deja "jwt refresh token"
 4 KB の予算内でそれを一度だけ返し、その後リポジトリが変化したかどうかを示す一行を添えます。`deja stats`
 は、コンパクション後に最初の編集が行われるまでのツール呼び出し回数を数えます。これがこの機能の効果を
 測る指標です。何を読み、何を保存し、どこに限界があるかは
-[自動コンパクション復旧](docs/compaction.md)を参照してください。
+[自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
 aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale.
@@ -445,19 +445,19 @@ deja bench read       # what it costs to read a database-backed store, and what 
 `~/.cache/deja` にあるローカルの転置インデックスです：JSONL と SQLite のストアを解析し、認証情報を
 秘匿化し、`records.bin` とトークンバケットを書き出し、ファイルごとの状態を `manifest.gob` で追跡するので、
 再実行時は変更分だけを取り込みます。MCP サーバー、stats、share、sync はすべてこのひとつのインデックスを
-読みます。詳細は [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照してください。
+読みます。詳細は [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) を参照してください。
 
 ## FAQ
 
 **何かがマシンの外に送られますか？** いいえ、あなたが指示しない限り送られません。
-[データフロー](docs/SECURITY-MODEL.md#data-flows)を参照してください。
+[データフロー](../../docs/SECURITY-MODEL.md#data-flows)を参照してください。
 
 **すでにログに含まれているシークレットはどうなりますか？** それらは元のハーネスのファイル——つまり
 エージェントのデータ——に残ります。`deja secrets` がそれを含むセッションを示すので、ローテーションや削除が
 できます。`--scrub` は届く範囲のトランスクリプトを書き換えます。既知の形式——AWS キー、`api_key=`/`token=` の代入、Bearer トークンや裸の JWT、PEM ブロック、
 各プロバイダーのトークン、高エントロピー値——はインデックス作成時に取り除かれるので、ダイジェスト、共有、
 同期エクスポートには含まれません。パターンマッチングはシークレット検出ではありません：未知の形式は
-すり抜ける可能性があります。[セキュリティモデル](docs/SECURITY-MODEL.md#redaction)を参照してください。
+すり抜ける可能性があります。[セキュリティモデル](../../docs/SECURITY-MODEL.md#redaction)を参照してください。
 
 **エージェントが遅くなりませんか？** リコールはローカルインデックスに対する字句検索です：
 中央値 0.7–0.8 ms で、モデルの応答を待つことはありません。フックではこれに加えてプロセス起動と
@@ -529,14 +529,14 @@ deja install --auto
 
 ## コントリビュート
 
-`make build test lint` を実行してから、[CONTRIBUTING.md](CONTRIBUTING.md) を読んでください。ハーネスの追加は
-[パーサーレジストリ](docs/ARCHITECTURE.md#source-parsers)から始めます。優先事項と対象外の事項は
-[ROADMAP.md](ROADMAP.md) にあります。初心者向けの Issue にはラベルが付いています。
+`make build test lint` を実行してから、[CONTRIBUTING.md](../../CONTRIBUTING.md) を読んでください。ハーネスの追加は
+[パーサーレジストリ](../../docs/ARCHITECTURE.md#source-parsers)から始めます。優先事項と対象外の事項は
+[ROADMAP.md](../../ROADMAP.md) にあります。初心者向けの Issue にはラベルが付いています。
 
 ## サポート
 
 バグや質問は [Issues](https://github.com/vshulcz/deja-vu/issues) へどうぞ。
-悪用可能だと思われるものは、代わりに [SECURITY.md](SECURITY.md) にある非公開のアドバイザリリンクから
+悪用可能だと思われるものは、代わりに [SECURITY.md](../../SECURITY.md) にある非公開のアドバイザリリンクから
 報告してください。deja が何を読み、何をどこにも送らないか、そしてプロジェクトを除外したりセッションを
 忘れさせたりする方法は[プライバシー](#プライバシー)にまとめています。
 

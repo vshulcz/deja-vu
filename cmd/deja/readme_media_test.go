@@ -23,7 +23,7 @@ import (
 func TestReadmeImagesAreAbsolute(t *testing.T) {
 	tag := regexp.MustCompile(`(?:src|srcset)="([^"]+)"`)
 	checked := 0
-	for _, name := range []string{"README.md", "README.zh.md"} {
+	for _, name := range []string{"README.md", "docs/readme/README.zh.md"} {
 		b, err := os.ReadFile(filepath.Join("..", "..", name))
 		if err != nil {
 			t.Fatal(err)
@@ -51,7 +51,7 @@ func TestReadmeImagesNameFilesThatExist(t *testing.T) {
 	const raw = "https://raw.githubusercontent.com/vshulcz/deja-vu/main/"
 	tag := regexp.MustCompile(`(?:src|srcset)="([^"]+)"`)
 	checked := 0
-	for _, name := range []string{"README.md", "README.zh.md"} {
+	for _, name := range []string{"README.md", "docs/readme/README.zh.md"} {
 		b, err := os.ReadFile(filepath.Join("..", "..", name))
 		if err != nil {
 			t.Fatal(err)

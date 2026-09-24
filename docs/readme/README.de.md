@@ -25,7 +25,7 @@ beide Retrieval-Harnesses liegen in diesem Repository und laufen in Minuten auf 
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">prüf die Zahlen selbst</a></sub>
 </p>
 
-<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | Deutsch | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Dokumentation</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">Vergleich</a></p>
 <p align="center"><sub>Wenn es dir hilft, gib deja-vu einen Stern auf <a href="https://github.com/vshulcz/deja-vu">GitHub</a>.</sub></p>

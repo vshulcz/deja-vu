@@ -24,7 +24,7 @@
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核對這些數字</a></sub>
 </p>
 
-<p align="center"><a href="../../README.md">English</a> | <a href="../../README.zh.md">简体中文</a> | 繁體中文 | <a href="../../README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
+<p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | 繁體中文 | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">文件</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">評測</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">與同類比較</a></p>
 <p align="center"><sub>覺得有用的話，歡迎在 <a href="https://github.com/vshulcz/deja-vu">GitHub</a> 上給 deja-vu 點個 Star。</sub></p>

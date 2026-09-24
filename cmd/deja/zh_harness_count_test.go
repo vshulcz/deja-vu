@@ -42,7 +42,7 @@ func TestChineseDocsCountTheHarnessesTheRegistryHas(t *testing.T) {
 	// docs/zh nor named for the language, so the walk below never reached it:
 	// its line said 三十三个智能体 while the English lines in the same file said
 	// thirty-four.
-	files := []string{"README.zh.md", filepath.ToSlash(filepath.Join("docs", "llms.txt"))}
+	files := []string{"docs/readme/README.zh.md", filepath.ToSlash(filepath.Join("docs", "llms.txt"))}
 	// docs/zh was the whole list, so the count went stale outside it:
 	// `extensions/dsh/docs/zh.md` said twenty-one agents, twelve releases out
 	// of date. A Chinese page under extensions/ is a Chinese page, and the
@@ -104,7 +104,7 @@ func TestChineseDocsCountTheHarnessesTheRegistryHas(t *testing.T) {
 		// The lede names the agents one by one, and adding a harness never
 		// touches that sentence. A correct count over a short list is worse
 		// than no count.
-		if name == "README.zh.md" {
+		if name == "docs/readme/README.zh.md" {
 			list := zhNamedList(text)
 			if list == "" {
 				t.Error("README.zh.md no longer names the harnesses; if that is on purpose, this check goes with it")
