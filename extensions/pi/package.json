@@ -1,6 +1,6 @@
 {
   "name": "@vshulcz/pi-deja",
-  "version": "0.21.1",
+  "version": "0.21.2",
   "description": "deja-vu memory for pi: the coding sessions already on this machine — pi, Claude Code, Codex, Cursor and 30 more — recalled at session start and on every prompt, searchable with /deja. A local index, no LLM.",
   "type": "module",
   "files": [
