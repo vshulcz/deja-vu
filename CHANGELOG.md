@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - recall no longer answers with the session that is asking. An agent's transcript is indexed while it is still being written, so the best match for a question asked mid-session could be the question itself, with the session holding the answer pushed off the page (#3945, #3965). Every hook that carries a session id now stamps it beside the index, and the MCP surfaces keep those sessions out of the search for twenty minutes. Nothing changes on the CLI, or on a machine with no hooks wired.
+- `deja install codex` no longer refuses a stock Codex config. Codex writes hook trust tables as `[hooks.state."browser@openai-bundled:plugin.json#hooks[0]:subagent_stop:0:0"]`, and the header check cut the line at that `#` as if it began a comment, so the header read as never closed and nothing was written (#3969). Reported and fixed by @h4ckm1n-dev.
 - The getting-started page lists every package under `extensions/`. It said "three more" and named opencode, dsh and Zed while the directory grew to seven, and README.md's table stopped at six; OpenClaw, pi, Grok and Kimi Code are now on both, in the install lines `extensions/README.md` already gives, and neither page counts its lists in prose any more. A test fails the next time a package lands without them.
 
 ## [0.21.1] - 2026-09-23
