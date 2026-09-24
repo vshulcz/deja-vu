@@ -138,7 +138,7 @@
 <pre>deja install roo</pre>
 <p>That writes four things, and only into editors Roo has actually run in:</p>
 <ul>
-<li><b>The MCP server</b>, in <code>mcp_settings.json</code> for each host — VS Code, Insiders, VSCodium, Cursor, Windsurf, and the CLI's own store. One tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</li>
+<li><b>The MCP server</b>, in <code>mcp_settings.json</code> for each host — VS Code, Insiders, VSCodium, Cursor, Windsurf, and the CLI's own store. One tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, get the commands and files this project's past sessions worked with, store a decision.</li>
 <li><b>The approval</b>: deja's own tool named in that entry's <code>alwaysAllow</code>. Roo asks before it runs an MCP tool otherwise — a click before every recall in the editor, and in the CLI's non-interactive mode a run that waits for an answer nobody can give.</li>
 <li><b>The <code>deja-history</code> skill</b> in <code>~/.agents/skills</code>, which Roo reads along with <code>~/.roo/skills</code>. It is what tells the model when to look: before re-debugging an error, when you say "didn't we fix this".</li>
 <li><b>A <code>/deja</code> command</b> in <code>~/.roo/commands</code>, for asking directly.</li>

@@ -23,8 +23,8 @@ submitted.
 ## Publishing
 
 The release publishes the npm packages at the release's own version, so
-`opencode-deja@0.21.0` and `dsh-deja@0.21.0` are the ones built against
-`deja 0.21.0` — `scripts/release-npm.mjs` sets the version and the
+`opencode-deja@0.21.2` and `dsh-deja@0.21.2` are the ones built against
+`deja 0.21.2` — `scripts/release-npm.mjs` sets the version and the
 `@vshulcz/deja-vu` dependency together. Each package keeps its own `LICENSE`
 and `repository.directory` because npm publishes from that directory.
 

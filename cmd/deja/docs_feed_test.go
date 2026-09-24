@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -108,5 +109,71 @@ func read(t *testing.T, path string, into any) {
 	}
 	if err := xml.Unmarshal(b, into); err != nil {
 		t.Fatalf("%s: %v", path, err)
+	}
+}
+
+// The check above runs feed → sitemap, so a feed missing a page passes it: the
+// entries it does carry are all fine. That is how docs/feed.xml went a release
+// without a page the sitemap had listed for two days, while still naming a page
+// that had been deleted — nothing read the sitemap side. This runs the other
+// direction, which is genfeed's whole contract: the feed is the newest forty
+// pages the repository serves, newest first, ties broken by URL.
+func TestTheFeedIsTheNewestPagesTheSitemapLists(t *testing.T) {
+	root := filepath.Join("..", "..")
+
+	var sm struct {
+		URLs []struct {
+			Loc     string `xml:"loc"`
+			Lastmod string `xml:"lastmod"`
+		} `xml:"url"`
+	}
+	read(t, filepath.Join(root, "docs", "sitemap.xml"), &sm)
+
+	type page struct{ loc, day string }
+	var served []page
+	for _, u := range sm.URLs {
+		loc, day := strings.TrimSpace(u.Loc), strings.TrimSpace(u.Lastmod)
+		if loc == "" || day == "" {
+			continue
+		}
+		// genfeed keeps a URL only when the file behind it is a page with a
+		// title; a redirect stub or a URL with nothing on disk is not one.
+		rel := strings.TrimPrefix(loc, "https://vshulcz.github.io/deja-vu/")
+		if rel == "" || strings.HasSuffix(rel, "/") {
+			rel += "index.html"
+		}
+		b, err := os.ReadFile(filepath.Join(root, "docs", filepath.FromSlash(rel)))
+		if err != nil || !strings.Contains(string(b), "<title>") {
+			continue
+		}
+		served = append(served, page{loc, day})
+	}
+	sort.SliceStable(served, func(i, j int) bool {
+		if served[i].day != served[j].day {
+			return served[i].day > served[j].day
+		}
+		return served[i].loc < served[j].loc
+	})
+	const entries = 40
+	if len(served) > entries {
+		served = served[:entries]
+	}
+
+	var feed struct {
+		Entries []struct {
+			ID string `xml:"id"`
+		} `xml:"entry"`
+	}
+	read(t, filepath.Join(root, "docs", "feed.xml"), &feed)
+
+	if len(feed.Entries) != len(served) {
+		t.Fatalf("the feed carries %d entries and the sitemap serves %d — run `go run ./scripts/genfeed`",
+			len(feed.Entries), len(served))
+	}
+	for i, want := range served {
+		if got := feed.Entries[i].ID; got != want.loc {
+			t.Errorf("entry %d is %s and the sitemap puts %s (%s) there — run `go run ./scripts/genfeed`",
+				i, got, want.loc, want.day)
+		}
 	}
 }

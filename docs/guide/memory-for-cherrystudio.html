@@ -138,7 +138,7 @@
 <h2>Getting recall into the app</h2>
 <pre>deja install cherrystudio</pre>
 <p>Cherry Studio keeps its MCP servers in its own SQLite store, seeded from a built-in list, so there is no config file to write and writing into a running app's database is not an installer's job. What the app has is import: <b>Settings → MCP → Import from JSON</b>. The command writes that file — <code>&lt;config&gt;/deja/cherrystudio-mcp.json</code> — and says where to point it. The <code>.mcpb</code> bundle from the <a href="https://github.com/vshulcz/deja-vu/releases/latest">latest release</a> is the same server through the app's other import path.</p>
-<p>Once imported, the agent has one tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision.</p>
+<p>Once imported, the agent has one tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, get the commands and files this project's past sessions worked with, store a decision.</p>
 
 <h2>Why nothing arrives on its own</h2>
 <p>There is no hook surface a third party can use: the agent sessions run inside the Electron app, and the extension points are the MCP server list and its import paths. So recall is something the model reaches for, and the <a href="../registry/cherrystudio.html">registry entry</a> records auto-recall as impossible rather than as work someone could pick up.</p>

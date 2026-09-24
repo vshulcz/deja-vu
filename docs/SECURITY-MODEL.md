@@ -74,6 +74,15 @@ Compaction capture and first-edit measurement events use this same bounded log.
 They carry hashed session/workspace identifiers, a capture revision, action
 counts, and short failure reasons. They do not contain the recovery packet.
 
+`deja secrets --scrub` is the one command that writes outside the index: it
+rewrites the harness transcripts that still hold a credential, in place. It
+replaces only the rule kinds the report names in the file the report named,
+writes the original to `<file>.deja-backup-<stamp>` first and leaves it there,
+refuses a session an agent is inside and a file written in the last two minutes,
+and re-checks size and mtime between the read and the rename. A store with no
+per-session file is not rewritten at all, and the count of what it could not
+reach is printed rather than dropped. Without `--scrub` the command only reports.
+
 The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
 output and does not listen on a network socket.

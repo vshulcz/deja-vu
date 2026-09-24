@@ -22,6 +22,20 @@ deja-stats.svg
 .opencode/
 .qwen/
 .kimi-code/
+.amp/
+.antigravity/
+.codex/
+.continue/
+.crush/
+.cursor/
+.gemini/
+.kiro/
+.openclaw/
+.pi/
+.windsurf/
+.zed/
+# Not `.claude/` — `.claude/commands/` is shipped. Only what a local run writes.
+.claude/settings.local.json
 
 # One line per Go command under scripts/: `go build ./scripts/<name>` drops a
 # binary called <name> in the repository root, and a careless `git add -A` then
@@ -82,3 +96,10 @@ extensions/*/*.tgz
 extensions/*/package-lock.json
 # a test run that starts deja from cmd/deja writes its state dir there
 /cmd/deja/deja/
+
+# What a local `go test` and a local npm run leave behind, and what Finder
+# leaves in every directory it has been asked to show.
+coverage.out
+*.prof
+/node_modules/
+.DS_Store
