@@ -326,6 +326,18 @@ func dejaTool() map[string]any {
 	}
 }
 
+// declaredModes is the mode list as the schema declares it, for the error a
+// model reads when it invents one.
+func declaredModes() []string {
+	schema, _ := dejaTool()["inputSchema"].(map[string]any)
+	props, _ := schema["properties"].(map[string]any)
+	mode, _ := props["mode"].(map[string]any)
+	if list, ok := mode["enum"].([]string); ok && len(list) > 0 {
+		return list
+	}
+	return []string{"recall"}
+}
+
 // dispatcherModes maps a mode onto the call that implements it. The old tool
 // names are the same strings, which is why a client with them wired keeps
 // working.
@@ -395,7 +407,9 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if !ok {
 			// Named, not guessed at: a model that invents a mode gets the list
 			// rather than an empty answer it will read as "no history".
-			return "", fmt.Errorf("mode %q is not one of recall, context, blame, fix, how, remember", a.Mode)
+			// Named from what the tool declares rather than spelled out here:
+			// the seventh mode landed and this sentence still listed six.
+			return "", fmt.Errorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
 		}
 		return callMCPTool(dir, target, spreadQ(mode, raw))
 	}
@@ -516,7 +530,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 	case "how":
 		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpHow(dir, name, raw) })
 	case "orient":
-		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpOrient(dir, name, raw) })
+		return recordedMCPAnswer(dir, usage.KindOrient, func() (string, int, error) { return mcpOrient(dir, name, raw) })
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`
@@ -2047,12 +2061,42 @@ func relevanceHitsAreAboutIt(hits []search.Hit, terms []string, idf map[string]f
 	if len(lead) > leadTermsKept {
 		lead = lead[:leadTermsKept]
 	}
+	// A store of a few sessions collapses every ratio to zero, so byIdentifying
+	// orders by shape and the "identifying" words are whichever are longest.
+	// There is no way to tell the subject from the filler on such a store, and
+	// the cost of guessing is asymmetric: judging the hit on one long ordinary
+	// word made a page about a subject the store had never held read as an
+	// answer about it, which is the whole of #2074. So the old rule stands
+	// exactly where the ranking cannot help — every word, or the caveat.
+	if flatIDF(known, idf) {
+		lead = known
+	}
 	for _, h := range hits {
 		if sessionSpeaksEvery(h.Session, lead) {
 			return true
 		}
 	}
 	return false
+}
+
+// flatIDF reports a store that cannot separate these words: every one of them
+// is worth the same, which on a real store means a handful of sessions.
+func flatIDF(terms []string, idf map[string]float64) bool {
+	first, seen := 0.0, false
+	for _, t := range terms {
+		v, ok := idf[t]
+		if !ok {
+			continue
+		}
+		if !seen {
+			first, seen = v, true
+			continue
+		}
+		if v != first {
+			return false
+		}
+	}
+	return seen
 }
 
 // sessionSpeaksEvery reports whether one session says every one of these words

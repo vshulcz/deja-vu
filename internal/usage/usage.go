@@ -50,6 +50,11 @@ const (
 	// most directly actionable thing deja has (#2858).
 	KindHow = "how"
 	KindFix = "fix"
+	// KindOrient is the mode that answers what work looks like in a project,
+	// counted apart from KindHow: they read the same table and answer different
+	// questions, and one journal line for both would make it impossible to see
+	// whether the map is ever asked for.
+	KindOrient = "orient"
 	// KindTool is the PreToolUse hook injection — one line about a command or
 	// file the agent is acting on. It is deduped per session, so it counts a
 	// distinct fact served, not every action. Leaving it out made deja's most
