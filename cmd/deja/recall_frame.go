@@ -84,6 +84,10 @@ const (
 	recallConclusionsMin = 160
 )
 
+// recallRanMax bounds the command line: an invocation longer than this is a
+// script, and the middle of it is what a reader skips.
+const recallRanMax = 120
+
 // recallTouchedFiles bounds how many paths recall names under its best hit:
 // enough to point at the work, short enough that it never crowds the answer.
 const recallTouchedFiles = 4
@@ -235,4 +239,37 @@ func commonDirPrefix(paths []string) string {
 		return ""
 	}
 	return pre
+}
+
+// recallRanLine renders the command the session ran and how it ended, from the
+// per-session table the build writes. Empty when the session ran nothing
+// recorded, or when the index predates the table.
+//
+// One command, not the list: whatever a hit carries is re-read on every later
+// turn of the session, so the second-best command is paid for on every turn
+// that follows. The one it prefers is a command the transcript saw pass —
+// evidence — over the newest one, which on a failing session is the failure.
+func recallRanLine(dir string, s model.Session) string {
+	fact, ok := index.SessionFactOf(dir, s.Harness, s.ID)
+	if !ok || len(fact.Commands) == 0 {
+		return ""
+	}
+	pick := fact.Commands[0]
+	for _, c := range fact.Commands {
+		if c.Passed() {
+			pick = c
+			break
+		}
+	}
+	// Without the "$ " the sources prefix and without the way one machine
+	// reached the directory: both are noise on a line whose whole point is
+	// something the agent can paste.
+	cmd := search.SafeLine(elideMiddleBytes(orientCommand(pick.Text), recallRanMax))
+	switch {
+	case pick.Passed():
+		return "it ran: " + cmd + " — exit 0 here"
+	case pick.Known:
+		return fmt.Sprintf("it ran: %s — exit %d here", cmd, pick.Exit)
+	}
+	return "it ran: " + cmd
 }

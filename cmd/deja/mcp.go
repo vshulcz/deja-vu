@@ -1647,6 +1647,16 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				if paths := recallTouchedLine(dir, h.Session, query.Tokens(q)); paths != "" {
 					fmt.Fprintf(&hb, "  files it touched: %s\n", paths)
 				}
+				// And what it ran, with the status the harness recorded. The
+				// line above says where the work was; this one is the only
+				// part of a recall answer that is not a claim — an agent
+				// verifies "the suite reads SVC_FIXTURES" by running it, and
+				// measured on a 325-file repository it spent ten to sixteen
+				// reads doing that after the answer had already arrived
+				// (#3951). "exit 0 here" is the evidence that search was for.
+				if ran := recallRanLine(dir, h.Session); ran != "" {
+					fmt.Fprintf(&hb, "  %s\n", ran)
+				}
 			}
 		}
 		served++

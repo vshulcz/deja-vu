@@ -162,14 +162,14 @@ func TestTheSidecarsAreAPhaseOfTheirOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	const phase = "mining fixes and commands"
-	if total := rec.totals[phase]; total != 4 {
+	if total := rec.totals[phase]; total != 5 {
 		t.Fatalf("%q reports %d units, want one per builder", phase, total)
 	}
 	sum := 0
 	for _, n := range rec.advances(phase) {
 		sum += n
 	}
-	if sum != 4 {
-		t.Errorf("%q advanced %d of 4 — a builder reports nothing", phase, sum)
+	if sum != 5 {
+		t.Errorf("%q advanced %d of 5 — a builder reports nothing", phase, sum)
 	}
 }

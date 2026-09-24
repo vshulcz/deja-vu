@@ -672,8 +672,8 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// store that is eight seconds of a twenty-second build, and it used to run
 	// under the previous phase's last percentage, so the bar sat still through
 	// it (#3372).
-	reportPhase("mining fixes and commands", 4)
-	// Four passes over the same sessions, each writing its own file and reading
+	reportPhase("mining fixes and commands", 5)
+	// Five passes over the same sessions, each writing its own file and reading
 	// nothing the others write, so they run together rather than one after the
 	// other. Profiled on a real store, they were 9.4 s (fixes) and 6.0 s
 	// (co-occurrence) of a 51 s build, with the whole machine idle beside them.
@@ -683,6 +683,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		func() { buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID }) },
 		func() { buildCommands(tmp, ss) },
 		func() { buildCommandFails(tmp, ss) },
+		func() { buildSessionFacts(tmp, ss) },
 	} {
 		sidecars.Add(1)
 		go func() {
@@ -1541,12 +1542,12 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	if len(ss) >= cooccurMinDF && len(ss) <= cooccurMaxSessions {
 		preRedactSessions(nil, ss)
 	}
-	// The four sidecars walk every session again — what co-occurs, which
-	// command followed which error, what was run and what failed. On a real
-	// store that is eight seconds of a twenty-second build, and it used to run
-	// under the previous phase's last percentage, so the bar sat still through
-	// it (#3372).
-	reportPhase("mining fixes and commands", 4)
+	// The sidecars walk every session again — what co-occurs, which command
+	// followed which error, what was run and what failed, and what each session
+	// touched and ran. On a real store that is eight seconds of a twenty-second
+	// build, and it used to run under the previous phase's last percentage, so
+	// the bar sat still through it (#3372).
+	reportPhase("mining fixes and commands", 5)
 	buildCooccur(tmp, ss)
 	reportAdvance(1)
 	buildFixes(tmp, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
@@ -1554,6 +1555,8 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	buildCommands(tmp, ss)
 	reportAdvance(1)
 	buildCommandFails(tmp, ss)
+	reportAdvance(1)
+	buildSessionFacts(tmp, ss)
 	reportAdvance(1)
 	reportPhase("writing index", sp.bucketCount())
 	if err := sp.writeBuckets(filepath.Join(tmp, "buckets")); err != nil {
@@ -3684,6 +3687,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	mergeFixes(dir, tmp, replacements, replaceKeys)
 	buildCommandsFromIndex(tmp)
 	buildCommandFailsFromIndex(tmp)
+	buildSessionFactsFromIndex(tmp)
 	return swapIndexDir(dir, tmp)
 }
 
@@ -4057,6 +4061,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	if carriesWork(appended) {
 		buildCommandsFromIndex(dir)
 		buildCommandFailsFromIndex(dir)
+		buildSessionFactsFromIndex(dir)
 	}
 	return filesTouched, messages, unreadable, nil
 }
