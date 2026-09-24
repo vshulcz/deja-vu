@@ -492,9 +492,14 @@ jobs:
           go run ./scripts/genmatrix
           go run ./scripts/genregistry
           go run ./scripts/genfeed
-          if ! git diff --quiet; then
+          # --porcelain rather than `git diff`, because a generator that adds a
+          # page writes an untracked file and a diff of tracked files does not
+          # see it: genregistry writes one per harness, so the first run after a
+          # parser lands is exactly the case this has to catch.
+          if [ -n "$(git status --porcelain)" ]; then
             echo "::error::A generated file is not what its generator writes. Run:"
             echo "::error::  go run ./scripts/gennav && go run ./scripts/genmatrix && go run ./scripts/genregistry && go run ./scripts/genfeed"
+            git --no-pager status --short
             git --no-pager diff --stat
             exit 1
           fi
