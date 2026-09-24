@@ -105,6 +105,12 @@ func buildSessionFactsFromIndex(tmp string) {
 func sessionFactOf(msgs []model.Message) (SessionFact, bool) {
 	var f SessionFact
 	seenCmd := map[string]bool{}
+	// One command past the cap, kept for the one that checked the work.
+	// Read off a real store: a session ends on `gh pr checks`, a commit and
+	// some cleanup, and the `make test` that proved the change sits further
+	// up — so a table of the last four commands holds the answer to "how is
+	// this checked here" almost never.
+	keptVerify := false
 	// Backwards: the file a session ended in and the command that finally ran
 	// are the ones worth handing back, and a long session's opening moves are
 	// usually the ones it abandoned.
@@ -112,7 +118,7 @@ func sessionFactOf(msgs []model.Message) (SessionFact, bool) {
 		m := msgs[i]
 		switch m.Role {
 		case roleCommand:
-			if len(f.Commands) >= sessionFactsCommands {
+			if len(f.Commands) >= sessionFactsCommands && keptVerify {
 				continue
 			}
 			// The marker a source appends sits at the end of the record, which
@@ -130,6 +136,11 @@ func sessionFactOf(msgs []model.Message) (SessionFact, bool) {
 			if key == "" || seenCmd[key] {
 				continue
 			}
+			verifies := VerifyCommand(cmd)
+			if len(f.Commands) >= sessionFactsCommands && !verifies {
+				continue
+			}
+			keptVerify = keptVerify || verifies
 			seenCmd[key] = true
 			sc := SessionCommand{Text: cmd}
 			if recorded {

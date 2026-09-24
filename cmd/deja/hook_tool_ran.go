@@ -97,10 +97,14 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 			if !c.Passed() {
 				continue
 			}
-			// The same exclusion the command line makes: `git status` passing
-			// in three sessions is true and says nothing about this file.
+			// "Ran here and passed" is true of a great deal that says nothing
+			// about the file. Read off a real store, the top candidate for
+			// two files in this repository was `kill %1; pkill -f 'codex
+			// exec'; echo …` — cleanup, run in two sessions, exit 0, and
+			// worth none of the bytes it costs at every action. So the line
+			// is restricted to the commands that check the work.
 			cmd := orientCommand(c.Text)
-			if cmd == "" || index.InspectionCommand(cmd) {
+			if cmd == "" || !index.VerifyCommand(cmd) {
 				continue
 			}
 			ck := normalizedCommandText(cmd)

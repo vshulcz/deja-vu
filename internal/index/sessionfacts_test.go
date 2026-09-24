@@ -2,6 +2,7 @@ package index
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -87,5 +88,34 @@ func TestNoEntryRatherThanAnEmptyOne(t *testing.T) {
 	}
 	if _, ok := SessionFactOf(t.TempDir(), "claude", "nobody"); ok {
 		t.Error("a missing table answered for a session")
+	}
+}
+
+// A session ends on a commit, a `gh pr checks` and some cleanup, and the
+// command that proved the change is further up — so a table of the last few
+// commands answers "how is this checked here" almost never. One slot past the
+// cap is kept for it.
+func TestTheCommandThatCheckedTheWorkSurvivesTheCap(t *testing.T) {
+	dir := t.TempDir()
+	msgs := []model.Message{
+		{Role: roleCommand, Text: "SVC_FIXTURES=./fixtures make test  → exit 0", Time: at(1)},
+	}
+	for i, c := range []string{"git add -A", "git commit -m wip", "gh pr create", "gh pr checks 1", "pkill -f codex"} {
+		msgs = append(msgs, model.Message{Role: roleCommand, Text: c + "  → exit 0", Time: at(2 + i)})
+	}
+	buildSessionFacts(dir, []model.Session{factSession("s5", msgs...)})
+	f, ok := SessionFactOf(dir, "claude", "s5")
+	if !ok {
+		t.Fatal("no entry for a session that ran commands")
+	}
+	var found bool
+	for _, c := range f.Commands {
+		found = found || strings.Contains(c.Text, "make test")
+	}
+	if !found {
+		t.Errorf("the command that checked the work was dropped: %v", f.Commands)
+	}
+	if len(f.Commands) > sessionFactsCommands+1 {
+		t.Errorf("the entry grew past one slot over the cap: %v", f.Commands)
 	}
 }
