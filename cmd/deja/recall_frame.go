@@ -88,6 +88,11 @@ const (
 // script, and the middle of it is what a reader skips.
 const recallRanMax = 120
 
+// recallFailedMax bounds the attempt that did not work, which is the shorter
+// half of the line: what it is worth is that the reader does not try it, and
+// that needs the program and its arguments, not a whole pipeline.
+const recallFailedMax = 60
+
 // recallTouchedFiles bounds how many paths recall names under its best hit:
 // enough to point at the work, short enough that it never crowds the answer.
 const recallTouchedFiles = 4
@@ -267,9 +272,34 @@ func recallRanLine(dir string, s model.Session) string {
 	cmd := search.SafeLine(elideMiddleBytes(orientCommand(pick.Text), recallRanMax))
 	switch {
 	case pick.Passed():
-		return "it ran: " + cmd + " — exit 0 here"
+		return "it ran: " + cmd + " — exit 0 here" + recallFailedTail(fact, pick)
 	case pick.Known:
 		return fmt.Sprintf("it ran: %s — exit %d here", cmd, pick.Exit)
 	}
 	return "it ran: " + cmd
+}
+
+// recallFailedTail is the attempt the same session made and the transcript saw
+// fail, for the line that has already named the one that worked.
+//
+// Knowing what works stops an agent searching; knowing what was tried and did
+// not stops it spending the turns the session ahead of it already spent. The
+// pair is on file — sessionfacts.gob records the outcome of each command it
+// keeps — and only the half that worked was being said.
+//
+// The same command failing and then passing is not that: it is a flake, or a
+// fix landing between two runs, and "X failed, then X worked" reads as advice
+// against the thing the line just recommended.
+func recallFailedTail(fact index.SessionFact, pick index.SessionCommand) string {
+	for _, c := range fact.Commands {
+		if !c.Known || c.Exit == 0 || c.Text == pick.Text {
+			continue
+		}
+		cmd := search.SafeLine(elideMiddleBytes(orientCommand(c.Text), recallFailedMax))
+		if cmd == "" {
+			continue
+		}
+		return fmt.Sprintf(", after %s exited %d", cmd, c.Exit)
+	}
+	return ""
 }

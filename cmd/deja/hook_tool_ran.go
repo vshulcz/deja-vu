@@ -27,6 +27,11 @@ const (
 	// this" — a command that passed in two sessions is evidence, and the
 	// sentence claims exactly that much.
 	ranLabel = " — ran here and passed: "
+	// failLabel is the other half of the same fact. A check that was red in
+	// the last two sessions is worth as much as one that was green: an agent
+	// told nothing runs it, watches it fail, and spends the turn deciding
+	// whether it broke something.
+	failLabel = " — ran here and failed: "
 	// toolHookRanMax is where a command stops being one and starts being a
 	// paragraph in a line the agent reads on every action.
 	toolHookRanMax = 90
@@ -41,6 +46,11 @@ type ranCandidate struct {
 	// sessions holding it: the entry keeps them most recent first, so a low
 	// rank is a command a session ended on rather than one it moved past.
 	rank int
+	// failed says the transcript saw it end badly, and exit is what with. The
+	// two are one candidate list rather than two, so a command that passes in
+	// three sessions still wins over one that failed in two.
+	failed bool
+	exit   int
 }
 
 // ranBetter orders two candidates: the one more sessions ran, then the one
@@ -50,6 +60,10 @@ type ranCandidate struct {
 // a map's order would have decided which one the agent was handed.
 func ranBetter(a, b ranCandidate) bool {
 	switch {
+	case a.failed != b.failed:
+		// What works outranks what does not, at any count: the reader is
+		// about to change this file, and one of the two is a thing to run.
+		return b.failed
 	case a.sessions != b.sessions:
 		return a.sessions > b.sessions
 	case a.rank != b.rank:
@@ -94,7 +108,7 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 		// session's opinion.
 		seen := map[string]bool{}
 		for pos, c := range f.Commands {
-			if !c.Passed() {
+			if !c.Known {
 				continue
 			}
 			// "Ran here and passed" is true of a great deal that says nothing
@@ -112,9 +126,12 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 				continue
 			}
 			seen[ck] = true
+			if !c.Passed() {
+				ck = "!" + ck
+			}
 			a := by[ck]
 			if a == nil {
-				a = &ranCandidate{text: cmd, rank: pos}
+				a = &ranCandidate{text: cmd, rank: pos, failed: !c.Passed(), exit: c.Exit}
 				by[ck] = a
 			}
 			a.sessions++
@@ -145,5 +162,8 @@ func fileHookRanLine(dir string, metas []index.SessionMeta) string {
 	// agent (#1863). The spacing inside it is kept, because `-run "Pool  Size"`
 	// is a different test filter from `-run "Pool Size"` (#2052).
 	cmd := truncateToolLine(search.SafeCommand(best.text), toolHookRanMax)
+	if best.failed {
+		return fmt.Sprintf("%s`%s` — exit %d in %s", failLabel, cmd, best.exit, toolSessionCount(best.sessions))
+	}
 	return fmt.Sprintf("%s`%s` (%s)", ranLabel, cmd, toolSessionCount(best.sessions))
 }

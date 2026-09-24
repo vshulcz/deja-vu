@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // ranStoreFor writes sessions that all edit one file and all run one command,
@@ -120,4 +121,45 @@ func TestOneSessionIsCountedOnceHoweverOftenItIsHandedOver(t *testing.T) {
 	if got := fileHookRanLine(dir, doubled); !strings.Contains(got, "(2 sessions)") {
 		t.Errorf("a doubled list of the same two sessions reads %q", got)
 	}
+}
+
+// A check that was red in the last two sessions is worth as much as one that
+// was green: an agent told nothing runs it, watches it fail, and spends the turn
+// working out whether it broke something. What outranks it is a command that
+// passed — at any count, because one of the two is a thing to run.
+func TestARedCheckIsSaidAndAGreenOneOutranksIt(t *testing.T) {
+	hermeticEnv(t)
+	dir := t.TempDir()
+	var ss []model.Session
+	var metas []index.SessionMeta
+	for i, id := range []string{"r1", "r2"} {
+		ss = append(ss, model.Session{Harness: "codex", ID: id, Messages: []model.Message{
+			{Role: "command", Text: "$ go test ./internal/store  → exit 2"},
+		}})
+		metas = append(metas, index.SessionMeta{Harness: "codex", ID: id, Updated: at(i)})
+	}
+	index.BuildSessionFactsForTest(dir, ss)
+	got := fileHookRanLine(dir, metas)
+	if !strings.Contains(got, "go test ./internal/store") || !strings.Contains(got, "exit 2") {
+		t.Errorf("a check red in two sessions is not reported: %q", got)
+	}
+	if strings.Contains(got, "passed") {
+		t.Errorf("a failing command reads as one that passed: %q", got)
+	}
+
+	// The same two sessions, both also ending on something that worked: that is
+	// the line, and the failure yields to it. Both, because the two-session bar
+	// applies to either half — one session's green is still a keystroke.
+	for i := range ss {
+		ss[i].Messages = append([]model.Message{{Role: "command", Text: "$ make test  → exit 0"}}, ss[i].Messages...)
+	}
+	index.BuildSessionFactsForTest(dir, ss)
+	if got := fileHookRanLine(dir, metas); !strings.Contains(got, "make test") || !strings.Contains(got, "passed") {
+		t.Errorf("a command that passed did not outrank the red one: %q", got)
+	}
+}
+
+// at is a fixed clock for the manifest rows these tests build by hand.
+func at(min int) time.Time {
+	return time.Date(2026, 9, 1, 10, min, 0, 0, time.UTC)
 }

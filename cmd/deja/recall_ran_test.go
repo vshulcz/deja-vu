@@ -71,3 +71,34 @@ func TestTheRanLineIsEmptyWithoutEvidence(t *testing.T) {
 		t.Errorf("a session that ran nothing produced %q", got)
 	}
 }
+
+// Knowing what worked stops an agent searching; knowing what was tried and did
+// not stops it spending the turns the session ahead of it already spent. Both
+// halves are in the table and only one was said.
+func TestTheRanLineNamesTheAttemptThatDidNotWork(t *testing.T) {
+	dir, s := ranStore(t,
+		model.Message{Role: "command", Text: "$ make test  → exit 2"},
+		model.Message{Role: "command", Text: "$ SVC_FIXTURES=./fixtures make test  → exit 0"},
+	)
+	got := recallRanLine(dir, s)
+	if !strings.Contains(got, "SVC_FIXTURES=./fixtures make test — exit 0 here") {
+		t.Errorf("the command that worked is not the head of the line: %q", got)
+	}
+	if !strings.Contains(got, "after make test exited 2") {
+		t.Errorf("the attempt that did not work is missing: %q", got)
+	}
+	if strings.Count(got, "\n") > 0 {
+		t.Errorf("the line is more than one line: %q", got)
+	}
+
+	// A command that failed and then passed is a flake or a fix landing between
+	// two runs, and "X failed, then X worked" reads as advice against the thing
+	// the line just recommended.
+	dir, s = ranStore(t,
+		model.Message{Role: "command", Text: "$ make test  → exit 2"},
+		model.Message{Role: "command", Text: "$ make test  → exit 0"},
+	)
+	if got := recallRanLine(dir, s); strings.Contains(got, "after") {
+		t.Errorf("the same command reads as the attempt that did not work: %q", got)
+	}
+}
