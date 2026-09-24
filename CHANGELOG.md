@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Every surface that tells an agent when to recall — the MCP instructions, the guidance block, both skills and the Hermes provider — now names two triggers that are not questions: the user stating that something of theirs already exists ("I already have X", "we use Y for this"), and the agent being about to say that something on this machine does not exist (#4004, #4005). The trigger lists were all questions, so a statement matched none of them. Cost is 66 tokens in the guidance block and 67 in the MCP instructions; the longer version lives in the skills, which load only when they are used.
+- `scripts/denialrate` counts how often an agent denies something the index could have answered, and says the rate is not measurable lexically: over 2817 sessions, 457 denying turns hit 50.6% against a control of 50.8% when the denying sentence has to name what it denies, and the loose rules put the control ahead (#4006).
+
 ## [0.21.2] - 2026-09-24
 
 recall stops answering with the session that is asking. An agent's own

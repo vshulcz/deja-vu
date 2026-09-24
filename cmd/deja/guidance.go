@@ -15,7 +15,7 @@ const (
 	guidanceEnd   = "<!-- deja guidance:end -->"
 )
 
-const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before. Use the deja MCP tool and pick a mode:
+const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before, and when they state that something of theirs already exists that you have no record of ("I already have X", "we use Y for this"). Before telling the user that something on this machine does not exist — a command, a file, a setting, a past decision — recall first. Use the deja MCP tool and pick a mode:
 
 - recall: search history with a specific error, function, or decision.
 - context: get a concise digest of the best matching session.
@@ -30,6 +30,11 @@ When recalled history helps — a reused fix, a skipped re-debug, a hint that ch
 // too expensive to keep in an MCP tool description, or in a guidance block that
 // sits in context all session, belongs here instead.
 const skillBody = `Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.
+
+Two triggers are easy to miss because they are not questions:
+
+- The user states that something of theirs already exists and you have no record of it — "I already have X", "we use Y for this", "that's what Z is for". They are not asking; they are telling you the history exists, which is a stronger reason to search than a question is.
+- You are about to tell the user that something on this machine does not exist — a command, a file, a setting, a past decision. Recall first. Absence from the code in front of you is not absence from the machine, and a wrong denial sends them to rebuild what they have.
 
 If the deja tool is not available in this session, the same index is reachable through the shell: ` + "`deja search --json \"<query>\"`" + `, ` + "`deja ctx <query>`" + `, ` + "`deja blame <path> --json`" + `.
 
@@ -163,7 +168,7 @@ func opencodeConfigHome() string {
 // The name has to match the directory, and the description is the only part
 // loaded before the skill is used, so it carries the trigger phrases.
 func skillFile(body string) string {
-	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved.\n---\n\n" + body + "\n"
+	return "---\nname: deja-history\ndescription: Search the user's past AI coding sessions. Use when they say things like 'didn't we fix this before', 'what did we decide about X' or 'I already have that', before re-debugging an error that may already be solved, and before telling them something on this machine does not exist.\n---\n\n" + body + "\n"
 }
 
 // instructionsFile wraps the same body for VS Code, whose custom instructions

@@ -13,10 +13,15 @@ import (
 // other; the same index answers both.
 const (
 	cliSkillName = "deja-search"
-	cliSkillDesc = "deja-vu memory — search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X', or before re-debugging an error that may already be solved."
+	cliSkillDesc = "deja-vu memory — search the user's past AI coding sessions with the deja CLI. Use when they say things like 'didn't we fix this before', 'what did we decide about X' or 'I already have that', before re-debugging an error that may already be solved, and before telling them something on this machine does not exist."
 )
 
 const cliSkillBody = `Search deja before re-deriving past work: when the user refers to earlier sessions or decisions, before debugging an error, and before implementing something that may already exist. It searches this machine's own history across every AI coding tool used on it, going back further than deja itself was installed.
+
+Two triggers are easy to miss because they are not questions:
+
+- The user states that something of theirs already exists and you have no record of it — "I already have X", "we use Y for this", "that's what Z is for". They are not asking; they are telling you the history exists, which is a stronger reason to search than a question is.
+- You are about to tell the user that something on this machine does not exist — a command, a file, a setting, a past decision. Recall first. Absence from the code in front of you is not absence from the machine, and a wrong denial sends them to rebuild what they have.
 
 This skill drives the ` + "`deja`" + ` binary through the shell. If the deja MCP tool is available in this session — one tool with a mode of recall, context, blame, fix, how or remember — use that instead: same index, one less hop. It appears only when ` + "`deja install`" + ` has wired this harness.
 

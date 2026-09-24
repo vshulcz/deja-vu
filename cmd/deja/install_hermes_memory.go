@@ -115,8 +115,11 @@ RECALL_SCHEMA = {
     "description": (
         "Search this machine's past coding sessions across every agent — what was "
         "tried, what failed, what finally worked. Use before debugging an error, "
-        "re-implementing anything that might already exist, or when the user "
-        "implies the work happened before ('didn't we fix this?')."
+        "re-implementing anything that might already exist, when the user implies "
+        "the work happened before ('didn't we fix this?'), when they state that "
+        "something of theirs already exists that you have no record of ('I already "
+        "have X'), and before saying that something "
+        "on this machine does not exist."
     ),
     "parameters": {
         "type": "object",
