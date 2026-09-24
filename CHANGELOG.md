@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-09-24
+
+recall stops answering with the session that is asking. An agent's own
+transcript is in the index while it is still being written, so a question put
+mid-session could come back as its own best match, with the session that held
+the answer off the page. `deja secrets --scrub` rewrites the transcripts that
+still carry a credential, and `fix` hands over what a session said about an
+error when nothing was run after it.
+
 ### Added
 - `deja secrets --scrub` rewrites the transcripts that still hold a credential: the same `[redacted:kind]` marker the index uses goes where the value was, the original stays at `<file>.deja-backup-<stamp>`, and `deja index` afterwards drops the finding. It replaces only the kinds the report names, refuses a transcript an agent is in or one written in the last two minutes, and prints how many findings it could not reach — a store with no per-session file cannot be rewritten at all, which on one machine was 36 of 88 findings. `--dry-run` says what it would do (#3823).
 - `deja forget --list` marks a tombstone whose session is gone everywhere — in neither the index nor any store — as suppressing nothing. A leftover from a session deleted on disk printed exactly like one somebody forgot yesterday. The row still starts with its id and the list is still one line per tombstone; a machine with no leftovers sees no change.
@@ -1520,7 +1529,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/vshulcz/deja-vu/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/vshulcz/deja-vu/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/vshulcz/deja-vu/compare/v0.20.2...v0.21.0
 [0.20.2]: https://github.com/vshulcz/deja-vu/compare/v0.20.1...v0.20.2
