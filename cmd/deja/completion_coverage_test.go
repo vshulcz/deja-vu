@@ -17,11 +17,13 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 		"hook-plan":    true, "hook-tool": true, "hook-tool-after": true,
 		"warmup-status": true, "mcp": true,
 	}
+	// The emitted script, not the template: the command list is substituted at
+	// run time now, the way the harnesses and the roles already were.
 	shells := map[string]string{
-		"bash":       bashCompletion,
-		"zsh":        zshCompletion,
-		"fish":       fishCompletion,
-		"powershell": powershellCompletion,
+		"bash":       emittedCompletion(t, "bash"),
+		"zsh":        emittedCompletion(t, "zsh"),
+		"fish":       emittedCompletion(t, "fish"),
+		"powershell": emittedCompletion(t, "powershell"),
 	}
 	names := make([]string, 0, len(commands))
 	for name := range commands {

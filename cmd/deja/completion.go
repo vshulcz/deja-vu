@@ -28,6 +28,12 @@ func runCompletion(args []string) error {
 	// The last hand-written list: seven copies of "user assistant tool" while
 	// --role accepted four more (#1658).
 	script = strings.ReplaceAll(script, "%ROLES%", strings.Join(knownRoles, " "))
+	// And the command list itself, which was the last copy left: `deja recap`
+	// and `deja tests` shipped in 0.21.0 and bash and fish had never heard of
+	// either, while the PowerShell array had grown three overlapping copies of
+	// itself from merges landing beside each other.
+	script = strings.ReplaceAll(script, "%COMMANDS%", strings.Join(completionCommands(), " "))
+	script = strings.ReplaceAll(script, "%COMMANDS_QUOTED%", "'"+strings.Join(completionCommands(), "', '")+"'")
 	_, err := fmt.Fprint(os.Stdout, script)
 	return err
 }
@@ -54,8 +60,7 @@ _deja_completion() {
     command="${COMP_WORDS[1]-}"
     action="${COMP_WORDS[2]-}"
 
-    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search secrets share show sources stats statusline sync uninstall update version view warmup wip"
-    local commands="blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote recap remember restore resume search share show sources stats statusline sync tests uninstall update version view warmup wip"
+    local commands="%COMMANDS%"
     local harnesses="%HARNESSES%"
     local install_targets="%INSTALL_TARGETS% --all --auto"
 
@@ -293,8 +298,7 @@ const fishCompletion = `function __deja_needs_command
     test (count (commandline -opc)) -eq 1
 end
 
-complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote remember restore resume search secrets share show sources stats statusline sync uninstall update version view warmup wip'
-complete -c deja -n '__deja_needs_command' -a 'blame bench brief check completion ctx doctor embed files fix forget friction handoff help how index install last log mcp promote recap remember restore resume search share show sources stats statusline sync tests uninstall update version view warmup wip'
+complete -c deja -n '__deja_needs_command' -a '%COMMANDS%'
 complete -c deja -n '__deja_needs_command' -l json -d 'Print JSON'
 complete -c deja -n '__deja_needs_command' -l re -d 'Interpret query as a regular expression'
 complete -c deja -n '__deja_needs_command' -l all -d 'Include all results'
@@ -372,17 +376,7 @@ const powershellCompletion = `# PowerShell completion for deja
 Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
 
-    $commands = @(
-        'blame', 'bench', 'brief', 'check', 'completion', 'ctx', 'doctor', 'embed',
-        'files', 'fix', 'forget', 'friction', 'handoff', 'help', 'how',
-        'index', 'install', 'last', 'log', 'mcp', 'promote', 'remember',
-        'restore', 'resume', 'search', 'secrets', 'share', 'show', 'sources', 'stats',
-        'index', 'install', 'last', 'log', 'mcp', 'promote', 'recap', 'remember',
-        'restore', 'resume', 'search', 'share', 'show', 'sources', 'stats',
-        'statusline', 'sync', 'uninstall', 'update', 'version', 'view', 'warmup', 'wip'
-        'restore', 'resume', 'search', 'share', 'show', 'sources', 'stats',
-        'statusline', 'sync', 'tests', 'uninstall', 'update', 'version', 'view', 'warmup', 'wip'
-    )
+    $commands = @(%COMMANDS_QUOTED%)
     $harnesses = @('%HARNESSES%' -split ' ' | Where-Object { $_ })
     $installTargets = @('%INSTALL_TARGETS%' -split ' ' | Where-Object { $_ }) + @('--all', '--auto')
     $handoffTargets = @('%HANDOFF_TARGETS%' -split ' ' | Where-Object { $_ })
@@ -468,3 +462,29 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
         }
 }
 `
+
+// completionCommands is what the shells offer, in one place instead of a copy
+// per shell: `deja recap` and `deja tests` shipped in 0.21.0 and bash and fish
+// had never heard of either, while the PowerShell array had grown three
+// overlapping copies of itself from merges landing beside each other.
+//
+// Written out rather than read from the command table, because that table holds
+// this function and Go will not have the cycle. What keeps the two in step is
+// TestEveryCommandIsOfferedByEveryShell, which fails the moment a command is
+// added to one and not the other.
+func completionCommands() []string {
+	return []string{
+		"bench", "blame", "brief", "check", "completion", "ctx", "doctor", "embed",
+		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
+		"install", "last", "log", "mcp", "promote", "recap", "remember", "restore",
+		"resume", "search", "secrets", "share", "show", "sources", "stats",
+		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
+		"warmup", "wip",
+	}
+}
+
+// completionHiddenCommands are the ones deja runs for itself. Leaving a command
+// out is a decision recorded here rather than a name missing from three scripts.
+var completionHiddenCommands = map[string]bool{
+	"warmup-status": true,
+}

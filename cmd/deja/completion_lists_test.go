@@ -85,3 +85,57 @@ func TestCompletionOffersEveryRole(t *testing.T) {
 		}
 	}
 }
+
+// The command list was the copy that outlived every other: `deja recap` and
+// `deja tests` shipped in 0.21.0 and neither bash nor fish had ever heard of
+// them, while the bash and fish scripts each carried the same list twice over
+// and the PowerShell array carried it three times — merges landing beside each
+// other. A command nobody can tab-complete is a command most people never find.
+func TestEveryCommandIsOfferedByEveryShell(t *testing.T) {
+	offered := map[string]bool{}
+	for _, name := range completionCommands() {
+		offered[name] = true
+	}
+	for name := range commands {
+		// Flags the table answers to, hooks a harness calls, and the internals
+		// nobody types: none of them is a command to complete.
+		if strings.HasPrefix(name, "-") || strings.HasPrefix(name, "hook-") || completionHiddenCommands[name] {
+			continue
+		}
+		if !offered[name] {
+			t.Errorf("`deja %s` is in the command table and in no completion script", name)
+		}
+	}
+	// The reverse, minus the four run() answers before the map is consulted.
+	handledEarly := map[string]bool{"search": true, "show": true, "last": true, "help": true}
+	for name := range offered {
+		if _, ok := commands[name]; !ok && !handledEarly[name] {
+			t.Errorf("completion offers %q, which is not a command", name)
+		}
+	}
+	want := strings.Join(completionCommands(), " ")
+	for _, shell := range []string{"bash", "fish"} {
+		if script := emittedCompletion(t, shell); !strings.Contains(script, want) {
+			t.Errorf("%s completion does not offer the command list", shell)
+		}
+	}
+}
+
+// One list per shell, not three. The duplicates were harmless to the shell and
+// fatal to the list: each copy drifted on its own.
+func TestNoShellCarriesTheCommandListTwice(t *testing.T) {
+	first := completionCommands()[0]
+	for _, shell := range completionTestShells {
+		script := emittedCompletion(t, shell)
+		if n := strings.Count(script, first+" "); n > 2 {
+			t.Errorf("%s completion mentions the head of the command list %d times", shell, n)
+		}
+	}
+	ps := emittedCompletion(t, "powershell")
+	if n := strings.Count(ps, "$commands = @("); n != 1 {
+		t.Errorf("the powershell script declares $commands %d times", n)
+	}
+	if n := strings.Count(ps, "'recap'"); n != 1 {
+		t.Errorf("'recap' appears %d times in the powershell script", n)
+	}
+}
