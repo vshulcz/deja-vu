@@ -133,7 +133,7 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // to 154 different files, which is a line on every edit saying the same thing.
 // What repeats is the decision, not the sentence built around it.
 func dedupeFact(line string) string {
-	for _, label := range []string{standingLabel, decisionLabel, endedLabel} {
+	for _, label := range []string{standingLabel, decisionLabel, endedLabel, ranLabel} {
 		if i := strings.Index(line, label); i >= 0 {
 			return line[i:]
 		}
@@ -775,9 +775,18 @@ func fileHookLine(dir, cwd, path string) string {
 		if d := promotedDecisionFor(inScope); d != "" {
 			return head + standingLabel + d
 		}
+		// Two sessions that both touched this file and both ended cleanly on
+		// the same command clear the same bar a decision does: it is a pattern
+		// rather than a coincidence. Before the scanned line, because that one
+		// is the newest thing a session said about the file and a command that
+		// passed twice is the one fact here the agent can check for itself.
+		if ran := fileHookRanLine(dir, inScope); ran != "" {
+			return head + ran
+		}
 		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
 			return head + decisionLabelFor(path, d) + d
 		}
+		// A count on its own is the number the bar above exists to withhold.
 		return ""
 	}
 	// The measured difference between a nudge that changes what an agent does
@@ -793,6 +802,13 @@ func fileHookLine(dir, cwd, path string) string {
 	// The command line has said the weaker "last time:" all along.
 	if d := promotedDecisionFor(inScope); d != "" {
 		return head + standingLabel + d
+	}
+	// The user's own decision outranks it; a scanned conclusion does not. That
+	// line is the newest thing a session said about the file, as often
+	// "changed the renderer (5)" as a decision, while this one is a command
+	// two sessions ran here and the transcript saw pass.
+	if ran := fileHookRanLine(dir, inScope); ran != "" {
+		return head + ran
 	}
 	if d := fileDecisionLine(dir, inScope); d != "" {
 		// A scanned line is called a decision only when it reads as one. The
