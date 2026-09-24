@@ -107,9 +107,19 @@ func scrubTargets(findings []index.SecretFinding) ([]scrubTarget, map[string]int
 			unreachable["no transcript file — the store is a database"]++
 			continue
 		}
-		st, err := os.Stat(f.Path)
-		if err != nil || !st.Mode().IsRegular() {
-			unreachable["the transcript is gone or is not a file"]++
+		st, err := os.Lstat(f.Path)
+		switch {
+		case err != nil:
+			unreachable["the transcript is gone"]++
+			continue
+		case st.Mode()&os.ModeSymlink != 0:
+			// Lstat rather than Stat: a rename over a symlink replaces the link
+			// with a file and leaves whatever it pointed at untouched, which is
+			// the opposite of what the reader asked for.
+			unreachable["the transcript is a symlink — edit what it points at"]++
+			continue
+		case !st.Mode().IsRegular():
+			unreachable["the transcript is not a file"]++
 			continue
 		}
 		t := byPath[f.Path]
@@ -162,12 +172,22 @@ func scrubOne(t scrubTarget, live map[string]bool, dryRun bool) scrubOutcome {
 	}
 	// Between the read and the write the client may have appended a turn. The
 	// rewrite would drop it, so the file is left alone and the copy goes.
+	// An append between the read and here would be dropped by the rewrite, so
+	// the file is left alone and the copy goes. What this cannot close is the
+	// microseconds between this check and the rename below — nothing portable
+	// locks a file another program holds open — which is why a session an agent
+	// is in, or a file written in the last two minutes, never gets this far.
 	if now, err := os.Stat(t.path); err != nil || now.Size() != st.Size() || !now.ModTime().Equal(st.ModTime()) {
-		_ = os.Remove(backup)
+		if err := os.Remove(backup); err != nil {
+			return scrubOutcome{target: t, skipped: "it changed while deja was reading it, and the copy at " + reportPath(backup) + " could not be removed"}
+		}
 		return scrubOutcome{target: t, skipped: "it changed while deja was reading it"}
 	}
 	if err := atomicfile.Write(t.path, []byte(clean), st.Mode().Perm()); err != nil {
-		return scrubOutcome{target: t, skipped: "could not replace it: " + err.Error()}
+		// The copy stays: it is the only thing standing between the reader and
+		// a half-written transcript, and a message that does not name it leaves
+		// them hunting for it.
+		return scrubOutcome{target: t, skipped: "could not replace it: " + err.Error() + " — the original is still at " + reportPath(backup)}
 	}
 	return scrubOutcome{target: t, written: counts, backup: backup}
 }
@@ -189,6 +209,13 @@ func printScrub(w io.Writer, outcomes []scrubOutcome, unreachable map[string]int
 				verb = "replaced"
 			}
 			fmt.Fprintf(w, "  %s %s in %s\n", verb, scrubKindSummary(o.written), name)
+			// The report counts markers in the index, which redacts decoded
+			// message text; this pass reads the raw file. When the two disagree
+			// the reader has to know, or they close a file that still holds a
+			// value (#3823).
+			if wrote := countOf(o.written); wrote < o.target.found {
+				fmt.Fprintf(w, "    %d of the %d the report counted here — the rest is spelled differently in the file itself\n", wrote, o.target.found)
+			}
 			if o.backup != "" {
 				fmt.Fprintf(w, "    the original is %s\n", search.SafePath(reportPath(o.backup)))
 			}
@@ -219,6 +246,14 @@ func printScrubUnreachable(w io.Writer, unreachable map[string]int) {
 	for _, r := range reasons {
 		fmt.Fprintf(w, "deja: %d finding%s out of reach — %s\n", unreachable[r], plural(unreachable[r]), r)
 	}
+}
+
+func countOf(counts map[string]int) int {
+	n := 0
+	for _, c := range counts {
+		n += c
+	}
+	return n
 }
 
 func scrubKindSummary(counts map[string]int) string {

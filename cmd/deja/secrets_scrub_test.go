@@ -192,3 +192,57 @@ func TestScrubLeavesAFileItCannotMatch(t *testing.T) {
 		t.Error("a copy was left beside a file nothing was done to")
 	}
 }
+
+// A symlinked transcript is left alone: a rename over a link replaces the link
+// and leaves what it pointed at holding the credential, which is the opposite of
+// what the reader asked for.
+func TestScrubWillNotFollowASymlink(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.jsonl")
+	if err := os.WriteFile(real, []byte(`{"t":"postgres://svc:hunter2pass@db:5432/app"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link.jsonl")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	targets, unreachable := scrubTargets([]index.SecretFinding{
+		{Kind: "url-credentials", Harness: "claude", ID: "s1", Path: link, Count: 1},
+	})
+	if len(targets) != 0 {
+		t.Errorf("a symlink was taken as a transcript to rewrite: %v", targets)
+	}
+	if unreachable["the transcript is a symlink — edit what it points at"] != 1 {
+		t.Errorf("the symlink was counted as %v", unreachable)
+	}
+	if b, _ := os.ReadFile(real); !strings.Contains(string(b), "hunter2pass") {
+		t.Error("what the link pointed at was rewritten")
+	}
+}
+
+// The report counts markers in the index, which redacts decoded message text;
+// the scrub reads raw bytes. When it reaches fewer than the report counted, the
+// reader has to be told, or they close a file that still holds a value.
+func TestScrubSaysWhenItReachedFewerThanTheReportCounted(t *testing.T) {
+	var out strings.Builder
+	printScrub(&out, []scrubOutcome{{
+		target:  scrubTarget{path: "/w/s/leaky.jsonl", found: 3},
+		written: map[string]int{"url-credentials": 1},
+	}}, nil, false)
+	if !strings.Contains(out.String(), "1 of the 3 the report counted here") {
+		t.Errorf("the gap is invisible:\n%s", out.String())
+	}
+}
+
+// A failed rewrite must name the copy it left behind: it is the only thing
+// between the reader and a half-written transcript.
+func TestAFailedRewriteNamesTheCopy(t *testing.T) {
+	var out strings.Builder
+	printScrub(&out, []scrubOutcome{{
+		target:  scrubTarget{path: "/w/s/leaky.jsonl"},
+		skipped: "could not replace it: read-only file system — the original is still at /w/s/leaky.jsonl.deja-backup-20260924-101500",
+	}}, nil, false)
+	if !strings.Contains(out.String(), "deja-backup-20260924-101500") {
+		t.Errorf("the copy is not named:\n%s", out.String())
+	}
+}
