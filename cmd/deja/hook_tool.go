@@ -152,6 +152,10 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	if recallIsOff() {
 		return nil
 	}
+	// The one place that knows whose session this is. The MCP tool is handed no
+	// session id, so what this hook writes down is how recall knows not to
+	// answer with the transcript being written (#3945, #3965).
+	markSessionLive(dir, input.SessionID)
 	measureCompactionRecovery(dir, input)
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "PreToolUse", shape, stdout); delivered {
 		return err

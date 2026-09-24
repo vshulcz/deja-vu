@@ -1361,7 +1361,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 			return note + text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveSessionIDs(dir)}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1376,7 +1376,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	if err != nil {
 		return "", 0, 0, nil, nil, err
 	}
-	ss := result.Sessions
+	ss := withoutLiveSessions(dir, result.Sessions)
 	o.Tier = result.Tier
 	if result.Stemmed {
 		o.Stemmed = true
@@ -1871,7 +1871,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveSessionIDs(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale {
@@ -1881,7 +1881,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	if err != nil {
 		return "", 0, 0, nil, nil, "", err
 	}
-	ss := result.Sessions
+	ss := withoutLiveSessions(dir, result.Sessions)
 	o.Tier = result.Tier
 	if result.Stemmed {
 		o.Stemmed = true

@@ -47,6 +47,13 @@ type Options struct {
 	// names: the working directory's, whose worktrees each record their own
 	// (#3713). Set, it replaces Project in the filter; empty, nothing changes.
 	Projects []string
+	// ExcludeSessions keeps sessions out by id, whatever they match. The agent
+	// surfaces set it to the sessions being written right now: a live transcript
+	// is indexed, so the best match for a question asked mid-session can be the
+	// question (#3945, #3965). It is honoured in the meta filter rather than on
+	// the way out, so a tier that would otherwise be filled by the caller's own
+	// session escalates to the next one instead of answering nothing.
+	ExcludeSessions map[string]bool
 	// Session narrows a search to one session, by the id prefix a hit prints.
 	// Finding the session by what was said and then searching inside it — for a
 	// command, a file, an error — took reopening the transcript by hand (#1321).

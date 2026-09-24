@@ -381,6 +381,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if plain {
 		shape = hookToolPlain
 	}
+	// The first moment this session exists, so the first recall of it — the one
+	// an agent plans against — already knows whose transcript to leave out.
+	markSessionLive(dir, input.SessionID)
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "SessionStart", shape, os.Stdout); delivered {
 		return err
 	}
