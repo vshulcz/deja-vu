@@ -22,6 +22,12 @@ rule, so the numbers on the site's day-zero page can be reproduced end to end.
        MEMPALACE=mempalace python3 scripts/day0compare/mempalace.py /tmp/day0
        FUNES=funes python3 scripts/day0compare/funes.py /tmp/day0 [--half-life 0]
 
+3. The standing cost of wiring a tool in at all — its definitions, which a
+   client puts in the prompt on every turn — is measured separately, without
+   the corpus:
+
+       SERVER='["deja","mcp"]' python3 scripts/day0compare/toolcost.py
+
    funes indexes the Claude layout in full (`funes index <path> --yes`, about
    two hours of local embedding for 19k sessions); its first recall downloads
    ~1.1 GB of models, and the header shortens session ids, so the driver reads
