@@ -96,6 +96,33 @@ func TestReadCompactionTranscriptRejectsForeignSession(t *testing.T) {
 	}
 }
 
+// The session id pins identity; the directory is where the session is now. A
+// session that moves between worktrees used to be refused outright — 6 of 20
+// large transcripts on one machine had two cwds in their last 4 MiB, and they
+// are the long sessions a compaction packet is for (#4031).
+func TestReadCompactionTranscriptFollowsTheSessionAcrossDirectories(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "thread.jsonl")
+	body := strings.Join([]string{
+		`{"type":"user","sessionId":"claude-1","cwd":"/work/widget","message":{"role":"user","content":"start here"}}`,
+		`{"type":"assistant","sessionId":"claude-1","cwd":"/work/widget","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./..."}}]}}`,
+		`{"type":"user","sessionId":"claude-1","cwd":"/work/widget-wt","message":{"role":"user","content":"now in the worktree"}}`,
+		`{"type":"assistant","sessionId":"claude-1","cwd":"/work/widget-wt","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Bash","input":{"command":"go vet ./..."}}]}}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ReadCompactionTranscript(path, "claude-1")
+	if err != nil {
+		t.Fatalf("a session that changed directory was refused: %v", err)
+	}
+	if got.Workspace != "/work/widget-wt" {
+		t.Fatalf("workspace %q, want the newest record's directory", got.Workspace)
+	}
+	if len(got.Session.Messages) == 0 {
+		t.Fatalf("no messages captured: %#v", got.Session)
+	}
+}
+
 func TestReadCompactionTranscriptAcceptsStableFinalRecordWithoutNewline(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "thread.jsonl")
 	line := `{"type":"user","sessionId":"claude-1","message":{"role":"user","content":"hello"}}`
