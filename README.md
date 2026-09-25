@@ -23,8 +23,8 @@ the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says
 and what it cannot.</p>
 
 <p align="center">
-<b>58% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
-<sub>Eleven runs an arm: 53,558 tokens against 126,222 with nothing wired, and 71% off on a later run of the same stand &middot;
+<b>58–80% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
+<sub>Eleven runs an arm: 53,558 tokens against 126,222 with nothing wired, and 24,068 against 119,461 on a later build, eleven runs again &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">what it costs to finish one task</a> &middot;
 both retrieval harnesses ship in this repo and run on the public datasets in minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">check the numbers yourself</a></sub>

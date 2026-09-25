@@ -18,8 +18,8 @@ agent. deja indexe les sessions que Claude Code, Codex, Cursor et tous les autre
 <p align="center"><b>deja est pleine dès la première minute : l'historique que 34 agents ont déjà écrit, indexé en quelques secondes, sans modèle et sans étape de collecte à part.</b></p>
 
 <p align="center">
-<b>58 % de tokens en moins</b> sur une tâche que cette machine avait déjà résolue &middot; <b>88.1 % hit@1</b> sur LongMemEval-S (jeu nettoyé de 470 questions) &middot; <b>70.5 %</b> sur LoCoMo &middot; des requêtes en <b>millisecondes</b> sur des gigaoctets d'historique<br>
-<sub>Onze exécutions par bras : 53,558 tokens contre 126,222 sans rien de branché, et 71 % lors d'une exécution ultérieure du même banc &middot;
+<b>58–80 % de tokens en moins</b> sur une tâche que cette machine avait déjà résolue &middot; <b>88.1 % hit@1</b> sur LongMemEval-S (jeu nettoyé de 470 questions) &middot; <b>70.5 %</b> sur LoCoMo &middot; des requêtes en <b>millisecondes</b> sur des gigaoctets d'historique<br>
+<sub>Onze exécutions par bras : 53,558 tokens contre 126,222 sans rien de branché, et 24,068 contre 119,461 sur une version ultérieure, là aussi onze exécutions &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">ce que coûte une tâche</a> &middot;
 les deux harnais de recherche sont dans ce dépôt et tournent sur des jeux de données publics en quelques minutes &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">vérifiez les chiffres vous-même</a></sub>

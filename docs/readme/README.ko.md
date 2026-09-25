@@ -18,8 +18,8 @@ deja는 Claude Code, Codex, Cursor를 비롯해 이 컴퓨터의 모든 에이�
 <p align="center"><b>deja는 처음부터 가득 차 있습니다. 34개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
 
 <p align="center">
-이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.1%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
-<sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 같은 스탠드의 이후 실행에서는 71% &middot;
+이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58–80% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.1%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
+<sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 이후 빌드에서 다시 11회 실행: 119,461 대비 24,068 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">작업 하나를 끝내는 비용</a> &middot;
 검색 평가 하네스 두 개 모두 이 저장소에 있고 공개 데이터셋에서 몇 분이면 돕니다 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">숫자를 직접 확인하세요</a></sub>

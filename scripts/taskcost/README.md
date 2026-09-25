@@ -33,5 +33,18 @@ arm, all solved:
     agentmemory 0.9.29             15.9         104,974    70s
     deja                            9.8          53,558    45s
 
+Run again on deja main at 54f6f6ab, eleven runs an arm, same model; one deja
+run of the eleven stopped without running the test and is counted:
+
+    arm                      tool calls   median tokens   wall
+    nothing wired                  18.2         119,461    61s
+    deja                            6.0          24,068    36s
+
 The numbers move with the model and the harness; what the stand is for is the
 gap between arms on one machine in one window, not the absolute figures.
+
+Two things that make an arm measure nothing, both silent: a home created fresh
+by `deja install opencode-auto` has no opencode `auth.json`, so opencode exits
+in seconds with zero tokens; and `run.sh` copies the history, builds the index
+and pins the MCP env only for the arm named `deja`, so a second deja build under
+another name needs its own fixture directory.

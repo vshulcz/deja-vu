@@ -17,8 +17,8 @@
 <p align="center"><b>deja 一开始就是满的：34 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <p align="center">
-同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
-<sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；同一台架的后续一次运行为 71% &middot;
+同一台机器已经做过的任务，<b>少花 58–80% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+<sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：24,068 对比 119,461 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
 两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
