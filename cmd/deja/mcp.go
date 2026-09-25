@@ -1377,7 +1377,11 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 			if id.note != "" {
 				note = id.note + "\n"
 			}
-			return note + text, 1, id.size, []string{id.session}, nil, nil
+			// A deep read, not a page: it gets recall_context's room and cut
+			// marker on top of what the caller reserved. It used to return
+			// before any budget applied, up to 3653 bytes over (#4023).
+			text = fitContextDigest(note+text, q, budget+contextMCPBudget-recallMCPBudget)
+			return text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
 	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveSessionIDs(dir)}
