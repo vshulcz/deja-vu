@@ -39,10 +39,11 @@ func compactionUsageKey(s index.CompactionState) usage.CompactionKey {
 }
 
 // captureCompaction reads only the transcript named by the host. It never
-// guesses another session or waits for a history rebuild on the hook path.
-func captureCompaction(dir string, input precompactHookInput) {
+// guesses another session or waits for a history rebuild on the hook path. It
+// returns the state this compaction stored, and false when it stored none.
+func captureCompaction(dir string, input precompactHookInput) (index.CompactionState, bool) {
 	if input.SessionID == "" {
-		return
+		return index.CompactionState{}, false
 	}
 	workspace := compactionWorkspace(hookProjectPath(input.CWD, input.WorkspaceRoots))
 	blockOldPacket := func() {
@@ -51,7 +52,7 @@ func captureCompaction(dir string, input precompactHookInput) {
 	pol := policy.Load()
 	if recallIsOff() || workspace == "" || !pol.Allows(policy.ActivationAuto, workspace) || pol.Ignored(input.TranscriptPath, workspace) {
 		blockOldPacket()
-		return
+		return index.CompactionState{}, false
 	}
 	failure := func(reason string) {
 		// Precompact cleared delivery marks before this attempt. Preserve a
@@ -64,22 +65,30 @@ func captureCompaction(dir string, input precompactHookInput) {
 	}
 	if input.TranscriptPath == "" {
 		failure("missing_transcript")
-		return
+		return index.CompactionState{}, false
 	}
 	now := time.Now().UTC()
 	transcript, err := sources.ReadCompactionTranscript(input.TranscriptPath, input.SessionID)
 	if err != nil {
 		failure("transcript_unavailable")
-		return
+		return index.CompactionState{}, false
 	}
 	if transcript.Workspace == "" || compactionWorkspace(transcript.Workspace) != workspace {
 		failure("workspace_mismatch")
-		return
+		return index.CompactionState{}, false
 	}
 	data := digest.ExtractCompactionContext(transcript.Session, digest.ExtractOptions{})
 	withCommandOutcomes(&data, transcript.Session)
 	data.Truncated = data.Truncated || transcript.Truncated
 	data.Freshness = compactionFreshness(workspace)
+	// The list the last compaction of this session left, so what it held
+	// stays until this segment closes it. The stored state is replaced below,
+	// which is what makes each line's age count compactions.
+	var prev []model.ContextCarry
+	if last, found, err := index.Compaction(dir, input.SessionID, workspace); err == nil && found {
+		prev = last.Data.Carry
+	}
+	data.Carry = digest.ExtractCarry(transcript.Session.Messages, prev)
 	saved, err := index.PutCompaction(dir, index.CompactionState{
 		SessionID: input.SessionID, Harness: transcript.Harness, Workspace: workspace,
 		Project: transcript.Session.Project, TranscriptPath: transcript.Path,
@@ -90,7 +99,7 @@ func captureCompaction(dir string, input precompactHookInput) {
 	})
 	if err != nil {
 		failure("storage_unavailable")
-		return
+		return index.CompactionState{}, false
 	}
 	if saved.CapturedAt.Equal(now) {
 		capture := usage.CompactionCapture{Key: compactionUsageKey(saved), ToolCalls: len(transcript.ToolCalls)}
@@ -99,6 +108,7 @@ func captureCompaction(dir string, input precompactHookInput) {
 		}
 		usage.RecordCompactionCapture(dir, capture)
 	}
+	return saved, true
 }
 
 // withCommandOutcomes says how each recorded command went.

@@ -58,5 +58,20 @@ type CompactionContext struct {
 	Conflicts   []ContextOpenItem   `json:"conflicts,omitempty"`
 	Sources     []ContextRef        `json:"sources,omitempty"`
 	Freshness   RepositoryFreshness `json:"freshness,omitempty"`
+	Carry       []ContextCarry      `json:"carry,omitempty"`
 	Truncated   bool                `json:"truncated,omitempty"`
+}
+
+// ContextCarry is one line of the "keep until closed" list: something the
+// transcript left open that a host summary tends to drop, carried from one
+// compaction to the next until the transcript closes it. Kind is "awaiting"
+// (a question to the user), "open" (a #N not yet merged or closed), "verdict"
+// (a hypothesis settled) or "recheck" (a check deferred to later). Key is the
+// "#N" list for open items and the normalized text otherwise; Age counts the
+// compactions the line has been carried through.
+type ContextCarry struct {
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+	Key  string `json:"key,omitempty"`
+	Age  int    `json:"age,omitempty"`
 }

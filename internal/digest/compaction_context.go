@@ -490,6 +490,12 @@ func RedactCompactionContext(c model.CompactionContext) model.CompactionContext 
 	c.Gaps = append([]model.ContextOpenItem(nil), c.Gaps...)
 	c.Conflicts = append([]model.ContextOpenItem(nil), c.Conflicts...)
 	c.Sources = append([]model.ContextRef(nil), c.Sources...)
+	c.Carry = append([]model.ContextCarry(nil), c.Carry...)
+	for i := range c.Carry {
+		c.Carry[i].Text = limitContextText(redactContextText(c.Carry[i].Text), carryTextBytes)
+		c.Carry[i].Key = limitContextText(redactContextText(c.Carry[i].Key), carryTextBytes)
+		c.Carry[i].Kind = limitContextText(c.Carry[i].Kind, 16)
+	}
 	c.Objective.Text = limitContextText(redactContextText(c.Objective.Text), contextObjectiveBytes)
 	c.Objective.Provenance = redactContextRef(c.Objective.Provenance)
 	for i := range c.Conclusions {
@@ -583,6 +589,11 @@ func boundCompactionContext(c model.CompactionContext) model.CompactionContext {
 			c.Conflicts = c.Conflicts[:len(c.Conflicts)-1]
 		case len(c.Objective.Text) > len(cutMark)+8:
 			c.Objective.Text = limitContextText(c.Objective.Text, len(c.Objective.Text)/2)
+		// The carried list goes last. It is at most twelve lines, and it holds
+		// what the host summary drops: 75% of the still-open #N items the
+		// summaries lost on 189 compactions were on it.
+		case len(c.Carry) > 0:
+			c.Carry = c.Carry[:len(c.Carry)-1]
 		default:
 			return c
 		}
@@ -625,6 +636,9 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 	}
 	add("Compaction context from normalized transcript records. Conclusions and open items are recorded claims, not independently verified.\n")
 	add(renderFreshness(c.Freshness))
+	// Ahead of the objective because the budget cuts from the bottom, and this
+	// is the part the host's own summary does not carry.
+	addCarrySection(&b, &omittedAny, limit, c.Carry)
 	if c.Objective.Text != "" {
 		add("\nObjective\n- " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
 	}
