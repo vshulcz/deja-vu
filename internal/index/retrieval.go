@@ -429,7 +429,32 @@ func withRelevanceTail(dir string, m Manifest, o query.Options, res SearchResult
 	// sessions hold every word — which is what both the CLI sentence and the
 	// agent-facing lead went on to claim (#3815).
 	out.Strict, out.StrictIDs = len(ss), seen
+	// Except where the AND it came from was not the query. A word the ladder
+	// dropped because no session matches it with the rest is a word nothing
+	// here holds, so "holds every word of the query" is false for every one
+	// of these sessions — and it is the strongest thing any surface says.
+	// Measured on this store: eight invented subjects, all eight answered
+	// with a strict count of 1 to 5 and three or four sessions tagged as
+	// holding the whole question, directly under a line saying the subject
+	// was ignored.
+	if droppedAWord(out.Variants) {
+		out.Strict, out.StrictIDs = 0, nil
+	}
 	return out, nil
+}
+
+// droppedAWord reports that the word-form ladder gave up on one of the query's
+// words: an empty variant is how it records "no session matches it with the
+// rest of the query".
+func droppedAWord(variants map[string][]string) bool {
+	for _, forms := range variants {
+		for _, f := range forms {
+			if f == "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // RelevanceTerms extracts the rankable tokens of a natural-language query:

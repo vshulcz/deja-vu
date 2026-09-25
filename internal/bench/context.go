@@ -142,3 +142,62 @@ func fillerText(rng *rand.Rand, lead string) string {
 	}
 	return b.String()
 }
+
+// ContextMarathonCount is how many chains the marathon corpus holds. Ten is
+// enough for a median to mean something and cheap enough to index beside the
+// corpus it is derived from.
+const ContextMarathonCount = 10
+
+// GenerateContextMarathon is the same corpus, re-filed. Every prior session of
+// a chain is folded into one long session, so the chain's eight facts sit
+// inside a single session that matches the query hundreds of times instead of
+// across fourteen that match it once each. The content is identical; only the
+// partitioning changes, which is what makes a coverage difference between the
+// two corpora attributable to choosing excerpts inside a session rather than
+// to ranking sessions against each other.
+//
+// Why it exists: on this machine's own store every recall page's deepest hit
+// matched between 24 and 23,278 times, and three excerpts is all a hit may
+// quote of it. No bench corpus had a session of that shape, so the whole class
+// was invisible to `deja bench` — the marathon arm of the prompt bench is the
+// only place a long session appears at all, and it measures ranking, not what
+// the page carries.
+func GenerateContextMarathon(seed int64) ContextCorpus {
+	base := GenerateContext(seed)
+	chains := make([]ContextChain, 0, ContextMarathonCount)
+	for _, chain := range base.Chains {
+		if chain.Negative || len(chains) >= ContextMarathonCount {
+			continue
+		}
+		chains = append(chains, foldChain(chain))
+	}
+	b, _ := json.Marshal(chains)
+	h := sha256.Sum256(b)
+	return ContextCorpus{Chains: chains, Hash: hex.EncodeToString(h[:])}
+}
+
+// foldChain merges a chain's prior sessions into one, keeping the task session
+// apart: the task is what the agent arrives with, not part of the history it
+// searches.
+func foldChain(chain ContextChain) ContextChain {
+	out := chain
+	out.Sessions = nil
+	if len(chain.Sessions) == 0 {
+		return out
+	}
+	priors := chain.Sessions[:len(chain.Sessions)-1]
+	task := chain.Sessions[len(chain.Sessions)-1]
+	if len(priors) == 0 {
+		out.Sessions = []model.Session{task}
+		return out
+	}
+	folded := model.Session{
+		ID: chain.ID + "-marathon", Harness: priors[0].Harness, Project: priors[0].Project,
+		Started: priors[0].Started, Updated: priors[len(priors)-1].Updated,
+	}
+	for _, s := range priors {
+		folded.Messages = append(folded.Messages, s.Messages...)
+	}
+	out.Sessions = []model.Session{folded, task}
+	return out
+}

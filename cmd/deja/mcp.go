@@ -342,15 +342,23 @@ func declaredModes() []string {
 // names are the same strings, which is why a client with them wired keeps
 // working.
 var dispatcherModes = map[string]string{
-	"recall":   "recall",
-	"search":   "recall",
-	"context":  "recall_context",
-	"digest":   "recall_context",
-	"blame":    "blame",
-	"fix":      "fix",
-	"how":      "how",
-	"orient":   "orient",
-	"remember": "remember",
+	"recall":  "recall",
+	"search":  "recall",
+	"context": "recall_context",
+	"digest":  "recall_context",
+	// Because deja tells agents to call it by this name. Every surface that
+	// names the deep read — the session-start lead, the wide-recall lead, the
+	// antigravity lead, the compaction lead, the trimmed-digest note, the
+	// blame overflow note — says "call recall_context", and on the one-tool
+	// clients that is the shape they get, where the dispatcher answered
+	// `mode "recall_context" is not one of recall, context, blame, ...`. An
+	// agent following deja's own instruction spent a call on an error.
+	"recall_context": "recall_context",
+	"blame":          "blame",
+	"fix":            "fix",
+	"how":            "how",
+	"orient":         "orient",
+	"remember":       "remember",
 }
 
 // qField is the argument each mode reads its subject from. One declared `q`
@@ -358,20 +366,25 @@ var dispatcherModes = map[string]string{
 // the description does, and the model still has to pick the right one after
 // picking the mode. The old names keep working — they are accepted here and
 // simply not listed, the same way the pre-#1298 tool names still answer.
+// Keyed by the call a mode resolves to, not by the mode: keyed by mode, every
+// alias needed its own row and two of them never got one. `search` and
+// `digest` were accepted by the dispatcher and then answered "query required",
+// because the field to copy q into was looked up under a name only the
+// canonical modes had.
 var qField = map[string]string{
-	"recall":   "query",
-	"context":  "query",
-	"blame":    "path",
-	"fix":      "error",
-	"how":      "what",
-	"orient":   "",
-	"remember": "text",
+	"recall":         "query",
+	"recall_context": "query",
+	"blame":          "path",
+	"fix":            "error",
+	"how":            "what",
+	"orient":         "",
+	"remember":       "text",
 }
 
 // spreadQ copies q into the field the mode reads, unless the caller already
 // named that field itself.
 func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
-	field, ok := qField[mode]
+	field, ok := qField[dispatcherModes[mode]]
 	if !ok || field == "" {
 		return raw
 	}
@@ -1465,6 +1478,17 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 	// that dropping the subject leaves an answer about the rest of the
 	// sentence, which is the shape #657 measured on twenty invented subjects.
 	absent := namedSomethingAbsent(result.Variants)
+	// The strict head is already gone when a word was dropped — nothing holds
+	// every word of a query the search could not match in full. The reading of
+	// the first hit goes the same way: the word that identified the question
+	// is the one that was dropped, so this page does not name what was asked.
+	if absent {
+		namesTheAsked = false
+	}
+	// Whether the line below the tier already said nothing is about this, so
+	// the absent-word case can say it from wherever the chain stopped without
+	// saying it twice.
+	saidNothing := false
 	if result.Stemmed {
 		fmt.Fprintf(&b, "No exact match; using word forms: %s\n", strings.Join(fuzzySummary(result.Variants), ", "))
 	} else if result.Fuzzy {
@@ -1508,9 +1532,10 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 			fmt.Fprintln(&b, "No exact match; the sessions below are ranked by relevance — check that one describes what is happening now before acting on it.")
 		} else {
 			fmt.Fprintln(&b, nothingIsAboutThis+" so the sessions below are the nearest by wording — treat them as leads to check, not as a record, and say plainly if none of them answers.")
+			saidNothing = true
 		}
 	}
-	if absent && result.Tier != search.TierRelevance {
+	if absent && !saidNothing {
 		// The tier below relevance already says which word it dropped; this
 		// says what dropping it means, in the words the relevance tier uses
 		// for the same situation.
@@ -1963,7 +1988,12 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	search.PrintContext(&b, whole, q)
 	text := b.String() + contextOthersNote(len(hits))
 	if hits[0].Tier != search.TierExact {
-		text = contextTierLead(hits[0].Tier, hits[0].Strict, sessionNamesTheAsked(whole, q, result.TermIDF)) +
+		// The words below say which one was dropped, and a session matched
+		// without it does not name what was asked either — the dropped word
+		// is the one that identified the question.
+		names := !namedSomethingAbsent(result.Variants) &&
+			sessionNamesTheAsked(whole, q, result.TermIDF)
+		text = contextTierLead(hits[0].Tier, hits[0].Strict, names) +
 			contextIgnoredWords(result) + text
 	}
 	return text, 1, rawSize([]model.Session{whole}), []string{whole.ID}, projectsOf(whole),
