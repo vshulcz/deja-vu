@@ -762,7 +762,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		if !sigs[p.Sig] {
 			continue
 		}
-		if remedyIsTheFailure(p) {
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
 			continue
 		}
 		// One session doing something after an error is not evidence that it
@@ -823,6 +823,85 @@ func remedyIsTheFailure(p FixPair) bool {
 		return false
 	}
 	return normalizeCommand(p.Failed) == normalizeCommand(p.Command)
+}
+
+// remedyIsIrreversible drops a pair whose remedy cannot be taken back: a merge,
+// a deleted branch, a force push, a hard reset, a dropped stash, a recursive
+// delete, a change to a cluster. What a session did next after an error is
+// often just the next step of its own work, and when that step is one of these
+// it gets handed to an agent at the moment it is stuck. Over 396 real hints, 27
+// were such commands and 24 of them had nothing to do with the error.
+func remedyIsIrreversible(cmd string) bool {
+	for _, seg := range strings.FieldsFunc(normalizeCommand(cmd), func(r rune) bool {
+		return r == ';' || r == '|' || r == '&' || r == '\n'
+	}) {
+		w := strings.Fields(seg)
+		has := func(words ...string) bool {
+			for _, x := range words {
+				for _, y := range w {
+					if y == x {
+						return true
+					}
+				}
+			}
+			return false
+		}
+		for len(w) > 0 && (strings.Contains(w[0], "=") || w[0] == "rtk" || w[0] == "sudo") {
+			w = w[1:]
+		}
+		if len(w) < 2 {
+			continue
+		}
+		sub := ""
+		for _, y := range w[1:] {
+			if !strings.HasPrefix(y, "-") {
+				sub = y
+				break
+			}
+		}
+		switch w[0] {
+		case "git":
+			switch sub {
+			case "push":
+				if has("--delete", "-d", "--force", "-f", "--force-with-lease", "--mirror") {
+					return true
+				}
+			case "branch":
+				if has("-D", "-d", "--delete") {
+					return true
+				}
+			case "reset":
+				if has("--hard") {
+					return true
+				}
+			case "stash":
+				if has("drop", "clear") {
+					return true
+				}
+			case "clean":
+				return true
+			}
+		case "gh":
+			if has("merge", "delete", "--admin", "--delete-branch") {
+				return true
+			}
+		case "rm":
+			if has("-rf", "-fr", "-r", "-R", "--recursive") {
+				return true
+			}
+		case "kubectl", "helm":
+			if has("delete", "apply", "patch", "scale", "drain", "rollout", "uninstall", "upgrade", "install") {
+				return true
+			}
+			// Anything at all against a production namespace.
+			for _, y := range w {
+				if strings.Contains(y, "prod") {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // FixCandidateSeen reports whether deja is holding an unconfirmed sighting for
