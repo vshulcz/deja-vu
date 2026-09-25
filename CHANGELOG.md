@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- On the one-tool MCP shape, `mode: "search"` and `mode: "digest"` were accepted and then answered "query required", and `mode: "recall_context"` — the name every block deja injects tells an agent to call — was rejected outright. The field that carries `q` is now keyed by the call a mode resolves to rather than by the mode, so all ten modes answer. An agent following deja's own instruction was spending a call on an error.
+
 ### Changed
 - Blocks after a session's first no longer carry the "matched on wording, not meaning" caution. It was there so a wording match would not be taken for an answer, and measured against that on a local 9B over 40 cases where the recalled history is about a sibling subject and holds a value nothing else does: quoted unhedged as the answer 12 times of 40 with the line, 10 of 40 without it. Dropping it takes 100 tokens off a session over real prompts, with the payload byte-identical. The untrusted-data frame stays on every block — dropping its sentence doubled how often a directive planted in recalled text was obeyed, 8/48 against 19/48.
 - Every surface that tells an agent when to recall — the MCP instructions, the guidance block, both skills and the Hermes provider — now names two triggers that are not questions: the user stating that something of theirs already exists ("I already have X", "we use Y for this"), and the agent being about to say that something on this machine does not exist (#4004, #4005). The trigger lists were all questions, so a statement matched none of them. Cost is 66 tokens in the guidance block and 67 in the MCP instructions; the longer version lives in the skills, which load only when they are used.
