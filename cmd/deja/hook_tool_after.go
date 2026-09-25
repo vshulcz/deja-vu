@@ -133,7 +133,14 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 	// `Output: ./main.go:9:2: …` and hashes to a signature no session recorded.
 	// Output without the frame comes back untouched.
 	out = unwrapGeminiShellOutput(out)
-	line := fixPairLine(dir, out)
+	// Out of the raw bytes for a cut payload, the way the tool name is: the
+	// line keeps to the project it names, and the harness sends cwd ahead of
+	// the output.
+	cwd := input.CWD
+	if cwd == "" && truncated {
+		cwd, _ = jsonStringAfter(after(string(raw), `"cwd"`))
+	}
+	line := fixPairLine(dir, hookCWD(cwd), out)
 	if line == "" {
 		return nil
 	}
@@ -424,12 +431,20 @@ func clampOutput(s string) string {
 
 // fixPairLine is the one line the failure gets: the error this machine saw
 // before and the command that followed it without the error coming back.
-func fixPairLine(dir, output string) string {
+func fixPairLine(dir, cwd, output string) string {
 	pol := policy.Load()
+	// A pair that names another project is what that project ran next, and
+	// that is almost never about this failure: over 396 hints on one machine,
+	// 2 of 67 from another project addressed the error and 59 had nothing to
+	// do with it, against 109 of 324 from the project itself. A pair with no
+	// project is a machine fact and stays.
+	others := func(project string) bool {
+		return cwd != "" && project != "" && !hookProjectIs(cwd, project)
+	}
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
 	pairs := index.FixesFor(dir, output, 4, func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project)
+		return pol.Allows(policy.ActivationAuto, project) && !others(project)
 	})
 	for _, p := range pairs {
 		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {

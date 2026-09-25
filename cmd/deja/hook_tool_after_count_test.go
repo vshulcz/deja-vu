@@ -54,7 +54,7 @@ func TestTheAfterHookSaysHowOftenTheErrorCameUp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	line := fixPairLine(dir, wall)
+	line := fixPairLine(dir, "", wall)
 	if line == "" {
 		t.Fatalf("the fixture found no fix pair for the wall")
 	}
