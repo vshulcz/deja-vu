@@ -342,15 +342,23 @@ func declaredModes() []string {
 // names are the same strings, which is why a client with them wired keeps
 // working.
 var dispatcherModes = map[string]string{
-	"recall":   "recall",
-	"search":   "recall",
-	"context":  "recall_context",
-	"digest":   "recall_context",
-	"blame":    "blame",
-	"fix":      "fix",
-	"how":      "how",
-	"orient":   "orient",
-	"remember": "remember",
+	"recall":  "recall",
+	"search":  "recall",
+	"context": "recall_context",
+	"digest":  "recall_context",
+	// Because deja tells agents to call it by this name. Every surface that
+	// names the deep read — the session-start lead, the wide-recall lead, the
+	// antigravity lead, the compaction lead, the trimmed-digest note, the
+	// blame overflow note — says "call recall_context", and on the one-tool
+	// clients that is the shape they get, where the dispatcher answered
+	// `mode "recall_context" is not one of recall, context, blame, ...`. An
+	// agent following deja's own instruction spent a call on an error.
+	"recall_context": "recall_context",
+	"blame":          "blame",
+	"fix":            "fix",
+	"how":            "how",
+	"orient":         "orient",
+	"remember":       "remember",
 }
 
 // qField is the argument each mode reads its subject from. One declared `q`
@@ -358,20 +366,25 @@ var dispatcherModes = map[string]string{
 // the description does, and the model still has to pick the right one after
 // picking the mode. The old names keep working — they are accepted here and
 // simply not listed, the same way the pre-#1298 tool names still answer.
+// Keyed by the call a mode resolves to, not by the mode: keyed by mode, every
+// alias needed its own row and two of them never got one. `search` and
+// `digest` were accepted by the dispatcher and then answered "query required",
+// because the field to copy q into was looked up under a name only the
+// canonical modes had.
 var qField = map[string]string{
-	"recall":   "query",
-	"context":  "query",
-	"blame":    "path",
-	"fix":      "error",
-	"how":      "what",
-	"orient":   "",
-	"remember": "text",
+	"recall":         "query",
+	"recall_context": "query",
+	"blame":          "path",
+	"fix":            "error",
+	"how":            "what",
+	"orient":         "",
+	"remember":       "text",
 }
 
 // spreadQ copies q into the field the mode reads, unless the caller already
 // named that field itself.
 func spreadQ(mode string, raw json.RawMessage) json.RawMessage {
-	field, ok := qField[mode]
+	field, ok := qField[dispatcherModes[mode]]
 	if !ok || field == "" {
 		return raw
 	}
