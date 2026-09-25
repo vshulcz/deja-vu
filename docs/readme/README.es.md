@@ -18,8 +18,8 @@ en disco, y devuelve la que corresponde a cualquiera de ellos que pregunte.</p>
 <p align="center"><b>deja está llena desde el primer minuto: el historial que 34 agentes ya escribieron, indexado en segundos, sin modelo y sin un paso aparte de captura.</b></p>
 
 <p align="center">
-<b>58–80% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
-<sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 24,068 frente a 119,461 en una versión posterior, otra vez once ejecuciones &middot;
+<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
+<sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 52,815 frente a 103,443 en una versión posterior, otra vez once ejecuciones &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">lo que cuesta terminar una tarea</a> &middot;
 los dos harnesses de recuperación están en este repositorio y corren sobre datasets públicos en minutos &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">comprueba los números tú mismo</a></sub>

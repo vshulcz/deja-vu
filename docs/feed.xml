@@ -18,6 +18,13 @@
     <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
   </entry>
   <entry>
+    <title>What each memory tool knows the day you install it — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
+    <updated>2026-09-25T00:00:00Z</updated>
+    <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
+  </entry>
+  <entry>
     <title>deja-vu — the one memory your coding agents share</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
@@ -44,13 +51,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/credentials-in-transcripts.html"></link>
     <updated>2026-09-24T00:00:00Z</updated>
     <summary>Agents write every command output to plaintext transcripts. One machine held 84 credentials in 42 sessions. How to find yours, and what to do about them.</summary>
-  </entry>
-  <entry>
-    <title>What each memory tool knows the day you install it — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
-    <updated>2026-09-24T00:00:00Z</updated>
-    <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
   <entry>
     <title>Does Claude Code remember previous conversations? — deja-vu</title>

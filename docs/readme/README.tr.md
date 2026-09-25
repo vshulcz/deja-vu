@@ -18,8 +18,8 @@ oturumları indeksler ve soran hangisiyse ona doğru olanı geri verir.</p>
 <p align="center"><b>deja ilk dakikadan itibaren dolu: 34 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
 
 <p align="center">
-Bu makinenin daha önce çözdüğü bir işte <b>%58–80 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
-<sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 119,461'e karşı 24,068 &middot;
+Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
+<sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 103,443'e karşı 52,815 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">bir işi bitirmenin maliyeti</a> &middot;
 her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerinde dakikalar içinde koşuyor &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">sayıları kendiniz doğrulayın</a></sub>

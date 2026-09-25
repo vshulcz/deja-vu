@@ -33,15 +33,19 @@ arm, all solved:
     agentmemory 0.9.29             15.9         104,974    70s
     deja                            9.8          53,558    45s
 
-Run again on deja main at 54f6f6ab, eleven runs an arm, same model; one deja
-run of the eleven stopped without running the test and is counted:
+Run again on deja main at 54f6f6ab, eleven runs an arm, same model, the two
+arms alternating run by run, all solved:
 
     arm                      tool calls   median tokens   wall
-    nothing wired                  18.2         119,461    61s
-    deja                            6.0          24,068    36s
+    nothing wired                  17.8         103,443    62s
+    deja                            7.1          52,815    43s
 
 The numbers move with the model and the harness; what the stand is for is the
-gap between arms on one machine in one window, not the absolute figures.
+gap between arms on one machine in one window, not the absolute figures. The
+window is shorter than it looks: the same arm's median moved between 24k and
+44k from one hour to the next on the same afternoon, and a sequential pair
+(all of one arm, then all of the other) came out at 80% off where the
+alternating one says 49%. Alternate the arms.
 
 Two things that make an arm measure nothing, both silent: a home created fresh
 by `deja install opencode-auto` has no opencode `auth.json`, so opencode exits
