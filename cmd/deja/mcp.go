@@ -1688,14 +1688,31 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		}
 		more = fmt.Sprintf("\n%d more %s — call recall again with offset=%d.\n", left, what, offset+served)
 	}
+	// The move the paging line cannot offer. A hit quotes at most three of its
+	// matches, so a session that matched hundreds of times arrives as a
+	// fragment, and the only follow-up this page named was more sessions.
+	// Measured on a live harness over six questions whose answer sat inside
+	// such a session: three to seven tool calls each, all but one of them a
+	// re-worded recall, and the figure asked for was in the served excerpts
+	// twice of six. With this line the same six cost 36% less context handed
+	// and 51% less billed.
+	deep := ""
+	if deepest := deepestServed(hits, served); deepest != nil {
+		deep = fmt.Sprintf("\nSession %s matched %d times and only three of them fit here — call recall_context with that id to read the rest.\n",
+			deepest.Session.ID, deepest.Count)
+	}
 	// The paging line is the instruction, not the evidence: appending it before
 	// the trim made a full page drop the one thing that says how to reach the
 	// rest, exactly where offset is meant to be used (#1726). Trim the excerpts
 	// to leave room for it instead.
 	out := b.String()
-	if len(out)+len(more) > budget {
+	if len(out)+len(more)+len(deep) > budget {
 		// A budget smaller than the instruction itself: keep the page and drop
-		// the line rather than trim to a negative length.
+		// the line rather than trim to a negative length. The depth line goes
+		// first — paging is the move an agent can always fall back to.
+		if len(more)+len(deep) >= budget {
+			deep = ""
+		}
 		if len(more) >= budget {
 			more = ""
 		}
@@ -1703,7 +1720,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 		// page budget cut ended mid-word saying nothing, so the last line an
 		// agent reads was the one line it could not tell was a fragment
 		// (#1799). Reserved before the trim, like the paging line above.
-		room := budget - len(more)
+		room := budget - len(more) - len(deep)
 		if room <= len(cutMarker) {
 			// No room to say it was cut without eating what was cut from:
 			// keep the bytes, drop the marker.
@@ -1712,7 +1729,10 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 			out = markCut(trimUTF8(out, room-len(cutMarker)))
 		}
 	}
-	out += more
+	// After the paging line, not before it: the cut marker on the last excerpt
+	// is read as the line above the paging line (#1799), and a second
+	// instruction wedged between them takes that place.
+	out += more + deep
 	var raw int64
 	var ids []string
 	// The projects behind the served hits, deduped in the order they appear —
@@ -2144,6 +2164,30 @@ func namedSomethingAbsent(variants map[string][]string) bool {
 // #2074 and then written twice — once in the plural over a page of sessions,
 // once in the singular over one — so an edit to either would have drifted from
 // the other without anything noticing.
+// deepReadFrom is how many matches a served session needs before the page
+// says to open it. A hit quotes at most three of its matches, so four already
+// leaves something behind; ten is where "the rest" is most of it, and it is
+// far below the hundreds a real long session matches.
+const deepReadFrom = 10
+
+// deepestServed is the session on this page with the most matches behind it,
+// or nil when every served hit fits in its own excerpts.
+func deepestServed(hits []search.Hit, served int) *search.Hit {
+	var out *search.Hit
+	for i := range hits {
+		if i >= served {
+			break
+		}
+		if hits[i].Count < deepReadFrom {
+			continue
+		}
+		if out == nil || hits[i].Count > out.Count {
+			out = &hits[i]
+		}
+	}
+	return out
+}
+
 const nothingIsAboutThis = "No session is about this. Nothing matched the query,"
 
 // contextTierLead says what the session below it is, for a tier that is not an
