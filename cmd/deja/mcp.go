@@ -2160,10 +2160,6 @@ func namedSomethingAbsent(variants map[string][]string) bool {
 	return false
 }
 
-// nothingIsAboutThis is the half both surfaces share. The wording was tuned in
-// #2074 and then written twice — once in the plural over a page of sessions,
-// once in the singular over one — so an edit to either would have drifted from
-// the other without anything noticing.
 // deepReadFrom is how many matches a served session needs before the page
 // says to open it. A hit quotes at most three of its matches, so four already
 // leaves something behind; ten is where "the rest" is most of it, and it is
@@ -2188,6 +2184,10 @@ func deepestServed(hits []search.Hit, served int) *search.Hit {
 	return out
 }
 
+// nothingIsAboutThis is the half both surfaces share. The wording was tuned in
+// #2074 and then written twice — once in the plural over a page of sessions,
+// once in the singular over one — so an edit to either would have drifted from
+// the other without anything noticing.
 const nothingIsAboutThis = "No session is about this. Nothing matched the query,"
 
 // contextTierLead says what the session below it is, for a tier that is not an
