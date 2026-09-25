@@ -1171,6 +1171,42 @@ func quotesDeja(low string) bool {
 	return false
 }
 
+// withoutDejaLines drops the lines of a message that quote deja — the credit
+// line, a recall echoed back — and keeps the rest, which is the agent's own
+// work. An answer that is all echo comes back empty.
+func withoutDejaLines(text string) string {
+	if !quotesDeja(strings.ToLower(text)) {
+		return text
+	}
+	var kept []string
+	for _, line := range strings.Split(text, "\n") {
+		if !quotesDeja(strings.ToLower(line)) {
+			kept = append(kept, line)
+		}
+	}
+	return strings.TrimSpace(strings.Join(kept, "\n"))
+}
+
+// acknowledgements are replies that close a turn without saying anything a
+// later session could use.
+var acknowledgements = map[string]bool{
+	"ok": true, "okay": true, "done": true, "ready": true, "yes": true, "no": true,
+	"none": true, "sure": true, "got it": true, "ping": true, "pong": true,
+	"no response requested": true, "review complete": true,
+	"ок": true, "да": true, "нет": true, "готово": true, "понял": true, "принято": true,
+}
+
+func acknowledgement(text string) bool {
+	t := strings.ToLower(strings.TrimSpace(text))
+	if len(t) > 40 {
+		return false
+	}
+	t = strings.TrimSpace(strings.TrimFunc(t, func(r rune) bool {
+		return strings.ContainsRune(".!,:;*`'\"", r)
+	}))
+	return acknowledgements[t]
+}
+
 // marksLine reports whether a marker fires on a line, which it does only where
 // it begins a word.
 //
@@ -1268,6 +1304,14 @@ func Conclusions(s model.Session, budget int, max int) []string {
 	var assistants []model.Message
 	for _, m := range s.Messages {
 		if m.Role != "assistant" || noisyMessage(m.Text) || IsAgentArtifact(m.Text) {
+			continue
+		}
+		// The last message is a candidate whatever it says, so these had to go
+		// before selection rather than in it: on a 2,285-session store 132
+		// served conclusions were deja's own recall echoed back and 104 were
+		// "ok", "done" and the like.
+		m.Text = withoutDejaLines(m.Text)
+		if m.Text == "" || acknowledgement(m.Text) {
 			continue
 		}
 		assistants = append(assistants, m)
