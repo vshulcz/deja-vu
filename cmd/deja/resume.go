@@ -109,6 +109,10 @@ var resumeIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // metacharacters into a printed command.
 var openclawKeyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]*$`)
 
+// reasonixPathPattern is a transcript path that can go on a command line as
+// one unquoted argument: no whitespace, quotes or shell metacharacters.
+var reasonixPathPattern = regexp.MustCompile(`^[A-Za-z0-9/\\:._~+-]+$`)
+
 // Crush names its sessions with a uuid. Nothing else goes on a command line.
 var crushSessionID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -247,6 +251,18 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// in. `--session-id` is the alias of `--resume` on both the TUI and
 		// `codewhale exec` (verified against 0.9.13's own --help).
 		return s.Project, "codewhale --resume " + s.ID, nil
+	case "reasonix":
+		// `--resume` looks an id up in the store of the workspace it runs in
+		// (the git root of the working directory), so it goes with that
+		// workspace. It also takes a file path, which is the only way back to
+		// a session saved with no workspace (internal/frontend/cli/cli_flags.go).
+		if ws := sources.ReasonixWorkspace(s.Path); ws != "" {
+			return ws, "reasonix --resume " + s.ID, nil
+		}
+		if !reasonixPathPattern.MatchString(s.Path) {
+			return "", "", fmt.Errorf("session %s has no workspace and its path holds characters deja will not place in a command — run reasonix --resume with the file %s", digest.Short(s.ID), s.Path)
+		}
+		return "", "reasonix --resume " + s.Path, nil
 	case "qwen":
 		return qwenProjectDirFor(s), "qwen -r " + s.ID, nil
 	case "openclaw":

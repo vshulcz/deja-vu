@@ -129,7 +129,7 @@ It is an environment variable rather than a flag because hooks and the MCP
 server are started by somebody else's process, and there is no command line of
 yours to put a flag on.
 
-The recipe before this was a loop over the 45 `DEJA_*_ROOT`/`_DB` names
+The recipe before this was a loop over the 46 `DEJA_*_ROOT`/`_DB` names
 in the published registry, and it leaked twice: the notes store is not in that
 registry, because it is not a harness, so the loop left it pointing at the
 developer's own notes — and `deja doctor --json` is no help either, since its

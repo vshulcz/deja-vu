@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Reasonix stores its history — session format</title>
+<meta name="description" content="Where Reasonix writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/reasonix.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Reasonix stores its history — session format">
+<meta property="og:description" content="Where Reasonix writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/reasonix.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Reasonix stores its history — session format">
+<meta name="twitter:description" content="Where Reasonix writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Reasonix writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Reasonix","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/reasonix.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/reasonix.html","name":"Reasonix","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html" aria-current="page">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Reasonix</h1>
+<ul>
+<li><strong>ID</strong>: <code>reasonix</code></li>
+<li><strong>Store</strong>: <code>&lt;state&gt;/projects/&lt;workspace-slug&gt;/sessions/&lt;id&gt;.jsonl</code> per workspace, and <code>&lt;state&gt;/sessions/&lt;id&gt;.jsonl</code> for sessions with none</li>
+<li><strong>State root</strong>: <code>$REASONIX_STATE_HOME</code>, else <code>$REASONIX_HOME</code>, else a <code>[storage] state</code> entry in <code>&lt;home&gt;/config.toml</code>, else <code>~/.reasonix</code> on macOS and Linux and <code>%APPDATA%\reasonix</code> on Windows</li>
+<li><strong>Store (legacy)</strong>: <code>~/.reasonix</code> on Windows, and the OS config directory (<code>~/Library/Application Support/reasonix</code>, <code>~/.config/reasonix</code>) on macOS and Linux — read while they are on disk, unless <code>REASONIX_HOME</code> or <code>REASONIX_STATE_HOME</code> is set</li>
+<li><strong>Read overrides</strong>: <code>DEJA_REASONIX_ROOT</code> replaces the state root; pointed at a <code>sessions</code> directory it reads that directory alone</li>
+<li><strong>Format</strong>: JSONL — one message per line, no envelope</li>
+<li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a session saved with no workspace is resumed by its file path</li>
+</ul>
+<p>Reasonix is a Go coding agent built around DeepSeek&#39;s prefix cache. The</p>
+<p>layout above comes from its own resolver, <code>internal/contract/config</code></p>
+<p>(<code>storage_roots.go</code>, <code>paths.go</code>); the workspace slug is the absolute path with</p>
+<p>separators and the drive colon turned into dashes, lower-cased on Windows.</p>
+<p>A line is <code>{role, content, …}</code> with <code>role</code> one of <code>system</code>, <code>user</code>,</p>
+<p><code>assistant</code>, <code>tool</code>. <code>content</code> is a string. An assistant turn carries</p>
+<p><code>tool_calls: [{id, name, arguments}]</code>, where <code>arguments</code> is a JSON string; the</p>
+<p>v0.x builds wrote OpenAI&#39;s nested <code>{id, type, function: {name, arguments}}</code></p>
+<p>instead, and both are read. <code>bash</code> becomes a command record, <code>read_file</code>,</p>
+<p><code>write_file</code>, <code>edit_file</code> and <code>multi_edit</code> become file records, and the edits</p>
+<p>keep the replaced span. A <code>tool</code> line is tool output. <code>system</code> lines and user</p>
+<p>lines marked <code>host_authored</code> are dropped: the host wrote them, not the person.</p>
+<p>Where <code>raw_content</code> is set on a user or tool line it is the text before the</p>
+<p>host added context or cut a result for the model, and that is what is indexed.</p>
+<p>Beside each transcript sits <code>&lt;id&gt;.jsonl.meta</code>, which carries <code>created_at</code>,</p>
+<p><code>updated_at</code>, <code>workspace_root</code> and the titles (<code>custom_title</code>, <code>topic_title</code>,</p>
+<p><code>name</code>). The session&#39;s clock and project come from there.</p>
+<p><strong>Last verified:</strong> 2026-09-26</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>Per-message time is partial.</strong> The host stamps <code>createdAt</code> (unix</li>
+</ul>
+<p>milliseconds) on the turns it records; tool results carry none. An unstamped</p>
+<p>line sits one millisecond after the line before it, so two identical turns</p>
+<p>stay two records (#3333).</p>
+<ul>
+<li><strong>v0.x kept the clock elsewhere.</strong> Its <code>&lt;id&gt;.meta.json</code> holds only</li>
+</ul>
+<p><code>workspace</code> and <code>summary</code>, and the timestamps are <code>ts</code> in</p>
+<p><code>&lt;id&gt;.events.jsonl</code>. With neither sidecar present the file&#39;s mtime is used.</p>
+<ul>
+<li><strong>Legacy copies.</strong> Reasonix imports legacy sessions into its current store</li>
+</ul>
+<p>and leaves the originals, so a legacy transcript is read only when the</p>
+<p>current store has no file with its name.</p>
+<ul>
+<li><strong>Sidecars share the directory.</strong> <code>.events.jsonl</code>, <code>.wire.jsonl</code>,</li>
+</ul>
+<p><code>.guardian.jsonl</code>, <code>.conflicts.jsonl</code>, <code>.adjudication.jsonl</code>,</p>
+<p><code>.execution.jsonl</code> and <code>.turns.jsonl</code> end in <code>.jsonl</code> and are not</p>
+<p>transcripts; nor are flat <code>subagent-*.jsonl</code> worker logs or the <code>subagents/</code></p>
+<p>tree. Locks, metadata, context and recovery files sit there too.</p>
+<ul>
+<li><strong>The shapes come from the source, not from a running install.</strong> Everything</li>
+</ul>
+<p>above is read from Reasonix&#39;s own code (<code>internal/state/store/session.go</code>,</p>
+<p><code>internal/state/sessionstore</code>, <code>internal/contract/provider/provider.go</code>) and</p>
+<p>from the transcript sample in #4053. Nothing here has been checked against a</p>
+<p>live Reasonix on this machine.</p>
+<ul>
+<li><strong>Nothing is wired.</strong> deja reads this store and writes nothing into</li>
+</ul>
+<p>Reasonix.</p>
+
+<hr>
+<p>deja reads this format and thirty-four others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

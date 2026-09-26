@@ -30,6 +30,9 @@ func hermeticEnv(t *testing.T) string {
 	// Hermes's own switch moves deja with it (#3203): pinned so a developer
 	// with HERMES_HOME exported never has a test read or write their Hermes.
 	t.Setenv("HERMES_HOME", "")
+	t.Setenv("REASONIX_HOME", "")
+	t.Setenv("REASONIX_STATE_HOME", "")
+	t.Setenv("DEJA_REASONIX_ROOT", "")
 	// Windows resolvers read APPDATA rather than the home directory — goose's
 	// config is one — so leaving it alone lets one test's install show up in
 	// another's report.

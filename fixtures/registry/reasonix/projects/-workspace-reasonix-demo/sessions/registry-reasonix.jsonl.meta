@@ -1,0 +1,11 @@
+{
+  "id": "registry-reasonix",
+  "created_at": "2026-09-20T10:00:00Z",
+  "updated_at": "2026-09-20T10:01:00Z",
+  "scope": "project",
+  "workspace_root": "/workspace/reasonix-demo",
+  "custom_title": "cache snapshot is never read",
+  "model": "deepseek-chat",
+  "turns": 1,
+  "preview": "the cache warms on every restart instead of reading the snapshot"
+}

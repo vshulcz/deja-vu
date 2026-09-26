@@ -193,7 +193,7 @@ Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor �
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
-Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
+Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed.
 
 Her birinin neyi desteklediği — MCP geri çağırma, otomatik geri çağırma, skill'ler, komutlar, resume, handoff —
 [İngilizce README'deki yetenek tablosunda](../../README.md#supported-harnesses). Özel depolama konumları `DEJA_*_ROOT`

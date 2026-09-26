@@ -192,7 +192,7 @@ Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor �
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
-Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
+Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed.
 
 Что именно каждый из них поддерживает — MCP-recall, авто-recall, skills, команды, resume, handoff — см. в
 [матрице возможностей в английском README](../../README.md#supported-harnesses). Нестандартные пути к хранилищам

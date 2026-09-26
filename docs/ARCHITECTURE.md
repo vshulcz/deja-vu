@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the thirty-four coding agents plus deja's own notes,
+what the loader registers: the thirty-five coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -35,6 +35,7 @@ against the loader list.
 | prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
 | DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
 | CodeWhale | `codewhale.go` | one JSON document per session under `${CODEWHALE_HOME:-~/.codewhale}/sessions`, and the pre-rebrand `~/.deepseek` root |
+| Reasonix | `reasonix.go` | flat role/content JSONL under `~/.reasonix` (`%APPDATA%\reasonix` on Windows), in `sessions/` and `projects/<slug>/sessions/` |
 | Zed | `zed.go` | threads in the SQLite store at `Zed/threads/threads.db` |
 | Crush | `crush.go` | SQLite databases named by `projects.json`, plus `<project>/.crush/crush.db` |
 | Cherry Studio | `cherrystudio.go` | Claude-format JSONL under the app's `Data/Agents/.claude/projects` |

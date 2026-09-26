@@ -1019,6 +1019,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 	cwRoots := sources.CodeWhaleRoots()
 	printFilesBesideIn("codewhale", sources.CodeWhaleRoot(), cwRoots, false, doctorExists(sources.CodeWhaleRoot()),
 		sources.CodeWhaleSessionFiles(), sources.CodeWhaleSidecarFiles()...)
+	// Reasonix keeps a dozen sidecars beside each transcript — metadata, event
+	// logs, locks, subagent logs — so those are placed, not counted as unread.
+	rxRoot := sources.ReasonixRoot()
+	printFilesBesideIn("reasonix", rxRoot, sources.ReasonixSessionDirsAll(), false, doctorExists(rxRoot),
+		sources.ReasonixSessionFiles(), sources.ReasonixSidecarFiles()...)
 	dshRoot := sources.DeepSeekRoot()
 	printFiles("deepseek", dshRoot, doctorExists(dshRoot), sources.DeepSeekSessionFiles())
 	zedDB := sources.ZedDB()

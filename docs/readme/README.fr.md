@@ -15,7 +15,7 @@ agent. deja indexe les sessions que Claude Code, Codex, Cursor et tous les autre
 
 <p align="center"><sub><em>Personne n'a cherché : l'agent a appelé deja de lui-même. Deux exécutions réelles, vrai modèle, vrais appels d'outils, sur un corpus synthétique, donc l'historique de personne n'est publié.</em></sub></p>
 
-<p align="center"><b>deja est pleine dès la première minute : l'historique que 34 agents ont déjà écrit, indexé en quelques secondes, sans modèle et sans étape de collecte à part.</b></p>
+<p align="center"><b>deja est pleine dès la première minute : l'historique que 35 agents ont déjà écrit, indexé en quelques secondes, sans modèle et sans étape de collecte à part.</b></p>
 
 <p align="center">
 <b>58 % de tokens en moins</b> sur une tâche que cette machine avait déjà résolue &middot; <b>88.1 % hit@1</b> sur LongMemEval-S (jeu nettoyé de 470 questions) &middot; <b>70.5 %</b> sur LoCoMo &middot; des requêtes en <b>millisecondes</b> sur des gigaoctets d'historique<br>
@@ -196,7 +196,7 @@ Claude Code · Cline · Codex CLI · opencode · aider · Gemini CLI · Cursor �
 Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) · OpenClaw ·
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
-Command Code · ZCode · CodeWhale · Kiro · Kilo Code · Zed.
+Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed.
 
 Ce que chacun prend en charge — rappel MCP, rappel automatique, skills, commandes, resume, handoff — se trouve
 dans la [matrice des capacités du README anglais](../../README.md#supported-harnesses). Les emplacements de stockage

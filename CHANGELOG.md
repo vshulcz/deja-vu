@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Reasonix's store, the thirty-fifth harness deja reads (#4053, requested by @TianQue6916). Its transcripts were reachable only through `DEJA_COMMANDCODE_ROOT`, which filed every session under `commandcode` with no project and no date. deja now follows Reasonix's own root chain (`REASONIX_STATE_HOME`, `REASONIX_HOME`, `[storage] state` in `config.toml`, then `~/.reasonix`, or `%APPDATA%\reasonix` on Windows) and reads both the global `sessions/` and each workspace's `projects/<slug>/sessions/`. Date and project come from the session's sidecars, or from the file's mtime; the legacy roots Reasonix still imports from are read while they exist. `deja resume` prints `reasonix --resume <id>` in the session's workspace.
+
 ### Fixed
 - The opencode npm plugin puts the session digest into opencode's first system message instead of adding a second one. vLLM and SGLang serving Qwen reject a request with two, answering "System message must be at the beginning.", so the title agent and subagents on those models failed every turn. The plugin `deja install --auto` writes already did this (#4058, reported by @R-omk).
 

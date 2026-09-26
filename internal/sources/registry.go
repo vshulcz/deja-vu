@@ -576,6 +576,17 @@ func allHarnesses() []Harness {
 			}},
 		},
 		{
+			// Reasonix writes flat role/content lines, but its clock and
+			// workspace sit in sidecars beside the transcript, and a compaction
+			// rewrites the file, so it is read whole rather than from an offset.
+			Name: "reasonix", Load: LoadReasonix, Files: ReasonixSessionFiles,
+			Kinds: []FileKind{{
+				Name:  "reasonix",
+				Match: IsReasonixSession,
+				Parse: fullParse(ParseReasonixFile),
+			}},
+		},
+		{
 			// DeepSeek Harness writes one log per session, zstd-framed by
 			// default, so a machine without the zstd CLI sees the files and
 			// reads nothing out of them (SkipReason says so).

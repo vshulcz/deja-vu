@@ -36,6 +36,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Command Code](commandcode.md) | flat role/content JSONL per session |
 | [ZCode](zcode.md) | flat role/content JSONL per session |
 | [CodeWhale](codewhale.md) | one JSON document per session, Anthropic-shaped content blocks |
+| [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar |
 | [Cherry Studio](cherrystudio.md) | Claude Code transcripts under the desktop app's data, one snapshot per stream chunk |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |

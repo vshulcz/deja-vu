@@ -1,0 +1,4 @@
+{"role":"system","content":"You are Reasonix, a coding agent."}
+{"role":"user","content":"the cache warms on every restart instead of reading the snapshot","createdAt":1789898405000}
+{"role":"tool","tool_call_id":"call_00_a","name":"read_file","content":"snapshot.go:57: open .cache/snap.bin: no such file or directory"}
+{"role":"assistant","content":"The snapshot is written to a relative path, so a restart from another directory never finds it.","createdAt":1789898431000}

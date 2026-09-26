@@ -15,7 +15,7 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
 
 <p align="center"><sub><em>誰も検索していません——エージェントが自分で deja を呼び出しました。実際のモデルと実際のツール呼び出しによる2回の本物の実行で、対象は合成コーパスです。誰の履歴も公開していません。</em></sub></p>
 
-<p align="center"><b>deja は最初から満杯の状態で始まります。34 のエージェントがすでに書き残した履歴を、インデックス作成中から検索でき、モデルもキャプチャ手順も不要です。</b></p>
+<p align="center"><b>deja は最初から満杯の状態で始まります。35 のエージェントがすでに書き残した履歴を、インデックス作成中から検索でき、モデルもキャプチャ手順も不要です。</b></p>
 
 <p align="center">しかも、誰かが頼む必要もありません。リコールはセッション開始時、プロンプトごと、
 ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
@@ -112,7 +112,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 
 ## できること
 
-**Codex で解決して、Claude が覚えている。** 34 のコーディングエージェントはすべての会話を
+**Codex で解決して、Claude が覚えている。** 35 のコーディングエージェントはすべての会話を
 ローカルファイルに書き出しています。deja はそれらのファイルを、全エージェントが読めるひとつの記憶レイヤーに変えます。
 
 | | |
@@ -272,7 +272,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; Reasonix.
 
 <details>
 <summary>各ハーネスの対応状況</summary>

@@ -286,6 +286,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "reasonix",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.reasonix"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "deepseek",
       "state": "missing",
       "paths": [
