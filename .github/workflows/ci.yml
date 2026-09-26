@@ -17,23 +17,31 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.25.x'
-      - name: compile only
+      - name: go vet (as CI)
+        run: go vet ./...
+      - name: plain go test (exact CI command)
         shell: bash
         run: |
           date -u +%T
-          time go test -count=1 -run '^$' ./... > /dev/null
+          set +e
+          go test -timeout 25m ./... > plain.txt 2>&1
+          echo "exit $?"
           date -u +%T
-      - name: run with timeline
+          grep -E "^(ok|FAIL|---)" plain.txt | head -40
+      - name: go test -json -count=1
         shell: bash
         run: |
-          go test -json -timeout 25m ./... > timeline.json || true
           date -u +%T
-      - name: cmd/deja slowest tests
-        shell: bash
-        run: |
-          grep '"Action":"pass"' timeline.json | grep '"Test"' | grep -o '"Package":"[^"]*","Test":"[^"]*","Elapsed":[0-9.]*' | sort -t: -k4 -rn | head -40
-          grep -E '"Action":"(start|pass|fail)","Package"' timeline.json | grep -v '"Test"' | head -80
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          set +e
+          go test -json -count=1 -timeout 25m ./... > timeline.json
+          echo "exit $?"
+          date -u +%T
+          grep -E '"Action":"(pass|fail)","Package":"[^"]*","Elapsed"' timeline.json > pkgs.txt || true
+          cat pkgs.txt | cut -c1-200
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: timeline
-          path: timeline.json
+          path: |
+            timeline.json
+            plain.txt
