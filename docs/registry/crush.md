@@ -1,7 +1,7 @@
 # Crush
 
 - **ID**: `crush`
-- **Store**: `<project>/.crush/crush.db`, one SQLite store per project, listed in `${XDG_DATA_HOME:-~/.local/share}/crush/projects.json`.
+- **Store**: `<data_dir>/crush.db`, one SQLite store per project, listed in `${XDG_DATA_HOME:-~/.local/share}/crush/projects.json`; `data_dir` is `<project>/.crush` by default, and an entry that moved it is followed.
 - **Read override**: `DEJA_CRUSH_ROOT` (the data home holding that registry)
 - **Format**: SQLite; `sessions` joined to `messages`, incremental by `sessions.updated_at`.
 

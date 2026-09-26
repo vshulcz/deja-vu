@@ -2,7 +2,7 @@
 
 ## Store and files
 
-Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent.
+Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent. The maintained `grok` CLI writes no session files: its history is in `${GROK_HOME:-~/.grok}/grok.db`, a SQLite store read through `sqlite3`, and `DEJA_GROK_DB` points deja at another copy.
 
 The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers `summary.json` and `.cwd` over decoding the directory name.
 
@@ -58,5 +58,11 @@ session asked for it is not written down, and deja does not guess.
   `~/.cursor/mcp.json`, so a machine wired for those has deja in Grok already.
   `~/.grok/GROK.md` is the exception: that file is for the other product, and
   Grok Build's home rules are `Agents.md`, `AGENTS.md`, `Claude.md`, `CLAUDE.md`.
+- The hooks run, but on 1.0.5 what session start, the prompt and both tool
+  events print is discarded — measured against a stubbed proxy by reading the
+  request the model was sent. The one reply Grok applies is a `PreToolUse`
+  `updatedInput`, which is how memory reaches a spawned agent's prompt; the
+  rest of the wiring is there for its side effects, warming the index and
+  forgetting what a compaction threw away.
 
 **Last verified:** 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)

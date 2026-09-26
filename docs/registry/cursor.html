@@ -38,7 +38,7 @@
 <article>
 <h1>Cursor session format</h1>
 <h2 id="stores-and-files">Stores and files</h2>
-<p>Cursor IDE stores chats in <code>state.vscdb</code> under <code>globalStorage/</code> and <code>workspaceStorage/*/</code>. The user root is <code>~/Library/Application Support/Cursor/User</code> on macOS and <code>~/.config/Cursor/User</code> on other systems; an existing <code>$XDG_CONFIG_HOME/Cursor/User</code> is used when available. <code>DEJA_CURSOR_ROOT</code> overrides IDE discovery.</p>
+<p>Cursor IDE stores chats in <code>state.vscdb</code> under <code>globalStorage/</code> and <code>workspaceStorage/*/</code>. The user root is <code>~/Library/Application Support/Cursor/User</code> on macOS, <code>%APPDATA%\Cursor\User</code> on Windows and <code>~/.config/Cursor/User</code> elsewhere; on Linux an existing <code>$XDG_CONFIG_HOME/Cursor/User</code> is used when available. <code>DEJA_CURSOR_ROOT</code> overrides IDE discovery.</p>
 <p>Cursor CLI writes <code>projects/&lt;encoded-path&gt;/agent-transcripts/**/*.jsonl</code> below <code>${CURSOR_CONFIG_DIR:-~/.cursor}</code>. <code>DEJA_CURSOR_CLI_ROOT</code> overrides transcript reads. Subagent transcripts are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code> — for index</p>
 <p>size, not because the parent already holds that work. Unlike Claude&#39;s sidechain</p>
 <p>files, Cursor&#39;s have not been read here: what the parent keeps and what only the</p>

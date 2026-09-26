@@ -40,11 +40,11 @@
 <p>Amp (Sourcegraph) stores one JSON object per thread under its local data</p>
 <p>directory:</p>
 <ul>
-<li>Linux: <code>${XDG_DATA_HOME}/amp/threads/</code>, or <code>~/.local/share/amp/threads/</code></li>
+<li><code>${XDG_DATA_HOME:-~/.local/share}/amp/threads/</code>, on every OS: macOS and</li>
 </ul>
-<p>when <code>XDG_DATA_HOME</code> is unset.</p>
+<p>Windows use the same <code>~/.local/share</code> default, and a set <code>XDG_DATA_HOME</code> is</p>
+<p>followed there too.</p>
 <ul>
-<li>macOS and Windows: <code>~/.local/share/amp/threads/</code>.</li>
 <li><code>DEJA_AMP_ROOT</code> replaces the thread directory directly. When set, it is the</li>
 </ul>
 <p>only root deja reads.</p>

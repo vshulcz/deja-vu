@@ -4,6 +4,7 @@
 - **Store**: `~/.hermes/state.db` (0.17+) or `~/.hermes/profiles/<profile>/state.db` (older builds, one store per profile)
 - **Home**: `HERMES_HOME`, Hermes's own variable, is followed — profiles, plugins and `config.yaml` are read and written under it. `DEJA_HERMES_HOME` overrides it.
 - **Read overrides**: `DEJA_HERMES_PROFILES_ROOT` for the profiles directory, `DEJA_HERMES_DB` to pin a single store
+- **Postgres**: with `sessiondb.provider: postgresql` Hermes stops writing `state.db`; set `DEJA_HERMES_PG_DSN` and deja reads the same columns from the `messages` table through `psql` (#1018)
 - **Format**: SQLite relational store
 
 A flat `messages` table, grouped by `session_id`: `role`, `content`, and `timestamp`
