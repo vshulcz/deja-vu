@@ -21,7 +21,7 @@ Three ways in, in order of how little work they are:
 |---|---|---|
 | `deja install --auto` | wires MCP and session-start recall into every agent found on the machine | one command |
 | `deja mcp` | an MCP server on stdio: one tool, seven modes | one config entry |
-| `deja <command> --json` | search, blame, fix, how, files, wip as JSON | a subprocess |
+| `deja <command> --json` | search, blame, fix, how, files, wip, friction, secrets, tests, recap as JSON | a subprocess |
 
 ## Detecting it, and installing it if missing
 
@@ -60,7 +60,7 @@ collapses to one server rather than listing every tool twice.
 ## The JSON surfaces
 
 `deja search`, `blame`, `fix`, `how`, `files`, `wip`, `last`, `show`, `stats`,
-`log` and `doctor` all take `--json`. The envelope carries `schema_version`, and
+`log`, `doctor`, `friction`, `secrets`, `tests` and `recap` all take `--json`. The envelope carries `schema_version`, and
 `docs/json-output.md` is the contract: within a version, changes are additive.
 
 The smallest useful integration is two lines — what was decided about this file
@@ -86,7 +86,8 @@ The commands are `deja hook-context` (session start, once per session),
 `deja hook-prompt` (per prompt), `deja hook-tool` (before a Bash or Edit call),
 `deja hook-tool-after` (after one failed) and `deja hook-plan` (before a plan is
 accepted). Each reads its harness's JSON event on stdin and writes at most a
-bounded block on stdout — 1,536 bytes for a prompt, about 4 KB for a tool call.
+bounded block on stdout — 1,536 bytes for a prompt, 480 before a tool call and
+420 after a failed one; the one-time compaction packet is 4 KB.
 There is one harness-shaped exception, `deja hook-antigravity`, because
 Antigravity fires a single PreInvocation event and nothing else; if your hook
 model does not fit the five above, that is the shape to copy.
@@ -96,12 +97,12 @@ nobody expects.
 ## What is a contract and what is not
 
 **Stable:** the `--json` surfaces under their `schema_version`, the MCP tool
-names and their arguments, the exit codes, and the environment variables named
-in `deja doctor --json`.
+names and their arguments, the exit codes, and the `DEJA_*` variables documented
+in the format registry and on this page.
 
 **Not stable, do not read:** `index.db` and everything in it — `manifest.gob`,
 `sessions.gob`, `records.bin`, the buckets, the sidecars. The format has moved
-forty-odd times and will keep moving; that is why the version lives in the
+fifty-odd times and will keep moving; that is why the version lives in the
 manifest. If you find yourself wanting to read it, the surface you want is
 probably missing and worth an issue.
 

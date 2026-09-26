@@ -5,7 +5,9 @@ short. The detail lives in the tool descriptions.
 
 Search deja before re-deriving past work: when the user refers to an earlier
 session or decision, before debugging an error, and before implementing
-something that may already exist. It searches this machine's own history across
+something that may already exist. Also when the user says something of theirs
+already exists that you have no record of ("I already have X", "we use Y for
+this"), and before telling them something on this machine does not exist. It searches this machine's own history across
 every AI coding tool used on it, further back than deja itself was installed.
 
 One tool, `deja`, with a `mode`:

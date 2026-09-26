@@ -44,9 +44,10 @@ not reachable.
 
 `/deja:recall <query>` for the times you want to ask directly.
 
-Recall nobody has to ask for: a `UserPromptSubmit` hook searches this machine's
-history for what the prompt is actually about, and stays silent when nothing
-matches.
+A `UserPromptSubmit` hook that searches this machine's history for what the
+prompt is about. Grok Build 1.0.5 discards what a prompt or tool hook prints, so
+today that recall does not reach the model; the MCP tool is how it does. The one hook answer Grok does apply is a `PreToolUse` `updatedInput`, and
+`deja install grok` uses it to put memory into a spawned agent's prompt.
 
 ## Having both is fine
 
@@ -54,8 +55,8 @@ matches.
 both — every tool listed twice, the same recall read twice on every prompt. So
 each half stands down when it finds the installer's copy:
 
-- the MCP server exits with a line saying why when `~/.grok/config.toml` has
-  `[mcp_servers.deja]`;
+- the MCP server answers the handshake and lists no tools when
+  `~/.grok/config.toml` has `[mcp_servers.deja]`;
 - the hook returns without output when `~/.grok/hooks/deja.json` has deja's
   hooks in it.
 

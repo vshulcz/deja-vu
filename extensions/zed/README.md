@@ -29,13 +29,6 @@ release build of the `deja` binary into its own directory — it cannot use a de
 you already have unless you name it, because an extension runs sandboxed and the
 usual install paths are not reachable from inside it:
 
-`deja install --auto` reaches Zed too, and writes the server into
-`settings.json` directly — the shorter path when you have the CLI. Both use the
-same id, `deja-context-server`, and Zed keys servers by id, so either order
-leaves exactly one server: the installer leaves this extension's entry alone
-when it finds it, and installing the extension later lands on the same key
-rather than beside it. `deja uninstall zed` removes what the CLI wrote.
-
 ```json
 {
   "context_servers": {
@@ -47,6 +40,13 @@ rather than beside it. `deja uninstall zed` removes what the CLI wrote.
   }
 }
 ```
+
+`deja install --auto` reaches Zed too, and writes the server into
+`settings.json` directly — the shorter path when you have the CLI. Both use the
+same id, `deja-context-server`, and Zed keys servers by id, so either order
+leaves exactly one server: the installer leaves this extension's entry alone
+when it finds it, and installing the extension later lands on the same key
+rather than beside it. `deja uninstall zed` removes what the CLI wrote.
 
 Indexing and search are local: no network calls, and credentials are redacted
 as the index is built.

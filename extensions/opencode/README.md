@@ -47,6 +47,11 @@ And recall nobody has to ask for:
 - the project's recent sessions are pushed onto the system prompt once per
   session, with a one-time toast so you know memory arrived;
 - each prompt gets a relevance pass of its own — silent when nothing matches;
+- a spawned agent gets recall in its own instructions, since it never sees the
+  system prompt or a user prompt;
+- after a tool call, a failed command gets the command this machine ran next
+  after the same error, and a file action gets that file's prior decision,
+  folded into the tool's output;
 - before compaction the working transcript is indexed, so the session survives
   the window collapsing.
 
@@ -58,7 +63,7 @@ And recall nobody has to ask for:
 }
 ```
 
-- `autoRecall` (default `true`) — the three hooks above. Turn off to keep only
+- `autoRecall` (default `true`) — the hooks above. Turn off to keep only
   the tools.
 - `tools` (default `true`) — the six tools. They are skipped on their own when
   `deja install` already wired the MCP server; set this to `false` to drop them

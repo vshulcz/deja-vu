@@ -3,9 +3,10 @@
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/kimi/docs/zh.md)
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session files coding
-agents already write to disk — Claude Code, Codex, Cursor, opencode and thirty
-more — and answers from them. This plugin brings that index into Kimi Code:
-recall arrives with the prompt, and the agent can search history itself.
+agents already write to disk — Claude Code, Codex, Cursor, opencode and
+thirty more — and answers from them. This plugin brings that index into
+Kimi Code: recall arrives with the prompt, and the agent can search history
+itself.
 
 ## Install
 
@@ -19,6 +20,14 @@ Kimi's update check reads. There is also a `kimi-deja.zip` release asset — 16 
 instead of a 3 MB repository — for a marketplace entry or an install that should
 not pull the whole project.
 
+Install the binary if you do not have it:
+
+```
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+```
+
+Plugins load from the managed copy, so run `/reload` or `/new` after installing.
+
 ## Updates
 
 Kimi only notifies about updates for plugins installed from its own
@@ -29,14 +38,6 @@ one this deja ships:
 ```
 kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
 ```
-
-Then install the binary if you do not have it:
-
-```
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-```
-
-Plugins load from the managed copy, so run `/reload` or `/new` after installing.
 
 ## What you get
 

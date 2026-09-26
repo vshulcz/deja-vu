@@ -23,7 +23,7 @@ a `schema_version` field so consumers can detect breaking changes.
   would be written into every line of that file. And the surface answers `null`
   when no digest has been recorded: a shape that is sometimes absent cannot be
   relied on to carry a version.
-- **`deja bench recall|context|prompt|block --json`** are object-shaped and carry no
+- **`deja bench recall|context|prompt|block|ingest|read --json`** are object-shaped and carry no
   `schema_version` either. They report a benchmark run to whoever asked for it,
   not a contract anything downstream parses on a schedule.
 
@@ -465,8 +465,6 @@ when unavailable; `policy` is always present. `embed.state` is the endpoint's,
 when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an
 endpoint is configured, so `embed` is present in that case even with no
-`index.sources_read_at` is when deja last walked this machine's stores, in RFC 3339, which is not when the index was last written: an import from a peer rewrites the index without opening a local transcript, so on a machine that syncs on a timer the two drift apart, and `stale_stores` is counted against this field rather than the build time. It is `never` when an import built the index and nothing local has been read yet, and absent on a store written before deja recorded it.
-
 endpoint. `index.path` points at the index
 directory; `index.db` is that directory's name, not a file. `index.state` is
 `missing`, `ok`, `stale`, `stale-readonly` (stale where the index cannot be
@@ -491,9 +489,11 @@ store holding transcripts the index has no state for at all carries `never_read`
 with how many — the count is absent when there are none, and goes away after an
 indexing pass.
 `sqlite3` and `git` are the two tools deja shells out to, each `ok` or
-`missing`: sqlite3 reads the opencode, Cursor, grok, hermes, goose and zed
-stores, and git supplies changed-file notes, worktree names and the task
+`missing`: sqlite3 reads every database-backed store (opencode and the schemas
+that borrow it, Cursor, Goose, Zed, Crush, Kiro, Hermes, Grok, OpenClaw), and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
+
+`index.sources_read_at` is when deja last walked this machine's stores, in RFC 3339, which is not when the index was last written: an import from a peer rewrites the index without opening a local transcript, so on a machine that syncs on a timer the two drift apart, and `stale_stores` is counted against this field rather than the build time. It is `never` when an import built the index and nothing local has been read yet, and absent on a store written before deja recorded it.
 
 `auto_recall` is the other half of an install: the files that make memory arrive
 without anyone asking, one row per harness deja can wire. `state` is `wired`,
@@ -804,6 +804,11 @@ remedy usually shares no word with the error, since what ties them is the comman
 before it, so the prose shows both and prints the second as *"after this
 failed"*. `failed` is omitted for every other remedy.
 
+A remedy that cannot be taken back is never returned: a merge or delete through
+`gh`, a deleted or force-pushed branch, `git reset --hard`, a dropped stash,
+`git clean`, a recursive `rm`, or a kubectl or helm change or anything against a
+prod namespace. Those are usually just the next step a session took.
+
 ```json
 {
   "error": "no matches found: --include=*.go",
@@ -1057,7 +1062,7 @@ A top-level array, so no `schema_version`, on the same terms as `blame`. It is
 script polls, and `null` raises where an empty list iterates zero times.
 
 `t` is when it happened and `kind` is what deja did — `recall`, `recall_context`,
-`blame`, `how` and `fix` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
+`blame`, `how`, `fix` and `orient` are answers to an agent that asked; `hook`, `dejavu` and `tool` are
 memory offered unasked; `resource` is a read of `deja://session/…`; `remember`
 writes rather than serves; `search` and `handoff` are the reader's own commands.
 `compaction_capture` and `compaction_recovery` measure recovery, with zero

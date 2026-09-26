@@ -12,6 +12,15 @@ objective even when it opens with one of those words. Each item identifies its
 source session, harness, role, and recorded timestamp. No checkpoint command or
 model call is required.
 
+The packet also carries a "Keep until closed" list: questions still waiting on
+the user, open `#N` items, settled verdicts, and checks put off for later — the
+lines a host summary tends to drop. Each capture starts from the list the last
+one left, drops a line once the transcript closes it (for an open item, a merge
+or close command or the user saying so), and ages out a line untouched for two
+compactions. It is capped at twelve lines: three awaiting, four verdicts, three
+rechecks, the rest open items. It is printed first and may take at most 40% of
+the packet.
+
 The next session-start, prompt, or tool hook for that same session and workspace
 returns a recovery packet once. Its 4 KiB limit includes the untrusted-history
 frame. The packet labels assistant conclusions as reported claims. A recorded
@@ -31,8 +40,9 @@ Packets live in the existing `manifest.gob`, alongside index metadata. There is
 no separate context store, additional MCP tool, or synthetic searchable session.
 The index keeps the latest packet for up to 32 session/workspace pairs, with a
 24 KiB limit per stored packet. A new capture replaces that session's packet;
-the oldest captures are evicted when the session limit is reached. There is no
-packet history. Full and incremental index rebuilds preserve retained packets.
+the oldest captures are evicted when the session limit is reached. Only the
+latest packet is kept; its keep-until-closed list is the one thing a new capture
+reads from the old. Full and incremental index rebuilds preserve retained packets.
 Packets are not included in sync exports.
 
 The reader inspects at most 4 MiB of transcript tail plus a 64 KiB header. The

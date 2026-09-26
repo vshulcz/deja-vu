@@ -65,8 +65,8 @@ testify or other test frameworks.
 The [source parser registry](docs/ARCHITECTURE.md#source-parsers) maps harnesses
 to their implementation under `internal/sources`. Follow the integration steps
 in [Add a new harness](docs/ARCHITECTURE.md#add-a-new-harness); a parser alone is
-not enough because discovery, incremental indexing, install support, and user
-documentation are separate paths.
+not enough. The registry entry is what wires discovery and incremental indexing,
+and install support and user documentation are separate paths.
 
 Fixtures must be synthetic and minimal. Put reusable cross-package samples
 under `fixtures/synthetic`; keep parser-specific cases near their tests. Use
