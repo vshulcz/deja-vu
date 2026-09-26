@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [pwsh-exact, bash-file, json]
+        mode: [trace, verbose, count1]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -23,21 +23,28 @@ jobs:
         with:
           go-version: '1.25.x'
       - run: go vet ./...
-      # exactly what ci.yml runs on windows: default shell (pwsh), output to the console
-      - if: matrix.mode == 'pwsh-exact'
-        run: go test -timeout 25m ./...
-      - if: matrix.mode == 'bash-file'
+      - if: matrix.mode == 'trace'
         shell: bash
         run: |
-          go test -timeout 25m ./... > plain.txt 2>&1; echo "exit $?"
-          grep -E "^(ok|FAIL|---)" plain.txt | head -40
-      - if: matrix.mode == 'json'
+          date -u +%T
+          go test -debug-trace="$RUNNER_TEMP/trace.json" -timeout 25m ./... > "$RUNNER_TEMP/plain.txt" 2>&1; echo "exit $?"
+          date -u +%T
+          grep -E "^(ok|FAIL|---)" "$RUNNER_TEMP/plain.txt" | head -30
+      - if: matrix.mode == 'verbose'
         shell: bash
         run: |
-          go test -json -timeout 25m ./... > timeline.json; echo "exit $?"
-          grep -E '"Action":"(pass|fail)","Package":"[^"]*","Elapsed"' timeline.json | cut -c1-200 || true
-      - if: always() && matrix.mode == 'json'
+          date -u +%T
+          go test -v -timeout 25m ./... > "$RUNNER_TEMP/plain.txt" 2>&1; echo "exit $?"
+          date -u +%T
+      - if: matrix.mode == 'count1'
+        shell: bash
+        run: |
+          date -u +%T
+          go test -count=1 -timeout 25m ./... > "$RUNNER_TEMP/plain.txt" 2>&1; echo "exit $?"
+          date -u +%T
+          grep -E "^(ok|FAIL|---)" "$RUNNER_TEMP/plain.txt" | head -30
+      - if: always() && matrix.mode == 'trace'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: timeline
-          path: timeline.json
+          name: trace
+          path: ${{ runner.temp }}/trace.json
