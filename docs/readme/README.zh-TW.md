@@ -144,7 +144,7 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <查詢詞>` | 搜尋所有歷史。多個詞是 AND，引號內要求連續文字；沒有精確命中時會嘗試詞形與近似拼寫。 |
 | `deja wip` | 這個目錄裡上一個會話在做什麼：任務、定下來的結論、手上的檔案、最後一條指令以及它是否失敗。全部從記錄裡推出來，不依賴誰記得寫筆記。 |
-| `deja blame <路徑>[:行號]` | 哪些會話討論過這個檔案、當時決定了什麼、為什麼。給出行號時：最後改動這一行的 commit，以及寫下被這次 commit 刪掉的那段文字的會話。 |
+| `deja blame <路徑>[:行號]` | 哪些會話討論過這個檔案、當時決定了什麼、為什麼。給出行號時：最後改動這一行的 commit，以及寫下這一行、或寫下被這次 commit 替換的那段文字的會話。 |
 | `deja files <主題>` | 反方向：某個主題的工作實際動過哪些檔案。 |
 | `deja how <工具>` | 這台機器實際怎麼跑一件事，帶真實參數，來自代理此前跑過的指令。 |
 | `deja fix <報錯>` | 這台機器上同樣的報錯之後跑過什麼，且那次之後錯誤沒有再出現。 |
@@ -159,7 +159,7 @@ $ deja "jwt refresh token"
 
 ### MCP 工具
 
-伺服器只暴露一個工具 `deja`，用 `mode` 參數選擇能力：`recall`、`context`、`blame`、`fix`、`how`、`remember`。
+伺服器只暴露一個工具 `deja`，用 `mode` 參數選擇能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`。
 `deja install` 會自動接好，只有手動設定代理時才需要在意它。原來的六個工具名對已經接好的客戶端仍然有效。
 
 一個工具而不是七個，是成本問題，不是風格問題。接上的 MCP 伺服器會把工具定義隨每一次請求一起送出，
@@ -219,6 +219,7 @@ deja bench context    # 30 條帶種子的任務鏈，外加五個負對照
 deja bench block      # 交出去的那段文字裡還剩不剩答案
 deja bench prompt     # 逐條提示的掛鉤在什麼時候開口，又在什麼時候開錯
 deja bench ingest     # 一次索引更新的代價：沒有變化、追加一輪、新增一個記錄檔、整檔重寫
+deja bench read       # 讀取一個資料庫儲存的代價，以及一個超長值對它的影響
 ```
 
 上下文實驗把 deja 召回與全量歷史、樸素 grep 和冷啟動作對比。預設種子下：
@@ -238,7 +239,7 @@ deja bench ingest     # 一次索引更新的代價：沒有變化、追加一�
 
 | 指標 | 結果 |
 | --- | --- |
-| 行程內查詢 | 中位數 **0.7–0.8 ms**，LongMemEval-S 乾草堆上約 19 ms |
+| 行程內查詢 | 中位數 **0.7–0.8 ms**，LongMemEval-S 乾草堆上約 15 ms |
 | `deja <查詢詞>` 端到端 | 該儲存庫上中位數約 0.2 s：行程啟動、對所有儲存做新鮮度檢查、排序、輸出 |
 | 僅新鮮度檢查 | 沒有變化時約 50 ms |
 | 索引大小 | 200 MB，約為語料的 10% |
@@ -274,7 +275,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 | 需要大型模型或嵌入金鑰 | 否 | 是 | 可選 |
 | 不用問也會召回 | 會話開始時、以及工具執行前 | 否 | 否 |
 
-[完整比較](https://vshulcz.github.io/deja-vu/guide/compare.html)涵蓋了其中十一個。
+[完整比較](https://vshulcz.github.io/deja-vu/guide/compare.html)涵蓋了其中十五個。
 
 **Claude Code 的會話歷史存在哪裡，能搜尋嗎？** 在 `~/.claude/projects` 下，每個會話一個 JSONL 檔；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地讀取牠們，`deja last` 列出每個代理最近的會話，`deja view` 把全部歷史開成一個本機頁面。各代理的路徑見[會話存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
 

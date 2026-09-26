@@ -144,7 +144,7 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <查询词>` | 搜索所有历史。多个词是 AND，引号内要求连续文本；没有精确命中时会尝试词形与近似拼写。 |
 | `deja wip` | 这个目录里上一个会话在做什么：任务、定下来的结论、手上的文件、最后一条命令以及它是否失败。全部从记录里推出来，不依赖谁记得写笔记。 |
-| `deja blame <路径>[:行号]` | 哪些会话讨论过这个文件、当时决定了什么、为什么。给出行号时：最后改动这一行的提交，以及写下被这次提交删掉的那段文本的会话。 |
+| `deja blame <路径>[:行号]` | 哪些会话讨论过这个文件、当时决定了什么、为什么。给出行号时：最后改动这一行的提交，以及写下这一行、或写下被这次提交替换的那段文本的会话。 |
 | `deja files <主题>` | 反方向：某个主题的工作实际动过哪些文件。 |
 | `deja how <工具>` | 这台机器实际怎么跑一件事，带真实参数，来自智能体此前跑过的命令。 |
 | `deja fix <报错>` | 这台机器上同样的报错之后跑过什么，且那次之后错误没有再出现。 |
@@ -159,7 +159,7 @@ $ deja "jwt refresh token"
 
 ### MCP 工具
 
-服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`remember`。
+服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`。
 `deja install` 会自动接好，只有手工配置智能体时才需要关心它。原来的六个工具名对已经接好的客户端仍然有效。
 
 ## 支持的工具
@@ -215,6 +215,7 @@ deja bench context    # 30 条带种子的任务链，外加五个负对照
 deja bench block      # 交出去的那段文字里还剩不剩答案
 deja bench prompt     # 逐条提示的钩子在什么时候开口，又在什么时候开错
 deja bench ingest     # 一次索引更新的代价：没有变化、追加一轮、新增一个记录文件、整文件重写
+deja bench read       # 读取一个数据库存储的代价，以及一个超长值对它的影响
 ```
 
 上下文实验把 deja 召回与全量历史、朴素 grep 和冷启动作对比。默认种子下：
@@ -234,7 +235,7 @@ deja bench ingest     # 一次索引更新的代价：没有变化、追加一�
 
 | 指标 | 结果 |
 | --- | --- |
-| 进程内查询 | 中位数 **0.7–0.8 ms**，LongMemEval-S 干草堆上约 19 ms |
+| 进程内查询 | 中位数 **0.7–0.8 ms**，LongMemEval-S 干草堆上约 15 ms |
 | `deja <查询词>` 端到端 | 该仓库上中位数约 0.2 s：进程启动、对所有存储做新鲜度检查、排序、打印 |
 | 仅新鲜度检查 | 没有变化时约 50 ms |
 | 索引大小 | 200 MB，约为语料的 10% |
@@ -270,7 +271,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 | 需要大模型或嵌入密钥 | 否 | 是 | 可选 |
 | 不用问也会召回 | 会话开始时、以及工具执行前 | 否 | 否 |
 
-[完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十一个。
+[完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十五个。
 
 **Claude Code 的会话历史存在哪里，能搜索吗？** 在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地读取它们，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
 
