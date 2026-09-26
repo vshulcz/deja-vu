@@ -208,14 +208,20 @@ func reasonixTranscriptsIn(root string) []string {
 // legacy root's whose id the current root does not already hold.
 func ReasonixSessionFiles() []string {
 	out := reasonixTranscriptsIn(ReasonixRoot())
+	// Windows names are case-insensitive: the same session under two
+	// spellings is one file there, and must be read once.
+	key := filepath.Base
+	if runtime.GOOS == "windows" {
+		key = func(p string) string { return strings.ToLower(filepath.Base(p)) }
+	}
 	have := map[string]bool{}
 	for _, p := range out {
-		have[filepath.Base(p)] = true
+		have[key(p)] = true
 	}
 	for _, root := range reasonixLegacyRoots() {
 		for _, p := range reasonixTranscriptsIn(root) {
-			if !have[filepath.Base(p)] {
-				have[filepath.Base(p)] = true
+			if !have[key(p)] {
+				have[key(p)] = true
 				out = append(out, p)
 			}
 		}
@@ -352,7 +358,11 @@ func ParseReasonixFile(path string) ([]model.Session, error) {
 			break
 		}
 	}
-	switch ws := ReasonixWorkspace(path); {
+	ws := meta.Workspace
+	if ws == "" {
+		ws = meta.LegacyWorkspace
+	}
+	switch {
 	case ws != "":
 		s.Project = claudeProjectName(pathToProjectKey(ws))
 	case filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(path)))) == "projects":
