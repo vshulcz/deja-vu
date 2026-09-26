@@ -108,6 +108,12 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintln(stdout, "deja: one session ran something after that error, and nothing has confirmed it worked — deja waits for a second sighting before naming a remedy")
 			return nil
 		}
+		if index.FixWithheldAsIrreversible(dir, text, func(project string) bool {
+			return pol.Allows(policy.ActivationSearch, project)
+		}) {
+			fmt.Fprintln(stdout, fixWithheldLine)
+			return nil
+		}
 		// The lookup hashes whole error lines, so the head of one — what a
 		// person types — is a different signature and matches nothing. Saying
 		// the machine never saw it is then a claim about the store rather than
@@ -129,6 +135,11 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 	}
 	return printFixPairs(stdout, pairs)
 }
+
+// fixWithheldLine is the empty answer when a remedy exists and was held back
+// because it cannot be taken back (remedyIsIrreversible). "No session ran a
+// command after that error" was false there.
+const fixWithheldLine = "deja: what ran after that error on this machine was a merge, a force push or a deletion — deja does not hand those over as a fix"
 
 // printFixPairs writes the pairs in the prose form, one remedy per pair.
 func printFixPairs(stdout io.Writer, pairs []index.FixPair) error {

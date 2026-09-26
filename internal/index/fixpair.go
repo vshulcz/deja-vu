@@ -917,12 +917,46 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 		if !sigs[p.Sig] || !p.Candidate {
 			continue
 		}
+		// A sighting FixesFor would drop is not one a second session can
+		// promote into an answer, so it is not "waiting for a second sighting".
+		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
+			continue
+		}
 		if allow != nil && !allow(p.Project) {
 			continue
 		}
 		// The same rule as FixesFor: saying deja holds a sighting it will not
 		// show is worse than saying nothing (#2660).
 		if ProjectsTouchedByIgnore(dir)[p.Project] {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+// FixWithheldAsIrreversible reports whether something did run after this error
+// and every such remedy was a command FixesFor refuses to hand over — a merge,
+// a force push, a deletion. The empty answer said "no session ran a command
+// after that error", which is false exactly then: the store holds the pair and
+// deja chose not to show it.
+func FixWithheldAsIrreversible(dir, text string, allow func(project string) bool) bool {
+	sigs := fixSignaturesFor(dir, text)
+	if len(sigs) == 0 {
+		return false
+	}
+	var ignored map[string]bool
+	for _, p := range ReadFixes(dir) {
+		if !sigs[p.Sig] || !remedyIsIrreversible(p.Command) {
+			continue
+		}
+		if allow != nil && !allow(p.Project) {
+			continue
+		}
+		if ignored == nil {
+			ignored = ProjectsTouchedByIgnore(dir)
+		}
+		if ignored[p.Project] {
 			continue
 		}
 		return true
