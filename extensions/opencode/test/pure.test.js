@@ -187,6 +187,31 @@ test("an MCP server in the config leaves recall as this package's job", async ()
   })
 })
 
+// opencode sends every entry of output.system as its own system message, and a
+// strict chat template (vLLM or SGLang serving Qwen) answers a second one with
+// "System message must be at the beginning." (#4058)
+test("the session digest joins the first system message instead of adding one", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deja-oc-"))
+  const bin = join(dir, "deja")
+  writeFileSync(
+    bin,
+    `#!/bin/sh\nif [ "$1" = hook-context ]; then echo '{"hookSpecificOutput":{"additionalContext":"past work"}}'; else echo 0.0.0; fi\n`,
+    { mode: 0o755 },
+  )
+  await withConfigHome(dir, async () => {
+    const hooks = await DejaPlugin({ client: quietClient(), directory: dir }, { bin })
+    const transform = hooks["experimental.chat.system.transform"]
+
+    const output = { system: ["agent prompt"] }
+    await transform({ sessionID: "s1" }, output)
+    assert.deepEqual(output.system, ["past work\n\nagent prompt"])
+
+    const empty = { system: [] }
+    await transform({ sessionID: "s1" }, empty)
+    assert.deepEqual(empty.system, ["past work"])
+  })
+})
+
 // The registration decision itself, since the hook tests above cannot see the
 // tools: registering those needs opencode's own plugin package, which the host
 // provides and the test environment does not.

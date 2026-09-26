@@ -262,7 +262,12 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       }
       const context = digests.get(key)
       if (context) {
-        output.system.push(context)
+        // Fold into the first system entry, as the generated plugin does.
+        // opencode sends each entry as its own system message, and a backend
+        // whose template allows one (vLLM or SGLang serving Qwen) rejects the
+        // request: "System message must be at the beginning." (#4058)
+        if (output.system.length) output.system[0] = context + "\n\n" + output.system[0]
+        else output.system.push(context)
         return
       }
       // Nothing recalled: this machine has no history yet, the first index is

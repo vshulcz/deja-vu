@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The opencode npm plugin puts the session digest into opencode's first system message instead of adding a second one. vLLM and SGLang serving Qwen reject a request with two, answering "System message must be at the beginning.", so the title agent and subagents on those models failed every turn. The plugin `deja install --auto` writes already did this (#4058, reported by @R-omk).
+
 ## [0.21.3] - 2026-09-26
 
 The line deja puts beside a failed command or before a risky one is now worth
