@@ -184,6 +184,10 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 	case "codewhale":
 		sessions, err = ParseCodeWhaleFile(path)
 	case "reasonix":
+		// The 1.x fixture is zstd frames, which only the CLI reads.
+		if filepath.Base(path) == "events.frames" && !ZstdAvailable() {
+			t.Skip("zstd not installed")
+		}
 		sessions, err = ParseReasonixFile(path)
 	case "commandcode":
 		sessions, err = ParseCommandCodeFile(path)

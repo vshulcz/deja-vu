@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -40,5 +42,43 @@ func TestResumeReasonix(t *testing.T) {
 	spaced := filepath.Join(dir, "my sessions", "bare.jsonl")
 	if _, cmd, err := resumeCommand(model.Session{Harness: "reasonix", ID: "bare", Path: spaced}); err == nil {
 		t.Errorf("a path with a space went on the command line unquoted: %q", cmd)
+	}
+}
+
+// 1.x keeps a session as a directory, and its --resume matches an id only in
+// the sessions-v4 store of the working directory: a project session goes with
+// the directory whose slug is its store's, and the global and desktop stores
+// have no command.
+func TestResumeReasonixV4(t *testing.T) {
+	state := t.TempDir()
+	ws := filepath.Join(t.TempDir(), "relaylab")
+	slugOf := ws
+	if runtime.GOOS == "windows" {
+		slugOf = strings.ToLower(slugOf)
+	}
+	slug := strings.NewReplacer("/", "-", "\\", "-", ":", "-").Replace(slugOf)
+	session := func(store ...string) string {
+		dir := filepath.Join(append([]string{state}, store...)...)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		m, _ := json.Marshal(map[string]any{"codec": "reasonix.session.linear/v4", "sessionId": filepath.Base(dir)})
+		h, _ := json.Marshal(map[string]any{"cwd": ws})
+		for name, body := range map[string][]byte{"manifest.json": m, "header.json": h, "events.frames": nil} {
+			if err := os.WriteFile(filepath.Join(dir, name), body, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return filepath.Join(dir, "events.frames")
+	}
+	id := "839559938275e9a3ebde5a804aa24edd"
+	gotDir, cmd, err := resumeCommand(model.Session{Harness: "reasonix", ID: id, Path: session("projects", slug, "sessions-v4", id)})
+	if err != nil || gotDir != ws || cmd != "reasonix --resume "+id {
+		t.Errorf("project: dir/cmd/err = %q/%q/%v, want the workspace and the id", gotDir, cmd, err)
+	}
+	for _, store := range [][]string{{"sessions-v4", id}, {"desktop-sessions-v5", "by-id", "desktop-1"}} {
+		if _, cmd, err := resumeCommand(model.Session{Harness: "reasonix", ID: id, Path: session(store...)}); err == nil {
+			t.Errorf("%s: printed %q for a store --resume does not search", filepath.Join(store...), cmd)
+		}
 	}
 }

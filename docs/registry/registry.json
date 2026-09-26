@@ -1033,14 +1033,18 @@
         "${REASONIX_STATE_HOME:-~/.reasonix}/sessions/<id>.jsonl",
         "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions/<id>.jsonl",
         "%APPDATA%\\reasonix\\sessions\\<id>.jsonl",
-        "${DEJA_REASONIX_ROOT}/sessions/<id>.jsonl"
+        "${DEJA_REASONIX_ROOT}/sessions/<id>.jsonl",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions-v4/<id>/events.frames",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/sessions-v4/<id>/events.frames",
+        "${REASONIX_STATE_HOME:-~/.reasonix}/desktop-sessions-v5/by-id/<id>/events.frames"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "zstd-frames-or-jsonl",
       "fixture_paths": [
-        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions/registry-reasonix.jsonl"
+        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions/registry-reasonix.jsonl",
+        "fixtures/registry/reasonix/projects/-workspace-reasonix-demo/sessions-v4/registry-reasonix-v4/events.frames"
       ],
       "parser_source": "internal/sources/reasonix.go",
-      "last_verified": "2026-09-26",
+      "last_verified": "2026-09-27",
       "display_name": "Reasonix",
       "capabilities": {
         "mcp": false,

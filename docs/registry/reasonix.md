@@ -1,13 +1,14 @@
 # Reasonix
 
 - **ID**: `reasonix`
-- **Store**: `<state>/projects/<workspace-slug>/sessions/<id>.jsonl` per workspace, and `<state>/sessions/<id>.jsonl` for sessions with none
+- **Store (1.x)**: `<state>/projects/<workspace-slug>/sessions-v4/<id>/events.frames` per workspace, `<state>/sessions-v4/<id>/events.frames` for CLI hosts with no workspace, and `<state>/desktop-sessions-v5/by-id/<id>/events.frames` for the desktop app
+- **Store (JSONL)**: `<state>/projects/<workspace-slug>/sessions/<id>.jsonl` per workspace, and `<state>/sessions/<id>.jsonl` for sessions with none
 - **State root**: `$REASONIX_STATE_HOME`, else `$REASONIX_HOME`, else a `[storage] state` entry in `<home>/config.toml`, else `~/.reasonix` on macOS and Linux and `%APPDATA%\reasonix` on Windows
 - **Store (legacy)**: `~/.reasonix` on Windows, and the OS config directory (`~/Library/Application Support/reasonix`, `~/.config/reasonix`) on macOS and Linux — read while they are on disk, unless `REASONIX_HOME` or `REASONIX_STATE_HOME` is set
 - **Read overrides**: `DEJA_REASONIX_ROOT` replaces the state root; pointed at a `sessions` directory it reads that directory alone
-- **Format**: JSONL — one message per line, no envelope
-- **Needs**: nothing
-- **Resume**: `reasonix --resume <id>`, run in the workspace the session was worked in; a session saved with no workspace is resumed by its file path
+- **Format**: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope
+- **Needs**: the `zstd` CLI for 1.x sessions; nothing for JSONL
+- **Resume**: `reasonix --resume <id>`, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command
 
 Reasonix is a Go coding agent built around DeepSeek's prefix cache. The
 layout above comes from its own resolver, `internal/contract/config`
@@ -29,7 +30,40 @@ Beside each transcript sits `<id>.jsonl.meta`, which carries `created_at`,
 `updated_at`, `workspace_root` and the titles (`custom_title`, `topic_title`,
 `name`). The session's clock and project come from there.
 
-**Last verified:** 2026-09-26
+## 1.x session directories
+
+Reasonix 1.x (npm `reasonix` 1.x, branch `main-v2`) keeps each session as a
+directory: `manifest.json` (`sessionId`, `createdAt`, `codec`
+`reasonix.session.linear/v4`), `header.json` with the workspace as `cwd` when
+the desktop app made the session, and `events.frames`. The rest —
+`events.offset-index.json`, `storage.identity.json`, `writer.lock` — and the
+dot directories beside the sessions (`.query-cache`, `.recovery-cache`,
+`.content-v1`) are not transcripts.
+
+`events.frames` is a run of frames: `RX4F`, the compressed and the raw size as
+big-endian uint32, then one zstd frame holding a JSON record
+(`internal/session/v4_codec.go`). Records come in batches — `batch/begin`,
+the events, `batch/end` with the SHA-256 of the records before it — and only a
+finished batch counts: a trailing batch with no end is a write in progress.
+An event's `payload` is base64 JSON; a payload over 64 KiB is a `payloadRef`
+to `.content-v1/objects/<aa>/<bb>/<sha256>` beside the sessions.
+
+The message list is replayed the way Reasonix projects it:
+`message/complete` appends `{message}`, `message/upsert` replaces by message
+id, `message/retract` drops `messageIds`, and `history/replace` and
+`legacy/import` swap in a whole list. `session/title` is the title. A message
+is Reasonix's provider message: `origin` is `user` or `host`, and host
+messages (the session-context snapshot) and `local_only` records are dropped;
+`createdAt` is unix milliseconds on user turns, and other messages take their
+batch's time; `tool_calls` and `raw_content` read as in the JSONL store, and a
+`tool` result's `tool_execution.exitCode` rides on its command when non-zero.
+
+The workspace is `header.json`'s `cwd`, else the `Current workspace: "<root>"`
+line of the host's session-context message (the CLI writes no header), else,
+for a desktop session, the workspace that lists its id in
+`<state>/desktop/workspace-state-v1.json`.
+
+**Last verified:** 2026-09-27
 
 ## Known quirks and drift
 
@@ -43,15 +77,30 @@ Beside each transcript sits `<id>.jsonl.meta`, which carries `created_at`,
 - **Legacy copies.** Reasonix imports legacy sessions into its current store
   and leaves the originals, so a legacy transcript is read only when the
   current store has no file with its name.
+- **Copies between stores.** 1.x mirrors a JSONL transcript into
+  `sessions-v4` under the same id, migrates one under a new id naming the
+  original in the manifest's `source.path`, and the desktop imports sessions
+  into its own store, recording each source under `sourceMappings` in
+  `workspace-state-v1.json`. None of them deletes the original. deja reads the
+  newest store's copy: desktop, then `sessions-v4`, then JSONL. A fork also
+  names its parent in `source.path`; that is a directory, and the parent is
+  still read.
+- **Resume in 1.x.** `--resume <id>` looks in the `sessions-v4` store whose
+  slug is the working directory's, not the git root the session-context names,
+  so the directory deja prints is the one whose slug matches the store.
+  The global and desktop stores are not searched by `--resume`.
 - **Sidecars share the directory.** `.events.jsonl`, `.wire.jsonl`,
   `.guardian.jsonl`, `.conflicts.jsonl`, `.adjudication.jsonl`,
   `.execution.jsonl` and `.turns.jsonl` end in `.jsonl` and are not
   transcripts; nor are flat `subagent-*.jsonl` worker logs or the `subagents/`
   tree. Locks, metadata, context and recovery files sit there too.
-- **The shapes come from the source, not from a running install.** Everything
-  above is read from Reasonix's own code (`internal/state/store/session.go`,
-  `internal/state/sessionstore`, `internal/contract/provider/provider.go`) and
-  from the transcript sample in #4053. Nothing here has been checked against a
-  live Reasonix on this machine.
+- **Where the shapes come from.** The JSONL store is read from Reasonix's own
+  code (`internal/state/store/session.go`, `internal/state/sessionstore`,
+  `internal/contract/provider/provider.go`) and from the transcript sample in
+  #4053, not from a running install. The 1.x store is read from the 1.x code
+  (`internal/session`, `internal/sessioncontent`, `internal/config/paths.go`)
+  and was checked against a
+  live `reasonix` 1.39.1: sessions it wrote are read here, and it resumes the
+  1.x fixture deja checks in.
 - **Nothing is wired.** deja reads this store and writes nothing into
   Reasonix.

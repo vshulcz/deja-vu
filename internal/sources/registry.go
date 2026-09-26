@@ -579,6 +579,8 @@ func allHarnesses() []Harness {
 			// Reasonix writes flat role/content lines, but its clock and
 			// workspace sit in sidecars beside the transcript, and a compaction
 			// rewrites the file, so it is read whole rather than from an offset.
+			// 1.x's events.frames is zstd-framed and replayed whole too: an
+			// upsert or a history replace rewrites what came before.
 			Name: "reasonix", Load: LoadReasonix, Files: ReasonixSessionFiles,
 			Kinds: []FileKind{{
 				Name:  "reasonix",

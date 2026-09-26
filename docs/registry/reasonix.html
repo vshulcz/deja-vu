@@ -39,13 +39,14 @@
 <h1>Reasonix</h1>
 <ul>
 <li><strong>ID</strong>: <code>reasonix</code></li>
-<li><strong>Store</strong>: <code>&lt;state&gt;/projects/&lt;workspace-slug&gt;/sessions/&lt;id&gt;.jsonl</code> per workspace, and <code>&lt;state&gt;/sessions/&lt;id&gt;.jsonl</code> for sessions with none</li>
+<li><strong>Store (1.x)</strong>: <code>&lt;state&gt;/projects/&lt;workspace-slug&gt;/sessions-v4/&lt;id&gt;/events.frames</code> per workspace, <code>&lt;state&gt;/sessions-v4/&lt;id&gt;/events.frames</code> for CLI hosts with no workspace, and <code>&lt;state&gt;/desktop-sessions-v5/by-id/&lt;id&gt;/events.frames</code> for the desktop app</li>
+<li><strong>Store (JSONL)</strong>: <code>&lt;state&gt;/projects/&lt;workspace-slug&gt;/sessions/&lt;id&gt;.jsonl</code> per workspace, and <code>&lt;state&gt;/sessions/&lt;id&gt;.jsonl</code> for sessions with none</li>
 <li><strong>State root</strong>: <code>$REASONIX_STATE_HOME</code>, else <code>$REASONIX_HOME</code>, else a <code>[storage] state</code> entry in <code>&lt;home&gt;/config.toml</code>, else <code>~/.reasonix</code> on macOS and Linux and <code>%APPDATA%\reasonix</code> on Windows</li>
 <li><strong>Store (legacy)</strong>: <code>~/.reasonix</code> on Windows, and the OS config directory (<code>~/Library/Application Support/reasonix</code>, <code>~/.config/reasonix</code>) on macOS and Linux — read while they are on disk, unless <code>REASONIX_HOME</code> or <code>REASONIX_STATE_HOME</code> is set</li>
 <li><strong>Read overrides</strong>: <code>DEJA_REASONIX_ROOT</code> replaces the state root; pointed at a <code>sessions</code> directory it reads that directory alone</li>
-<li><strong>Format</strong>: JSONL — one message per line, no envelope</li>
-<li><strong>Needs</strong>: nothing</li>
-<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a session saved with no workspace is resumed by its file path</li>
+<li><strong>Format</strong>: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope</li>
+<li><strong>Needs</strong>: the <code>zstd</code> CLI for 1.x sessions; nothing for JSONL</li>
+<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command</li>
 </ul>
 <p>Reasonix is a Go coding agent built around DeepSeek&#39;s prefix cache. The</p>
 <p>layout above comes from its own resolver, <code>internal/contract/config</code></p>
@@ -64,7 +65,35 @@
 <p>Beside each transcript sits <code>&lt;id&gt;.jsonl.meta</code>, which carries <code>created_at</code>,</p>
 <p><code>updated_at</code>, <code>workspace_root</code> and the titles (<code>custom_title</code>, <code>topic_title</code>,</p>
 <p><code>name</code>). The session&#39;s clock and project come from there.</p>
-<p><strong>Last verified:</strong> 2026-09-26</p>
+<h2 id="1-x-session-directories">1.x session directories</h2>
+<p>Reasonix 1.x (npm <code>reasonix</code> 1.x, branch <code>main-v2</code>) keeps each session as a</p>
+<p>directory: <code>manifest.json</code> (<code>sessionId</code>, <code>createdAt</code>, <code>codec</code></p>
+<p><code>reasonix.session.linear/v4</code>), <code>header.json</code> with the workspace as <code>cwd</code> when</p>
+<p>the desktop app made the session, and <code>events.frames</code>. The rest —</p>
+<p><code>events.offset-index.json</code>, <code>storage.identity.json</code>, <code>writer.lock</code> — and the</p>
+<p>dot directories beside the sessions (<code>.query-cache</code>, <code>.recovery-cache</code>,</p>
+<p><code>.content-v1</code>) are not transcripts.</p>
+<p><code>events.frames</code> is a run of frames: <code>RX4F</code>, the compressed and the raw size as</p>
+<p>big-endian uint32, then one zstd frame holding a JSON record</p>
+<p>(<code>internal/session/v4_codec.go</code>). Records come in batches — <code>batch/begin</code>,</p>
+<p>the events, <code>batch/end</code> with the SHA-256 of the records before it — and only a</p>
+<p>finished batch counts: a trailing batch with no end is a write in progress.</p>
+<p>An event&#39;s <code>payload</code> is base64 JSON; a payload over 64 KiB is a <code>payloadRef</code></p>
+<p>to <code>.content-v1/objects/&lt;aa&gt;/&lt;bb&gt;/&lt;sha256&gt;</code> beside the sessions.</p>
+<p>The message list is replayed the way Reasonix projects it:</p>
+<p><code>message/complete</code> appends <code>{message}</code>, <code>message/upsert</code> replaces by message</p>
+<p>id, <code>message/retract</code> drops <code>messageIds</code>, and <code>history/replace</code> and</p>
+<p><code>legacy/import</code> swap in a whole list. <code>session/title</code> is the title. A message</p>
+<p>is Reasonix&#39;s provider message: <code>origin</code> is <code>user</code> or <code>host</code>, and host</p>
+<p>messages (the session-context snapshot) and <code>local_only</code> records are dropped;</p>
+<p><code>createdAt</code> is unix milliseconds on user turns, and other messages take their</p>
+<p>batch&#39;s time; <code>tool_calls</code> and <code>raw_content</code> read as in the JSONL store, and a</p>
+<p><code>tool</code> result&#39;s <code>tool_execution.exitCode</code> rides on its command when non-zero.</p>
+<p>The workspace is <code>header.json</code>&#39;s <code>cwd</code>, else the <code>Current workspace: &#34;&lt;root&gt;&#34;</code></p>
+<p>line of the host&#39;s session-context message (the CLI writes no header), else,</p>
+<p>for a desktop session, the workspace that lists its id in</p>
+<p><code>&lt;state&gt;/desktop/workspace-state-v1.json</code>.</p>
+<p><strong>Last verified:</strong> 2026-09-27</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>Per-message time is partial.</strong> The host stamps <code>createdAt</code> (unix</li>
@@ -83,6 +112,22 @@
 <p>and leaves the originals, so a legacy transcript is read only when the</p>
 <p>current store has no file with its name.</p>
 <ul>
+<li><strong>Copies between stores.</strong> 1.x mirrors a JSONL transcript into</li>
+</ul>
+<p><code>sessions-v4</code> under the same id, migrates one under a new id naming the</p>
+<p>original in the manifest&#39;s <code>source.path</code>, and the desktop imports sessions</p>
+<p>into its own store, recording each source under <code>sourceMappings</code> in</p>
+<p><code>workspace-state-v1.json</code>. None of them deletes the original. deja reads the</p>
+<p>newest store&#39;s copy: desktop, then <code>sessions-v4</code>, then JSONL. A fork also</p>
+<p>names its parent in <code>source.path</code>; that is a directory, and the parent is</p>
+<p>still read.</p>
+<ul>
+<li><strong>Resume in 1.x.</strong> <code>--resume &lt;id&gt;</code> looks in the <code>sessions-v4</code> store whose</li>
+</ul>
+<p>slug is the working directory&#39;s, not the git root the session-context names,</p>
+<p>so the directory deja prints is the one whose slug matches the store.</p>
+<p>The global and desktop stores are not searched by <code>--resume</code>.</p>
+<ul>
 <li><strong>Sidecars share the directory.</strong> <code>.events.jsonl</code>, <code>.wire.jsonl</code>,</li>
 </ul>
 <p><code>.guardian.jsonl</code>, <code>.conflicts.jsonl</code>, <code>.adjudication.jsonl</code>,</p>
@@ -90,12 +135,15 @@
 <p>transcripts; nor are flat <code>subagent-*.jsonl</code> worker logs or the <code>subagents/</code></p>
 <p>tree. Locks, metadata, context and recovery files sit there too.</p>
 <ul>
-<li><strong>The shapes come from the source, not from a running install.</strong> Everything</li>
+<li><strong>Where the shapes come from.</strong> The JSONL store is read from Reasonix&#39;s own</li>
 </ul>
-<p>above is read from Reasonix&#39;s own code (<code>internal/state/store/session.go</code>,</p>
-<p><code>internal/state/sessionstore</code>, <code>internal/contract/provider/provider.go</code>) and</p>
-<p>from the transcript sample in #4053. Nothing here has been checked against a</p>
-<p>live Reasonix on this machine.</p>
+<p>code (<code>internal/state/store/session.go</code>, <code>internal/state/sessionstore</code>,</p>
+<p><code>internal/contract/provider/provider.go</code>) and from the transcript sample in</p>
+<h1 id="4053-not-from-a-running-install-the-1-x-store-is-read-from-the-1-x-code">4053, not from a running install. The 1.x store is read from the 1.x code</h1>
+<p>(<code>internal/session</code>, <code>internal/sessioncontent</code>, <code>internal/config/paths.go</code>)</p>
+<p>and was checked against a</p>
+<p>live <code>reasonix</code> 1.39.1: sessions it wrote are read here, and it resumes the</p>
+<p>1.x fixture deja checks in.</p>
 <ul>
 <li><strong>Nothing is wired.</strong> deja reads this store and writes nothing into</li>
 </ul>

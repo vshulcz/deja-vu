@@ -256,6 +256,26 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// (the git root of the working directory), so it goes with that
 		// workspace. It also takes a file path, which is the only way back to
 		// a session saved with no workspace (internal/frontend/cli/cli_flags.go).
+		//
+		// 1.x keeps a session as a directory. Its --resume matches the id in
+		// the sessions-v4 store of the working directory and takes no
+		// directory path (internal/cli/cli_flags.go:131-200), so a session in
+		// the global or the desktop store has no command to reopen it by.
+		switch sources.ReasonixStore(s.Path) {
+		case "desktop":
+			return "", "", fmt.Errorf("session %s was made in the Reasonix desktop app and reopens from its sidebar; the CLI does not read that store", digest.Short(s.ID))
+		case "global":
+			return "", "", fmt.Errorf("session %s is in Reasonix's store for sessions with no workspace, which `reasonix --resume` does not search", digest.Short(s.ID))
+		case "project":
+			ws := sources.ReasonixWorkspace(s.Path)
+			if ws == "" {
+				return "", "", fmt.Errorf("session %s: deja cannot tell which directory it was started in; run `reasonix --resume %s` there", digest.Short(s.ID), s.ID)
+			}
+			if !reasonixPathPattern.MatchString(s.ID) {
+				return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", s.ID)
+			}
+			return ws, "reasonix --resume " + s.ID, nil
+		}
 		if ws := sources.ReasonixWorkspace(s.Path); ws != "" {
 			return ws, "reasonix --resume " + s.ID, nil
 		}

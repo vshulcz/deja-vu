@@ -1,6 +1,9 @@
 package sources
 
-import "strings"
+import (
+	"path/filepath"
+	"strings"
+)
 
 // SkipReason says why a harness deja can see on disk produced nothing. That is
 // a missing external tool: six stores are read through the sqlite3 CLI, and an
@@ -38,6 +41,19 @@ func SkipReason(harness string) string {
 			return ""
 		}
 		return "zstd CLI not found"
+	}
+	// Reasonix 1.x writes its event log as zstd frames; its JSONL stores read
+	// without the tool, and a machine with only those has nothing to explain.
+	if harness == "reasonix" {
+		if ZstdAvailable() {
+			return ""
+		}
+		for _, f := range ReasonixSessionFiles() {
+			if filepath.Base(f) == "events.frames" {
+				return "zstd CLI not found"
+			}
+		}
+		return ""
 	}
 	if SQLite3Available() {
 		return ""

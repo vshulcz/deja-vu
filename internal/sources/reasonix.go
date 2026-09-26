@@ -149,126 +149,6 @@ func ReasonixRoots() []string {
 	return append([]string{ReasonixRoot()}, reasonixLegacyRoots()...)
 }
 
-// reasonixSessionDirs lists the directories under one root that hold
-// transcripts: the global sessions/ and one per workspace.
-func reasonixSessionDirs(root string) []string {
-	dirs := []string{filepath.Join(root, "sessions")}
-	projects, _ := filepath.Glob(filepath.Join(root, "projects", "*", "sessions"))
-	dirs = append(dirs, projects...)
-	if !dirExists(dirs[0]) && !dirExists(filepath.Join(root, "projects")) {
-		// Pointed straight at a sessions directory.
-		dirs = append(dirs, root)
-	}
-	return dirs
-}
-
-func dirExists(p string) bool {
-	st, err := os.Stat(p)
-	return err == nil && st.IsDir()
-}
-
-// reasonixSidecarSuffixes end in .jsonl and are not transcripts; Reasonix
-// keeps the same list in internal/state/store/session.go.
-var reasonixSidecarSuffixes = []string{
-	".events.jsonl", ".conflicts.jsonl", ".guardian.jsonl", ".wire.jsonl",
-	".adjudication.jsonl", ".execution.jsonl", ".turns.jsonl",
-}
-
-// isReasonixTranscriptName reports whether a file name is a conversation. A
-// flat subagent-*.jsonl is a delegated worker's log, reached through its parent.
-func isReasonixTranscriptName(name string) bool {
-	if !strings.HasSuffix(name, ".jsonl") || strings.HasPrefix(name, ".") || strings.HasPrefix(name, "subagent-") {
-		return false
-	}
-	for _, s := range reasonixSidecarSuffixes {
-		if strings.HasSuffix(name, s) {
-			return false
-		}
-	}
-	return true
-}
-
-func reasonixTranscriptsIn(root string) []string {
-	var out []string
-	for _, dir := range reasonixSessionDirs(root) {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		for _, e := range entries {
-			if !e.IsDir() && isReasonixTranscriptName(e.Name()) {
-				out = append(out, filepath.Join(dir, e.Name()))
-			}
-		}
-	}
-	return out
-}
-
-// ReasonixSessionFiles lists the transcripts: the current root's, then each
-// legacy root's whose id the current root does not already hold.
-func ReasonixSessionFiles() []string {
-	out := reasonixTranscriptsIn(ReasonixRoot())
-	// Windows names are case-insensitive: the same session under two
-	// spellings is one file there, and must be read once.
-	key := filepath.Base
-	if runtime.GOOS == "windows" {
-		key = func(p string) string { return strings.ToLower(filepath.Base(p)) }
-	}
-	have := map[string]bool{}
-	for _, p := range out {
-		have[key(p)] = true
-	}
-	for _, root := range reasonixLegacyRoots() {
-		for _, p := range reasonixTranscriptsIn(root) {
-			if !have[key(p)] {
-				have[key(p)] = true
-				out = append(out, p)
-			}
-		}
-	}
-	return out
-}
-
-// ReasonixSidecarFiles names everything else in the session directories —
-// metadata, event logs, locks, context and recovery state, subagent logs — so
-// doctor places them instead of counting them as transcripts it failed on.
-func ReasonixSidecarFiles() []string {
-	var out []string
-	for _, root := range ReasonixRoots() {
-		for _, dir := range reasonixSessionDirs(root) {
-			out = append(out, walkFiles(dir, func(p string) bool {
-				return filepath.Dir(p) != filepath.Clean(dir) || !isReasonixTranscriptName(filepath.Base(p))
-			})...)
-		}
-	}
-	return out
-}
-
-// ReasonixSessionDirsAll is every session directory doctor walks.
-func ReasonixSessionDirsAll() []string {
-	var out []string
-	for _, root := range ReasonixRoots() {
-		out = append(out, reasonixSessionDirs(root)...)
-	}
-	return out
-}
-
-// IsReasonixSession lets the registry claim a path for incremental ingest.
-func IsReasonixSession(p string) bool {
-	if !isReasonixTranscriptName(filepath.Base(p)) {
-		return false
-	}
-	dir := filepath.Dir(p)
-	for _, root := range ReasonixRoots() {
-		for _, d := range reasonixSessionDirs(root) {
-			if dir == filepath.Clean(d) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func LoadReasonix() []model.Session {
 	return parseFiles(ReasonixSessionFiles(), ParseReasonixFile)
 }
@@ -313,8 +193,12 @@ func readReasonixMeta(path string) reasonixMeta {
 }
 
 // ReasonixWorkspace is the directory a session was worked in, from its
-// metadata, or "" when neither sidecar names one.
+// metadata, or "" when neither sidecar names one. For a 1.x session it is the
+// directory `reasonix --resume` finds it from, or "" when there is none.
 func ReasonixWorkspace(path string) string {
+	if filepath.Base(path) == "events.frames" {
+		return reasonixV4ResumeDir(path)
+	}
 	m := readReasonixMeta(path)
 	if m.Workspace != "" {
 		return m.Workspace
@@ -344,8 +228,12 @@ func reasonixEventSpan(path string) (first, last time.Time) {
 	return first, last
 }
 
-// ParseReasonixFile reads one transcript.
+// ParseReasonixFile reads one transcript: a JSONL file, or a 1.x session
+// directory's events.frames.
 func ParseReasonixFile(path string) ([]model.Session, error) {
+	if filepath.Base(path) == "events.frames" {
+		return ParseReasonixV4(path)
+	}
 	meta := readReasonixMeta(path)
 	s := model.Session{
 		Harness: "reasonix",
