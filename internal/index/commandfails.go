@@ -2,6 +2,7 @@ package index
 
 import (
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -106,6 +107,8 @@ type commandFailAcc struct {
 	// attributed. Records and messages both arrive in the order they were
 	// written.
 	pending map[string]string
+	// The first program's part of that command, to tell whose glob failed.
+	first map[string]string
 }
 
 func newCommandFailAcc() *commandFailAcc {
@@ -115,10 +118,64 @@ func newCommandFailAcc() *commandFailAcc {
 			sessions map[string]bool
 		}{},
 		pending: map[string]string{},
+		first:   map[string]string{},
 	}
 }
 
-func (a *commandFailAcc) command(key, text string) { a.pending[key] = CommandHead(text) }
+func (a *commandFailAcc) command(key, text string) {
+	if !failureIsTheHeads(text) {
+		delete(a.pending, key)
+		return
+	}
+	a.pending[key] = CommandHead(text)
+	seg := strings.TrimSpace(firstTextLine(text))
+	if i := strings.IndexAny(seg, "|;&"); i > 0 {
+		seg = seg[:i]
+	}
+	a.first[key] = seg
+}
+
+// failureSegmentRE splits a command line into the programs it runs.
+var failureSegmentRE = regexp.MustCompile(`\|\||&&|;|\||&`)
+
+var failureQuotedRE = regexp.MustCompile(`"[^"]*"|'[^']*'`)
+
+// outputFilters only reshape what the command before them printed, so an error
+// in the output is still that command's.
+var outputFilters = map[string]bool{
+	"tail": true, "head": true, "grep": true, "rg": true, "egrep": true, "cut": true,
+	"sort": true, "uniq": true, "wc": true, "tee": true, "cat": true, "less": true,
+	"echo": true, "printf": true, "true": true, "tr": true, "column": true,
+}
+
+// failureIsTheHeads reports whether an error in this command's output can be
+// laid at its first program. The warning is keyed on that program, and in a
+// chain the error came from whichever part failed: `gh pr checks 41; go test`
+// was on file as gh ending in a failing Go test, `git fetch && [ $a == $b ]` as
+// git ending in zsh's "== not found". Over 835 warnings in real transcripts the
+// command that followed failed 2.5% of the time, against 2.6% for every Bash
+// run — the line predicted nothing. A pipe into a filter keeps the error the
+// first program's.
+func failureIsTheHeads(text string) bool {
+	line := strings.TrimSpace(withoutExitStatus(strings.TrimSpace(firstTextLine(text))))
+	line = strings.TrimPrefix(line, "$ ")
+	// A pattern in quotes is an argument, not a pipe: `grep -E "ok|FAIL"`.
+	line = failureQuotedRE.ReplaceAllString(line, "q")
+	for _, r := range []string{"2>&1", ">&2", "&>"} {
+		line = strings.ReplaceAll(line, r, " ")
+	}
+	segs := failureSegmentRE.Split(line, -1)
+	for _, seg := range segs[1:] {
+		f := strings.Fields(seg)
+		if len(f) == 0 {
+			continue
+		}
+		if !outputFilters[filepath.Base(f[0])] {
+			return false
+		}
+	}
+	return true
+}
 
 func (a *commandFailAcc) output(key, project, text string) {
 	head := a.pending[key]
@@ -127,6 +184,14 @@ func (a *commandFailAcc) output(key, project, text string) {
 	}
 	line, _, ok := firstFrictionLine(text)
 	if !ok {
+		return
+	}
+	// zsh refuses the whole line over one unmatched glob, and names it. When
+	// the glob is not in the first program's part, the error is not its:
+	// `go test ./... | grep -rn --include=*.go` was on file as go test ending
+	// in "no matches found: --include=*.go".
+	if glob, isGlob := strings.CutPrefix(line, "no matches found: "); isGlob && !strings.Contains(a.first[key], glob) {
+		delete(a.pending, key)
 		return
 	}
 	// One failure per run: the first friction line is what the run ended on,
