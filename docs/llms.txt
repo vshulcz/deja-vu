@@ -16,6 +16,8 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html): how to delete Claude Code sessions, how large ~/.claude/projects gets, what is inside a session file, and what deleting one costs
 - [Delete Cline task history](https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html): distinguish the modern CLI session store from the VS Code extension task tree and remove only the conversation data you intend to delete
 - [Delete Kiro session history](https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html): the CLI writes a transcript and header pair per session and the IDE a directory per session under ~/.kiro/sessions; remove the right one, and check the globalStorage and TUI copies that tree does not cover
+- [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): one JSON file per thread under ~/.local/share/amp/threads, so deleting one conversation is deleting one file; the thread in your Amp account is separate
+- [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): one JSON file per session plus a sessions.json list the history view reads; remove the entry with the file, or the session stays listed and cannot be deleted from Continue
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
 

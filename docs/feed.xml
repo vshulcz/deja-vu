@@ -95,6 +95,13 @@
     <summary>How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.</summary>
   </entry>
   <entry>
+    <title>Delete Continue session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html"></link>
+    <updated>2026-09-26T00:00:00Z</updated>
+    <summary>Continue keeps one JSON file per session plus a sessions.json list the history view reads. How to remove one session or all, and why the list has to go too.</summary>
+  </entry>
+  <entry>
     <title>Delete VS Code Copilot Chat history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html"></link>
     <updated>2026-09-26T00:00:00Z</updated>
     <summary>How to give Cursor recall over every coding agent&#39;s sessions on this machine — where its SQLite chat store lives, and what deja install cursor-auto writes.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
-    <updated>2026-09-26T00:00:00Z</updated>
-    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
   </entry>
 </feed>
