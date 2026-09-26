@@ -162,14 +162,7 @@ jobs:
             if (pkg.dependencies?.["@vshulcz/deja-vu"]) pkg.dependencies["@vshulcz/deja-vu"] = "^" + d;
             fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");
           ' "$out/package.json" "$version" "${GITHUB_REF_NAME#v}"
-          # The CLI only asks for an OIDC token when Actions hands it the
-          # request URL, and falls back to a stored token when the mint is
-          # refused — both of which end as "Not logged in", which says nothing
-          # about which one happened. The v0.21.0 run ended there.
-          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
-            echo "no OIDC request url in this job: trusted publishing cannot run" >&2
-            exit 1
-          fi
+          node scripts/release-clawhub-auth.mjs @vshulcz/openclaw-deja "$version"
           npx -y clawhub@0.23.3 package publish "$out" \
             --family code-plugin \
             --name @vshulcz/openclaw-deja \

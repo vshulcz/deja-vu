@@ -157,11 +157,11 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <requête>` | Cherche dans tout l'historique. Plusieurs mots valent ET, les guillemets exigent un texte contigu ; sans correspondance exacte, elle essaie les formes du mot et les orthographes proches. |
 | `deja wip` | Ce que faisait la dernière session dans ce répertoire : la tâche, ce qui a été tranché, les fichiers en main, la dernière commande et si elle a échoué. Tout est déduit des enregistrements, sans dépendre de notes prises par quelqu'un. |
-| `deja blame <chemin>[:ligne]` | Quelles sessions ont discuté ce fichier, ce qui a été décidé et pourquoi. Avec un numéro de ligne : le commit qui l'a modifiée en dernier, et la session qui a écrit le texte que ce commit a supprimé. |
+| `deja blame <chemin>[:ligne]` | Quelles sessions ont discuté ce fichier, ce qui a été décidé et pourquoi. Avec un numéro de ligne : le commit qui l'a modifiée en dernier, et la session qui a écrit cette ligne ou le texte que ce commit a remplacé. |
 | `deja files <sujet>` | Dans l'autre sens : quels fichiers le travail sur un sujet a réellement touchés. |
 | `deja how <outil>` | Comment cela se lance vraiment sur cette machine, avec de vrais arguments, tirés des commandes que les agents ont déjà exécutées. |
 | `deja fix <erreur>` | Ce qui a été lancé après la même erreur sur cette machine, et après quoi l'erreur n'est pas revenue. |
-| `deja friction` | Les erreurs qui touchent plus de trois sessions différentes, avec les outils d'où elles viennent. |
+| `deja friction` | Les erreurs qui touchent trois sessions différentes ou plus, avec les outils d'où elles viennent. |
 | `deja ctx <requête>` | Résumé Markdown des meilleurs résultats, prêt à être collé dans un prompt. |
 | `deja resume <id>` | Rouvre la session trouvée dans l'outil auquel elle appartient. |
 | `deja view` | Exporte toute la mémoire dans un seul fichier HTML local. Pas de serveur, rien ne quitte la machine. |
@@ -173,7 +173,7 @@ La référence complète est dans la [documentation des commandes](https://vshul
 ### Outils MCP
 
 Le serveur expose un seul outil, `deja`, et le paramètre `mode` choisit la capacité : `recall`, `context`,
-`blame`, `fix`, `how`, `remember`. `deja install` le branche tout seul, donc cela n'importe que si vous
+`blame`, `fix`, `how`, `orient`, `remember`. `deja install` le branche tout seul, donc cela n'importe que si vous
 configurez un agent à la main. Les six anciens noms d'outils continuent de fonctionner chez les clients déjà
 branchés.
 
@@ -240,6 +240,7 @@ deja bench context    # 30 chaînes de tâches avec graine, plus cinq contrôles
 deja bench block      # si la réponse est encore dans le fragment de texte remis
 deja bench prompt     # quand le hook par prompt parle, et quand il parle à tort
 deja bench ingest     # coût d'une mise à jour de l'index : rien n'a changé, un tour ajouté, un fichier en plus, réécriture complète
+deja bench read       # ce que coûte la lecture d'un stockage en base de données, et l'effet d'une seule valeur longue
 ```
 
 L'expérience de contexte compare le rappel de deja à l'historique complet, à un grep naïf et au démarrage à
@@ -261,7 +262,7 @@ Mesuré sur un vrai dépôt : 2,419 sessions, 179k messages, 1.9 Go d'enregistre
 
 | Mesure | Résultat |
 | --- | --- |
-| Requête dans le processus | médiane **0.7–0.8 ms**, environ 19 ms sur les meules de foin de LongMemEval-S |
+| Requête dans le processus | médiane **0.7–0.8 ms**, environ 15 ms sur les meules de foin de LongMemEval-S |
 | `deja <requête>` de bout en bout | médiane d'environ 0.2 s sur ce dépôt : démarrage du processus, contrôle de fraîcheur de tous les stockages, classement, affichage |
 | Contrôle de fraîcheur seul | environ 50 ms quand rien n'a changé |
 | Taille de l'index | 200 Mo, environ 10 % du corpus |
@@ -300,7 +301,7 @@ automatique, il sait dès l'ouverture de la session ce qui avait été décidé 
 | Nécessite une clé LLM ou embeddings | non | oui | facultatif |
 | Rappelle sans qu'on le lui demande | au démarrage de session et avant l'exécution d'un outil | non | non |
 
-La [comparaison complète](https://vshulcz.github.io/deja-vu/guide/compare.html) en couvre onze.
+La [comparaison complète](https://vshulcz.github.io/deja-vu/guide/compare.html) en couvre quinze.
 
 **Où est l'historique de sessions de Claude Code, et peut-on le chercher ?** Dans `~/.claude/projects`, un
 fichier JSONL par session ; Codex dans `~/.codex/sessions`, Cursor dans le SQLite `state.vscdb`. `deja search`

@@ -140,7 +140,7 @@
 <pre>deja install omp-auto</pre>
 <p>Four things, all reversible with <code>deja uninstall omp-auto</code>:</p>
 <ul>
-<li><b>The extension</b> at <code>~/.omp/agent/extensions/deja/index.js</code>, which answers the <code>context</code> event: a handler returning <code>{ messages }</code> replaces what goes to the provider, and that is the only seam here that reaches the model before it answers.</li>
+<li><b>The extension</b> at <code>~/.omp/agent/extensions/deja/index.js</code>, which answers the <code>context</code> event: a handler returning <code>{ messages }</code> replaces what goes to the provider, and that is the only seam here that reaches the model before it answers. It also answers <code>tool_result</code>, which hands over what the model is about to read and takes a replacement back: a failed command gets what this machine ran after the same error, and a file the agent just opened gets what past sessions decided about it.</li>
 <li><b>The MCP server</b> in <code>~/.omp/agent/mcp.json</code>, so what arrived can be followed up on — read a session in full, see a file's history, ask what fixed an error, store a decision.</li>
 <li><b>The slash command</b> at <code>~/.omp/agent/commands/deja.md</code>, for asking directly.</li>
 <li><b>The shared skill</b> at <code>~/.agents/skills/deja-history/SKILL.md</code>.</li>
@@ -148,7 +148,7 @@
 <p>Which event, and that a returned list is honoured at all, came from running a probe extension against omp 17.4.1 and watching what fired: <code>input</code> never does in print mode, <code>before_agent_start</code> carries the prompt but not the context, and a marker prepended in <code>context</code> came back out of the model. The hook command names deja's launcher rather than the build it was installed from, so the extension keeps working when the binary moves.</p>
 
 <h2>What arrives</h2>
-<p>At the front of the context: a short digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred — and, when your prompt is already answered by your own history, that answer. Silence is the common case, and an injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+<p>At the front of the context: a short digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred — and, when your prompt is already answered by your own history, that answer. Beside a tool's result: the repair for a failed command, or the prior decision on a file just opened. Silence is the common case, and an injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
 
 <h2>The part that is not about omp</h2>
 <p>The index covers every agent's transcripts on the machine — thirty-four of them, each in its own format — so a fix found in Claude Code answers a question asked in omp, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

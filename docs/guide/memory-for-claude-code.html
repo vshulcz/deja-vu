@@ -142,7 +142,7 @@
 
 <h2>Adding recall</h2>
 <pre>deja install claude-auto</pre>
-<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and a SessionStart hook in <code>~/.claude/settings.json</code> so a new session opens already carrying what the last ones settled. The MCP server on its own is <code>deja install claude-code</code>.</p>
+<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and five hooks in <code>~/.claude/settings.json</code>: SessionStart, so a new session opens already carrying what the last ones settled; UserPromptSubmit, which searches for what the prompt is about; PreToolUse, which names a file's or command's prior decision before the action and puts memory into a spawned subagent's instructions; PostToolUse, which answers a failed command with what ran after the same error here before; and PreCompact. The MCP server on its own is <code>deja install claude-code</code>.</p>
 <p>This repository is also a Claude plugin marketplace, if you would rather install it the way Claude Code installs everything else:</p>
 <pre>claude plugin marketplace add vshulcz/deja-vu
 claude plugin install deja-vu@deja-vu</pre>
@@ -153,7 +153,7 @@ claude plugin install deja-vu@deja-vu</pre>
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 
 <h2>What the hook actually changes</h2>
-<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. Claude Code also hands a hook the transcript before it compacts, which is the one seam that makes the working context recoverable: deja keeps the task, the files and each command with whether it passed, and gives them back once after the summary lands. <a href="after-compaction.html">After compaction</a> covers that half.</p>
+<p>Without it, recall depends on the agent deciding to search. The hook moves the decision earlier: the session opens with what this project already settled, so the first exchange is not spent re-deriving it. Claude Code also hands a hook the transcript before it compacts, which is the one seam that makes the working context recoverable: deja keeps the task, the conclusions, each command with whether it passed and what is still open, and gives them back once after the summary lands. <a href="after-compaction.html">After compaction</a> covers that half.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — thirty-four of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>

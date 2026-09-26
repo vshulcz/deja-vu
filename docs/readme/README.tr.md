@@ -156,11 +156,11 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <sorgu>` | Tüm geçmişte arar. Birden çok sözcük VE anlamına gelir, tırnak bitişik metin ister; tam eşleşme yoksa sözcük biçimlerini ve yakın yazımları dener. |
 | `deja wip` | Bu dizindeki son oturum ne yapıyordu: görev, varılan sonuç, elde olan dosyalar, son komut ve başarısız olup olmadığı. Hepsi kayıtlardan çıkarılır, kimsenin not tutmuş olmasına bağlı değildir. |
-| `deja blame <yol>[:satır]` | Bu dosyayı hangi oturumlar konuştu, ne karar verildi ve neden. Satır numarası verilirse: o satırı en son değiştiren commit ve o commit'in sildiği metni yazan oturum. |
+| `deja blame <yol>[:satır]` | Bu dosyayı hangi oturumlar konuştu, ne karar verildi ve neden. Satır numarası verilirse: o satırı en son değiştiren commit ve o satırı ya da o commit'in değiştirdiği metni yazan oturum. |
 | `deja files <konu>` | Ters yön: bir konudaki çalışmanın gerçekte hangi dosyalara dokunduğu. |
 | `deja how <araç>` | Bu makinede bu iş gerçekte nasıl çalıştırılıyor — ajanların daha önce çalıştırdığı komutlardan alınmış gerçek argümanlarla. |
 | `deja fix <hata>` | Bu makinede aynı hatadan sonra ne çalıştırıldı ve ondan sonra hata bir daha çıkmadı. |
-| `deja friction` | Üçten fazla farklı oturuma isabet eden hatalar ve hangi araçlardan geldikleri. |
+| `deja friction` | Üç veya daha fazla farklı oturuma isabet eden hatalar ve hangi araçlardan geldikleri. |
 | `deja ctx <sorgu>` | En iyi sonuçların Markdown özeti, doğrudan bir prompt'a girecek biçimde. |
 | `deja resume <id>` | Bulunan oturumu ait olduğu araçta yeniden açar. |
 | `deja view` | Tüm belleği tek bir yerel HTML dosyasına aktarır. Sunucu yok, veri makineden çıkmaz. |
@@ -172,7 +172,7 @@ Tam başvuru [komut belgelerinde](https://vshulcz.github.io/deja-vu/guide/comman
 ### MCP araçları
 
 Sunucu tek bir `deja` aracı sunar, yeteneği `mode` parametresi seçer: `recall`, `context`, `blame`, `fix`,
-`how`, `remember`. `deja install` bunu kendiliğinden bağlar, yani yalnızca bir ajanı elle yapılandırırken
+`how`, `orient`, `remember`. `deja install` bunu kendiliğinden bağlar, yani yalnızca bir ajanı elle yapılandırırken
 önemlidir. Eski altı araç adı, hâlihazırda bağlı istemcilerde çalışmaya devam eder.
 
 Yedi yerine tek araç bir maliyet meselesidir, üslup meselesi değil. Bağlı bir MCP sunucusu araç tanımlarını
@@ -235,6 +235,7 @@ deja bench context    # tohumlu 30 görev zinciri ve beş olumsuz kontrol
 deja bench block      # teslim edilen metin parçasında yanıt hâlâ var mı
 deja bench prompt     # prompt başına kanca ne zaman konuşuyor, ne zaman yanlış konuşuyor
 deja bench ingest     # bir indeks güncellemesinin maliyeti: değişiklik yok, bir tur eklendi, yeni bir kayıt dosyası, dosyanın tümden yeniden yazılması
+deja bench read       # veritabanı tabanlı bir deponun okunma maliyeti ve tek bir uzun değerin buna etkisi
 ```
 
 Bağlam deneyi, deja'nın geri çağırmasını tam geçmişle, naif grep ile ve soğuk başlangıçla karşılaştırır.
@@ -256,7 +257,7 @@ Gerçek bir depoda ölçüldü: 2,419 oturum, 179k mesaj, 1.9 GB kayıt.
 
 | Ölçüt | Sonuç |
 | --- | --- |
-| Süreç içi sorgu | ortanca **0.7–0.8 ms**, LongMemEval-S samanlıklarında yaklaşık 19 ms |
+| Süreç içi sorgu | ortanca **0.7–0.8 ms**, LongMemEval-S samanlıklarında yaklaşık 15 ms |
 | Uçtan uca `deja <sorgu>` | o depoda ortanca yaklaşık 0.2 s: süreç başlatma, tüm depoların tazelik denetimi, sıralama, yazdırma |
 | Yalnızca tazelik denetimi | hiçbir şey değişmediğinde yaklaşık 50 ms |
 | İndeks boyutu | 200 MB, külliyatın yaklaşık %10'u |
@@ -294,7 +295,7 @@ açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştır
 | LLM veya gömme anahtarı gerekir | hayır | evet | isteğe bağlı |
 | Sorulmadan geri çağırır | oturum başlangıcında ve araç çalıştırılmadan önce | hayır | hayır |
 
-[Tam karşılaştırma](https://vshulcz.github.io/deja-vu/guide/compare.html) bunlardan on bir tanesini kapsıyor.
+[Tam karşılaştırma](https://vshulcz.github.io/deja-vu/guide/compare.html) bunlardan on beş tanesini kapsıyor.
 
 **Claude Code oturum geçmişi nerede ve aranabilir mi?** `~/.claude/projects` altında, oturum başına bir JSONL
 dosyası; Codex `~/.codex/sessions` altında, Cursor ise SQLite `state.vscdb` içinde. `deja search` bunları

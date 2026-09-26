@@ -155,11 +155,11 @@ $ deja "jwt refresh token"
 | --- | --- |
 | `deja <consulta>` | Busca em todo o histórico. Várias palavras são AND, aspas exigem texto contíguo; sem correspondência exata ele tenta formas da palavra e grafias próximas. |
 | `deja wip` | O que a última sessão neste diretório estava fazendo: a tarefa, o que ficou decidido, os arquivos em mão, o último comando e se ele falhou. Tudo deduzido dos registros, sem depender de alguém ter anotado. |
-| `deja blame <caminho>[:linha]` | Quais sessões discutiram este arquivo, o que foi decidido e por quê. Com número de linha: o commit que a alterou por último e a sessão que escreveu o texto que esse commit apagou. |
+| `deja blame <caminho>[:linha]` | Quais sessões discutiram este arquivo, o que foi decidido e por quê. Com número de linha: o commit que a alterou por último e a sessão que escreveu essa linha ou o texto que esse commit substituiu. |
 | `deja files <assunto>` | Na direção contrária: quais arquivos o trabalho sobre um assunto realmente mexeu. |
 | `deja how <ferramenta>` | Como isso é executado de verdade nesta máquina, com argumentos reais, tirados de comandos que os agentes já rodaram. |
 | `deja fix <erro>` | O que foi executado depois do mesmo erro nesta máquina, e depois do quê o erro não voltou. |
-| `deja friction` | Erros que aparecem em mais de três sessões diferentes, dizendo de quais ferramentas vieram. |
+| `deja friction` | Erros que aparecem em três ou mais sessões diferentes, dizendo de quais ferramentas vieram. |
 | `deja ctx <consulta>` | Resumo em Markdown dos melhores resultados, pronto para entrar num prompt. |
 | `deja resume <id>` | Reabre a sessão encontrada na ferramenta a que ela pertence. |
 | `deja view` | Exporta toda a memória para um único arquivo HTML local. Sem servidor, nada sai da máquina. |
@@ -171,7 +171,7 @@ A referência completa está na [documentação dos comandos](https://vshulcz.gi
 ### Ferramentas MCP
 
 O servidor expõe uma única ferramenta, `deja`, e o parâmetro `mode` escolhe a capacidade: `recall`, `context`,
-`blame`, `fix`, `how`, `remember`. O `deja install` conecta sozinho, então isso só importa se você configurar
+`blame`, `fix`, `how`, `orient`, `remember`. O `deja install` conecta sozinho, então isso só importa se você configurar
 um agente à mão. Os seis nomes antigos continuam funcionando nos clientes já conectados.
 
 Uma ferramenta em vez de sete é questão de custo, não de estilo. Um servidor MCP conectado manda as definições
@@ -235,6 +235,7 @@ deja bench context    # 30 cadeias de tarefas com semente mais cinco controles n
 deja bench block      # se a resposta continua no trecho de texto entregue
 deja bench prompt     # quando o hook por prompt fala e quando fala errado
 deja bench ingest     # custo de uma atualização do índice: sem mudança, um turno acrescentado, um arquivo novo, reescrita completa
+deja bench read       # quanto custa ler um armazenamento em banco de dados e o que um único valor longo faz com ele
 ```
 
 O experimento de contexto compara o recall do deja com o histórico completo, um grep ingênuo e a partida a
@@ -256,7 +257,7 @@ Medido sobre um repositório real: 2,419 sessões, 179k mensagens, 1.9 GB de reg
 
 | Métrica | Resultado |
 | --- | --- |
-| Consulta dentro do processo | mediana **0.7–0.8 ms**, cerca de 19 ms nos palheiros do LongMemEval-S |
+| Consulta dentro do processo | mediana **0.7–0.8 ms**, cerca de 15 ms nos palheiros do LongMemEval-S |
 | `deja <consulta>` ponta a ponta | mediana de uns 0.2 s nesse repositório: partida do processo, checagem de frescor de todos os stores, ranking, impressão |
 | Só a checagem de frescor | cerca de 50 ms quando nada mudou |
 | Tamanho do índice | 200 MB, uns 10% do corpus |
@@ -294,7 +295,7 @@ ligado, ele já sabe na abertura da sessão o que foi decidido antes neste proje
 | Precisa de chave de LLM ou de embeddings | não | sim | opcional |
 | Faz recall sem ser perguntado | no início da sessão e antes de executar ferramentas | não | não |
 
-A [comparação completa](https://vshulcz.github.io/deja-vu/guide/compare.html) cobre onze delas.
+A [comparação completa](https://vshulcz.github.io/deja-vu/guide/compare.html) cobre quinze delas.
 
 **Onde fica o histórico de sessões do Claude Code e dá para pesquisar?** Em `~/.claude/projects`, um arquivo
 JSONL por sessão; Codex em `~/.codex/sessions`, Cursor no SQLite `state.vscdb`. O `deja search` lê tudo onde
