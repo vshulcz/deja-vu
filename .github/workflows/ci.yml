@@ -535,6 +535,9 @@ jobs:
         with:
           go-version: '1.25.x'
           cache: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
       - uses: anchore/sbom-action/download-syft@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
       - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
         with:
@@ -542,6 +545,8 @@ jobs:
           version: latest
           args: release --snapshot --clean --skip=publish,sign
       - run: node --check scripts/release-npm.mjs
+      - run: node --check scripts/release-clawhub-auth.mjs
+      - run: node --test scripts/release_clawhub_auth_test.mjs
 
   scripts:
     name: shellcheck + actionlint

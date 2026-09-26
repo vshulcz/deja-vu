@@ -233,28 +233,38 @@ $ deja "jwt refresh token"
 これが必要になるのはエージェントを手動で設定する場合だけです。以前の 6 つのツール名
 （`recall`、`recall_context`、`blame`、`fix`、`how`、`remember`）も、すでにそれらに接続されているものに対しては引き続き応答します。
 
+ツールを 7 つではなくひとつにしたのは、見た目ではなくコストの問題です。接続された MCP サーバーは
+リクエストのたびにツール定義を送るので、エージェントが何も呼ばなくても毎ターン費用がかかります。
+ここでは 477 token、[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html) で測った
+8 つのサーバーのうち最大のものは 8,283 token でした。deja 自身も、スキーマをモード付きのツール
+ひとつに絞るまでは 828 token でした。
+
 <details>
 <summary>引数と戻り値の形式</summary>
 
 | ツール | 引数 | 戻り値 |
 | --- | --- | --- |
-| `deja` | `mode`、および `query`、`path`、`error`、`what`、`text`、`tags?`、`harness?`、`project?`、`since?`、`limit?`、`offset?`、`all?` | モードによって異なります（下表）。 |
+| `deja` | `mode`、`q`、`harness?`、`project?`、`limit?` | モードによって異なります（下表）。 |
 
-| モード | 読み取る引数 | 戻り値 |
-| --- | --- | --- |
-| `recall` | `query`、`harness?`、`limit?`、`offset?` | 密度の高い一致スニペット（上限 4KB）。 |
-| `context` | `query`、`harness?` | 最も一致したセッションの Markdown ダイジェスト。 |
-| `blame` | `path`、`harness?`、`project?`、`since?`、`limit?`、`all?` | そのファイルについて議論したセッション。 |
-| `fix` | `error`、`project?`、`limit?` | 以前同じエラーの後に、このマシンで実行または変更された内容。 |
-| `how` | `what`、`project?`、`limit?` | ここでエージェントが実行した内容に基づく、実際の呼び出し方。 |
-| `remember` | `text`、`project?`、`tags?` | 後でリコールするために、恒久的な決定を保存します。 |
+`q` には、そのモードが尋ねる内容を入れます。以下のモードごとの引数名も引き続き受け付けますが、
+スキーマは呼び出しの有無にかかわらず毎ターン読まれるため、宣言はしていません。
+
+| モード | `q` の中身 | ほかに読む引数 | 戻り値 |
+| --- | --- | --- | --- |
+| `recall` | 質問、または正確なエラー文字列・名前・フラグ | `harness?`、`limit?`、`offset?` | 密度の高い一致スニペット（上限 4KB）。 |
+| `context` | recall と同じ | `harness?` | 最も一致したセッションの Markdown ダイジェスト。 |
+| `blame` | ファイルパス | `harness?`、`project?`、`since?`、`limit?`、`all?` | そのファイルについて議論したセッション。 |
+| `fix` | 失敗した出力をそのまま | `project?`、`limit?` | 以前同じエラーの後に、このマシンで実行または変更された内容。 |
+| `how` | ツールや対象（例：`go test`） | `project?`、`limit?` | ここでエージェントが実行した内容に基づく、実際の呼び出し方。 |
+| `orient` | なし（プロジェクトについて尋ねます） | `project?`、`limit?` | 過去のセッションがここで実行したコマンドと、作業したファイル。 |
+| `remember` | 恒久的な事実や決定をひとつ | `project?`、`tags?` | 後でリコールするために、恒久的な決定を保存します。 |
 
 </details>
 
 ## 対応ハーネス
 
 自動リコールをインストールすると、Claude Code と Codex はコンパクション開始時に deja へ
-トランスクリプトを渡し、deja は要約が捨てようとしているもの——タスク、結論、ファイル、
+トランスクリプトを渡し、deja は要約が捨てようとしているもの——タスク、結論、
 各コマンドとその結果、未解決のこと——を保持します。同じセッションとワークスペースに対する次のフックが、
 4 KB の予算内でそれを一度だけ返し、その後リポジトリが変化したかどうかを示す一行を添えます。`deja stats`
 は、コンパクション後に最初の編集が行われるまでのツール呼び出し回数を数えます。これがこの機能の効果を
@@ -316,7 +326,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 
 ### 独自パッケージを持つハーネス
 
-`deja install --auto` は、他のハーネスと同様にこの 6 つもすべて接続し、それが最短の方法であることに
+`deja install --auto` は、他のハーネスと同様にこの 8 つもすべて接続し、それが最短の方法であることに
 変わりはありません。これらには各エコシステム内のパッケージもあり、CLI ではなくそこから拡張機能を
 インストールする人向けです：
 
@@ -328,10 +338,15 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Kimi Code | プラグイン `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | プラグイン `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` の後に `codex plugin add deja-vu@deja-vu` |
 | Grok Build | プラグイン `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` の後に `grok plugin install deja` |
+| OpenClaw | ClawHub と npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
+| pi（と omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 
-どちらの方法も単独で十分で、両方を使っても問題ありません。opencode、dsh、Kimi、Grok、Codex の
-パッケージは `deja install` が書き込んだ内容を読み取り、足りないものだけを追加します。Zed では両方が
-同じサーバー ID を使うので、どの順番でインストールしても重複は生じません。
+どちらの方法も単独で十分で、両方を使っても問題ありません。どのパッケージもまず `deja install` が
+書き込んだ内容を読み取ります。opencode、dsh、OpenClaw は足りないものだけを追加し、Kimi、Grok、Codex、pi は
+インストーラーがすでに接続している場合は手を引きます。Zed では両方が同じサーバー ID を使います。
+そのため、どの順番でインストールしても重複は生じません。
+
+どのパッケージも手元の deja を使い、同梱のコピーは予備にすぎません。
 
 いずれもすでに入っている deja を使い、同梱のコピーはフォールバックにすぎません。
 
@@ -428,7 +443,7 @@ deja bench read       # what it costs to read a database-backed store, and what 
 
 | 計測項目 | 結果 |
 | --- | --- |
-| プロセス内の検索 | 中央値 **0.7–0.8 ms**（`deja bench recall`、100 クエリ、半分はロシア語）、LongMemEval-S のヘイスタックでは約 19 ms |
+| プロセス内の検索 | 中央値 **0.7–0.8 ms**（`deja bench recall`、100 クエリ、半分はロシア語）、LongMemEval-S のヘイスタックでは約 15 ms |
 | `deja <query>` のエンドツーエンド | そのストアで中央値約 0.2 秒：プロセス起動、全ストアの鮮度チェック、ランキング、出力を含む |
 | 鮮度チェックのみ | 変更がない場合は約 50 ms |
 | インデックスサイズ | 200 MB、コーパスの約 10% |
@@ -457,7 +472,7 @@ deja bench read       # what it costs to read a database-backed store, and what 
 できます。`--scrub` は届く範囲のトランスクリプトを書き換えます。既知の形式——AWS キー、`api_key=`/`token=` の代入、Bearer トークンや裸の JWT、PEM ブロック、
 各プロバイダーのトークン、高エントロピー値——はインデックス作成時に取り除かれるので、ダイジェスト、共有、
 同期エクスポートには含まれません。パターンマッチングはシークレット検出ではありません：未知の形式は
-すり抜ける可能性があります。[セキュリティモデル](../../docs/SECURITY-MODEL.md#redaction)を参照してください。
+すり抜ける可能性があります。[セキュリティモデル](../../docs/SECURITY-MODEL.md#redaction-boundary)を参照してください。
 
 **エージェントが遅くなりませんか？** リコールはローカルインデックスに対する字句検索です：
 中央値 0.7–0.8 ms で、モデルの応答を待つことはありません。フックではこれに加えてプロセス起動と
@@ -478,7 +493,7 @@ deja bench read       # what it costs to read a database-backed store, and what 
 [engram](https://github.com/Gentleman-Programming/engram) は記録先行型ツールの中で最も優れており、
 そのモデルが合うなら試す価値があります。ただし、やはり空の状態から始まり、エージェントが保存することを
 選んだものしか知りません。[完全な比較](https://vshulcz.github.io/deja-vu/guide/compare.html)では
-11 のツールを取り上げています。
+15 のツールを取り上げています。
 
 **Claude Code のセッション履歴はどこに保存されていて、検索できますか？**
 `~/.claude/projects` の下に、セッションごとに 1 つの JSONL ファイルとして保存されています。Codex は
