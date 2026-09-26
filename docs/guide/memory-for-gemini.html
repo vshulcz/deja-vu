@@ -144,7 +144,7 @@
 <p>That reads <code>gemini-extension.json</code> at the root of the repository and wires the deja MCP server plus a short context file. Measured on Gemini CLI 0.55.1: <code>gemini mcp list</code> then reports <code>deja (from deja): deja mcp (stdio) - Connected</code>.</p>
 <p>The other path also wires the hooks:</p>
 <pre>deja install gemini-auto</pre>
-<p>Hooks are the difference between the two. Gemini runs them only when <code>hooksConfig.enabled</code> is set in your <code>settings.json</code>, and an extension cannot write that file — so the extension gives you recall on demand, and the CLI install adds recall that arrives on its own at session start and on each prompt.</p>
+<p>Hooks are the difference between the two. Gemini runs them only when <code>hooksConfig.enabled</code> is set in your <code>settings.json</code>, and an extension cannot write that file — so the extension gives you recall on demand, and the CLI install adds recall that arrives on its own at session start and on each prompt, and, when a shell command fails, what this machine ran after the same error before.</p>
 <p>Both name the extension <code>deja</code>, which is deliberate: Gemini keys extensions by that name and answers a second install with <code>Extension "deja" is already installed</code>. Having both wired is not a state you can reach by accident.</p>
 <p>Either way it needs the binary, since an extension delivers files rather than runtimes:</p>
 <pre>brew install deja-vu
