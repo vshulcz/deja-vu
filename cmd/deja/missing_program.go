@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -41,6 +42,15 @@ func missingProgramLine(dir, cmd string) string {
 	pol := policy.Load()
 	allow := func(project string) bool { return pol.Allows(policy.ActivationAuto, project) }
 	for _, prog := range commandPrograms(cmd) {
+		// Installed since. The sightings stay on file, and the line went on
+		// saying the program was missing: over one machine's transcripts every
+		// one of 56 such lines for docker and shellcheck was shown after the
+		// binary was already there. Only this direction is checked — a program
+		// the hook's PATH cannot see may still be missing for the agent's shell,
+		// so not finding it changes nothing.
+		if _, err := exec.LookPath(prog); err == nil {
+			continue
+		}
 		_, sig, ok := index.FrictionSignature("command not found: " + prog)
 		if !ok {
 			continue

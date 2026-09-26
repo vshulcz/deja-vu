@@ -11,6 +11,8 @@ import (
 // twice drifts, and the narrower copy then wins by accident. This is that
 // sharing, asserted: one store, both surfaces, the same fact.
 func TestBothSurfacesSayTheWrapperRemedy(t *testing.T) {
+	// timeout is on PATH on Linux and Windows; the line is for a machine without it.
+	t.Setenv("PATH", t.TempDir())
 	dir := seedWrapperWall(t, func(int) string { return longWorkerCommand })
 
 	// The wording differs because the sentences differ — the pre-tool line has

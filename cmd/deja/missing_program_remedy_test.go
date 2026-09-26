@@ -40,6 +40,7 @@ func seedMissingProgram(t *testing.T, remedy string) string {
 // and for `timeout` on a real store both recorded pairs are the same command with
 // the wrapper taken out — the line can say so.
 func TestTheMissingProgramLineSaysTheCommandRanWithoutIt(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
 	dir := seedMissingProgram(t, "launchctl kickstart -k system/app.worker")
 	got := missingProgramLine(dir, "timeout 30 launchctl kickstart -k system/app.worker")
 	if !strings.Contains(got, "is not on this machine") {
@@ -53,6 +54,7 @@ func TestTheMissingProgramLineSaysTheCommandRanWithoutIt(t *testing.T) {
 // A remedy that is a different command is a claim one recorded run does not
 // support, and a diagnostic is not a remedy at all: the line stays a fact.
 func TestADifferentCommandIsNotOfferedAsTheRemedy(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
 	dir := seedMissingProgram(t, "launchctl print system/app.worker | grep state")
 	got := missingProgramLine(dir, "timeout 30 launchctl kickstart -k system/app.worker")
 	if !strings.Contains(got, "is not on this machine") {
