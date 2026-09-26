@@ -152,14 +152,15 @@ find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete</pre>
 <p>Raising it keeps history longer; lowering it is a sweep on a timer. The setting only covers <code>~/.claude/projects</code> &mdash; your prompt history in <code>~/.claude/history.jsonl</code> is a separate file and survives it.</p>
 
 <h2>Age is the wrong axis for disk space</h2>
-<p>Measured on one machine, 1,320 transcripts across thirteen projects:</p>
+<p>Measured on one machine, 1,320 transcripts across 21 project directories:</p>
 <pre>all sessions              1,320 files    2.73 GB
 older than 30 days          368 files    0.11 GB   (4% of the bytes)
 the ten largest files        10 files    2.36 GB   (86% of the bytes)
 the single largest           1 file      1.01 GB</pre>
 <p>Twenty-eight percent of the files were older than a month and they held four percent of the space. Sessions grow with what a tool printed into them, not with how long ago they ran, so one long afternoon of a build loop outweighs a year of ordinary work. If the goal is free space, sort by size and delete the top few. If the goal is that old work stops sitting on the disk, age is the right axis and the <code>find</code> above is the whole job.</p>
-<pre># the ten worst offenders, largest first
-find ~/.claude/projects -name '*.jsonl' -exec ls -S {} + | head</pre>
+<pre># the ten worst offenders, in MB, largest first
+find ~/.claude/projects -name '*.jsonl' -exec du -m {} + | sort -rn | head</pre>
+<p><code>ls -S</code> looks like the shorter way to write that and is wrong for the job: <code>-exec &hellip; +</code> hands the command a batch at a time, so each batch is sorted on its own and the first ten lines are the largest of the first batch. Sorting after the exec is what makes the order global.</p>
 
 <h2>What you lose</h2>
 <p>A deleted transcript leaves <code>claude --resume</code> immediately, and nothing in the agent breaks. What goes with it is the record: what you tried in that session, the command that finally worked, the reason a decision went the way it did. That is not recoverable from the repository, because most of it was never committed &mdash; and a backup snapshot taken before the sweep is the only copy left. <a href="recover-a-deleted-session.html">Recovering a deleted session</a> covers what is still reachable when it is already gone.</p>
