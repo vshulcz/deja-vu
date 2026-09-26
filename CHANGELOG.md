@@ -7,12 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-09-26
+
+The line deja puts beside a failed command or before a risky one is now worth
+reading. It no longer offers a merge, a force push or a deletion as the fix for
+an error, keeps to this project's remedies, stops calling a program on PATH
+missing, and stops blaming a chain's error on its first command: of the
+warnings before a command, 90% now describe something that command does,
+against 38%. The compaction packet keeps the open items a summary drops until
+the transcript closes them, and a recall page that found one long session says
+which session to open.
+
 ### Added
 - The compaction packet carries a short "keep until closed" list: questions waiting on the user, open #N items the agent named, verdicts, and rechecks promised for later. Each line stays across compactions until the transcript closes it (a `gh pr merge N`, "#N merged", a user reply). On 189 real compactions the summaries dropped 35% of open #N items, 71% of verdict lines and 97% of deferred rechecks; the list holds 72% of the dropped #N that were still open, is 274 tokens median, and was right on 34 of 40 hand-checked lines. It takes at most 40% of the packet. Claude Code and Codex only, where the packet is captured.
 - A recall page whose answer is a fragment of one long session now says which session to open: "Session <id> matched N times and only three of them fit here — call recall_context with that id to read the rest." A hit quotes at most three of its matches, and the only follow-up the page offered was `offset=` — more sessions, never more of the one already found. Over eighteen questions on a live harness the line cut billed tokens 23% to 51% and gained two correct answers of twelve; it costs 149 bytes and appears only when a served session matched ten times or more.
 - `deja bench context` measures the same chains a second time with their history folded into one long session each, and prints it as its own table. Every corpus in the benchmark filed history as many short sessions with one fact each, which is not the shape a real store has: on this machine's own store every recall page's deepest hit matched between 24 and 23,278 times. Folded, the session-start block carries a quarter of a chain's facts instead of half, in 89 tokens instead of 360 — the same content, reached less often because it is filed in one place. The existing rows do not move; the second corpus is built and indexed on its own.
 
 ### Fixed
+- An opencode 1.18.3 store read as having no sessions. Its `session_message` table held only model-switch events while `message` and `part` held every turn, and any row there made deja read the store the 2.x way. It now counts only the rows the 2.x reader can use (#4025, contributed by @aniruddhaadak80).
+- Appends to omp transcripts under a profile or `$XDG_DATA_HOME/omp` are indexed as they happen. A full build read them, and the incremental pass matched them to no harness and skipped every later turn until the next rebuild: 3 of omp's 4 roots (#4041).
 - "X is not on this machine" is no longer said about a program that is on PATH. The sightings stay on file after the program is installed, and the line kept repeating them: on one machine every one of the 56 such lines shown for docker and shellcheck came after the binary was there. The check only silences — a program the hook cannot see may still be missing for the agent's shell, so not finding it changes nothing.
 - The warning before a command ("Last time this machine ran X it ended with: …") no longer lays a chain's error at its first program. The error came from whichever part of the line failed, so `gh pr checks` was on file as ending in a failing Go test and `git fetch` as ending in zsh's "== not found". A failure is now recorded against the first program only when everything after it just filters its output, and zsh's "no matches found" only against the part that held the glob. Over 835 warnings shown in real transcripts, 38% described something the command itself does; with the rule 90% do. It drops 486 of the 514 wrong ones and 75 of the 321 right ones, the errors of chains that did fail at their first program.
 - A command that cannot be taken back is no longer offered as the fix for an error: merging or deleting through `gh`, deleting or force-pushing a branch, `git reset --hard`, dropping a stash, `git clean`, a recursive `rm`, and changing a cluster or touching a production namespace. The remedy is whatever a session ran next after the same error, and that is often just its next step. Over 396 real hints on one machine, 27 were such commands; 25 had nothing to do with the error they answered. A pair behind one of these still answers.
