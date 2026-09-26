@@ -4,13 +4,13 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Delete Cline task history — deja-vu</title>
-<meta name="description" content="Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html">
+<title>Delete Amp thread history — deja-vu</title>
+<meta name="description" content="Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Delete Cline task history">
-<meta property="og:description" content="Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html">
+<meta property="og:title" content="Delete Amp thread history">
+<meta property="og:description" content="Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
@@ -21,13 +21,13 @@
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Delete Cline task history">
-<meta name="twitter:description" content="Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.">
+<meta name="twitter:title" content="Delete Amp thread history">
+<meta name="twitter:description" content="Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Cline task history","description":"Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.","url":"https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-19","dateModified":"2026-09-19","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Amp thread history","description":"Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.","url":"https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-26","dateModified":"2026-09-26","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -69,9 +69,9 @@
 <a href="delete-copilot-chat-history.html">Copilot Chat</a>
 <a href="delete-gemini-cli-history.html">Gemini CLI</a>
 <a href="delete-opencode-session-history.html">opencode</a>
-<a href="delete-cline-task-history.html" aria-current="page">Cline</a>
+<a href="delete-cline-task-history.html">Cline</a>
 <a href="delete-kilo-code-task-history.html">Kilo Code</a>
-<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-amp-thread-history.html" aria-current="page">Amp</a>
 <a href="delete-kiro-session-history.html">Kiro</a>
 </details>
 <details class="grpfold"><summary>Per-agent guides <span class="n">34</span></summary>
@@ -118,37 +118,33 @@
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside><article>
-<h1>How to delete Cline task history, and what you lose</h1>
-<p class="pagelede">Cline has two separate stores; remove the conversation file, not the task's other state<span class="mins" data-mins></span></p>
-<p>Cline's modern CLI and its older VS Code extension do not share a history store. Check which one you used before deleting anything. The CLI keeps message JSON and a session manifest together; the extension keeps conversation history inside a task directory that may contain other task state.</p>
+<h1>How to delete Amp thread history, and what you lose</h1>
+<p class="pagelede">one thread is one file, so deleting one conversation is deleting one file<span class="mins" data-mins></span></p>
+<p>Amp writes each thread to its own JSON file, with no database and no index beside it. That makes it the easy case: removing one conversation means removing one file, and the other threads are not touched.</p>
 
-<h2>Where the sessions are</h2>
-<p>The modern CLI/SDK store follows these variables in order; the first one set wins:</p>
-<pre>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/&lt;sessionId&gt;/
-  &lt;sessionId&gt;.messages.json
-  &lt;sessionId&gt;.json</pre>
-<p>The legacy VS Code extension uses a different tree:</p>
-<pre>&lt;host globalStorage&gt;/saoudrizwan.claude-dev/tasks/&lt;taskId&gt;/
-  api_conversation_history.json
-  state/taskHistory.json</pre>
-<p>Each VS Code-family host has its own <code>globalStorage</code> (Code, Code - Insiders, VSCodium, Cursor or Windsurf), so check the host where the task ran. The extension's task directory also holds more than the conversation.</p>
+<h2>Where the threads are</h2>
+<p>On Linux, Amp follows <code>XDG_DATA_HOME</code> when it is set:</p>
+<pre>${XDG_DATA_HOME:-~/.local/share}/amp/threads/*.json</pre>
+<p>On macOS and Windows, the directory is <code>~/.local/share/amp/threads/</code> as well. Each <code>*.json</code> file is one thread, holding its <code>id</code>, its <code>title</code>, when it was created, and its messages.</p>
 
-<h2>How to delete one conversation</h2>
-<p>First close Cline and the editor so the active session cannot rewrite its files. For the CLI, remove the session's directory, which contains both the messages and the manifest:</p>
-<pre>rm -r "${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-$HOME/.cline}/data}/sessions}/&lt;sessionId&gt;"</pre>
-<p>For the extension, remove only <code>api_conversation_history.json</code> from the task directory. Keep the rest of that directory if you want its title, workspace and task state:</p>
-<pre>rm "&lt;host globalStorage&gt;/saoudrizwan.claude-dev/tasks/&lt;taskId&gt;/api_conversation_history.json"</pre>
-<p>To clear all history for one store, remove its entire <code>sessions</code> directory (CLI) or the extension's <code>tasks</code> directory. This also removes every session or task in that store. The two stores are independent: clearing one does not clear the other.</p>
+<h2>How to delete one thread</h2>
+<p>Close Amp first, so a running thread cannot write its file back. Then find the thread by its title and remove that file:</p>
+<pre>grep -l '"title": *"the title you remember"' ~/.local/share/amp/threads/*.json
+rm ~/.local/share/amp/threads/&lt;file&gt;.json</pre>
+<p>To delete every thread at once, remove the whole directory:</p>
+<pre>rm -r ~/.local/share/amp/threads</pre>
+<p>Use <code>${XDG_DATA_HOME}/amp/threads</code> instead if you set that variable on Linux.</p>
 
 <h2>What you lose</h2>
-<p>The conversation is the record of what Cline tried, the tools it used and the reasoning around the task. Removing the CLI session directory also removes its manifest; removing the extension's history file leaves the task directory's other state behind. Deleted conversations cannot be recovered from Cline unless you have a separate backup.</p>
+<p>The thread is the record of what Amp tried, what worked and why. Once its file is gone, the local copy of that record is gone too. There is no archive on disk to recover it from, unless you keep a separate backup.</p>
+<p>These files are Amp's local copy. Amp also keeps threads in your account on its service, and deleting a local file does not delete the thread there. Remove it from Amp itself if that copy has to go too.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Cline formats, alongside the other agents' histories, into one local index:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Amp's thread files, alongside the other agents' histories, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja "Cline task about the refactor"</pre>
-<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone.</p>
-<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-cline.html">Memory for Cline</a> · <a href="../registry/cline.html">The Cline format</a></p>
+deja "Amp thread about the rate limiter"</pre>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a thread from the index when you do want it gone.</p>
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-amp.html">Memory for Amp</a> · <a href="../registry/amp.html">The Amp format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>
 </body></html>

@@ -334,3 +334,34 @@ insert into session_message values('m3','s1','idle',3,1790102983000,179010298300
 		t.Errorf("wrote = %v", got[RoleWrote])
 	}
 }
+
+func TestOpencodeReadsOldTurnsWhenSessionMessageOnlyHasEvents(t *testing.T) {
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	db := filepath.Join(t.TempDir(), "opencode.db")
+	script := `create table session(id text primary key, directory text, title text, time_created integer, time_updated integer);
+create table message(id text primary key, session_id text, time_created integer, data text);
+create table part(id text primary key, message_id text, data text);
+create table session_message(id text primary key, session_id text, type text, seq integer, time_created integer, time_updated integer, data text);
+insert into session values('s1','/w','transitional opencode schema',1767409200000,1767409300000);
+insert into message values('m1','s1',1767409201000,'{"role":"user","time":{"created":1767409201000}}');
+insert into part values('p1','m1','{"type":"text","text":"why does TestRetry flake","time":{"start":1767409201000}}');
+insert into message values('m2','s1',1767409202000,'{"role":"assistant","time":{"created":1767409202000}}');
+insert into part values('p2','m2','{"type":"text","text":"the timeout is too short","time":{"start":1767409202000}}');
+insert into session_message values('e1','s1','model-switched',1,1767409200500,1767409200500,'{}');
+insert into session_message values('e2','s1','agent-switched',2,1767409201500,1767409201500,'{}');`
+	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite setup: %v %s", err, out)
+	}
+	if opencodeV2(db) {
+		t.Fatal("switch events are not conversation turns")
+	}
+	ss, err := ParseOpencodeDB(db)
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 2 {
+		t.Fatalf("len=%d err=%v", len(ss), err)
+	}
+	if ss[0].Messages[0].Role != "user" || ss[0].Messages[1].Role != "assistant" {
+		t.Fatalf("roles = %q, %q", ss[0].Messages[0].Role, ss[0].Messages[1].Role)
+	}
+}

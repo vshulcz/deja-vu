@@ -4,13 +4,13 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Delete opencode session history — deja-vu</title>
-<meta name="description" content="opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.">
-<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html">
+<title>Delete Kiro session history — deja-vu</title>
+<meta name="description" content="Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Delete opencode session history">
-<meta property="og:description" content="opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.">
-<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html">
+<meta property="og:title" content="Delete Kiro session history">
+<meta property="og:description" content="Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
@@ -24,16 +24,16 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="Delete opencode session history">
-<meta name="twitter:description" content="opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.">
+<meta name="twitter:title" content="Delete Kiro session history">
+<meta name="twitter:description" content="Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete opencode session history", "description": "opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete opencode session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does opencode store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "In one SQLite database at ~/.local/share/opencode/opencode.db, or under XDG_DATA_HOME when that is set. Sessions, messages and message parts are three tables inside that single file."}}, {"@type": "Question", "name": "How do I delete one opencode session?", "acceptedAnswer": {"@type": "Answer", "text": "From opencode itself. The database is live state the client owns, and editing it underneath a running client is how people lose more than the session they meant. With the client closed, removing opencode.db removes every session at once."}}, {"@type": "Question", "name": "Why did deleting sessions not free any disk space?", "acceptedAnswer": {"@type": "Answer", "text": "Deleting rows does not shrink a SQLite file: the freed pages are reused by later writes. VACUUM with the client closed rewrites the file at its real size, and removing the file frees all of it."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kiro session history", "description": "Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-09-26"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Kiro session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Kiro store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.kiro/sessions, in two trees. The CLI writes a pair of files per session to ~/.kiro/sessions/cli: <sessionId>.jsonl holds the transcript and <sessionId>.json the header. The IDE writes one directory per session, ~/.kiro/sessions/<workspace>/sess_<uuid>, holding messages.jsonl and session.json."}}, {"@type": "Question", "name": "How do I delete one Kiro session?", "acceptedAnswer": {"@type": "Answer", "text": "Close Kiro first. For a CLI session, remove both files named after the session id. For an IDE session, remove its sess_ directory. Each session is its own file or directory, so removing one does not touch the others."}}, {"@type": "Question", "name": "Does deleting ~/.kiro/sessions remove everything Kiro kept?", "acceptedAnswer": {"@type": "Answer", "text": "Not necessarily. The IDE also mirrors chats into its globalStorage, and the CLI's TUI keeps conversations in a data.sqlite3 database. Neither lives under ~/.kiro/sessions, so check them too if the goal is that nothing is left."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -75,11 +75,11 @@
 <a href="delete-cursor-chat-history.html">Cursor</a>
 <a href="delete-copilot-chat-history.html">Copilot Chat</a>
 <a href="delete-gemini-cli-history.html">Gemini CLI</a>
-<a href="delete-opencode-session-history.html" aria-current="page">opencode</a>
+<a href="delete-opencode-session-history.html">opencode</a>
 <a href="delete-cline-task-history.html">Cline</a>
 <a href="delete-kilo-code-task-history.html">Kilo Code</a>
 <a href="delete-amp-thread-history.html">Amp</a>
-<a href="delete-kiro-session-history.html">Kiro</a>
+<a href="delete-kiro-session-history.html" aria-current="page">Kiro</a>
 </details>
 <details class="grpfold"><summary>Per-agent guides <span class="n">34</span></summary>
 <a href="memory-for-aider.html">aider</a>
@@ -127,31 +127,37 @@
 <a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
 <article>
 
-<h1>How to delete opencode session history, and what you lose</h1>
-<p class="pagelede">one SQLite file holds every session, so the unit of deletion is larger than you expect<span class="mins" data-mins></span></p>
-<p>opencode does not write a file per conversation. Every session, every message and every part of a message lives in one SQLite database, which makes removing all of it easy and removing one of it awkward.</p>
+<h1>How to delete Kiro session history, and what you lose</h1>
+<p class="pagelede">the CLI and the IDE write different trees, so check which one a session came from<span class="mins" data-mins></span></p>
+<p>Kiro ships a CLI and an IDE, and they do not write the same files. Both keep their sessions under <code>~/.kiro/sessions</code>, but the CLI writes a pair of files per session and the IDE writes a directory per session. Deleting one conversation is easy once you know which tree it is in.</p>
 
 <h2>Where the sessions are</h2>
-<pre>~/.local/share/opencode/opencode.db
-${XDG_DATA_HOME}/opencode/opencode.db</pre>
-<p>Three tables carry a conversation: <code>session</code>, <code>message</code> joined by <code>session_id</code>, and <code>part</code> joined by <code>message_id</code> — the text, the tool calls and their results are parts.</p>
+<p>The CLI writes two files per session, side by side:</p>
+<pre>~/.kiro/sessions/cli/&lt;sessionId&gt;.jsonl   the transcript
+~/.kiro/sessions/cli/&lt;sessionId&gt;.json    the header: session id and the directory it ran in</pre>
+<p>The IDE writes one directory per session, grouped by workspace:</p>
+<pre>~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;/messages.jsonl
+~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;/session.json</pre>
+<p><code>session.json</code> holds the id, the model, the workspace paths and the timestamps. <code>messages.jsonl</code> holds the conversation, along with the agent's own bookkeeping records.</p>
 
 <h2>How to delete it</h2>
-<p>Delete a session from opencode itself. The database is live state the client owns, and editing it underneath a running client is how people lose more than the session they meant to remove.</p>
-<p>With opencode closed, the file is the whole history:</p>
-<pre>rm ~/.local/share/opencode/opencode.db</pre>
-<p>Two things people get wrong here. Deleting rows does not shrink the file — SQLite reuses the freed pages — so run <code>VACUUM</code> with the client closed if the space is what you are after. And there is no archive: a removed session is gone, not moved.</p>
+<p>Close Kiro first, so a running session cannot write its files back. Then, for one CLI session, remove both files named after its id:</p>
+<pre>rm ~/.kiro/sessions/cli/&lt;sessionId&gt;.jsonl ~/.kiro/sessions/cli/&lt;sessionId&gt;.json</pre>
+<p>For one IDE session, remove its directory:</p>
+<pre>rm -r ~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;</pre>
+<p>Every session is its own file or directory, so removing one leaves the rest alone. To clear a whole tree, remove <code>~/.kiro/sessions/cli</code> for the CLI, or the workspace directories beside it for the IDE. The two trees are independent: clearing one does not clear the other.</p>
+<p>What <code>~/.kiro/sessions</code> does not cover: the IDE also mirrors its chats into its <code>globalStorage</code> (<code>kiro.kiroagent/&lt;workspace&gt;/*.chat</code>), and the CLI's TUI keeps conversations in a <code>kiro-cli/data.sqlite3</code> database, in the <code>conversations_v2</code> table. If the goal is that nothing is left, check those too. deja does not read either one yet, because no sample of them was available to verify against, so this page does not describe their contents.</p>
 
 <h2>What you lose</h2>
-<p>The sessions are the record of what was tried and what worked. opencode's own list is the only way back into them, and it reads the same database — so the answer to a question you solved in June exists only while that file does.</p>
+<p>The sessions are the record of what was tried and what worked. A CLI session you remove can no longer be reopened with <code>kiro-cli chat --resume-id</code>. There is no archive: a removed session is gone, not moved.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other thirty-three agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other thirty-three agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
-deja "opencode session about the retry budget"</pre>
-<p>Nothing to switch on first: the database is already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>
+deja "Kiro session about the migration"</pre>
+<p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>
 
-<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-opencode.html">Memory for opencode</a> · <a href="../registry/opencode.html">The opencode format</a></p>
+<p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-kiro.html">Memory for Kiro</a> · <a href="../registry/kiro.html">The Kiro format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>
 

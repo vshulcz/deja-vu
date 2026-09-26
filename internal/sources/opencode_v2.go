@@ -68,9 +68,9 @@ func readOpencodeSchema(db string) opencodeSchema {
 	if !have["session_message"] {
 		return out
 	}
-	// The table exists in a store that has never used it. What decides is
-	// whether the turns are in there.
-	n, err := sqliteOutput(db, `select count(*) from session_message`)
+	// A 1.18.3 store can hold only switch events here while message and part
+	// still hold every turn, so count only the row types this reader can project.
+	n, err := sqliteOutput(db, `select count(*) from session_message where type in ('user','assistant','compaction')`)
 	if err != nil {
 		return out
 	}
