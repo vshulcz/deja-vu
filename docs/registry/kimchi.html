@@ -59,11 +59,10 @@
 <p>deja indexes is the selector Kimchi takes — <code>deja resume</code> prints that</p>
 <p>command rather than handing over a paste.</p>
 <ul>
-<li>The root is flat — one directory, every session in it — so there is no encoded</li>
+<li>A session file directly under the root has no encoded project directory to</li>
 </ul>
-<p>project directory to read a name from. The header line&#39;s <code>cwd</code> is what names</p>
-<p>the project, the same choice omp and prime-agent make for the same reason;</p>
-<p>drop it and every Kimchi session lands under no project at all.</p>
+<p>read a name from, so the header line&#39;s <code>cwd</code> names the project there — the</p>
+<p>same choice omp and prime-agent make (#3678).</p>
 <ul>
 <li>The default root sits under the config home rather than a dot directory of its</li>
 </ul>

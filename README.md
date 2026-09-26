@@ -120,7 +120,7 @@ to local files, and deja turns those files into one memory layer all of them rea
 | --- | --- |
 | **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
 | **Cross-agent recall** | The MCP `deja` tool in `recall` mode answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
-| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8% — and on Claude Code and Codex it captures the task, the files and the commands as the compaction starts, then returns them once in the next session. |
+| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8% — and on Claude Code and Codex it captures the task, what was concluded, the commands and what is still open as the compaction starts, then hands them back once after it. |
 | **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision, that command's working invocation, or the program this machine does not have. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
 | **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
 
@@ -198,7 +198,7 @@ $ deja "jwt refresh token"
 | `deja blame <path>[:line]` | Which sessions discussed a file, what was decided, and why. With a line: the commit that last changed it, and the session that wrote that line or the text the commit replaced. `--attribution` prints the line answer alone, as JSON with `--json`, and `--git-note` records it in `refs/notes/deja`. |
 | `deja files <topic>` | The other direction: which files the work on a subject actually touched. |
 | `deja how <tool>` | How this machine actually runs a thing, with the real flags, from what agents ran before. |
-| `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. |
+| `deja fix <error>` | What this machine ran after that same error before, when the error did not come back. Never a merge, a force push or a deletion. |
 | `deja friction` | Errors that hit three or more separate sessions, with the harnesses named. |
 
 <details>
@@ -260,7 +260,7 @@ whether or not the tool is called.
 | `recall` | the question, or an exact error string, name or flag | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
 | `context` | the same as recall | `harness?` | Markdown digest of the best-matching session. |
 | `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
-| `fix` | the failing output, verbatim | `project?`, `limit?` | What this machine ran, or changed, after that same error before. |
+| `fix` | the failing output, verbatim | `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
 | `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
@@ -271,8 +271,9 @@ whether or not the tool is called.
 
 With auto-recall installed, Claude Code and Codex hand deja the transcript as a
 compaction starts, and it keeps what the summary is about to drop: the task, the
-conclusions, the files, the commands with what each one did, and what was left
-open. The next hook for the same session and workspace gives it back once, inside
+conclusions, the commands with what each one did, and what was left open, with a
+keep-until-closed list (questions waiting on you, open issue numbers, settled
+verdicts) carried from one compaction to the next until the transcript closes it. The next hook for the same session and workspace gives it back once, inside
 a 4 KB budget, with a line saying whether the repository moved since. `deja stats`
 counts the tool calls before the first edit after a compaction, which is the
 number this is measured against. See [automatic compaction
@@ -419,7 +420,7 @@ deja bench ingest     # what an update costs: unchanged, a turn, a new transcrip
 deja bench read       # what it costs to read a database-backed store, and what one long value does to it
 ```
 
-`bench block` asks the question the other three cannot: with the right session in
+`bench block` asks the question the others cannot: with the right session in
 hand, does the block carry what that session settled. Eight sessions discuss each
 subject and one of them settles it, in the middle of its own transcript rather
 than at the end — so the baseline arm, the newest turns of the top hit, scores
@@ -454,7 +455,7 @@ transcripts:
 
 | Measurement | Result |
 | --- | --- |
-| Lookup, in process | **0.7–0.8 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~19 ms on the LongMemEval-S haystacks |
+| Lookup, in process | **0.7–0.8 ms** median (`deja bench recall`, 100 queries, half of them Russian), ~15 ms on the LongMemEval-S haystacks |
 | `deja <query>`, end to end | ~0.2 s median on that store: process start, the freshness check over every store, ranking, printing |
 | Freshness check alone | ~50 ms when nothing changed |
 | Index size | 200 MB, ~10% of corpus |
@@ -484,7 +485,7 @@ and delete, and `--scrub` rewrites the transcripts it can reach. Known shapes �
 tokens and bare JWTs, PEM blocks, provider tokens, high-entropy values — are stripped as
 the index is built, so they do not reach digests, shares or sync exports. Pattern matching
 is not secret detection: a shape it does not know can pass through. See the
-[security model](docs/SECURITY-MODEL.md#redaction).
+[security model](docs/SECURITY-MODEL.md#redaction-boundary).
 
 **Will it slow my agent down?** A recall is a lexical lookup against a local index:
 0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a

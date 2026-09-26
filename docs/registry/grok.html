@@ -38,7 +38,7 @@
 <article>
 <h1>Grok Build session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent.</p>
+<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent. The maintained <code>grok</code> CLI writes no session files: its history is in <code>${GROK_HOME:-~/.grok}/grok.db</code>, a SQLite store read through <code>sqlite3</code>, and <code>DEJA_GROK_DB</code> points deja at another copy.</p>
 <p>The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers <code>summary.json</code> and <code>.cwd</code> over decoding the directory name.</p>
 <h2 id="two-products-share-this-directory">Two products share this directory</h2>
 <p><code>@vibe-kit/grok-cli</code> (npm) also keeps its configuration under <code>~/.grok</code>, and the</p>
@@ -85,6 +85,14 @@
 <p><code>~/.cursor/mcp.json</code>, so a machine wired for those has deja in Grok already.</p>
 <p><code>~/.grok/GROK.md</code> is the exception: that file is for the other product, and</p>
 <p>Grok Build&#39;s home rules are <code>Agents.md</code>, <code>AGENTS.md</code>, <code>Claude.md</code>, <code>CLAUDE.md</code>.</p>
+<ul>
+<li>The hooks run, but on 1.0.5 what session start, the prompt and both tool</li>
+</ul>
+<p>events print is discarded — measured against a stubbed proxy by reading the</p>
+<p>request the model was sent. The one reply Grok applies is a <code>PreToolUse</code></p>
+<p><code>updatedInput</code>, which is how memory reaches a spawned agent&#39;s prompt; the</p>
+<p>rest of the wiring is there for its side effects, warming the index and</p>
+<p>forgetting what a compaction threw away.</p>
 <p><strong>Last verified:</strong> 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)</p>
 
 <hr>

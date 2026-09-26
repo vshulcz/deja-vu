@@ -2,7 +2,7 @@
 
 ## Stores and files
 
-Cursor IDE stores chats in `state.vscdb` under `globalStorage/` and `workspaceStorage/*/`. The user root is `~/Library/Application Support/Cursor/User` on macOS and `~/.config/Cursor/User` on other systems; an existing `$XDG_CONFIG_HOME/Cursor/User` is used when available. `DEJA_CURSOR_ROOT` overrides IDE discovery.
+Cursor IDE stores chats in `state.vscdb` under `globalStorage/` and `workspaceStorage/*/`. The user root is `~/Library/Application Support/Cursor/User` on macOS, `%APPDATA%\Cursor\User` on Windows and `~/.config/Cursor/User` elsewhere; on Linux an existing `$XDG_CONFIG_HOME/Cursor/User` is used when available. `DEJA_CURSOR_ROOT` overrides IDE discovery.
 
 Cursor CLI writes `projects/<encoded-path>/agent-transcripts/**/*.jsonl` below `${CURSOR_CONFIG_DIR:-~/.cursor}`. `DEJA_CURSOR_CLI_ROOT` overrides transcript reads. Subagent transcripts are excluded unless `DEJA_INCLUDE_SUBAGENTS=1` — for index
 size, not because the parent already holds that work. Unlike Claude's sidechain

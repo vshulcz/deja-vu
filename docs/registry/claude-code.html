@@ -38,14 +38,15 @@
 <article>
 <h1>Claude Code session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Claude Code writes transcripts below <code>${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/</code>. deja also reads three other stores with the same JSONL format: <code>&lt;config&gt;/transcripts/</code>, where headless and SDK-driven clients write; <code>${HOME}/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/&lt;projects&gt;/</code>, where Xcode-hosted Claude sessions are written; and <code>~/.cc-mirror/&lt;variant&gt;/.claude/&lt;projects&gt;/</code>, the isolated variants cc-mirror runs. <code>DEJA_XCODE_CLAUDE_ROOT</code> relocates the Xcode transcript root. <code>DEJA_CLAUDE_ROOT</code> points session reads at one directory and remains the whole answer, so a seeded stand cannot pick up the machine&#39;s own history; <code>DEJA_CC_MIRROR_ROOT</code> moves the variant base. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with <code>-</code>; nested <code>subagents/*.jsonl</code> files are excluded unless <code>DEJA_INCLUDE_SUBAGENTS=1</code>.</p>
+<p>Claude Code writes transcripts below <code>${CLAUDE_CONFIG_DIR:-~/.claude}/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/</code>. deja also reads three other stores with the same JSONL format: <code>&lt;config&gt;/transcripts/</code>, where headless and SDK-driven clients write; <code>${HOME}/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/&lt;projects&gt;/</code>, where Xcode-hosted Claude sessions are written; and <code>~/.cc-mirror/&lt;variant&gt;/.claude/&lt;projects&gt;/</code>, the isolated variants cc-mirror runs. <code>DEJA_XCODE_CLAUDE_ROOT</code> relocates the Xcode transcript root. <code>DEJA_CLAUDE_ROOT</code> points session reads at one directory and remains the whole answer, so a seeded stand cannot pick up the machine&#39;s own history; <code>DEJA_CC_MIRROR_ROOT</code> moves the variant base. Files are JSONL and normally named for a session ID. A project directory encodes an absolute path by replacing both separators and literal hyphens with <code>-</code>; nested <code>subagents/*.jsonl</code> files are read as the task the subagent was given and the answer it came back with; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes the whole child transcript and <code>=0</code> skips them.</p>
 <p>A subagent&#39;s transcript is not a copy of its parent. The parent keeps the launch,</p>
 <p>the <code>agentId</code> and a summary of what came back; the child&#39;s own turns and tool</p>
 <p>stream exist only in the sidechain file, where every line carries</p>
 <p><code>isSidechain: true</code>, the parent&#39;s <code>sessionId</code>, its own <code>agentId</code> and an</p>
-<p><code>attributionAgent</code> naming which agent ran. The default skip is about index size,</p>
-<p>not about the work being there twice — with the env var set, deja indexes each</p>
-<p>sidechain as its own session keyed by <code>agentId</code>, with the parent recorded as its</p>
+<p><code>attributionAgent</code> naming which agent ran. Reading only the task and the answer</p>
+<p>by default is about index size — the reasoning and tool stream in between are</p>
+<p>where the volume is (#3009) — not about the work being there twice. deja indexes</p>
+<p>each sidechain as its own session keyed by <code>agentId</code>, with the parent recorded as its</p>
 <p><code>parent</code> (#1384). Keying on <code>sessionId</code>, which the child repeats, folded the two</p>
 <p>together and one of them won.</p>
 <p>The top-level <code>~/.claude.json</code> is not a transcript. When <code>CLAUDE_CONFIG_DIR</code> is set, Claude moves that file to <code>$CLAUDE_CONFIG_DIR/.claude.json</code>.</p>
@@ -59,7 +60,7 @@
 <li>JSONL can end in a partial line while Claude is writing. Malformed lines are skipped; a later indexing pass reads the completed tail.</li>
 <li>Tool and control records use other <code>type</code> values and do not become messages.</li>
 <li>Project path encoding is ambiguous because <code>-</code> represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.</li>
-<li>Subagent logs largely duplicate parent content and are opt-in.</li>
+<li>Subagent logs are read as task and answer by default; the full child transcript is opt-in.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-09-10</p>
 

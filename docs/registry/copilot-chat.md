@@ -1,7 +1,7 @@
 # VS Code Copilot Chat
 
 - **ID**: `copilot-chat`
-- **Store**: two, and a newer extension writes only the second. VS Code User folder `workspaceStorage/<hash>/chatSessions/<sessionId>.jsonl` (flat `.json` on older builds), empty-window chats under `globalStorage/emptyWindowChatSessions/`, and the extension's own `workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/<sessionId>.jsonl`. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (`copilot`).
+- **Store**: two, and a newer extension writes only the second. VS Code User folder `workspaceStorage/<hash>/chatSessions/<sessionId>.jsonl` (flat `.json` on older builds), empty-window chats under `globalStorage/emptyWindowChatSessions/`, and the extension's own `workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/<sessionId>.jsonl`. A named profile keeps its own copy of both under `profiles/<id>/`, and those are read too. Code, Code Insiders and VSCodium hosts. Not Copilot CLI (`copilot`).
 - **Read override**: `DEJA_COPILOT_CHAT_ROOTS` (path list of User folders)
 - **Format**: two, one per store. The `chatSessions` file is a JSONL mutation log (`kind` 0 initial / 1 set / 2 push / 3 delete) or whole-file JSON; full re-parse per pass, because compaction rewrites the file and a byte-offset resume would apply deltas to state it never saw. The `GitHub.copilot-chat/transcripts` file is a `type`-discriminated event log — `session.start`, `user.message`, `assistant.message`, `assistant.turn_start`/`turn_end`, `tool.execution_start`/`complete` — read by `internal/sources/copilot_agent.go`.
 

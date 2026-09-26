@@ -13,11 +13,11 @@ import (
 // and this file is the two roots and their names.
 //
 //	Senpi:  ${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/<encoded-cwd>/*.jsonl
-//	Kimchi: ${KIMCHI_CODING_AGENT_DIR:-~/.config/kimchi/harness}/sessions/*.jsonl
+//	Kimchi: ${KIMCHI_CODING_AGENT_DIR:-~/.config/kimchi/harness}/sessions/--<encoded-cwd>--/*.jsonl
 //
-// Senpi keeps the encoded project directory pi has, so that names the project;
-// Kimchi's root is flat, and the header line's cwd is what names it there — the
-// choice omp and prime-agent already make for the same reason.
+// Both keep the encoded project directory pi has, so that names the project; a
+// Kimchi file directly under the root has none, and the header line's cwd names
+// it there — the choice omp and prime-agent already make for the same reason.
 
 // SenpiConfigDir is the agent directory. SENPI_CODING_AGENT_DIR moves it, and
 // moves it for deja: a machine that has said where its sessions are should not

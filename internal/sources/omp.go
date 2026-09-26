@@ -81,6 +81,24 @@ func ompProfileRoots(dir, middle string) []string {
 	return out
 }
 
+// underOmpRoot reports whether p sits under any session root omp may write to.
+// The incremental index classifies a changed file by its path, and matching the
+// default root alone left profile and XDG transcripts with no kind: read on a
+// full build, then every append skipped until the next one. The roots are only
+// listed for a path that names omp at all, since every file the index sees
+// passes through here.
+func underOmpRoot(p string) bool {
+	if os.Getenv("DEJA_OMP_ROOT") == "" && !strings.Contains(p, "omp") {
+		return false
+	}
+	for _, root := range OmpSessionRoots() {
+		if strings.HasPrefix(p, root+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
 // OmpSessionFiles lists transcript files under every omp session root.
 func OmpSessionFiles() []string {
 	var files []string

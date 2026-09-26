@@ -43,3 +43,30 @@ func TestFixesForSkipsAnIrreversibleRemedy(t *testing.T) {
 		t.Errorf("want only the install, got %+v", got)
 	}
 }
+
+// When every remedy on file is one FixesFor withholds, the store still holds
+// the pair: the empty answer must not say nothing ran after the error.
+func TestAWithheldRemedyIsNotReportedAsNothingRan(t *testing.T) {
+	dir := t.TempDir()
+	sig := frictionHash(mustFriction(t, "zsh:1: command not found: timeout"))
+	writeFixesForTest(t, dir, []FixPair{
+		{Sig: sig, Command: "gh pr merge 41 --squash --delete-branch", Project: "p"},
+		{Sig: sig, Command: "git push -f origin main", Candidate: true, Project: "p"},
+	})
+	const e = "zsh:1: command not found: timeout"
+	if got := FixesFor(dir, e, 4, nil); len(got) != 0 {
+		t.Fatalf("want nothing served, got %+v", got)
+	}
+	if !FixWithheldAsIrreversible(dir, e, nil) {
+		t.Error("the withheld merge is not reported")
+	}
+	if FixCandidateSeen(dir, e, nil) {
+		t.Error("an irreversible sighting is reported as waiting for confirmation")
+	}
+	if FixWithheldAsIrreversible(dir, e, func(string) bool { return false }) {
+		t.Error("a pair the policy hides is still reported")
+	}
+	if FixWithheldAsIrreversible(dir, "some other error nobody hit", nil) {
+		t.Error("an unseen error reports a withheld remedy")
+	}
+}

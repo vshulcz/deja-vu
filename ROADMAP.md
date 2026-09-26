@@ -20,15 +20,15 @@ the place to discuss design.
   message text copied out of the file to be scored, while the postings already
   carry the offsets of the records that matched. Reading only what is scored, and
   reading it without copying, are the two directions; both touch the hot path, so
-  each wants its latency, peak-RSS and bench numbers before and after. The map
-  with today's measurements is in
+  each wants its latency, peak-RSS and bench numbers before and after. The last
+  profile, and why it moved, is on
   [#3491](https://github.com/vshulcz/deja-vu/issues/3491).
 - **Windows correctness.** The Windows leg runs on `main`, on the weekly canary
   and on any pull request labelled `windows` rather than on every commit, so the
   gap between "green on Linux and macOS" and "correct on Windows" has to be
   closed deliberately. Path-shaped fixtures and the exclude-on-rebuild path are
-  verified there; anything touching paths, output or the filesystem gets the
-  label.
+  verified there, and CI puts the label on a pull request that touches the paths
+  which have broken the leg before.
 - Maintain the security model, signed checksums, provenance and release SBOMs as
   release and harness formats change.
 
@@ -49,10 +49,10 @@ the place to discuss design.
   both stronger and precise without lifting an off-topic session.
 - **Point-of-action in the harnesses that still refuse it.** The repair beside a
   failed command and the file's prior decision now reach Claude Code, Codex,
-  Cursor, opencode, Gemini, Qwen, Cline, Amp, Antigravity, Crush, Grok,
+  Cursor, opencode, Gemini, Qwen, Cline, Amp, Antigravity, Crush,
   Command Code, omp, and pi with its descendants. What is left is
-  where the harness itself drops what a hook returns — Kimi's post-tool events,
-  prime-agent's tool events, Roo until its hooks ship — and each is recorded in
+  where the harness itself drops what a hook returns — Grok's tool events, Kimi's
+  post-tool events, prime-agent's tool events, Roo until its hooks ship — and each is recorded in
   the registry with the measurement behind it.
 - **Follow the work an agent handed off.** A subagent's run is its own session
   now, and where a harness records the edge — Grok's `summary.json`, Claude's

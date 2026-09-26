@@ -39,7 +39,7 @@
 <h1>Crush</h1>
 <ul>
 <li><strong>ID</strong>: <code>crush</code></li>
-<li><strong>Store</strong>: <code>&lt;project&gt;/.crush/crush.db</code>, one SQLite store per project, listed in <code>${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</code>.</li>
+<li><strong>Store</strong>: <code>&lt;data_dir&gt;/crush.db</code>, one SQLite store per project, listed in <code>${XDG_DATA_HOME:-~/.local/share}/crush/projects.json</code>; <code>data_dir</code> is <code>&lt;project&gt;/.crush</code> by default, and an entry that moved it is followed.</li>
 <li><strong>Read override</strong>: <code>DEJA_CRUSH_ROOT</code> (the data home holding that registry)</li>
 <li><strong>Format</strong>: SQLite; <code>sessions</code> joined to <code>messages</code>, incremental by <code>sessions.updated_at</code>.</li>
 </ul>

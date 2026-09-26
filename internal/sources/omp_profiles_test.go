@@ -118,3 +118,27 @@ func TestOmpIgnoresXDGWithoutAnOmpDirectory(t *testing.T) {
 		t.Fatalf("roots = %v, want just the default profile", roots)
 	}
 }
+
+// The incremental index finds a changed file's parser by its path. A profile or
+// XDG transcript was listed and read on a full build, then matched no kind, so
+// every later append to it was skipped until the next rebuild.
+func TestEveryOmpRootIsClassifiedAsOmp(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("DEJA_OMP_ROOT", "")
+	xdg := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", xdg)
+
+	paths := []string{
+		writeOmpSession(t, filepath.Join(home, ".omp", "agent", "sessions", "-work-a"), "aaa", "/work/a"),
+		writeOmpSession(t, filepath.Join(home, ".omp", "profiles", "work", "agent", "sessions", "-work-b"), "bbb", "/work/b"),
+		writeOmpSession(t, filepath.Join(xdg, "omp", "sessions", "-work-c"), "ccc", "/work/c"),
+		writeOmpSession(t, filepath.Join(xdg, "omp", "profiles", "side", "sessions", "-work-d"), "ddd", "/work/d"),
+	}
+	for _, p := range paths {
+		if got := KindForPath(p); got != "omp" {
+			t.Errorf("KindForPath(%s) = %q, want omp", p, got)
+		}
+	}
+}

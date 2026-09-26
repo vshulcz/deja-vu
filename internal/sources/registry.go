@@ -524,7 +524,7 @@ func allHarnesses() []Harness {
 			Name: "omp", Load: LoadOmp, Files: OmpSessionFiles,
 			Kinds: []FileKind{{
 				Name:      "omp",
-				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, OmpRoot()) },
+				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && underOmpRoot(p) },
 				Parse:     fullParse(ParseOmpFile),
 				ParseFrom: offsetParse(ParseOmpFileFromOffset),
 			}},

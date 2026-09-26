@@ -50,8 +50,9 @@ At a supported pre-compaction hook, `manifest.gob` also retains redacted,
 transcript-derived continuation packets for at most 32 session/workspace pairs,
 with a 24 KiB limit per packet. These contain objectives, conclusions, the
 commands a session ran with whether each passed or failed, explicit
-gaps/conflicts, provenance, and repository fingerprints. They
-remain local, are omitted from sync export, and follow ignored/excluded project
+gaps/conflicts, provenance, repository fingerprints, and a short list of
+transcript lines left open (questions to the user, open issue numbers, verdicts,
+deferred checks) carried from one compaction to the next. They remain local, are omitted from sync export, and follow ignored/excluded project
 and forgotten-session controls. `deja forget` removes matching packets even
 before their source sessions have been indexed. See [compaction recovery](compaction.md).
 

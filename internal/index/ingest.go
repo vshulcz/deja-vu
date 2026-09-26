@@ -667,7 +667,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		return err
 	}
 	dropEmptySessions(&m, wrote)
-	// The four sidecars walk every session again — what co-occurs, which
+	// The five sidecars walk every session again — what co-occurs, which
 	// command followed which error, what was run and what failed. On a real
 	// store that is eight seconds of a twenty-second build, and it used to run
 	// under the previous phase's last percentage, so the bar sat still through
