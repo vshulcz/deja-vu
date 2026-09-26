@@ -134,9 +134,10 @@ jobs:
     # compiler and the linker again. So the cap is 120 — a real hang is still
     # bounded by the go -timeout below, which kills one with a stack long
     # before this. The run that raised it came in at 1h28m43s, so 120 is about
-    # a third of headroom rather than a comfortable margin; the lever left is
-    # splitting the leg across runners, which halves the compile as well as the
-    # tests but renames a required check.
+    # a third of headroom rather than a comfortable margin. The compiler reading
+    # was wrong: compiling every test binary on the runner is 41s, and the leg
+    # came down to about a quarter of an hour once `go test` ran with -json (see
+    # the windows test step).
     timeout-minutes: 120
     env:
       # Whether this leg does real work. The windows runner needs twenty-odd
@@ -228,9 +229,38 @@ jobs:
       # them against 5259s without, one run each, which is inside a leg whose
       # identical runs have come in at 49m, 57m and 62m. Not worth a narrower
       # leg, and not worth measuring again.
-      - run: go test -timeout 25m ./...
+      #
+      # The suite runs under -json on windows because that is what makes it fast.
+      # On 2026-09-26 three windows jobs ran the same commit side by side: with
+      # -json the whole suite took 13m16s, and the same `go test` without it was
+      # still running past 51 minutes, with the output going to a file or to the
+      # console alike. The tests take the same time in both (cmd/deja 778s here,
+      # 841s in the plain leg that morning), and compiling every test binary is
+      # 41s, so the rest of the old 85-89 minutes was never the compiler. jq
+      # prints the per-package lines the plain run did, and on a failure the
+      # output of what failed, build errors included.
+      - name: go test (windows)
         if: runner.os == 'Windows' && env.FULL == 'true'
         shell: bash
+        run: |
+          set +e
+          out="$RUNNER_TEMP/test.json"
+          go test -json -timeout 25m ./... > "$out"
+          code=$?
+          jq -r 'select(.Test == null and (.Action == "pass" or .Action == "fail" or .Action == "skip")) | "\(.Action)\t\(.Package)\t\(.Elapsed // 0)s"' "$out"
+          if [ "$code" -ne 0 ]; then
+            echo "::group::output of the failing tests"
+            jq -r 'select(.Action == "fail" and .Test != null) | "\(.Package) \(.Test)"' "$out" | while read -r pkg test; do
+              jq -j --arg p "$pkg" --arg t "$test" 'select(.Package == $p and .Test == $t and .Action == "output") | .Output' "$out"
+            done
+            jq -j 'select(.Action == "build-output") | .Output' "$out"
+            # a package that failed without a failing test: panic, timeout
+            jq -r 'select(.Action == "fail" and .Test == null) | .Package' "$out" | while read -r pkg; do
+              jq -j --arg p "$pkg" 'select(.Package == $p and .Test == null and .Action == "output") | .Output' "$out"
+            done
+            echo "::endgroup::"
+          fi
+          exit "$code"
       - run: go build ./cmd/deja
       - name: Benchmark lexical recall floor
         if: matrix.os == 'ubuntu-latest'
