@@ -65,6 +65,7 @@ var groups = []group{
 	}},
 	{title: "Deleting sessions", fold: true, links: []link{
 		{"session-files-on-disk.html", "Claude Code"},
+		{"delete-old-claude-sessions.html", "Old sessions"},
 		{"delete-codex-sessions.html", "Codex"},
 		{"delete-cursor-chat-history.html", "Cursor"},
 		{"delete-copilot-chat-history.html", "Copilot Chat"},
