@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to delete old Claude Code sessions — deja-vu</title>
+<meta name="description" content="find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How to delete old Claude Code sessions">
+<meta property="og:description" content="find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="How to delete old Claude Code sessions">
+<meta name="twitter:description" content="find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete old Claude Code sessions", "description": "Deleting Claude Code sessions by age: the find command, the cleanupPeriodDays setting, what an old session still costs on disk, and what you lose when it goes.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-09-26"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete old sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete old Claude Code sessions?", "acceptedAnswer": {"@type": "Answer", "text": "By age, with find: find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete removes every transcript last written more than 30 days ago. Run it without -delete first to see the list."}}, {"@type": "Question", "name": "Does Claude Code archive old sessions?", "acceptedAnswer": {"@type": "Answer", "text": "No. There is no archive, no trash and no recycle bin. The list in claude --resume is built by reading ~/.claude/projects, so a session missing from it is a file missing from disk."}}, {"@type": "Question", "name": "Can Claude Code delete old sessions automatically?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. cleanupPeriodDays in ~/.claude/settings.json is the retention in days; transcripts older than that are removed. It is 30 by default, and raising it keeps them longer."}}, {"@type": "Question", "name": "Does deleting old sessions free much disk space?", "acceptedAnswer": {"@type": "Answer", "text": "Usually not. On one machine with 1,320 transcripts totalling 2.73 GB, the 368 files older than 30 days held 0.11 GB — four percent. The ten largest sessions held 2.36 GB, eighty-six percent."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">10</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">11</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html" aria-current="page">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">34</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>How to delete old Claude Code sessions</h1>
+<p class="pagelede">age is a <code>find</code> away, and <code>cleanupPeriodDays</code> does it on a timer &mdash; but old sessions are rarely what fills the disk<span class="mins" data-mins></span></p>
+
+<p>Claude Code has no archive. Nothing is moved aside, nothing goes to a trash folder, and there is no retention view to prune: the list you see in <code>claude --resume</code> is built by reading <code>~/.claude/projects</code> each time, so a session that has left that list is a file that has left the disk. &ldquo;Delete my archived sessions&rdquo; therefore means one of two things &mdash; delete the ones older than some date, or delete the ones that are large.</p>
+
+<h2>Delete by age</h2>
+<p>One command, and it is worth running once without <code>-delete</code> to see what it would take.</p>
+<pre># what would go: every transcript last written more than 30 days ago
+find ~/.claude/projects -name '*.jsonl' -mtime +30
+
+# how much that is
+find ~/.claude/projects -name '*.jsonl' -mtime +30 -exec du -ch {} + | tail -1
+
+# do it
+find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete</pre>
+<p><code>-mtime</code> reads the last write, not the start, so a session you resumed last week counts as last week's however old its first line is. If <code>CLAUDE_CONFIG_DIR</code> is set, the path moves with it.</p>
+
+<h2>Let Claude Code do it</h2>
+<p>The same sweep is a setting. <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code> is a retention in days, 30 unless you say otherwise, and transcripts older than that are removed for you.</p>
+<pre>{ "cleanupPeriodDays": 90 }</pre>
+<p>Raising it keeps history longer; lowering it is a sweep on a timer. The setting only covers <code>~/.claude/projects</code> &mdash; your prompt history in <code>~/.claude/history.jsonl</code> is a separate file and survives it.</p>
+
+<h2>Age is the wrong axis for disk space</h2>
+<p>Measured on one machine, 1,320 transcripts across thirteen projects:</p>
+<pre>all sessions              1,320 files    2.73 GB
+older than 30 days          368 files    0.11 GB   (4% of the bytes)
+the ten largest files        10 files    2.36 GB   (86% of the bytes)
+the single largest           1 file      1.01 GB</pre>
+<p>Twenty-eight percent of the files were older than a month and they held four percent of the space. Sessions grow with what a tool printed into them, not with how long ago they ran, so one long afternoon of a build loop outweighs a year of ordinary work. If the goal is free space, sort by size and delete the top few. If the goal is that old work stops sitting on the disk, age is the right axis and the <code>find</code> above is the whole job.</p>
+<pre># the ten worst offenders, largest first
+find ~/.claude/projects -name '*.jsonl' -exec ls -S {} + | head</pre>
+
+<h2>What you lose</h2>
+<p>A deleted transcript leaves <code>claude --resume</code> immediately, and nothing in the agent breaks. What goes with it is the record: what you tried in that session, the command that finally worked, the reason a decision went the way it did. That is not recoverable from the repository, because most of it was never committed &mdash; and a backup snapshot taken before the sweep is the only copy left. <a href="recover-a-deleted-session.html">Recovering a deleted session</a> covers what is still reachable when it is already gone.</p>
+<p>An index built while the files existed keeps answering after they are deleted, which is the one copy that survives a sweep by design. That is what <a href="../">deja</a> is: it reads the transcripts once, keeps its own index under <code>~/.cache/deja</code>, and answers from it &mdash; so you can run the <code>find</code> above without losing what those sessions knew.</p>
+
+<p><a href="session-files-on-disk.html">Deleting Claude Code sessions, in full</a> &middot; <a href="where-sessions-are-stored.html">Where every agent stores history</a> &middot; <a href="recover-a-deleted-session.html">Recover a deleted session</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
