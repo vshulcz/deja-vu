@@ -404,10 +404,11 @@ func scanCompactionToolLines(harness string, data []byte, base int64, nativeSess
 		if err != nil {
 			return nil, "", false, err
 		}
+		// Newest wins. The session id already pins identity; a session that
+		// moved between worktrees is still the same session, and refusing it
+		// left the long ones — 6 of 20 large transcripts on one machine — with
+		// no packet at all (#4031).
 		if declaredWorkspace != "" {
-			if workspace != "" && workspace != declaredWorkspace {
-				return nil, "", false, ErrTranscriptIdentity
-			}
 			workspace = declaredWorkspace
 		}
 		calls = append(calls, got...)
