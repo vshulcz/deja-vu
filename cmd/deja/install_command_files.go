@@ -100,9 +100,8 @@ func commandFilePath(harness string) string {
 		// the entries as `/omg:*`. Same shape as the others here.
 		return filepath.Join(sources.GjcConfigDir(), "commands", "deja.md")
 	case "omp":
-		// The active profile's agent directory; the default profile's is
-		// ~/.omp/agent. A named profile reads its own, which is why install
-		// writes the profiles it finds rather than this one alone.
+		// The default profile's agent directory, ~/.omp/agent. A named
+		// profile reads its own and does not get the command.
 		return filepath.Join(sources.OmpConfigDir(), "commands", "deja.md")
 	}
 	return ""
