@@ -89,7 +89,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 其他安裝方式：`brew install deja-vu`、
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
 `npx @vshulcz/deja-vu "查詢詞"` 先試試而不裝任何東西。Windows 上安裝腳本會結束並提示
-`unsupported OS`——它是 shell 腳本。請用 `scoop install deja-vu`（在 Scoop 內建的 main bucket 裡），或從
+`unsupported OS`——它是 shell 腳本。請用 `scoop install deja-vu`（在 Scoop 內建的 main bucket 裡）或 `winget install vshulcz.deja-vu`，或從
 [最新發行版](https://github.com/vshulcz/deja-vu/releases/latest)取
 `deja-vu_<version>_windows_amd64.zip`，把 `deja.exe` 放進 `PATH`。
 

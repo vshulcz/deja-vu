@@ -92,7 +92,7 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 और तरीके: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, या बिना कुछ इंस्टॉल किए आज़माने के लिए
 `npx @vshulcz/deja-vu "क्वेरी"`। Windows पर इंस्टॉल स्क्रिप्ट `unsupported OS` कहकर रुक जाती है क्योंकि वह एक shell
-स्क्रिप्ट है; `scoop install deja-vu` चलाइए (यह Scoop के main bucket में है), या [नवीनतम रिलीज़](https://github.com/vshulcz/deja-vu/releases/latest) से
+स्क्रिप्ट है; `scoop install deja-vu` चलाइए (यह Scoop के main bucket में है) या `winget install vshulcz.deja-vu`, या [नवीनतम रिलीज़](https://github.com/vshulcz/deja-vu/releases/latest) से
 `deja-vu_<version>_windows_amd64.zip` लीजिए और `deja.exe` को `PATH` में रखिए।
 
 सिर्फ़ बाइनरी भी पूरा इंस्टॉल है: इंडेक्सिंग, खोज, `show`, `ctx`, `blame`, `--json` और क्रेडेंशियल हटाने के लिए और कुछ

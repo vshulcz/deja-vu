@@ -92,7 +92,7 @@ O skill chama o binário `deja` que você já instalou; não traz um próprio.
 Outros caminhos: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, ou `npx @vshulcz/deja-vu "consulta"` para
 experimentar sem instalar nada. No Windows o script de instalação termina com `unsupported OS` porque é um
-script de shell; use `scoop install deja-vu` (está no bucket main do Scoop) ou pegue `deja-vu_<version>_windows_amd64.zip` da
+script de shell; use `scoop install deja-vu` (está no bucket main do Scoop) ou `winget install vshulcz.deja-vu`, ou pegue `deja-vu_<version>_windows_amd64.zip` da
 [última release](https://github.com/vshulcz/deja-vu/releases/latest) e coloque `deja.exe` no `PATH`.
 
 Só o binário já é uma instalação completa: indexar, buscar, `show`, `ctx`, `blame`, `--json` e a limpeza de

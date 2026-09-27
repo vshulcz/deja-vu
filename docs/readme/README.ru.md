@@ -92,7 +92,7 @@ Skill вызывает установленный бинарник `deja`, св�
 Другие способы: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, или `npx @vshulcz/deja-vu "запрос"`, чтобы
 попробовать ничего не устанавливая. На Windows установочный скрипт выходит с `unsupported OS` — это
-shell-скрипт; используйте `scoop install deja-vu` (есть в основном bucket Scoop) или возьмите `deja-vu_<version>_windows_amd64.zip` из
+shell-скрипт; используйте `scoop install deja-vu` (есть в основном bucket Scoop) или `winget install vshulcz.deja-vu`, либо возьмите `deja-vu_<version>_windows_amd64.zip` из
 [последнего релиза](https://github.com/vshulcz/deja-vu/releases/latest) и положите `deja.exe` в `PATH`.
 
 Одного бинарника достаточно для полной работы: индексация, поиск, `show`, `ctx`, `blame`, `--json` и

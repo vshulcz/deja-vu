@@ -91,7 +91,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 다른 설치 방법: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, 또는 아무것도 설치하지 않고 먼저 써 보려면
 `npx @vshulcz/deja-vu "검색어"`. Windows에서는 설치 스크립트가 `unsupported OS`로 끝납니다. shell
-스크립트이기 때문입니다. `scoop install deja-vu`를 쓰거나(Scoop 기본 main 버킷에 있습니다) [최신 릴리스](https://github.com/vshulcz/deja-vu/releases/latest)에서
+스크립트이기 때문입니다. `scoop install deja-vu`(Scoop 기본 main 버킷에 있습니다)나 `winget install vshulcz.deja-vu`를 쓰거나 [최신 릴리스](https://github.com/vshulcz/deja-vu/releases/latest)에서
 `deja-vu_<version>_windows_amd64.zip`을 받아 `deja.exe`를 `PATH`에 두세요.
 
 바이너리 하나만으로도 온전한 설치입니다. 색인, 검색, `show`, `ctx`, `blame`, `--json`, 비밀정보 제거는

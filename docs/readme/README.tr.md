@@ -92,7 +92,7 @@ Skill, kurduğunuz `deja` ikilisini çağırır; kendi kopyasını taşımaz.
 Diğer yollar: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest` ya da hiçbir şey kurmadan denemek için
 `npx @vshulcz/deja-vu "sorgu"`. Windows'ta kurulum betiği `unsupported OS` diyerek çıkar, çünkü bir shell
-betiği; `scoop install deja-vu` kullanın (Scoop'un main bucket'ında) ya da [son sürümden](https://github.com/vshulcz/deja-vu/releases/latest)
+betiği; `scoop install deja-vu` kullanın (Scoop'un main bucket'ında) veya `winget install vshulcz.deja-vu` kullanın ya da [son sürümden](https://github.com/vshulcz/deja-vu/releases/latest)
 `deja-vu_<version>_windows_amd64.zip` dosyasını alıp `deja.exe`'yi `PATH`'e koyun.
 
 Yalnızca ikili dosya bile tam bir kurulumdur: indeksleme, arama, `show`, `ctx`, `blame`, `--json` ve kimlik

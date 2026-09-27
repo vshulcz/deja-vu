@@ -30,6 +30,29 @@ func TestDocsNameTheWindowsInstall(t *testing.T) {
 		if !strings.Contains(text, "scoop install deja-vu") {
 			t.Errorf("%s does not name the scoop install, which is the short path on windows", name)
 		}
+		// And winget, which ships with Windows: the package has been in
+		// microsoft/winget-pkgs since 0.21.0 (#428125), and a reader without
+		// Scoop should not be sent to the zip.
+		if !strings.Contains(text, "winget install vshulcz.deja-vu") {
+			t.Errorf("%s does not name the winget install", name)
+		}
+	}
+}
+
+// The translations carry their own Windows paragraph, so each one has to name
+// both package managers too.
+func TestTranslatedReadmesNameBothWindowsInstalls(t *testing.T) {
+	root := filepath.Join("..", "..")
+	for _, l := range readmeLanguages {
+		b, err := os.ReadFile(filepath.Join(root, l.file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, cmd := range []string{"scoop install deja-vu", "winget install vshulcz.deja-vu"} {
+			if !strings.Contains(string(b), cmd) {
+				t.Errorf("%s does not name %q", l.file, cmd)
+			}
+		}
 	}
 }
 

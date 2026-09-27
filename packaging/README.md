@@ -58,7 +58,7 @@ from the local manifests, and then open a pull request. Do not replace the
 previous version directory.
 
 Add package-manager commands to the project README only after each upstream
-manifest is accepted. Scoop is, and the README lists it; the WinGet submission
-([microsoft/winget-pkgs#428125](https://github.com/microsoft/winget-pkgs/pull/428125))
-is still open, so the WinGet manifests here are a publication source, not a
-working install channel.
+manifest is accepted. Both are: Scoop in Main, and WinGet since 0.21.0
+([microsoft/winget-pkgs#428125](https://github.com/microsoft/winget-pkgs/pull/428125)),
+so `winget install vshulcz.deja-vu` works. WinGet has no automation proposing
+version bumps, so each release needs its own pull request there.

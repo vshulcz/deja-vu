@@ -84,10 +84,11 @@ claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@d
 ```
 
 Windows ではインストールスクリプトが `unsupported OS` で終了します——シェルスクリプトだからです。
-代わりに Scoop を使ってください。Scoop に標準で入っている main バケットから入手できます：
+代わりに Scoop（標準の main バケットにあります）か、Windows に最初から入っている winget を使ってください：
 
 ```powershell
 scoop install deja-vu
+winget install vshulcz.deja-vu
 ```
 
 または[最新リリース](https://github.com/vshulcz/deja-vu/releases/latest)から

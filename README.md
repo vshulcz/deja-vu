@@ -78,10 +78,11 @@ claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@d
 ```
 
 On Windows the install script exits with `unsupported OS` — it is a shell script. Use
-Scoop instead, from the main bucket every Scoop install already has:
+Scoop, from the main bucket every Scoop install already has, or winget, which ships with Windows:
 
 ```powershell
 scoop install deja-vu
+winget install vshulcz.deja-vu
 ```
 
 Or take `deja-vu_<version>_windows_amd64.zip` from the
