@@ -7,18 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- The Zed extension uses the `deja` already on PATH instead of downloading its own copy. Its probe runs `deja --version`, which Zed refuses unless the manifest lists it, and the manifest listed nothing (#4068).
-- The `deja-history` skill names `orient` with the other modes; the MCP tool had seven and the skill listed six.
+## [0.21.3] - 2026-09-27
 
-### Added
-- Reasonix, the thirty-fifth harness deja reads (#4053, requested by @TianQue6916). Its sessions were reachable only through `DEJA_COMMANDCODE_ROOT`, filed under `commandcode` with no project and no date. deja now follows Reasonix's own root chain (`REASONIX_STATE_HOME`, `REASONIX_HOME`, `[storage] state` in `config.toml`, then `~/.reasonix`, or `%APPDATA%\reasonix` on Windows) and reads the JSONL store, the legacy roots while they exist, and the 1.x session directories, whose `events.frames` it decodes through the `zstd` CLI. `deja resume` prints `reasonix --resume <id>` in the session's workspace.
-- `deja install reasonix` and `reasonix-auto`. Both install one Reasonix plugin package, `deja`, carrying the MCP server, the `deja-history` skill and `/deja`. `reasonix-auto` adds a runtime extension, `deja reasonix-ext`, since on Reasonix 1.39.1 only SessionStart hook output reaches the model: it appends the session digest and per-prompt recall to the user turn, not the system prompt, so DeepSeek's prefix cache keeps hitting; adds the fix for a failed command to that tool result; and hands the compaction summarizer deja's record of the turns being folded. With a warm index the per-prompt step took a median of 131 ms over eight turns, against 120 ms for the hook run directly. `deja doctor` reports the package, a disabled record, and a runtime binary that is gone.
-
-### Fixed
-- The opencode npm plugin puts the session digest into opencode's first system message instead of adding a second one. vLLM and SGLang serving Qwen reject a request with two ("System message must be at the beginning."), so the title agent and subagents on those models failed every turn. The plugin `deja install --auto` writes already did this (#4058, reported by @R-omk).
-
-## [0.21.3] - 2026-09-26
+Reasonix is the thirty-fifth agent deja reads, and `deja install reasonix-auto`
+brings recall into it through a plugin package and a runtime extension.
 
 The line deja puts beside a failed command or before a risky one is now worth
 reading. It no longer offers a merge, a force push or a deletion as the fix for
@@ -30,11 +22,16 @@ the transcript closes them, and a recall page that found one long session says
 which session to open.
 
 ### Added
+- Reasonix, the thirty-fifth harness deja reads (#4053, requested by @TianQue6916). Its sessions were reachable only through `DEJA_COMMANDCODE_ROOT`, filed under `commandcode` with no project and no date. deja now follows Reasonix's own root chain (`REASONIX_STATE_HOME`, `REASONIX_HOME`, `[storage] state` in `config.toml`, then `~/.reasonix`, or `%APPDATA%\reasonix` on Windows) and reads the JSONL store, the legacy roots while they exist, and the 1.x session directories, whose `events.frames` it decodes through the `zstd` CLI. `deja resume` prints `reasonix --resume <id>` in the session's workspace.
+- `deja install reasonix` and `reasonix-auto`. Both install one Reasonix plugin package, `deja`, carrying the MCP server, the `deja-history` skill and `/deja`. `reasonix-auto` adds a runtime extension, `deja reasonix-ext`, since on Reasonix 1.39.1 only SessionStart hook output reaches the model: it appends the session digest and per-prompt recall to the user turn, not the system prompt, so DeepSeek's prefix cache keeps hitting; adds the fix for a failed command to that tool result; and hands the compaction summarizer deja's record of the turns being folded. With a warm index the per-prompt step took a median of 131 ms over eight turns, against 120 ms for the hook run directly. `deja doctor` reports the package, a disabled record, and a runtime binary that is gone.
 - The compaction packet carries a short "keep until closed" list: questions waiting on the user, open #N items the agent named, verdicts, and rechecks promised for later. Each line stays across compactions until the transcript closes it (a `gh pr merge N`, "#N merged", a user reply). On 189 real compactions the summaries dropped 35% of open #N items, 71% of verdict lines and 97% of deferred rechecks; the list holds 72% of the dropped #N that were still open, is 274 tokens median, and was right on 34 of 40 hand-checked lines. It takes at most 40% of the packet. Claude Code and Codex only, where the packet is captured.
 - A recall page whose answer is a fragment of one long session now says which session to open: "Session <id> matched N times and only three of them fit here — call recall_context with that id to read the rest." A hit quotes at most three of its matches, and the only follow-up the page offered was `offset=` — more sessions, never more of the one already found. Over eighteen questions on a live harness the line cut billed tokens 23% to 51% and gained two correct answers of twelve; it costs 149 bytes and appears only when a served session matched ten times or more.
 - `deja bench context` measures the same chains a second time with their history folded into one long session each, and prints it as its own table. Every corpus in the benchmark filed history as many short sessions with one fact each, which is not the shape a real store has: on this machine's own store every recall page's deepest hit matched between 24 and 23,278 times. Folded, the session-start block carries a quarter of a chain's facts instead of half, in 89 tokens instead of 360 — the same content, reached less often because it is filed in one place. The existing rows do not move; the second corpus is built and indexed on its own.
 
 ### Fixed
+- The Zed extension uses the `deja` already on PATH instead of downloading its own copy. Its probe runs `deja --version`, which Zed refuses unless the manifest lists it, and the manifest listed nothing (#4068).
+- The `deja-history` skill names `orient` with the other modes; the MCP tool had seven and the skill listed six.
+- The opencode npm plugin puts the session digest into opencode's first system message instead of adding a second one. vLLM and SGLang serving Qwen reject a request with two ("System message must be at the beginning."), so the title agent and subagents on those models failed every turn. The plugin `deja install --auto` writes already did this (#4058, reported by @R-omk).
 - `deja fix` and the MCP `fix` mode say when what ran after an error was withheld as irreversible. With only a merge, a force push or a deletion on file, the CLI answered that the line matched nothing and offered the same line back as the closest one it held, and MCP said no session ran a command after it. Both now say the remedy exists and is not handed over; MCP still adds what sessions said about the error.
 - An opencode 1.18.3 store read as having no sessions. Its `session_message` table held only model-switch events while `message` and `part` held every turn, and any row there made deja read the store the 2.x way. It now counts only the rows the 2.x reader can use (#4025, contributed by @aniruddhaadak80).
 - Appends to omp transcripts under a profile or `$XDG_DATA_HOME/omp` are indexed as they happen. A full build read them, and the incremental pass matched them to no harness and skipped every later turn until the next rebuild: 3 of omp's 4 roots (#4041).
