@@ -16,6 +16,12 @@
 
 <p align="center"><b>deja 一开始就是满的：35 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
+<p align="center"><b>在同样的 19,195 个会话上，领先另外七个记忆工具</b>——agentmemory、MemPalace、claude-mem、CASS、ctx、agentsview 和 funes：
+第一位命中最多（100 题中 19 题；第二名 14 题），建索引最快（17.6 秒；第二名 72 秒），首次回答最快（26 毫秒），
+同一台机器已经做过的任务，token 只有 agentmemory 的一半（53,558 对比 104,974）。<br>
+<sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完整表格，以及如何重跑你怀疑的那一行</a></sub></p>
+
 <p align="center">
 同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
 <sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;

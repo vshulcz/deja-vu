@@ -22,6 +22,12 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says what that catches
 and what it cannot.</p>
 
+<p align="center"><b>Ahead of seven other memory tools on the same 19,195 sessions</b> — agentmemory, MemPalace, claude-mem, CASS, ctx, agentsview and funes:
+the most answers at rank one (19 of 100; the next best, 14), the fastest build (17.6 s; the next, 72 s), the fastest first answer (26 ms),
+and half the tokens agentmemory spends on a task this machine had already solved (53,558 against 104,974).<br>
+<sub>I maintain deja-vu, so every driver, the corpus and the scoring rule are in this repository &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">the full table, and how to re-run a row you doubt</a></sub></p>
+
 <p align="center">
 <b>58% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>
 <sub>Eleven runs an arm: 53,558 tokens against 126,222 with nothing wired, and 52,815 against 103,443 on a later build with the two arms run alternately &middot;
