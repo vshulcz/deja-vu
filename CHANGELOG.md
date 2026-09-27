@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `deja rules` keeps the rules you give your agents in one file, `~/.config/deja/rules.md`, and `deja rules sync` copies it as a marked block into the global rules file of each installed agent that has one deja knows: Claude Code, Codex, opencode, Gemini, Qwen, Kimi, Grok and goose. A rule given to one agent used to stay there; on the machine this was measured on, seven were given again in other agents. doctor names an agent whose copy is behind, and uninstall takes the block out.
+
 ### Fixed
 
 - The OpenClaw plugin reaches ClawHub with each release again. ClawHub mints a publish token only for a `workflow_dispatch` run and refused every tag push since 0.21.0, so the tag run now dispatches `release.yml` with the tag and that run publishes.

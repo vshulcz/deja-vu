@@ -188,6 +188,7 @@ _deja() {
     'how:commands this machine actually ran for a thing'
     'doctor:diagnose local stores and wiring'
     'promote:distill a session into a curated note'
+    'rules:copy your rules file into every agent'
     'embed:build the semantic sidecar'
     'forget:remove indexed sessions'
     'handoff:continue a session in another agent'
@@ -477,7 +478,7 @@ func completionCommands() []string {
 		"bench", "blame", "brief", "check", "completion", "ctx", "doctor", "embed",
 		"files", "fix", "forget", "friction", "handoff", "help", "how", "index",
 		"install", "last", "log", "mcp", "promote", "recap", "remember", "restore",
-		"resume", "search", "secrets", "share", "show", "sources", "stats",
+		"resume", "rules", "search", "secrets", "share", "show", "sources", "stats",
 		"statusline", "sync", "tests", "uninstall", "update", "version", "view",
 		"warmup", "wip",
 	}

@@ -33,6 +33,11 @@ func doctorCommands(w io.Writer) {
 		fmt.Fprintf(w, "  %-12s %s\n", "",
 			"`skill` means there is no file of deja's to install: the skill is the command there, and each harness spells the invocation its own way")
 	}
+	// The other text an install shares with the agents: the reader's rules,
+	// said only when some copy is behind them (#4086).
+	if note := rulesDoctorNote(); note != "" {
+		fmt.Fprintf(w, "  %-12s %s\n", "rules", note)
+	}
 }
 
 type doctorCommandFile struct {

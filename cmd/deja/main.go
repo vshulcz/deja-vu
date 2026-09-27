@@ -230,6 +230,7 @@ var commands = map[string]command{
 	"stats":         runStats,
 	"remember":      runRemember,
 	"promote":       func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
+	"rules":         runRules,
 	"forget":        runForget,
 	"mcp":           func(dir string, _ []string) error { return serveMCPProcess(dir, os.Stdin, os.Stdout) },
 	"hook-prompt": func(dir string, rest []string) error {
@@ -4105,6 +4106,7 @@ Usage:
              [--project name] [--harness name] [--since 30d] [--role name]
   deja remember "text" [--project name] [--tag name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
+  deja rules [sync]  (copy ~/.config/deja/rules.md into every agent's global rules file)
   deja mcp
   deja version
   deja <command> --help

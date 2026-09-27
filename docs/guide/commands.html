@@ -160,6 +160,7 @@
 <tr><td><code>deja version</code></td><td>Print the version.</td></tr>
 <tr><td><code>deja sources</code></td><td>Discovered stores per harness, with redaction counts.</td></tr>
 <tr><td><code>deja install &lt;target|--all|--auto&gt;</code></td><td>Wire MCP recall (and hooks) into your agents. <code>--no-guidance</code> skips the instruction block, <code>--no-index</code> skips the first index build.</td></tr>
+<tr><td><code>deja rules [sync]</code></td><td>Your standing rules in one file, <code>~/.config/deja/rules.md</code>. <code>deja rules</code> lists each installed agent's global rules file and whether its copy is in sync; <code>sync</code> writes the rules there as a marked block, leaving the rest of the file alone, and an empty file takes the copies back out. Agents whose global rules file deja has not verified are listed and left alone.</td></tr>
 <tr><td><code>deja embed</code></td><td>Build the semantic vector sidecar from an embedding endpoint.</td></tr>
 <tr><td><code>deja sync export/import/ssh</code></td><td>Move redacted memory between machines. Bare <code>deja sync</code> exchanges with every machine deja knows; <code>sync ssh &lt;host&gt;</code> pushes, <code>--pull</code> pulls, <code>--both</code> does both, <code>--full</code> sends everything rather than what changed.</td></tr>
 <tr><td><code>deja sync forget &lt;host&gt;</code></td><td>Drop a machine deja knows, so a bare <code>deja sync</code> stops trying it.</td></tr>

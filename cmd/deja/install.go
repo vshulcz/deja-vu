@@ -222,6 +222,16 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			note(t, err)
 			continue
 		}
+		// The copy of the reader's rules leaves with the harness, whether or not
+		// --no-guidance was given: the markers are deja's, and an uninstall is
+		// the promise that nothing of deja's is left in the agent's files (#4086).
+		if uninstall {
+			if p, a, err := dropRulesBlock(t); err != nil {
+				note(t, err)
+			} else if p != "" && a != "unchanged" && !banner {
+				fmt.Printf("%s: rules %s %s\n", t, a, p)
+			}
+		}
 		if guidance {
 			gr, err := guidanceResult(t, uninstall)
 			if err != nil {
