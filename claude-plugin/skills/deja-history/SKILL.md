@@ -21,6 +21,7 @@ These are the modes of the one deja tool, passed as `mode`.
 - blame: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
 - fix: paste a failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
 - how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.
+- orient: at the start of work in a project, the commands past sessions ran there and the files they worked in, before you go reading.
 - remember: store one durable decision after it is settled, as a single self-contained fact. Not transcripts, not anything already obvious from the code.
 
 ## Reading a result

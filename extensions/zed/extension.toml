@@ -1,10 +1,17 @@
 id = "deja-mcp-server"
 name = "deja"
 description = "deja-vu memory for Zed: search and recall the sessions your other coding agents already wrote, from inside Zed"
-version = "0.1.4"
+version = "0.1.5"
 schema_version = 1
 authors = ["vshulcz <vshulcz@gmail.com>"]
 repository = "https://github.com/vshulcz/deja-vu"
 
 [context_servers.deja-context-server]
 name = "deja"
+
+# The PATH probe in src/lib.rs (deja_on_path). Zed refuses an exec the
+# manifest does not list, and without it every user got the download.
+[[capabilities]]
+kind = "process:exec"
+command = "deja"
+args = ["--version"]
