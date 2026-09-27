@@ -100,7 +100,8 @@
 <p><code>reasonix plugin install &lt;dir&gt; --name deja --replace --yes</code>, which copies it to</p>
 <p><code>&lt;home&gt;/plugins/deja</code> and records it in <code>&lt;home&gt;/plugin-packages.json</code>. With no</p>
 <p><code>reasonix</code> on PATH deja writes the same layout itself. <code>&lt;home&gt;</code> is</p>
-<p><code>$REASONIX_HOME</code>, else <code>~/.reasonix</code>. <code>config.toml</code> is not touched.</p>
+<p><code>$REASONIX_HOME</code>, else <code>~/.reasonix</code> on macOS and Linux and</p>
+<p><code>%APPDATA%\reasonix</code> on Windows. <code>config.toml</code> is not touched.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install reasonix</code> puts the server in the package&#39;s</li>
 </ul>
@@ -116,10 +117,17 @@
 <p>the model. The extension appends the session digest (first turn) and the</p>
 <p>per-prompt recall to the user turn at <code>input.receive</code>, so recall sits in the</p>
 <p>turn tail and the prefix cache is not disturbed; the system prompt is never</p>
-<p>edited. Reasonix stores the typed text as <code>raw_content</code>, and that is what</p>
-<p>deja indexes. At <code>tool.after</code> it appends the pre-tool line and, when a</p>
-<p>command failed, what fixed the same failure before. At</p>
-<p><code>compaction.prepare</code> it adds deja&#39;s record of the folded turns to the</p>
+<p>edited. Recall is asked about what the person typed: the host&#39;s own blocks,</p>
+<p>the plan-mode marker and <code>Referenced context:</code> file bodies are left out of</p>
+<p>the query, and the host&#39;s own turns (a goal round, the message after a plan</p>
+<p>approval) get nothing. Reasonix stores the typed text as <code>raw_content</code>, and</p>
+<p>that is what deja indexes. At <code>tool.after</code> it adds the pre-tool line for a</p>
+<p>shell command (<code>bash</code>, or <code>pwsh</code> and <code>powershell</code> on Windows) or a file</p>
+<p>write, and when a command failed, what fixed the same failure before. Both</p>
+<p>go after the output; for output Reasonix will cut to a CI summary (first</p>
+<p>and last eight lines) they go in front, on one line. At</p>
+<p><code>compaction.prepare</code> it adds deja&#39;s record of the folded turns, read from</p>
+<p>what the person typed rather than the recall appended to it, to the</p>
 <p>summarizer&#39;s guidance. It publishes a status line while the first index</p>
 <p>builds and one &#34;recalled N prior sessions&#34; notice per session. Every answer</p>
 <p>has a budget under the host&#39;s timeout (4 s per prompt, 2 s per tool call,</p>
@@ -138,7 +146,11 @@
 <ul>
 <li><strong>Uninstall</strong>: removes the package directory and deja&#39;s record, and the</li>
 </ul>
-<p>state file too when deja created it.</p>
+<p>state file too when deja created it. A <code>deja</code> package deja did not write —</p>
+<p>a linked one (<code>plugin install --link</code>), or a record pointing at another</p>
+<p>source — is left alone, and install refuses to replace it. When install</p>
+<p>ran <code>reasonix</code>, the receipt-signing key and crash directory that run</p>
+<p>created go too, unless Reasonix has used the key since.</p>
 <ul>
 <li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code> in the session&#39;s workspace.</li>
 <li><strong>Handoff</strong>: paste.</li>
@@ -198,13 +210,20 @@
 <li><strong>Pre-tool lines arrive with the result.</strong> A <code>tool.before</code> answer can</li>
 </ul>
 <p>only let a call run, change it or stop it, so the line deja has about a</p>
-<p>command or file is held and appended to that call&#39;s result.</p>
+<p>command or file is asked for at <code>tool.after</code>, which fires only for a call</p>
+<p>that ran, and added to that call&#39;s result.</p>
 <ul>
-<li><strong>The session id is read off the store.</strong> The extension is told a</li>
+<li><strong>Which session.</strong> The extension is told a host-local id (<code>boot-1</code> on</li>
 </ul>
-<p>host-local id (<code>boot-1</code> on 1.39.1). deja takes the real one from the one</p>
-<p><code>sessions-v4</code> directory written since the session began; with none or</p>
-<p>several it files the session under a key of its own.</p>
+<p>1.39.1). A <code>session.start</code> or <code>session.load</code> event names the session in</p>
+<p><code>sessionPath</code> where Reasonix has one — a bare id on the 1.x binding, a</p>
+<p>session directory or a JSONL path elsewhere — and that is the key; a</p>
+<p><code>session.rotate</code> names the session that is ending. Without a name, deja</p>
+<p>takes the one <code>sessions-v4</code> directory in the workspace whose manifest</p>
+<p><code>createdAt</code> is after the session began and that no earlier session in the</p>
+<p>process was filed under; with none or several it files the session under a</p>
+<p>key of its own. A session event with no name that arrives within two</p>
+<p>seconds of a turn is taken as that turn&#39;s own.</p>
 <ul>
 <li><strong>2.x is checked from source only.</strong> Reasonix 2.x (branch <code>studio</code>) has</li>
 </ul>
