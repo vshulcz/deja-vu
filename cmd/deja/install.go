@@ -934,6 +934,10 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installOpenClawMCP(exe, uninstall)
 	case "openclaw-auto":
 		return installOpenClawAuto(exe, uninstall)
+	case "reasonix":
+		return installReasonix(exe, uninstall, false)
+	case "reasonix-auto":
+		return installReasonix(exe, uninstall, true)
 	case "opencode":
 		return installOpencode(exe, uninstall)
 	case "opencode-auto":
@@ -4405,6 +4409,7 @@ func installTargetNames() []string {
 		"prime", "prime-auto",
 		"deepseek", "deepseek-auto",
 		"openclaw", "openclaw-auto",
+		"reasonix", "reasonix-auto",
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
@@ -4563,6 +4568,11 @@ func existingTargetChecks() map[string]string {
 		"gjc":          sources.GjcRoot(),
 		"zcode":        sources.ZCodeRoot(),
 		"commandcode":  commandCodeFirstRoot(),
+		// Reasonix's own config.toml, which it writes on first run. deja
+		// writes beside it — plugins/ and plugin-packages.json — and never
+		// into it, so keying on the home itself would make every machine a
+		// Reasonix machine after one install.
+		"reasonix": filepath.Join(sources.ReasonixHome(), "config.toml"),
 		// These six have install targets and were in the matrix with nothing
 		// looking for them, so `--auto` wired the other nineteen and said
 		// nothing about Amp, prime-agent, Crush, Continue, Zed or VS Code on a

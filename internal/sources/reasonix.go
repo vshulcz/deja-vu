@@ -33,6 +33,31 @@ import (
 // Reasonix copies those into its current store without touching the
 // originals, so a legacy file is read only when no current one has its id.
 
+// ReasonixHome is where config.toml, plugin-packages.json and plugins/ live.
+func ReasonixHome() string { return reasonixHome() }
+
+// ReasonixWorkspaceStore is the 1.x sessions-v4 directory Reasonix keeps for
+// one workspace: the absolute path folded by WorkspaceSlug
+// (internal/config/paths.go), lower-cased on Windows. A path long enough for
+// Reasonix to hash its slug gets "", since the hash is not reproduced here.
+func ReasonixWorkspaceStore(workspace string) string {
+	root := strings.TrimSpace(workspace)
+	if root == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	if runtime.GOOS == "windows" {
+		root = strings.ToLower(root)
+	}
+	slug := strings.NewReplacer(string(os.PathSeparator), "-", "/", "-", `\`, "-", ":", "-").Replace(root)
+	if len(slug) > 255 {
+		return ""
+	}
+	return filepath.Join(ReasonixStateRoot(), "projects", slug, "sessions-v4")
+}
+
 // reasonixHome is where config.toml lives: $REASONIX_HOME, else the OS default.
 func reasonixHome() string {
 	if v := os.Getenv("REASONIX_HOME"); v != "" {
@@ -276,10 +301,38 @@ func ParseReasonixFile(path string) ([]model.Session, error) {
 		start = end
 	}
 
-	// A line without createdAt sits one millisecond after the one before it,
-	// so two identical turns stay two records (#3333).
+	err := scanJSONLFromOffset(path, 0, reasonixLineReader(&s, start))
+	if len(s.Messages) == 0 {
+		return nil, err
+	}
+	s.Touch(start)
+	s.Touch(end)
+	return []model.Session{s}, err
+}
+
+// ParseReasonixMessages reads Reasonix provider messages already in memory —
+// the fold a compaction.prepare intercept hands an extension, which has the
+// same {role, content, tool_calls} shape as a JSONL line.
+func ParseReasonixMessages(lines [][]byte, at time.Time) model.Session {
+	s := model.Session{Harness: "reasonix"}
+	read := reasonixLineReader(&s, at)
+	for _, line := range lines {
+		var m map[string]any
+		d := json.NewDecoder(strings.NewReader(string(line)))
+		d.UseNumber()
+		if d.Decode(&m) == nil {
+			read(m)
+		}
+	}
+	return s
+}
+
+// reasonixLineReader appends one line's messages to s. A line without
+// createdAt sits one millisecond after the one before it, so two identical
+// turns stay two records (#3333).
+func reasonixLineReader(s *model.Session, start time.Time) func(map[string]any) {
 	clock := start.Add(-time.Millisecond)
-	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
+	return func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role == "" {
 			return
@@ -318,13 +371,7 @@ func ParseReasonixFile(path string) ([]model.Session, error) {
 				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: ts})
 			}
 		}
-	})
-	if len(s.Messages) == 0 {
-		return nil, err
 	}
-	s.Touch(start)
-	s.Touch(end)
-	return []model.Session{s}, err
 }
 
 // reasonixToolUses turns tool_calls into the tool_use blocks the dialect

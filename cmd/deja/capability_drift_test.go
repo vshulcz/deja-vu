@@ -156,6 +156,11 @@ func TestCapabilityRegistryMatchesCode(t *testing.T) {
 		case "goose":
 			// Goose declares commands in config.yaml, not a commands directory.
 			gotCommand = strings.Contains(gooseRecipe("/bin/deja"), "title: deja")
+		case "reasonix":
+			// The command rides in deja's plugin package, beside the manifest
+			// that lists its directory.
+			files := reasonixPackageFiles("/bin/deja", false)
+			gotCommand = len(files["commands/deja.md"]) > 0 && strings.Contains(string(files["reasonix-plugin.json"]), `"commands"`)
 		case "continue":
 			// Continue declares its slash commands in the assistant config, as
 			// `prompts:`, so the artifact to read is the config deja writes.

@@ -762,6 +762,10 @@ func ownGuidanceFile(harness string) string {
 		return sharedSkillPath()
 	case "kiro":
 		return kiroSteeringPath()
+	case "reasonix":
+		// Inside the plugin package, which is how Reasonix loads a skill a
+		// package ships: listed as /deja:deja-history under /skills.
+		return reasonixSkillPath()
 	}
 	return ""
 }

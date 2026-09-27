@@ -487,4 +487,6 @@ func completionCommands() []string {
 // out is a decision recorded here rather than a name missing from three scripts.
 var completionHiddenCommands = map[string]bool{
 	"warmup-status": true,
+	// Reasonix starts it as the plugin's runtime and talks JSON-RPC to it.
+	"reasonix-ext": true,
 }

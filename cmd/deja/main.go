@@ -307,6 +307,15 @@ var commands = map[string]command{
 	"hook-goose-prompt": func(dir string, _ []string) error {
 		return refreshGooseForPrompt(dir, readHookStdin())
 	},
+	// The code extension `deja install reasonix-auto` registers. Reasonix
+	// starts it and speaks JSON-RPC on its stdin; at a terminal it says so
+	// rather than sitting on a read nobody will answer.
+	"reasonix-ext": func(dir string, _ []string) error {
+		if sayIfTypedByHand("reasonix-ext") {
+			return nil
+		}
+		return runReasonixExt(dir, os.Stdin, os.Stdout)
+	},
 	"blame": runBlame,
 }
 
@@ -4033,6 +4042,7 @@ var helpHidden = map[string]bool{
 	"hook-goose-prompt": true,
 	"hook-precompact":   true,
 	"hook-refresh":      true,
+	"reasonix-ext":      true,
 	"warmup-status":     true,
 }
 

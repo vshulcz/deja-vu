@@ -82,6 +82,8 @@ func doctorCommandFiles() []doctorCommandFile {
 	out = append(out, doctorCommandFile{name: "copilot-chat", path: doctorFirstExisting(
 		copilotChatPromptPaths(),
 		filepath.Join(vsCodeDefaultUserDir(), "prompts", "deja.prompt.md"))})
+	// Reasonix reads it from deja's plugin package and lists it as /deja:deja.
+	out = append(out, doctorCommandFile{name: "reasonix", path: reasonixCommandPath()})
 	for _, name := range skillIsTheCommandHarnesses() {
 		out = append(out, doctorCommandFile{name: name, path: commandSkillPath(name), skill: true})
 	}

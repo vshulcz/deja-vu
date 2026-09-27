@@ -15,7 +15,7 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
 		"hook-refresh": true,
 		"hook-plan":    true, "hook-tool": true, "hook-tool-after": true,
-		"warmup-status": true, "mcp": true,
+		"warmup-status": true, "mcp": true, "reasonix-ext": true,
 	}
 	// The emitted script, not the template: the command list is substituted at
 	// run time now, the way the harnesses and the roles already were.

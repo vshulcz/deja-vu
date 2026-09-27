@@ -83,6 +83,9 @@ func autoWirings() []autoWiring {
 		// Command Code keeps its hooks in the same settings.json as its
 		// permissions, and its timeout unit is seconds.
 		{"commandcode", func() string { return commandCodeSettings() }, "hook-context", ""},
+		// Reasonix hands the model nothing from a hook but SessionStart, so
+		// recall there is the code extension in deja's plugin package.
+		{"reasonix", func() string { return reasonixInstalledManifest() }, "reasonix-ext", ""},
 		{"aider", func() string { return aiderContextPath() }, "",
 			"context file — refreshed by `deja aider`, not by aider itself"},
 		// Roo's guidance moved out of the always-on rules file into a skill;
@@ -163,8 +166,15 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	// looks like a machine with memory and runs without it.
 	case a.name == "opencode" && opencodePluginShapeStale(string(b)):
 		state = "stale"
+	// Reasonix loads a package only while plugin-packages.json holds an
+	// enabled record of it; the directory alone is inert.
+	case a.name == "reasonix" && !reasonixPackageEnabled():
+		state = "stale"
 	default:
 		state = "wired"
+	}
+	if a.name == "reasonix" && reasonixRuntimeMissing() != "" {
+		binaryMissing = true
 	}
 	// Only the files that run the binary: aider's is a digest of past sessions
 	// and roo's is guidance, and either may quote a path for reasons of its own.
@@ -206,6 +216,8 @@ func doctorAutoRecall(w io.Writer) {
 			// it cannot work: the MCP install writes this same file, and only
 			// the -auto target writes the hook (#3313). Name that target.
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — `deja install %s-auto`)\n", a.name, "stale", reportPath(path), a.marker, a.name)
+		case a.name == "reasonix" && !reasonixPackageEnabled():
+			fmt.Fprintf(w, "  %-12s %-11s %s  (no enabled record in %s — `deja install reasonix-auto`)\n", a.name, "stale", reportPath(path), reportPath(reasonixStatePath()))
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
 		}
@@ -221,7 +233,9 @@ func doctorAutoRecall(w io.Writer) {
 		if a.marker == "" {
 			continue
 		}
-		if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
+		if missing := reasonixRuntimeMissingFor(a.name); missing != "" {
+			fmt.Fprintf(w, "  %-12s runs %s, which is not there — `deja install reasonix-auto` rewrites it for this binary\n", "", missing)
+		} else if exe := hookExeNote(path, a.name+"-auto"); exe != "" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", exe)
 		} else if other := otherBinaryNote(path, a.name+"-auto"); other != "" {
 			// The quieter half of the same question: the binary is there and is
