@@ -22,11 +22,15 @@ before a file is edited or a command runs, and after one fails. Keys and tokens 
 the index is built; <a href="docs/SECURITY-MODEL.md">the security model</a> says what that catches
 and what it cannot.</p>
 
-<p align="center"><b>Ahead of seven other memory tools on the same 19,195 sessions</b> — agentmemory, MemPalace, claude-mem, CASS, ctx, agentsview and funes:
-the most answers at rank one (19 of 100; the next best, 14), the fastest build (17.6 s; the next, 72 s), the fastest first answer (26 ms),
-and half the tokens agentmemory spends on a task this machine had already solved (53,558 against 104,974).<br>
+<p align="center"><b>The most accurate, the cheapest to run and the fastest coding-agent memory we could measure.</b><br>
+<b>Accurate:</b> 97.2% R@5 on the full LongMemEval-S (500 questions), where MemPalace publishes 96.6% and agentmemory 95.2%;
+on the same 19,195 sessions, 19 of 100 answers at rank one against 14 for the best of the other seven.<br>
+<b>Cheap:</b> half the tokens agentmemory spends on a task this machine had already solved (53,558 against 104,974),
+and 477 tokens of tool definitions a turn, the fewest of the seven MCP servers measured.<br>
+<b>Fast:</b> 17.6 s to index 19,195 sessions (the next, 72 s), 26 ms to the first answer, 97 ms median search.<br>
 <sub>I maintain deja-vu, so every driver, the corpus and the scoring rule are in this repository &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">the full table, and how to re-run a row you doubt</a></sub></p>
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">the head-to-head, and how to re-run a row you doubt</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval and LoCoMo runs</a></sub></p>
 
 <p align="center">
 <b>58% fewer tokens</b> on a task this machine had already solved &middot; <b>88.1% hit@1</b> on LongMemEval-S (470-question cleaned set) &middot; <b>70.5% retrieval hit@1</b> on LoCoMo &middot; <b>millisecond</b> lookups over gigabytes of history<br>

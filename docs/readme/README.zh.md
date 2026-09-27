@@ -16,11 +16,15 @@
 
 <p align="center"><b>deja 一开始就是满的：35 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
-<p align="center"><b>在同样的 19,195 个会话上，领先另外七个记忆工具</b>——agentmemory、MemPalace、claude-mem、CASS、ctx、agentsview 和 funes：
-第一位命中最多（100 题中 19 题；第二名 14 题），建索引最快（17.6 秒；第二名 72 秒），首次回答最快（26 毫秒），
-同一台机器已经做过的任务，token 只有 agentmemory 的一半（53,558 对比 104,974）。<br>
+<p align="center"><b>我们能测到的编码代理记忆里，最准、最省、最快。</b><br>
+<b>最准：</b>完整 LongMemEval-S（500 题）上 R@5 97.2%，MemPalace 公布的是 96.6%，agentmemory 是 95.2%；
+在同样的 19,195 个会话上，100 题中 19 题排在第一位，另外七个工具里最好的是 14 题。<br>
+<b>最省：</b>同一台机器已经做过的任务，token 只有 agentmemory 的一半（53,558 对比 104,974）；
+每轮工具定义只占 477 token，是测过的七个 MCP 服务器里最少的。<br>
+<b>最快：</b>19,195 个会话 17.6 秒建完索引（第二名 72 秒），首次回答 26 毫秒，搜索中位数 97 毫秒。<br>
 <sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完整表格，以及如何重跑你怀疑的那一行</a></sub></p>
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面对比，以及如何重跑你怀疑的那一行</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 和 LoCoMo 的运行记录</a></sub></p>
 
 <p align="center">
 同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
