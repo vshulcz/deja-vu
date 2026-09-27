@@ -60,5 +60,7 @@ previous version directory.
 Add package-manager commands to the project README only after each upstream
 manifest is accepted. Both are: Scoop in Main, and WinGet since 0.21.0
 ([microsoft/winget-pkgs#428125](https://github.com/microsoft/winget-pkgs/pull/428125)),
-so `winget install vshulcz.deja-vu` works. WinGet has no automation proposing
-version bumps, so each release needs its own pull request there.
+so `winget install vshulcz.deja-vu` works. WinGet has no bot proposing
+version bumps, so the `winget` job in `.github/workflows/release.yml` opens the
+pull request for each tag with Komac, using the `WINGET_TOKEN` secret (a classic
+PAT with `public_repo`). Without the secret the job warns and does nothing.

@@ -137,6 +137,49 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/release-npm.mjs "${GITHUB_REF_NAME#v}" dist
 
+  # winget has no bot proposing version bumps the way Scoop's checkver does, so
+  # without this every release stays behind there until someone opens a pull
+  # request by hand (0.21.0 was listed while 0.21.3 shipped). Komac reads the
+  # previous version's manifests and swaps in this release's zips and hashes.
+  # WINGET_TOKEN is a classic PAT with public_repo; Komac opens the PR from
+  # that account's winget-pkgs fork.
+  winget:
+    name: winget-pkgs pull request
+    if: github.event_name == 'push' && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    needs: goreleaser
+    permissions: {}
+    env:
+      KOMAC_VERSION: 2.16.0
+      KOMAC_SHA256: 7d2707fa6210f2789a3702de49fbd150b736dbf426ee0b9bc8e098736f9fd82d
+    steps:
+      - name: Install Komac
+        run: |
+          set -euo pipefail
+          f="komac-${KOMAC_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSLo "$f" "https://github.com/russellbanks/Komac/releases/download/v${KOMAC_VERSION}/$f"
+          echo "${KOMAC_SHA256}  $f" | sha256sum -c -
+          tar xzf "$f" komac
+          sudo install komac /usr/local/bin/komac
+
+      - name: Open the pull request
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          KOMAC_CREATED_WITH: deja-vu release workflow
+          KOMAC_CREATED_WITH_URL: https://github.com/${{ github.repository }}/blob/main/.github/workflows/release.yml
+        run: |
+          set -euo pipefail
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "::warning::WINGET_TOKEN is not set; winget stays on the previous version"
+            exit 0
+          fi
+          v="${GITHUB_REF_NAME#v}"
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+          komac update vshulcz.deja-vu --version "$v" \
+            --urls "$base/deja-vu_${v}_windows_amd64.zip" "$base/deja-vu_${v}_windows_arm64.zip" \
+            --release-notes-url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" \
+            --submit
+
   # ClawHub mints a publish token only for a workflow_dispatch run, and refused
   # every tag push from v0.21.0 on ("GitHub OIDC workflow requires
   # workflow_dispatch, got push"). The tag run dispatches this file on the tag
