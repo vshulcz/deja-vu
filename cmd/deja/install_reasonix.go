@@ -179,15 +179,19 @@ func reasonixEntryName(raw json.RawMessage) string {
 
 // ours finds deja's record, and whether it is the one this install writes.
 func (st reasonixState) ours() (index int, current bool) {
-	want, _ := json.Marshal(wantReasonixEntry())
+	want := wantReasonixEntry()
 	for i, raw := range st.Plugins {
 		if reasonixEntryName(raw) != reasonixPluginName {
 			continue
 		}
 		var got reasonixEntry
 		_ = json.Unmarshal(raw, &got)
-		b, _ := json.Marshal(got)
-		return i, bytes.Equal(b, want)
+		// The paths as Reasonix may spell them: root with forward slashes
+		// (pluginpkg.RelativeRoot), source however the command line gave it.
+		same := got.Name == want.Name && rxSamePath(got.Source, want.Source) &&
+			filepath.ToSlash(got.Root) == want.Root && got.Version == want.Version &&
+			got.Description == want.Description && got.ManifestKind == want.ManifestKind && got.Enabled
+		return i, same
 	}
 	return -1, false
 }
@@ -220,7 +224,16 @@ func reasonixPackageIsOurs(manifestPath string) bool {
 	if mcpEntryRunsDeja(m.MCPServers["deja"]) {
 		return true
 	}
-	return isDejaBinaryToken(m.Runtime.Command) && len(m.Runtime.Args) > 0 && m.Runtime.Args[0] == "reasonix-ext"
+	if isDejaBinaryToken(m.Runtime.Command) && len(m.Runtime.Args) > 0 && m.Runtime.Args[0] == "reasonix-ext" {
+		return true
+	}
+	// The binary's name is not the only proof. On Windows the entry names
+	// the build itself, since the launcher is unix-only, and a build called
+	// anything but deja.exe — a test binary, a renamed download — reads as
+	// someone else's. A package byte-identical to the copy deja keeps in its
+	// own directory is the one deja handed Reasonix.
+	own, err := os.ReadFile(filepath.Join(reasonixPluginSourceDir(), "reasonix-plugin.json"))
+	return err == nil && bytes.Equal(own, b)
 }
 
 // reasonixInstalledRuntime reports whether deja's installed package carries
@@ -265,10 +278,10 @@ func reasonixRecordIsOurs(raw json.RawMessage, ourDir bool) bool {
 	if json.Unmarshal(raw, &e) != nil {
 		return false
 	}
-	if filepath.Clean(e.Source) == filepath.Clean(reasonixPluginSourceDir()) {
+	if rxSamePath(e.Source, reasonixPluginSourceDir()) {
 		return true
 	}
-	return e.Root == "plugins/"+reasonixPluginName && ourDir && reasonixPackageIsOurs(reasonixInstalledManifest())
+	return filepath.ToSlash(e.Root) == "plugins/"+reasonixPluginName && ourDir && reasonixPackageIsOurs(reasonixInstalledManifest())
 }
 
 func reasonixInstalledMatches(files map[string][]byte) bool {

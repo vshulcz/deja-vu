@@ -161,8 +161,11 @@ func TestInstallReasonixAutoWritesThePackageAndItsRecord(t *testing.T) {
 	if err := json.Unmarshal(b, &m); err != nil {
 		t.Fatal(err)
 	}
-	launcher := hookExeFor("/unused", false)
-	if m.APIVersion != "reasonix.io/plugin/v2" || m.MCPServers["deja"].Command != launcher || m.MCPServers["deja"].Args[0] != "mcp" {
+	// The launcher on unix; on Windows, where the launcher is a shell script
+	// Reasonix cannot run, the build itself.
+	exe, _ := os.Executable()
+	launcher := hookExeFor(exe, false)
+	if m.APIVersion != "reasonix.io/plugin/v2" || !rxSamePath(m.MCPServers["deja"].Command, launcher) || m.MCPServers["deja"].Args[0] != "mcp" {
 		t.Errorf("manifest = %s, want a v2 package whose MCP server runs the launcher", b)
 	}
 	// Reasonix refuses a runtime command that is not absolute.
@@ -410,13 +413,18 @@ func TestDoctorReadsTheReasonixWiring(t *testing.T) {
 	// The runtime command is a field of its own; a launcher that went away
 	// must still be reported.
 	manifest := reasonixInstalledManifest()
-	m := mustRead(t, manifest)
+	var doc map[string]any
+	if err := json.Unmarshal(mustRead(t, manifest), &doc); err != nil {
+		t.Fatal(err)
+	}
 	gone := filepath.Join(t.TempDir(), "gone", "deja")
-	writeTestFile(t, manifest, strings.ReplaceAll(string(m), hookExeFor("/unused", false), gone))
+	doc["runtime"].(map[string]any)["command"] = gone
+	edited, _ := json.MarshalIndent(doc, "", "  ")
+	writeTestFile(t, manifest, string(edited))
 	if _, missing := wiring(); !missing {
 		t.Errorf("runtime pointing at %s: doctor did not report it missing", gone)
 	}
-	if got := reasonixRuntimeMissing(); got != gone {
+	if got := reasonixRuntimeMissing(); filepath.ToSlash(got) != filepath.ToSlash(gone) {
 		t.Errorf("missing runtime = %q, want %q", got, gone)
 	}
 }

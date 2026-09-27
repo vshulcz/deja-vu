@@ -3,7 +3,10 @@ package main
 import (
 	"errors"
 	"os"
+	"path"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -101,4 +104,35 @@ func removeReasonixSource() {
 	}
 	_ = os.RemoveAll(src)
 	pruneCreatedDir(filepath.Dir(src))
+}
+
+// rxSamePath reports whether two spellings name the same path: cleaned,
+// either separator, resolved where the path exists (on Windows that also
+// expands a short name like RUNNER~1), and without case on Windows.
+func rxSamePath(a, b string) bool {
+	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
+		return false
+	}
+	resolve := func(p string) string {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return r
+		}
+		return p
+	}
+	return samePathSpelling(a, b, runtime.GOOS == "windows") ||
+		samePathSpelling(resolve(a), resolve(b), runtime.GOOS == "windows")
+}
+
+// samePathSpelling compares two path strings as text: cleaned, with either
+// separator, and without case when fold is set.
+func samePathSpelling(a, b string, fold bool) bool {
+	norm := func(p string) string {
+		p = strings.ReplaceAll(p, `\`, "/")
+		p = strings.TrimRight(path.Clean(p), "/")
+		return p
+	}
+	if fold {
+		return strings.EqualFold(norm(a), norm(b))
+	}
+	return norm(a) == norm(b)
 }
