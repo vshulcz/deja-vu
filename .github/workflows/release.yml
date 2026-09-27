@@ -139,8 +139,10 @@ jobs:
 
   # ClawHub mints a publish token only for a workflow_dispatch run, and refused
   # every tag push from v0.21.0 on ("GitHub OIDC workflow requires
-  # workflow_dispatch, got push"). The tag run dispatches this file on the
-  # default branch with the tag, and that run publishes.
+  # workflow_dispatch, got push"). The tag run dispatches this file on the tag
+  # itself, and that run publishes. ClawHub records the commit and ref from the
+  # run's OIDC token, so dispatching on the tag is what makes the listing point
+  # at the released commit.
   clawhub-dispatch:
     name: Hand the ClawHub publish to a dispatched run
     if: github.event_name == 'push'
@@ -152,8 +154,7 @@ jobs:
       - name: Dispatch release.yml for this tag
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f tag="$GITHUB_REF_NAME"
+        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f tag="$GITHUB_REF_NAME"
 
   clawhub:
     name: ClawHub package
@@ -172,9 +173,10 @@ jobs:
         run: |
           [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3, got: $TAG"; exit 1; }
 
+      # The run's own commit and full ref: ClawHub refuses source metadata that
+      # differs from the OIDC token. A tag older than this job can't be
+      # dispatched on, so republishing one runs on main and packs main's plugin.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          ref: refs/tags/${{ inputs.tag }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -202,8 +204,8 @@ jobs:
             --name @vshulcz/openclaw-deja \
             --version "$version" \
             --source-repo "$GITHUB_REPOSITORY" \
-            --source-commit "$(git rev-parse HEAD)" \
-            --source-ref "$TAG" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF" \
             --source-path extensions/openclaw \
             --changelog "deja-vu $TAG" \
             --no-input
