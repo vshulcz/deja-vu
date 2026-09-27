@@ -10,7 +10,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | --- | --- |
 | [Claude Code](claude-code.md) | JSONL transcript |
 | [Codex CLI](codex.md) | rollout and history JSONL |
-| [opencode](opencode.md) | SQLite relational store |
+| [opencode](opencode.md) | SQLite relational store, plus a JSON diff file per session |
 | [Cursor](cursor.md) | SQLite key-value store and JSONL transcript |
 | [Gemini CLI](gemini.md) | session JSON and replayable JSONL |
 | [aider](aider.md) | append-only Markdown |
@@ -26,7 +26,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Kimi Code](kimi.md) | per-agent wire JSONL |
 | [OpenClaw](openclaw.md) | append-only pi-format JSONL |
 | [Copilot CLI](copilot.md) | session event JSONL |
-| [VS Code Copilot Chat](copilot-chat.md) | JSON/JSONL mutation log in VS Code workspaceStorage |
+| [VS Code Copilot Chat](copilot-chat.md) | JSON/JSONL mutation log in VS Code workspaceStorage, and the extension's own event-log transcripts |
 | [Roo Code](roo.md) | task JSON in VS Code globalStorage |
 | [Kilo Code](kilocode.md) | task JSON in VS Code globalStorage, plus the CLI's OpenCode-schema SQLite |
 | [Kiro](kiro.md) | one JSONL per session from the CLI, another from the IDE |
@@ -34,13 +34,13 @@ This registry records observed on-disk session formats for the harnesses that de
 | [gajae-code](gjc.md) | pi's session JSONL, sub-agent passes one level down |
 | [Kimchi Coding](kimchi.md) | pi's session JSONL, flat root |
 | [Command Code](commandcode.md) | flat role/content JSONL per session |
-| [ZCode](zcode.md) | flat role/content JSONL per session |
+| [ZCode](zcode.md) | flat role/content JSONL per session, plus the CLI's OpenCode-schema SQLite |
 | [CodeWhale](codewhale.md) | one JSON document per session, Anthropic-shaped content blocks |
-| [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar |
+| [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory |
 | [Cherry Studio](cherrystudio.md) | Claude Code transcripts under the desktop app's data, one snapshot per stream chunk |
 | [Continue](continue.md) | one JSON document per session, list beside it |
 | [Crush](crush.md) | one SQLite store per project, registry in the data home |
-| [Hermes](hermes.md) | SQLite state store |
+| [Hermes](hermes.md) | SQLite state store, and Postgres when configured |
 | [DeepSeek Harness](deepseek.md) | append-only session log, zstd-framed JSONL |
 | [Zed](zed.md) | SQLite thread store, zstd-compressed bodies |
 

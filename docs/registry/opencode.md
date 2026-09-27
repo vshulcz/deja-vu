@@ -44,10 +44,6 @@ deja reads both layouts and picks by asking where the turns are: `session_messag
 
 The per-session diff store (`storage/session_diff/`) is a 1.x store; a 2.0 home does not write it.
 
-### The 1.x layout
-
-### The older layout
-
 ### opencode 1.x
 
 The parser joins three tables:
@@ -65,13 +61,21 @@ part(id, message_id, data)
 {"type":"text","text":"The query now uses the index.","time":{"start":"2026-07-17T09:00:01Z"}}
 ```
 
-Only parts with `type: "text"` are messages. The role comes from `message.data.role`. Message time prefers `part.data.time.start`, then `message.data.time.created`; session times come from the `session` row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. `session.directory` supplies the project.
+Parts with `type: "text"` are messages; the role comes from `message.data.role`. Parts marked `synthetic` or `ignored` are opencode's own text and are dropped, and a message with `summary` set is a compaction digest, indexed under the summary role. Four tool parts are read as well: `read` gives a file record from `state.input.filePath`, `bash` a command record from `state.input.command` with a non-zero `state.metadata.exit` and its `state.output` as tool output, and `apply_patch` edit records from `state.input.patchText`. Message time prefers `part.data.time.start`, then `message.data.time.created`, then the `message.time_created` column; session times come from the `session` row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. `session.directory` supplies the project, `session.title` the title, and `session.parent_id` marks a subagent run.
+
+## Wiring
+
+- **MCP**: `deja install opencode` adds a `mcp.deja` entry of type `local` to `opencode.json` (or `opencode.jsonc` when that is the one present) in `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`.
+- **Skill**: `~/.config/opencode/skills/deja-history/SKILL.md`.
+- **Command**: `~/.config/opencode/commands/deja.md`, invoked as `/deja`.
+- **Auto-recall**: `deja install opencode-auto` also writes a plugin, `~/.config/opencode/plugins/deja.js`. It puts the session digest into the first system block (`experimental.chat.system.transform`), appends per-prompt recall to the last user message (`experimental.chat.messages.transform`), adds recall to a spawned `task` agent's prompt (`tool.execute.before`), appends a file's history or a failed command's earlier fix to the tool output (`tool.execute.after`), and runs `deja hook-precompact` at `experimental.session.compacting`. The plugin shape follows the store: 2.0 loads only a default export, 1.x only a named one.
+- **Resume**: `opencode -s <id>`, run in the session's directory.
 
 ## Known quirks and drift
 
 - The database can be several gigabytes. deja projects JSON scalars in SQL instead of streaming complete blobs.
 - Message content is split across `message` and `part`; one message can have several parts.
-- Non-text parts, including tool data, are ignored. Text is capped at 64 KiB per part.
+- Tool parts other than the ones above are ignored, and so is the output of `read`. A message is capped at 1 MiB.
 - A missing database must not be passed to SQLite because the CLI would create it.
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 

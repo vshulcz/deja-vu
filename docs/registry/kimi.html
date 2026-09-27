@@ -48,16 +48,26 @@
 <p>timestamps. User turns arrive as <code>context.append_message</code>; streamed assistant</p>
 <p>turns are reconstructed from <code>step.begin</code> → <code>content.part</code> (type <code>text</code> only;</p>
 <p><code>think</code> parts are skipped) → <code>step.end</code>, with an end-of-file flush so a</p>
-<p>response that is mid-stream when indexing runs is not lost. Sub-agent</p>
-<p>histories under <code>agents/agent-*</code>, tool payloads and media are out of scope.</p>
+<p>response that is mid-stream when indexing runs is not lost. <code>tool.result</code></p>
+<p>events keep their <code>output</code> text under the <code>tool-output</code> role, error results</p>
+<p>included. Sub-agent histories under <code>agents/agent-*</code> and media are out of</p>
+<p>scope.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install kimi</code> writes <code>mcpServers.deja</code> into</li>
 </ul>
 <p><code>$KIMI_CODE_HOME/mcp.json</code> (common JSON shape, existing entries preserved).</p>
 <ul>
 <li><strong>Guidance</strong>: the shared skill at <code>~/.agents/skills/deja-history/SKILL.md</code>. Kimi Code 0.28.1 scans both that directory and <code>$KIMI_CODE_HOME/skills</code>, and deja writes the shared one so a machine with several harnesses keeps one copy. The <code>~/.kimi/skills/</code> in some write-ups belongs to <code>MoonshotAI/kimi-cli</code>, a different tool with the same name. An older deja wrote a block into the global <code>AGENTS.md</code>, which install now removes.</li>
+<li><strong>Auto-recall</strong>: <code>deja install kimi-auto</code> adds marked <code>[[hooks]]</code> entries to</li>
+</ul>
+<p><code>$KIMI_CODE_HOME/config.toml</code>: two <code>UserPromptSubmit</code> hooks</p>
+<p>(<code>deja hook-context --plain --once</code>, <code>deja hook-prompt --plain</code>) and a</p>
+<p><code>PreCompact</code> one. Measured on 0.28.1, <code>UserPromptSubmit</code> is the only event</p>
+<p>whose output reaches the model, and it takes plain stdout, so the session</p>
+<p>digest rides the first prompt rather than a session-start hook.</p>
+<ul>
 <li><strong>Resume</strong>: <code>kimi --session &lt;sessionId&gt;</code> (verified live on 0.28.1).</li>
-<li><strong>Handoff</strong>: paste — the CLI has no documented start-with-prompt flag.</li>
+<li><strong>Handoff</strong>: exec, <code>kimi -p</code>.</li>
 </ul>
 <p>Requested and specified by <a href="https://github.com/yearth">@yearth</a> in</p>
 <p><a href="https://github.com/vshulcz/deja-vu/issues/248">#248</a>.</p>

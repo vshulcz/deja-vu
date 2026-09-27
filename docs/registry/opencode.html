@@ -65,8 +65,6 @@ session_message(id, session_id, type, seq, time_created, time_updated, data)</co
 <p>The message types on a 2.0 store are <code>user</code>, <code>assistant</code>, <code>synthetic</code>, <code>system</code>, <code>idle</code>, <code>shell</code>, <code>skill</code>, <code>compaction</code>, <code>model-switched</code>, <code>agent-switched</code> and <code>location-switched</code>. deja reads the first two and a compaction&#39;s summary; the rest are opencode talking to itself.</p>
 <p>deja reads both layouts and picks by asking where the turns are: <code>session_message</code> when it holds rows, <code>message</code> and <code>part</code> otherwise. The sessions come from <code>session_v2</code>, or from <code>session</code> on a store that has no <code>session_v2</code>.</p>
 <p>The per-session diff store (<code>storage/session_diff/</code>) is a 1.x store; a 2.0 home does not write it.</p>
-<h3 id="the-1-x-layout">The 1.x layout</h3>
-<h3 id="the-older-layout">The older layout</h3>
 <h3 id="opencode-1-x">opencode 1.x</h3>
 <p>The parser joins three tables:</p>
 <pre><code class="language-sql">session(id, directory, time_created, time_updated)
@@ -75,12 +73,20 @@ part(id, message_id, data)</code></pre>
 <p><code>message.data</code> and <code>part.data</code> are JSON. A real-shaped pair is:</p>
 <pre><code class="language-json">{&#34;role&#34;:&#34;assistant&#34;,&#34;time&#34;:{&#34;created&#34;:&#34;2026-07-17T09:00:01Z&#34;}}
 {&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The query now uses the index.&#34;,&#34;time&#34;:{&#34;start&#34;:&#34;2026-07-17T09:00:01Z&#34;}}</code></pre>
-<p>Only parts with <code>type: &#34;text&#34;</code> are messages. The role comes from <code>message.data.role</code>. Message time prefers <code>part.data.time.start</code>, then <code>message.data.time.created</code>; session times come from the <code>session</code> row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. <code>session.directory</code> supplies the project.</p>
+<p>Parts with <code>type: &#34;text&#34;</code> are messages; the role comes from <code>message.data.role</code>. Parts marked <code>synthetic</code> or <code>ignored</code> are opencode&#39;s own text and are dropped, and a message with <code>summary</code> set is a compaction digest, indexed under the summary role. Four tool parts are read as well: <code>read</code> gives a file record from <code>state.input.filePath</code>, <code>bash</code> a command record from <code>state.input.command</code> with a non-zero <code>state.metadata.exit</code> and its <code>state.output</code> as tool output, and <code>apply_patch</code> edit records from <code>state.input.patchText</code>. Message time prefers <code>part.data.time.start</code>, then <code>message.data.time.created</code>, then the <code>message.time_created</code> column; session times come from the <code>session</code> row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. <code>session.directory</code> supplies the project, <code>session.title</code> the title, and <code>session.parent_id</code> marks a subagent run.</p>
+<h2 id="wiring">Wiring</h2>
+<ul>
+<li><strong>MCP</strong>: <code>deja install opencode</code> adds a <code>mcp.deja</code> entry of type <code>local</code> to <code>opencode.json</code> (or <code>opencode.jsonc</code> when that is the one present) in <code>$XDG_CONFIG_HOME/opencode</code>, else <code>~/.config/opencode</code>.</li>
+<li><strong>Skill</strong>: <code>~/.config/opencode/skills/deja-history/SKILL.md</code>.</li>
+<li><strong>Command</strong>: <code>~/.config/opencode/commands/deja.md</code>, invoked as <code>/deja</code>.</li>
+<li><strong>Auto-recall</strong>: <code>deja install opencode-auto</code> also writes a plugin, <code>~/.config/opencode/plugins/deja.js</code>. It puts the session digest into the first system block (<code>experimental.chat.system.transform</code>), appends per-prompt recall to the last user message (<code>experimental.chat.messages.transform</code>), adds recall to a spawned <code>task</code> agent&#39;s prompt (<code>tool.execute.before</code>), appends a file&#39;s history or a failed command&#39;s earlier fix to the tool output (<code>tool.execute.after</code>), and runs <code>deja hook-precompact</code> at <code>experimental.session.compacting</code>. The plugin shape follows the store: 2.0 loads only a default export, 1.x only a named one.</li>
+<li><strong>Resume</strong>: <code>opencode -s &lt;id&gt;</code>, run in the session&#39;s directory.</li>
+</ul>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The database can be several gigabytes. deja projects JSON scalars in SQL instead of streaming complete blobs.</li>
 <li>Message content is split across <code>message</code> and <code>part</code>; one message can have several parts.</li>
-<li>Non-text parts, including tool data, are ignored. Text is capped at 64 KiB per part.</li>
+<li>Tool parts other than the ones above are ignored, and so is the output of <code>read</code>. A message is capped at 1 MiB.</li>
 <li>A missing database must not be passed to SQLite because the CLI would create it.</li>
 <li>The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.</li>
 </ul>

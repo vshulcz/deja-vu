@@ -52,9 +52,10 @@ Six tools the model can call:
 
 One command: `/deja <what to look for>`.
 
-And, unless you turn it off, automatic recall: before each step the plugin asks
-deja whether this machine's history answers the prompt, and adds the answer to
-the runtime context. Silence is the common case — it speaks only when there is
+And, unless you turn it off, automatic recall: once per session the plugin adds
+what past sessions settled in this project, and before each step it asks deja
+whether this machine's history answers the prompt and adds the answer to the
+runtime context. Silence is the common case — it speaks only when there is
 something to say.
 
 ```yaml

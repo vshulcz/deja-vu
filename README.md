@@ -70,8 +70,9 @@ or `npx @vshulcz/deja-vu "query"` to try it without installing anything. Desktop
 take MCP servers as bundles can open the `.mcpb` from the
 [latest release](https://github.com/vshulcz/deja-vu/releases/latest); it carries the binary.
 
-Claude Code, Codex, Cursor, Qwen, OpenClaw and Copilot can take the same plugin bundle from
-their own marketplaces instead:
+Claude Code, Cursor, Qwen, OpenClaw and Copilot can take the same plugin bundle from
+their own marketplaces instead (Codex has a bundle of its own, in the table under
+[Harnesses with a package of their own](#harnesses-with-a-package-of-their-own)):
 
 ```sh
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
@@ -107,7 +108,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Command Code, Cherry Studio and Reasonix get the skill, and Kiro a steering file, from their own install target.
 
 </details>
 
@@ -150,7 +151,8 @@ The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
-the version check in `deja doctor`, and `deja embed` against an endpoint you set.
+the version check in `deja doctor`, and `deja embed` (and the query embedding a search
+makes once vectors exist) against the embedding endpoint described below.
 
 Credentials are redacted at index time: AWS keys, `api_key=` and `token=` assignments,
 bearer tokens and raw JWTs, PEM private key blocks, provider tokens, `scheme://user:pass@host`
@@ -304,7 +306,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | — |
+| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 (2026.8+ store); zstd for .zst archives |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
@@ -322,9 +324,9 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 | CodeWhale | — | — | ? | ? | ✅ | paste | none |
-| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
+| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | zstd for 1.x sessions |
 
-✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated
+✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 
 </details>
 <!-- matrix:end -->

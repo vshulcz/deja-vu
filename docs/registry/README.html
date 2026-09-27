@@ -44,7 +44,7 @@
 <tr><th>Harness</th><th>Format</th></tr>
 <tr><td><a href="claude-code.html">Claude Code</a></td><td>JSONL transcript</td></tr>
 <tr><td><a href="codex.html">Codex CLI</a></td><td>rollout and history JSONL</td></tr>
-<tr><td><a href="opencode.html">opencode</a></td><td>SQLite relational store</td></tr>
+<tr><td><a href="opencode.html">opencode</a></td><td>SQLite relational store, plus a JSON diff file per session</td></tr>
 <tr><td><a href="cursor.html">Cursor</a></td><td>SQLite key-value store and JSONL transcript</td></tr>
 <tr><td><a href="gemini.html">Gemini CLI</a></td><td>session JSON and replayable JSONL</td></tr>
 <tr><td><a href="aider.html">aider</a></td><td>append-only Markdown</td></tr>
@@ -60,7 +60,7 @@
 <tr><td><a href="kimi.html">Kimi Code</a></td><td>per-agent wire JSONL</td></tr>
 <tr><td><a href="openclaw.html">OpenClaw</a></td><td>append-only pi-format JSONL</td></tr>
 <tr><td><a href="copilot.html">Copilot CLI</a></td><td>session event JSONL</td></tr>
-<tr><td><a href="copilot-chat.html">VS Code Copilot Chat</a></td><td>JSON/JSONL mutation log in VS Code workspaceStorage</td></tr>
+<tr><td><a href="copilot-chat.html">VS Code Copilot Chat</a></td><td>JSON/JSONL mutation log in VS Code workspaceStorage, and the extension&#39;s own event-log transcripts</td></tr>
 <tr><td><a href="roo.html">Roo Code</a></td><td>task JSON in VS Code globalStorage</td></tr>
 <tr><td><a href="kilocode.html">Kilo Code</a></td><td>task JSON in VS Code globalStorage, plus the CLI&#39;s OpenCode-schema SQLite</td></tr>
 <tr><td><a href="kiro.html">Kiro</a></td><td>one JSONL per session from the CLI, another from the IDE</td></tr>
@@ -68,13 +68,13 @@
 <tr><td><a href="gjc.html">gajae-code</a></td><td>pi&#39;s session JSONL, sub-agent passes one level down</td></tr>
 <tr><td><a href="kimchi.html">Kimchi Coding</a></td><td>pi&#39;s session JSONL, flat root</td></tr>
 <tr><td><a href="commandcode.html">Command Code</a></td><td>flat role/content JSONL per session</td></tr>
-<tr><td><a href="zcode.html">ZCode</a></td><td>flat role/content JSONL per session</td></tr>
+<tr><td><a href="zcode.html">ZCode</a></td><td>flat role/content JSONL per session, plus the CLI&#39;s OpenCode-schema SQLite</td></tr>
 <tr><td><a href="codewhale.html">CodeWhale</a></td><td>one JSON document per session, Anthropic-shaped content blocks</td></tr>
-<tr><td><a href="reasonix.html">Reasonix</a></td><td>flat role/content JSONL per session, clock and workspace in a sidecar</td></tr>
+<tr><td><a href="reasonix.html">Reasonix</a></td><td>flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory</td></tr>
 <tr><td><a href="cherrystudio.html">Cherry Studio</a></td><td>Claude Code transcripts under the desktop app&#39;s data, one snapshot per stream chunk</td></tr>
 <tr><td><a href="continue.html">Continue</a></td><td>one JSON document per session, list beside it</td></tr>
 <tr><td><a href="crush.html">Crush</a></td><td>one SQLite store per project, registry in the data home</td></tr>
-<tr><td><a href="hermes.html">Hermes</a></td><td>SQLite state store</td></tr>
+<tr><td><a href="hermes.html">Hermes</a></td><td>SQLite state store, and Postgres when configured</td></tr>
 <tr><td><a href="deepseek.html">DeepSeek Harness</a></td><td>append-only session log, zstd-framed JSONL</td></tr>
 <tr><td><a href="zed.html">Zed</a></td><td>SQLite thread store, zstd-compressed bodies</td></tr>
 </table></div>

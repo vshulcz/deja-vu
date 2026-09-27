@@ -40,7 +40,7 @@
 <ul>
 <li><strong>ID</strong>: <code>continue</code></li>
 <li><strong>Store</strong>: <code>${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/&lt;sessionId&gt;.json</code>, one document per session, with <code>sessions.json</code> beside them as the list.</li>
-<li><strong>Read override</strong>: <code>DEJA_CONTINUE_ROOT</code></li>
+<li><strong>Read override</strong>: <code>DEJA_CONTINUE_ROOT</code> replaces the global directory (sessions are read from its <code>sessions/</code>)</li>
 <li><strong>Format</strong>: whole-file JSON rewritten on change; full re-parse per pass.</li>
 </ul>
 <p>Continue runs in VS Code and JetBrains, and its chat, agent and plan modes all</p>
@@ -53,9 +53,9 @@
 <p>model tools (<code>read_file</code>, <code>edit_file</code>) rather than commands anyone ran, and the</p>
 <p>command index is for the latter.</p>
 <p>Nothing in the file carries a timestamp. <code>sessions.json</code> records <code>dateCreated</code></p>
-<p>and <code>workspaceDirectory</code> per session, so that date is the session&#39;s start and</p>
-<p>the file&#39;s mtime is its update; turns are laid out in order from the start,</p>
-<p>which is enough to order them within the session. The project name comes from</p>
+<p>and <code>workspaceDirectory</code> per session, so that date is the session&#39;s start (the</p>
+<p>file&#39;s mtime when the list has no entry); turns are laid out one second apart</p>
+<p>from the start, which is enough to order them within the session. The project name comes from</p>
 <p><code>workspaceDirectory</code>, falling back to the list entry when the document omits it.</p>
 <p>Shape verified against Continue&#39;s own types (<code>core/index.d.ts</code>: <code>Session</code>,</p>
 <p><code>ChatHistoryItem</code>, <code>ChatMessage</code>) and <code>core/util/paths.ts</code>; a live-store</p>
@@ -63,7 +63,7 @@
 <ul>
 <li><strong>MCP</strong>: <code>deja install continue</code> adds the server to <code>mcpServers:</code> in</li>
 </ul>
-<p><code>~/.continue/config.yaml</code> — a list of mappings, not the keyed object other</p>
+<p><code>${CONTINUE_GLOBAL_DIR:-~/.continue}/config.yaml</code> — a list of mappings, not the keyed object other</p>
 <p>harnesses use, so the entry is found again by its <code>name</code>. Verified on</p>
 <p>@continuedev/cli 1.5.47 against a recording endpoint: the <code>deja</code> tool is in</p>
 <p>the tool list of every request, and a call came back with the seeded decision</p>

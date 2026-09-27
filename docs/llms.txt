@@ -18,6 +18,13 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Delete Kiro session history](https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html): the CLI writes a transcript and header pair per session and the IDE a directory per session under ~/.kiro/sessions; remove the right one, and check the globalStorage and TUI copies that tree does not cover
 - [Delete Amp thread history](https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html): one JSON file per thread under ~/.local/share/amp/threads, so deleting one conversation is deleting one file; the thread in your Amp account is separate
 - [Delete Continue session history](https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html): one JSON file per session plus a sessions.json list the history view reads; remove the entry with the file, or the session stays listed and cannot be deleted from Continue
+- [Delete old Claude Code sessions](https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html): `find ~/.claude/projects -mtime +30 -delete` or `cleanupPeriodDays`, and why age frees far less disk than size
+- [Delete Codex CLI sessions](https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html): one rollout, one day, or all of ~/.codex/sessions, and why ~/.codex/history.jsonl keeps your prompts regardless
+- [Delete Cursor chat history](https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html): where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately
+- [Delete Gemini CLI chat history](https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html): chats under ~/.gemini/tmp, mapping a project id back to a directory, and what the prompt log keeps
+- [Delete opencode session history](https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html): one SQLite database, what its tables hold, and why deleting rows does not free the space
+- [Delete VS Code Copilot Chat history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html): where the conversations are kept and what goes with them
+- [Delete Kilo Code task history](https://vshulcz.github.io/deja-vu/guide/delete-kilo-code-task-history.html): task JSON under the extension's storage, and the CLI's separate SQLite store
 - [CLI reference](https://vshulcz.github.io/deja-vu/guide/commands.html): every command and flag
 - [Agents & MCP](https://vshulcz.github.io/deja-vu/guide/agents.html): the deja MCP tool and its modes, and what each harness supports
 
@@ -64,6 +71,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html)
 - [Qwen Code](https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html)
 - [Roo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-roo.html)
+- [Kilo Code](https://vshulcz.github.io/deja-vu/guide/memory-for-kilocode.html)
 - [prime-agent (PrimeIntellect)](https://vshulcz.github.io/deja-vu/guide/memory-for-prime.html)
 - [Continue](https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html)
 - [Crush](https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html)
@@ -78,6 +86,8 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Antigravity](https://vshulcz.github.io/deja-vu/guide/memory-for-antigravity.html)
 - [Senpi](https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html)
 - [Kimchi Coding](https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html)
+- [Kiro](https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html)
+- [Cherry Studio](https://vshulcz.github.io/deja-vu/guide/memory-for-cherrystudio.html)
 - [gajae-code](https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html)
 - [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html)
 - [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html)

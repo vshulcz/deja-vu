@@ -31,7 +31,8 @@ event, so `pi install`'s omp counterpart picks this package up as well.
 ## What it does
 
 - **Session start**: a digest of what earlier sessions in this project decided
-  goes to the model before your first prompt; the receipt shows in the footer.
+  goes to the model with your first prompt; a notice says it arrived, and the
+  footer keeps deja's status line for the rest of the session.
 - **Every prompt** (`before_agent_start`): the prompt is matched against the
   index and, when a past session answers it, that session goes to the model
   with the prompt. Silence is the common case.

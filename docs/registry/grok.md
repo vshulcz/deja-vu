@@ -2,18 +2,21 @@
 
 ## Store and files
 
-Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent. The maintained `grok` CLI writes no session files: its history is in `${GROK_HOME:-~/.grok}/grok.db`, a SQLite store read through `sqlite3`, and `DEJA_GROK_DB` points deja at another copy.
+Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent. `grok-dev`, another CLI sharing `~/.grok`, writes no session files: its history is in `${GROK_HOME:-~/.grok}/grok.db`, a SQLite store read through `sqlite3`, and `DEJA_GROK_DB` points deja at another copy.
 
 The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers `summary.json` and `.cwd` over decoding the directory name.
 
-## Two products share this directory
+## Three products share this directory
 
-`@vibe-kit/grok-cli` (npm) also keeps its configuration under `~/.grok`, and the
-two are unrelated: it reads `~/.grok/user-settings.json` plus a project-level
-`.grok/settings.json`, and never looks at `config.toml`. Its MCP servers are
-**per project** — `grok mcp add` writes into the working directory — so a
-global `deja install` cannot wire it. Run `grok mcp add deja --command deja
---args mcp` inside a project to use deja there.
+Grok Build reads `config.toml`. `grok-dev` keeps its history in `grok.db` and
+reads MCP servers from `~/.grok/user-settings.json`, as an array under
+`mcp.servers` of `{id, label, enabled, transport, command, args}` rather than a
+map. `deja install grok` writes both files. `@vibe-kit/grok-cli` (npm) reads
+MCP servers only from the project's `.grok/settings.json` and has no user-level
+MCP, so a global `deja install` cannot wire it: run `grok mcp add deja
+--command deja --args mcp` inside a project to use deja there. What reaches it
+from install is `~/.grok/GROK.md`, which it reads only when the project has no
+`.grok/GROK.md` of its own.
 
 ## Records
 

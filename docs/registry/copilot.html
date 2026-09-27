@@ -52,22 +52,27 @@
 <p>and <code>old_str</code>/<code>new_str</code> for an edit, which is the one place the replaced text</p>
 <p>survives. <code>create</code> hands over the whole file as <code>file_text</code>, and that is the</p>
 <p>only record a created file&#39;s lines were ever in a session — a commit that adds</p>
-<p>them deletes nothing for the replaced side to match. <code>tool.execution_complete</code> carries <code>data.result.content</code> and a</p>
-<p><code>success</code> flag; failed results are indexed on purpose, because the error a</p>
-<p>command hit is what a later search reaches for. <code>session.shutdown</code> also lists</p>
-<p><code>codeChanges.filesModified</code>, the only harness that hands over a modified-file</p>
-<p>list the parser does not have to infer.</p>
+<p>them deletes nothing for the replaced side to match. <code>tool.execution_complete</code> carries <code>data.result.content</code>,</p>
+<p>indexed as tool output whether or not the call failed, because the error a</p>
+<p>command hit is what a later search reaches for. Its <code>success</code> flag is true on</p>
+<p>failed runs too, so a non-zero exit code is read from the telemetry or the</p>
+<p>trailer in the output and added to the command record. <code>session.shutdown</code></p>
+<p>lists <code>codeChanges.filesModified</code>; deja does not read it, since the tool events</p>
+<p>already name every file.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install copilot</code> writes <code>mcpServers.deja</code> into</li>
 </ul>
 <p><code>~/.copilot/mcp-config.json</code>.</p>
 <ul>
-<li><strong>Guidance</strong>: a skill Copilot loads on demand.</li>
+<li><strong>Skill</strong>: <code>~/.copilot/skills/deja-history/SKILL.md</code>, loaded on demand;</li>
+</ul>
+<p>Copilot invokes a skill by name, so it is also the <code>/deja-history</code> command.</p>
+<ul>
 <li><strong>Auto-recall</strong>: none. Copilot CLI exposes no hook that can inject context,</li>
 </ul>
-<p>so MCP plus guidance is the whole install.</p>
+<p>so MCP plus the skill is the whole install.</p>
 <ul>
-<li><strong>Resume</strong>: <code>copilot --resume &lt;sessionId&gt;</code>.</li>
+<li><strong>Resume</strong>: <code>copilot --resume=&lt;sessionId&gt;</code>.</li>
 <li><strong>Handoff</strong>: exec.</li>
 </ul>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>

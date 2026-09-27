@@ -42,6 +42,7 @@
 <li><strong>Store</strong>: <code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/&lt;agentId&gt;/agent/openclaw-agent.sqlite</code> since OpenClaw 2026.8 — session rows and transcript events in one per-agent SQLite database; before that, <code>agents/&lt;agentId&gt;/sessions/&lt;sessionId&gt;.jsonl</code>, one append-only pi-format transcript per session, which the upgrade migrates into the database and leaves behind as an archive</li>
 <li><strong>Read override</strong>: <code>DEJA_OPENCLAW_ROOT</code> (agents root), <code>OPENCLAW_STATE_DIR</code> (OpenClaw&#39;s own state override, also honored)</li>
 <li><strong>Format</strong>: SQLite (<code>transcript_events.event_json</code>, one pi-format line per row, <code>session_windows</code> marking reset and rollover boundaries) or JSONL, append-cheap incremental parse from offset</li>
+<li><strong>Needs</strong>: the <code>sqlite3</code> CLI for the SQLite store, <code>zstd</code> for <code>.zst</code> delete archives</li>
 </ul>
 <p>OpenClaw&#39;s agent runtime is pi-lineage, so transcripts share pi&#39;s line shape:</p>
 <p>a <code>{&#34;type&#34;:&#34;session&#34;}</code> header (id, timestamp, optional cwd) followed by</p>
@@ -76,13 +77,29 @@
 <p>Live-verified: <code>openclaw mcp probe deja</code> reports the tools and the agent</p>
 <p>calls <code>recall</code> mid-turn.</p>
 <ul>
+<li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. OpenClaw</li>
+</ul>
+<p>offers a skill as a command, so the skill is also <code>/deja-history</code>.</p>
+<ul>
+<li><strong>Auto-recall</strong>: <code>deja install openclaw-auto</code> adds the MCP entry, a plugin</li>
+</ul>
+<p>at <code>&lt;state&gt;/extensions/deja</code> (enabled under <code>plugins.entries</code> in</p>
+<p><code>openclaw.json</code>) and a hook pack at <code>&lt;state&gt;/hooks/deja-recall</code> (with</p>
+<p><code>hooks.internal.enabled</code> set). The plugin puts the session digest in front</p>
+<p>of the first turn at <code>agent_turn_prepare</code>, per-prompt recall at</p>
+<p><code>before_prompt_build</code>, and at <code>before_compaction</code> clears the list of blocks</p>
+<p>already shown so recall can send them again. The hook pack</p>
+<p>adds the digest at <code>agent:bootstrap</code>, which fires only in gateway mode.</p>
+<ul>
 <li><strong>Resume</strong>: <code>openclaw chat --session &lt;key&gt;</code>. OpenClaw addresses a</li>
 </ul>
 <p>conversation by key (<code>agent:&lt;id&gt;:&lt;name&gt;</code>); the uuid its transcript is named</p>
 <p>after opens nothing, and the mapping lives in <code>sessions.json</code> beside the</p>
 <p>transcripts. deja reads the key from there. Live-verified: the terminal UI</p>
 <p>came up on <code>agent:main:main</code> with that session&#39;s history, and a run through</p>
-<p><code>openclaw agent --session-id</code> answered from it.</p>
+<p><code>openclaw agent --session-id</code> answered from it. The lookup reads the</p>
+<p><code>sessions.json</code> beside a JSONL transcript, so a session read from the</p>
+<p>SQLite store gets no command.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

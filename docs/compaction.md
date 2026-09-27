@@ -65,6 +65,12 @@ files that change during reading cannot produce a successful capture. Other
 hosts keep the existing warmup and recall behavior until a supported transcript
 reader and the required hook payload are available.
 
+Reasonix is handled differently. Its extension receives the turns being folded,
+builds the same packet from them in process, and hands it to Reasonix's
+summarizer as guidance, so the summary keeps it. Nothing is stored in the
+manifest for it and there is no recovery packet on a later hook; the next turn
+gets the ordinary digest again.
+
 Stored text uses the existing redaction pass; `DEJA_NO_REDACT=1` retains its
 documented opt-out behavior. `DEJA_RECALL=off`, automatic-recall policy, ignored
 directories, excluded projects, and forgotten-session tombstones apply to this

@@ -10,11 +10,11 @@ Zed's built-in agent keeps every thread in one SQLite database under Zed's **dat
 | Linux, FreeBSD | `${XDG_DATA_HOME:-~/.local/share}/zed/threads/threads.db` |
 | Windows | `%LOCALAPPDATA%\Zed\threads\threads.db` |
 
-`~/.config/zed` is the *config* directory. It exists on every platform and holds `settings.json`, keymaps and prompts — it holds no threads, so a reader that looks there finds nothing on a machine with years of history.
+`~/.config/zed` (`$XDG_CONFIG_HOME/zed` when set, `%APPDATA%\Zed` on Windows) is the *config* directory. It holds `settings.json`, keymaps and prompts — it holds no threads, so a reader that looks there finds nothing on a machine with years of history.
 
 A Flatpak install overrides the Linux root with `FLATPAK_XDG_DATA_HOME`. `DEJA_ZED_ROOT` relocates the root and `DEJA_ZED_DB` points at a store directly; the second is how the fixture is read without a Zed install.
 
-Reading this store needs the `sqlite3` CLI, like opencode's and Cursor's, **and** the `zstd` CLI, which no other harness needs. Thread bodies are compressed; sqlite3 alone opens the store and reads nothing out of it. With either tool missing, `deja sources` and `deja doctor` say which one rather than reporting an empty history.
+Reading this store needs the `sqlite3` CLI, like opencode's and Cursor's, **and** the `zstd` CLI. Thread bodies are compressed; sqlite3 alone opens the store and reads nothing out of it. With either tool missing, `deja sources` and `deja doctor` say which one rather than reporting an empty history.
 
 ## Records
 
@@ -81,7 +81,13 @@ line, so they are left alone.
 - `parent_id` marks a subagent thread. Those rows are indexed like any other today; nothing filters them.
 - The compressed fixture row is a real zstd frame, so its bytes are opaque in review. The SQL states the plaintext it decompresses to and a test pins the two together.
 
-## Skill and command
+## MCP, skill and command
+
+`deja install zed` writes a `deja-context-server` entry under `context_servers`
+in that `settings.json`, editing the text so the file's comments survive, and
+renames an older `deja` entry it finds. `DEJA_ZED_CONFIG` points it at another
+settings file.
+
 
 Zed 1.4.2 replaced its rules library with Agent Skills and loads them globally
 from `~/.agents/skills/<name>/SKILL.md` — the shared file deja already writes,

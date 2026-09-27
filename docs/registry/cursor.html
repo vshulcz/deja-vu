@@ -52,13 +52,15 @@
 <h2 id="cli-jsonl-records">CLI JSONL records</h2>
 <pre><code class="language-json">{&#34;role&#34;:&#34;assistant&#34;,&#34;message&#34;:{&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The cache key omitted the locale.&#34;}]}}</code></pre>
 <p>Tool calls follow the Anthropic <code>tool_use</code> shape with Cursor&#39;s own names: <code>path</code> rather than <code>file_path</code>, <code>Shell</code> rather than <code>Bash</code>, <code>old_string</code>/<code>new_string</code> on <code>StrReplace</code>, and the whole file as <code>contents</code> on <code>Write</code> — the last of these is the only record a created file&#39;s lines were ever in a session.</p>
-<p>Only <code>user</code> and <code>assistant</code> roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as <code>turn_ended</code> are ignored. The transcript has no message timestamps, so deja uses file modification time.</p>
+<p>Only <code>user</code> and <code>assistant</code> roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as <code>turn_ended</code> are ignored. Records carry no timestamp field; a user turn&#39;s text starts with a <code>&lt;timestamp&gt;Sunday, Jul 26, 2026, 1:06 PM (UTC+3)&lt;/timestamp&gt;</code> block, which deja reads and carries forward to the assistant turns that answer it. A transcript with no readable block falls back to the file&#39;s modification time.</p>
 <h2 id="the-second-cli-store-and-why-it-is-unread">The second CLI store, and why it is unread</h2>
 <p>Cursor CLI also writes one SQLite store per chat:</p>
 <pre><code>~/.cursor/chats/&lt;workspace-hash&gt;/&lt;chat-uuid&gt;/meta.json
 ~/.cursor/chats/&lt;workspace-hash&gt;/&lt;chat-uuid&gt;/store.db</code></pre>
 <p><code>store.db</code> holds <code>blobs(id TEXT, data BLOB)</code> and <code>meta(key, value)</code>. The blobs are content-addressed and the tree needs no schema to walk: <code>meta</code>&#39;s single value is hex-encoded JSON naming <code>latestRootBlobId</code>, that blob is protobuf whose repeated field 1 is a list of 32-byte child digests in message order, and each child is plain JSON in the Vercel AI SDK shape — <code>{&#34;role&#34;,&#34;content&#34;}</code> with <code>text</code>, <code>reasoning</code>, <code>tool-call</code> and <code>tool-result</code> parts, the calls named as above but keyed <code>toolName</code>/<code>args</code>.</p>
 <p>deja does not read it, because on the machine where it was decoded reading it added nothing: all 19 stores walked, and of the 67 turns they held, 51 were already in the JSONL transcript and the remaining 16 were the <code>&lt;user_info&gt;</code> environment preamble the transcript omits. Every chat with a <code>store.db</code> had a transcript beside it. What <code>deja doctor</code> reports instead is the count of chats with no transcript beside them, which is silent today and is the only signal if a release stops writing <code>agent-transcripts</code>.</p>
+<h2 id="wiring">Wiring</h2>
+<p><code>deja install cursor</code> adds the server to <code>${CURSOR_CONFIG_DIR:-~/.cursor}/mcp.json</code>, writes the shared skill <code>~/.agents/skills/deja-history/SKILL.md</code> and the <code>/deja</code> command in <code>commands/deja.md</code> beside it. <code>deja install cursor-auto</code> adds the same plus <code>hooks.json</code> entries: <code>sessionStart</code> (<code>deja hook-context</code>), <code>beforeSubmitPrompt</code> (<code>hook-prompt</code>, interactive TUI only — headless <code>-p</code> skips it), <code>preToolUse</code>, <code>postToolUse</code> and <code>preCompact</code>. Cursor also runs the hooks in <code>~/.claude/settings.json</code> and dedupes them against its own by exact command string, so a machine with both wired gets one injection.</p>
 <h2 id="resume">Resume</h2>
 <p>CLI chats only. A transcript is named after the chat id <code>cursor-agent --resume</code></p>
 <p>takes, and the command runs in the project directory because Cursor lists chats</p>
@@ -72,7 +74,7 @@
 <li>Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.</li>
 <li>SQLite values are JSON inside a key-value table and malformed or null entries occur.</li>
 <li>CLI project path encoding has the same separator-versus-hyphen ambiguity as Claude Code.</li>
-<li>SQLite text is capped at 64 KiB. CLI subagent duplication is opt-in.</li>
+<li>A parsed message is capped at 1 MiB. CLI subagent transcripts are opt-in.</li>
 <li>Both CLI layouts are written by <code>cursor-agent 2026.09.02-c22c1a3</code>, minutes apart in the same session.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-09-21</p>

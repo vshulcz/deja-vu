@@ -150,7 +150,7 @@ deja bench prompt</pre>
 <h2>What an update costs</h2>
 <pre>deja bench ingest</pre>
 <p>The three above score what comes back. This one asks what it costs to keep the index current, which is the half nobody was measuring: a path that rewrote and re-tokenized the whole store every time a new conversation appeared survived two months and twenty releases before anyone produced a number for it.</p>
-<p>Four classes, because they are the four things that happen to a store — nothing changed, a turn was appended to a transcript, a transcript appeared, a transcript was rewritten — and for each one the wall time, the records written, and whether the records already on file were replaced. Only the last class should replace them; the other three must cost what they added. That column is the regression gate, because it is exact where a wall time on a shared runner is not.</p>
+<p>Five classes, because they are the things that happen to a store — nothing changed, a turn was appended to a transcript, a transcript appeared, a transcript was renamed, a transcript was rewritten — and for each one the wall time, the records written, and whether the records already on file were replaced. Only the last class should replace them; the other four must cost what they added, and a rename, which some harnesses do when a session is resumed, must not cost a second copy of the log. That column is the regression gate, because it is exact where a wall time on a shared runner is not.</p>
 
 <h2>What a store costs to read</h2>
 <pre>deja bench read</pre>

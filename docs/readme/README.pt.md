@@ -15,7 +15,7 @@ em disco, e devolve a certa para qualquer um deles que perguntar.</p>
 
 <p align="center"><sub><em>Ninguém pesquisou nada: o agente chamou o deja por conta própria. Duas execuções reais, modelo real, chamadas de ferramenta reais, sobre um corpus sintético: o histórico de ninguém é publicado.</em></sub></p>
 
-<p align="center"><b>O deja já chega cheio: o histórico que 34 agentes escreveram, indexado em segundos, sem modelo e sem uma etapa separada de captura.</b></p>
+<p align="center"><b>O deja já chega cheio: o histórico que 35 agentes escreveram, indexado em segundos, sem modelo e sem uma etapa separada de captura.</b></p>
 
 <p align="center">
 <b>58% menos tokens</b> numa tarefa que esta máquina já havia resolvido &middot; <b>88.1% hit@1</b> no LongMemEval-S (conjunto limpo de 470 perguntas) &middot; <b>70.5%</b> no LoCoMo &middot; consultas em <b>milissegundos</b> sobre gigabytes de histórico<br>
@@ -86,7 +86,7 @@ O skill chama o binário `deja` que você já instalou; não traz um próprio.
 Outros caminhos: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, ou `npx @vshulcz/deja-vu "consulta"` para
 experimentar sem instalar nada. No Windows o script de instalação termina com `unsupported OS` porque é um
-script de shell; pegue `deja-vu_<version>_windows_amd64.zip` da
+script de shell; use `scoop install deja-vu` (está no bucket main do Scoop) ou pegue `deja-vu_<version>_windows_amd64.zip` da
 [última release](https://github.com/vshulcz/deja-vu/releases/latest) e coloque `deja.exe` no `PATH`.
 
 Só o binário já é uma instalação completa: indexar, buscar, `show`, `ctx`, `blame`, `--json` e a limpeza de
@@ -95,14 +95,14 @@ recall no início da sessão — vale a pena, mas é opcional.
 
 ## O que você ganha
 
-**Resolvido no Codex, lembrado pelo Claude.** Trinta e quatro agentes de código escrevem cada conversa em
+**Resolvido no Codex, lembrado pelo Claude.** Trinta e cinco agentes de código escrevem cada conversa em
 arquivos locais, e o deja transforma esses arquivos numa camada de memória que todos eles conseguem ler.
 
 | | |
 | --- | --- |
 | **Busca para trás no tempo** | `deja "connection pool exhausted"` varre gigabytes, incluindo tudo o que veio antes de você instalar o deja. Uma pergunta em linguagem natural cai no modo por relevância. Tempo é uma dica, não um filtro. |
 | **Recall entre agentes** | A ferramenta MCP `deja` no modo `recall` responde «isso a gente corrigiu três semanas atrás» de dentro de qualquer agente, não importa quem corrigiu na época. |
-| **Sobrevive à compactação** | Medido em 43 compactações: o resumo preservou 77% das decisões e 0.2% dos comandos que você rodou. Os 99.8% restantes o deja devolve. No Claude Code e no Codex, o deja anota a tarefa, os arquivos e os comandos no instante em que a compactação começa, e devolve tudo de uma vez na sessão seguinte. |
+| **Sobrevive à compactação** | Medido em 43 compactações: o resumo preservou 77% das decisões e 0.2% dos comandos que você rodou. Os 99.8% restantes o deja devolve. No Claude Code e no Codex, o deja anota a tarefa, os arquivos e os comandos no instante em que a compactação começa, e devolve tudo uma vez, logo depois dela. |
 | **Recall na hora de agir** | Antes de o agente editar um arquivo ou rodar um comando, o hook `PreToolUse` diz o que já foi decidido sobre aquele arquivo, qual forma daquele comando funciona aqui, ou que o programa simplesmente não existe nesta máquina. Quando um comando falha, o hook `PostToolUse` mostra o que foi rodado depois do mesmo erro nesta máquina — exatamente o par que o agente não vai perguntar. |
 | **Indexa o trabalho, não só a conversa** | Cada arquivo aberto em cada turno, cada comando executado com seu código de saída, e o trecho exato que uma edição substituiu. Justamente o que todo resumo perde. |
 
@@ -158,7 +158,7 @@ $ deja "jwt refresh token"
 | `deja blame <caminho>[:linha]` | Quais sessões discutiram este arquivo, o que foi decidido e por quê. Com número de linha: o commit que a alterou por último e a sessão que escreveu essa linha ou o texto que esse commit substituiu. |
 | `deja files <assunto>` | Na direção contrária: quais arquivos o trabalho sobre um assunto realmente mexeu. |
 | `deja how <ferramenta>` | Como isso é executado de verdade nesta máquina, com argumentos reais, tirados de comandos que os agentes já rodaram. |
-| `deja fix <erro>` | O que foi executado depois do mesmo erro nesta máquina, e depois do quê o erro não voltou. |
+| `deja fix <erro>` | O que foi executado depois do mesmo erro nesta máquina, e depois do quê o erro não voltou. Nunca um merge, um force push nem uma exclusão. |
 | `deja friction` | Erros que aparecem em três ou mais sessões diferentes, dizendo de quais ferramentas vieram. |
 | `deja ctx <consulta>` | Resumo em Markdown dos melhores resultados, pronto para entrar num prompt. |
 | `deja resume <id>` | Reabre a sessão encontrada na ferramenta a que ela pertence. |
@@ -299,7 +299,7 @@ A [comparação completa](https://vshulcz.github.io/deja-vu/guide/compare.html) 
 
 **Onde fica o histórico de sessões do Claude Code e dá para pesquisar?** Em `~/.claude/projects`, um arquivo
 JSONL por sessão; Codex em `~/.codex/sessions`, Cursor no SQLite `state.vscdb`. O `deja search` lê tudo onde
-está, o `deja last` lista a sessão mais recente de cada agente, e o `deja view` abre o histórico inteiro como
+está, o `deja last` lista as sessões recentes de todos os agentes, e o `deja view` abre o histórico inteiro como
 uma página local. Os caminhos por agente estão em
 [onde as sessões ficam guardadas](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 

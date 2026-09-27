@@ -52,12 +52,10 @@
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
-<li><strong>A SQLite store beside the transcripts, unread.</strong> No sample of that schema is</li>
+<li><strong>The CLI database is read on a third party&#39;s word.</strong> It goes through</li>
 </ul>
-<p>in hand, and a reader written against a guessed shape is one that skips the</p>
-<p>half of a store it does not understand without saying so. The transcripts are</p>
-<p>the conversation either way; the database becomes work the day a sample of it</p>
-<p>exists.</p>
+<p>OpenCode&#39;s schema reader (see below); that shape has not been checked</p>
+<p>against a running ZCode.</p>
 <ul>
 <li>Wiring: <code>deja install zcode</code> writes the server into <code>mcp.servers</code> in</li>
 </ul>
@@ -81,8 +79,8 @@
 <p>strict schema — and ships an installer against it. Nothing here is verified</p>
 <p>on the machine deja was written on.</p>
 <h2 id="the-cli-database">The CLI database</h2>
-<p>It was left unread while nothing said what shape it was in. The shape is now</p>
-<p>attested by <code>zcode-stats</code> 0.8.0 — a read-only dashboard over the live database,</p>
+<p>It was left unread while nothing said what shape it was in. deja reads it</p>
+<p>now, on the shape attested by <code>zcode-stats</code> 0.8.0 — a read-only dashboard over the live database,</p>
 <p>whose own description names <code>~/.zcode/cli/db/db.sqlite</code> and whose queries name</p>
 <p>the tables:</p>
 <pre><code class="language-sql">SELECT directory, count(*), sum(task_type = &#39;interactive&#39;),
@@ -92,7 +90,8 @@ SELECT json_extract(data, &#39;$.role&#39;) FROM message GROUP BY role
 SELECT json_extract(data, &#39;$.type&#39;) FROM part GROUP BY type</code></pre>
 <p><code>session</code> / <code>message(data)</code> / <code>part(data)</code> is OpenCode&#39;s schema, which deja</p>
 <p>already parses for OpenCode and for Kilo Code&#39;s CLI, so this is one more root</p>
-<p>rather than a new reader.</p>
+<p>rather than a new reader: text parts, <code>read</code>, <code>bash</code> and <code>apply_patch</code> calls,</p>
+<p>as the opencode page describes.</p>
 <p>Said plainly: that is a third party&#39;s attestation, not a running ZCode checked</p>
 <p>here. <code>task_type</code> also separates <code>subagent_child</code> and <code>fork</code> from <code>interactive</code>,</p>
 <p>which is the distinction <code>DEJA_INCLUDE_SUBAGENTS</code> draws elsewhere — left alone</p>

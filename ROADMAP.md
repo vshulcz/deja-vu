@@ -34,11 +34,12 @@ the place to discuss design.
 
 ## Next
 
-- **Compaction recovery past two hosts.** Claude Code and Codex hand a hook the
-  transcript before they shorten it, which is what makes the capture possible.
-  Every other harness that compacts keeps the summary to itself, so the packet
-  stops at those two until a host exposes the same seam — and each one that does
-  is work the day it lands.
+- **Compaction recovery past three hosts.** Claude Code and Codex hand a hook the
+  transcript before they shorten it, which is what makes the capture possible,
+  and Reasonix hands its extension the turns it is folding, where deja's packet
+  goes to the summarizer instead. Every other harness that compacts keeps the
+  summary to itself, so the packet stops at those three until a host exposes the
+  same seam — and each one that does is work the day it lands.
 - **The plan, before it is executed.** `deja check` answers a plan with what this
   machine already knows about it, and `hook-plan` delivers the same thing at
   `ExitPlanMode`. No installer wires it yet: the measurement that would justify
@@ -50,7 +51,7 @@ the place to discuss design.
 - **Point-of-action in the harnesses that still refuse it.** The repair beside a
   failed command and the file's prior decision now reach Claude Code, Codex,
   Cursor, opencode, Gemini, Qwen, Cline, Amp, Antigravity, Crush,
-  Command Code, omp, and pi with its descendants. What is left is
+  Command Code, Reasonix, omp, and pi with its descendants. What is left is
   where the harness itself drops what a hook returns — Grok's tool events, Kimi's
   post-tool events, prime-agent's tool events, Roo until its hooks ship — and each is recorded in
   the registry with the measurement behind it.

@@ -16,9 +16,9 @@ itself.
 ```
 
 That form pins the latest release and records where it came from, which is what
-Kimi's update check reads. There is also a `kimi-deja.zip` release asset — 16 KB
-instead of a 3 MB repository — for a marketplace entry or an install that should
-not pull the whole project.
+Kimi's update check reads. There is also a `kimi-deja.zip` release asset — about
+10 KB instead of the whole repository — for a marketplace entry or an install
+that should not pull the whole project.
 
 Install the binary if you do not have it:
 

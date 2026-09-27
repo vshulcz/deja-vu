@@ -141,7 +141,7 @@
 
 <h2>Search by the most specific thing you remember</h2>
 <p>Not the topic — the token. An exact error string, a function name, a file path, a flag. Those survive in a transcript verbatim, and they are what separates the session you want from forty that discuss the same subject:</p>
-<pre>$ deja "connection pool exhausted"
+<pre>$ deja "refresh token"
 [claude] api   · Jul 8 · 8f31c0a9 — 2 matches
   login started failing after refresh token rotation; jwt kid mismatch in tests
   fixed by reloading jwks cache after rotateKey and adding a clock-skew test
@@ -162,7 +162,7 @@
 <pre>deja show 8f31c0a9      # read the session
 deja ctx  8f31c0a9      # a Markdown digest to paste into whatever you are doing now
 deja resume 8f31c0a9    # reopen it in the agent that ran it</pre>
-<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for twenty-eight of the thirty-five harnesses deja reads. The remaining seven — aider, Cherry Studio, Command Code, DeepSeek Harness, VS Code Copilot Chat, ZCode and Zed — have no resume path of their own, and deja says so rather than pretending. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor.</p>
+<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for twenty-eight of the thirty-five harnesses deja reads. The remaining seven — aider, Cherry Studio, Command Code, DeepSeek Harness, VS Code Copilot Chat, ZCode and Zed — have no resume path of their own, and deja says so rather than pretending. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
 <p>Ids are matched by prefix, so the eight characters a result prints are enough to type.</p>
 
 <h2>When the answer is a command rather than a session</h2>

@@ -11,14 +11,22 @@ Tool calls are `tool.call` events with `name` and `args`: `path` for the file to
 timestamps. User turns arrive as `context.append_message`; streamed assistant
 turns are reconstructed from `step.begin` → `content.part` (type `text` only;
 `think` parts are skipped) → `step.end`, with an end-of-file flush so a
-response that is mid-stream when indexing runs is not lost. Sub-agent
-histories under `agents/agent-*`, tool payloads and media are out of scope.
+response that is mid-stream when indexing runs is not lost. `tool.result`
+events keep their `output` text under the `tool-output` role, error results
+included. Sub-agent histories under `agents/agent-*` and media are out of
+scope.
 
 - **MCP**: `deja install kimi` writes `mcpServers.deja` into
   `$KIMI_CODE_HOME/mcp.json` (common JSON shape, existing entries preserved).
 - **Guidance**: the shared skill at `~/.agents/skills/deja-history/SKILL.md`. Kimi Code 0.28.1 scans both that directory and `$KIMI_CODE_HOME/skills`, and deja writes the shared one so a machine with several harnesses keeps one copy. The `~/.kimi/skills/` in some write-ups belongs to `MoonshotAI/kimi-cli`, a different tool with the same name. An older deja wrote a block into the global `AGENTS.md`, which install now removes.
+- **Auto-recall**: `deja install kimi-auto` adds marked `[[hooks]]` entries to
+  `$KIMI_CODE_HOME/config.toml`: two `UserPromptSubmit` hooks
+  (`deja hook-context --plain --once`, `deja hook-prompt --plain`) and a
+  `PreCompact` one. Measured on 0.28.1, `UserPromptSubmit` is the only event
+  whose output reaches the model, and it takes plain stdout, so the session
+  digest rides the first prompt rather than a session-start hook.
 - **Resume**: `kimi --session <sessionId>` (verified live on 0.28.1).
-- **Handoff**: paste — the CLI has no documented start-with-prompt flag.
+- **Handoff**: exec, `kimi -p`.
 
 Requested and specified by [@yearth](https://github.com/yearth) in
 [#248](https://github.com/vshulcz/deja-vu/issues/248).

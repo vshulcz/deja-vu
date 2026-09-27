@@ -97,7 +97,7 @@ func markdownTable(r registry) string {
 			gapMark(e, "skill", e.Capabilities.Skill), gapMark(e, "command", e.Capabilities.Command),
 			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
-	b.WriteString("\n✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated\n")
+	b.WriteString("\n✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated\n")
 	// The per-gap notes name upstream PRs and issue numbers. That is real work
 	// and worth publishing, but on a front page it reads as a maintainer's
 	// notebook, so it goes to the reference page only.
@@ -163,7 +163,7 @@ func htmlTable(r registry) string {
 			gapMark(e, "resume", e.Capabilities.Resume), handoffMark(e.Capabilities.Handoff), prereq)
 	}
 	b.WriteString("</table>\n")
-	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ blocked by an upstream bug &middot; ? not investigated</p>")
+	b.WriteString("<p>✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated</p>")
 	if n := notes(r, func(s string) string { return "<code>" + s + "</code>" }, html.EscapeString); n != "" {
 		b.WriteString("\n<ul>")
 		for _, line := range strings.Split(strings.TrimSpace(n), "\n") {

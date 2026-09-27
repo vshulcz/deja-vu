@@ -137,9 +137,9 @@
 
 <h2>Where the chats are</h2>
 <p>The user directory is <code>~/Library/Application Support/Code/User</code> on macOS, <code>~/.config/Code/User</code> on Linux and <code>%APPDATA%\Code\User</code> on Windows — with <code>Code - Insiders</code> or <code>VSCodium</code> in place of <code>Code</code> for those builds. Under it:</p>
-<pre>&lt;User&gt;/workspaceStorage/&lt;hash&gt;/chatSessions/*.json          # one file per chat
+<pre>&lt;User&gt;/workspaceStorage/&lt;hash&gt;/chatSessions/*.jsonl         # one file per chat (.json before VS Code 1.109)
 &lt;User&gt;/workspaceStorage/&lt;hash&gt;/GitHub.copilot-chat/transcripts/*.jsonl
-&lt;User&gt;/globalStorage/emptyWindowChatSessions/*.json          # a window with no folder open
+&lt;User&gt;/globalStorage/emptyWindowChatSessions/*.jsonl         # a window with no folder open
 &lt;User&gt;/workspaceStorage/no-workspace/chatSessions/*.json</pre>
 <p>The <code>&lt;hash&gt;</code> is not a folder name, which is what makes this awkward to do by hand. The directory beside the chats says which project it belongs to:</p>
 <pre>for d in ~/Library/Application\ Support/Code/User/workspaceStorage/*/; do
@@ -152,7 +152,7 @@ done</pre>
 <p>Use the Chat view — <b>Show Chats</b>, then delete the one you mean. It is the only route that keeps the extension's own index of the list in step with what is on disk.</p>
 <p>If you want it gone from disk instead, close VS Code first, and be precise about the level you are removing:</p>
 <pre># one conversation
-rm ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions/&lt;id&gt;.json
+rm ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions/&lt;id&gt;.jsonl
 
 # every chat for one workspace, both stores
 rm -rf ~/Library/Application\ Support/Code/User/workspaceStorage/&lt;hash&gt;/chatSessions \

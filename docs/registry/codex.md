@@ -13,7 +13,7 @@ A rollout begins with session metadata and then event records. The parser reads 
 {"timestamp":"2026-07-17T09:00:01Z","type":"response_item","payload":{"role":"assistant","content":[{"type":"output_text","text":"The migration is complete."}]}}
 ```
 
-`payload.role` is retained. When only `payload.message` is present, deja treats it as a user message. Content may be a string or an array of text-bearing parts. `session_meta` supplies the stable ID and project working directory. Timestamps accept RFC 3339, Unix seconds, or Unix milliseconds.
+`payload.role` is retained. When only `payload.message` is present, an `agent_message` payload is the assistant and anything else is the user. `event_msg` turns are read only when the rollout has no roled `response_item` messages, since a current rollout carries every turn in both streams. An `exec_command` `function_call` becomes a command record, its `function_call_output` tool output (with the exit code), and a `custom_tool_call` (`apply_patch`) the edit it made. Content may be a string or an array of text-bearing parts. `session_meta` supplies the stable ID and project working directory. Timestamps accept RFC 3339, Unix seconds, or Unix milliseconds.
 
 ## Prompt history
 
@@ -23,12 +23,12 @@ Each history line is independent:
 {"session_id":"session-7","ts":1784278801,"text":"check the migration"}
 ```
 
-History entries map to one-message sessions with role `user` and project `history`. The same prompt may also occur in its rollout; consumers should expect this duplication.
+History entries map to one-message sessions with role `user` and project `history`. The same prompt is usually in its rollout too. A full load keeps only the entries whose session has no rollout; an incremental pass reads the history file on its own, so a prompt can still appear in both.
 
 ## Known quirks and drift
 
 - Rollout files are append-only JSONL and may have a torn final line.
-- Events without a payload and non-message payloads are ignored.
+- Events without a payload, and payloads that are neither a message nor a tool call, are ignored.
 - `history.jsonl` duplicates user prompts but lacks assistant responses and project metadata.
 - Reading a compressed rollout needs the `zstd` CLI; without it the store reports `zstd CLI not found` rather than quietly holding fewer sessions. A store of plain rollouts needs nothing.
 - Older records use `payload.message`; current records generally use structured `payload.content`.

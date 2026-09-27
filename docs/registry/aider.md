@@ -18,7 +18,7 @@ The query misses the tenant predicate.
 
 ## Message mapping
 
-Outside fenced code blocks, `#### ` starts or continues a user message. Plain Markdown is assistant output. Lines beginning with `> ` are tool or system output and are not indexed. Blank lines remain part of the current message.
+Outside fenced code blocks, `#### ` starts or continues a user message. Plain Markdown is assistant output. Lines beginning with `> ` are tool or system output and are not indexed; neither are unprefixed lines directly under one (the rest of that output block), nor anything before the session's first `#### ` line (the banner and the `--verbose` dump). A `#### ` line that is one of aider's own commands (`/add`, `/undo`, `/clear`, …) is dropped; `/ask` and `/code` keep their text. Blank lines remain part of the current message.
 
 The header timestamp uses local time with layout `YYYY-MM-DD HH:MM:SS`. aider does not store message timestamps, so every message receives the session start. It does not store a session ID; deja derives a stable ID from the history path and the session's ordinal in that file.
 

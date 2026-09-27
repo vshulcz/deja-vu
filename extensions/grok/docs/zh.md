@@ -35,13 +35,13 @@ MCP 服务端，带着 deja 在各处提供的那一个工具：`deja`，模式�
 
 `/deja:recall <要查什么>`，用于你想直接问的时候。
 
-以及不需要谁开口的召回：一个 `UserPromptSubmit` 钩子会在这台机器的历史里找这条提问真正问的是什么，没有匹配时保持沉默。
+一个 `UserPromptSubmit` 钩子，会在这台机器的历史里找这条提问说的是什么。Grok Build 1.0.5 会丢掉提问钩子和工具钩子打印的内容，所以目前这份召回到不了模型；能到达模型的是 MCP 工具。Grok 唯一会采纳的钩子返回是 `PreToolUse` 的 `updatedInput`，`deja install grok` 用它把记忆放进派生出来的智能体的提示里。
 
 ## 两边都装也没问题
 
 `deja install grok` 和这个插件接的是同样的两样东西，而 Grok 会把两份都跑起来——每个工具列两遍，每条提问把同样的召回读两遍。所以两边各自在发现安装器的副本时主动让位：
 
-- 当 `~/.grok/config.toml` 里有 `[mcp_servers.deja]` 时，MCP 服务端退出并说明原因；
+- 当 `~/.grok/config.toml` 里有 `[mcp_servers.deja]` 时，MCP 服务端回应握手，但不列出任何工具；
 - 当 `~/.grok/hooks/deja.json` 里有 deja 的钩子时，钩子直接返回、不输出任何内容。
 
 `deja install` 写下的那份优先，因为那是它负责保持更新的副本。`deja uninstall grok` 把所有权交回插件。

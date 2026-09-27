@@ -148,7 +148,7 @@
 
 <h2>What arrives, and what does not</h2>
 <p>The <code>deja</code> tool with its seven modes, in agent mode, and the instruction to use it. Measured on VS Code 1.134.0: with the instructions file installed and deja never mentioned in the question, "the packer keeps refusing our manifest — why?" made Copilot Chat call <code>recall</code> on its own, and answer from a session it had never seen.</p>
-<p>What Copilot Chat still does not have is a hook. There is no session-start and no per-prompt event an outside tool can use, so nothing can hand it a block at a fixed moment or react to a failing command — the instructions file steers the agent, it does not inject. A slash command is the other gap: deja serves an MCP prompt and VS Code lists it, but its slash form is not something we have driven end to end.</p>
+<p>What Copilot Chat still does not have is a hook. There is no session-start and no per-prompt event an outside tool can use, so nothing can hand it a block at a fixed moment or react to a failing command — the instructions file steers the agent, it does not inject. The same install writes <code>&lt;User&gt;/prompts/deja.prompt.md</code>, which the chat box lists as <code>/deja</code>: a way to ask directly, not something that fires on its own.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — thirty-five of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>

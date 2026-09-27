@@ -21,9 +21,15 @@ not indexed.
   `${CLINE_MCP_SETTINGS_PATH:-$CLINE_DATA_DIR/settings/cline_mcp_settings.json}`
   (flattened command/args shape, accepted by current Cline; existing entries
   preserved).
+- **Auto, skill, command**: `deja install cline` also writes a plugin to
+  `${CLINE_DIR:-~/.cline}/plugins/deja/`. It registers a rule whose content is
+  session-start recall, a message builder that adds recall for each prompt and
+  a repair after a failed command, the `/deja` command, and the
+  `deja-history` skill bundled in the plugin. Cline's own hooks cannot carry
+  context back, so the plugin is the channel.
 - **Resume**: `cline --id <sessionId>` for modern sessions only; legacy VS
   Code tasks reopen from the extension UI.
-- **Handoff**: paste.
+- **Handoff**: `cline <prompt>` runs directly.
 
 Specified by the community in
 [#253](https://github.com/vshulcz/deja-vu/issues/253) with synthetic samples

@@ -13,8 +13,8 @@ against the loader list.
 | Source | Code | Input |
 | --- | --- | --- |
 | Claude Code | `claude.go` | JSONL files under `~/.claude/projects` |
-| Codex CLI | `codex.go` | rollout JSONL files plus `history.jsonl` under `~/.codex` |
-| opencode | `opencode.go` | SQLite database at `~/.local/share/opencode/opencode.db` |
+| Codex CLI | `codex.go` | rollout JSONL files (`.jsonl.zst` once Codex compresses them) plus `history.jsonl` under `~/.codex` |
+| opencode | `opencode.go`, `opencode_v2.go`, `opencode_diff.go` | SQLite database at `~/.local/share/opencode/opencode.db` (the 1.x tables and the 2.0 `session_v2`/`session_message` ones), plus `storage/session_diff/*.json` beside it |
 | aider | `aider.go` | `.aider.chat.history.md` files under configured project roots |
 | Amp | `amp.go` | one JSON thread object per `~/.local/share/amp/threads/*.json` |
 | Gemini CLI | `gemini.go` | JSON and JSONL chats under `~/.gemini/tmp` |
@@ -24,7 +24,7 @@ against the loader list.
 | Qwen Code | `qwen.go` | JSONL chats under `~/.qwen/projects/*/chats` |
 | pi | `pi.go` | JSONL transcripts under `~/.pi/agent/sessions` |
 | Copilot CLI | `copilot.go` | `events.jsonl` per session under `~/.copilot/session-state` |
-| VS Code Copilot Chat | `copilot_chat.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions` |
+| VS Code Copilot Chat | `copilot_chat.go`, `copilot_agent.go` | `.jsonl` / `.json` under VS Code User `workspaceStorage/*/chatSessions`, and the extension's own `GitHub.copilot-chat/transcripts/*.jsonl` |
 | Cline | `cline.go` | task JSON under the VS Code extension's storage, both store generations |
 | Continue | `continuedev.go` | one JSON document per session under `~/.continue/sessions`, with `sessions.json` as the list |
 | Roo Code | `roo.go` | task JSON under `rooveterinaryinc.roo-cline` in VS Code globalStorage, and the CLI's own store under `~/.vscode-mock/global-storage` |
@@ -35,7 +35,7 @@ against the loader list.
 | prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
 | DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
 | CodeWhale | `codewhale.go` | one JSON document per session under `${CODEWHALE_HOME:-~/.codewhale}/sessions`, and the pre-rebrand `~/.deepseek` root |
-| Reasonix | `reasonix.go` | flat role/content JSONL under `~/.reasonix` (`%APPDATA%\reasonix` on Windows), in `sessions/` and `projects/<slug>/sessions/` |
+| Reasonix | `reasonix.go`, `reasonix_stores.go`, `reasonix_v4.go` | under `~/.reasonix` (`%APPDATA%\reasonix` on Windows): flat role/content JSONL in `sessions/` and `projects/<slug>/sessions/`, and the 1.x session directories (`sessions-v4/<id>/`, `desktop-sessions-v5/by-id/<id>/`) whose `events.frames` log is zstd-framed JSON |
 | Zed | `zed.go` | threads in the SQLite store at `Zed/threads/threads.db` |
 | Crush | `crush.go` | SQLite databases named by `projects.json`, plus `<project>/.crush/crush.db` |
 | Cherry Studio | `cherrystudio.go` | Claude-format JSONL under the app's `Data/Agents/.claude/projects` |
@@ -46,7 +46,7 @@ against the loader list.
 | gajae-code | `gjc.go` | JSONL under `~/.gjc/agent/sessions` |
 | Senpi | `senpi.go` | JSONL under `~/.senpi/agent/sessions` |
 | Kimchi Coding | `senpi.go` | JSONL under the harness directory's `sessions`, one directory per encoded cwd |
-| Hermes | `hermes.go`, `hermes_pg.go` | SQLite state per profile, or Postgres when `DEJA_HERMES_PG_DSN` is set |
+| Hermes | `hermes.go`, `hermes_pg.go` | SQLite `state.db` under the Hermes home and per profile, plus Postgres when `DEJA_HERMES_PG_DSN` is set |
 | deja notes | `notes.go` | `deja remember` entries in `notes.jsonl` |
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
@@ -146,12 +146,14 @@ transcript keeps what deja printed and blame reads transcripts.
 `deja sync export <dir>` reads `records.bin` and writes JSONL batch files named `deja-sync-<source-hash>-<timestamp>.jsonl`. Each line is one object:
 
 ```json
-{"harness":"claude","session_id":"abc123","project":"api","role":"assistant","text":"fixed by ...","time":"2026-07-14T12:00:00Z"}
+{"harness":"claude","session_id":"abc123","project":"api","role":"assistant","text":"fixed by ...","time":"2026-07-14T12:00:00Z","origin":"laptop"}
 ```
+
+`origin` is the exporting machine's name and is omitted by older exporters.
 
 The export watermark is per peer and source path (falling back to session key for synthetic records) and is stored in `manifest.gob` as the max exported record timestamp. Re-running export emits only records with a newer timestamp for that source and that peer, so what one machine has already received says nothing about what another still needs. An export with no peer named keeps the bare source key, which is what manifests written before per-peer watermarks carry. Text is redacted again during export.
 
-`deja sync import <dir>` reads all `*.jsonl` batches, appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time`, making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin.
+`deja sync import <dir>` reads all `*.jsonl` batches, appends records to the local index, updates touched token buckets, and writes imported session metadata with the original harness and an `imported:` project prefix. Imported IDs are namespaced (`imported-<hash>`) so they do not clobber local sessions from the same harness. The manifest stores dedupe keys of `harness:session_id:time:role:text-hash` (the older time-only key is still honoured), making re-import idempotent. Imported records live only in the index, so full rebuilds replay them from the old `records.bin` before regenerating from sources, and exports skip them to avoid echoing history back to its origin.
 
 ### Which machines are one machine
 
@@ -248,14 +250,14 @@ somewhere else moves the binary without any config being rewritten. On Windows
 there is no launcher and the entry holds the binary's path, because a `.cmd`
 cannot be exec'd the way a shebang script can.
 
-`deja hook-context` is intentionally hidden from normal help. It first checks for a pending compaction recovery packet, which can exist before the first index build. For ordinary project recall, it derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB. It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code). `--notes` prints only the notes meant for the person (the one-time built note and the weekly count) and marks them shown; the dsh and OpenClaw plugins add it to their `/deja` reply, since neither host shows a person what a hook prints.
+`deja hook-context` is intentionally hidden from normal help. It first checks for a pending compaction recovery packet, which can exist before the first index build. For ordinary project recall, it derives the current project from the payload's `cwd`, else `CLAUDE_PROJECT_DIR` if the host exports one, else the directory it was run in, using the same Claude project-name logic as the parser, reads only an existing warm index (`manifest.gob`/`sessions.gob` must already exist), selects the most recent matching sessions by metadata project (ranked by the files the working tree is touching), leads them with the project's `accepted` promoted notes, and prints Claude's `SessionStart` response JSON with a compact markdown digest capped at 2KB (4KB in aggressive recall mode). It never triggers a cold index build; missing index, empty results, corrupt data, or any other error produce no output and exit 0 so agent startup is not blocked. `--plain` prints the digest without the hook envelope, and `--once` gives it to the first turn of a session and nothing after — for a harness whose session-start output goes nowhere, where the digest has to ride the per-prompt hook instead (Kimi Code). `--notes` prints only the notes meant for the person (the one-time built note and the weekly count) and marks them shown; the dsh and OpenClaw plugins add it to their `/deja` reply, since neither host shows a person what a hook prints.
 
 `--auto` wires four more hooks with the same best-effort contract. The ordinary recall paths use a warm index; compaction capture reads the current transcript and stores a bounded packet without building the search index:
 
 - **`hook-prompt`** (`UserPromptSubmit`) searches the index for the prompt's content and injects a small digest, or the `you have been here` line on a déjà-vu match. What it searches on is the ask — the last line ending in `?`, or the last line carrying a word — read before the rest of the prompt, so a pasted repo listing or stack trace above the question does not spend the six-term budget. The same question from the same reader is answered once an hour: the per-session cooldowns count sessions shown, so an identical prompt on a timer used to walk one session further down the ranking on every tick. A spawned agent is exempt, because a fleet is many readers behind one id.
 - **`hook-tool`** (`PreToolUse`, matched to the editing/command tools) reads the tool payload — a `Bash` command or an `Edit`/`Write`/`apply_patch` target — and injects one line naming that file's or command's prior decision. Deliberately thin: it fires once per action, so it dedupes per agent session and carries at most one decision. A fact it has already given this session yields to the next one it can offer rather than ending the call — for a command that is the missing program, then the failure it hit here, held against the first program only when the rest of the line just filters its output — but only among those two, because the producers behind them rank and load sessions and cost a hundred milliseconds at the point of action. How much history it waits for depends on what it has to say — a bare count of sessions needs five before it is worth a line, while a decision stands from the second session, because a count is a number an agent can do nothing with. A program this machine has never had is named from two sightings, and never while it is on the hook's PATH, and a promoted note says it is the project's standing decision rather than this file's. Where the sessions that touched the file also finished cleanly on a command, that command is what the line hands over instead of the conclusion — the one part of it the agent can check rather than believe, from `sessionfacts.gob`. `--plain` prints the block without the hook envelope, for hosts that take a string back from a handler rather than reading a hook's stdout; pi and omp use it, and they send a lowercase `read` because neither has a seam that runs before an edit. opencode is the same case for the same reason: its before-seam can only rewrite a tool's arguments, so the plugin sends the file action from `tool.execute.after` and folds the line into the tool's own output.
 - **`hook-tool-after`** (`PostToolUse`, matched to the command tools) answers a failed command with the pair already on file: the error seen before and what followed it without failing. Only pairs from the current project, or recorded with no project, are offered, and never a remedy that cannot be taken back: a merge, a deleted branch, a force push, a hard reset, a dropped stash, `git clean`, a recursive `rm`, or a kubectl or helm change or anything against a prod namespace. Two lines at most, 420 bytes, deduped per agent session, and silent unless the store holds a pair for that error. What counts as a failure comes from the harness's exit status where it reports one, and otherwise from the recorded output, by the same rule `deja friction` uses.
-- **`hook-precompact`** (`PreCompact`) runs wherever a harness has a compaction event — Claude Code, Codex, Cursor, opencode, Qwen, Grok Build, Kimi, OpenClaw, pi, omp and prime-agent — and its first job is everywhere: forget what this session was shown, because compaction throws away the blocks while the list that stops them repeating outlives them. Where the host also hands over the transcript path and its own session id, which today is Claude Code and Codex, it captures bounded structured state from the current transcript in the existing index manifest before compaction. The next hook for the same session and workspace returns a recovery packet once, capped at 4 KiB including its trust frame. It records objectives, conclusions, verification commands, explicit gaps/conflicts, provenance, and repository freshness without requiring an agent checkpoint. Capture never waits for a full index rebuild. See [automatic compaction recovery](compaction.md) for limits, privacy controls, and the raw-actions-to-first-edit metric.
+- **`hook-precompact`** (`PreCompact`) runs wherever a harness has a compaction event — Claude Code, Codex, Cursor, opencode, Qwen, Grok Build, Kimi, OpenClaw, pi, omp and prime-agent; Reasonix's extension does the same in process on its own compaction event — and its first job is everywhere: forget what this session was shown, because compaction throws away the blocks while the list that stops them repeating outlives them. Where the host also hands over the transcript path and its own session id, which today is Claude Code and Codex, it captures bounded structured state from the current transcript in the existing index manifest before compaction. The next hook for the same session and workspace returns a recovery packet once, capped at 4 KiB including its trust frame. It records objectives, conclusions, verification commands, explicit gaps/conflicts, provenance, and repository freshness without requiring an agent checkpoint. Capture never waits for a full index rebuild. See [automatic compaction recovery](compaction.md) for limits, privacy controls, and the raw-actions-to-first-edit metric.
 
 ## Ranking
 
@@ -297,10 +299,11 @@ func ParseNewHarnessFile(path string) ([]model.Session, error)
 func ParseNewHarnessFileFromOffset(path string, offset int64) ([]model.Session, error) // if append-only
 ```
 
-Five steps:
+Six steps:
 
 1. Add parser code in `internal/sources` that returns `model.Session` with stable `Harness`, `ID`, `Project`, `Path`, `Started`, `Updated`, and `Messages`.
 2. Add a `Harness` entry to `allHarnesses()` in `internal/sources/registry.go`: `Load`, `Files`, and one `FileKind` per file shape with `Match`, `Parse` and, for append-only formats, `ParseFrom`. `Match` has to accept every root `Files` walks: the incremental index finds a changed file's parser by its path.
 3. Discovery, path matching and incremental parsing in `internal/index` read from that entry; nothing there needs editing.
-4. Add install/uninstall config handling in `cmd/deja/install.go` if the harness supports MCP.
-5. Add fixtures and tests for parsing, indexing, search, and install behavior.
+4. Add install/uninstall config handling in `cmd/deja/install.go` (and an `install_<harness>.go` when the wiring is more than an MCP entry) if the harness supports MCP.
+5. Add an entry in `docs/registry/registry.json` and a `docs/registry/<id>.md` page linked from its README; the `registry*_test.go` files in `internal/sources` check them against the loader list and each other.
+6. Add fixtures and tests for parsing, indexing, search, and install behavior.

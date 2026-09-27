@@ -11,7 +11,8 @@ your file are all it takes, and it finishes in seconds.
 ## The file
 
 JSON, mapping the dataset's `question_id` to the session ids your system ranked,
-best first. Twenty is enough; more is ignored.
+best first. Twenty is enough: the table stops at hit@20, and a hit further
+down the list only adds its small share to MRR.
 
 ```json
 {

@@ -152,12 +152,9 @@
 ## User problem statement(s)
 …
 
-## What was tried
-…
-
-## Outcome
+## Key assistant conclusions / code blocks
 …</pre>
-<p>Markdown, structured as the thing a reader needs rather than as the thing the harness stored: what the problem was, what was tried, what was decided. Redaction runs again on the way out — the same rules the index applied, re-applied to what leaves.</p>
+<p>Markdown, structured as the thing a reader needs rather than as the thing the harness stored: what the problem was and what the agent concluded, with its code blocks. Redaction runs again on the way out — the same rules the index applied, re-applied to what leaves.</p>
 
 <h2>Everything, as data</h2>
 <pre>$ deja sync export ./out
@@ -165,14 +162,14 @@ deja: exported 180516 records
 deja: records were redacted at index time (566 masked). pattern redaction is a floor —
       review the export before moving it; rotate anything that leaked.</pre>
 <p>JSONL across every harness the index read, in a shape another machine's deja can import — which is what <a href="sync-across-machines.html">syncing between machines</a> uses. It is also a plain archive: the records are ordinary JSON, and nothing needs deja to read them back.</p>
-<p>That second line is printed on every export on purpose. Redaction is pattern matching, and pattern matching has a floor: it catches the shapes it knows — AWS keys, bearer tokens, JWTs, PEM blocks, <code>scheme://user:pass@host</code> URLs, high-entropy values in secret-shaped positions — and cannot promise there is nothing else. Read an export before it leaves the machine, and rotate anything that did leak. Project exclusions are honoured by the export too, so a project you excluded does not travel.</p>
+<p>That second line is printed on every export that writes records, on purpose. Redaction is pattern matching, and pattern matching has a floor: it catches the shapes it knows — AWS keys, bearer tokens, JWTs, PEM blocks, <code>scheme://user:pass@host</code> URLs, high-entropy values in secret-shaped positions — and cannot promise there is nothing else. Read an export before it leaves the machine, and rotate anything that did leak. Project exclusions are honoured by the export too, so a project you excluded does not travel.</p>
 
 <h2>Browsing rather than exporting</h2>
 <pre>deja view</pre>
 <p>Writes one local HTML file with the sessions, the recalls served and the notes, and opens it. No server, nothing uploaded — the page is a file on your disk. This is usually what people actually wanted when they went looking for an export: a way to look through what is there.</p>
 
 <h2>Before you clear history</h2>
-<p>Deleting a harness's transcripts is not the same as removing them from an index that already read them. If you keep an index, <code>deja forget --session <code>deja forget &lt;id&gt;</code> removes those sessionslt;id<code>deja forget &lt;id&gt;</code> removes those sessionsgt;</code> removes those sessions and writes a tombstone so a later <code>deja index</code> cannot resurrect them from the source; <code>--list</code> shows the tombstones and <code>--unforget</code> reverses one. <a href="privacy.html">Privacy</a> covers the rest: what is indexed, what is stripped, and what never leaves the machine.</p>
+<p>Deleting a harness's transcripts is not the same as removing them from an index that already read them. If you keep an index, <code>deja forget --session &lt;id&gt;</code> removes that session and writes a tombstone so a later <code>deja index</code> cannot resurrect them from the source; <code>--list</code> shows the tombstones and <code>--unforget</code> reverses one. <a href="privacy.html">Privacy</a> covers the rest: what is indexed, what is stripped, and what never leaves the machine.</p>
 
 <p><a href="where-sessions-are-stored.html">Where each agent keeps its sessions</a> · <a href="privacy.html">Privacy</a> · <a href="commands.html">CLI reference</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

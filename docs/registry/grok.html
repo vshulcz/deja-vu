@@ -38,15 +38,18 @@
 <article>
 <h1>Grok Build session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent. The maintained <code>grok</code> CLI writes no session files: its history is in <code>${GROK_HOME:-~/.grok}/grok.db</code>, a SQLite store read through <code>sqlite3</code>, and <code>DEJA_GROK_DB</code> points deja at another copy.</p>
+<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent. <code>grok-dev</code>, another CLI sharing <code>~/.grok</code>, writes no session files: its history is in <code>${GROK_HOME:-~/.grok}/grok.db</code>, a SQLite store read through <code>sqlite3</code>, and <code>DEJA_GROK_DB</code> points deja at another copy.</p>
 <p>The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers <code>summary.json</code> and <code>.cwd</code> over decoding the directory name.</p>
-<h2 id="two-products-share-this-directory">Two products share this directory</h2>
-<p><code>@vibe-kit/grok-cli</code> (npm) also keeps its configuration under <code>~/.grok</code>, and the</p>
-<p>two are unrelated: it reads <code>~/.grok/user-settings.json</code> plus a project-level</p>
-<p><code>.grok/settings.json</code>, and never looks at <code>config.toml</code>. Its MCP servers are</p>
-<p><strong>per project</strong> — <code>grok mcp add</code> writes into the working directory — so a</p>
-<p>global <code>deja install</code> cannot wire it. Run `grok mcp add deja --command deja</p>
-<p>--args mcp` inside a project to use deja there.</p>
+<h2 id="three-products-share-this-directory">Three products share this directory</h2>
+<p>Grok Build reads <code>config.toml</code>. <code>grok-dev</code> keeps its history in <code>grok.db</code> and</p>
+<p>reads MCP servers from <code>~/.grok/user-settings.json</code>, as an array under</p>
+<p><code>mcp.servers</code> of <code>{id, label, enabled, transport, command, args}</code> rather than a</p>
+<p>map. <code>deja install grok</code> writes both files. <code>@vibe-kit/grok-cli</code> (npm) reads</p>
+<p>MCP servers only from the project&#39;s <code>.grok/settings.json</code> and has no user-level</p>
+<p>MCP, so a global <code>deja install</code> cannot wire it: run `grok mcp add deja</p>
+<p>--command deja --args mcp` inside a project to use deja there. What reaches it</p>
+<p>from install is <code>~/.grok/GROK.md</code>, which it reads only when the project has no</p>
+<p><code>.grok/GROK.md</code> of its own.</p>
 <h2 id="records">Records</h2>
 <p><code>summary.json</code> includes <code>info.id</code>, <code>info.cwd</code>, titles, and RFC 3339 creation/update times. Conversation lines use ACP session updates:</p>
 <pre><code class="language-json">{&#34;timestamp&#34;:1784278802,&#34;params&#34;:{&#34;update&#34;:{&#34;sessionUpdate&#34;:&#34;agent_message_chunk&#34;,&#34;content&#34;:{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The first chunk &#34;}},&#34;_meta&#34;:{&#34;promptId&#34;:&#34;prompt-1&#34;}}}</code></pre>

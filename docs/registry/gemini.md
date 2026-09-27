@@ -17,6 +17,10 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 
 `type: "user"` maps to `user`; `gemini` and `model` map to `assistant`. Other types, including informational and error events, are ignored. Content is a string or an array of parts with `text`. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.
 
+## Wiring
+
+`deja install gemini` adds the server under `mcpServers` in `~/.gemini/settings.json` and writes the shared skill `~/.agents/skills/deja-history/SKILL.md`. There is no command file: Gemini's command namespace is flat, the MCP server's own prompt is already `/deja`, and each skill is listed as a command too. `deja install gemini-auto` adds the same plus an extension at `~/.gemini/extensions/deja/`, because Gemini loads hooks from extensions and not from `settings.json`, and only with `hooksConfig.enabled` set, which install turns on. The extension wires `SessionStart` (`deja hook-context`), `BeforeAgent` (`hook-prompt`) and `AfterTool` on `run_shell_command` (`hook-tool-after`); timeouts are in milliseconds.
+
 ## Resume
 
 `gemini --resume <uuid>` takes the session id deja indexes — the `--help` text

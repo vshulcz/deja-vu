@@ -3,7 +3,7 @@
 - **ID**: `codewhale`
 - **Store**: `${CODEWHALE_HOME:-~/.codewhale}/sessions/<id>.json` — one file per session
 - **Store (pre-rebrand)**: `~/.deepseek/sessions/<id>.json`, which CodeWhale migrates into the current root on first access
-- **Read overrides**: `DEJA_CODEWHALE_ROOT` replaces the session directory; `CODEWHALE_HOME` moves the whole store
+- **Read overrides**: `DEJA_CODEWHALE_ROOT` replaces the current session directory (the legacy one is still read while it exists); `CODEWHALE_HOME` moves the whole store and turns the legacy root off
 - **Format**: JSON — `{schema_version, metadata, messages}`, pretty-printed
 - **Needs**: nothing
 - **Resume**: `codewhale --resume <id>`, run in the workspace the session was worked in — `--session-id` is its alias and `codewhale exec` takes both (checked against 0.9.13)

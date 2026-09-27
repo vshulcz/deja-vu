@@ -249,6 +249,8 @@
       "store_paths": [
         "~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "~/.config/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
+        "${XDG_CONFIG_HOME}/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
+        "%APPDATA%/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl",
         "${DEJA_CURSOR_ROOT}",
         "${DEJA_CURSOR_CLI_ROOT}"
@@ -332,6 +334,8 @@
       "id": "goose",
       "store_paths": [
         "${GOOSE_PATH_ROOT}/data/sessions/sessions.db",
+        "%APPDATA%/Block/goose/data/sessions/*.jsonl",
+        "%APPDATA%/Block/goose/data/sessions/sessions.db",
         "~/Library/Application Support/Block/goose/sessions/*.jsonl",
         "~/Library/Application Support/Block/goose/sessions/sessions.db",
         "~/Library/Application Support/goose/sessions/sessions.db",
@@ -390,8 +394,8 @@
     {
       "id": "hermes",
       "store_paths": [
-        "~/.hermes/state.db",
-        "~/.hermes/profiles/*/state.db",
+        "${DEJA_HERMES_HOME:-${HERMES_HOME:-~/.hermes}}/state.db",
+        "${DEJA_HERMES_HOME:-${HERMES_HOME:-~/.hermes}}/profiles/*/state.db",
         "${DEJA_HERMES_PROFILES_ROOT}/*/state.db",
         "${DEJA_HERMES_DB}"
       ],
@@ -485,7 +489,7 @@
         "command": true,
         "resume": true,
         "handoff": "paste",
-        "prereq": ""
+        "prereq": "sqlite3 (2026.8+ store); zstd for .zst archives"
       },
       "gaps": {}
     },
@@ -806,7 +810,7 @@
         "~/.zcode/cli/db/db.sqlite",
         "${DEJA_ZCODE_DB}"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "jsonl+sqlite",
       "fixture_paths": [
         "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl"
       ],
@@ -867,7 +871,7 @@
       "gaps": {
         "auto": {
           "state": "todo",
-          "why": "Kiro's agent hooks are per-workspace and fire on file events (`.kiro/hooks/`), not before a prompt, so there is no session-start surface a global install can write. Its steering files (`.kiro/steering/*.md`) are the per-workspace channel and would need a per-project install (#3651)."
+          "why": "Kiro's agent hooks are per-workspace and fire on file events (`.kiro/hooks/`), not before a prompt, so there is no session-start surface a global install can write. Tracked in #3651."
         },
         "skill": {
           "state": "impossible",
@@ -919,7 +923,7 @@
       "store_paths": [
         "<vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json",
         "${DEJA_ROO_ROOTS}/tasks/*/api_conversation_history.json",
-        "~/.vscode-mock/global-storage/tasks/*/api_conversation_history.json"
+        "${DEJA_ROO_CLI_ROOT:-~/.vscode-mock/global-storage}/tasks/*/api_conversation_history.json"
       ],
       "format_kind": "json",
       "fixture_paths": [
@@ -1033,6 +1037,7 @@
         "${REASONIX_STATE_HOME:-~/.reasonix}/sessions/<id>.jsonl",
         "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions/<id>.jsonl",
         "%APPDATA%\\reasonix\\sessions\\<id>.jsonl",
+        "%APPDATA%\\reasonix\\projects\\<workspace-slug>\\sessions\\<id>.jsonl",
         "${DEJA_REASONIX_ROOT}/sessions/<id>.jsonl",
         "${REASONIX_STATE_HOME:-~/.reasonix}/projects/<workspace-slug>/sessions-v4/<id>/events.frames",
         "${REASONIX_STATE_HOME:-~/.reasonix}/sessions-v4/<id>/events.frames",
@@ -1053,7 +1058,7 @@
         "command": true,
         "resume": true,
         "handoff": "paste",
-        "prereq": "none"
+        "prereq": "zstd for 1.x sessions"
       },
       "gaps": {}
     }

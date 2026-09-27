@@ -315,7 +315,7 @@ footer a:hover{color:var(--ph-hi)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      34 of your coding agents already wrote to disk — months of history from before you
+      35 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
     <div class="cmdline">
       <span class="p">$</span>
@@ -420,6 +420,7 @@ footer a:hover{color:var(--ph-hi)}
     <span>Amp</span><span>Continue</span><span>Copilot Chat</span><span>prime-agent</span>
     <span>Crush</span><span>Senpi</span><span>Kimchi Coding</span><span>Command Code</span><span>ZCode</span><span>gajae-code</span><span>CodeWhale</span><span>Reasonix</span>
     <span class="more">one memory, all of them</span>
+  </div></div>
   </div>
 </section>
 
@@ -473,8 +474,8 @@ footer a:hover{color:var(--ph-hi)}
         <a href="guide/auditing-agents.html">Auditing what an agent did</a> ·
         <a href="guide/privacy.html">Privacy</a> ·
         <a href="guide/benchmarks.html">Benchmarks</a> ·
-        <a href="guide/compare.html">How it compares</a>
-<a href="guide/day-zero.html">Day zero: eight tools, one machine with 19,195 sessions already on disk</a></p></div>
+        <a href="guide/compare.html">How it compares</a> ·
+        <a href="guide/day-zero.html">Day zero: eight tools, one machine with 19,195 sessions already on disk</a></p></div>
   </div>
   <p class="agents" style="margin-top:18px">
     <span><a href="guide/memory-for-claude-code.html">Claude Code</a></span>
@@ -665,9 +666,9 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix\n35 harnesses, one index — real paths in the <a href="#harnesses">matrix below</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix\n35 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
-    'version':'<p class="none">deja 0.21.2</p>',
+    'version':'<p class="none">deja 0.21.3</p>',
     'clear':''
   };
   COMMANDS['--help']=COMMANDS['help'];COMMANDS['--version']=COMMANDS['version'];

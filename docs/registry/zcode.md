@@ -16,11 +16,9 @@ block, which deja has no use for and ignores.
 
 ## Known quirks and drift
 
-- **A SQLite store beside the transcripts, unread.** No sample of that schema is
-  in hand, and a reader written against a guessed shape is one that skips the
-  half of a store it does not understand without saying so. The transcripts are
-  the conversation either way; the database becomes work the day a sample of it
-  exists.
+- **The CLI database is read on a third party's word.** It goes through
+  OpenCode's schema reader (see below); that shape has not been checked
+  against a running ZCode.
 - Wiring: `deja install zcode` writes the server into `mcp.servers` in
   `~/.zcode/cli/config.json` — one level deeper than the `mcpServers` every
   other client here uses — and `deja install zcode-auto` adds the hooks to the
@@ -40,8 +38,8 @@ block, which deja has no use for and ignores.
 
 ## The CLI database
 
-It was left unread while nothing said what shape it was in. The shape is now
-attested by `zcode-stats` 0.8.0 — a read-only dashboard over the live database,
+It was left unread while nothing said what shape it was in. deja reads it
+now, on the shape attested by `zcode-stats` 0.8.0 — a read-only dashboard over the live database,
 whose own description names `~/.zcode/cli/db/db.sqlite` and whose queries name
 the tables:
 
@@ -55,7 +53,8 @@ SELECT json_extract(data, '$.type') FROM part GROUP BY type
 
 `session` / `message(data)` / `part(data)` is OpenCode's schema, which deja
 already parses for OpenCode and for Kilo Code's CLI, so this is one more root
-rather than a new reader.
+rather than a new reader: text parts, `read`, `bash` and `apply_patch` calls,
+as the opencode page describes.
 
 Said plainly: that is a third party's attestation, not a running ZCode checked
 here. `task_type` also separates `subagent_child` and `fork` from `interactive`,

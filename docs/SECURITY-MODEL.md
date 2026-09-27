@@ -242,6 +242,27 @@ and archive/SBOM metadata can vary with tool versions. `SOURCE_DATE_EPOCH`
 stabilizes timestamps but does not remove those differences.
 
 
+## Recall trust policy
+
+`~/.config/deja/policy.json` (XDG-aware; `DEJA_POLICY_FILE` moves it) decides
+which history may be handed to an agent on each read path. `activations` maps
+`search`, `mcp` and `auto` (the hooks) to rules keyed by origin: `local`,
+`imported` for anything that arrived by sync, `imported:<group>` for one group
+of synced projects, and `*`. The most specific rule wins, and an activation with
+no rules allows every origin. `DEJA_AUTORECALL_LOCAL_ONLY=1` denies imported
+memory on the `auto` path. Content leaves the machine for an embedding endpoint
+only when all three activations allow it.
+
+`ignore` lists shell globs matched against a session's path and project; a
+match stays out of recall. With no `ignore` key the default is
+`*/.claude/jobs/*`, a background agent's own scratch tree; writing the key
+replaces that default. A file that is missing or does not parse means the
+default policy, so recall never breaks on a bad file; `deja doctor` reports what
+is in force.
+
+The policy filters what recall serves. It does not keep anything out of the
+index; the exclude list and `deja forget` above do that.
+
 ## Recall output framing
 
 Agent-facing recall (the MCP tool's `recall` and `context` modes and the

@@ -2,7 +2,7 @@
 
 - **ID**: `continue`
 - **Store**: `${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/<sessionId>.json`, one document per session, with `sessions.json` beside them as the list.
-- **Read override**: `DEJA_CONTINUE_ROOT`
+- **Read override**: `DEJA_CONTINUE_ROOT` replaces the global directory (sessions are read from its `sessions/`)
 - **Format**: whole-file JSON rewritten on change; full re-parse per pass.
 
 Continue runs in VS Code and JetBrains, and its chat, agent and plan modes all
@@ -16,9 +16,9 @@ model tools (`read_file`, `edit_file`) rather than commands anyone ran, and the
 command index is for the latter.
 
 Nothing in the file carries a timestamp. `sessions.json` records `dateCreated`
-and `workspaceDirectory` per session, so that date is the session's start and
-the file's mtime is its update; turns are laid out in order from the start,
-which is enough to order them within the session. The project name comes from
+and `workspaceDirectory` per session, so that date is the session's start (the
+file's mtime when the list has no entry); turns are laid out one second apart
+from the start, which is enough to order them within the session. The project name comes from
 `workspaceDirectory`, falling back to the list entry when the document omits it.
 
 Shape verified against Continue's own types (`core/index.d.ts`: `Session`,
@@ -26,7 +26,7 @@ Shape verified against Continue's own types (`core/index.d.ts`: `Session`,
 validation is still welcome.
 
 - **MCP**: `deja install continue` adds the server to `mcpServers:` in
-  `~/.continue/config.yaml` — a list of mappings, not the keyed object other
+  `${CONTINUE_GLOBAL_DIR:-~/.continue}/config.yaml` — a list of mappings, not the keyed object other
   harnesses use, so the entry is found again by its `name`. Verified on
   @continuedev/cli 1.5.47 against a recording endpoint: the `deja` tool is in
   the tool list of every request, and a call came back with the seeded decision

@@ -157,7 +157,7 @@ deja "the thing you were doing"</pre>
 <p>Anything the agent never wrote down is not recoverable, and deja does not pretend otherwise: it indexes the files, it does not reconstruct what was in the model's head. Sessions that were never flushed to disk before the crash — some tools write on turn boundaries, not on every token — lose their last turn. That last turn is usually the one you remember anyway.</p>
 
 <h2>The part that is not about this</h2>
-<p>The index covers every agent's transcripts on the machine — <a href="where-sessions-are-stored.html">each in its own format</a> — including sessions from before deja was installed. Indexing and search are local: BM25 over the transcripts, no model, no embeddings, credentials stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+<p>The index covers every agent's transcripts on the machine — <a href="where-sessions-are-stored.html">each in its own format</a> — including sessions from before deja was installed. Indexing and search are local: BM25 over the transcripts, no model needed (embeddings are optional, through <code>deja embed</code>), credentials stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
 
 <p><a href="getting-started.html">Getting started</a> &middot; <a href="find-a-session.html">Finding a session</a> &middot; <a href="after-compaction.html">What compaction drops</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

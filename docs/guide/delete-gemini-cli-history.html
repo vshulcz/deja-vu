@@ -166,7 +166,7 @@ rm ~/.gemini/tmp/&lt;project-id&gt;/logs.json
 
 # everything Gemini CLI has kept
 rm -rf ~/.gemini/tmp/*</pre>
-<p>Two traps. The tree also holds checkpoint files, which are not chats — a tool that walks it looking for sessions has to skip them, and so do you. And <code>~/.gemini/tmp</code> is where Antigravity keeps its own store on some installs, so a blanket <code>rm -rf ~/.gemini/tmp</code> can take a different agent's history with it; that is why deja reads the two apart rather than treating the directory as one store.</p>
+<p>Two traps. The tree also holds checkpoint files, which are not chats — a tool that walks it looking for sessions has to skip them, and so do you. And Antigravity keeps its own store beside this tree, under <code>~/.gemini/antigravity*</code>, so clearing all of <code>~/.gemini</code> rather than <code>~/.gemini/tmp</code> takes a different agent's history with it; deja reads the two as separate stores for the same reason.</p>
 
 <h2>What you lose</h2>
 <p>The chats are the record of what was tried and what worked. Gemini CLI has no search across projects, so a decision from two months ago is reachable only while its chat file exists — and a sub-agent's run, nested one directory deeper, is often the only place a piece of work was described at all.</p>

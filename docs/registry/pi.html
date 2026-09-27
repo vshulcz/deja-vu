@@ -76,7 +76,7 @@
 <tr><th><code>message.role</code></th><th>deja maps to</th></tr>
 <tr><td><code>user</code></td><td><code>user</code></td></tr>
 <tr><td><code>assistant</code></td><td><code>assistant</code></td></tr>
-<tr><td><code>toolResult</code></td><td>skipped (tool output, not conversational)</td></tr>
+<tr><td><code>toolResult</code></td><td>tool output (<code>RoleToolOutput</code>)</td></tr>
 </table></div>
 <h3 id="content">Content</h3>
 <p><code>message.content</code> is an array of typed blocks. deja extracts <code>text</code> from blocks where <code>&#34;type&#34;: &#34;text&#34;</code>. Blocks with <code>&#34;type&#34;: &#34;thinking&#34;</code> or <code>&#34;type&#34;: &#34;toolCall&#34;</code> are skipped.</p>
@@ -88,6 +88,10 @@
 <p><code>pi install npm:@vshulcz/pi-deja</code> installs the recall extension as a pi package (<code>pi-package</code> keyword, <code>pi.extensions</code>); it wires the same four handlers the installer writes — session start, prompt, <code>tool_result</code> and <code>session_compact</code> — and stands down when <code>deja install pi-auto</code> already wrote <code>~/.pi/agent/extensions/deja.ts</code>, or when the omp counterpart is in place.</p>
 <h2 id="mcp">MCP</h2>
 <p>pi does not include built-in MCP but supports it via the <code>pi-mcp-adapter</code> package (<code>pi install npm:pi-mcp-adapter</code>). The adapter reads <code>~/.pi/agent/mcp.json</code> with the standard <code>mcpServers</code> shape. <code>deja install pi</code> writes to that file.</p>
+<h2 id="skill-auto-recall-command">Skill, auto-recall, command</h2>
+<p>The skill is the shared <code>~/.agents/skills/deja-history/SKILL.md</code>; pi scans that directory, and a second copy in <code>~/.pi/agent/skills</code> makes it report a collision, so install removes one an older deja left there.</p>
+<p><code>deja install pi-auto</code> writes the MCP entry and <code>~/.pi/agent/extensions/deja.ts</code>. The extension returns the session digest on the first turn and per-prompt recall after that at <code>before_agent_start</code>, adds to a <code>tool_result</code> a file&#39;s history after a <code>read</code> or the earlier fix after a failed <code>bash</code> command, runs <code>deja hook-precompact</code> at <code>session_compact</code>, and registers <code>/deja &lt;query&gt;</code>, which runs <code>deja search</code>.</p>
+<p><code>deja resume</code> prints <code>pi --session &lt;id&gt;</code>, run in the project directory when the encoded name still resolves.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Project directory encoding uses <code>--</code> prefix and suffix (e.g. <code>--Users-max-code-foo--</code>) compared to Claude Code&#39;s single <code>-</code> prefix. The <code>resolveEncodedPath</code> function handles both.</li>

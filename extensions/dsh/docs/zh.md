@@ -14,6 +14,12 @@ deja 索引 Claude Code、Codex、Cursor、opencode、Antigravity、Grok Build�
 dsh plugin --profile web add dsh-deja
 ```
 
+也可以不走 npm，直接从仓库安装——根目录的 manifest 会重新导出这个目录，两种写法都行：
+
+```sh
+dsh plugin --profile web add github:vshulcz/deja-vu#path:extensions/dsh
+```
+
 插件调用 `deja` 可执行文件。它作为依赖随插件一起安装；如果 `PATH` 上已有 `deja` 就直接使用，`DEJA_BIN` 可覆盖两者。
 
 装了 CLI 的话，`deja install --auto` 也会把 dsh 接好——写入 deja 的 MCP 服务端和 `/deja` 命令——那条路更短。
@@ -34,7 +40,7 @@ dsh plugin --profile web add dsh-deja
 
 一个命令：`/deja <要查什么>`。
 
-以及默认开启的自动召回：每一步之前，插件会问 deja 这台机器的历史能否回答当前提问，并把结果加入运行时上下文。多数情况下它保持沉默，只有确实有内容时才开口。
+以及默认开启的自动召回：每个会话一次，插件把这个项目里以前的会话定下来的事加进来；每一步之前，插件会问 deja 这台机器的历史能否回答当前提问，并把结果加入运行时上下文。多数情况下它保持沉默，只有确实有内容时才开口。
 
 ```yaml
 - insert:
@@ -50,6 +56,6 @@ dsh plugin --profile web add dsh-deja
 
 ## 不做什么
 
-不用大模型，不用向量嵌入，不联网。索引是本地 BM25，建立在本来就存在的文件之上，一次查询约一毫秒，数据不离开本机。密钥在建立索引时被脱敏。
+不用大模型，不用向量嵌入。索引是本地 BM25，建立在本来就存在的文件之上，一次查询约一毫秒，除非你主动要求，否则不走网络。密钥在建立索引时被脱敏。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。

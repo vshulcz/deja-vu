@@ -10,11 +10,11 @@
 <p align="center">你的代理正準備重新除錯一個你三月就修好的問題——當時是在另一個代理裡修的。deja 索引 Claude Code、Codex、Cursor
 以及這台機器上其他所有代理本來就寫在磁碟上的會話，無論哪個代理來問，都把對的那一筆交回去。</p>
 
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時牠毫無印象，有 deja 時牠用八個月前的結論作答"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
 <p align="center"><sub><em>沒有人去搜尋——是代理自己呼叫了 deja。兩次真實執行，真實模型、真實工具呼叫，跑在合成語料上：不會公開任何人的歷史。</em></sub></p>
 
-<p align="center"><b>deja 一開始就是滿的：34 個代理早已寫下的歷史，幾秒建好索引，不需要模型，也不需要額外的蒐集步驟。</b></p>
+<p align="center"><b>deja 一開始就是滿的：35 個代理早已寫下的歷史，幾秒建好索引，不需要模型，也不需要額外的蒐集步驟。</b></p>
 
 <p align="center">
 同一台機器已經做過的任務，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 題清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 數 GB 歷史上的查詢在<b>毫秒</b>級<br>
@@ -83,7 +83,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 其他安裝方式：`brew install deja-vu`、
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
 `npx @vshulcz/deja-vu "查詢詞"` 先試試而不裝任何東西。Windows 上安裝腳本會結束並提示
-`unsupported OS`——它是 shell 腳本，請從
+`unsupported OS`——它是 shell 腳本。請用 `scoop install deja-vu`（在 Scoop 內建的 main bucket 裡），或從
 [最新發行版](https://github.com/vshulcz/deja-vu/releases/latest)取
 `deja-vu_<version>_windows_amd64.zip`，把 `deja.exe` 放進 `PATH`。
 
@@ -92,14 +92,14 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 三十四個編碼代理把每一次對話都寫進本機檔案，
-deja 把這些檔案變成一層牠們都能讀的記憶。
+**在 Codex 裡解決，Claude 記得。** 三十五個編碼代理把每一次對話都寫進本機檔案，
+deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
 | --- | --- |
 | **回溯式搜尋** | `deja "connection pool exhausted"` 搜遍數 GB，包括你安裝 deja 之前的一切。自然語言提問會退回到相關性檔位。時間是提示，不是過濾條件。 |
 | **跨代理召回** | MCP 的 `deja` 工具用 `recall` 模式在任何一個代理裡都能回答「這個我們三週前修過」，不管當初是誰修的。 |
-| **壓縮之後仍然在** | 在 43 次上下文壓縮上實測：摘要保住了 77% 的決策和 0.2% 的你跑過的指令。其餘 99.8% 由 deja 交回。在 Claude Code 和 Codex 上，壓縮剛開始時 deja 就把任務、檔案和指令記下來，下一個會話裡一次交回。 |
+| **壓縮之後仍然在** | 在 43 次上下文壓縮上實測：摘要保住了 77% 的決策和 0.2% 的你跑過的指令。其餘 99.8% 由 deja 交回。在 Claude Code 和 Codex 上，壓縮剛開始時 deja 就把任務、檔案和指令記下來，壓縮之後交回一次。 |
 | **在動手的那一刻召回** | 代理改檔案或跑指令之前，`PreToolUse` 掛鉤會說出這個檔案此前的決定、這條指令能用的寫法，或者這台機器上根本沒有的那個程式。指令失敗時，`PostToolUse` 掛鉤給出這台機器上同樣報錯之後跑過什麼——那正是代理不會主動去問的一對。 |
 | **索引的是活兒，不只是話** | 每一輪打開過的檔案、跑過的指令及其結束碼、以及一次編輯替換掉的確切片段。那正是所有摘要都會丟掉的部分。 |
 
@@ -113,7 +113,7 @@ deja 把這些檔案變成一層牠們都能讀的記憶。
 
 `deja stats --card` 直接畫在終端機裡；給它一個檔名，它會寫出一張 SVG，可以放進個人主頁的 README。要發到別處，就把它[轉成 PNG](https://vshulcz.github.io/deja-vu/card/)——那個頁面在你自己的瀏覽器裡完成轉換。
 
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 統計卡片：一年的會話熱力圖、牠們來自哪些代理、以及最長的一次"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="760" alt="deja 統計卡片：一年的會話熱力圖、它們來自哪些代理、以及最長的一次"></p>
 
 完整的功能參考在[文件站](https://vshulcz.github.io/deja-vu/)。
 
@@ -126,7 +126,7 @@ deja 把這些檔案變成一層牠們都能讀的記憶。
 以及寫在散文裡的密碼——「the admin password is …」這種沒有任何分隔符可依的寫法。
 值會變成 `[redacted:<kind>]`，周圍的文字仍可搜尋。`deja share` 和 `deja sync export` 在匯出時再做一次遮蔽。樣式比對不是金鑰偵測：規則不認識的形態可能原樣通過，見安全模型。
 
-`deja forget` 把會話從重建後的索引裡移除並寫下墓碑，之後的 `deja index` 無法從原始歷史裡把牠們還原回來。
+`deja forget` 把會話從重建後的索引裡移除並寫下墓碑，之後的 `deja index` 無法從原始歷史裡把它們還原回來。
 [安全模型](../../docs/SECURITY-MODEL.md)記錄了資料流向、遮蔽的邊界、信任假設與發行版驗證。
 
 ## 命令列
@@ -147,7 +147,7 @@ $ deja "jwt refresh token"
 | `deja blame <路徑>[:行號]` | 哪些會話討論過這個檔案、當時決定了什麼、為什麼。給出行號時：最後改動這一行的 commit，以及寫下這一行、或寫下被這次 commit 替換的那段文字的會話。 |
 | `deja files <主題>` | 反方向：某個主題的工作實際動過哪些檔案。 |
 | `deja how <工具>` | 這台機器實際怎麼跑一件事，帶真實參數，來自代理此前跑過的指令。 |
-| `deja fix <報錯>` | 這台機器上同樣的報錯之後跑過什麼，且那次之後錯誤沒有再出現。 |
+| `deja fix <報錯>` | 這台機器上同樣的報錯之後跑過什麼，且那次之後錯誤沒有再出現。絕不會是 merge、force push 或刪除。 |
 | `deja friction` | 命中三個以上不同會話的報錯，並指出來自哪些工具。 |
 | `deja ctx <查詢詞>` | 最佳命中的 Markdown 摘要，可直接接進提示詞。 |
 | `deja resume <id>` | 在原來的工具裡重新開啟找到的那個會話。 |
@@ -168,7 +168,7 @@ deja 自己在把結構縮成一個帶模式的工具之前，也是 828。
 
 ## 支援的工具
 
-開啟自動召回後，Claude Code 和 Codex 會在壓縮開始時把當前記錄交給 deja，牠留下摘要即將丟掉的東西：
+開啟自動召回後，Claude Code 和 Codex 會在壓縮開始時把當前記錄交給 deja，它留下摘要即將丟掉的東西：
 任務、結論、檔案、每條指令跑成了什麼、以及還剩什麼沒做完。同一個會話、同一個工作目錄下的下一個掛鉤
 會把這些一次交回，總量不超過 4 KB，並附一行說明儲存庫此後有沒有變動。
 `deja stats` 統計壓縮之後到第一次編輯之間的工具呼叫次數，這個功能就是拿它來衡量的。
@@ -187,7 +187,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed。
 ### 自帶套件的代理
 
 `deja install --auto` 會像接其他工具一樣把下面這幾個接好，那始終是最短的一條路。
-牠們同時在各自的生態裡有一個套件，方便習慣從那邊安裝擴充的人：
+它們同時在各自的生態裡有一個套件，方便習慣從那邊安裝擴充的人：
 
 | 代理 | 套件 | 安裝 |
 | --- | --- | --- |
@@ -204,7 +204,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed。
 opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 pi 在安裝器已經接好時
 直接讓位；在 Zed 裡兩邊用的是同一個 server id。所以無論先裝哪個都不會重複。
 
-牠們用的都是你已經裝好的 deja，套件裡自帶的那份只是備援。
+它們用的都是你已經裝好的 deja，套件裡自帶的那份只是備援。
 
 ## 可選的語意召回
 
@@ -257,14 +257,14 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 
 **有東西離開我的機器嗎？** 沒有，除非你主動要求。見[資料流向](../../docs/SECURITY-MODEL.md#data-flows)。
 
-**日誌裡已經有的金鑰怎麼辦？** 牠們留在原本的工具檔案裡，那是你的代理的資料。
-牠們不會進入 deja 的索引、摘要、分享或同步匯出。
+**日誌裡已經有的金鑰怎麼辦？** 它們留在原本的工具檔案裡，那是你的代理的資料。
+它們不會進入 deja 的索引、摘要、分享或同步匯出。
 
 **會拖慢我的代理嗎？** 一次召回是對本機索引的詞彙查詢：中位數 0.7–0.8 ms，沒有任何東西在等模型。
 掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——數 GB 的儲存庫上是幾十毫秒。
 
 **我需要改變工作方式嗎？** 不需要。是代理自己呼叫召回；開啟自動召回後，
-會話一打開牠就已經知道這個專案此前的決定。
+會話一打開它就已經知道這個專案此前的決定。
 
 **和其他記憶工具有什麼不同？**
 
@@ -277,7 +277,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 
 [完整比較](https://vshulcz.github.io/deja-vu/guide/compare.html)涵蓋了其中十五個。
 
-**Claude Code 的會話歷史存在哪裡，能搜尋嗎？** 在 `~/.claude/projects` 下，每個會話一個 JSONL 檔；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地讀取牠們，`deja last` 列出每個代理最近的會話，`deja view` 把全部歷史開成一個本機頁面。各代理的路徑見[會話存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+**Claude Code 的會話歷史存在哪裡，能搜尋嗎？** 在 `~/.claude/projects` 下，每個會話一個 JSONL 檔；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地讀取它們，`deja last` 列出每個代理最近的會話，`deja view` 把全部歷史開成一個本機頁面。各代理的路徑見[會話存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
 
 **Claude Code 的會話歷史不見了，是丟了嗎？** Claude Code 會刪除 30 天以前的記錄（`~/.claude/settings.json` 裡的 `cleanupPeriodDays`），`claude --resume` 只列出還剩下的。deja 在清理前索引過的會話，檔案沒了之後仍然可以搜尋。詳見[磁碟上的會話檔案](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
 
@@ -311,7 +311,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
-裝好十秒，建索引十來秒。下一次代理打開會話，牠就已經知道你在這個專案裡解決過什麼——
+裝好十秒，建索引十來秒。下一次代理打開會話，它就已經知道你在這個專案裡解決過什麼——
 包括你裝 deja 之前的那些。
 
 ## 參與開發

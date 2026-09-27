@@ -69,8 +69,9 @@ deja install --auto
 受け付けるデスクトップアプリでは、[最新リリース](https://github.com/vshulcz/deja-vu/releases/latest)の
 `.mcpb` を開けます。バイナリも同梱されています。
 
-Claude Code、Codex、Cursor、Qwen、OpenClaw、Copilot では、それぞれのマーケットプレイスから
-同じプラグインバンドルを入れることもできます：
+Claude Code、Cursor、Qwen、OpenClaw、Copilot では、それぞれのマーケットプレイスから
+同じプラグインバンドルを入れることもできます（Codex には専用のバンドルがあります。下の
+[独自パッケージを持つハーネス](#独自パッケージを持つハーネス)を参照）：
 
 ```sh
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
@@ -106,7 +107,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 <details>
 <summary>各エージェント自身のガイダンスファイルに書き込まれる内容</summary>
 
-インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、Zed は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build には、それが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。
+インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、Zed は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build には、それが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。Kilo Code、gajae-code、Command Code、Cherry Studio、Reasonix にはスキルが、Kiro にはステアリングファイルが、それぞれ専用のインストールターゲットから書き込まれます。
 
 </details>
 
@@ -119,7 +120,7 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 | --- | --- |
 | **さかのぼって検索** | `deja "connection pool exhausted"` で数 GB を検索。deja をインストールする前の履歴もすべて対象です。自然言語の質問は関連度ティアにフォールバックします。時間はフィルターではなくヒントとして扱われます。 |
 | **エージェント横断のリコール** | MCP の `deja` ツールを `recall` モードで使えば、元々どのエージェントで解決したかに関係なく、尋ねたエージェントで *「これは3週間前に直した」* に答えます。 |
-| **コンパクションを生き延びる** | 43 回のコンパクションで計測したところ、要約に残ったのは決定事項の 77%、実行したコマンドの 0.2% でした。deja は残りの 99.8% を返します——さらに Claude Code と Codex では、コンパクション開始時にタスク、ファイル、コマンドを捕捉し、次のセッションで一度だけ返します。 |
+| **コンパクションを生き延びる** | 43 回のコンパクションで計測したところ、要約に残ったのは決定事項の 77%、実行したコマンドの 0.2% でした。deja は残りの 99.8% を返します——さらに Claude Code と Codex では、コンパクション開始時にタスク、ファイル、コマンドを捕捉し、その後に一度だけ返します。 |
 | **行動の直前にリコール** | エージェントがファイルを編集したりコマンドを実行したりする前に、deja はそのファイルに関する過去の決定、そのコマンドの動作実績のある呼び出し方、あるいはこのマシンにないプログラムを示します。コマンドが失敗すると、`PostToolUse` フックが、このマシンで以前同じエラーの後に何が行われたかを答えます——エージェントが自分では尋ねようとしない組み合わせです。 |
 | **会話だけでなく作業もインデックス化** | 各ターンで開いたファイル、実行されたコマンドとその終了ステータス、編集で置き換えられた正確な範囲。どの要約も捨ててしまう部分です。 |
 
@@ -148,7 +149,8 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 ## プライバシー
 
 インデックス作成と検索はローカルで完結します。ネットワークを使うのは `deja update`、`deja sync ssh`、
-`deja doctor` のバージョンチェック、そして自分で設定したエンドポイントに対する `deja embed` だけです。
+`deja doctor` のバージョンチェック、そして埋め込みエンドポイント（後述）に対する `deja embed`
+（ベクトルがあれば検索時のクエリ埋め込みも）だけです。
 
 認証情報はインデックス作成時に秘匿化されます：AWS キー、`api_key=` や `token=` の代入、
 Bearer トークンや生の JWT、PEM 秘密鍵ブロック、各プロバイダーのトークン、`scheme://user:pass@host`
@@ -195,7 +197,7 @@ $ deja "jwt refresh token"
 | `deja blame <path>[:line]` | どのセッションがそのファイルについて議論し、何を決め、なぜそうしたか。行を指定すると：その行を最後に変更したコミットと、その行を書いた、あるいはコミットが置き換えたテキストを書いたセッション。`--attribution` は行についての答えだけを出力し、`--json` と併用すると JSON で、`--git-note` と併用すると `refs/notes/deja` に記録します。 |
 | `deja files <topic>` | 逆方向：あるテーマに関する作業が実際に触れたファイル。 |
 | `deja how <tool>` | このマシンで実際にどう実行されているか。以前エージェントが実行した内容から、実際のフラグ付きで示します。 |
-| `deja fix <error>` | 以前同じエラーが起きたとき、このマシンで何を実行し、エラーが再発しなかったか。 |
+| `deja fix <error>` | 以前同じエラーが起きたとき、このマシンで何を実行し、エラーが再発しなかったか。merge、force push、削除は決して返しません。 |
 | `deja friction` | 3 つ以上の別々のセッションで発生したエラーを、ハーネス名付きで表示します。 |
 
 <details>
@@ -254,7 +256,7 @@ $ deja "jwt refresh token"
 | `recall` | 質問、または正確なエラー文字列・名前・フラグ | `harness?`、`limit?`、`offset?` | 密度の高い一致スニペット（上限 4KB）。 |
 | `context` | recall と同じ | `harness?` | 最も一致したセッションの Markdown ダイジェスト。 |
 | `blame` | ファイルパス | `harness?`、`project?`、`since?`、`limit?`、`all?` | そのファイルについて議論したセッション。 |
-| `fix` | 失敗した出力をそのまま | `project?`、`limit?` | 以前同じエラーの後に、このマシンで実行または変更された内容。 |
+| `fix` | 失敗した出力をそのまま | `limit?` | 以前同じエラーの後に、このマシンで実行または変更された内容。 |
 | `how` | ツールや対象（例：`go test`） | `project?`、`limit?` | ここでエージェントが実行した内容に基づく、実際の呼び出し方。 |
 | `orient` | なし（プロジェクトについて尋ねます） | `project?`、`limit?` | 過去のセッションがここで実行したコマンドと、作業したファイル。 |
 | `remember` | 恒久的な事実や決定をひとつ | `project?`、`tags?` | 後でリコールするために、恒久的な決定を保存します。 |
@@ -345,8 +347,6 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 書き込んだ内容を読み取ります。opencode、dsh、OpenClaw は足りないものだけを追加し、Kimi、Grok、Codex、pi は
 インストーラーがすでに接続している場合は手を引きます。Zed では両方が同じサーバー ID を使います。
 そのため、どの順番でインストールしても重複は生じません。
-
-どのパッケージも手元の deja を使い、同梱のコピーは予備にすぎません。
 
 いずれもすでに入っている deja を使い、同梱のコピーはフォールバックにすぎません。
 

@@ -9,7 +9,7 @@
 
 - **Wiring**: `deja install kilocode` writes the extension's
   `<globalStorage>/kilocode.kilo-code/settings/mcp_settings.json` for every host
-  that has it, **and** the CLI's own `<config>/kilo/kilo.jsonc` — Kilo vendors
+  that has it, **and** the CLI's own `<config>/kilo/kilo.jsonc` (or `kilo.json` when that is the file present) — Kilo vendors
   OpenCode, so the CLI takes OpenCode's `mcp` block. `kilo mcp list` prints
   `✓ deja connected` once it is there. The skill goes in
   `~/.kilocode/skills/deja-history/SKILL.md` and the command in
@@ -71,11 +71,10 @@ see [OpenCode](opencode.md) for the field-by-field description.
   commands in `~/.config/kilo/commands/`, project ones in `.kilo/commands/`,
   and a file named `deja.md` is invoked as `/deja`. `deja install kilocode`
   writes the global one.
-- Wiring: `deja install kilocode` writes the MCP server into
-  `<globalStorage>/kilocode.kilo-code/settings/mcp_settings.json` for every host that carries the
-  extension, and the shared manual into `~/.kilocode/skills/deja-history/SKILL.md`, which is where
-  Kilo's own loader looks first (`packages/opencode/src/kilocode/paths.ts`). A machine with the CLI
-  and no editor gets the skill and a note saying the server was not wired anywhere.
+- Skill location: `~/.kilocode/skills/deja-history/SKILL.md` is where Kilo's
+  own loader looks first (`packages/opencode/src/kilocode/paths.ts`). A machine
+  with the CLI and no editor gets the CLI config, the skill and the command,
+  and a note saying no editor host carried the extension.
 - No hooks: a search of Kilo-Org/kilocode finds no hook surface, and the extension is a Roo fork
   whose hooks are still in flight upstream, so recall arrives when the model calls the tool rather
   than on its own.

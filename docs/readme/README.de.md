@@ -15,7 +15,7 @@ dieser Maschine ohnehin auf die Platte schreiben, und gibt die richtige an den z
 
 <p align="center"><sub><em>Niemand hat gesucht — der Agent hat deja von sich aus aufgerufen. Zwei echte Läufe, echtes Modell, echte Tool-Aufrufe, auf einem synthetischen Korpus: es wird niemandes Historie veröffentlicht.</em></sub></p>
 
-<p align="center"><b>deja ist von der ersten Minute an voll: die Historie, die 34 Agents längst geschrieben haben, in Sekunden indiziert, ohne Modell und ohne eigenen Erfassungsschritt.</b></p>
+<p align="center"><b>deja ist von der ersten Minute an voll: die Historie, die 35 Agents längst geschrieben haben, in Sekunden indiziert, ohne Modell und ohne eigenen Erfassungsschritt.</b></p>
 
 <p align="center">
 <b>58 % weniger Tokens</b> bei einer Aufgabe, die diese Maschine schon gelöst hatte &middot; <b>88.1 % hit@1</b> auf LongMemEval-S (bereinigter Satz aus 470 Fragen) &middot; <b>70.5 %</b> auf LoCoMo &middot; Abfragen in <b>Millisekunden</b> über Gigabytes an Historie<br>
@@ -86,7 +86,7 @@ Der Skill ruft das installierte `deja`-Binary auf und bringt kein eigenes mit.
 Weitere Wege: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, oder `npx @vshulcz/deja-vu "suchbegriff"`, um es ohne
 Installation auszuprobieren. Unter Windows bricht das Installationsskript mit `unsupported OS` ab, weil es ein
-Shell-Skript ist. Nimm `deja-vu_<version>_windows_amd64.zip` aus dem
+Shell-Skript ist. Nimm stattdessen `scoop install deja-vu` (aus dem Main-Bucket von Scoop), oder nimm `deja-vu_<version>_windows_amd64.zip` aus dem
 [letzten Release](https://github.com/vshulcz/deja-vu/releases/latest) und leg `deja.exe` in den `PATH`.
 
 Das Binary allein ist bereits eine vollständige Installation: Indizieren, Suchen, `show`, `ctx`, `blame`,
@@ -95,14 +95,14 @@ Agents anzubinden und den Recall beim Session-Start einzuschalten — sinnvoll, 
 
 ## Was du davon hast
 
-**In Codex gelöst, von Claude erinnert.** Vierunddreißig Coding-Agents schreiben jedes Gespräch in lokale
+**In Codex gelöst, von Claude erinnert.** Fünfunddreißig Coding-Agents schreiben jedes Gespräch in lokale
 Dateien, und deja macht aus diesen Dateien eine Gedächtnisschicht, die sie alle lesen können.
 
 | | |
 | --- | --- |
 | **Suche rückwärts in der Zeit** | `deja "connection pool exhausted"` durchsucht Gigabytes, auch alles von vor der Installation von deja. Eine Frage in natürlicher Sprache fällt auf den Relevanzmodus zurück. Zeit ist ein Hinweis, kein Filter. |
 | **Recall über Agenten hinweg** | Das MCP-Tool `deja` im Modus `recall` antwortet aus jedem Agenten heraus „das haben wir vor drei Wochen behoben“, egal wer es damals behoben hat. |
-| **Übersteht die Kompaktierung** | Gemessen an 43 Kompaktierungen: die Zusammenfassung behielt 77 % der Entscheidungen und 0.2 % der Befehle, die du ausgeführt hast. Die übrigen 99.8 % gibt deja zurück. In Claude Code und Codex notiert deja Aufgabe, Dateien und Befehle in dem Moment, in dem die Kompaktierung beginnt, und gibt sie in der nächsten Session am Stück zurück. |
+| **Übersteht die Kompaktierung** | Gemessen an 43 Kompaktierungen: die Zusammenfassung behielt 77 % der Entscheidungen und 0.2 % der Befehle, die du ausgeführt hast. Die übrigen 99.8 % gibt deja zurück. In Claude Code und Codex notiert deja Aufgabe, Dateien und Befehle in dem Moment, in dem die Kompaktierung beginnt, und gibt sie danach einmal zurück. |
 | **Recall im Moment des Handelns** | Bevor der Agent eine Datei ändert oder einen Befehl ausführt, nennt der `PreToolUse`-Hook die früheren Entscheidungen zu dieser Datei, die hier funktionierende Form dieses Befehls, oder dass das Programm auf dieser Maschine schlicht nicht existiert. Scheitert ein Befehl, zeigt der `PostToolUse`-Hook, was auf dieser Maschine nach demselben Fehler ausgeführt wurde — genau das Paar, nach dem der Agent nicht fragt. |
 | **Indiziert die Arbeit, nicht nur das Gesagte** | Jede in einem Zug geöffnete Datei, jeder ausgeführte Befehl samt Exit-Code und das exakte Fragment, das eine Änderung ersetzt hat. Genau das, was jede Zusammenfassung verliert. |
 
@@ -161,7 +161,7 @@ $ deja "jwt refresh token"
 | `deja blame <pfad>[:zeile]` | Welche Sessions diese Datei besprochen haben, was entschieden wurde und warum. Mit Zeilennummer: der Commit, der sie zuletzt geändert hat, und die Session, die diese Zeile geschrieben hat oder den Text, den dieser Commit ersetzt hat. |
 | `deja files <thema>` | Die Gegenrichtung: welche Dateien die Arbeit an einem Thema tatsächlich angefasst hat. |
 | `deja how <werkzeug>` | Wie das auf dieser Maschine wirklich ausgeführt wird, mit echten Argumenten, aus Befehlen, die Agents bereits ausgeführt haben. |
-| `deja fix <fehler>` | Was auf dieser Maschine nach demselben Fehler ausgeführt wurde und wonach der Fehler nicht wieder auftrat. |
+| `deja fix <fehler>` | Was auf dieser Maschine nach demselben Fehler ausgeführt wurde und wonach der Fehler nicht wieder auftrat. Niemals ein Merge, ein Force-Push oder eine Löschung. |
 | `deja friction` | Fehler, die in drei oder mehr verschiedenen Sessions auftauchen, mit Angabe der Werkzeuge. |
 | `deja ctx <suchbegriff>` | Markdown-Zusammenfassung der besten Treffer, direkt in einen Prompt einsetzbar. |
 | `deja resume <id>` | Öffnet die gefundene Session wieder in dem Werkzeug, zu dem sie gehört. |
@@ -288,7 +288,7 @@ nicht.
 
 **Bremst das meinen Agenten?** Ein Recall ist eine lexikalische Abfrage auf einen lokalen Index: Median
 0.7–0.8 ms, und nichts wartet auf ein Modell. Der Hook fügt Prozessstart und Aktualitätsprüfung der Speicher
-hinzu — Zehntelsekunden im Bereich einiger Dutzend Millisekunden bei einem mehrere Gigabyte großen Repository.
+hinzu — einige Dutzend Millisekunden bei einem mehrere Gigabyte großen Repository.
 
 **Muss ich meine Arbeitsweise ändern?** Nein. Den Recall ruft der Agent selbst auf; mit automatischem Recall
 weiß er schon beim Öffnen der Session, was in diesem Projekt zuvor entschieden wurde.
@@ -306,7 +306,7 @@ Der [vollständige Vergleich](https://vshulcz.github.io/deja-vu/guide/compare.ht
 
 **Wo liegt die Session-Historie von Claude Code, und kann man sie durchsuchen?** Unter `~/.claude/projects`,
 eine JSONL-Datei je Session; Codex unter `~/.codex/sessions`, Cursor in der SQLite-Datei `state.vscdb`.
-`deja search` liest sie an Ort und Stelle, `deja last` listet die jüngste Session jedes Agenten, und
+`deja search` liest sie an Ort und Stelle, `deja last` listet die jüngsten Sessions aller Agenten, und
 `deja view` öffnet die gesamte Historie als lokale Seite. Die Pfade je Agent stehen unter
 [wo Sessions gespeichert werden](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 

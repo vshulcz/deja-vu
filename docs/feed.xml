@@ -50,7 +50,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
     <updated>2026-09-27T00:00:00Z</updated>
-    <summary>Every deja subcommand: search, recall, ctx, blame, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
+    <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
     <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>

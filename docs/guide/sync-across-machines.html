@@ -150,7 +150,7 @@ deja sync                       # every machine deja already knows, both ways</p
 <h2>Deciding what synced memory may do</h2>
 <p>Memory from another machine is not automatically as trusted as memory from this one — a work laptop's history in a personal session, or the reverse, is a real concern. The trust policy at <code>~/.config/deja/policy.json</code> separates the paths memory can activate on: <code>search</code>, <code>mcp</code> and <code>auto</code>. Synced sessions stay searchable but never inject themselves:</p>
 <pre>{"activations": {"auto": {"imported": false}}}</pre>
-<p>The same rule can name a single peer (<code>imported:work</code>) rather than all imports. Receipts and <code>deja log --last</code> name the policy that allowed each injection, so what reached the model is inspectable after the fact rather than a matter of trust.</p>
+<p>A rule can also be narrower than all imports: <code>imported:&lt;group&gt;</code> matches sessions whose project, on the machine they came from, starts with that directory. It cannot name a machine, because a sync batch does not carry one. Receipts and <code>deja log --last</code> name the policy that allowed each injection, so what reached the model is inspectable after the fact rather than a matter of trust.</p>
 
 <h2>Keeping it current</h2>
 <p><code>deja install sync-timer</code> runs the exchange on a schedule, and <code>deja doctor</code> reports each peer with when it last synced — a peer that has quietly stopped is the failure mode worth catching, because everything keeps working and simply stops being shared.</p>

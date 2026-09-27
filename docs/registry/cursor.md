@@ -29,7 +29,7 @@ Bubble `type: 1` maps to `user`; other numeric types map to `assistant`. Text us
 
 Tool calls follow the Anthropic `tool_use` shape with Cursor's own names: `path` rather than `file_path`, `Shell` rather than `Bash`, `old_string`/`new_string` on `StrReplace`, and the whole file as `contents` on `Write` — the last of these is the only record a created file's lines were ever in a session.
 
-Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. The transcript has no message timestamps, so deja uses file modification time.
+Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. Records carry no timestamp field; a user turn's text starts with a `<timestamp>Sunday, Jul 26, 2026, 1:06 PM (UTC+3)</timestamp>` block, which deja reads and carries forward to the assistant turns that answer it. A transcript with no readable block falls back to the file's modification time.
 
 ## The second CLI store, and why it is unread
 
@@ -43,6 +43,10 @@ Cursor CLI also writes one SQLite store per chat:
 `store.db` holds `blobs(id TEXT, data BLOB)` and `meta(key, value)`. The blobs are content-addressed and the tree needs no schema to walk: `meta`'s single value is hex-encoded JSON naming `latestRootBlobId`, that blob is protobuf whose repeated field 1 is a list of 32-byte child digests in message order, and each child is plain JSON in the Vercel AI SDK shape — `{"role","content"}` with `text`, `reasoning`, `tool-call` and `tool-result` parts, the calls named as above but keyed `toolName`/`args`.
 
 deja does not read it, because on the machine where it was decoded reading it added nothing: all 19 stores walked, and of the 67 turns they held, 51 were already in the JSONL transcript and the remaining 16 were the `<user_info>` environment preamble the transcript omits. Every chat with a `store.db` had a transcript beside it. What `deja doctor` reports instead is the count of chats with no transcript beside them, which is silent today and is the only signal if a release stops writing `agent-transcripts`.
+
+## Wiring
+
+`deja install cursor` adds the server to `${CURSOR_CONFIG_DIR:-~/.cursor}/mcp.json`, writes the shared skill `~/.agents/skills/deja-history/SKILL.md` and the `/deja` command in `commands/deja.md` beside it. `deja install cursor-auto` adds the same plus `hooks.json` entries: `sessionStart` (`deja hook-context`), `beforeSubmitPrompt` (`hook-prompt`, interactive TUI only — headless `-p` skips it), `preToolUse`, `postToolUse` and `preCompact`. Cursor also runs the hooks in `~/.claude/settings.json` and dedupes them against its own by exact command string, so a machine with both wired gets one injection.
 
 ## Resume
 
@@ -59,7 +63,7 @@ take, so those still reopen only in the editor.
 - Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.
 - SQLite values are JSON inside a key-value table and malformed or null entries occur.
 - CLI project path encoding has the same separator-versus-hyphen ambiguity as Claude Code.
-- SQLite text is capped at 64 KiB. CLI subagent duplication is opt-in.
+- A parsed message is capped at 1 MiB. CLI subagent transcripts are opt-in.
 - Both CLI layouts are written by `cursor-agent 2026.09.02-c22c1a3`, minutes apart in the same session.
 
 **Last verified:** 2026-09-21

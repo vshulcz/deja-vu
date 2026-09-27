@@ -15,8 +15,9 @@ a `schema_version` field so consumers can detect breaking changes.
 - **`deja blame --json`** and **`deja log --json`** return a top-level JSON
   array rather than an envelope, so neither carries `schema_version`. Their
   element shapes are stable; only additive fields inside them are permitted.
-- **`deja stats --impact --json`** returns one flat object of counters and
-  carries no `schema_version` either, on the same terms.
+- **`deja stats --impact --json`** and **`deja stats --redaction --json`**
+  return one flat object of counters and carry no `schema_version` either, on
+  the same terms.
 - **`deja log --last --json`** carries no `schema_version` for two reasons of
   its own. The object it prints is the record deja stores in
   `.injections.jsonl`, marshalled from the same struct, so a version field on it
@@ -139,7 +140,11 @@ written against version 1:
 Stemmed search may also include `variants`; semantic search sets `semantic`.
 `superseded` (optional) carries the date of a newer same-project session whose
 matches overlap this hit — an earlier-attempt signal. `reused` (optional)
-counts recent agent recalls that served this session.
+counts recent agent recalls that served this session. `moved` (optional) is a
+sentence saying how many of the files the session touched have commits since
+it ended; only the first three hits are checked, and `DEJA_MOVED=0` turns it
+off. `lifecycle`, `lifecycle_note` and `lifecycle_at` (optional) on the hit
+carry the state of a promoted decision, as they do on a `blame` row.
 
 ### What a hit's `messages` are
 
@@ -245,7 +250,7 @@ return redacted index content in a bounded message window; the default limit is
 ```
 
 Use `--offset N --limit N` to page without parsing human output. An offset past
-the end returns an empty `messages` array and a `returned` count of zero.
+the end returns a session with no `messages` key and a `returned` count of zero.
 
 ## `deja stats --json`
 
@@ -383,6 +388,11 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
   ],
   "auto_recall": [
     {
+      "name": "claude-code",
+      "state": "wired",
+      "path": "/home/user/.claude/settings.json"
+    },
+    {
       "name": "opencode",
       "state": "wired",
       "path": "/home/user/.config/opencode/plugins/deja.js"
@@ -430,7 +440,7 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
     }
   },
   "ingest_health": {
-    "claude": {"malformed_lines": 0, "failed_files": 0}
+    "claude": {"malformed_lines": 2}
   },
   "ingest_files": {
     "/Users/you/.claude/projects/app/one.jsonl": {"malformed": 2}
@@ -479,10 +489,13 @@ now masks), `older-rules` (readable, answering, re-deriving behind the answer)
 or `newer` (the binary was rolled back, not the index). The first two are the
 ones that pair with `rereading`; the field is absent on a current store. Store
 `state`
-values are `ok`, `missing`, `unreadable`, `parsed-zero`, `denied` (which adds a
-`denied` field naming the unreadable path), `needs-sqlite3` and `needs-zstd`
-(both of which add a `skipped` field saying which CLI is missing); an existing
-but empty store directory reports `missing`. A store also carries `indexed_sessions`
+values are `ok`, `missing`, `unplugged` (no files, and the disk the store was on
+is gone), `excluded` (the harness is in the exclude list, so nothing was read),
+`unreadable` (which adds an `error` with what the parser said), `parsed-zero`,
+`denied` (which adds a `denied` field naming the unreadable path),
+`needs-sqlite3` and `needs-zstd` (which add a `skipped` field saying which CLI
+is missing when the store was skipped for it); an existing but empty store
+directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
 permission walk was cut short or blocked carries `partial` or `unchecked`. A
 store holding transcripts the index has no state for at all carries `never_read`
@@ -490,7 +503,7 @@ with how many — the count is absent when there are none, and goes away after a
 indexing pass.
 `sqlite3` and `git` are the two tools deja shells out to, each `ok` or
 `missing`: sqlite3 reads every database-backed store (opencode and the schemas
-that borrow it, Cursor, Goose, Zed, Crush, Kiro, Hermes, Grok, OpenClaw), and git supplies changed-file notes, worktree names and the task
+that borrow it, Cursor, Goose, Zed, Crush, Hermes, Grok, OpenClaw), and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
 
 `index.sources_read_at` is when deja last walked this machine's stores, in RFC 3339, which is not when the index was last written: an import from a peer rewrites the index without opening a local transcript, so on a machine that syncs on a timer the two drift apart, and `stale_stores` is counted against this field rather than the build time. It is `never` when an import built the index and nothing local has been read yet, and absent on a store written before deja recorded it.
@@ -502,6 +515,17 @@ integration looks), `missing`, or `plugin` (the harness carries its own).
 `binary_missing` marks a row whose entries name a deja binary that is no longer
 there — what an upgrade leaves behind, with every hook exiting 127.
 
+The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
+event by event, so they have two states of their own: `out of date` (some of the
+events this release writes are there and some are not — the file keeps working
+and lacks everything added since) and `unreadable` for a settings file that will
+not parse. `codex-hook` also reports what codex's trust store says about the
+entry: `untrusted` (codex has never been shown it and runs no hook at all) or
+`disabled`.
+
+`mcp` rows are `wired`, `not-wired` (the config file is there without a deja
+server in it) or `config-missing`.
+
 `commands` is the third thing an install writes: the `/deja` a user types, one
 row per harness. `state` is `written`, `missing`, `someone else's` for a file
 under that name deja did not write, or `skill` — the harnesses that make a skill
@@ -512,14 +536,6 @@ command. Each of those spells the invocation its own way (codex `/skills`, Kimi
 one.
 `path` is worth reading rather than assuming: the file is not called `deja` in
 every harness.
-
-The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
-event by event, so they have two states of their own: `out of date` (some of the
-events this release writes are there and some are not — the file keeps working
-and lacks everything added since) and `unreadable` for a settings file that will
-not parse. `codex-hook` also reports what codex's trust store says about the
-entry: `untrusted` (codex has never been shown it and runs no hook at all) or
-`disabled`.
 
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a
@@ -664,7 +680,8 @@ findings. A consumer that wants those has the counts and should not present
 them as credentials.
 
 `path` is the transcript still holding the value and is omitted for a
-database-backed store, where one file holds every session in it. `withheld` is
+database-backed store, where one file holds every session in it. `sessions` is
+how many sessions the findings come from. `withheld` is
 present when the ignore rule kept sessions out of the scan. `findings` is an
 empty array, never null, on a clean machine.
 ## `deja tests --json`
@@ -743,7 +760,8 @@ What the window settled, one entry per session, newest first:
 }
 ```
 
-Every line is a sentence from the session, trimmed but never rewritten, and
+A session entry also carries `title` when the session has one. Every line is a
+sentence from the session, trimmed but never rewritten, and
 `sessions_in_window` against `sessions_with_lines` is the honest part: a week of
 28 sessions where 15 concluded something is not a week of 15.
 
@@ -982,6 +1000,27 @@ last 14 days, and from then on the figures are a window whose start moves. Read
 rewrite that would leave nothing keeps the newest few hundred events instead of
 emptying the file. It is absent only when the log holds nothing at all, which is
 the one case where the counts are all zero anyway.
+
+## `deja stats --redaction --json`
+
+What the ingest-time redaction masked in this index:
+
+```json
+{
+  "total": 412,
+  "by_harness": {
+    "claude": {"bearer-token": 3, "entropy": 290}
+  },
+  "sidecar_size": 12345,
+  "tombstones": 2
+}
+```
+
+`total` is every value masked while the index was built, `by_harness` the same
+count split by store and rule, `tombstones` how many sessions `deja forget` has
+removed from this machine, and `sidecar_size` the semantic sidecar's size in
+bytes, omitted when there is none. No envelope and no `schema_version`, on the
+same terms as `--impact`.
 
 ## `deja stats --year --json`
 

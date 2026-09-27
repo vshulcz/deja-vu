@@ -42,9 +42,22 @@ pi and omp share: prime-agent descends from the same codebase
 
 ## What deja does with it
 
-Sessions are indexed and searchable like any other harness. Wiring — MCP,
-hooks, skills, commands, resume, handoff — is not implemented for prime-agent;
-`deja install` does not write to its config.
+Sessions are indexed and searchable like any other harness.
+
+- **MCP**: `deja install prime` adds a `stdio` entry under `mcpServers` in
+  `~/.prime/agent/settings.json` (under `PRIME_AGENT_CODING_AGENT_DIR` when
+  that is set).
+- **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`, which
+  prime-agent loads.
+- **Auto-recall**: `deja install prime-auto` also writes
+  `~/.prime/agent/extensions/deja.ts`. At `before_agent_start` it returns the
+  session digest on the first turn and per-prompt recall after that;
+  `session_start` shows a footer status while the first index builds, and
+  `session_compact` runs `deja hook-precompact`. It registers `/deja
+  <query>`, which runs `deja search`. `tool_result` does not fire in
+  `--print` on 0.9.1, so the repair line after a failed command is not wired.
+- **Resume**: `prime-agent --resume <id>`.
+- **Handoff**: exec.
 
 Reported and specified from source by @iMaxTomas in #2529.
 

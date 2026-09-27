@@ -34,7 +34,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Copilot CLI", "description": "How to give GitHub Copilot CLI recall over every coding agent's sessions on this machine — where its events live, and the MCP entry it needs.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-09-15"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Memory for Copilot CLI","item":"https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html"}]}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to GitHub Copilot CLI?","acceptedAnswer":{"@type":"Answer","text":"Run deja install copilot, which writes the deja entry into ~/.copilot/mcp-config.json in Copilot's own schema."}},{"@type":"Question","name":"Where does Copilot CLI keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.copilot/session-state/<sessionId>/events.jsonl as a stream of {type, data, timestamp} records."}},{"@type":"Question","name":"Why is the Copilot MCP entry different from other harnesses?","acceptedAnswer":{"@type":"Answer","text":"Copilot's config is not the common mcpServers shape: entries carry a type and a list of enabled tools, so deja writes it in Copilot's own form."}}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I add memory to GitHub Copilot CLI?","acceptedAnswer":{"@type":"Answer","text":"Run deja install copilot, which writes the deja entry into ~/.copilot/mcp-config.json in Copilot's own schema."}},{"@type":"Question","name":"Where does Copilot CLI keep its sessions?","acceptedAnswer":{"@type":"Answer","text":"Under ~/.copilot/session-state/<sessionId>/events.jsonl as a stream of {type, data, timestamp} records."}},{"@type":"Question","name":"Why is the Copilot MCP entry different from other harnesses?","acceptedAnswer":{"@type":"Answer","text":"Copilot's entries are not the common mcpServers shape: each carries a type and a list of enabled tools, so deja writes it in Copilot's own form."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -141,7 +141,7 @@
 
 <h2>Adding recall</h2>
 <pre>deja install copilot</pre>
-<p>Copilot keeps its MCP servers in <code>~/.copilot/mcp-config.json</code>, and its schema is not the common <code>mcpServers</code> one — entries carry a type and a list of enabled tools, so the entry is written in Copilot's own shape rather than copied from another harness.</p>
+<p>Copilot keeps its MCP servers under <code>mcpServers</code> in <code>~/.copilot/mcp-config.json</code>, but its entries are not the common shape — each carries a type and a list of enabled tools, so the entry is written in Copilot's own form rather than copied from another harness. The same install writes the <code>deja-history</code> skill to <code>~/.copilot/skills/</code>, which Copilot also lists as the <code>/deja-history</code> command.</p>
 <p>It needs the binary, which that entry calls by name:</p>
 <pre>brew install deja-vu
 # or
@@ -152,7 +152,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — thirty-five of them today, <a href="where-sessions-are-stored.html">each in its own format</a> — so a fix found in one tool answers a question asked in another, including sessions from before any of this was installed. That is the reason to index rather than to capture.</p>
-<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). An injection is capped at 1,536 bytes per prompt and about 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+<p>Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>). Copilot runs hooks but drops the context they return, so nothing is injected here: recall is the tool and the skill. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
 
 <p><a href="getting-started.html">Getting started</a> · <a href="../registry/copilot.html">How Copilot's store is read</a> · <a href="agents.html">Agents &amp; MCP</a></p>
 

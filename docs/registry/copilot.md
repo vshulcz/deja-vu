@@ -15,18 +15,21 @@ The work is filed outside the message stream. `tool.execution_start` carries
 and `old_str`/`new_str` for an edit, which is the one place the replaced text
 survives. `create` hands over the whole file as `file_text`, and that is the
 only record a created file's lines were ever in a session — a commit that adds
-them deletes nothing for the replaced side to match. `tool.execution_complete` carries `data.result.content` and a
-`success` flag; failed results are indexed on purpose, because the error a
-command hit is what a later search reaches for. `session.shutdown` also lists
-`codeChanges.filesModified`, the only harness that hands over a modified-file
-list the parser does not have to infer.
+them deletes nothing for the replaced side to match. `tool.execution_complete` carries `data.result.content`,
+indexed as tool output whether or not the call failed, because the error a
+command hit is what a later search reaches for. Its `success` flag is true on
+failed runs too, so a non-zero exit code is read from the telemetry or the
+trailer in the output and added to the command record. `session.shutdown`
+lists `codeChanges.filesModified`; deja does not read it, since the tool events
+already name every file.
 
 - **MCP**: `deja install copilot` writes `mcpServers.deja` into
   `~/.copilot/mcp-config.json`.
-- **Guidance**: a skill Copilot loads on demand.
+- **Skill**: `~/.copilot/skills/deja-history/SKILL.md`, loaded on demand;
+  Copilot invokes a skill by name, so it is also the `/deja-history` command.
 - **Auto-recall**: none. Copilot CLI exposes no hook that can inject context,
-  so MCP plus guidance is the whole install.
-- **Resume**: `copilot --resume <sessionId>`.
+  so MCP plus the skill is the whole install.
+- **Resume**: `copilot --resume=<sessionId>`.
 - **Handoff**: exec.
 
 ## Known quirks and drift

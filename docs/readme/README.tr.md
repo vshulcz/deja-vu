@@ -15,7 +15,7 @@ oturumları indeksler ve soran hangisiyse ona doğru olanı geri verir.</p>
 
 <p align="center"><sub><em>Kimse arama yapmadı; ajan deja'yı kendisi çağırdı. Gerçek model ve gerçek araç çağrılarıyla iki gerçek çalıştırma, sentetik bir külliyat üzerinde: kimsenin geçmişi yayımlanmıyor.</em></sub></p>
 
-<p align="center"><b>deja ilk dakikadan itibaren dolu: 34 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
+<p align="center"><b>deja ilk dakikadan itibaren dolu: 35 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
 
 <p align="center">
 Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
@@ -86,7 +86,7 @@ Skill, kurduğunuz `deja` ikilisini çağırır; kendi kopyasını taşımaz.
 Diğer yollar: `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest` ya da hiçbir şey kurmadan denemek için
 `npx @vshulcz/deja-vu "sorgu"`. Windows'ta kurulum betiği `unsupported OS` diyerek çıkar, çünkü bir shell
-betiği; [son sürümden](https://github.com/vshulcz/deja-vu/releases/latest)
+betiği; `scoop install deja-vu` kullanın (Scoop'un main bucket'ında) ya da [son sürümden](https://github.com/vshulcz/deja-vu/releases/latest)
 `deja-vu_<version>_windows_amd64.zip` dosyasını alıp `deja.exe`'yi `PATH`'e koyun.
 
 Yalnızca ikili dosya bile tam bir kurulumdur: indeksleme, arama, `show`, `ctx`, `blame`, `--json` ve kimlik
@@ -95,14 +95,14 @@ oturum başlangıcında geri çağırmayı açmaktır; değerli ama isteğe bağ
 
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Otuz dört kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Otuz beş kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |
 | --- | --- |
 | **Geriye doğru arama** | `deja "connection pool exhausted"` gigabaytları tarar, deja'yı kurmanızdan öncesi dahil. Doğal dildeki bir soru ilgi düzeyine göre çalışan kipe düşer. Zaman bir ipucudur, filtre değil. |
 | **Ajanlar arası geri çağırma** | MCP'deki `deja` aracı `recall` kipinde, hangi ajanın içinden olursa olsun "bunu üç hafta önce düzeltmiştik" yanıtını verir; o zaman kimin düzelttiği fark etmez. |
-| **Sıkıştırmadan sağ çıkar** | 43 bağlam sıkıştırması üzerinde ölçüldü: özet, kararların %77'sini ve çalıştırdığınız komutların %0.2'sini korudu. Kalan %99.8'i deja geri verir. Claude Code ve Codex'te deja, sıkıştırma başladığı anda görevi, dosyaları ve komutları not eder ve sonraki oturumda tek seferde geri verir. |
+| **Sıkıştırmadan sağ çıkar** | 43 bağlam sıkıştırması üzerinde ölçüldü: özet, kararların %77'sini ve çalıştırdığınız komutların %0.2'sini korudu. Kalan %99.8'i deja geri verir. Claude Code ve Codex'te deja, sıkıştırma başladığı anda görevi, dosyaları ve komutları not eder ve sıkıştırmadan sonra bir kez geri verir. |
 | **Harekete geçme anında geri çağırma** | Ajan bir dosyayı değiştirmeden veya bir komut çalıştırmadan önce `PreToolUse` kancası, o dosya hakkında daha önce ne karar verildiğini, o komutun burada işe yarayan biçimini ya da programın bu makinede hiç olmadığını söyler. Komut başarısız olduğunda `PostToolUse` kancası, bu makinede aynı hatadan sonra ne çalıştırıldığını gösterir — ajanın kendiliğinden sormayacağı tam da bu ikilidir. |
 | **Konuşmayı değil işi indeksler** | Her turda açılan her dosya, çalıştırılan her komut ve çıkış kodu, bir düzenlemenin yerine geçtiği tam parça. Her özetin kaybettiği şey tam olarak budur. |
 
@@ -159,7 +159,7 @@ $ deja "jwt refresh token"
 | `deja blame <yol>[:satır]` | Bu dosyayı hangi oturumlar konuştu, ne karar verildi ve neden. Satır numarası verilirse: o satırı en son değiştiren commit ve o satırı ya da o commit'in değiştirdiği metni yazan oturum. |
 | `deja files <konu>` | Ters yön: bir konudaki çalışmanın gerçekte hangi dosyalara dokunduğu. |
 | `deja how <araç>` | Bu makinede bu iş gerçekte nasıl çalıştırılıyor — ajanların daha önce çalıştırdığı komutlardan alınmış gerçek argümanlarla. |
-| `deja fix <hata>` | Bu makinede aynı hatadan sonra ne çalıştırıldı ve ondan sonra hata bir daha çıkmadı. |
+| `deja fix <hata>` | Bu makinede aynı hatadan sonra ne çalıştırıldı ve ondan sonra hata bir daha çıkmadı. Asla bir merge, force push ya da silme değil. |
 | `deja friction` | Üç veya daha fazla farklı oturuma isabet eden hatalar ve hangi araçlardan geldikleri. |
 | `deja ctx <sorgu>` | En iyi sonuçların Markdown özeti, doğrudan bir prompt'a girecek biçimde. |
 | `deja resume <id>` | Bulunan oturumu ait olduğu araçta yeniden açar. |
@@ -299,7 +299,7 @@ açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştır
 
 **Claude Code oturum geçmişi nerede ve aranabilir mi?** `~/.claude/projects` altında, oturum başına bir JSONL
 dosyası; Codex `~/.codex/sessions` altında, Cursor ise SQLite `state.vscdb` içinde. `deja search` bunları
-yerinde okur, `deja last` her ajanın en son oturumunu listeler, `deja view` ise tüm geçmişi yerel bir sayfa
+yerinde okur, `deja last` tüm ajanların son oturumlarını listeler, `deja view` ise tüm geçmişi yerel bir sayfa
 olarak açar. Ajan başına yollar
 [oturumların saklandığı yer](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 sayfasında.

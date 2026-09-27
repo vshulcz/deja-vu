@@ -1,19 +1,25 @@
 # Windows package manifests
 
-This directory keeps the source manifests for Scoop and WinGet. They are
-pinned to a published release so their URLs and SHA-256 values can be checked
-before submission.
+This directory keeps the source manifests for Scoop and WinGet, and the
+template for the `.mcpb` bundle (`mcpb/manifest.json`, whose `0.0.0` version
+`scripts/mcpb` replaces when the release job packs the bundles). The Scoop and
+WinGet manifests are pinned to a published release so their URLs and SHA-256
+values can be checked before submission.
 
 ## Update checklist
 
-After GoReleaser publishes a tag:
+After GoReleaser publishes a tag, the release job runs
+`go run ./scripts/pinmanifests -version <version> -checksums dist/checksums.txt`,
+which sets the version, release URLs and hashes in `scoop/deja-vu.json` and the
+three files under `winget/` (and the plugin manifests elsewhere in the repo), and
+attaches the Windows manifests to the release. It cannot commit them back, so:
 
-1. Download `checksums.txt` from the GitHub release and confirm both Windows
-   zip assets are listed.
-2. In `scoop/deja-vu.json`, set `version`, the two initial download URLs, and
-   their hashes. Leave the `$version` autoupdate URLs unchanged.
-3. In all three files under `winget/`, set `PackageVersion`. Update the release
-   URLs, `InstallerSha256` values, `LicenseUrl`, and `ReleaseNotesUrl`.
+1. Download `checksums.txt` from the GitHub release, run the same command
+   locally, and commit the result. CI runs `pinmanifests -check` and fails
+   until the committed manifests match the newest release.
+2. Do not hand-edit the versions or hashes; if a file carries a version the
+   tool does not own, add it to `scripts/pinmanifests`.
+3. The `$version` autoupdate URLs in the Scoop manifest stay as they are.
 4. Download both archives and confirm each contains `deja.exe` at its root.
 5. On Windows, validate the WinGet set:
 
@@ -52,5 +58,7 @@ from the local manifests, and then open a pull request. Do not replace the
 previous version directory.
 
 Add package-manager commands to the project README only after each upstream
-manifest is accepted. Until then, the checked-in manifests are publication
-sources, not working install channels.
+manifest is accepted. Scoop is, and the README lists it; the WinGet submission
+([microsoft/winget-pkgs#428125](https://github.com/microsoft/winget-pkgs/pull/428125))
+is still open, so the WinGet manifests here are a publication source, not a
+working install channel.

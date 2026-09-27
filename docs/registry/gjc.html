@@ -69,16 +69,18 @@
 </ul>
 <p>empty messages.</p>
 <ul>
-<li>Wiring: <code>deja install gjc</code> writes the server into <code>~/.gjc/agent/mcp.json</code></li>
+<li>Wiring: <code>deja install gjc</code> writes the server into <code>~/.gjc/agent/mcp.json</code>,</li>
 </ul>
-<p>and the skill into <code>~/.gjc/agent/skills/deja-history/SKILL.md</code>. Both paths</p>
+<p>the skill into <code>~/.gjc/agent/skills/deja-history/SKILL.md</code> and the <code>/deja</code></p>
+<p>command into <code>~/.gjc/agent/commands/deja.md</code>. The first two paths</p>
 <p>are from gjc&#39;s own surface table (<code>docs/customization.md</code>), and the skill</p>
 <p>location matters: gjc loads its native skills directory, while Claude&#39;s and</p>
 <p>Codex&#39;s are import candidates it does not read, so a skill written there</p>
 <p>would be a file no session ever sees.</p>
 <ul>
-<li>Auto-recall is <code>deja install gjc-auto</code>, and it is pi&#39;s extension unchanged:</li>
+<li>Auto-recall is <code>deja install gjc-auto</code>, which adds pi&#39;s extension unchanged</li>
 </ul>
+<p>at <code>~/.gjc/agent/extensions/deja.ts</code>:</p>
 <p><code>loadExtensionModules</code> in <code>src/discovery/builtin.ts</code> discovers modules in</p>
 <p><code>&lt;agent dir&gt;/extensions</code> (native <code>.gjc</code>/<code>.pi</code> only, a <code>*.ts</code> file or a</p>
 <p>directory with an index), and the events in</p>

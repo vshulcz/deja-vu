@@ -31,6 +31,9 @@ the wrong root.
 - **MCP**: `deja install roo` writes the server into `mcp_settings.json` for
   every host Roo has run in, and names deja's own tool in that entry's
   `alwaysAllow` — without it Roo asks before every recall.
+- **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`.
+- **Command**: `~/.roo/commands/deja.md`, invoked as `/deja`.
+- **Auto-recall**: none; Roo has no released lifecycle hooks.
 - **Resume**: `roo --session-id <uuid>`, run in the task's workspace, for tasks
   the CLI created. Editor tasks reopen from the extension's history UI.
 - **Handoff**: paste.

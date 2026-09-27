@@ -14,7 +14,7 @@
 
 <p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
 
-<p align="center"><b>deja 一开始就是满的：34 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
+<p align="center"><b>deja 一开始就是满的：35 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <p align="center">
 同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
@@ -83,7 +83,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 其他安装方式：`brew install deja-vu`、
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`，或者用
 `npx @vshulcz/deja-vu "查询词"` 先试试而不装任何东西。Windows 上安装脚本会退出并提示
-`unsupported OS`——它是 shell 脚本，请从
+`unsupported OS`——它是 shell 脚本。请用 `scoop install deja-vu`（在 Scoop 自带的 main bucket 里），或从
 [最新发布](https://github.com/vshulcz/deja-vu/releases/latest)取
 `deja-vu_<version>_windows_amd64.zip`，把 `deja.exe` 放进 `PATH`。
 
@@ -99,7 +99,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 | --- | --- |
 | **回溯式搜索** | `deja "connection pool exhausted"` 搜遍几个 GB，包括你安装 deja 之前的一切。自然语言提问会退化到相关性档位。时间是提示，不是过滤条件。 |
 | **跨智能体召回** | MCP 的 `deja` 工具用 `recall` 模式在任何一个智能体里都能回答「这个我们三周前修过」，不管当初是谁修的。 |
-| **压缩之后仍然在** | 在 43 次上下文压缩上实测：摘要保住了 77% 的决策和 0.2% 的你跑过的命令。其余 99.8% 由 deja 交回。在 Claude Code 和 Codex 上，压缩刚开始时 deja 就把任务、文件和命令记下来，下一个会话里一次性交回。 |
+| **压缩之后仍然在** | 在 43 次上下文压缩上实测：摘要保住了 77% 的决策和 0.2% 的你跑过的命令。其余 99.8% 由 deja 交回。在 Claude Code 和 Codex 上，压缩刚开始时 deja 就把任务、文件和命令记下来，压缩之后交回一次。 |
 | **在动手的那一刻召回** | 智能体改文件或跑命令之前，`PreToolUse` 钩子会说出这个文件此前的决定、这条命令能用的写法，或者这台机器上根本没有的那个程序。命令失败时，`PostToolUse` 钩子给出这台机器上同样报错之后跑过什么——那正是智能体不会主动去问的一对。 |
 | **索引的是活儿，不只是话** | 每一轮打开过的文件、跑过的命令及其退出码、以及一次编辑替换掉的确切片段。那正是所有摘要都会丢掉的部分。 |
 
@@ -147,7 +147,7 @@ $ deja "jwt refresh token"
 | `deja blame <路径>[:行号]` | 哪些会话讨论过这个文件、当时决定了什么、为什么。给出行号时：最后改动这一行的提交，以及写下这一行、或写下被这次提交替换的那段文本的会话。 |
 | `deja files <主题>` | 反方向：某个主题的工作实际动过哪些文件。 |
 | `deja how <工具>` | 这台机器实际怎么跑一件事，带真实参数，来自智能体此前跑过的命令。 |
-| `deja fix <报错>` | 这台机器上同样的报错之后跑过什么，且那次之后错误没有再出现。 |
+| `deja fix <报错>` | 这台机器上同样的报错之后跑过什么，且那次之后错误没有再出现。绝不会是 merge、force push 或删除。 |
 | `deja friction` | 命中三个以上不同会话的报错，并指出来自哪些工具。 |
 | `deja ctx <查询词>` | 最佳命中的 Markdown 摘要，可直接接进提示词。 |
 | `deja resume <id>` | 在原来的工具里重新打开找到的那个会话。 |

@@ -27,13 +27,15 @@ project directory names the project, and the header's cwd wins when it is there.
   sub-agents already use.
 - `service_tier_change` lines are not turns and are dropped rather than read as
   empty messages.
-- Wiring: `deja install gjc` writes the server into `~/.gjc/agent/mcp.json`
-  and the skill into `~/.gjc/agent/skills/deja-history/SKILL.md`. Both paths
+- Wiring: `deja install gjc` writes the server into `~/.gjc/agent/mcp.json`,
+  the skill into `~/.gjc/agent/skills/deja-history/SKILL.md` and the `/deja`
+  command into `~/.gjc/agent/commands/deja.md`. The first two paths
   are from gjc's own surface table (`docs/customization.md`), and the skill
   location matters: gjc loads its native skills directory, while Claude's and
   Codex's are import candidates it does not read, so a skill written there
   would be a file no session ever sees.
-- Auto-recall is `deja install gjc-auto`, and it is pi's extension unchanged:
+- Auto-recall is `deja install gjc-auto`, which adds pi's extension unchanged
+  at `~/.gjc/agent/extensions/deja.ts`:
   `loadExtensionModules` in `src/discovery/builtin.ts` discovers modules in
   `<agent dir>/extensions` (native `.gjc`/`.pi` only, a `*.ts` file or a
   directory with an index), and the events in

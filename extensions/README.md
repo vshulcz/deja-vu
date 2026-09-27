@@ -22,16 +22,18 @@ submitted.
 
 ## Publishing
 
-The release publishes the npm packages at the release's own version, so
-`opencode-deja@0.21.2` and `dsh-deja@0.21.2` are the ones built against
-`deja 0.21.2` — `scripts/release-npm.mjs` sets the version and the
-`@vshulcz/deja-vu` dependency together. Each package keeps its own `LICENSE`
-and `repository.directory` because npm publishes from that directory.
+The release publishes the four npm packages (opencode, dsh, openclaw, pi) at
+the release's own version, so `opencode-deja@0.21.2` and `dsh-deja@0.21.2` are
+the ones built against `deja 0.21.2` — `scripts/release-npm.mjs` sets the
+version and the `@vshulcz/deja-vu` dependency together, and the release
+workflow publishes the OpenClaw package to ClawHub at the same version. Each
+package keeps its own `LICENSE` and `repository.directory` because npm
+publishes from that directory.
 
-The two packages were versioned independently before this, so a release whose
-version is still behind what npm serves is skipped with a line saying so,
-rather than moving the `latest` tag backwards. They join the release version as
-soon as it passes them.
+Some of them were versioned independently before this. When npm already serves
+the release's version or a later one for a package, that package is published
+at the next patch of its own line instead, so the `latest` tag never moves
+backwards and the dependency still names this release's deja.
 
 Publishing by hand is still possible when a fix should not wait for a release:
 
@@ -57,7 +59,7 @@ The Kimi Code plugin has two routes, and both are ours to keep working. The
 repository form (`/plugins install https://github.com/vshulcz/deja-vu`) reads
 `kimi.plugin.json` at the repository root — the only reason that file exists —
 and records the release it came from, which is what Kimi's update check reads.
-The `kimi-deja.zip` release asset carries the same plugin at 16 KB for a
+The `kimi-deja.zip` release asset carries the same plugin in about 10 KB for a
 marketplace entry. `TestKimiManifestsAgree` keeps the two manifests one plugin.
 
 Kimi notifies about updates only for plugins installed from its own

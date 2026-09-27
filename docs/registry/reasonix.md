@@ -4,7 +4,7 @@
 - **Store (1.x)**: `<state>/projects/<workspace-slug>/sessions-v4/<id>/events.frames` per workspace, `<state>/sessions-v4/<id>/events.frames` for CLI hosts with no workspace, and `<state>/desktop-sessions-v5/by-id/<id>/events.frames` for the desktop app
 - **Store (JSONL)**: `<state>/projects/<workspace-slug>/sessions/<id>.jsonl` per workspace, and `<state>/sessions/<id>.jsonl` for sessions with none
 - **State root**: `$REASONIX_STATE_HOME`, else `$REASONIX_HOME`, else a `[storage] state` entry in `<home>/config.toml`, else `~/.reasonix` on macOS and Linux and `%APPDATA%\reasonix` on Windows
-- **Store (legacy)**: `~/.reasonix` on Windows, and the OS config directory (`~/Library/Application Support/reasonix`, `~/.config/reasonix`) on macOS and Linux — read while they are on disk, unless `REASONIX_HOME` or `REASONIX_STATE_HOME` is set
+- **Store (legacy)**: `~/.reasonix` on Windows, and the OS config directory (`~/Library/Application Support/reasonix`, `$XDG_CONFIG_HOME/reasonix`, `~/.config/reasonix`) on macOS and Linux — read while they are on disk, unless `REASONIX_HOME`, `REASONIX_STATE_HOME` or `DEJA_REASONIX_ROOT` is set
 - **Read overrides**: `DEJA_REASONIX_ROOT` replaces the state root; pointed at a `sessions` directory it reads that directory alone
 - **Format**: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope
 - **Needs**: the `zstd` CLI for 1.x sessions; nothing for JSONL

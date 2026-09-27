@@ -86,7 +86,7 @@ Le skill appelle le binaire `deja` que vous avez installé, il n'en embarque pas
 Autres moyens : `brew install deja-vu`,
 `go install github.com/vshulcz/deja-vu/cmd/deja@latest`, ou `npx @vshulcz/deja-vu "requête"` pour essayer sans
 rien installer. Sous Windows, le script d'installation s'arrête sur `unsupported OS` : c'est un script shell.
-Prenez `deja-vu_<version>_windows_amd64.zip` dans la
+Utilisez `scoop install deja-vu` (il est dans le bucket main de Scoop), ou prenez `deja-vu_<version>_windows_amd64.zip` dans la
 [dernière release](https://github.com/vshulcz/deja-vu/releases/latest) et mettez `deja.exe` dans le `PATH`.
 
 Le binaire seul est déjà une installation complète : indexation, recherche, `show`, `ctx`, `blame`, `--json` et
@@ -95,14 +95,14 @@ vos agents et activer le rappel au démarrage de session. Ça vaut le coup, mais
 
 ## Ce que ça apporte
 
-**Résolu dans Codex, retenu par Claude.** Trente-quatre agents de code écrivent chaque conversation dans des
+**Résolu dans Codex, retenu par Claude.** Trente-cinq agents de code écrivent chaque conversation dans des
 fichiers locaux, et deja transforme ces fichiers en une couche de mémoire qu'ils peuvent tous lire.
 
 | | |
 | --- | --- |
 | **Recherche vers le passé** | `deja "connection pool exhausted"` parcourt des gigaoctets, y compris tout ce qui précède l'installation de deja. Une question en langage naturel bascule sur le mode pertinence. Le temps est un indice, pas un filtre. |
 | **Rappel entre agents** | L'outil MCP `deja` en mode `recall` répond « on a corrigé ça il y a trois semaines » depuis n'importe quel agent, peu importe qui l'avait corrigé. |
-| **Survit au compactage** | Mesuré sur 43 compactages : le résumé a gardé 77 % des décisions et 0.2 % des commandes que vous avez lancées. Les 99.8 % restants, deja les rend. Dans Claude Code et Codex, deja note la tâche, les fichiers et les commandes au moment où le compactage commence, et les restitue d'un bloc à la session suivante. |
+| **Survit au compactage** | Mesuré sur 43 compactages : le résumé a gardé 77 % des décisions et 0.2 % des commandes que vous avez lancées. Les 99.8 % restants, deja les rend. Dans Claude Code et Codex, deja note la tâche, les fichiers et les commandes au moment où le compactage commence, et les restitue une fois, juste après. |
 | **Rappel au moment d'agir** | Avant que l'agent modifie un fichier ou lance une commande, le hook `PreToolUse` dit ce qui avait été décidé sur ce fichier, quelle forme de cette commande marche ici, ou que le programme n'existe tout simplement pas sur cette machine. Quand une commande échoue, le hook `PostToolUse` montre ce qui a été lancé après la même erreur sur cette machine : exactement la paire que l'agent ne demandera pas. |
 | **Indexe le travail, pas seulement les mots** | Chaque fichier ouvert à chaque tour, chaque commande lancée avec son code de sortie, et le fragment exact qu'une édition a remplacé. Précisément ce que tout résumé perd. |
 
@@ -160,7 +160,7 @@ $ deja "jwt refresh token"
 | `deja blame <chemin>[:ligne]` | Quelles sessions ont discuté ce fichier, ce qui a été décidé et pourquoi. Avec un numéro de ligne : le commit qui l'a modifiée en dernier, et la session qui a écrit cette ligne ou le texte que ce commit a remplacé. |
 | `deja files <sujet>` | Dans l'autre sens : quels fichiers le travail sur un sujet a réellement touchés. |
 | `deja how <outil>` | Comment cela se lance vraiment sur cette machine, avec de vrais arguments, tirés des commandes que les agents ont déjà exécutées. |
-| `deja fix <erreur>` | Ce qui a été lancé après la même erreur sur cette machine, et après quoi l'erreur n'est pas revenue. |
+| `deja fix <erreur>` | Ce qui a été lancé après la même erreur sur cette machine, et après quoi l'erreur n'est pas revenue. Jamais un merge, un force push ni une suppression. |
 | `deja friction` | Les erreurs qui touchent trois sessions différentes ou plus, avec les outils d'où elles viennent. |
 | `deja ctx <requête>` | Résumé Markdown des meilleurs résultats, prêt à être collé dans un prompt. |
 | `deja resume <id>` | Rouvre la session trouvée dans l'outil auquel elle appartient. |
@@ -305,7 +305,7 @@ La [comparaison complète](https://vshulcz.github.io/deja-vu/guide/compare.html)
 
 **Où est l'historique de sessions de Claude Code, et peut-on le chercher ?** Dans `~/.claude/projects`, un
 fichier JSONL par session ; Codex dans `~/.codex/sessions`, Cursor dans le SQLite `state.vscdb`. `deja search`
-les lit sur place, `deja last` liste la session la plus récente de chaque agent, et `deja view` ouvre tout
+les lit sur place, `deja last` liste les sessions récentes de tous les agents, et `deja view` ouvre tout
 l'historique comme une page locale. Les chemins par agent sont dans
 [où sont stockées les sessions](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 

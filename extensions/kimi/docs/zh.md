@@ -11,15 +11,7 @@
 /reload
 ```
 
-这种写法会锁定最新的发布版并记录来源，而这正是 Kimi 的更新检查所读取的内容。还有一个 `kimi-deja.zip` 发布资源——16 KB，而不是 3 MB 的整个仓库——适合市场条目，或者不希望拉下整个项目的安装方式。
-
-## 更新
-
-Kimi 只会提示从它自己市场安装的插件有更新。对于从仓库安装的情况，再跑一次 `/plugins install` 就会拉取当前的发布版；而当你手上这份落后于这个 deja 附带的版本时，`deja doctor` 会说明：
-
-```
-kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
-```
+这种写法会锁定最新的发布版并记录来源，而这正是 Kimi 的更新检查所读取的内容。还有一个 `kimi-deja.zip` 发布资源——约 10 KB，而不是整个仓库——适合市场条目，或者不希望拉下整个项目的安装方式。
 
 如果还没有可执行文件，装一下：
 
@@ -28,6 +20,14 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 ```
 
 插件从托管副本加载，所以装完之后请执行 `/reload` 或 `/new`。
+
+## 更新
+
+Kimi 只会提示从它自己市场安装的插件有更新。对于从仓库安装的情况，再跑一次 `/plugins install` 就会拉取当前的发布版；而当你手上这份落后于这个 deja 附带的版本时，`deja doctor` 会说明：
+
+```
+kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
+```
 
 ## 提供的能力
 

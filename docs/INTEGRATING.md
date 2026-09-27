@@ -41,7 +41,7 @@ npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com
 `deja install --auto` wires everything it finds. If your tool owns the agent's
 configuration and would rather write one entry at a time, `deja install
 <target>` takes named targets — `deja install --help` prints the list, which is
-fifty-odd of them — and `--all` is `--auto` without the session-start hook.
+sixty-odd of them — and `--all` wires the MCP entry for every agent found, without the hooks and plugins `--auto` adds (targets already wired with `--auto` keep theirs).
 
 ## The MCP server
 
@@ -75,7 +75,7 @@ And the one that earns its place in a wrapper: what this machine ran after the
 error your tool just caught.
 
 ```sh
-deja fix "$stderr_line" --json | jq -r '.[0].command // empty'
+deja fix "$stderr_line" --json | jq -r '.fixes[0].command // empty'
 ```
 
 ## The hook contracts
@@ -129,7 +129,7 @@ It is an environment variable rather than a flag because hooks and the MCP
 server are started by somebody else's process, and there is no command line of
 yours to put a flag on.
 
-The recipe before this was a loop over the 46 `DEJA_*_ROOT`/`_DB` names
+The recipe before this was a loop over the 48 `DEJA_*` store variables
 in the published registry, and it leaked twice: the notes store is not in that
 registry, because it is not a harness, so the loop left it pointing at the
 developer's own notes — and `deja doctor --json` is no help either, since its

@@ -15,7 +15,9 @@ seconds) and `content` blocks (`type: text` only for v1). SQLite: `sessions` joi
 `messages` on `session_id`; `content_json` is a JSON array of content blocks.
 
 - **MCP**: `deja install goose` adds the server as an extension in
-  `~/.config/goose/config.yaml`.
+  `~/.config/goose/config.yaml` (`$XDG_CONFIG_HOME/goose`,
+  `%APPDATA%\Block\goose\config` on Windows, `$GOOSE_PATH_ROOT/config` when
+  that is set).
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`.
 - **Command**: Goose declares commands in the same config rather than a
   commands directory, so `/deja` is a recipe entry there.

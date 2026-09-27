@@ -4,6 +4,7 @@
 - **Store**: `${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/<agentId>/agent/openclaw-agent.sqlite` since OpenClaw 2026.8 — session rows and transcript events in one per-agent SQLite database; before that, `agents/<agentId>/sessions/<sessionId>.jsonl`, one append-only pi-format transcript per session, which the upgrade migrates into the database and leaves behind as an archive
 - **Read override**: `DEJA_OPENCLAW_ROOT` (agents root), `OPENCLAW_STATE_DIR` (OpenClaw's own state override, also honored)
 - **Format**: SQLite (`transcript_events.event_json`, one pi-format line per row, `session_windows` marking reset and rollover boundaries) or JSONL, append-cheap incremental parse from offset
+- **Needs**: the `sqlite3` CLI for the SQLite store, `zstd` for `.zst` delete archives
 
 OpenClaw's agent runtime is pi-lineage, so transcripts share pi's line shape:
 a `{"type":"session"}` header (id, timestamp, optional cwd) followed by
@@ -38,12 +39,24 @@ against a 2026.8.2 store and openclaw source
   `mcp.servers` (OpenClaw's own layout, not the common `mcpServers` root).
   Live-verified: `openclaw mcp probe deja` reports the tools and the agent
   calls `recall` mid-turn.
+- **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. OpenClaw
+  offers a skill as a command, so the skill is also `/deja-history`.
+- **Auto-recall**: `deja install openclaw-auto` adds the MCP entry, a plugin
+  at `<state>/extensions/deja` (enabled under `plugins.entries` in
+  `openclaw.json`) and a hook pack at `<state>/hooks/deja-recall` (with
+  `hooks.internal.enabled` set). The plugin puts the session digest in front
+  of the first turn at `agent_turn_prepare`, per-prompt recall at
+  `before_prompt_build`, and at `before_compaction` clears the list of blocks
+  already shown so recall can send them again. The hook pack
+  adds the digest at `agent:bootstrap`, which fires only in gateway mode.
 - **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
   conversation by key (`agent:<id>:<name>`); the uuid its transcript is named
   after opens nothing, and the mapping lives in `sessions.json` beside the
   transcripts. deja reads the key from there. Live-verified: the terminal UI
   came up on `agent:main:main` with that session's history, and a run through
-  `openclaw agent --session-id` answered from it.
+  `openclaw agent --session-id` answered from it. The lookup reads the
+  `sessions.json` beside a JSONL transcript, so a session read from the
+  SQLite store gets no command.
 - **Handoff**: paste.
 
 **Last verified:** 2026-09-02

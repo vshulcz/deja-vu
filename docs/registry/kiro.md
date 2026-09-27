@@ -59,9 +59,9 @@ directory per session under the workspace, holding `session.json` (id, model,
   tool and stops rather than carrying the full skill deja writes where a skill
   is loaded on demand.
 - Auto-recall is still a gap, and not for lack of a hook system: Kiro's agent
-  hooks are per-workspace and fire on file events, not before a prompt, and
-  its steering files (`.kiro/steering/*.md`) are per-workspace too. Both need
-  a per-project install, which deja does not have yet.
+  hooks are per-workspace and fire on file events, not before a prompt, so
+  they need a per-project install, which deja does not have yet. The global
+  steering file above names the tool; it does not carry recall.
 
 ## Measured on a live install
 

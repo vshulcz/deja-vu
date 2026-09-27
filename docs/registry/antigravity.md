@@ -12,9 +12,11 @@ Each line has a source, content, and creation time:
 {"source":"USER_EXPLICIT","created_at":"2026-07-17T09:00:00Z","content":"<USER_REQUEST>Check the build.<ADDITIONAL_METADATA>{\"cwd\":\"/work/api\"}</ADDITIONAL_METADATA></USER_REQUEST>"}
 ```
 
-`USER_EXPLICIT` maps to `user` and `MODEL` maps to `assistant`. Other sources are ignored. `created_at` is RFC 3339. The directory below `brain` is the session ID; the transcript does not currently provide project metadata, so deja records `-`.
+`USER_EXPLICIT` maps to `user`; other sources except `MODEL` are ignored. A `MODEL` line is split by its `type`: `PLANNER_RESPONSE` (or no type) is assistant text, `RUN_COMMAND` and `GENERIC` give a command record from their `Task Description:` line, and `VIEW_FILE`, `CODE_ACTION` and `LIST_DIRECTORY` give a file record for the path they name. The body of a tool step, minus its `Created At:`/`Completed At:` header, is kept as tool output. `created_at` is RFC 3339. The directory below `brain` is the session ID.
 
-Before indexing user text, deja removes the outer `<USER_REQUEST>` wrapper and complete `<ADDITIONAL_METADATA>` and `<USER_SETTINGS_CHANGE>` blocks. Assistant content is retained as written. Content is capped at 64 KiB.
+The transcript carries no workspace. deja takes the project from the IDE's `cache/conversation_metadata.json` (`WorkspaceURIs`), then from the CLI's `cache/last_conversations.json`, and failing both from the deepest directory shared by the absolute paths the session touched; otherwise it records `-`.
+
+Before indexing user text, deja removes the outer `<USER_REQUEST>` wrapper, complete `<ADDITIONAL_METADATA>` and `<USER_SETTINGS_CHANGE>` blocks, and the `Comments on artifact URI:` lines the IDE adds when a plan is approved or rejected. Content is capped at 1 MiB per message.
 
 A tool step names its file in a sentence ("The following changes were made by
 the replace_file_content tool to: `<path>`"), not on a labelled line, and

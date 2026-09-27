@@ -50,8 +50,7 @@ the one above.
 - No hook surface for a third party, so auto-recall is recorded as impossible
   rather than as a gap someone could close: the agent sessions run inside the
   Electron app, and the extension points are the MCP server list and its import
-  paths. Same for slash commands. A skill channel was not found either — the
-  guidance reaches the model through the MCP tool descriptions.
+  paths. Same for slash commands.
 
 ## The import file, checked against the app's own validator
 

@@ -53,7 +53,7 @@ Messages use a wrapper envelope:
 | --- | --- |
 | `user` | `user` |
 | `assistant` | `assistant` |
-| `toolResult` | skipped (tool output, not conversational) |
+| `toolResult` | tool output (`RoleToolOutput`) |
 
 ### Content
 
@@ -74,6 +74,14 @@ The `id` field from the session header line is used as the session ID. The UUID 
 ## MCP
 
 pi does not include built-in MCP but supports it via the `pi-mcp-adapter` package (`pi install npm:pi-mcp-adapter`). The adapter reads `~/.pi/agent/mcp.json` with the standard `mcpServers` shape. `deja install pi` writes to that file.
+
+## Skill, auto-recall, command
+
+The skill is the shared `~/.agents/skills/deja-history/SKILL.md`; pi scans that directory, and a second copy in `~/.pi/agent/skills` makes it report a collision, so install removes one an older deja left there.
+
+`deja install pi-auto` writes the MCP entry and `~/.pi/agent/extensions/deja.ts`. The extension returns the session digest on the first turn and per-prompt recall after that at `before_agent_start`, adds to a `tool_result` a file's history after a `read` or the earlier fix after a failed `bash` command, runs `deja hook-precompact` at `session_compact`, and registers `/deja <query>`, which runs `deja search`.
+
+`deja resume` prints `pi --session <id>`, run in the project directory when the encoded name still resolves.
 
 ## Known quirks and drift
 

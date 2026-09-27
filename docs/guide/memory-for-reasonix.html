@@ -134,7 +134,7 @@
 <h1>Adding memory to Reasonix</h1>
 <p class="pagelede">it can resume one session; nothing reads the others back<span class="mins" data-mins></span></p>
 
-<p>Reasonix keeps every session under <code>~/.reasonix</code> (or <code>$REASONIX_HOME</code>) and resumes one with <code>--resume</code>. A new session reads none of the others, and nothing in it knows about the Claude Code session in the same repo yesterday. This page is about adding that.</p>
+<p>Reasonix keeps every session under <code>~/.reasonix</code> (<code>%APPDATA%\reasonix</code> on Windows; <code>$REASONIX_STATE_HOME</code> or <code>$REASONIX_HOME</code> moves it) and resumes one with <code>--resume</code>. A new session reads none of the others, and nothing in it knows about the Claude Code session in the same repo yesterday. This page is about adding that.</p>
 
 <h2>What Reasonix already has</h2>
 <p>The session store, a way back into one session, and a plugin system: a package with a <code>reasonix-plugin.json</code> manifest can carry MCP servers, skills, slash commands and a runtime extension that the host starts beside the session. Its hooks run, but on 1.39.1 only what a <code>SessionStart</code> hook prints reaches the model; the output of the per-prompt and per-tool hooks is dropped. So recall has to go through the extension.</p>
@@ -152,7 +152,7 @@
 
 <h2>What arrives, and where</h2>
 <p>On a session's first prompt, a short digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred. On a prompt your own history already answers, that answer. Both are appended to the user turn, not the system prompt: Reasonix is built around DeepSeek's prefix cache, and a system prompt that changes every turn would miss it every turn. Appended to the turn, the text stays byte-identical in every later request's prefix. Reasonix stores what you typed separately, and that is what deja indexes, so recall does not feed back into the index.</p>
-<p>When a command fails, the tool result the model reads carries what followed that same error here before. When the conversation is compacted, deja adds its record of the folded turns — the objective, the conclusions, each command with how it went — to the summarizer's instructions. While the first index builds, the status line says so; once per session a line says how many past sessions were recalled.</p>
+<p>After a shell command or a file write, the tool result the model reads carries one line on what this machine already knows about that command or file, and when a command failed, what followed that same error here before. Reasonix gives no seam before a tool runs that can add text, so the line arrives with the result. When the conversation is compacted, deja adds its record of the folded turns — the objective, the conclusions, each command with how it went — to the summarizer's instructions. While the first index builds, the status line says so; once per session a line says how many past sessions were recalled.</p>
 <p>Each answer has a budget under the host's own timeout. A slow or failed lookup, or one with nothing to say, leaves the turn exactly as Reasonix built it. On a test machine with a warm index, eight TUI turns took a median of 131 ms for that step, against 120 ms for deja's per-prompt hook run directly on the same prompts.</p>
 
 <h2>The part that is not about Reasonix</h2>

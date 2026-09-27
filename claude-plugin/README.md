@@ -8,7 +8,7 @@ claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@d
 ```
 
 It carries deja's MCP server, the `deja-history` skill, the `/deja` command and
-the session-start, pre-compact, pre-tool and post-failure hooks — the same
+the session-start, per-prompt, pre-compact, pre-tool and post-failure hooks — the same
 wiring `deja install --auto` writes, packaged the way those harnesses install
 things.
 
