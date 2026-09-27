@@ -17,13 +17,19 @@ oturumları indeksler ve soran hangisiyse ona doğru olanı geri verir.</p>
 
 <p align="center"><b>deja ilk dakikadan itibaren dolu: 35 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
 
-<p align="center">
-Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
-<sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 103,443'e karşı 52,815 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">bir işi bitirmenin maliyeti</a> &middot;
-her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerinde dakikalar içinde koşuyor &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">sayıları kendiniz doğrulayın</a></sub>
-</p>
+<p align="center"><b>Ölçebildiğimiz kodlama ajanı hafızaları arasında en isabetlisi, çalıştırması en ucuzu ve en hızlısı.</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">En isabetli<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı · MemPalace %96.6, agentmemory %95.2<br>aynı 19,195 oturumda: 100 sorudan 19'u ilk sırada, en yakını 14</sub></td>
+<td align="center" width="33%">En ucuz<br>agentmemory'nin <b>yarısı kadar token</b><br><sub>zaten çözülmüş bir görevde 104,974'e karşı 53,558<br>tur başına 477 token araç tanımı, yedi sunucunun en azı</sub></td>
+<td align="center" width="33%">En hızlı<br>19,195 oturumu <b>17.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu'yu ben geliştiriyorum; bu yüzden tüm sürücüler, derlem ve puanlama kuralı bu depoda &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">birebir karşılaştırma ve şüphelendiğiniz bir satırı yeniden ölçme</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval ve LoCoMo çalıştırmaları</a></sub></p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | Türkçe | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -229,6 +235,14 @@ sözcüksel arama ve MCP geri çağırma her zamanki gibi çalışır.
 
 ## Kanıt
 
+<p>
+Bu makinenin daha önce çözdüğü bir işte <b>%58 daha az token</b> &middot; LongMemEval-S üzerinde (470 soruluk temizlenmiş küme) <b>%88.1 hit@1</b> &middot; LoCoMo üzerinde <b>%70.5</b> &middot; gigabaytlarca geçmişte <b>milisaniyelik</b> sorgular<br>
+<sub>Kol başına on bir çalıştırma: hiçbir şey bağlı değilken 126,222'ye karşı 53,558 token; sonraki bir sürümde yine on birer çalıştırma: 103,443'e karşı 52,815 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">bir işi bitirmenin maliyeti</a> &middot;
+her iki erişim değerlendirme düzeneği de bu depoda ve açık veri kümelerinde dakikalar içinde koşuyor &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">sayıları kendiniz doğrulayın</a></sub>
+</p>
+
 ```sh
 deja bench recall     # sıralama gerilemesi için alt sınır: 100 sorgu, yarısı Rusça, geri çağırma düşerse CI kırılır
 deja bench context    # tohumlu 30 görev zinciri ve beş olumsuz kontrol
@@ -273,20 +287,41 @@ okur. Ayrıntılar [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) dosyasınd
 
 ## Sık sorulanlar
 
-**Makinemden bir şey çıkıyor mu?** Siz istemedikçe hayır.
+<details>
+<summary><b>Makinemden bir şey çıkıyor mu?</b></summary>
+
+Siz istemedikçe hayır.
 [Veri akışları](../../docs/SECURITY-MODEL.md#data-flows) bölümüne bakın.
 
-**Günlüklerde zaten duran sırlar ne olacak?** Onlar özgün aracın dosyalarında kalır, sizin ajanınızın
+</details>
+
+<details>
+<summary><b>Günlüklerde zaten duran sırlar ne olacak?</b></summary>
+
+Onlar özgün aracın dosyalarında kalır, sizin ajanınızın
 verisidir. deja'nın indeksine, özetlerine, share'ine veya sync dışa aktarımına girmezler.
 
-**Ajanımı yavaşlatır mı?** Bir geri çağırma, yerel indekse yapılan sözcüksel bir sorgudur: ortanca 0.7–0.8 ms
+</details>
+
+<details>
+<summary><b>Ajanımı yavaşlatır mı?</b></summary>
+
+Bir geri çağırma, yerel indekse yapılan sözcüksel bir sorgudur: ortanca 0.7–0.8 ms
 ve hiçbir şey model beklemez. Kanca, süreç başlatmayı ve depoların tazelik denetimini ekler; birkaç gigabaytlık
 bir depoda onlarca milisaniye.
 
-**Çalışma şeklimi değiştirmem gerekir mi?** Hayır. Geri çağırmayı ajanın kendisi çağırır; otomatik geri çağırma
+</details>
+
+<details>
+<summary><b>Çalışma şeklimi değiştirmem gerekir mi?</b></summary>
+
+Hayır. Geri çağırmayı ajanın kendisi çağırır; otomatik geri çağırma
 açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştırıldığını zaten bilir.
 
-**Diğer bellek araçlarından farkı ne?**
+</details>
+
+<details>
+<summary><b>Diğer bellek araçlarından farkı ne?</b></summary>
 
 | | deja | Bellek platformları<br>(Mem0, Letta, memU) | Oturum araması<br>(cass) |
 | --- | :-: | :-: | :-: |
@@ -297,24 +332,39 @@ açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştır
 
 [Tam karşılaştırma](https://vshulcz.github.io/deja-vu/guide/compare.html) bunlardan on beş tanesini kapsıyor.
 
-**Claude Code oturum geçmişi nerede ve aranabilir mi?** `~/.claude/projects` altında, oturum başına bir JSONL
+</details>
+
+<details>
+<summary><b>Claude Code oturum geçmişi nerede ve aranabilir mi?</b></summary>
+
+`~/.claude/projects` altında, oturum başına bir JSONL
 dosyası; Codex `~/.codex/sessions` altında, Cursor ise SQLite `state.vscdb` içinde. `deja search` bunları
 yerinde okur, `deja last` tüm ajanların son oturumlarını listeler, `deja view` ise tüm geçmişi yerel bir sayfa
 olarak açar. Ajan başına yollar
 [oturumların saklandığı yer](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 sayfasında.
 
-**Claude Code geçmişim kayboldu, gitti mi?** Claude Code 30 günden eski kayıtları siler
+</details>
+
+<details>
+<summary><b>Claude Code geçmişim kayboldu, gitti mi?</b></summary>
+
+Claude Code 30 günden eski kayıtları siler
 (`~/.claude/settings.json` içindeki `cleanupPeriodDays`) ve `claude --resume` yalnızca kalanları listeler.
 deja'nın temizlikten önce indekslediği oturumlar, dosya kaybolduktan sonra da aranabilir kalır. Ayrıntılar
 [diskteki oturum dosyaları](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) sayfasında.
 
-**Her şeyi nasıl silerim?**
+</details>
+
+<details>
+<summary><b>Her şeyi nasıl silerim?</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## Kılavuzlar
 

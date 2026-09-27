@@ -17,13 +17,19 @@ deja는 Claude Code, Codex, Cursor를 비롯해 이 컴퓨터의 모든 에이�
 
 <p align="center"><b>deja는 처음부터 가득 차 있습니다. 35개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
 
-<p align="center">
-이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.1%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
-<sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 이후 빌드에서 다시 11회 실행: 103,443 대비 52,815 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">작업 하나를 끝내는 비용</a> &middot;
-검색 평가 하네스 두 개 모두 이 저장소에 있고 공개 데이터셋에서 몇 분이면 돕니다 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">숫자를 직접 확인하세요</a></sub>
-</p>
+<p align="center"><b>우리가 측정할 수 있었던 코딩 에이전트 메모리 중 가장 정확하고, 가장 저렴하고, 가장 빠릅니다.</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">가장 정확<br>LongMemEval-S <b>97.2% R@5</b><br><sub>전체 500문항 · MemPalace 96.6%, agentmemory 95.2%<br>같은 19,195개 세션: 1순위 적중 19/100, 차순위 14</sub></td>
+<td align="center" width="33%">가장 저렴<br>agentmemory의 <b>절반 토큰</b><br><sub>이미 해결한 작업에서 53,558 대 104,974<br>도구 정의는 턴당 477토큰, 7개 중 최소</sub></td>
+<td align="center" width="33%">가장 빠름<br>19,195개 세션 인덱싱 <b>17.6초</b><br><sub>7개 도구 중 차순위: 72초<br>첫 응답 26ms, 검색 중앙값 97ms</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu는 제가 관리하므로 모든 드라이버, 코퍼스, 채점 규칙이 이 저장소에 있습니다 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">직접 비교와 의심스러운 행을 다시 돌리는 방법</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 및 LoCoMo 실행 결과</a></sub></p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | 한국어 | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -223,6 +229,14 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed.
 
 ## 근거
 
+<p>
+이 컴퓨터가 이미 해결한 작업에서 <b>토큰 58% 절감</b> &middot; LongMemEval-S(470문항 정제 세트)에서 <b>hit@1 88.1%</b> &middot; LoCoMo에서 <b>70.5%</b> &middot; 수 기가바이트 기록을 <b>밀리초</b> 단위로 조회<br>
+<sub>한쪽당 11회 실행: 53,558 토큰 대 아무것도 연결하지 않았을 때의 126,222, 이후 빌드에서 다시 11회 실행: 103,443 대비 52,815 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">작업 하나를 끝내는 비용</a> &middot;
+검색 평가 하네스 두 개 모두 이 저장소에 있고 공개 데이터셋에서 몇 분이면 돕니다 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">숫자를 직접 확인하세요</a></sub>
+</p>
+
 ```sh
 deja bench recall     # 랭킹 회귀의 하한: 질의 100개, 절반은 러시아어, 회상이 떨어지면 CI 실패
 deja bench context    # 시드가 있는 작업 사슬 30개와 음성 대조군 5개
@@ -266,20 +280,41 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 
 ## 자주 묻는 질문
 
-**뭔가 내 컴퓨터를 떠나나요?** 직접 요청하지 않는 한 아닙니다.
+<details>
+<summary><b>뭔가 내 컴퓨터를 떠나나요?</b></summary>
+
+직접 요청하지 않는 한 아닙니다.
 [데이터 흐름](../../docs/SECURITY-MODEL.md#data-flows)을 보세요.
 
-**이미 로그에 있는 비밀정보는요?** 그건 원래 도구의 파일에 남습니다. 여러분 에이전트의 데이터니까요.
+</details>
+
+<details>
+<summary><b>이미 로그에 있는 비밀정보는요?</b></summary>
+
+그건 원래 도구의 파일에 남습니다. 여러분 에이전트의 데이터니까요.
 deja의 색인, 요약, share, sync 내보내기에는 들어가지 않습니다.
 
-**에이전트가 느려지나요?** 회상 한 번은 로컬 색인에 대한 어휘 질의입니다. 중앙값 0.7–0.8 ms이고
+</details>
+
+<details>
+<summary><b>에이전트가 느려지나요?</b></summary>
+
+회상 한 번은 로컬 색인에 대한 어휘 질의입니다. 중앙값 0.7–0.8 ms이고
 모델을 기다리는 것은 없습니다. 훅은 프로세스 시작과 저장소 신선도 확인을 더하는데, 수 기가바이트 저장소에서
 수십 밀리초입니다.
 
-**일하는 방식을 바꿔야 하나요?** 아니요. 회상은 에이전트가 스스로 호출합니다. 자동 회상을 켜면 세션이
+</details>
+
+<details>
+<summary><b>일하는 방식을 바꿔야 하나요?</b></summary>
+
+아니요. 회상은 에이전트가 스스로 호출합니다. 자동 회상을 켜면 세션이
 열리는 순간 이 프로젝트에서 전에 무엇을 결정했는지 이미 알고 있습니다.
 
-**다른 기억 도구와 무엇이 다른가요?**
+</details>
+
+<details>
+<summary><b>다른 기억 도구와 무엇이 다른가요?</b></summary>
 
 | | deja | 기억 플랫폼<br>(Mem0, Letta, memU) | 세션 검색<br>(cass) |
 | --- | :-: | :-: | :-: |
@@ -290,23 +325,38 @@ deja의 색인, 요약, share, sync 내보내기에는 들어가지 않습니다
 
 [전체 비교](https://vshulcz.github.io/deja-vu/guide/compare.html)에서 열다섯 개를 다룹니다.
 
-**Claude Code 세션 기록은 어디 있고 검색할 수 있나요?** `~/.claude/projects` 아래, 세션마다 JSONL 파일
+</details>
+
+<details>
+<summary><b>Claude Code 세션 기록은 어디 있고 검색할 수 있나요?</b></summary>
+
+`~/.claude/projects` 아래, 세션마다 JSONL 파일
 하나입니다. Codex는 `~/.codex/sessions`, Cursor는 SQLite의 `state.vscdb`입니다. `deja search`는 그것들을
 제자리에서 읽고, `deja last`는 에이전트별 최근 세션을 보여 주며, `deja view`는 전체 기록을 로컬 페이지
 하나로 엽니다. 도구별 경로는
 [세션이 저장되는 곳](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)에 있습니다.
 
-**Claude Code 세션 기록이 사라졌는데 잃어버린 건가요?** Claude Code는 30일이 지난 기록을 지웁니다
+</details>
+
+<details>
+<summary><b>Claude Code 세션 기록이 사라졌는데 잃어버린 건가요?</b></summary>
+
+Claude Code는 30일이 지난 기록을 지웁니다
 (`~/.claude/settings.json`의 `cleanupPeriodDays`). `claude --resume`은 남은 것만 보여 줍니다. 정리 전에
 deja가 색인한 세션은 파일이 사라진 뒤에도 검색됩니다. 자세한 내용은
 [디스크의 세션 파일](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)에 있습니다.
 
-**전부 지우려면?**
+</details>
+
+<details>
+<summary><b>전부 지우려면?</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## 가이드
 

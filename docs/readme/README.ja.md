@@ -19,15 +19,21 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
 
 <p align="center">しかも、誰かが頼む必要もありません。リコールはセッション開始時、プロンプトごと、
 ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
-何が取り除かれ、何は取り除けないのかは[セキュリティモデル](../../docs/SECURITY-MODEL.md)に書いてあります。</p>
+何が取り除かれ、何は取り除けないのかは<a href="../../docs/SECURITY-MODEL.md">セキュリティモデル</a>に書いてあります。</p>
 
-<p align="center">
-このマシンが一度解いた作業では <b>token が 58% 少ない</b> &middot; LongMemEval-S（470 問のクリーン版）で <b>88.1% hit@1</b> &middot; LoCoMo で <b>70.5% retrieval hit@1</b> &middot; 数 GB の履歴に対して<b>ミリ秒</b>単位の検索<br>
-<sub>各アーム 11 回の実行で 53,558 token、記憶をつながない場合の 126,222 に対して。後のビルドで再び各 11 回：103,443 に対して 52,815 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">1 つの作業を終えるまでの費用</a> &middot;
-検索側のハーネスはどちらもこのリポジトリに含まれており、公開データセット上で数分で実行できます &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">数字をご自身で確かめてください</a></sub>
-</p>
+<p align="center"><b>私たちが測定できたコーディングエージェント向けメモリの中で、最も正確で、最も安く、最も速い。</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">最も正確<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
+<td align="center" width="33%">最も安い<br>agentmemory の<b>半分のトークン</b><br><sub>解決済みのタスクで 53,558 対 104,974<br>ツール定義は 1 ターン 477 トークン、7 つの中で最少</sub></td>
+<td align="center" width="33%">最も速い<br>19,195 セッションを <b>17.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu は私がメンテナンスしているため、ドライバ、コーパス、採点ルールはすべてこのリポジトリにあります &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">直接比較と、疑わしい行の再実行方法</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval と LoCoMo の実行結果</a></sub></p>
 
 <p align="center">
   <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -402,6 +408,14 @@ deja embed
 
 ## 検証
 
+<p>
+このマシンが一度解いた作業では <b>token が 58% 少ない</b> &middot; LongMemEval-S（470 問のクリーン版）で <b>88.1% hit@1</b> &middot; LoCoMo で <b>70.5% retrieval hit@1</b> &middot; 数 GB の履歴に対して<b>ミリ秒</b>単位の検索<br>
+<sub>各アーム 11 回の実行で 53,558 token、記憶をつながない場合の 126,222 に対して。後のビルドで再び各 11 回：103,443 に対して 52,815 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">1 つの作業を終えるまでの費用</a> &middot;
+検索側のハーネスはどちらもこのリポジトリに含まれており、公開データセット上で数分で実行できます &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">数字をご自身で確かめてください</a></sub>
+</p>
+
 ```sh
 deja bench recall     # ranking floor: 100 queries, half Russian, CI fails if recall drops
 deja bench context    # 30 seeded task chains plus five negative controls
@@ -464,24 +478,45 @@ deja bench read       # what it costs to read a database-backed store, and what 
 
 ## FAQ
 
-**何かがマシンの外に送られますか？** いいえ、あなたが指示しない限り送られません。
+<details>
+<summary><b>何かがマシンの外に送られますか？</b></summary>
+
+いいえ、あなたが指示しない限り送られません。
 [データフロー](../../docs/SECURITY-MODEL.md#data-flows)を参照してください。
 
-**すでにログに含まれているシークレットはどうなりますか？** それらは元のハーネスのファイル——つまり
+</details>
+
+<details>
+<summary><b>すでにログに含まれているシークレットはどうなりますか？</b></summary>
+
+それらは元のハーネスのファイル——つまり
 エージェントのデータ——に残ります。`deja secrets` がそれを含むセッションを示すので、ローテーションや削除が
 できます。`--scrub` は届く範囲のトランスクリプトを書き換えます。既知の形式——AWS キー、`api_key=`/`token=` の代入、Bearer トークンや裸の JWT、PEM ブロック、
 各プロバイダーのトークン、高エントロピー値——はインデックス作成時に取り除かれるので、ダイジェスト、共有、
 同期エクスポートには含まれません。パターンマッチングはシークレット検出ではありません：未知の形式は
 すり抜ける可能性があります。[セキュリティモデル](../../docs/SECURITY-MODEL.md#redaction-boundary)を参照してください。
 
-**エージェントが遅くなりませんか？** リコールはローカルインデックスに対する字句検索です：
+</details>
+
+<details>
+<summary><b>エージェントが遅くなりませんか？</b></summary>
+
+リコールはローカルインデックスに対する字句検索です：
 中央値 0.7–0.8 ms で、モデルの応答を待つことはありません。フックではこれに加えてプロセス起動と
 ストアの鮮度チェックがかかります——数 GB のストアで数十ミリ秒です。
 
-**作業のやり方を変える必要はありますか？** いいえ。エージェントが自分でリコールを呼び出し、
+</details>
+
+<details>
+<summary><b>作業のやり方を変える必要はありますか？</b></summary>
+
+いいえ。エージェントが自分でリコールを呼び出し、
 自動リコールを有効にしていれば、セッションを開いた時点でプロジェクトの過去の決定をすでに知っています。
 
-**他のメモリツールとどう違うのですか？**
+</details>
+
+<details>
+<summary><b>他のメモリツールとどう違うのですか？</b></summary>
 
 | | deja | メモリプラットフォーム<br>（Mem0、Letta、memU） | セッション検索<br>（cass） |
 | --- | :-: | :-: | :-: |
@@ -495,26 +530,45 @@ deja bench read       # what it costs to read a database-backed store, and what 
 選んだものしか知りません。[完全な比較](https://vshulcz.github.io/deja-vu/guide/compare.html)では
 15 のツールを取り上げています。
 
-**Claude Code のセッション履歴はどこに保存されていて、検索できますか？**
+</details>
+
+<details>
+<summary><b>Claude Code のセッション履歴はどこに保存されていて、検索できますか？</b></summary>
+
 `~/.claude/projects` の下に、セッションごとに 1 つの JSONL ファイルとして保存されています。Codex は
 `~/.codex/sessions`、Cursor は SQLite の `state.vscdb` に保存します。`deja search` はそれらすべてをその場で
 読み取り、`deja last` は全エージェントの最近のセッションを一覧表示し、`deja view` は履歴全体をひとつの
 ローカルページとして開きます。各エージェントのパスは[セッションの保存場所](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)を参照してください。
 
-**Claude Code のセッション履歴が消えました。もう戻りませんか？** Claude Code は 30 日より古い
+</details>
+
+<details>
+<summary><b>Claude Code のセッション履歴が消えました。もう戻りませんか？</b></summary>
+
+Claude Code は 30 日より古い
 トランスクリプトを削除します（`~/.claude/settings.json` の `cleanupPeriodDays`）。`claude --resume` が
 一覧表示するのは残っているものだけです。削除前に deja がインデックス化したセッションは、ファイルが
 消えた後も検索できます。詳細：[ディスク上のセッションファイル](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
 
-**Windows はどうですか？** ビルドは存在し、CI でもテストスイートを実行しています。十分に実績があるのは
+</details>
+
+<details>
+<summary><b>Windows はどうですか？</b></summary>
+
+ビルドは存在し、CI でもテストスイートを実行しています。十分に実績があるのは
 macOS と Linux です。実環境でのレポートは [#9](https://github.com/vshulcz/deja-vu/issues/9) で歓迎しています。
 
-**すべてを消去するには？**
+</details>
+
+<details>
+<summary><b>すべてを消去するには？</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## ガイド
 

@@ -17,13 +17,19 @@ deja उन सेशन्स को इंडेक्स करता है 
 
 <p align="center"><b>deja पहले ही मिनट से भरी हुई है: वह इतिहास जो 35 एजेंट पहले ही लिख चुके हैं, कुछ सेकंड में इंडेक्स, न कोई मॉडल, न कोई अलग कैप्चर स्टेप।</b></p>
 
-<p align="center">
-उसी काम पर जो यह मशीन पहले हल कर चुकी थी, <b>58% कम टोकन</b> &middot; LongMemEval-S (470 सवालों का साफ़ किया सेट) पर <b>88.1% hit@1</b> &middot; LoCoMo पर <b>70.5%</b> &middot; गीगाबाइट इतिहास पर <b>मिलीसेकंड</b> में क्वेरी<br>
-<sub>हर भुजा पर ग्यारह रन: कुछ भी जुड़ा न होने पर 126,222 के मुक़ाबले 53,558 टोकन; बाद के बिल्ड पर फिर ग्यारह रन: 103,443 के मुक़ाबले 52,815 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">एक काम पूरा करने की लागत</a> &middot;
-दोनों रिट्रीवल हार्नेस इसी रिपॉज़िटरी में हैं और सार्वजनिक डेटासेट पर मिनटों में चलते हैं &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">आँकड़े खुद जाँचिए</a></sub>
-</p>
+<p align="center"><b>जितनी कोडिंग-एजेंट मेमोरी हम माप सके, उनमें सबसे सटीक, चलाने में सबसे सस्ती और सबसे तेज़।</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">सबसे सटीक<br>LongMemEval-S पर <b>97.2% R@5</b><br><sub>सभी 500 प्रश्न · MemPalace 96.6%, agentmemory 95.2%<br>उन्हीं 19,195 सेशन पर: 100 में 19 पहले स्थान पर, अगला सबसे अच्छा 14</sub></td>
+<td align="center" width="33%">सबसे सस्ती<br>agentmemory के <b>आधे टोकन</b><br><sub>पहले से हल किए काम पर 53,558 बनाम 104,974<br>हर टर्न 477 टोकन की टूल परिभाषाएँ, सात में सबसे कम</sub></td>
+<td align="center" width="33%">सबसे तेज़<br>19,195 सेशन इंडेक्स करने में <b>17.6 s</b><br><sub>सात में अगला: 72 s<br>पहले जवाब तक 26 ms, खोज की माध्यिका 97 ms</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu का मेंटेनर मैं हूँ, इसलिए हर ड्राइवर, कॉर्पस और स्कोरिंग नियम इसी रिपॉज़िटरी में हैं &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">सीधी तुलना, और जिस पंक्ति पर शक हो उसे दोबारा कैसे मापें</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval और LoCoMo रन</a></sub></p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | हिन्दी</p>
 
@@ -228,6 +234,14 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed.
 
 ## प्रमाण
 
+<p>
+उसी काम पर जो यह मशीन पहले हल कर चुकी थी, <b>58% कम टोकन</b> &middot; LongMemEval-S (470 सवालों का साफ़ किया सेट) पर <b>88.1% hit@1</b> &middot; LoCoMo पर <b>70.5%</b> &middot; गीगाबाइट इतिहास पर <b>मिलीसेकंड</b> में क्वेरी<br>
+<sub>हर भुजा पर ग्यारह रन: कुछ भी जुड़ा न होने पर 126,222 के मुक़ाबले 53,558 टोकन; बाद के बिल्ड पर फिर ग्यारह रन: 103,443 के मुक़ाबले 52,815 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">एक काम पूरा करने की लागत</a> &middot;
+दोनों रिट्रीवल हार्नेस इसी रिपॉज़िटरी में हैं और सार्वजनिक डेटासेट पर मिनटों में चलते हैं &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">आँकड़े खुद जाँचिए</a></sub>
+</p>
+
 ```sh
 deja bench recall     # रैंकिंग रिग्रेशन की निचली सीमा: 100 क्वेरी, आधी रूसी में, रिकॉल गिरे तो CI फ़ेल
 deja bench context    # बीज सहित 30 टास्क चेन और पाँच नकारात्मक नियंत्रण
@@ -271,20 +285,41 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 
 ## अक्सर पूछे जाने वाले सवाल
 
-**क्या कुछ भी मेरी मशीन से बाहर जाता है?** नहीं, जब तक आप खुद न कहें।
+<details>
+<summary><b>क्या कुछ भी मेरी मशीन से बाहर जाता है?</b></summary>
+
+नहीं, जब तक आप खुद न कहें।
 [डेटा प्रवाह](../../docs/SECURITY-MODEL.md#data-flows) देखिए।
 
-**लॉग में जो सीक्रेट पहले से हैं उनका क्या?** वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है। वे deja
+</details>
+
+<details>
+<summary><b>लॉग में जो सीक्रेट पहले से हैं उनका क्या?</b></summary>
+
+वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है। वे deja
 के इंडेक्स, सारांश, share या sync निर्यात में नहीं जाते।
 
-**क्या इससे मेरा एजेंट धीमा होगा?** एक रिकॉल लोकल इंडेक्स पर शाब्दिक क्वेरी है: माध्यिका 0.7–0.8 ms, और कुछ भी
+</details>
+
+<details>
+<summary><b>क्या इससे मेरा एजेंट धीमा होगा?</b></summary>
+
+एक रिकॉल लोकल इंडेक्स पर शाब्दिक क्वेरी है: माध्यिका 0.7–0.8 ms, और कुछ भी
 मॉडल का इंतज़ार नहीं करता। हुक प्रोसेस शुरू होने और स्टोर की ताज़गी जाँच जोड़ता है — कई गीगाबाइट की रिपॉज़िटरी पर
 कुछ दर्जन मिलीसेकंड।
 
-**क्या मुझे काम करने का तरीक़ा बदलना होगा?** नहीं। रिकॉल एजेंट खुद बुलाता है; ऑटोमैटिक रिकॉल चालू हो तो सेशन खुलते
+</details>
+
+<details>
+<summary><b>क्या मुझे काम करने का तरीक़ा बदलना होगा?</b></summary>
+
+नहीं। रिकॉल एजेंट खुद बुलाता है; ऑटोमैटिक रिकॉल चालू हो तो सेशन खुलते
 ही उसे पता होता है कि इस प्रोजेक्ट में पहले क्या तय हुआ था।
 
-**दूसरे मेमोरी टूल्स से यह कैसे अलग है?**
+</details>
+
+<details>
+<summary><b>दूसरे मेमोरी टूल्स से यह कैसे अलग है?</b></summary>
 
 | | deja | मेमोरी प्लेटफ़ॉर्म<br>(Mem0, Letta, memU) | सेशन खोज<br>(cass) |
 | --- | :-: | :-: | :-: |
@@ -295,23 +330,38 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 
 [पूरी तुलना](https://vshulcz.github.io/deja-vu/guide/compare.html) इनमें से पंद्रह को कवर करती है।
 
-**Claude Code का सेशन इतिहास कहाँ है और क्या उसे खोजा जा सकता है?** `~/.claude/projects` के नीचे, हर सेशन की एक
+</details>
+
+<details>
+<summary><b>Claude Code का सेशन इतिहास कहाँ है और क्या उसे खोजा जा सकता है?</b></summary>
+
+`~/.claude/projects` के नीचे, हर सेशन की एक
 JSONL फ़ाइल; Codex `~/.codex/sessions` में, Cursor SQLite `state.vscdb` में। `deja search` उन्हें वहीं पढ़ता है,
 `deja last` सभी एजेंट्स के हाल के सेशन दिखाता है, और `deja view` पूरे इतिहास को एक लोकल पेज के रूप में खोलता है।
 हर एजेंट के पथ
 [सेशन कहाँ रखे जाते हैं](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) में हैं।
 
-**मेरा Claude Code इतिहास ग़ायब हो गया, क्या वह चला गया?** Claude Code 30 दिन से पुराने रिकॉर्ड हटा देता है
+</details>
+
+<details>
+<summary><b>मेरा Claude Code इतिहास ग़ायब हो गया, क्या वह चला गया?</b></summary>
+
+Claude Code 30 दिन से पुराने रिकॉर्ड हटा देता है
 (`~/.claude/settings.json` में `cleanupPeriodDays`), और `claude --resume` सिर्फ़ बचा हुआ दिखाता है। सफ़ाई से
 पहले deja ने जो सेशन इंडेक्स किए, वे फ़ाइल के ग़ायब होने के बाद भी खोजे जा सकते हैं। विवरण
 [डिस्क पर सेशन फ़ाइलें](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html) में है।
 
-**सब कुछ कैसे मिटाऊँ?**
+</details>
+
+<details>
+<summary><b>सब कुछ कैसे मिटाऊँ?</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## गाइड
 

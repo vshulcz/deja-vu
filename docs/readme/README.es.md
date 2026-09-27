@@ -17,13 +17,19 @@ en disco, y devuelve la que corresponde a cualquiera de ellos que pregunte.</p>
 
 <p align="center"><b>deja está llena desde el primer minuto: el historial que 35 agentes ya escribieron, indexado en segundos, sin modelo y sin un paso aparte de captura.</b></p>
 
-<p align="center">
-<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
-<sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 52,815 frente a 103,443 en una versión posterior, otra vez once ejecuciones &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">lo que cuesta terminar una tarea</a> &middot;
-los dos harnesses de recuperación están en este repositorio y corren sobre datasets públicos en minutos &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">comprueba los números tú mismo</a></sub>
-</p>
+<p align="center"><b>La memoria para agentes de código más precisa, la más barata de usar y la más rápida que pudimos medir.</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">La más precisa<br><b>97.2% R@5</b> en LongMemEval-S<br><sub>las 500 preguntas · MemPalace 96.6%, agentmemory 95.2%<br>mismas 19,195 sesiones: 19/100 en primer lugar, la siguiente 14</sub></td>
+<td align="center" width="33%">La más barata<br><b>la mitad de tokens</b> que agentmemory<br><sub>53,558 frente a 104,974 en una tarea ya resuelta<br>477 tokens de definiciones de herramientas, la menor de siete</sub></td>
+<td align="center" width="33%">La más rápida<br><b>17.6 s</b> para indexar 19,195 sesiones<br><sub>la siguiente de siete: 72 s<br>26 ms hasta la primera respuesta, 97 ms de mediana de búsqueda</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>Mantengo deja-vu, así que cada driver, el corpus y la regla de puntuación están en este repositorio &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">la comparación directa y cómo volver a medir una fila que dudes</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">ejecuciones de LongMemEval y LoCoMo</a></sub></p>
 
 <p align="center"><a href="../../README.md">English</a> | <a href="README.zh.md">简体中文</a> | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | Español | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -232,6 +238,14 @@ y el recall por MCP funcionan como siempre.
 
 ## Evidencia
 
+<p>
+<b>58% menos tokens</b> en una tarea que esta máquina ya había resuelto &middot; <b>88.1% hit@1</b> en LongMemEval-S (conjunto depurado de 470 preguntas) &middot; <b>70.5%</b> en LoCoMo &middot; consultas en <b>milisegundos</b> sobre gigabytes de historial<br>
+<sub>Once ejecuciones por brazo: 53,558 tokens frente a 126,222 sin nada conectado, y 52,815 frente a 103,443 en una versión posterior, otra vez once ejecuciones &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">lo que cuesta terminar una tarea</a> &middot;
+los dos harnesses de recuperación están en este repositorio y corren sobre datasets públicos en minutos &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">comprueba los números tú mismo</a></sub>
+</p>
+
 ```sh
 deja bench recall     # cota inferior de regresión del ranking: 100 consultas, la mitad en ruso, CI falla si el recall baja
 deja bench context    # 30 cadenas de tareas con semilla más cinco controles negativos
@@ -276,20 +290,41 @@ segunda ejecución solo ingiere lo que cambió. El servidor MCP, las estadístic
 
 ## Preguntas frecuentes
 
-**¿Sale algo de mi máquina?** No, a menos que lo pidas. Ver
+<details>
+<summary><b>¿Sale algo de mi máquina?</b></summary>
+
+No, a menos que lo pidas. Ver
 [flujos de datos](../../docs/SECURITY-MODEL.md#data-flows).
 
-**¿Y los secretos que ya están en los logs?** Se quedan en los archivos de la herramienta original, que son
+</details>
+
+<details>
+<summary><b>¿Y los secretos que ya están en los logs?</b></summary>
+
+Se quedan en los archivos de la herramienta original, que son
 datos de tu agente. No entran en el índice de deja, ni en los resúmenes, ni en share, ni en el export de sync.
 
-**¿Va a ralentizar a mi agente?** Un recall es una consulta léxica a un índice local: mediana de 0.7–0.8 ms y
+</details>
+
+<details>
+<summary><b>¿Va a ralentizar a mi agente?</b></summary>
+
+Un recall es una consulta léxica a un índice local: mediana de 0.7–0.8 ms y
 nada esperando a un modelo. El hook añade el arranque del proceso y la comprobación de frescura de los
 almacenes: decenas de milisegundos en un repositorio de varios gigabytes.
 
-**¿Tengo que cambiar cómo trabajo?** No. El recall lo llama el propio agente; con el recall automático
+</details>
+
+<details>
+<summary><b>¿Tengo que cambiar cómo trabajo?</b></summary>
+
+No. El recall lo llama el propio agente; con el recall automático
 activado, ya sabe al abrir la sesión qué se decidió antes en este proyecto.
 
-**¿En qué se diferencia de otras herramientas de memoria?**
+</details>
+
+<details>
+<summary><b>¿En qué se diferencia de otras herramientas de memoria?</b></summary>
 
 | | deja | Plataformas de memoria<br>(Mem0, Letta, memU) | Búsqueda de sesiones<br>(cass) |
 | --- | :-: | :-: | :-: |
@@ -300,24 +335,39 @@ activado, ya sabe al abrir la sesión qué se decidió antes en este proyecto.
 
 La [comparación completa](https://vshulcz.github.io/deja-vu/guide/compare.html) cubre quince de ellas.
 
-**¿Dónde está el historial de sesiones de Claude Code y se puede buscar?** En `~/.claude/projects`, un archivo
+</details>
+
+<details>
+<summary><b>¿Dónde está el historial de sesiones de Claude Code y se puede buscar?</b></summary>
+
+En `~/.claude/projects`, un archivo
 JSONL por sesión; Codex en `~/.codex/sessions`, Cursor en el SQLite `state.vscdb`. `deja search` los lee donde
 están, `deja last` lista las sesiones recientes de todos los agentes y `deja view` abre todo el historial como una
 página local. Las rutas por agente están en
 [dónde se guardan las sesiones](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 
-**Ha desaparecido mi historial de Claude Code, ¿lo he perdido?** Claude Code borra los registros de más de 30
+</details>
+
+<details>
+<summary><b>Ha desaparecido mi historial de Claude Code, ¿lo he perdido?</b></summary>
+
+Claude Code borra los registros de más de 30
 días (`cleanupPeriodDays` en `~/.claude/settings.json`) y `claude --resume` solo lista lo que queda. Las
 sesiones que deja indexó antes de la limpieza siguen siendo buscables después de que el archivo desaparezca.
 Los detalles están en
 [archivos de sesión en disco](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
 
-**¿Cómo borro todo?**
+</details>
+
+<details>
+<summary><b>¿Cómo borro todo?</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## Guías
 

@@ -16,23 +16,19 @@
 
 <p align="center"><b>deja 一开始就是满的：35 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
-<p align="center"><b>我们能测到的编码代理记忆里，最准、最省、最快。</b><br>
-<b>最准：</b>完整 LongMemEval-S（500 题）上 R@5 97.2%，MemPalace 公布的是 96.6%，agentmemory 是 95.2%；
-在同样的 19,195 个会话上，100 题中 19 题排在第一位，另外七个工具里最好的是 14 题。<br>
-<b>最省：</b>同一台机器已经做过的任务，token 只有 agentmemory 的一半（53,558 对比 104,974）；
-每轮工具定义只占 477 token，是测过的七个 MCP 服务器里最少的。<br>
-<b>最快：</b>19,195 个会话 17.6 秒建完索引（第二名 72 秒），首次回答 26 毫秒，搜索中位数 97 毫秒。<br>
-<sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
+<p align="center"><b>我们能测到的编码代理记忆里，最准、最省、最快。</b></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">最准<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
+<td align="center" width="33%">最省<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
+<td align="center" width="33%">最快<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>deja-vu 是我维护的，所以每个驱动脚本、语料和评分规则都在本仓库里 &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">正面对比，以及如何重跑你怀疑的那一行</a> &middot;
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval 和 LoCoMo 的运行记录</a></sub></p>
-
-<p align="center">
-同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
-<sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
-两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
-</p>
 
 <p align="center"><a href="../../README.md">English</a> | 简体中文 | <a href="README.zh-TW.md">繁體中文</a> | <a href="README.ja.md">日本語</a> | <a href="README.ko.md">한국어</a> | <a href="README.es.md">Español</a> | <a href="README.pt.md">Português</a> | <a href="README.fr.md">Français</a> | <a href="README.de.md">Deutsch</a> | <a href="README.ru.md">Русский</a> | <a href="README.tr.md">Türkçe</a> | <a href="README.hi.md">हिन्दी</a></p>
 
@@ -219,6 +215,14 @@ opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 p
 
 ## 证据
 
+<p>
+同一台机器已经做过的任务，<b>少花 58% 的 token</b> &middot; LongMemEval-S（470 题清理集）上 <b>88.1% hit@1</b> &middot; LoCoMo 上 <b>70.5%</b> &middot; 数 GB 历史上的查询在<b>毫秒</b>级<br>
+<sub>每组 11 次运行：53,558 token，对比未接入任何记忆时的 126,222；之后的版本上再各跑 11 次：52,815 对比 103,443 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">完成一个任务要花多少</a> &middot;
+两套检索评测都在本仓库里，几分钟即可在公开数据集上跑完 &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">自己核对这些数字</a></sub>
+</p>
+
 ```sh
 deja bench recall     # 排序回归下限：100 条查询，一半是俄语，召回下降时 CI 失败
 deja bench context    # 30 条带种子的任务链，外加五个负对照
@@ -261,18 +265,39 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 
 ## 常见问题
 
-**有东西离开我的机器吗？** 没有，除非你主动要求。见[数据流向](../../docs/SECURITY-MODEL.md#data-flows)。
+<details>
+<summary><b>有东西离开我的机器吗？</b></summary>
 
-**日志里已经有的密钥怎么办？** 它们留在原本的工具文件里，那是你的智能体的数据。
+没有，除非你主动要求。见[数据流向](../../docs/SECURITY-MODEL.md#data-flows)。
+
+</details>
+
+<details>
+<summary><b>日志里已经有的密钥怎么办？</b></summary>
+
+它们留在原本的工具文件里，那是你的智能体的数据。
 它们不会进入 deja 的索引、摘要、分享或同步导出。
 
-**会拖慢我的智能体吗？** 一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
+</details>
+
+<details>
+<summary><b>会拖慢我的智能体吗？</b></summary>
+
+一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
 钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的仓库上是几十毫秒。
 
-**我需要改变工作方式吗？** 不需要。是智能体自己调用召回；开启自动召回后，
+</details>
+
+<details>
+<summary><b>我需要改变工作方式吗？</b></summary>
+
+不需要。是智能体自己调用召回；开启自动召回后，
 会话一打开它就已经知道这个项目此前的决定。
 
-**和其他记忆工具有什么不同？**
+</details>
+
+<details>
+<summary><b>和其他记忆工具有什么不同？</b></summary>
 
 | | deja | 记忆平台<br>(Mem0、Letta、memU) | 会话检索<br>(cass) |
 | --- | :-: | :-: | :-: |
@@ -283,16 +308,31 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 
 [完整对比](https://vshulcz.github.io/deja-vu/guide/compare.html)覆盖了其中十五个。
 
-**Claude Code 的会话历史存在哪里，能搜索吗？** 在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地读取它们，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+</details>
 
-**Claude Code 的会话历史不见了，是丢了吗？** Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `cleanupPeriodDays`），`claude --resume` 只列出还剩下的。deja 在清理前索引过的会话，文件没了之后仍然可以搜索。详见[磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
+<details>
+<summary><b>Claude Code 的会话历史存在哪里，能搜索吗？</b></summary>
 
-**怎么全部清除？**
+在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地读取它们，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+
+</details>
+
+<details>
+<summary><b>Claude Code 的会话历史不见了，是丢了吗？</b></summary>
+
+Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `cleanupPeriodDays`），`claude --resume` 只列出还剩下的。deja 在清理前索引过的会话，文件没了之后仍然可以搜索。详见[磁盘上的会话文件](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html)。
+
+</details>
+
+<details>
+<summary><b>怎么全部清除？</b></summary>
 
 ```sh
 deja uninstall --all
 rm -rf ~/.cache/deja
 ```
+
+</details>
 
 ## 指南
 
