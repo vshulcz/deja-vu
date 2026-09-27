@@ -66,7 +66,7 @@ func reasonixCommandPath() string {
 // reasonixIntercepts are the points the extension is allowed to rule on. The
 // sidecar subscribes to the ones it finds here, so this list is the ceiling.
 var reasonixIntercepts = []string{
-	"input.receive", "tool.before", "tool.after", "compaction.prepare",
+	"input.receive", "tool.after", "compaction.prepare",
 	"session.start", "session.load", "session.rotate",
 }
 
@@ -223,6 +223,54 @@ func reasonixPackageIsOurs(manifestPath string) bool {
 	return isDejaBinaryToken(m.Runtime.Command) && len(m.Runtime.Args) > 0 && m.Runtime.Args[0] == "reasonix-ext"
 }
 
+// reasonixInstalledRuntime reports whether deja's installed package carries
+// the extension.
+func reasonixInstalledRuntime() bool {
+	if reasonixForeignPackage() {
+		return false
+	}
+	b, err := os.ReadFile(reasonixInstalledManifest())
+	if err != nil {
+		return false
+	}
+	var m struct {
+		Runtime struct {
+			Args []string `json:"args"`
+		} `json:"runtime"`
+	}
+	return json.Unmarshal(b, &m) == nil && len(m.Runtime.Args) > 0 && m.Runtime.Args[0] == "reasonix-ext"
+}
+
+// reasonixForeignPackage reports whether plugins/deja is someone else's: a
+// link (`reasonix plugin install --link` leaves one, and deja never does), or
+// a directory whose manifest does not run deja.
+func reasonixForeignPackage() bool {
+	root := reasonixInstalledRoot()
+	fi, err := os.Lstat(root)
+	if err != nil {
+		return false
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return true
+	}
+	manifest := reasonixInstalledManifest()
+	return fileExists(manifest) && !reasonixPackageIsOurs(manifest)
+}
+
+// reasonixRecordIsOurs reports whether a plugin-packages.json record named
+// deja is deja's: installed from deja's own source directory, or rooted at
+// plugins/deja while that directory holds deja's package.
+func reasonixRecordIsOurs(raw json.RawMessage, ourDir bool) bool {
+	var e reasonixEntry
+	if json.Unmarshal(raw, &e) != nil {
+		return false
+	}
+	if filepath.Clean(e.Source) == filepath.Clean(reasonixPluginSourceDir()) {
+		return true
+	}
+	return e.Root == "plugins/"+reasonixPluginName && ourDir && reasonixPackageIsOurs(reasonixInstalledManifest())
+}
+
 func reasonixInstalledMatches(files map[string][]byte) bool {
 	root := reasonixInstalledRoot()
 	for _, rel := range sortedPackagePaths(files) {
@@ -250,7 +298,13 @@ func installReasonix(exe string, uninstall, auto bool) (installResult, error) {
 	}
 	exe = hookExeFor(exe, false)
 	manifest := reasonixInstalledManifest()
-	if fileExists(manifest) && !reasonixPackageIsOurs(manifest) {
+	// The plain target does not take out a runtime deja already installed:
+	// `install --all` runs it beside the -auto target, and each would undo
+	// the other. `deja uninstall reasonix-auto` is how the runtime goes.
+	if !auto && reasonixInstalledRuntime() {
+		auto = true
+	}
+	if reasonixForeignPackage() {
 		return installResult{}, fmt.Errorf("%s is a Reasonix plugin named %q that deja did not write — left as it was", reasonixInstalledRoot(), reasonixPluginName)
 	}
 	files := reasonixPackageFiles(exe, auto)
@@ -262,6 +316,9 @@ func installReasonix(exe string, uninstall, auto bool) (installResult, error) {
 	st, _, err := readReasonixState(statePath)
 	if err != nil {
 		return installResult{}, err
+	}
+	if i, _ := st.ours(); i >= 0 && !reasonixRecordIsOurs(st.Plugins[i], isRealDir(reasonixInstalledRoot())) {
+		return installResult{}, fmt.Errorf("%s records a Reasonix plugin named %q that deja did not install — left as it was", statePath, reasonixPluginName)
 	}
 	if _, current := st.ours(); current && reasonixInstalledMatches(files) {
 		return reasonixResult("unchanged", auto), nil

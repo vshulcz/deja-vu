@@ -202,13 +202,19 @@ func (h *fakeRxHost) published() []map[string]any {
 
 func (h *fakeRxHost) handshake(intercepts ...string) map[string]any {
 	h.t.Helper()
+	return h.handshakeAt(h.t.TempDir(), intercepts...)
+}
+
+// handshakeAt is the handshake for a session in workspace ws.
+func (h *fakeRxHost) handshakeAt(ws string, intercepts ...string) map[string]any {
+	h.t.Helper()
 	if len(intercepts) == 0 {
 		intercepts = reasonixIntercepts
 	}
 	f := h.request("extension/initialize", map[string]any{
 		"protocolVersion": "2", "protocolId": "reasonix.extension.v2",
 		"manifest":     map[string]any{"intercepts": intercepts, "capabilities": []string{"interceptors", "ui"}},
-		"session":      map[string]any{"sessionId": "boot-1", "workspaceRoot": h.t.TempDir(), "generation": 1},
+		"session":      map[string]any{"sessionId": "boot-1", "workspaceRoot": ws, "generation": 1},
 		"capabilities": map[string]any{"contentRefs": true, "uiHost": "tui", "protocolVersion": "2"},
 	})
 	if f.Error != nil {
@@ -346,5 +352,23 @@ func TestReasonixExtReadsAnExternalizedPayload(t *testing.T) {
 	}
 	if r := send(strings.Repeat("0", 64)); r.Decision != "continue" {
 		t.Errorf("content that does not match its hash answered %+v, want continue", r)
+	}
+}
+
+// An answer too big for one frame cannot be sent. The host still gets one —
+// "continue" — instead of waiting out its timeout for nothing.
+func TestReasonixExtAnswersContinueWhenTheReplyIsTooBig(t *testing.T) {
+	fakeRxHooks(t, func(sub string, _ map[string]any) (string, error) {
+		if sub == "hook-tool-after" {
+			return "<deja-recall>\nFIX " + strings.Repeat("y", 4000) + "\n</deja-recall>", nil
+		}
+		return "", nil
+	})
+	h := startFakeRxHost(t)
+	h.handshake()
+	result := strings.Repeat("a", rxFrameBytes-2000)
+	r := h.intercept("tool.after", map[string]any{"name": "bash", "arguments": `{"command":"make"}`, "result": result, "isError": true})
+	if r.Decision != "continue" || len(r.Replacement) != 0 {
+		t.Errorf("answer = %s with %d bytes, want continue", r.Decision, len(r.Replacement))
 	}
 }

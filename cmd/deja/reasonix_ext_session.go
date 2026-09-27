@@ -14,12 +14,12 @@ import (
 
 // Which session the sidecar is serving, and what it tells the person about it.
 
-// sessionKey is the id deja files this session's injections under. The
-// sidecar is told only a host-local id ("boot-1" on 1.39.1), so the real one
-// is read off the session store: the one sessions-v4 directory in this
-// workspace written since the session began. With none or several, a key of
-// the sidecar's own stands in — still one reader, just not one deja can match
-// to the transcript it will later index.
+// sessionKey is the id deja files this session's injections under: the one a
+// session event named, else the one sessions-v4 directory in this workspace
+// whose manifest says it was created after this session began and that no
+// earlier session in this process was filed under. With none or several, a
+// key of the sidecar's own stands in — still one reader, just not one deja
+// can match to the transcript it will later index.
 func (x *rxExt) sessionKey() string {
 	x.mu.Lock()
 	s, workspace := x.sess, x.workspace
@@ -28,11 +28,18 @@ func (x *rxExt) sessionKey() string {
 		return s.key
 	}
 	since := s.boundary
+	exclude := make(map[string]bool, len(x.retired))
+	for k := range x.retired {
+		exclude[k] = true
+	}
 	x.mu.Unlock()
-	id := reasonixLiveSession(sources.ReasonixWorkspaceStore(workspace), since.Add(-rxSessionRaceWindow))
+	id := reasonixLiveSession(sources.ReasonixWorkspaceStore(workspace), since, exclude)
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	if x.sess != s {
+		return s.key
+	}
+	if s.realKey {
 		return s.key
 	}
 	if id != "" {
@@ -46,9 +53,11 @@ func (x *rxExt) sessionKey() string {
 }
 
 // reasonixLiveSession is the id of the one session directory in store whose
-// transcript or manifest changed at or after since, or "" when there is not
-// exactly one.
-func reasonixLiveSession(store string, since time.Time) string {
+// manifest records a creation at or after since, leaving out the ids in
+// exclude, or "" when there is not exactly one. A write time says nothing
+// here: the session a /new replaced is saved as it ends, and a parallel
+// Reasonix in the same workspace writes whenever it likes.
+func reasonixLiveSession(store string, since time.Time, exclude map[string]bool) string {
 	if store == "" {
 		return ""
 	}
@@ -61,28 +70,51 @@ func reasonixLiveSession(store string, since time.Time) string {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		dir := filepath.Join(store, e.Name())
-		fresh := false
-		for _, name := range []string{"events.frames", "manifest.json"} {
-			if fi, err := os.Stat(filepath.Join(dir, name)); err == nil && !fi.ModTime().Before(since) {
-				fresh = true
-			}
+		var m struct {
+			SessionID string    `json:"sessionId"`
+			CreatedAt time.Time `json:"createdAt"`
 		}
-		if !fresh {
+		b, err := os.ReadFile(filepath.Join(store, e.Name(), "manifest.json"))
+		if err != nil || json.Unmarshal(b, &m) != nil || m.CreatedAt.IsZero() || m.CreatedAt.Before(since) {
+			continue
+		}
+		id := m.SessionID
+		if id == "" {
+			id = e.Name()
+		}
+		if exclude[id] {
 			continue
 		}
 		if found != "" {
 			return ""
 		}
-		found = e.Name()
-		var m struct {
-			SessionID string `json:"sessionId"`
-		}
-		if b, err := os.ReadFile(filepath.Join(dir, "manifest.json")); err == nil && json.Unmarshal(b, &m) == nil && m.SessionID != "" {
-			found = m.SessionID
-		}
+		found = id
 	}
 	return found
+}
+
+// reasonixSessionIDFrom reads a session event's sessionPath: a bare session
+// id on the 1.x binding, or a path — a sessions-v4 directory, whose manifest
+// holds the id, or a JSONL transcript, named for it.
+func reasonixSessionIDFrom(path string) string {
+	v := strings.TrimSpace(path)
+	if v == "" {
+		return ""
+	}
+	if !strings.ContainsAny(v, `/\`) {
+		return v
+	}
+	dir := v
+	if filepath.Base(v) == "events.frames" || filepath.Base(v) == "manifest.json" {
+		dir = filepath.Dir(v)
+	}
+	var m struct {
+		SessionID string `json:"sessionId"`
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "manifest.json")); err == nil && json.Unmarshal(b, &m) == nil && m.SessionID != "" {
+		return m.SessionID
+	}
+	return strings.TrimSuffix(filepath.Base(dir), ".jsonl")
 }
 
 // surface tells the person what deja did, on the host's own status and

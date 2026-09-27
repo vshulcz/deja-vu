@@ -68,6 +68,9 @@ type rxExt struct {
 	started     time.Time
 	sess        *rxSession
 	lastStatus  string
+	// retired holds the ids of sessions this process has seen end; the
+	// store lookup never hands one of them to a later session.
+	retired map[string]bool
 }
 
 // rxSession is what deja keeps about the Reasonix session being served.
@@ -77,16 +80,17 @@ type rxSession struct {
 	realKey  bool
 	turns    int
 	lastTurn time.Time
+	// digested is whether the session digest went out since the session
+	// began or was last compacted.
+	digested bool
 	// announced is whether this session has had its "recalled" line.
 	announced bool
-	// notes holds pre-tool lines until the result of the same call, which is
-	// the first thing the model reads after the tool runs.
-	notes map[string]string
 }
 
 func newRxExt(dir, exe string, conn *rxConn) *rxExt {
 	now := time.Now()
-	return &rxExt{dir: dir, exe: exe, conn: conn, started: now, sess: &rxSession{boundary: now, notes: map[string]string{}}}
+	return &rxExt{dir: dir, exe: exe, conn: conn, started: now, retired: map[string]bool{},
+		sess: &rxSession{boundary: now}}
 }
 
 func (x *rxExt) begin(hostSession, workspace string, generation uint64, ui bool) {
@@ -98,19 +102,73 @@ func (x *rxExt) begin(hostSession, workspace string, generation uint64, ui bool)
 // observe handles the session events. A session that starts, loads or
 // rotates is a new reader: its digest, its announcement and its dedupe key
 // start over.
+//
+// Reasonix names the session in sessionPath where it has one: the new
+// session's id at start (internal/control/session_binding.go), the loaded
+// session at load, and the session that is ending at rotate. Events travel a
+// queue of their own, so the one for a session can land after its first
+// turn; an event with no name that arrives right behind a turn is read as
+// that turn's.
 func (x *rxExt) observe(p rxEventParams) {
 	switch p.Event {
 	case "session.start", "session.load", "session.rotate":
 	default:
 		return
 	}
+	var payload struct {
+		SessionPath string `json:"sessionPath"`
+	}
+	_ = json.Unmarshal(p.Payload, &payload)
+	id := reasonixSessionIDFrom(payload.SessionPath)
 	x.mu.Lock()
 	defer x.mu.Unlock()
 	s := x.sess
-	if s.turns == 0 || time.Since(s.lastTurn) < rxSessionRaceWindow {
+	quiet := s.turns == 0 || (!s.lastTurn.IsZero() && time.Since(s.lastTurn) < rxSessionRaceWindow)
+	if p.Event == "session.rotate" {
+		// The id is the session ending. Serving another one already means
+		// the rotate overtook nothing; serving that one means it is over.
+		switch {
+		case id != "" && s.realKey && s.key != id:
+			x.retired[id] = true
+			return
+		case id != "" && s.realKey && s.key == id:
+		case quiet:
+			if id != "" {
+				x.retired[id] = true
+			}
+			return
+		}
+		x.retire(s, id)
 		return
 	}
-	x.sess = &rxSession{boundary: time.Now(), notes: map[string]string{}}
+	if id != "" {
+		if s.realKey && s.key == id {
+			return
+		}
+		if quiet && !x.retired[id] {
+			// The event for the session being served: name it.
+			s.key, s.realKey = id, true
+			return
+		}
+		x.retire(s, "")
+		x.sess.key, x.sess.realKey = id, true
+		return
+	}
+	if quiet {
+		return
+	}
+	x.retire(s, "")
+}
+
+// retire ends the session being served and starts the next one. x.mu is held.
+func (x *rxExt) retire(s *rxSession, ended string) {
+	if s.realKey {
+		x.retired[s.key] = true
+	}
+	if ended != "" {
+		x.retired[ended] = true
+	}
+	x.sess = &rxSession{boundary: time.Now()}
 }
 
 // intercept rules on one point and never fails the host's operation: any
@@ -129,7 +187,7 @@ func (x *rxExt) intercept(p rxInterceptParams) (res rxInterceptResult) {
 		ceiling = rxPromptBudget
 	case "compaction.prepare":
 		ceiling = rxCompactBudget
-	case "tool.before", "tool.after":
+	case "tool.after":
 	default:
 		return res
 	}
@@ -147,8 +205,6 @@ func (x *rxExt) intercept(p rxInterceptParams) (res rxInterceptResult) {
 	switch p.Event {
 	case "input.receive":
 		replaced = x.onInput(ctx, fields)
-	case "tool.before":
-		x.onToolBefore(ctx, fields)
 	case "tool.after":
 		replaced = x.onToolAfter(ctx, fields)
 	case "compaction.prepare":
@@ -204,13 +260,15 @@ const rxInjectionCap = 10000
 // the per-prompt recall on every turn it has something to say.
 func (x *rxExt) onInput(ctx context.Context, fields map[string]json.RawMessage) map[string]json.RawMessage {
 	text := rxString(fields, "text")
-	if strings.TrimSpace(text) == "" {
+	typed := rxTypedText(text)
+	if typed == "" {
 		return nil
 	}
 	key := x.sessionKey()
 	x.mu.Lock()
 	s, cwd := x.sess, x.workspace
-	first := s.turns == 0
+	first := !s.digested
+	s.digested = true
 	s.turns++
 	s.lastTurn = time.Now()
 	x.mu.Unlock()
@@ -226,7 +284,7 @@ func (x *rxExt) onInput(ctx context.Context, fields map[string]json.RawMessage) 
 			}, "hook-context", "--plain")
 		}()
 	}
-	recall := x.hook(ctx, map[string]any{"prompt": text, "session_id": key, "cwd": cwd}, "hook-prompt", "--plain")
+	recall := x.hook(ctx, map[string]any{"prompt": typed, "session_id": key, "cwd": cwd}, "hook-prompt", "--plain")
 	wg.Wait()
 
 	var parts []string
@@ -243,21 +301,22 @@ func (x *rxExt) onInput(ctx context.Context, fields map[string]json.RawMessage) 
 }
 
 // rxHookToolInput turns a Reasonix tool call into the Claude-shaped fields
-// deja's tool hooks read: bash's command, and a file tool's path as file_path,
-// resolved against the workspace the way Reasonix resolves it.
+// deja's tool hooks read: the shell tool's command — bash, or pwsh and
+// powershell on Windows (tool.IsShellToolName) — and a file tool's path as
+// file_path, resolved against the workspace the way Reasonix resolves it.
 func rxHookToolInput(name, arguments, workspace string) (string, map[string]string) {
 	var args struct {
 		Command string `json:"command"`
 		Path    string `json:"path"`
 	}
 	_ = json.Unmarshal([]byte(arguments), &args)
-	switch name {
-	case "bash":
+	switch {
+	case rxIsShellTool(name):
 		if strings.TrimSpace(args.Command) == "" {
 			return "", nil
 		}
 		return "Bash", map[string]string{"command": args.Command}
-	case "write_file", "edit_file", "multi_edit":
+	case name == "write_file", name == "edit_file", name == "multi_edit":
 		p := strings.TrimSpace(args.Path)
 		if p == "" {
 			return "", nil
@@ -271,56 +330,53 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 	return "", nil
 }
 
-func rxCallKey(name, arguments string) string { return name + "\x00" + arguments }
-
-// onToolBefore asks deja what this machine knows about the command or file.
-// A tool.before answer can only let the call run, change it or stop it, so
-// the line waits for the result of the same call and is read with it.
-func (x *rxExt) onToolBefore(ctx context.Context, fields map[string]json.RawMessage) {
-	name, arguments := rxString(fields, "name"), rxString(fields, "arguments")
-	x.mu.Lock()
-	cwd := x.workspace
-	x.mu.Unlock()
-	tool, input := rxHookToolInput(name, arguments, cwd)
-	if tool == "" {
-		return
+// rxIsShellTool mirrors Reasonix's tool.IsShellToolName.
+func rxIsShellTool(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "bash", "pwsh", "powershell", "shell":
+		return true
 	}
-	key := x.sessionKey()
-	line := x.hook(ctx, map[string]any{
-		"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": input,
-		"session_id": key, "cwd": cwd,
-	}, "hook-tool", "--plain")
-	if line == "" {
-		return
-	}
-	x.mu.Lock()
-	x.sess.notes[rxCallKey(name, arguments)] = line
-	x.mu.Unlock()
+	return false
 }
 
-// onToolAfter appends to the result the model is about to read: the pre-tool
-// line held for this call, and at a failed command the fix that followed the
-// same failure before.
+// onToolAfter adds to the result the model is about to read: what this
+// machine knows about the command or file — the line other harnesses get
+// before the call — and at a failed command the fix that followed the same
+// failure before. Both are asked for here rather than at tool.before: a
+// tool.before answer can only let the call run, change it or stop it, and a
+// line asked for there and then never shown, because the call was refused,
+// would count as seen for the rest of the session. tool.after fires only for
+// a call that ran.
 func (x *rxExt) onToolAfter(ctx context.Context, fields map[string]json.RawMessage) map[string]json.RawMessage {
 	name, arguments := rxString(fields, "name"), rxString(fields, "arguments")
 	result := rxString(fields, "result")
 	var isError bool
 	_ = json.Unmarshal(fields["isError"], &isError)
 	x.mu.Lock()
-	callKey := rxCallKey(name, arguments)
-	note := x.sess.notes[callKey]
-	delete(x.sess.notes, callKey)
 	cwd := x.workspace
 	x.mu.Unlock()
-	var fix string
-	if isError && isCommandTool(name) {
-		if _, input := rxHookToolInput(name, arguments, cwd); input != nil {
-			fix = x.hook(ctx, map[string]any{
-				"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": input,
-				"tool_response": result, "session_id": x.sessionKey(), "cwd": cwd,
-			}, "hook-tool-after", "--plain")
-		}
+	tool, input := rxHookToolInput(name, arguments, cwd)
+	if tool == "" {
+		return nil
 	}
+	key := x.sessionKey()
+	var note, fix string
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		note = x.hook(ctx, map[string]any{
+			"hook_event_name": "PreToolUse", "tool_name": tool, "tool_input": input,
+			"session_id": key, "cwd": cwd,
+		}, "hook-tool", "--plain")
+	}()
+	if isError && tool == "Bash" {
+		fix = x.hook(ctx, map[string]any{
+			"hook_event_name": "PostToolUseFailure", "tool_name": "Bash", "tool_input": input,
+			"tool_response": result, "session_id": key, "cwd": cwd,
+		}, "hook-tool-after", "--plain")
+	}
+	wg.Wait()
 	var parts []string
 	for _, block := range []string{note, fix} {
 		if block != "" && len(block) <= rxInjectionCap {
@@ -329,6 +385,17 @@ func (x *rxExt) onToolAfter(ctx context.Context, fields map[string]json.RawMessa
 	}
 	if len(parts) == 0 {
 		return nil
+	}
+	if rxLooksLikeCILog(result) {
+		// Reasonix cuts a log like this to its first and last eight lines
+		// (internal/agent/ci_output.go) after tool.after has run. Appended,
+		// deja's lines would take the place of the real tail; as one line
+		// at the head they cost one line of it and arrive whole.
+		lines := make([]string, len(parts))
+		for i, p := range parts {
+			lines[i] = rxOneLine(p)
+		}
+		return withString(fields, "result", strings.Join(lines, "\n")+"\n"+result)
 	}
 	return withString(fields, "result", strings.TrimRight(result, "\n")+"\n\n"+strings.Join(parts, "\n\n"))
 }
@@ -344,7 +411,7 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 	key := x.sessionKey()
 	x.mu.Lock()
 	cwd := x.workspace
-	x.sess.turns = 0
+	x.sess.digested = false
 	x.mu.Unlock()
 	forgetInjected(x.dir, key)
 	forgetInjected(x.dir, compactionFailureKey(key))
@@ -357,7 +424,7 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 	}
 	lines := make([][]byte, len(messages))
 	for i, m := range messages {
-		lines[i] = m
+		lines[i] = withoutOwnRecall(m)
 	}
 	session := sources.ParseReasonixMessages(lines, time.Now())
 	if len(session.Messages) == 0 {

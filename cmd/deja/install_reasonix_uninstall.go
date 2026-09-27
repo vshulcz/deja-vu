@@ -20,9 +20,14 @@ func uninstallReasonix() (installResult, error) {
 	}
 	i, _ := st.ours()
 	hasRoot := isRealDir(root)
-	if hasRoot && !reasonixPackageIsOurs(manifest) {
+	if reasonixForeignPackage() {
 		return installResult{Path: manifest, Action: "unchanged",
 			Note: "a plugin named deja that deja did not write is installed there — left as it was"}, nil
+	}
+	if i >= 0 && !reasonixRecordIsOurs(st.Plugins[i], hasRoot) {
+		// A record by the same name that points somewhere else is another
+		// package's, whatever it is called.
+		i = -1
 	}
 	if !hasRoot && i < 0 {
 		removeReasonixSource()
@@ -67,8 +72,9 @@ func reasonixCrashDir() string {
 }
 
 // removeReasonixReceiptKey takes back the key the install's reasonix run
-// created, while nothing has been signed with it: a receipt beside it means
-// Reasonix has used it since, and then it stays.
+// created, while nothing has been signed with it: a receipt beside it, or a
+// model-credential journal, means Reasonix has used it since, and then it
+// stays.
 func removeReasonixReceiptKey() {
 	key := reasonixReceiptKey()
 	if !wiringCreated(key) {
@@ -76,6 +82,10 @@ func removeReasonixReceiptKey() {
 	}
 	entries, err := os.ReadDir(filepath.Dir(key))
 	if err != nil || len(entries) != 1 {
+		return
+	}
+	// The same key signs the model-credential journals beside the receipts.
+	if journals, err := os.ReadDir(filepath.Join(sources.ReasonixHome(), "transactions", "model-credentials")); err == nil && len(journals) > 0 {
 		return
 	}
 	if os.Remove(key) == nil {

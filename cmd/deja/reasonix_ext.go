@@ -148,15 +148,17 @@ func (c *rxConn) write(f rxFrame) error {
 	return err
 }
 
-func (c *rxConn) reply(id json.RawMessage, result any) {
+func (c *rxConn) reply(id json.RawMessage, result any) error {
 	b, err := json.Marshal(result)
 	if err != nil {
 		c.fail(id, &rxRPCError{Code: -32603, Message: err.Error()})
-		return
+		return err
 	}
 	if werr := c.write(rxFrame{ID: id, Result: b}); werr != nil {
 		fmt.Fprintf(os.Stderr, "deja reasonix-ext: %v\n", werr)
+		return werr
 	}
+	return nil
 }
 
 func (c *rxConn) fail(id json.RawMessage, e *rxRPCError) {
@@ -338,7 +340,7 @@ func (x *rxExt) serve() error {
 				return nil
 			}
 		case f.Method == "extension/shutdown" && hasID:
-			c.reply(f.ID, map[string]bool{"accepted": true})
+			_ = c.reply(f.ID, map[string]bool{"accepted": true})
 			return nil
 		case f.Method == "extension/initialized":
 		case f.Method == "extension/event" && !hasID:
@@ -357,7 +359,11 @@ func (x *rxExt) serve() error {
 			c.handlers.Add(1)
 			go func(id json.RawMessage) {
 				defer c.handlers.Done()
-				c.reply(id, x.intercept(p))
+				// A replacement over the frame cap is not sent; the
+				// host still gets an answer, and it is the turn untouched.
+				if c.reply(id, x.intercept(p)) != nil {
+					_ = c.reply(id, rxContinue())
+				}
 			}(f.ID)
 		case hasID:
 			c.fail(f.ID, &rxRPCError{Code: -32601, Message: "deja does not serve " + f.Method})
@@ -388,7 +394,7 @@ type rxInitParams struct {
 // ones the installed manifest also lists, since anything beyond it fails the
 // handshake.
 var rxSubscriptions = []string{
-	"input.receive", "tool.before", "tool.after", "compaction.prepare",
+	"input.receive", "tool.after", "compaction.prepare",
 	"session.start", "session.load", "session.rotate",
 }
 
@@ -426,7 +432,7 @@ func (x *rxExt) initialize(f rxFrame) bool {
 	if strings.TrimSpace(v) == "" {
 		v = "dev"
 	}
-	x.conn.reply(f.ID, map[string]any{
+	_ = x.conn.reply(f.ID, map[string]any{
 		"protocolVersion":    strconv.Itoa(rxProtocolMajor),
 		"name":               reasonixPluginName,
 		"version":            v,

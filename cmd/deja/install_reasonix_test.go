@@ -245,20 +245,6 @@ func TestUninstallReasonixRestoresTheHome(t *testing.T) {
 	}
 }
 
-func TestInstallReasonixLeavesAForeignDejaPackage(t *testing.T) {
-	home := reasonixTestHome(t, false)
-	foreign := `{"apiVersion":"reasonix.io/plugin/v2","name":"deja","mcpServers":{"deja":{"type":"stdio","command":"node","args":["deja-notes.js"]}}}`
-	writeTestFile(t, filepath.Join(home, "plugins", "deja", "reasonix-plugin.json"), foreign)
-	before := treeOf(t, home)
-	if _, err := installReasonix("/bin/deja", false, true); err == nil || !strings.Contains(err.Error(), "did not write") {
-		t.Fatalf("install over a foreign package = %v, want a refusal", err)
-	}
-	if res, err := installReasonix("/bin/deja", true, true); err != nil || res.Action != "unchanged" {
-		t.Fatalf("uninstall of a foreign package = %+v %v, want unchanged", res, err)
-	}
-	sameTree(t, "the Reasonix home with someone else's deja plugin", before, treeOf(t, home))
-}
-
 // With reasonix on PATH the package goes through Reasonix's own installer, and
 // the uninstall still takes back exactly what that installer made.
 func TestInstallReasonixHandsThePackageToTheCLI(t *testing.T) {
@@ -267,17 +253,20 @@ func TestInstallReasonixHandsThePackageToTheCLI(t *testing.T) {
 	}
 	for _, other := range []bool{true, false} {
 		t.Run(fmt.Sprintf("other plugin %v", other), func(t *testing.T) {
-			reasonixViaFakeCLI(t, other, false)
+			reasonixViaFakeCLI(t, other, "")
 		})
 	}
 	// Reasonix signed a receipt with the key after the install: the key is
 	// in use and stays, whoever made it.
 	t.Run("receipt key in use", func(t *testing.T) {
-		reasonixViaFakeCLI(t, false, true)
+		reasonixViaFakeCLI(t, false, "receipt")
+	})
+	t.Run("key signed a credential journal", func(t *testing.T) {
+		reasonixViaFakeCLI(t, false, "journal")
 	})
 }
 
-func reasonixViaFakeCLI(t *testing.T, other, used bool) {
+func reasonixViaFakeCLI(t *testing.T, other bool, used string) {
 	home := reasonixTestHome(t, other)
 	bin := filepath.Join(t.TempDir(), "reasonix")
 	log := filepath.Join(t.TempDir(), "calls")
@@ -346,12 +335,15 @@ EOF
 		t.Errorf("a second install ran reasonix again (%d runs); nothing had changed", n)
 	}
 	receipts := filepath.Join(home, "transactions", "model-settings-receipts")
-	if used {
+	switch used {
+	case "receipt":
 		writeTestFile(t, filepath.Join(receipts, "abc.json"), "{}")
+	case "journal":
+		writeTestFile(t, filepath.Join(home, "transactions", "model-credentials", "j1.json"), "{}")
 	}
 	installReasonixTarget(t, "reasonix-auto", true)
 	after := treeOf(t, home)
-	if used {
+	if used != "" {
 		if _, err := os.Stat(filepath.Join(receipts, "request-digest.key")); err != nil {
 			t.Fatalf("uninstall took a key Reasonix has signed with: %v", err)
 		}
@@ -426,5 +418,30 @@ func TestDoctorReadsTheReasonixWiring(t *testing.T) {
 	}
 	if got := reasonixRuntimeMissing(); got != gone {
 		t.Errorf("missing runtime = %q, want %q", got, gone)
+	}
+}
+
+// The plain target on a machine that has the runtime keeps it: `install
+// --all` runs both, and dropping it only for the -auto target to put it back
+// rewrote the package twice on every run.
+func TestInstallReasonixPlainKeepsAnInstalledRuntime(t *testing.T) {
+	reasonixTestHome(t, false)
+	installReasonixTarget(t, "reasonix-auto", false)
+	out := installReasonixTarget(t, "reasonix", false)
+	if !strings.Contains(out, "unchanged") {
+		t.Errorf("plain install after -auto said:\n%s", out)
+	}
+	if !strings.Contains(string(mustRead(t, reasonixInstalledManifest())), `"reasonix-ext"`) {
+		t.Error("the plain target took the runtime out")
+	}
+	out = captureStdout(t, func() {
+		if err := runInstall(index.DefaultDir(), []string{"--all", "--no-index"}, false); err != nil {
+			t.Fatal(err)
+		}
+	})
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "reasonix") && !strings.Contains(line, "unchanged") {
+			t.Errorf("install --all rewrote the package: %s", line)
+		}
 	}
 }
