@@ -4107,6 +4107,7 @@ Usage:
   deja remember "text" [--project name] [--tag name]
   deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
   deja rules [sync]  (copy ~/.config/deja/rules.md into every agent's global rules file)
+  deja rules candidates [--json] [--limit n] [--since 90d]  (turns where you corrected an agent, for your agent to group into rules)
   deja mcp
   deja version
   deja <command> --help

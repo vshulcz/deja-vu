@@ -57,3 +57,13 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 - If `deja` is not on PATH or the index is empty, say that history search is unavailable. Do not invent what it might have found.
 - Work a subagent did is in the index as its task and its answer, not in full. A Claude Task or a Cursor subagent writes its turns and tool calls to its own transcript, and the parent keeps only the launch and a summary — so a hit on the parent can look complete while the run itself is elsewhere. `DEJA_INCLUDE_SUBAGENTS=1` takes the whole child transcript in; Cursor's are still left out by default.
 - Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.
+
+## Rules the user keeps repeating
+
+When the user asks you to find or suggest their standing rules — the things they keep having to tell their agents:
+
+1. Run `deja rules candidates` (`--since 90d` for recent ones). It lists turns where the user corrected an agent, across every tool on this machine, each numbered `#n` with the session it came from. It writes nothing.
+2. Find the standing rules in that list: preferences the user would want applied in every future session, stated in at least two different sessions. Ignore one-off corrections about a specific task. For each rule give one imperative sentence, the `#n` that state it, and how many distinct sessions. At most 15, most recurring first.
+3. Show the list and stop. Write nothing until the user picks. Then show the exact lines you will append to the rules file `deja rules` names, append only those, and run `deja rules sync`, which copies the file into every installed agent's global rules file.
+
+This takes a strong model: on one machine's 236 candidates a frontier model found the user's recurring rules with real citations, and a 9B local model invented candidate numbers. On a small model, say so rather than guess.

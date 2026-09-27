@@ -62,7 +62,7 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 
 - Result windows are bounded. Do not report corpus-wide counts, or claim a complete audit, from the number of hits you got back.
 - If deja is unavailable or the index is empty, say that history search is unavailable. Do not invent what it might have found.
-- Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.`
+- Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.` + "\n\n" + rulesSkillSection
 
 // sharedSkillHarnesses read the cross-agent skills directory defined by the
 // Agent Skills standard. Measured, not assumed, for gemini, openclaw and qwen:
@@ -199,8 +199,10 @@ func guidanceText(harness string) string {
 		if harness == "vscode" {
 			// Copilot Chat has no hook, so this file is the only thing that is
 			// in front of the model before it reads the question. It says to
-			// call the tool; the tool is what carries the history.
-			return instructionsFile(body)
+			// call the tool; the tool is what carries the history. The rules
+			// section stays out: this file is in every chat, and a procedure
+			// the user asks for a few times a year is not worth that.
+			return instructionsFile(strings.TrimSuffix(body, "\n\n"+rulesSkillSection))
 		}
 		return skillFile(body)
 	}

@@ -188,7 +188,7 @@ _deja() {
     'how:commands this machine actually ran for a thing'
     'doctor:diagnose local stores and wiring'
     'promote:distill a session into a curated note'
-    'rules:copy your rules file into every agent'
+    'rules:copy your rules file into every agent, or list your corrections'
     'embed:build the semantic sidecar'
     'forget:remove indexed sessions'
     'handoff:continue a session in another agent'

@@ -235,6 +235,7 @@ $ deja "jwt refresh token"
 | `deja stats` | Your agent work, wrapped. `--card` draws it in the terminal, `--card <file>.svg` writes one for a profile, `--html` a browsable timeline. |
 | `deja secrets [--scrub]` | Which sessions' source transcripts carry credentials, and what kind. Never prints a value. `--scrub` rewrites the ones it can, original kept beside the file. |
 | `deja rules [sync]` | Keep your standing rules in `~/.config/deja/rules.md`; `sync` copies them as a marked block into every installed agent's global rules file. |
+| `deja rules candidates [--json] [--limit n] [--since 90d]` | The turns where you corrected an agent, across every tool, numbered with their session. Ask your agent to suggest rules and it groups them; nothing is written until you pick. |
 | `deja doctor [--deep]` | Self-diagnosis, and with `--deep`, proof of the index against the sources. |
 | `deja mcp` | The stdio MCP server, which is what `deja install` wires in. |
 

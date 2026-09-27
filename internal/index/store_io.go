@@ -1388,6 +1388,16 @@ func EachRecordOfRole(dir, role string, fn func(SessionMeta, Record)) error {
 	})
 }
 
+// EachRecordInRoles is eachRecordOfRoles for callers outside the package: a
+// session's turns of several kinds, in the order they alternated.
+func EachRecordInRoles(dir string, roles []string, fn func(SessionMeta, Record)) error {
+	want := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		want[r] = true
+	}
+	return eachRecordOfRoles(dir, want, fn)
+}
+
 // RoleEdit is the record kind holding the exact bytes an agent replaced.
 const RoleEdit = roleEdit
 

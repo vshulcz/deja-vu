@@ -170,7 +170,10 @@ func rulesState(path, body string) (string, error) {
 	return "stale", nil
 }
 
-func runRules(_ string, args []string) error {
+func runRules(dir string, args []string) error {
+	if len(args) > 0 && args[0] == "candidates" {
+		return runRulesCandidates(dir, os.Stdout, args[1:])
+	}
 	return runRulesTo(os.Stdout, args)
 }
 
@@ -181,8 +184,10 @@ func runRulesTo(w io.Writer, args []string) error {
 		case "sync":
 			sync = true
 		case "status":
+		case "candidates":
+			return fmt.Errorf("rules: candidates goes first and takes no other subcommand — `deja rules candidates [--json] [--limit n] [--since 90d]`")
 		default:
-			return unknownFlag("rules", a, []string{"sync", "status"})
+			return unknownFlag("rules", a, []string{"sync", "status", "candidates"})
 		}
 	}
 	body, exists, err := readRules()

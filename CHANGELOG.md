@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `deja rules` keeps the rules you give your agents in one file, `~/.config/deja/rules.md`, and `deja rules sync` copies it as a marked block into the global rules file of each installed agent that has one deja knows: Claude Code, Codex, opencode, Gemini, Qwen, Kimi, Grok and goose. A rule given to one agent used to stay there; on the machine this was measured on, seven were given again in other agents. doctor names an agent whose copy is behind, and uninstall takes the block out.
+- `deja rules candidates` lists the turns where you corrected an agent, and the deja skill tells your agent how to group them into suggested rules, with the turns behind each one, and to write only the ones you pick. deja leaves the grouping to the agent because it measured badly without one: three word-based groupings found 0 real rules in their top 10, while a frontier model given the same list found 10 of 10. A small local model did not manage it, so this wants a strong agent.
 
 ### Fixed
 
