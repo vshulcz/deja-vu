@@ -219,7 +219,7 @@ Full reference: [commands](https://vshulcz.github.io/deja-vu/guide/commands.html
 ### MCP tools
 
 The server exposes one tool, `deja`, with a `mode`; `deja install` wires it in. One tool
-costs 477 tokens of definitions a turn, against 8,283 for the largest of the eight servers
+costs 477 tokens of definitions a turn, against 8,283 for the largest of the seven servers
 measured in [day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html). The six
 older tool names (`recall`, `recall_context`, `blame`, `fix`, `how`, `remember`) still answer.
 
