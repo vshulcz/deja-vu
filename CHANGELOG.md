@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The OpenClaw plugin reaches ClawHub with each release again. ClawHub mints a publish token only for a `workflow_dispatch` run and refused every tag push since 0.21.0, so the tag run now dispatches `release.yml` with the tag and that run publishes.
+
 ## [0.21.3] - 2026-09-27
 
 Reasonix is the thirty-fifth agent deja reads, and `deja install reasonix-auto`

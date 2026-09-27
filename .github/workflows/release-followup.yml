@@ -26,7 +26,9 @@ concurrency:
 jobs:
   check:
     name: Has the repository caught up
-    if: github.event.workflow_run.conclusion == 'success'
+    # A dispatched Release run only publishes to ClawHub and runs on a branch,
+    # not a tag, so there is nothing to catch up on after it.
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read

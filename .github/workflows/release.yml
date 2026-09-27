@@ -4,12 +4,20 @@ on:
   push:
     tags:
       - 'v*'
+  # Only the ClawHub job runs on dispatch; see clawhub-dispatch below.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish to ClawHub, e.g. v0.21.3
+        required: true
+        type: string
 
 permissions: {}
 
 jobs:
   goreleaser:
     name: GitHub release + Homebrew
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -129,18 +137,44 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node scripts/release-npm.mjs "${GITHUB_REF_NAME#v}" dist
 
-  clawhub:
-    name: ClawHub package
+  # ClawHub mints a publish token only for a workflow_dispatch run, and refused
+  # every tag push from v0.21.0 on ("GitHub OIDC workflow requires
+  # workflow_dispatch, got push"). The tag run dispatches this file on the
+  # default branch with the tag, and that run publishes.
+  clawhub-dispatch:
+    name: Hand the ClawHub publish to a dispatched run
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: npm
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch release.yml for this tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH" -f tag="$GITHUB_REF_NAME"
+
+  clawhub:
+    name: ClawHub package
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       # ClawHub trusted publishing: the CLI trades the workflow's OIDC token for
       # a one-package, one-version publish token, so no secret is stored. The
       # package's trusted-publisher config names this repo and release.yml.
       id-token: write
+    env:
+      TAG: ${{ inputs.tag }}
     steps:
+      - name: Check the tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag must look like v1.2.3, got: $TAG"; exit 1; }
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -161,15 +195,15 @@ jobs:
             pkg.version = v;
             if (pkg.dependencies?.["@vshulcz/deja-vu"]) pkg.dependencies["@vshulcz/deja-vu"] = "^" + d;
             fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");
-          ' "$out/package.json" "$version" "${GITHUB_REF_NAME#v}"
+          ' "$out/package.json" "$version" "${TAG#v}"
           node scripts/release-clawhub-auth.mjs @vshulcz/openclaw-deja "$version"
           npx -y clawhub@0.23.3 package publish "$out" \
             --family code-plugin \
             --name @vshulcz/openclaw-deja \
             --version "$version" \
             --source-repo "$GITHUB_REPOSITORY" \
-            --source-commit "$GITHUB_SHA" \
-            --source-ref "$GITHUB_REF_NAME" \
+            --source-commit "$(git rev-parse HEAD)" \
+            --source-ref "$TAG" \
             --source-path extensions/openclaw \
-            --changelog "deja-vu $GITHUB_REF_NAME" \
+            --changelog "deja-vu $TAG" \
             --no-input
