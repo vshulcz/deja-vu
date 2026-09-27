@@ -107,6 +107,7 @@ var groups = []group{
 		{"memory-for-pi.html", "pi"},
 		{"memory-for-prime.html", "prime-agent"},
 		{"memory-for-qwen.html", "Qwen Code"},
+		{"memory-for-reasonix.html", "Reasonix"},
 		{"memory-for-roo.html", "Roo Code"},
 		{"memory-for-senpi.html", "Senpi"},
 		{"memory-for-copilot-chat.html", "VS Code Copilot Chat"},

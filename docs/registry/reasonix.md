@@ -63,6 +63,47 @@ line of the host's session-context message (the CLI writes no header), else,
 for a desktop session, the workspace that lists its id in
 `<state>/desktop/workspace-state-v1.json`.
 
+## Wiring
+
+Reasonix takes everything as one plugin package (`reasonix-plugin.json`,
+`apiVersion: reasonix.io/plugin/v2`). deja writes the package to
+`~/.config/deja/reasonix-plugin` and hands it to
+`reasonix plugin install <dir> --name deja --replace --yes`, which copies it to
+`<home>/plugins/deja` and records it in `<home>/plugin-packages.json`. With no
+`reasonix` on PATH deja writes the same layout itself. `<home>` is
+`$REASONIX_HOME`, else `~/.reasonix`. `config.toml` is not touched.
+
+- **MCP**: `deja install reasonix` puts the server in the package's
+  `mcpServers`. Package servers start with the session; the model reaches
+  `deja` through `use_capability`.
+- **Skill**: `skills/deja-history/SKILL.md` in the package.
+- **Command**: `commands/deja.md` in the package, listed as `/deja:deja`.
+- **Auto-recall**: `deja install reasonix-auto` adds a runtime, `deja
+  reasonix-ext`, speaking Reasonix's extension protocol v2 (JSON-RPC 2.0 over
+  stdio). Hooks cannot carry it: on 1.39.1 only `SessionStart` stdout reaches
+  the model. The extension appends the session digest (first turn) and the
+  per-prompt recall to the user turn at `input.receive`, so recall sits in the
+  turn tail and the prefix cache is not disturbed; the system prompt is never
+  edited. Reasonix stores the typed text as `raw_content`, and that is what
+  deja indexes. At `tool.after` it appends the pre-tool line and, when a
+  command failed, what fixed the same failure before. At
+  `compaction.prepare` it adds deja's record of the folded turns to the
+  summarizer's guidance. It publishes a status line while the first index
+  builds and one "recalled N prior sessions" notice per session. Every answer
+  has a budget under the host's timeout (4 s per prompt, 2 s per tool call,
+  10 s for compaction); an error, a timeout or nothing to say leaves the turn
+  as the host built it.
+- **Statusline**: not installed. A Reasonix statusline replaces the built-in
+  row and lives in `config.toml`; the extension's status and notice lines
+  carry the same information.
+- **Trust**: a runtime runs with full trust. `--yes` is the approval, and
+  install prints what was trusted; `reasonix plugin show deja` lists the
+  intercepts.
+- **Uninstall**: removes the package directory and deja's record, and the
+  state file too when deja created it.
+- **Resume**: `reasonix --resume <id>` in the session's workspace.
+- **Handoff**: paste.
+
 **Last verified:** 2026-09-27
 
 ## Known quirks and drift
@@ -102,5 +143,13 @@ for a desktop session, the workspace that lists its id in
   and was checked against a
   live `reasonix` 1.39.1: sessions it wrote are read here, and it resumes the
   1.x fixture deja checks in.
-- **Nothing is wired.** deja reads this store and writes nothing into
-  Reasonix.
+- **Pre-tool lines arrive with the result.** A `tool.before` answer can
+  only let a call run, change it or stop it, so the line deja has about a
+  command or file is held and appended to that call's result.
+- **The session id is read off the store.** The extension is told a
+  host-local id (`boot-1` on 1.39.1). deja takes the real one from the one
+  `sessions-v4` directory written since the session began; with none or
+  several it files the session under a key of its own.
+- **2.x is checked from source only.** Reasonix 2.x (branch `studio`) has
+  the same v2 manifest and extension protocol, so the package is the same
+  there; it has not been run against a 2.x build.

@@ -81,6 +81,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [gajae-code](https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html)
 - [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html)
 - [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html)
+- [Reasonix](https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html): a plugin package; recall rides in the turn tail, not the system prompt
 - [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html): read-only, nothing to install yet
 
 ## Evidence

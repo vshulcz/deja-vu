@@ -1047,36 +1047,15 @@
       "last_verified": "2026-09-27",
       "display_name": "Reasonix",
       "capabilities": {
-        "mcp": false,
-        "auto": false,
-        "skill": false,
-        "command": false,
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
         "resume": true,
         "handoff": "paste",
         "prereq": "none"
       },
-      "gaps": {
-        "mcp": {
-          "state": "todo",
-          "why": "Reasonix reads MCP servers from its own config.toml; deja does not write that file yet — this release reads the store and wires nothing (#4053).",
-          "source": "https://github.com/esengine/DeepSeek-Reasonix/blob/main/internal/contract/config/mcp_load.go"
-        },
-        "auto": {
-          "state": "todo",
-          "why": "Hooks live in .reasonix/settings.json in Reasonix's own schema, not Claude's; not written yet (#4053).",
-          "source": "https://github.com/esengine/DeepSeek-Reasonix/tree/main/internal/ext/hook"
-        },
-        "skill": {
-          "state": "unknown",
-          "why": "Skill discovery scans ~/.claude as well as ~/.reasonix (config.ConventionDirs), so the skill deja writes for Claude Code may already load there; not checked against a running Reasonix.",
-          "source": "https://github.com/esengine/DeepSeek-Reasonix/blob/main/internal/ext/skill/skill.go"
-        },
-        "command": {
-          "state": "unknown",
-          "why": "Custom slash commands are read from the same convention directories as skills; not checked against a running Reasonix.",
-          "source": "https://github.com/esengine/DeepSeek-Reasonix/blob/main/internal/contract/config/paths.go"
-        }
-      }
+      "gaps": {}
     }
   ]
 }

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add memory to Reasonix: recall past sessions — deja-vu</title>
+<meta name="description" content="Reasonix can resume one session; nothing reads the others back. deja installs a plugin with a server, skill, command and extension, and indexes every agent.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Add memory to Reasonix: recall past sessions">
+<meta property="og:description" content="Reasonix can resume one session; nothing reads the others back. deja installs a plugin with a server, skill, command and extension, and indexes every agent.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Add memory to Reasonix: recall past sessions">
+<meta name="twitter:description" content="Reasonix can resume one session; nothing reads the others back. deja installs a plugin with a server, skill, command and extension, and indexes every agent.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Reasonix", "description": "Reasonix keeps every session and can resume one; nothing reads the others back. deja installs a Reasonix plugin with its MCP server, skill, slash command and an extension, and indexes every other agent on the machine.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-27", "dateModified": "2026-09-27"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Reasonix", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Reasonix remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps every session under ~/.reasonix and can resume one with --resume, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine and gives the model a tool to search them."}}, {"@type": "Question", "name": "How do I add memory to Reasonix?", "acceptedAnswer": {"@type": "Answer", "text": "deja install reasonix-auto installs a Reasonix plugin named deja: an MCP server, a skill, a /deja command and an extension that adds recall to the turn at input.receive, the fix for a failed command at tool.after, and deja's record of the folded turns at compaction. It goes through reasonix plugin install when reasonix is on PATH."}}, {"@type": "Question", "name": "Does deja break Reasonix's prefix cache?", "acceptedAnswer": {"@type": "Answer", "text": "No. The system prompt is never edited. Recall is appended to the user turn, which is the tail of the request, and stays byte-identical in every later request's prefix."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">10</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">12</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold" open><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html" aria-current="page">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Adding memory to Reasonix</h1>
+<p class="pagelede">it can resume one session; nothing reads the others back<span class="mins" data-mins></span></p>
+
+<p>Reasonix keeps every session under <code>~/.reasonix</code> (or <code>$REASONIX_HOME</code>) and resumes one with <code>--resume</code>. A new session reads none of the others, and nothing in it knows about the Claude Code session in the same repo yesterday. This page is about adding that.</p>
+
+<h2>What Reasonix already has</h2>
+<p>The session store, a way back into one session, and a plugin system: a package with a <code>reasonix-plugin.json</code> manifest can carry MCP servers, skills, slash commands and a runtime extension that the host starts beside the session. Its hooks run, but on 1.39.1 only what a <code>SessionStart</code> hook prints reaches the model; the output of the per-prompt and per-tool hooks is dropped. So recall has to go through the extension.</p>
+
+<h2>Adding recall</h2>
+<pre>deja install reasonix-auto</pre>
+<p>This writes one plugin package, named <code>deja</code>, and hands it to <code>reasonix plugin install</code>; with no <code>reasonix</code> on PATH, deja writes the same layout itself. <code>deja uninstall reasonix-auto</code> takes it back out. The package holds:</p>
+<ul>
+<li><b>The MCP server</b>, started with the session. The model finds it through <code>use_capability</code>.</li>
+<li><b>The skill</b> at <code>skills/deja-history/SKILL.md</code>.</li>
+<li><b>The slash command</b> at <code>commands/deja.md</code>, listed as <code>/deja:deja</code>, so a question works whether or not the model decides to look.</li>
+<li><b>The extension</b>, <code>deja reasonix-ext</code>, which the host starts and talks to over stdin and stdout. <code>deja install reasonix</code> without the suffix installs the first three and leaves this one out.</li>
+</ul>
+<p>A runtime extension runs with full trust in Reasonix, and <code>--yes</code> is how the install approves it; deja prints that line when it installs. <code>reasonix plugin show deja</code> lists what the extension intercepts. <code>config.toml</code> is never written.</p>
+
+<h2>What arrives, and where</h2>
+<p>On a session's first prompt, a short digest of what this machine has done on the project — decisions, the commands that worked, the errors that recurred. On a prompt your own history already answers, that answer. Both are appended to the user turn, not the system prompt: Reasonix is built around DeepSeek's prefix cache, and a system prompt that changes every turn would miss it every turn. Appended to the turn, the text stays byte-identical in every later request's prefix. Reasonix stores what you typed separately, and that is what deja indexes, so recall does not feed back into the index.</p>
+<p>When a command fails, the tool result the model reads carries what followed that same error here before. When the conversation is compacted, deja adds its record of the folded turns — the objective, the conclusions, each command with how it went — to the summarizer's instructions. While the first index builds, the status line says so; once per session a line says how many past sessions were recalled.</p>
+<p>Each answer has a budget under the host's own timeout. A slow or failed lookup, or one with nothing to say, leaves the turn exactly as Reasonix built it. Measured on a warm index over seven turns, the per-prompt step took a median of about 150 ms, within 20 ms of running deja's per-prompt hook directly.</p>
+
+<h2>The part that is not about Reasonix</h2>
+<p>The index covers every agent's transcripts on the machine — thirty-five of them, each in its own format — so a fix found in Claude Code answers a question asked in Reasonix, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>
+
+<p><a href="getting-started.html">Getting started</a> · <a href="switching-agents.html">Switching between agents</a> · <a href="../registry/reasonix.html">The Reasonix session format</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

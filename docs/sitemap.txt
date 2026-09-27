@@ -47,6 +47,7 @@ https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-kimchi.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html
+https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-senpi.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html
 https://vshulcz.github.io/deja-vu/guide/lost-context.html
