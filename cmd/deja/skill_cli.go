@@ -23,7 +23,7 @@ Two triggers are easy to miss because they are not questions:
 - The user states that something of theirs already exists and you have no record of it — "I already have X", "we use Y for this", "that's what Z is for". They are not asking; they are telling you the history exists, which is a stronger reason to search than a question is.
 - You are about to tell the user that something on this machine does not exist — a command, a file, a setting, a past decision. Recall first. Absence from the code in front of you is not absence from the machine, and a wrong denial sends them to rebuild what they have.
 
-This skill drives the ` + "`deja`" + ` binary through the shell. If the deja MCP tool is available in this session — one tool with a mode of recall, context, blame, fix, how or remember — use that instead: same index, one less hop. It appears only when ` + "`deja install`" + ` has wired this harness.
+This skill drives the ` + "`deja`" + ` binary through the shell. If the deja MCP tool is available in this session — one tool with a mode of recall, context, blame, fix, how, orient or remember — use that instead: same index, one less hop. It appears only when ` + "`deja install`" + ` has wired this harness.
 
 ## Finding something
 

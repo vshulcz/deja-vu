@@ -4109,7 +4109,7 @@ Usage:
   deja version
   deja <command> --help
   deja update [--force]
-  deja install <target>... | --all | --auto  [--no-guidance] [--no-index]
+  deja install <target>... | --all | --auto  [--no-guidance] [--no-index] [--force]
   deja uninstall <target>... | --all | --auto
     targets:
 %s

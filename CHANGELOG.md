@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The Zed extension uses the `deja` already on PATH instead of downloading its own copy. Its probe runs `deja --version`, which Zed refuses unless the manifest lists it, and the manifest listed nothing (#4068).
+- The `deja-history` skill names `orient` with the other modes; the MCP tool had seven and the skill listed six.
+
 ### Added
 - Reasonix, the thirty-fifth harness deja reads (#4053, requested by @TianQue6916). Its sessions were reachable only through `DEJA_COMMANDCODE_ROOT`, filed under `commandcode` with no project and no date. deja now follows Reasonix's own root chain (`REASONIX_STATE_HOME`, `REASONIX_HOME`, `[storage] state` in `config.toml`, then `~/.reasonix`, or `%APPDATA%\reasonix` on Windows) and reads the JSONL store, the legacy roots while they exist, and the 1.x session directories, whose `events.frames` it decodes through the `zstd` CLI. `deja resume` prints `reasonix --resume <id>` in the session's workspace.
 - `deja install reasonix` and `reasonix-auto`. Both install one Reasonix plugin package, `deja`, carrying the MCP server, the `deja-history` skill and `/deja`. `reasonix-auto` adds a runtime extension, `deja reasonix-ext`, since on Reasonix 1.39.1 only SessionStart hook output reaches the model: it appends the session digest and per-prompt recall to the user turn, not the system prompt, so DeepSeek's prefix cache keeps hitting; adds the fix for a failed command to that tool result; and hands the compaction summarizer deja's record of the turns being folded. With a warm index the per-prompt step took a median of 131 ms over eight turns, against 120 ms for the hook run directly. `deja doctor` reports the package, a disabled record, and a runtime binary that is gone.
