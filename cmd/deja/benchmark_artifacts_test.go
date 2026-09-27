@@ -226,12 +226,17 @@ func TestQuotedHeadlineNumbersComeFromTheRuns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, ok := countedBefore(string(index), "hit@1 · LongMemEval-S")
+	// It quotes R@5 on the full set, because that is the metric and the
+	// denominator MemPalace and agentmemory publish beside it.
+	got, ok := countedBefore(string(index), "R@5 · LongMemEval-S, all 500 questions")
 	if !ok {
-		t.Fatal("docs/index.html has no counter labelled hit@1 · LongMemEval-S")
+		t.Fatal("docs/index.html has no counter labelled R@5 · LongMemEval-S, all 500 questions")
 	}
-	if got != wantHit1 {
-		t.Errorf("the landing counter is %s; the committed run is %s", got, wantHit1)
+	if want := pct1(full.Total.Hit5); got != want {
+		t.Errorf("the landing counter is %s; the committed full run is %s", got, want)
+	}
+	if full.Total.N != 500 {
+		t.Errorf("the landing label says 500 questions; the full run counted %d", full.Total.N)
 	}
 }
 

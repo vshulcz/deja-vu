@@ -87,11 +87,12 @@ h1 em{font-style:normal;color:var(--amber)}
 .under b{color:var(--coat-hi);font-weight:400}
 
 .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
-  border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:104px}
+  border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .proof div{background:var(--bg);padding:26px 24px}
 .proof b{display:block;font:700 31px/1 var(--sans);color:var(--ink);letter-spacing:-.02em}
 .proof b i{font-style:normal;font-size:16px;color:var(--faint);font-weight:500}
 .proof .lab{display:block;margin-top:9px;font:12.5px var(--mono);color:var(--faint)}
+.proofcap{margin:14px 0 104px;font:13px/1.5 var(--mono);color:var(--faint)}
 
 section{margin-bottom:104px}
 h2{font:700 12px/1 var(--mono);letter-spacing:.18em;color:var(--faint);
@@ -348,10 +349,13 @@ footer a:hover{color:var(--ph-hi)}
 </div>
 
 <div class="proof reveal" id="proof">
-  <div><b data-count="88.1" data-dp="1">0<i>%</i></b><span class="lab">hit@1 · LongMemEval-S, 470-question cleaned set</span></div>
-  <div><b data-count="0.7" data-dp="1">0<i>ms</i></b><span class="lab">median lookup, <code>deja bench recall</code></span></div>
-  <div><b>0</b><span class="lab">models, keys or cloud accounts</span></div>
+  <div><b data-count="97.2" data-dp="1">0<i>%</i></b><span class="lab">R@5 · LongMemEval-S, all 500 questions · MemPalace publishes 96.6, agentmemory 95.2</span></div>
+  <div><b data-count="49" data-dp="0">0<i>%</i></b><span class="lab">fewer tokens than agentmemory on a task already solved · 53,558 vs 104,974</span></div>
+  <div><b data-count="17.6" data-dp="1">0<i>s</i></b><span class="lab">to index 19,195 sessions · the next of seven tools, 72 s</span></div>
 </div>
+<p class="proofcap reveal">The most accurate, the cheapest and the fastest coding-agent memory we could measure.
+  I maintain deja-vu, so <a href="guide/day-zero.html">every driver and the corpus</a> are in the repository
+  — re-run a row you doubt. <a href="guide/benchmarks.html">All the runs</a>.</p>
 
 <section class="reveal">
   <h2>The difference</h2>
