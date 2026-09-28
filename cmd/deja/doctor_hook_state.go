@@ -65,6 +65,11 @@ func claudeHookWiringState() hookWiringState {
 	if doctorLauncherNote(st.path, "claude-auto") != "" {
 		st.dead = true
 	}
+	// A binary that is there can still be one the shell cannot reach as the
+	// file spells it (#4125); asked only when nothing above already said dead.
+	if !st.dead && len(st.missing) < len(claudeHookWiring) && claudeHookRunNote(st.hooks) != "" {
+		st.dead = true
+	}
 	return st
 }
 
