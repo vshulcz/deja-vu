@@ -291,7 +291,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 			return "", "", err
 		}
 		if key == "" {
-			return "", "", fmt.Errorf("session %s is not in openclaw's session store, so it has no key to reopen by", digest.Short(s.ID))
+			// Either the store never mapped this id, or a reset moved its key
+			// on to a newer window: the old one stays searchable but
+			// `--session <key>` would open the new one.
+			return "", "", fmt.Errorf("session %s is not the current session of any openclaw key, so there is no key that reopens it", digest.Short(s.ID))
 		}
 		if !openclawKeyPattern.MatchString(key) {
 			return "", "", fmt.Errorf("session key %q contains characters deja will not place in a command", key)

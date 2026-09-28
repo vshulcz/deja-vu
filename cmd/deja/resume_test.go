@@ -287,6 +287,9 @@ func TestResumeOpenClawSQLiteUsesTheCurrentSessionKey(t *testing.T) {
 			case old:
 				if err == nil {
 					t.Errorf("old window %s reopened the current session with %q", s.ID, cmd)
+				} else if !strings.Contains(err.Error(), "not the current session") {
+					// It is in the store; saying otherwise sends the user looking for it.
+					t.Errorf("old window %s: %v", s.ID, err)
 				}
 			default:
 				t.Errorf("unexpected session %s", s.ID)
