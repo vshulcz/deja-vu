@@ -71,7 +71,16 @@ func hookRun(exe string, rest ...string) string {
 // double quote, so the two platforms quote differently — and a backslash is
 // not a reason to quote on Windows, where every path has them.
 func hookCommandQuote(s string) string {
-	if runtime.GOOS == "windows" {
+	return hookCommandQuoteFor(runtime.GOOS, s)
+}
+
+// On Windows the path is written with forward slashes. Claude Code hands its
+// hooks to Git Bash, which strips an unquoted backslash, so the command named
+// a file that does not exist and every hook exited 127 (#4116). Windows opens
+// a path with forward slashes the same way, and so do cmd.exe and PowerShell.
+func hookCommandQuoteFor(goos, s string) string {
+	if goos == "windows" {
+		s = strings.ReplaceAll(s, `\`, "/")
 		if !strings.ContainsAny(s, " \t") {
 			return s
 		}

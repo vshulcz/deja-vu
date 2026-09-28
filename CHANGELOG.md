@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On Windows, Claude Code's hooks run again. deja wrote the binary's path with backslashes, Claude Code hands hook commands to Git Bash, and bash strips unquoted backslashes, so every hook exited 127 without a word (#4116). Hook commands now name the path with forward slashes, which bash, cmd.exe and PowerShell all run. Existing configs are rewritten on the first run after upgrading.
 - The OpenClaw plugin reaches ClawHub with each release again. ClawHub mints a publish token only for a `workflow_dispatch` run and refused every tag push since 0.21.0, so the tag run now dispatches `release.yml` with the tag and that run publishes.
 
 ## [0.21.3] - 2026-09-27
