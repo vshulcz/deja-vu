@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -27,7 +28,8 @@ func TestHermesExtensionIsTheProviderInstallWrites(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(got) != body {
+		// A Windows checkout may hand the file back with CRLF endings.
+		if strings.ReplaceAll(string(got), "\r\n", "\n") != body {
 			t.Errorf("extensions/hermes/%s differs from what deja install writes — DEJA_WRITE_EXTENSIONS=1 go test ./cmd/deja -run TestHermesExtension", name)
 		}
 	}
