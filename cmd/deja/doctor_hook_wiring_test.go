@@ -19,7 +19,9 @@ func writeClaudeSettings(t *testing.T, events ...string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeClaudeSettingsNaming(t, exe, events...)
+	// Spelled the way the installer spells it, forward slashes on Windows
+	// (#4116): the raw path there is the form Git Bash cannot run.
+	writeClaudeSettingsNaming(t, hookCommandQuote(exe), events...)
 }
 
 // writeClaudeSettingsNaming is the same fixture with the binary named, for the

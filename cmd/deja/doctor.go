@@ -249,6 +249,8 @@ func doctorHooks(w io.Writer) {
 	// what can be gone is everything it resolves to (#3422).
 	if note := doctorLauncherNote(st.path, "claude-auto"); note != "" {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
+	} else if st.runNote != "" {
+		fmt.Fprintf(w, "  %-12s %s\n", "", st.runNote)
 	}
 }
 

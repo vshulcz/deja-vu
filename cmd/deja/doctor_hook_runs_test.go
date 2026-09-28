@@ -1,0 +1,94 @@
+package main
+
+import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+// Every Claude Code hook exited 127 on a Windows machine whose settings named
+// `H:\pycode\Self\deja-vu\deja.exe`, and doctor printed "wired": the binary
+// was there, and Git Bash could not reach it as spelled (#4116). The same
+// spelling fails in any bash, so the check is exercised here with it.
+func TestDoctorSaysWhenTheShellCannotRunTheHook(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("no bash")
+	}
+	hermeticEnv(t)
+	write := func(exe string) {
+		t.Helper()
+		var b strings.Builder
+		b.WriteString(`{"hooks":{`)
+		for i, h := range claudeHookWiring {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(`"` + h.Event + `":[{"hooks":[{"type":"command","command":` + jsonQuoted(exe+" "+h.Sub) + `}]}]`)
+		}
+		b.WriteString(`}}`)
+		dir := sources.ClaudeConfigDir()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(b.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// On Windows the binary is really there, spelled the way deja used to
+	// write it; elsewhere the spelling alone is enough to fail in bash, and
+	// the path is not absolute there, so the missing-binary check stays out.
+	broken := `H:\pycode\Self\deja-vu\deja.exe`
+	if runtime.GOOS == "windows" {
+		if claudeHookShell() == "" {
+			t.Skip("no Git Bash")
+		}
+		broken = filepath.Join(t.TempDir(), "deja.exe")
+		if err := os.WriteFile(broken, []byte("MZ"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(broken)
+	if st := claudeHookWiringState(); !st.dead {
+		t.Errorf("a hook bash cannot run reads as %q and not dead", st.state)
+	}
+	if note := claudeHookRunNote(claudeHookWiringState().hooks); !strings.Contains(note, "exits 127") {
+		t.Errorf("no note for a hook bash cannot run: %q", note)
+	}
+	if out, _ := captureRun(t, "doctor"); !strings.Contains(out, "every hook exits 127") {
+		t.Errorf("doctor's report does not say the hooks cannot start:\n%s", out)
+	}
+
+	// The control: the same file naming a binary bash can run says nothing.
+	ok := filepath.Join(t.TempDir(), "deja")
+	if err := os.WriteFile(ok, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write(hookCommandQuote(ok))
+	if note := claudeHookRunNote(claudeHookWiringState().hooks); note != "" {
+		t.Errorf("a runnable hook was reported: %q", note)
+	}
+	if st := claudeHookWiringState(); st.dead {
+		t.Error("a runnable hook reads as dead")
+	}
+}
+
+// A command the reader built around deja is not deja's to check: `command -v`
+// would run the part after `&&`.
+func TestTheHookRunCheckLeavesAWrappedCommandAlone(t *testing.T) {
+	for _, exe := range []string{"cd /x && /usr/local/bin/deja", "FOO=1 /usr/local/bin/deja", "$HOME/bin/deja", "'/a b/deja' || true"} {
+		if hookExeIsOneWord(exe) {
+			t.Errorf("%q passed as one word", exe)
+		}
+	}
+	for _, exe := range []string{"/usr/local/bin/deja", "'/Applications/My Tools/deja'", `"C:/Program Files/deja/deja.exe"`, `H:\pycode\Self\deja-vu\deja.exe`, `C:\Users\RUNNER~1\AppData\Local\Temp\deja.exe`} {
+		if !hookExeIsOneWord(exe) {
+			t.Errorf("%q, a path deja writes, was skipped", exe)
+		}
+	}
+}

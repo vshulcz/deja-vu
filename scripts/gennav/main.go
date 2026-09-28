@@ -51,6 +51,7 @@ var groups = []group{
 		{"switching-agents.html", "Switching agents"},
 		{"parallel-sessions.html", "Parallel sessions"},
 		{"rules-files.html", "When CLAUDE.md grows"},
+		{"one-rules-file.html", "One rules file"},
 		{"token-cost.html", "What memory costs"},
 	}},
 	{title: "Session history", fold: true, links: []link{

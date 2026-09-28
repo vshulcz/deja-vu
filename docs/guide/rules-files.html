@@ -48,7 +48,7 @@
 <a href="commands.html">CLI reference</a>
 <a href="harnesses.html">Harnesses</a>
 <a href="privacy.html">Privacy</a>
-<details class="grpfold" open><summary>Why agents forget <span class="n">10</span></summary>
+<details class="grpfold" open><summary>Why agents forget <span class="n">11</span></summary>
 <a href="forgetting.html">Why agents forget</a>
 <a href="does-my-agent-remember.html">Does my agent remember?</a>
 <a href="lost-context.html">Lost context</a>
@@ -58,6 +58,7 @@
 <a href="switching-agents.html">Switching agents</a>
 <a href="parallel-sessions.html">Parallel sessions</a>
 <a href="rules-files.html" aria-current="page">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
 <details class="grpfold"><summary>Session history <span class="n">8</span></summary>
@@ -165,6 +166,7 @@ deja blame internal/index/ingest.go   # what earlier sessions decided about this
 
 <h2>A way to shorten one</h2>
 <p>Go through the file line by line and ask two questions. Is this true on every session? Could the agent find it out from the repository in one step? A line that fails the first is history; a line that fails the second is noise. What survives is usually a page, and the rest is not deleted so much as moved to where it can be retrieved on demand.</p>
+<p>If what survives has to reach more than one agent — <code>CLAUDE.md</code> for Claude Code, <code>AGENTS.md</code> for Codex — see <a href="one-rules-file.html">one set of rules for every agent</a>.</p>
 <p>One caution: do not convert a rules file into a memory system by hand. Writing down each fact you might need later is the same manual step that made the file long, and the sessions already contain them.</p>
 
 <p><a href="forgetting.html">Why agents forget</a> · <a href="token-cost.html">What memory costs in tokens</a> · <a href="repeated-mistakes.html">When the same wall comes back</a></p>

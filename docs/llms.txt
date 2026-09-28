@@ -36,6 +36,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
 - [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
+- [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
 - [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
 - [Auditing an agent](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html): review agent changes when the diff cannot say what was tried
 - [Exporting a conversation](https://vshulcz.github.io/deja-vu/guide/export-conversations.html): markdown, JSON, or a shareable page
