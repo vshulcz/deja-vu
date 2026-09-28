@@ -12,6 +12,7 @@ https://vshulcz.github.io/deja-vu/guide/export-conversations.html
 https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html
 https://vshulcz.github.io/deja-vu/guide/token-cost.html
 https://vshulcz.github.io/deja-vu/guide/rules-files.html
+https://vshulcz.github.io/deja-vu/guide/one-rules-file.html
 https://vshulcz.github.io/deja-vu/guide/auditing-agents.html
 https://vshulcz.github.io/deja-vu/guide/find-a-session.html
 https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html

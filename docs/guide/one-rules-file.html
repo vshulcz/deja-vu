@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CLAUDE.md, AGENTS.md, GEMINI.md: one rules file — deja-vu</title>
+<meta name="description" content="Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/one-rules-file.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="CLAUDE.md, AGENTS.md, GEMINI.md: one rules file">
+<meta property="og:description" content="Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/one-rules-file.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="CLAUDE.md, AGENTS.md, GEMINI.md: one rules file">
+<meta name="twitter:description" content="Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "CLAUDE.md, AGENTS.md, GEMINI.md: one rules file", "description": "Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.", "url": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-28", "dateModified": "2026-09-28"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"One rules file","item":"https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does Claude Code read AGENTS.md?","acceptedAnswer":{"@type":"Answer","text":"Since 2.1.277 Claude Code reads a project's AGENTS.md when the project has no CLAUDE.md. With both present it reads CLAUDE.md, so a CLAUDE.md that holds one line, @AGENTS.md, imports the shared file and works on any version with imports."}},{"@type":"Question","name":"How do I use one rules file for Claude Code, Codex and Gemini CLI?","acceptedAnswer":{"@type":"Answer","text":"In a repository, keep the rules in AGENTS.md, import it from CLAUDE.md with @AGENTS.md, and point Gemini CLI at it with context.fileName in .gemini/settings.json. For your own rules across projects, keep them in ~/.config/deja/rules.md and run deja rules sync, which copies them into each installed agent's global rules file."}},{"@type":"Question","name":"Where are the global rules files for Claude Code, Codex and Gemini CLI?","acceptedAnswer":{"@type":"Answer","text":"~/.claude/CLAUDE.md for Claude Code, ~/.codex/AGENTS.md for Codex, ~/.gemini/GEMINI.md for Gemini CLI, ~/.config/opencode/AGENTS.md for opencode and ~/.qwen/QWEN.md for Qwen Code."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold" open><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html" aria-current="page">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">12</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>One set of rules for every agent</h1>
+<p class="pagelede">CLAUDE.md, AGENTS.md, GEMINI.md — the same rules, written three times, drifting apart<span class="mins" data-mins></span></p>
+
+<p>You tell Claude Code to run the tests with <code>-race</code>. A week later Codex runs them without it, because that rule went into <code>CLAUDE.md</code> and Codex reads <code>AGENTS.md</code>. Every agent reads its own file, and a rule given to one never reaches the others.</p>
+<p>There are two separate problems here. One is a repository that several agents work in. The other is your own rules, the ones you carry across every project, which live in a different file per agent in your home directory.</p>
+
+<h2>Which file each agent reads</h2>
+<table>
+<tr><th>Agent</th><th>In the project</th><th>Your global file</th></tr>
+<tr><td>Claude Code</td><td><code>CLAUDE.md</code>, or <code>AGENTS.md</code> when there is no <code>CLAUDE.md</code> (2.1.277+)</td><td><code>~/.claude/CLAUDE.md</code></td></tr>
+<tr><td>Codex</td><td><code>AGENTS.md</code></td><td><code>~/.codex/AGENTS.md</code></td></tr>
+<tr><td>opencode</td><td><code>AGENTS.md</code></td><td><code>~/.config/opencode/AGENTS.md</code></td></tr>
+<tr><td>Gemini CLI</td><td><code>GEMINI.md</code></td><td><code>~/.gemini/GEMINI.md</code></td></tr>
+<tr><td>Qwen Code</td><td><code>QWEN.md</code></td><td><code>~/.qwen/QWEN.md</code></td></tr>
+<tr><td>Kimi Code</td><td><code>AGENTS.md</code></td><td><code>~/.kimi-code/AGENTS.md</code></td></tr>
+<tr><td>Grok Build</td><td><code>AGENTS.md</code></td><td><code>~/.grok/AGENTS.md</code></td></tr>
+<tr><td>goose</td><td><code>.goosehints</code></td><td>its hints file under <code>~/.config/goose</code></td></tr>
+</table>
+<p>Cursor, Windsurf and most IDE agents keep your personal rules in their settings rather than in a file, so nothing outside the editor can write them.</p>
+
+<h2>In one repository: make AGENTS.md the source</h2>
+<p><code>AGENTS.md</code> is the name most agents already read, so keep the rules there and point the rest at it.</p>
+<p><b>Claude Code.</b> A <code>CLAUDE.md</code> with a single import line reads the shared file, and works whether or not your version picks up <code>AGENTS.md</code> on its own:</p>
+<pre>@AGENTS.md</pre>
+<p>Claude-specific lines can go under it. Deleting <code>CLAUDE.md</code> also works on 2.1.277 and later, since Claude Code then reads <code>AGENTS.md</code> itself, but the import is the version that does not depend on which build a teammate runs.</p>
+<p><b>Gemini CLI.</b> Tell it which context files to load, in <code>.gemini/settings.json</code>:</p>
+<pre>{ "context": { "fileName": ["AGENTS.md", "GEMINI.md"] } }</pre>
+<p><b>A symlink</b> (<code>ln -s AGENTS.md CLAUDE.md</code>) is the other common answer. It works on macOS and Linux, and turns into a plain text file with a path in it on a Windows checkout without symlink support.</p>
+
+<h2>Your own rules, across every agent</h2>
+<p>The global files are where the standing preferences go: how you want commits written, what never to run without asking, the test flag you always want. They are also the ones that drift, because nobody opens <code>~/.gemini/GEMINI.md</code> to add the rule they just gave Claude Code.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> keeps them in one file and copies it out. Write the rules in <code>~/.config/deja/rules.md</code>, then:</p>
+<pre>$ deja rules
+rules: ~/.config/deja/rules.md, 12 lines, 640 bytes
+  claude-code  missing   ~/.claude/CLAUDE.md
+  codex        in sync   ~/.codex/AGENTS.md
+  opencode     stale     ~/.config/opencode/AGENTS.md
+  gemini       missing   ~/.gemini/GEMINI.md
+run `deja rules sync` to bring them in line
+
+$ deja rules sync</pre>
+<p><code>sync</code> writes the rules into each file as a block between <code>&lt;!-- deja rules:start --&gt;</code> and <code>&lt;!-- deja rules:end --&gt;</code> and leaves everything else in the file alone. Edit <code>rules.md</code> and sync again; empty it and sync takes the blocks back out. It only writes to agents deja is installed for, and only to files it has verified the agent reads. An agent whose global file it does not know is listed and left alone rather than guessed at. <code>deja doctor</code> names any agent whose copy has fallen behind.</p>
+<p>The file is capped at 8 KB. Every agent reads it on every session, so it is worth keeping to what you would say to a new colleague on day one — <a href="rules-files.html">what belongs in a rules file</a> covers the rest.</p>
+
+<h2>Finding the rules you keep repeating</h2>
+<p>Most people have never written their rules down; they say them again every few sessions. Those corrections are already in the transcripts. <code>deja rules candidates</code> lists the turns where you corrected an agent, across every tool on the machine, each with the session it came from:</p>
+<pre>$ deja rules candidates --since 90d
+#14 codex 2026-09-03 deja:9f2c41ab
+user: no, run it with -race, always
+before it, the agent: Tests pass: ok  ./internal/index 1.8s
+...</pre>
+<p>deja does not group them itself, because the same rule comes back in different words each time: three word-based groupings over one machine's 236 candidates put no real rule in their top ten. Ask your agent to suggest your rules instead. The deja skill has it run the command, group the list into rules stated in at least two sessions, cite the turns behind each one, and stop. Nothing is written to <code>rules.md</code> until you pick. On that same list a frontier model found ten real rules out of ten; a small local model invented candidate numbers, so use a strong one for this step.</p>
+
+<p><a href="rules-files.html">When CLAUDE.md gets too long</a> · <a href="switching-agents.html">Switching agents</a> · <a href="repeated-mistakes.html">When the same wall comes back</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
