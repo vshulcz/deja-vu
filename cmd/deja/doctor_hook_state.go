@@ -19,6 +19,7 @@ type hookWiringState struct {
 	state   string
 	missing []string       // events this release wires that the file lacks
 	dead    bool           // the entries name a deja that is not there
+	runNote string         // or name one the host's shell cannot reach as spelled (#4125)
 	hooks   map[string]any // for the repeat check, which reads the entries
 	absent  bool           // the file itself is not there, so there is nothing else to say
 	// trustUnknown is codex's own state: hooks.json is wired and its trust
@@ -67,8 +68,9 @@ func claudeHookWiringState() hookWiringState {
 	}
 	// A binary that is there can still be one the shell cannot reach as the
 	// file spells it (#4125); asked only when nothing above already said dead.
-	if !st.dead && len(st.missing) < len(claudeHookWiring) && claudeHookRunNote(st.hooks) != "" {
-		st.dead = true
+	if !st.dead && len(st.missing) < len(claudeHookWiring) {
+		st.runNote = claudeHookRunNote(st.hooks)
+		st.dead = st.runNote != ""
 	}
 	return st
 }
