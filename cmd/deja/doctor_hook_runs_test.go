@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -39,7 +40,20 @@ func TestDoctorSaysWhenTheShellCannotRunTheHook(t *testing.T) {
 		}
 	}
 
-	write(`H:\pycode\Self\deja-vu\deja.exe`)
+	// On Windows the binary is really there, spelled the way deja used to
+	// write it; elsewhere the spelling alone is enough to fail in bash, and
+	// the path is not absolute there, so the missing-binary check stays out.
+	broken := `H:\pycode\Self\deja-vu\deja.exe`
+	if runtime.GOOS == "windows" {
+		if claudeHookShell() == "" {
+			t.Skip("no Git Bash")
+		}
+		broken = filepath.Join(t.TempDir(), "deja.exe")
+		if err := os.WriteFile(broken, []byte("MZ"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(broken)
 	if st := claudeHookWiringState(); !st.dead {
 		t.Errorf("a hook bash cannot run reads as %q and not dead", st.state)
 	}

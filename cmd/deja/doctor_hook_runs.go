@@ -68,7 +68,7 @@ func hookExeIsOneWord(exe string) bool {
 		inner := exe[1 : n-1]
 		return !strings.ContainsAny(inner, "\"'$`")
 	}
-	return exe != "" && !strings.ContainsAny(exe, " \t\"'$`;&|<>(){}*?!~=")
+	return exe != "" && !strings.ContainsAny(exe, " \t\"'$`;&|<>(){}*?!=")
 }
 
 // claudeHookShell is the shell Claude Code hands hook commands to: Git Bash on
