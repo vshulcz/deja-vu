@@ -86,7 +86,7 @@ func TestTheHookRunCheckLeavesAWrappedCommandAlone(t *testing.T) {
 			t.Errorf("%q passed as one word", exe)
 		}
 	}
-	for _, exe := range []string{"/usr/local/bin/deja", "'/Applications/My Tools/deja'", `"C:/Program Files/deja/deja.exe"`, `H:\pycode\Self\deja-vu\deja.exe`} {
+	for _, exe := range []string{"/usr/local/bin/deja", "'/Applications/My Tools/deja'", `"C:/Program Files/deja/deja.exe"`, `H:\pycode\Self\deja-vu\deja.exe`, `C:\Users\RUNNER~1\AppData\Local\Temp\deja.exe`} {
 		if !hookExeIsOneWord(exe) {
 			t.Errorf("%q, a path deja writes, was skipped", exe)
 		}
