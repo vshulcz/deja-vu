@@ -18,7 +18,14 @@
     <summary>find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.</summary>
   </entry>
   <entry>
-    <title>How to delete Claude Code sessions — deja-vu</title>
+    <title>Add memory to Oh My Pi (omp): recall past sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html"></link>
+    <updated>2026-09-28T00:00:00Z</updated>
+    <summary>Oh My Pi (omp) keeps a session log per agent directory and reads none of it back. deja wires its extension, MCP server and skill, and indexes every agent.</summary>
+  </entry>
+  <entry>
+    <title>Delete Claude Code sessions: claude project purge — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-09-28T00:00:00Z</updated>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html"></link>
     <updated>2026-09-27T00:00:00Z</updated>
     <summary>Command Code logs a session per project and starts each one cold. deja wires its MCP server, hooks, skill and command, and indexes every agent here.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Continue: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"></link>
-    <updated>2026-09-27T00:00:00Z</updated>
-    <summary>Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.</summary>
   </entry>
 </feed>

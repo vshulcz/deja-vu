@@ -4,14 +4,14 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to delete Claude Code sessions — deja-vu</title>
+<title>Delete Claude Code sessions: claude project purge — deja-vu</title>
 <meta name="description" content="A whole project: claude project purge. One session: rm its .jsonl under ~/.claude/projects. On a timer: cleanupPeriodDays. What you lose either way.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html">
 <link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:type" content="article">
-<meta property="og:title" content="How to delete Claude Code sessions">
+<meta property="og:title" content="Delete Claude Code sessions: claude project purge">
 <meta property="og:description" content="A whole project: claude project purge. One session: rm its .jsonl under ~/.claude/projects. On a timer: cleanupPeriodDays. What you lose either way.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
@@ -28,7 +28,7 @@
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
-<meta name="twitter:title" content="How to delete Claude Code sessions">
+<meta name="twitter:title" content="Delete Claude Code sessions: claude project purge">
 <meta name="twitter:description" content="A whole project: claude project purge. One session: rm its .jsonl under ~/.claude/projects. On a timer: cleanupPeriodDays. What you lose either way.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
@@ -143,6 +143,7 @@
 <h2>How to delete Claude Code sessions</h2>
 <p>From the terminal, a whole project goes with one command: <code>claude project purge</code>, in Claude Code since 2.1.126. It deletes the project's transcripts, and with them its <code>memory/</code> directory, the file-edit history of each session, and the project's entry in <code>~/.claude.json</code> (trust, prompt history, MCP servers). Run it with <code>--dry-run</code> first; it prints exactly that list.</p>
 <p>A single session has no command. It is a file, and deleting the file is the whole operation. The directory name is the project path with slashes turned into dashes, the file name is the session id. (<code>claude rm &lt;id&gt;</code> is for background sessions started with <code>claude --bg</code>, not for these.)</p>
+<p><code>/clear</code> does not delete anything either. It starts a new conversation with an empty context; the one before it stays on disk as its own <code>.jsonl</code>.</p>
 <pre># every session of this project, and the state that goes with it
 claude project purge --dry-run      # see what would be deleted
 claude project purge
