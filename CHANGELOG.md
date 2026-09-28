@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `deja warmup` and `deja version` refuse arguments instead of ignoring them. `deja warmup --rebuild` ran the ordinary incremental build and exited 0; it now fails and names `deja index --rebuild`, which is where the rebuild lives.
 - The OpenClaw plugin reaches ClawHub with each release again. ClawHub mints a publish token only for a `workflow_dispatch` run and refused every tag push since 0.21.0, so the tag run now dispatches `release.yml` with the tag and that run publishes.
 
 ## [0.21.3] - 2026-09-27
