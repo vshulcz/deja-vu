@@ -43,18 +43,20 @@ func TestAWindowsHookPathRunsInCmdAndPowerShell(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := hookCommandQuote(exe) + " -test.run=NoSuchTest"
+	cmd := hookCommandQuote(exe)
 	if strings.Contains(cmd, `"`) {
 		// PowerShell reads a leading quoted string as a value, not a command;
 		// that is true of the quoting before this change as well.
 		t.Skipf("the temp path has a space: %s", exe)
 	}
 	for _, sh := range [][]string{
-		{"cmd", "/c", cmd},
-		{"powershell", "-NoProfile", "-Command", cmd},
+		{"cmd", "/c", cmd + " -test.run=NoSuchTest"},
+		// PowerShell splits an unquoted -test.run=… at the dot; the argument
+		// is the test's, the path in front of it is what is under test.
+		{"powershell", "-NoProfile", "-Command", cmd + " '-test.run=NoSuchTest'"},
 	} {
 		if out, err := exec.Command(sh[0], sh[1:]...).CombinedOutput(); err != nil {
-			t.Errorf("%s ran %q: %v\n%s", sh[0], cmd, err, out)
+			t.Errorf("%s ran %q: %v\n%s", sh[0], sh[len(sh)-1], err, out)
 		}
 	}
 }

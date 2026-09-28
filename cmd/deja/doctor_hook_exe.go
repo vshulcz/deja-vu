@@ -68,7 +68,9 @@ func dejaHookCommandMissing(path string) string {
 			continue
 		}
 		if _, err := os.Stat(cand); err != nil {
-			return cand
+			// Hook commands name a Windows path with forward slashes (#4116);
+			// the note names it the way the reader's own tools print it.
+			return filepath.FromSlash(cand)
 		}
 	}
 	return ""
@@ -90,7 +92,7 @@ func quotedDejaCommandMissing(text string) string {
 			continue
 		}
 		if _, err := os.Stat(cand); err != nil {
-			return cand
+			return filepath.FromSlash(cand)
 		}
 	}
 	return ""
