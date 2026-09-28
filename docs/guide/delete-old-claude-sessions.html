@@ -147,6 +147,8 @@ find ~/.claude/projects -name '*.jsonl' -mtime +30 -exec du -ch {} + | tail -1
 find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete</pre>
 <p><code>-mtime</code> reads the last write, not the start, so a session you resumed last week counts as last week's however old its first line is. If <code>CLAUDE_CONFIG_DIR</code> is set, the path moves with it.</p>
 
+<p>To drop a whole project rather than its old sessions, <code>claude project purge</code> (Claude Code 2.1.126 and later) deletes every transcript of it along with its memory directory and file-edit history; <code>--dry-run</code> lists them first. <a href="session-files-on-disk.html">Deleting Claude Code sessions</a> has the one-session case.</p>
+
 <h2>Let Claude Code do it</h2>
 <p>The same sweep is a setting. <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code> is a retention in days, 30 unless you say otherwise, and transcripts older than that are removed for you.</p>
 <pre>{ "cleanupPeriodDays": 90 }</pre>
