@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,11 @@ const hermesMemoryDir = "deja-memory"
 // disk.
 func installHermesMemoryProvider(exe string, uninstall bool) (installResult, error) {
 	dir := filepath.Join(sources.HermesHome(), "plugins", hermesMemoryDir)
+	if hermesInstalledIt(hermesMemoryDir) {
+		// The same provider, put there by `hermes plugins install` from
+		// extensions/hermes: Hermes owns the directory and its record.
+		return installResult{Path: dir, Action: "kept"}, nil
+	}
 	if uninstall {
 		if _, err := os.Stat(dir); err != nil {
 			return installResult{Path: dir, Action: "unchanged"}, nil
@@ -59,6 +65,22 @@ func installHermesMemoryProvider(exe string, uninstall bool) (installResult, err
 		return installResult{}, err
 	}
 	return installResult{Path: dir, Action: a}, nil
+}
+
+// hermesInstalledIt reports whether `hermes plugins install` put the named
+// plugin in place: Hermes records every install it makes in
+// plugins/.install-metadata.json, keyed by plugin name.
+func hermesInstalledIt(name string) bool {
+	b, err := os.ReadFile(filepath.Join(sources.HermesHome(), "plugins", ".install-metadata.json"))
+	if err != nil {
+		return false
+	}
+	var record map[string]json.RawMessage
+	if json.Unmarshal(b, &record) != nil {
+		return false
+	}
+	_, ok := record[name]
+	return ok
 }
 
 // external_dependencies is what `hermes memory setup` checks before it
@@ -223,7 +245,10 @@ class DejaMemoryProvider(MemoryProvider):
         return "deja"
 
     def is_available(self) -> bool:
-        return bool(shutil.which(DEJA)) or os.path.isfile(DEJA)
+        # A bare name is found on PATH, as subprocess does; only a path is a file.
+        if os.path.isabs(DEJA):
+            return os.path.isfile(DEJA)
+        return bool(shutil.which(DEJA))
 
     def unavailable_reason(self) -> str:
         return (

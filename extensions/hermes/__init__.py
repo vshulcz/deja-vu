@@ -125,7 +125,10 @@ class DejaMemoryProvider(MemoryProvider):
         return "deja"
 
     def is_available(self) -> bool:
-        return bool(shutil.which(DEJA)) or os.path.isfile(DEJA)
+        # A bare name is found on PATH, as subprocess does; only a path is a file.
+        if os.path.isabs(DEJA):
+            return os.path.isfile(DEJA)
+        return bool(shutil.which(DEJA))
 
     def unavailable_reason(self) -> str:
         return (
