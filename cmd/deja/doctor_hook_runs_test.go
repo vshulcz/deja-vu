@@ -63,3 +63,18 @@ func TestDoctorSaysWhenTheShellCannotRunTheHook(t *testing.T) {
 		t.Error("a runnable hook reads as dead")
 	}
 }
+
+// A command the reader built around deja is not deja's to check: `command -v`
+// would run the part after `&&`.
+func TestTheHookRunCheckLeavesAWrappedCommandAlone(t *testing.T) {
+	for _, exe := range []string{"cd /x && /usr/local/bin/deja", "FOO=1 /usr/local/bin/deja", "$HOME/bin/deja", "'/a b/deja' || true"} {
+		if hookExeIsOneWord(exe) {
+			t.Errorf("%q passed as one word", exe)
+		}
+	}
+	for _, exe := range []string{"/usr/local/bin/deja", "'/Applications/My Tools/deja'", `"C:/Program Files/deja/deja.exe"`, `H:\pycode\Self\deja-vu\deja.exe`} {
+		if !hookExeIsOneWord(exe) {
+			t.Errorf("%q, a path deja writes, was skipped", exe)
+		}
+	}
+}

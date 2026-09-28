@@ -50,11 +50,25 @@ func claudeHookExe(hooks map[string]any) string {
 			h, _ := hAny.(map[string]any)
 			cmd, _ := h["command"].(string)
 			if i := strings.Index(cmd, " hook-prompt"); i > 0 {
-				return strings.TrimSpace(cmd[:i])
+				if exe := strings.TrimSpace(cmd[:i]); hookExeIsOneWord(exe) {
+					return exe
+				}
 			}
 		}
 	}
 	return ""
+}
+
+// hookExeIsOneWord reports whether exe is a single word the way deja writes
+// one: bare, or wholly inside one pair of quotes. Anything else is a command
+// the reader built around deja — `cd x && deja`, `FOO=1 deja` — and handing
+// that to `command -v` would run part of it.
+func hookExeIsOneWord(exe string) bool {
+	if n := len(exe); n >= 2 && (exe[0] == '"' || exe[0] == '\'') && exe[n-1] == exe[0] {
+		inner := exe[1 : n-1]
+		return !strings.ContainsAny(inner, "\"'$`")
+	}
+	return exe != "" && !strings.ContainsAny(exe, " \t\"'$`;&|<>(){}*?!~=")
 }
 
 // claudeHookShell is the shell Claude Code hands hook commands to: Git Bash on
