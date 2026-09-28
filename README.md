@@ -1,47 +1,80 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo-dark.svg">
-    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="330" alt="deja-vu">
+    <img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/logo.svg" width="280" alt="deja-vu">
   </picture>
 </p>
 
 <p align="center"><b>The one memory your coding agents share, built from the history already on your disk.</b></p>
 
 <p align="center">Your agent is about to re-debug something you fixed in March — in a different agent.
-deja starts full: it indexes the sessions Claude Code, Codex, Cursor and 32 more agents already
-wrote to disk, and hands the right one back in whichever agent asks. No model, no capture step, no server.</p>
+deja starts full: it indexes what Claude Code, Codex, Cursor and 32 more agents already wrote to disk,
+and hands it back in whichever agent asks.</p>
+
+<p align="center">English | <a href="docs/readme/README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
+
+<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Two real runs against a synthetic corpus: nobody's history is published.</em></sub></p>
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto
+```
+
+<p align="center"><sub>macOS and Linux; ten seconds to install, about ten to index &middot;
+<a href="#install">Windows, Homebrew, npm and the rest</a></sub></p>
+
+<table align="center">
+<tr>
+<td align="center" width="33%">Most accurate<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>MemPalace publishes 96.6%, agentmemory 95.2%</sub></td>
+<td align="center" width="33%">Cheapest<br><b>half the tokens</b> of agentmemory<br><sub>on a task this machine had already solved</sub></td>
+<td align="center" width="33%">Fastest<br><b>17.6 s</b> to index 19,195 sessions<br><sub>the next of seven tools takes 72 s</sub></td>
+</tr>
+</table>
+
+<p align="center"><sub>I maintain deja-vu, so every driver, the corpus and the scoring rule are in this repository &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">the head-to-head, and how to re-run a row you doubt</a> &middot;
+<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">every run</a></sub></p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
   <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
 <p align="center"><a href="https://vshulcz.github.io/deja-vu/">Docs</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">Benchmarks</a> &middot; <a href="https://vshulcz.github.io/deja-vu/guide/compare.html">How it compares</a> &middot; <a href="docs/INTEGRATING.md">Building it into your tool</a></p>
-<p align="center">English | <a href="docs/readme/README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
-
-<p align="center"><b>The most accurate, the cheapest to run and the fastest coding-agent memory we could measure.</b></p>
-
-<table align="center">
-<tr>
-<td align="center" width="33%">Most accurate<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>all 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>same 19,195 sessions: 19/100 at rank one, next best 14</sub></td>
-<td align="center" width="33%">Cheapest<br><b>half the tokens</b> of agentmemory<br><sub>53,558 against 104,974 on a task already solved<br>477 tokens of tool definitions, fewest of seven</sub></td>
-<td align="center" width="33%">Fastest<br><b>17.6 s</b> to index 19,195 sessions<br><sub>next of seven tools: 72 s<br>26 ms to the first answer, 97 ms median search</sub></td>
-</tr>
-</table>
-
-<p align="center"><sub>I maintain deja-vu, so every driver, the corpus and the scoring rule are in this repository &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/day-zero.html">the head-to-head, and how to re-run a row you doubt</a> &middot;
-<a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval and LoCoMo runs</a></sub></p>
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="The same question put to the same agent twice: without memory it has no record of it, with deja it answers with the decision from eight months earlier"></p>
-
-<p align="center"><sub><em>Nobody searched anything — the agent called deja itself. Two real runs against a synthetic corpus: nobody's history is published.</em></sub></p>
 
 <p align="center"><sub>Found it useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</sub></p>
 
+## Highlights
+
+- **Starts full.** Months of history from before you installed it are searchable on day one: `deja "connection pool exhausted"` over gigabytes.
+- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [thirty-five agents](#supported-harnesses) read the same index.
+- **Nobody has to ask.** Recall arrives at session start, before a file is edited or a command runs, and after a command fails.
+- **Survives compaction.** Over 43 measured compactions the summary kept 77% of the decisions and 0.2% of the commands; deja hands back the rest ([how](docs/compaction.md)).
+- **Indexes the work, not just the talk.** The files each turn opened, the commands with their exit status, the exact spans an edit replaced.
+- **Knows what held.** `deja promote <id> --state rejected` marks a reverted decision, and every later hit says it was tried and why it was dropped; `--state accepted` takes the mark back.
+- **Says when the ground moved.** A hit reports *4 files this session touched have changed since*, and stays quiet when it cannot tell.
+- **Local and private.** No model, no embeddings, no server. Keys and tokens are stripped as the index is built ([privacy](#privacy)).
+- **Moves with you.** `deja sync ssh laptop` between machines, no cloud in between; `deja handoff --to codex` to continue in another agent.
+- **One Go binary.** macOS, Linux and Windows, through Homebrew, Scoop, winget, npm or `go install`.
+
+### Your own work, wrapped
+
+`deja stats --card` draws it in the terminal; give it a filename and it writes an
+SVG for a profile README. To post it anywhere else, [turn it into a
+PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
+browser.
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="600" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
+
+The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu/).
+
 ## Install
+
+The two commands at the top are the whole install on macOS and Linux:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
@@ -111,42 +144,6 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush and Zed each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Command Code, Cherry Studio and Reasonix get the skill, and Kiro a steering file, from their own install target.
 
 </details>
-
-## What you get
-
-**Solve it in Codex. Claude remembers.** Thirty-five coding agents write every conversation
-to local files, and deja turns those files into one memory layer all of them read.
-
-| | |
-| --- | --- |
-| **Retroactive search** | `deja "connection pool exhausted"` over gigabytes, including everything from before you installed deja. Natural-language questions fall back to a relevance tier. Time is a hint, not a filter. |
-| **Cross-agent recall** | The MCP `deja` tool in `recall` mode answers *"we fixed this three weeks ago"* in whichever agent asks, whoever solved it originally. |
-| **It survives compaction** | Measured over 43 compactions: the summary keeps 77% of the decisions and 0.2% of the commands you ran. deja hands back the other 99.8% — and on Claude Code and Codex it captures the task, what was concluded, the commands and what is still open as the compaction starts, then hands them back once after it ([how](docs/compaction.md)). |
-| **Recall at the point of action** | Before an agent edits a file or runs a command, deja names that file's prior decision, that command's working invocation, or the program this machine does not have. When a command fails, a `PostToolUse` hook answers with what followed that same error here before — the pair an agent never thinks to ask for. |
-| **It indexes the work, not just the talk** | The files each turn opened, the commands that ran with their exit status, and the exact spans an edit replaced. That is the part every summary throws away. |
-
-<details>
-<summary>Four more: rejected decisions, staleness, sync and handoff, redaction</summary>
-
-| | |
-| --- | --- |
-| **It knows what held** | `deja promote <id> --state rejected --note "why"` marks a decision you reverted. Every later hit for that session shows it was tried and rejected, with the reason. Nothing is deleted, and `--state accepted` takes the mark back. |
-| **It says when the ground moved** | A hit reports *4 files this session touched have changed since*, and says nothing when it cannot tell. It never claims anything is unchanged. |
-| **Sync and handoff** | `deja sync ssh laptop` moves memory between machines, append-only, no cloud in the middle. `deja handoff --to codex` packages the live context so you can continue in another agent. |
-| **Redaction** | Keys, tokens, JWTs and private key blocks are stripped at index time, so the cache is safe to keep. |
-
-</details>
-
-### Your own work, wrapped
-
-`deja stats --card` draws it in the terminal; give it a filename and it writes an
-SVG for a profile README. To post it anywhere else, [turn it into a
-PNG](https://vshulcz.github.io/deja-vu/card/) — that page converts it in your own
-browser.
-
-<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/docs/assets/stats-card-demo.svg" width="600" alt="deja stats card: a year of agent sessions as a heatmap, the agents they came from, and the longest one"></p>
-
-The full feature reference lives in the [docs](https://vshulcz.github.io/deja-vu/).
 
 ## Privacy
 
