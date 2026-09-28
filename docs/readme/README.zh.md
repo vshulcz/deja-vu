@@ -70,6 +70,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja
 pi install npm:@vshulcz/pi-deja
+hermes plugins install vshulcz/deja-vu/extensions/hermes
 ```
 
 `deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
@@ -201,6 +202,7 @@ Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · Zed。
 | Grok Build | 插件 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`，然后 `grok plugin install deja` |
 | OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | 记忆提供者 `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
 opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时

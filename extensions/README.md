@@ -14,6 +14,7 @@ same local index.
 | [`zed/`](zed) | Zed extension `deja-mcp-server` | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
+| [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Two more integrations live outside this directory because their registries read
 a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and

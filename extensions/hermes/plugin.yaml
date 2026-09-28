@@ -1,0 +1,7 @@
+name: deja-memory
+version: 0.1.0
+description: "deja — memory from the coding sessions every agent on this machine already wrote to disk. No model, no key, no server."
+external_dependencies:
+  - name: deja
+    install: "brew install deja-vu"
+    check: "deja --version"
