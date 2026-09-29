@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseOmpFile(t *testing.T) {
+	t.Setenv("DEJA_INDEX_PATHS", "1")
 	root := t.TempDir()
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
