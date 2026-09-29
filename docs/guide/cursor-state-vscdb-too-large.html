@@ -167,8 +167,9 @@ WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 
 <h2>Shrinking it, safest first</h2>
 <ul>
+<li><b>Delete <code>state.vscdb.backup</code>, if there is one.</b> Cursor stopped updating it, so it is a leftover copy, sometimes over 10 GB; with Cursor quit it can go without touching a chat (<a href="https://forum.cursor.com/t/how-can-i-reduce-the-size-of-the-state-vscdb-file-without-deleting-chats/169927">Cursor staff on the forum</a>).</li>
 <li><b>Delete the biggest chats in Cursor.</b> Export the ones you want to keep first. Deleting from the UI lets Cursor remove the rows it owns; editing the table while Cursor runs is how people lose window state along with the chat.</li>
-<li><b>Compact afterwards.</b> Deleted rows leave free pages behind until the file is compacted. Cursor's forum points to a <code>GC Agent KV Blobs</code> developer command for orphaned blobs, and reports that compaction needs free disk on the order of the database's size, sometimes close to twice it. <code>VACUUM</code> on a closed copy has the same requirement.</li>
+<li><b>Clean up after it.</b> <code>Delete old chats…</code> in the command palette removes chats in bulk, and the <code>GC Agent KV Blobs</code> developer command removes blobs no chat refers to any more. On a database an older Cursor created, the space they free stays inside the file, so the size on disk barely moves even when Cursor gets fast again. Compaction gives it back, and needs free disk on the order of the database's size, sometimes close to twice it (<a href="https://forum.cursor.com/t/gc-agent-kv-blobs-temporarily-consumed-62-gb-of-free-space-while-compacting-a-29-gb-state-vscdb/172165">62 GB for a 29 GB file</a>).</li>
 <li><b>Start over.</b> With Cursor quit, move <code>state.vscdb</code>, <code>state.vscdb-wal</code> and <code>state.vscdb-shm</code> aside, not into the trash, and start Cursor: it creates an empty database. Every chat goes from the list, and so does the other state kept there. Keep the old file until you are sure nothing in it is missed.</li>
 </ul>
 
