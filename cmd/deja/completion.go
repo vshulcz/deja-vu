@@ -137,11 +137,17 @@ _deja_completion() {
             ;;
         sync)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "export import ssh" -- "$cur") )
+                COMPREPLY=( $(compgen -W "export import ssh forget" -- "$cur") )
             elif [[ "$action" == "export" ]]; then
-                COMPREPLY=( $(compgen -W "--full" -- "$cur") )
+                if [[ "$prev" == "--peer" ]]; then
+                    COMPREPLY=()
+                else
+                    COMPREPLY=( $(compgen -W "--full --include-imported --peer" -- "$cur") )
+                fi
             elif [[ "$action" == "ssh" ]]; then
-                COMPREPLY=( $(compgen -W "--pull --full" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--pull --full --both" -- "$cur") )
+            elif [[ "$action" == "forget" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -d -- "$cur") )
             fi
@@ -272,13 +278,15 @@ _deja() {
       ;;
     sync)
       if (( CURRENT == 3 )); then
-        _values 'sync action' export import ssh
+        _values 'sync action' export import ssh forget
       elif [[ "$words[3]" == "export" ]]; then
-        _arguments '--full[export all records]' '1:directory:_files -/'
+        _arguments '--full[export all records]' '--include-imported[include records received from other machines]' '--peer=[destination peer name]:peer:' '1:directory:_files -/'
       elif [[ "$words[3]" == "import" ]]; then
         _arguments '1:directory:_files -/'
+      elif [[ "$words[3]" == "forget" ]]; then
+        _arguments '1:host:'
       else
-        _arguments '--pull[pull from the remote]' '--full[transfer all records]' '1:host:'
+        _arguments '--pull[pull from the remote]' '--full[transfer all records]' '--both[transfer in both directions]' '1:host:'
       fi
       ;;
     show)
@@ -327,13 +335,13 @@ complete -c deja -n '__fish_seen_subcommand_from context' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
-complete -c deja -n '__fish_seen_subcommand_from forget' -l list
-complete -c deja -n '__fish_seen_subcommand_from forget' -l dry-run
-complete -c deja -n '__fish_seen_subcommand_from forget' -l session -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l project -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l before -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l unforget -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l all-matches
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l list
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l dry-run
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l session -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l before -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l unforget -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l all-matches
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a '%HANDOFF_TARGETS%'
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
@@ -365,12 +373,15 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a '%ROLES%'
-complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from export import ssh' -a 'export import ssh'
+complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from export import ssh forget' -a 'export import ssh forget'
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l include-imported
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l peer -r
 complete -c deja -n '__fish_seen_subcommand_from export' -l full
 complete -c deja -n '__fish_seen_subcommand_from export' -F
 complete -c deja -n '__fish_seen_subcommand_from import' -F
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l pull
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l full
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l both
 `
 
 const powershellCompletion = `# PowerShell completion for deja
@@ -437,9 +448,9 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--json', '--impact', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
             }
             'sync' {
-                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh') }
-                elseif ($action -eq 'export') { @('--full') }
-                elseif ($action -eq 'ssh') { @('--pull', '--full') }
+                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh', 'forget') }
+                elseif ($action -eq 'export' -and $previous -ne '--peer') { @('--full', '--include-imported', '--peer') }
+                elseif ($action -eq 'ssh') { @('--pull', '--full', '--both') }
                 else { @() }
             }
             'show' {
