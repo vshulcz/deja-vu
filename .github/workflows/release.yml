@@ -165,6 +165,7 @@ jobs:
       - name: Open the pull request
         env:
           GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
           KOMAC_CREATED_WITH: deja-vu release workflow
           KOMAC_CREATED_WITH_URL: https://github.com/${{ github.repository }}/blob/main/.github/workflows/release.yml
         run: |
@@ -173,6 +174,12 @@ jobs:
             echo "::warning::WINGET_TOKEN is not set; winget stays on the previous version"
             exit 0
           fi
+          # komac branches from upstream master inside the fork; a fork far
+          # enough behind lacks that commit and komac fails with "Ref cannot
+          # be created" (#4137).
+          owner="$(gh api user --jq .login)"
+          gh api -X POST "repos/${owner}/winget-pkgs/merge-upstream" -f branch=master >/dev/null \
+            || echo "::warning::could not sync ${owner}/winget-pkgs with upstream"
           v="${GITHUB_REF_NAME#v}"
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
           komac update vshulcz.deja-vu --version "$v" \
