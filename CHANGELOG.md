@@ -7,11 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.21.4] - 2026-09-29
 
+One rules file for every agent: `deja rules sync` copies yours into the global
+rules file of each installed agent, and `deja rules candidates` finds the
+corrections you keep repeating so your agent can suggest them as rules. On
+Windows, Claude Code's hooks run again; they had been exiting 127 on every call
+while doctor said they were wired, and doctor now says so. Chats deleted from
+Cursor's database, or left behind when a bloated one is moved aside, stay
+searchable through a full rebuild. deja also installs as a Hermes memory
+provider straight from Hermes, and from winget on Windows.
+
+### Added
 - `deja rules` keeps the rules you give your agents in one file, `~/.config/deja/rules.md`, and `deja rules sync` copies it as a marked block into the global rules file of each installed agent that has one deja knows: Claude Code, Codex, opencode, Gemini, Qwen, Kimi, Grok and goose. A rule given to one agent used to stay there; on the machine this was measured on, seven were given again in other agents. doctor names an agent whose copy is behind, and uninstall takes the block out.
 - `deja rules candidates` lists the turns where you corrected an agent, and the deja skill tells your agent how to group them into suggested rules, with the turns behind each one, and to write only the ones you pick. deja leaves the grouping to the agent because it measured badly without one: three word-based groupings found 0 real rules in their top 10, while a frontier model given the same list found 10 of 10. A small local model did not manage it, so this wants a strong agent.
-
 - `hermes plugins install vshulcz/deja-vu/extensions/hermes` installs deja as a Hermes memory provider without `deja install`. It is the provider `deja install hermes-auto` writes, with deja taken from PATH, and a test keeps the two identical.
 - On Windows, `winget install vshulcz.deja-vu` installs deja from the winget community repository, next to `scoop install deja-vu`.
 
@@ -20,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A full rebuild keeps the chats Cursor deleted from `state.vscdb`, and the ones left behind when a bloated database is moved aside and Cursor starts over. The incremental pass already kept them; a rebuild read the database and wrote only what is in it now, so they went at the next content-version bump. The same holds for the other database-backed stores (#4128).
 - On Windows, Claude Code's hooks run again. deja wrote the binary's path with backslashes, Claude Code hands hook commands to Git Bash, and bash strips unquoted backslashes, so every hook exited 127 without a word (#4116). Hook commands now name the path with forward slashes, which bash, cmd.exe and PowerShell all run (a path with a space stays double-quoted, as before). Existing configs are rewritten on the first run after upgrading.
 - `deja doctor` says when Claude Code's hooks cannot start, not only when their binary is gone. It asks the shell Claude Code runs hooks in (Git Bash on Windows) for the binary as the settings file spells it, the check that would have caught #4116's 127 on every hook while doctor printed `wired` (#4125).
-- `deja warmup` and `deja version` refuse arguments instead of ignoring them. `deja warmup --rebuild` ran the ordinary incremental build and exited 0; it now fails and names `deja index --rebuild`, which is where the rebuild lives.
+- `deja warmup` and `deja version` refuse arguments instead of ignoring them. `deja warmup --rebuild` ran the ordinary incremental build and exited 0; it now fails and names `deja index --rebuild`, which is where the rebuild lives (#4109, contributed by @Sharawey74).
 - The OpenClaw plugin reaches ClawHub with each release again. ClawHub mints a publish token only for a `workflow_dispatch` run and refused every tag push since 0.21.0, so the tag run now dispatches `release.yml` with the tag and that run publishes.
 
 ## [0.21.3] - 2026-09-27
@@ -1588,7 +1597,9 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.2...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.4...HEAD
+[0.21.4]: https://github.com/vshulcz/deja-vu/compare/v0.21.3...v0.21.4
+[0.21.3]: https://github.com/vshulcz/deja-vu/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/vshulcz/deja-vu/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/vshulcz/deja-vu/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/vshulcz/deja-vu/compare/v0.20.2...v0.21.0
