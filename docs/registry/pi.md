@@ -57,7 +57,7 @@ Messages use a wrapper envelope:
 
 ### Content
 
-`message.content` is an array of typed blocks. deja extracts `text` from blocks where `"type": "text"`. Blocks with `"type": "thinking"` or `"type": "toolCall"` are skipped.
+`message.content` is an array of typed blocks. deja extracts `text` from blocks where `"type": "text"`. Thinking blocks are skipped. Assistant `toolCall` blocks for `bash`, `read`, `edit`, and `write` also feed command, file-path, replaced-span, and written-line records. Both legacy `oldText`/`newText` edits and the `edits` array are supported. The `DEJA_INDEX_COMMANDS`, `DEJA_INDEX_PATHS`, `DEJA_INDEX_EDITS`, and `DEJA_INDEX_WRITES` switches apply as they do for Claude Code.
 
 ### Timestamps
 

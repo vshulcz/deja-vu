@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"strings"
 
@@ -88,6 +89,29 @@ func piShapedLine(s *model.Session, m map[string]any, useHeaderCwd bool) {
 		if txt != "" {
 			s.Messages = append(s.Messages, model.Message{Role: outRole, Text: txt, Time: t})
 		}
+		if role == "assistant" {
+			raw := piToolCalls(msg["content"])
+			if IndexToolPaths() {
+				if paths := claudeToolPaths(raw); paths != "" {
+					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: paths, Time: t})
+				}
+			}
+			if IndexEdits() {
+				for _, span := range claudeEditSpans(raw) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+				}
+			}
+			if IndexWrites() {
+				for _, record := range claudeWroteRecords(raw) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: record, Time: t})
+				}
+			}
+			if IndexCommands() {
+				for _, command := range claudeCommands(raw) {
+					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: command.Text, Time: t})
+				}
+			}
+		}
 	}
 }
 
@@ -124,4 +148,53 @@ func PiProjectDirBase(path string) string {
 		return ""
 	}
 	return base
+}
+
+// piToolCalls adapts known pi tool arguments to the shared extractors. Keeping
+// their filtering and size limits also keeps restore and blame records aligned
+// with the other harnesses. Paths retain the spelling recorded by the agent.
+func piToolCalls(content any) json.RawMessage {
+	blocks, _ := content.([]any)
+	var calls []map[string]any
+	for _, block := range blocks {
+		part, ok := block.(map[string]any)
+		if !ok || part["type"] != "toolCall" {
+			continue
+		}
+		args, ok := part["arguments"].(map[string]any)
+		if !ok {
+			continue
+		}
+		var name string
+		input := map[string]any{}
+		switch part["name"] {
+		case "bash":
+			name = "Bash"
+			input["command"] = args["command"]
+		case "read":
+			name = "Read"
+			input["file_path"] = args["path"]
+		case "write":
+			name = "Write"
+			input["file_path"], input["content"] = args["path"], args["content"]
+		case "edit":
+			name = "MultiEdit"
+			input["file_path"] = args["path"]
+			input["old_string"], input["new_string"] = args["oldText"], args["newText"]
+			var edits []map[string]any
+			items, _ := args["edits"].([]any)
+			for _, item := range items {
+				if edit, ok := item.(map[string]any); ok {
+					edits = append(edits, map[string]any{"old_string": edit["oldText"], "new_string": edit["newText"]})
+				}
+			}
+			input["edits"] = edits
+		default:
+			continue
+		}
+		calls = append(calls, map[string]any{"type": "tool_use", "name": name, "input": input})
+	}
+	// The input comes from decoded JSON, so all copied values are encodable.
+	raw, _ := json.Marshal(calls)
+	return raw
 }
