@@ -81,10 +81,10 @@ _deja_completion() {
             ;;
         bench)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "recall context" -- "$cur") )
+                COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
             elif [[ "$action" == "recall" ]]; then
                 COMPREPLY=( $(compgen -W "--json" -- "$cur") )
-            elif [[ "$action" == "context" ]]; then
+            elif [[ "$action" == "context" || "$action" == "prompt" || "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
             ;;
@@ -230,7 +230,7 @@ _deja() {
       ;;
     bench)
       if (( CURRENT == 3 )); then
-        _values 'benchmark' recall context
+        _values 'benchmark' recall context prompt block ingest read
       elif [[ "$words[3]" == "recall" ]]; then
         _arguments '--json[print JSON]'
       else
@@ -320,10 +320,10 @@ complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
-complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context' -a 'recall context'
+complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
 complete -c deja -n '__fish_seen_subcommand_from recall' -l json
-complete -c deja -n '__fish_seen_subcommand_from context' -l json
-complete -c deja -n '__fish_seen_subcommand_from context' -l seed -r
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l json
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
@@ -410,7 +410,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--all', '--json', '--harness', '--project', '--since') }
             }
             'bench' {
-                if ($argumentPosition -eq 1) { @('recall', 'context') }
+                if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
                 elseif ($action -eq 'recall') { @('--json') }
                 else { @('--json', '--seed') }
             }
