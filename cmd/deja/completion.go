@@ -74,7 +74,7 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "--all --json --harness --project --since" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--all --json --harness --project --since --attribution --git-note" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
@@ -226,7 +226,7 @@ _deja() {
 
   case "$words[2]" in
     blame)
-      _arguments '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
+      _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; requires --attribution]' '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
       ;;
     bench)
       if (( CURRENT == 3 )); then
@@ -314,6 +314,8 @@ complete -c deja -n '__deja_needs_command' -l limit -r -d 'Max sessions to retur
 complete -c deja -n '__fish_seen_subcommand_from search' -l limit -r -d 'Max sessions to return (1-100)'
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l attribution -d 'Show line attribution'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l git-note -d 'Write attribution as a git note; requires --attribution'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
 complete -c deja -n '__fish_seen_subcommand_from blame' -l json
 complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNESSES%'
@@ -407,7 +409,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
         $candidates = switch ($command) {
             'blame' {
                 if ($previous -eq '--harness') { $harnesses }
-                else { @('--all', '--json', '--harness', '--project', '--since') }
+                else { @('--all', '--json', '--harness', '--project', '--since', '--attribution', '--git-note') }
             }
             'bench' {
                 if ($argumentPosition -eq 1) { @('recall', 'context') }
