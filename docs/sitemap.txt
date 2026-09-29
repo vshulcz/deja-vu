@@ -124,3 +124,4 @@ https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/registry/codewhale.html
 https://vshulcz.github.io/deja-vu/registry/reasonix.html
+https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html
