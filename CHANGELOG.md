@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A full rebuild keeps the chats Cursor deleted from `state.vscdb`, and the ones left behind when a bloated database is moved aside and Cursor starts over. The incremental pass already kept them; a rebuild read the database and wrote only what is in it now, so they went at the next content-version bump. The same holds for the other database-backed stores (#4128).
 - On Windows, Claude Code's hooks run again. deja wrote the binary's path with backslashes, Claude Code hands hook commands to Git Bash, and bash strips unquoted backslashes, so every hook exited 127 without a word (#4116). Hook commands now name the path with forward slashes, which bash, cmd.exe and PowerShell all run (a path with a space stays double-quoted, as before). Existing configs are rewritten on the first run after upgrading.
 - `deja doctor` says when Claude Code's hooks cannot start, not only when their binary is gone. It asks the shell Claude Code runs hooks in (Git Bash on Windows) for the binary as the settings file spells it, the check that would have caught #4116's 127 on every hook while doctor printed `wired` (#4125).
 - `deja warmup` and `deja version` refuse arguments instead of ignoring them. `deja warmup --rebuild` ran the ordinary incremental build and exited 0; it now fails and names `deja index --rebuild`, which is where the rebuild lives.

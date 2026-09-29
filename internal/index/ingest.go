@@ -549,6 +549,15 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// the progress weights above still count only what this pass parses.
 	orphans := orphanedSessions(dir, harness, files)
 	ss = append(ss, sources.FilterSessions(orphans.sessions)...)
+	// And the chats a database store no longer holds while the store itself
+	// is still there: Cursor's state.vscdb with a chat deleted, or moved
+	// aside and started over. The incremental pass keeps them; so does this.
+	vanished := sources.FilterSessions(vanishedFromStores(dir, harness, files, ss))
+	ss = append(ss, vanished...)
+	if progress != nil && len(vanished) > 0 {
+		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja forget <id>` drops one for good\n",
+			len(vanished), pluralS(len(vanished)), map[bool]string{true: "its", false: "their"}[len(vanished) == 1])
+	}
 	ss = filterTombstonedSet(ss, dead)
 	for p, st := range orphans.files {
 		files[p] = st
@@ -939,6 +948,72 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		if !seen[p] {
 			out.unreadable++
 		}
+	}
+	return out
+}
+
+// vanishedFromStores returns the sessions a database-backed store held at the
+// last build and no longer hands back, for a store that is still on disk. One
+// file there holds every session, so the file-level carry in orphanedSessions
+// never sees a single one of them go: the file is still there. The incremental
+// pass reads such a store from a cursor and keeps what it had; a rebuild reads
+// it whole and, without this, kept only what is in it now.
+//
+// A store is database-backed when the last build stamped its LastUpdated —
+// setStoreLastUpdated does that for those alone. fresh is what this build
+// already has, sources and carries both, keyed as harness:id.
+func vanishedFromStores(dir, harness string, files map[string]FileState, fresh []model.Session) []model.Session {
+	m, err := readManifest(dir)
+	if err != nil {
+		return nil
+	}
+	stores := map[string]bool{}
+	for p, st := range m.Files {
+		if st.LastUpdated <= 0 {
+			continue
+		}
+		if _, ok := files[p]; !ok {
+			continue // gone whole: orphanedSessions answers for that
+		}
+		if harness != "" {
+			name := harnessForPath(p)
+			if store := sources.HarnessForKind(name); store != "" {
+				name = store
+			}
+			if name != harness {
+				continue
+			}
+		}
+		stores[p] = true
+	}
+	if len(stores) == 0 {
+		return nil
+	}
+	have := make(map[string]bool, len(fresh))
+	for _, s := range fresh {
+		have[s.Harness+":"+s.ID] = true
+	}
+	by := map[string]*model.Session{}
+	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		if !stores[r.SourcePath] || have[r.Key] {
+			return
+		}
+		s := by[r.Key]
+		if s == nil {
+			meta, ok := m.Sessions[r.Key]
+			if !ok {
+				return
+			}
+			cp := sessionFromMeta(meta)
+			cp.Path = r.SourcePath
+			s = &cp
+			by[r.Key] = s
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	})
+	out := make([]model.Session, 0, len(by))
+	for _, key := range sortedKeys(by) {
+		out = append(out, *by[key])
 	}
 	return out
 }
