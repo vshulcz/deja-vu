@@ -177,9 +177,10 @@ jobs:
           # komac branches from upstream master inside the fork; a fork far
           # enough behind lacks that commit and komac fails with "Ref cannot
           # be created" (#4137).
-          owner="$(gh api user --jq .login)"
-          gh api -X POST "repos/${owner}/winget-pkgs/merge-upstream" -f branch=master >/dev/null \
-            || echo "::warning::could not sync ${owner}/winget-pkgs with upstream"
+          if ! owner="$(gh api user --jq .login)" \
+            || ! gh api -X POST "repos/${owner}/winget-pkgs/merge-upstream" -f branch=master >/dev/null; then
+            echo "::warning::could not sync the winget-pkgs fork with upstream"
+          fi
           v="${GITHUB_REF_NAME#v}"
           base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
           komac update vshulcz.deja-vu --version "$v" \
