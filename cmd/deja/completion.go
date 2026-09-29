@@ -128,6 +128,13 @@ _deja_completion() {
         resume)
             COMPREPLY=( $(compgen -W "--exec" -- "$cur") )
             ;;
+        secrets)
+            if [[ "$prev" == "--limit" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--limit --json --scrub --dry-run" -- "$cur") )
+            fi
+            ;;
         stats)
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
@@ -267,6 +274,9 @@ _deja() {
     resume)
       _arguments '--exec[launch the native harness]' '1:session ID prefix:'
       ;;
+    secrets)
+      _arguments '--limit=[maximum findings]:count:' '--json[print JSON]' '--scrub[rewrite files to remove secrets]' '--dry-run[show what --scrub would change]'
+      ;;
     stats)
       _arguments '--json[print JSON]' '--impact[measured impact report]' '--year[your last twelve months in one screen]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
       ;;
@@ -355,6 +365,10 @@ complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l json
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l scrub -d 'Rewrite files to remove secrets'
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l dry-run -d 'Show what --scrub would change'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
 complete -c deja -n '__fish_seen_subcommand_from stats' -l impact
 complete -c deja -n '__fish_seen_subcommand_from stats' -l year
@@ -431,6 +445,10 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'remember' { @('--project', '--tag') }
             'resume' { @('--exec') }
+            'secrets' {
+                if ($previous -eq '--limit') { @() }
+                else { @('--limit', '--json', '--scrub', '--dry-run') }
+            }
             'stats' {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { @('user', 'assistant', 'tool') }
