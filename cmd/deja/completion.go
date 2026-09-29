@@ -125,6 +125,15 @@ _deja_completion() {
         remember)
             COMPREPLY=( $(compgen -W "--project --tag" -- "$cur") )
             ;;
+        rules)
+            if (( COMP_CWORD == 2 )); then
+                COMPREPLY=( $(compgen -W "sync status candidates" -- "$cur") )
+            elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" ]]; then
+                COMPREPLY=( $(compgen -W "--json --limit --since" -- "$cur") )
+            else
+                COMPREPLY=()
+            fi
+            ;;
         resume)
             COMPREPLY=( $(compgen -W "--exec" -- "$cur") )
             ;;
@@ -264,6 +273,13 @@ _deja() {
     remember)
       _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '1:text:'
       ;;
+    rules)
+      if (( CURRENT == 3 )); then
+        _values 'rules action' sync status candidates
+      elif [[ "$words[3]" == "candidates" ]]; then
+        _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:'
+      fi
+      ;;
     resume)
       _arguments '--exec[launch the native harness]' '1:session ID prefix:'
       ;;
@@ -354,6 +370,10 @@ complete -c deja -n '__fish_seen_subcommand_from last' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l json
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
 complete -c deja -n '__fish_seen_subcommand_from stats' -l impact
@@ -365,7 +385,7 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a '%ROLES%'
-complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from export import ssh' -a 'export import ssh'
+complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from export import ssh' -a 'export import ssh'
 complete -c deja -n '__fish_seen_subcommand_from export' -l full
 complete -c deja -n '__fish_seen_subcommand_from export' -F
 complete -c deja -n '__fish_seen_subcommand_from import' -F
@@ -430,6 +450,11 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 else { @('--json', '--from', '--harness', '--project', '--since', '--role') }
             }
             'remember' { @('--project', '--tag') }
+            'rules' {
+                if ($argumentPosition -eq 1) { @('sync', 'status', 'candidates') }
+                elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
+                else { @() }
+            }
             'resume' { @('--exec') }
             'stats' {
                 if ($previous -eq '--harness') { $harnesses }
