@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: vshulcz.deja-vu
-PackageVersion: 0.21.3
+PackageVersion: 0.21.4
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
@@ -10,10 +10,10 @@ NestedInstallerFiles:
 UpgradeBehavior: install
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.21.3/deja-vu_0.21.3_windows_amd64.zip
-  InstallerSha256: E08BC07FC5E6EF5E8D29EEFB3F9F4F0C09965A6998182B6C37536790436CCB75
+  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.21.4/deja-vu_0.21.4_windows_amd64.zip
+  InstallerSha256: 2BC26D30C3EF6C2209C8E93F62208523185246F2126B2088028C9A7E79AD8292
 - Architecture: arm64
-  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.21.3/deja-vu_0.21.3_windows_arm64.zip
-  InstallerSha256: FBE048B2707F6BAA5E86AF21528D90C60BADC24969086493EDC5AFE42374EB33
+  InstallerUrl: https://github.com/vshulcz/deja-vu/releases/download/v0.21.4/deja-vu_0.21.4_windows_arm64.zip
+  InstallerSha256: E5A0E308B9BA9DB6EB57B7B75348AE014DF41D1FBE4D5B4A38565B05EDFD1F01
 ManifestType: installer
 ManifestVersion: 1.12.0
