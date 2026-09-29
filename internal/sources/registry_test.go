@@ -377,7 +377,7 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 			// (retrieval.go: roleToolOutput); a fixture whose harness records
 			// what a tool printed should be able to show it.
 			role := message.Role
-			if (role != "user" && role != "assistant" && role != "tool-output") ||
+			if (role != "user" && role != "assistant" && role != "tool-output" && role != RoleFiles && role != RoleCommand && role != RoleEdit && role != RoleWrote) ||
 				strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
 				t.Fatalf("%s fixture produced invalid message: %#v", id, message)
 			}

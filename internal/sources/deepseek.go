@@ -1,11 +1,8 @@
 package sources
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -70,6 +67,10 @@ var deepSeekLogNames = []string{
 }
 
 func isDeepSeekLog(p string) bool {
+	base := filepath.Base(p)
+	if _, _, ok := parseCanonicalDeepSeekLogFilename(base); ok {
+		return true
+	}
 	for _, name := range deepSeekLogNames {
 		if hasBase(p, name) {
 			return true
@@ -87,19 +88,48 @@ func LoadDeepSeek() []model.Session {
 }
 
 func ParseDeepSeekFile(path string) ([]model.Session, error) {
-	raw, err := readDeepSeekLog(path)
+	trace, err := ReadDeepSeekTrace(path)
 	if err != nil {
 		return nil, err
 	}
+	if trace.Unsupported {
+		return nil, nil
+	}
+
+	id := strings.TrimPrefix(trace.Header.ID, "session-")
+	if id == "" {
+		id = strings.TrimPrefix(filepath.Base(filepath.Dir(path)), "session-")
+	}
+
 	s := model.Session{
 		Harness: "deepseek",
-		ID:      strings.TrimPrefix(filepath.Base(filepath.Dir(path)), "session-"),
+		ID:      id,
 		Project: "-",
 		Path:    path,
 	}
-	// Deltas of the step being streamed, kept only until that step's complete
-	// message arrives; a step that ends without one was interrupted, and then
-	// the deltas are all there is.
+	if trace.Header.CWD != "" {
+		s.Project = projectName(trace.Header.CWD)
+	}
+	if trace.Header.ParentSession != "" {
+		s.Parent = strings.TrimPrefix(trace.Header.ParentSession, "session-")
+	}
+	if trace.Header.Origin != "" {
+		s.Kind = trace.Header.Origin
+	}
+	if trace.Header.AgentPreset != "" {
+		s.Agent = trace.Header.AgentPreset
+	}
+	s.Touch(trace.Header.CreatedAt)
+
+	type toolCallInfo struct {
+		name string
+		args map[string]any
+		time time.Time
+		seq  int
+	}
+	callsByID := make(map[string]toolCallInfo)
+	callsBySeq := make(map[int]toolCallInfo)
+
 	var pending []string
 	var pendingAt time.Time
 	flush := func() {
@@ -108,43 +138,32 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 		if text == "" {
 			return
 		}
-		// The answer is stamped with the last delta that made it: a message
-		// without a time sorts to the beginning of history and is dropped by
-		// every consumer that filters by date.
 		s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: pendingAt})
 	}
-	for _, line := range bytes.Split(raw, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
-		var e map[string]any
-		if json.Unmarshal(line, &e) != nil {
-			continue
-		}
-		typ, _ := e["type"].(string)
-		data, _ := e["data"].(map[string]any)
-		at := parseTimeAny(e["time"])
-		switch typ {
+
+	for _, ev := range trace.Events {
+		at := ev.Time
+		switch ev.Type {
 		case "session":
-			if id, _ := e["id"].(string); id != "" {
-				s.ID = strings.TrimPrefix(id, "session-")
+			var data map[string]any
+			if json.Unmarshal(ev.Data, &data) == nil {
+				if sid, _ := data["id"].(string); sid != "" {
+					s.ID = strings.TrimPrefix(sid, "session-")
+				}
+				if cwd, _ := data["cwd"].(string); cwd != "" {
+					s.Project = projectName(cwd)
+				}
 			}
-			if cwd, _ := e["cwd"].(string); cwd != "" {
-				s.Project = projectName(cwd)
-			}
-			s.Touch(parseTimeAny(e["createdAt"]))
 		case "session/title":
-			// The last one wins. dsh names a session twice — a stand-in it cuts
-			// out of the opening message, then the real one when its title
-			// model answers — and the log is append-only, so the latest event
-			// is the name the harness is showing. Keeping the first listed
-			// every dsh session under a sentence cut mid-phrase (#2551).
-			if title, _ := data["title"].(string); title != "" {
-				s.Title = title
+			var data struct {
+				Title string `json:"title"`
+			}
+			if json.Unmarshal(ev.Data, &data) == nil && data.Title != "" {
+				s.Title = data.Title
 			}
 		case "user/message":
-			if !deepSeekSpokenByUser(data) {
+			var data map[string]any
+			if json.Unmarshal(ev.Data, &data) != nil || !deepSeekSpokenByUser(data) {
 				continue
 			}
 			flush()
@@ -153,39 +172,166 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 				s.Touch(at)
 			}
 		case "assistant/chunk":
-			chunk, _ := data["chunk"].(map[string]any)
-			if kind, _ := chunk["type"].(string); kind == "text-delta" {
-				if text, _ := chunk["text"].(string); text != "" {
-					pending = append(pending, text)
+			var data struct {
+				Chunk struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				} `json:"chunk"`
+			}
+			if json.Unmarshal(ev.Data, &data) == nil && data.Chunk.Type == "text-delta" && data.Chunk.Text != "" {
+				pending = append(pending, data.Chunk.Text)
+				pendingAt = at
+				s.Touch(at)
+			}
+		case "text-chunks":
+			var data struct {
+				Texts []any `json:"texts"`
+			}
+			if json.Unmarshal(ev.Data, &data) == nil {
+				for _, part := range deepSeekPackedTexts(data.Texts) {
+					pending = append(pending, part)
 					pendingAt = at
 					s.Touch(at)
 				}
 			}
-		case "text-chunks":
-			// A run of three or more consecutive deltas is stored as one packed
-			// row rather than as the events themselves, so a reader that knows
-			// only `assistant/chunk` loses exactly the long answers.
-			at := parseTimeAny(e["time0"])
-			for _, part := range deepSeekPackedTexts(data["texts"]) {
-				pending = append(pending, part)
-				pendingAt = at
-				s.Touch(at)
-			}
 		case "assistant/message":
-			// The complete message supersedes whatever of it was streamed.
 			pending = nil
-			msg, _ := data["message"].(map[string]any)
-			if text := deepSeekContentText(msg["content"]); text != "" {
-				s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: at})
-				s.Touch(at)
+			var data struct {
+				Message struct {
+					Content any `json:"content"`
+				} `json:"message"`
+			}
+			if json.Unmarshal(ev.Data, &data) == nil {
+				if text := deepSeekContentText(data.Message.Content); text != "" {
+					s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: text, Time: at})
+					s.Touch(at)
+				}
 			}
 		case "step/end", "turn/end":
 			flush()
+		case "tool/call":
+			var data struct {
+				CallID    string `json:"callId"`
+				Name      string `json:"name"`
+				Arguments any    `json:"arguments"`
+			}
+			if json.Unmarshal(ev.Data, &data) == nil {
+				info := toolCallInfo{
+					name: data.Name,
+					args: parseToolArguments(data.Arguments),
+					time: at,
+					seq:  ev.Seq,
+				}
+				if data.CallID != "" {
+					callsByID[data.CallID] = info
+				}
+				if ev.HasSeq {
+					callsBySeq[ev.Seq] = info
+				}
+			}
 		case "tool/result":
 			flush()
-			msg, _ := data["message"].(map[string]any)
-			if text := deepSeekToolText(msg["content"]); text != "" {
-				s.Messages = append(s.Messages, model.Message{Role: "tool-output", Text: text, Time: at})
+			var data struct {
+				Message struct {
+					Source struct {
+						CallID string `json:"callId"`
+					} `json:"source"`
+					Content any `json:"content"`
+				} `json:"message"`
+			}
+			_ = json.Unmarshal(ev.Data, &data)
+
+			var call toolCallInfo
+			var found bool
+			if data.Message.Source.CallID != "" {
+				call, found = callsByID[data.Message.Source.CallID]
+			}
+			if !found && len(ev.SourceEventSeqs) > 0 {
+				for _, sSeq := range ev.SourceEventSeqs {
+					if c, ok := callsBySeq[sSeq]; ok {
+						call = c
+						found = true
+						break
+					}
+				}
+			}
+
+			if found {
+				tTime := call.time
+				if tTime.IsZero() {
+					tTime = at
+				}
+				lowerName := strings.ToLower(call.name)
+				switch lowerName {
+				case "bash":
+					if cmd := str(call.args["command"]); cmd != "" && IndexCommands() && worthIndexing(cmd) {
+						s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: tTime})
+						s.Touch(tTime)
+					}
+				case "read":
+					p := str(call.args["file_path"])
+					if p == "" {
+						p = str(call.args["path"])
+					}
+					if p != "" && IndexToolPaths() {
+						s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: tTime})
+						s.Touch(tTime)
+					}
+				case "write":
+					p := str(call.args["file_path"])
+					if p == "" {
+						p = str(call.args["path"])
+					}
+					content := str(call.args["content"])
+					if p != "" && IndexToolPaths() {
+						s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: tTime})
+						s.Touch(tTime)
+					}
+					if p != "" && content != "" && IndexWrites() {
+						if rec := WroteRecord(p, content); rec != "" {
+							s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: tTime})
+							s.Touch(tTime)
+						}
+					}
+				case "edit":
+					p := str(call.args["file_path"])
+					if p == "" {
+						p = str(call.args["path"])
+					}
+					oldStr := str(call.args["old_string"])
+					newStr := str(call.args["new_string"])
+					if p != "" && IndexToolPaths() {
+						s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: tTime})
+						s.Touch(tTime)
+					}
+					if p != "" && oldStr != "" && IndexEdits() {
+						span := oldStr
+						if len(span) > editSpanMax {
+							span = span[:editSpanMax]
+						}
+						s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: p + "\n" + span, Time: tTime})
+						s.Touch(tTime)
+					}
+					if p != "" && newStr != "" && IndexWrites() {
+						if rec := WroteRecord(p, newStr); rec != "" {
+							s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: rec, Time: tTime})
+							s.Touch(tTime)
+						}
+					}
+				default:
+					p := str(call.args["file_path"])
+					if p == "" {
+						p = str(call.args["path"])
+					}
+					if p != "" && IndexToolPaths() {
+						s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: p, Time: tTime})
+						s.Touch(tTime)
+					}
+				}
+			}
+
+			if text := deepSeekToolText(data.Message.Content); text != "" && IndexToolOutput() {
+				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: text, Time: at})
 				s.Touch(at)
 			}
 		}
@@ -195,6 +341,19 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+func parseToolArguments(v any) map[string]any {
+	if m, ok := v.(map[string]any); ok {
+		return m
+	}
+	if s, ok := v.(string); ok {
+		var m map[string]any
+		if json.Unmarshal([]byte(s), &m) == nil {
+			return m
+		}
+	}
+	return nil
 }
 
 // deepSeekSpokenByUser separates what a person typed from what a plugin spliced
@@ -269,6 +428,10 @@ func deepSeekToolText(v any) string {
 		}
 		if text, _ := block["text"].(string); text != "" {
 			out = append(out, text)
+			continue
+		}
+		if val, _ := block["value"].(string); val != "" {
+			out = append(out, val)
 		}
 	}
 	return strings.TrimSpace(strings.Join(out, "\n"))
@@ -279,24 +442,6 @@ func deepSeekToolText(v any) string {
 // through the same `zstd` CLI the Zed store already needs — see SkipReason for
 // what a machine without it is told.
 func readDeepSeekLog(path string) ([]byte, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	if !strings.HasSuffix(path, ".zstd") {
-		return raw, nil
-	}
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	cmd := exec.Command("zstd", "-d", "-c", "-q")
-	cmd.Stdin = bytes.NewReader(raw)
-	var out, errBuf bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errBuf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("deepseek: zstd -d %s: %w: %s", filepath.Base(path), err,
-			strings.TrimSpace(errBuf.String()))
-	}
-	return out.Bytes(), nil
+	raw, _, _, err := readDeepSeekBytes(path)
+	return raw, err
 }

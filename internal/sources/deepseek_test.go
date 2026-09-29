@@ -92,7 +92,7 @@ func TestParseDeepSeekFile(t *testing.T) {
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 	}
-	want := []string{"user", "assistant", "tool-output", "assistant"}
+	want := []string{"user", "assistant", "files", "tool-output", "assistant"}
 	if strings.Join(roles, ",") != strings.Join(want, ",") {
 		t.Fatalf("roles = %v, want %v:\n%+v", roles, want, s.Messages)
 	}
@@ -104,11 +104,14 @@ func TestParseDeepSeekFile(t *testing.T) {
 	if strings.Contains(s.Messages[1].Text, "надо открыть конфиг") {
 		t.Error("the model's reasoning was recalled as something it said")
 	}
-	if s.Messages[2].Text != "pgbouncer pool_size = 40" {
-		t.Errorf("tool output = %q", s.Messages[2].Text)
+	if s.Messages[2].Role != "files" || s.Messages[2].Text != "/work/pgbouncer-lab/notes.txt" {
+		t.Errorf("files = %+v", s.Messages[2])
 	}
-	if s.Messages[3].Text != "держим 40 на шард" {
-		t.Errorf("final answer = %q", s.Messages[3].Text)
+	if s.Messages[3].Text != "pgbouncer pool_size = 40" {
+		t.Errorf("tool output = %q", s.Messages[3].Text)
+	}
+	if s.Messages[4].Text != "держим 40 на шард" {
+		t.Errorf("final answer = %q", s.Messages[4].Text)
 	}
 	for i, m := range s.Messages {
 		if m.Time.IsZero() {
@@ -165,11 +168,11 @@ func TestParseDeepSeekFileReadsZstdFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || len(ss[0].Messages) != 4 {
+	if len(ss) != 1 || len(ss[0].Messages) != 5 {
 		t.Fatalf("compressed session read as %+v", ss)
 	}
-	if ss[0].Messages[3].Text != "держим 40 на шард" {
-		t.Errorf("answer = %q", ss[0].Messages[3].Text)
+	if ss[0].Messages[4].Text != "держим 40 на шард" {
+		t.Errorf("answer = %q", ss[0].Messages[4].Text)
 	}
 }
 
