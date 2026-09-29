@@ -21,6 +21,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Delete old Claude Code sessions](https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html): `find ~/.claude/projects -mtime +30 -delete` or `cleanupPeriodDays`, and why age frees far less disk than size
 - [Delete Codex CLI sessions](https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html): one rollout, one day, or all of ~/.codex/sessions, and why ~/.codex/history.jsonl keeps your prompts regardless
 - [Delete Cursor chat history](https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html): where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately
+- [Cursor state.vscdb too large](https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html): which chats fill a 30–125 GB state.vscdb, shrinking it safest first, and keeping the chats you delete searchable
 - [Delete Gemini CLI chat history](https://vshulcz.github.io/deja-vu/guide/delete-gemini-cli-history.html): chats under ~/.gemini/tmp, mapping a project id back to a directory, and what the prompt log keeps
 - [Delete opencode session history](https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html): one SQLite database, what its tables hold, and why deleting rows does not free the space
 - [Delete VS Code Copilot Chat history](https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html): where the conversations are kept and what goes with them

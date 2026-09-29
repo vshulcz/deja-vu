@@ -69,6 +69,7 @@ var groups = []group{
 		{"delete-old-claude-sessions.html", "Old sessions"},
 		{"delete-codex-sessions.html", "Codex"},
 		{"delete-cursor-chat-history.html", "Cursor"},
+		{"cursor-state-vscdb-too-large.html", "Cursor state.vscdb too large"},
 		{"delete-copilot-chat-history.html", "Copilot Chat"},
 		{"delete-gemini-cli-history.html", "Gemini CLI"},
 		{"delete-opencode-session-history.html", "opencode"},

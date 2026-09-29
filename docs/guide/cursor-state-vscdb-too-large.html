@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cursor state.vscdb too large: shrink it safely — deja-vu</title>
+<meta name="description" content="Cursor's state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Cursor state.vscdb too large: shrink it safely">
+<meta property="og:description" content="Cursor's state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Cursor state.vscdb too large: shrink it safely">
+<meta name="twitter:description" content="Cursor's state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Cursor state.vscdb too large: shrink it safely, and what you lose", "description": "Cursor's state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.", "url": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-09-29"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cursor chat history", "item": "https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why is Cursor's state.vscdb so large?","acceptedAnswer":{"@type":"Answer","text":"It holds every chat: one composerData row per chat, one bubbleId row per message, plus the agent's checkpoint and blob rows. Long agent chats are usually most of it; a query over cursorDiskKV grouped by chat shows which."}},{"@type":"Question","name":"How do I shrink state.vscdb without losing chats?","acceptedAnswer":{"@type":"Answer","text":"Delete the biggest chats from Cursor after exporting the ones you need, then compact, which needs free disk on the order of the database's size. To keep deleted chats searchable, index them with deja-vu first; a chat in its index stays searchable after it leaves state.vscdb."}},{"@type":"Question","name":"Is it safe to delete state.vscdb?","acceptedAnswer":{"@type":"Answer","text":"Only with Cursor quit, and it removes every chat along with the other state stored there. Move state.vscdb, -wal and -shm aside rather than deleting them, so the old file is still there if something is missed."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">13</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html" aria-current="page">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Cursor's state.vscdb is huge: what fills it, and how to shrink it</h1>
+<p class="pagelede">tens of gigabytes of chat state, and the way out that keeps the chats<span class="mins" data-mins></span></p>
+
+<p>The usual report: after a restart Cursor sits on "Loading chats", a new chat spins on the first message, and <code>globalStorage</code> turns out to be 30, 50 or 125 GB. Almost all of that is one file, <code>state.vscdb</code>, and almost all of the file is chat state.</p>
+
+<h2>Where it is</h2>
+<pre># macOS
+~/Library/Application Support/Cursor/User/globalStorage/state.vscdb
+# Linux
+~/.config/Cursor/User/globalStorage/state.vscdb
+# Windows
+%APPDATA%\Cursor\User\globalStorage\state.vscdb</pre>
+<p>It is SQLite. The chats live in the <code>cursorDiskKV</code> table: <code>composerData:&lt;id&gt;</code> for each chat, <code>bubbleId:&lt;chat&gt;:&lt;bubble&gt;</code> for each message, and <code>checkpointId:</code> and <code>agentKv:</code> rows for the agent's checkpoints and blobs. The <a href="delete-cursor-chat-history.html">deletion page</a> covers the layout in more detail.</p>
+
+<h2>Find what is big, without touching Cursor</h2>
+<p>Quit Cursor and copy the file, or read it in place with <code>-readonly</code>. Both queries scan the whole table, so on a 50 GB database expect a few minutes.</p>
+<p>Which kind of row holds the space:</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 1, instr(key, ':') - 1) AS kind, count(*),
+       round(sum(length(CAST(value AS BLOB))) / 1e9, 2) AS gb
+FROM cursorDiskKV GROUP BY kind ORDER BY gb DESC;"</pre>
+<p>Which chats hold it:</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT substr(key, 10, 36) AS chat, count(*) AS messages,
+       round(sum(length(CAST(value AS BLOB))) / 1e6) AS mb
+FROM cursorDiskKV WHERE key LIKE 'bubbleId:%'
+GROUP BY chat ORDER BY mb DESC LIMIT 15;"</pre>
+<p>And the name of one of them, to find it in Cursor's chat list:</p>
+<pre>sqlite3 -readonly state.vscdb "
+SELECT json_extract(value, '$.name') FROM cursorDiskKV
+WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
+<p>The usual finding is a handful of long agent chats holding most of the file, not thousands of small ones.</p>
+
+<h2>Shrinking it, safest first</h2>
+<ul>
+<li><b>Delete the biggest chats in Cursor.</b> Export the ones you want to keep first. Deleting from the UI lets Cursor remove the rows it owns; editing the table while Cursor runs is how people lose window state along with the chat.</li>
+<li><b>Compact afterwards.</b> Deleted rows leave free pages behind until the file is compacted. Cursor's forum points to a <code>GC Agent KV Blobs</code> developer command for orphaned blobs, and reports that compaction needs free disk on the order of the database's size, sometimes close to twice it. <code>VACUUM</code> on a closed copy has the same requirement.</li>
+<li><b>Start over.</b> With Cursor quit, move <code>state.vscdb</code>, <code>state.vscdb-wal</code> and <code>state.vscdb-shm</code> aside, not into the trash, and start Cursor: it creates an empty database. Every chat goes from the list, and so does the other state kept there. Keep the old file until you are sure nothing in it is missed.</li>
+</ul>
+
+<h2>Keeping the chats you delete</h2>
+<p>Whichever way you shrink it, the chats in it are the record of what you worked out and what the agent ran, and Cursor keeps no archive.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes Cursor's chats, reading the database through <code>sqlite3</code> without writing to it, together with the history of Claude Code, Codex and the other agents on the machine. A chat that is in its index stays searchable after it leaves <code>state.vscdb</code>, including when the whole database is moved aside, so run it once before you delete anything:</p>
+<pre>deja index
+deja "pgbouncer"          # finds the chat after it is gone from Cursor</pre>
+<p><code>deja forget &lt;id&gt;</code> drops one for good.</p>
+
+<p><a href="delete-cursor-chat-history.html">Deleting Cursor chat history</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="memory-for-cursor.html">Giving Cursor recall over the rest</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
