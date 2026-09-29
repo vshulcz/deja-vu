@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-type completionDispatchCase struct { words, want, absent []string }
+type completionDispatchCase struct{ words, want, absent []string }
 
 func checkCompletionDispatch(t *testing.T, cases []completionDispatchCase) {
 	t.Helper()
