@@ -75,6 +75,7 @@ var groups = []group{
 		{"delete-opencode-session-history.html", "opencode"},
 		{"delete-cline-task-history.html", "Cline"},
 		{"delete-roo-task-history.html", "Roo Code"},
+		{"delete-zed-thread-history.html", "Zed"},
 		{"delete-kilo-code-task-history.html", "Kilo Code"},
 		{"delete-amp-thread-history.html", "Amp"},
 		{"delete-continue-session-history.html", "Continue"},
