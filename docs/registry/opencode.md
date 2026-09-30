@@ -14,14 +14,16 @@ database gives, by id; `DEJA_OPENCODE_DIFFS` overrides where it looks.
 
 ## Schema
 
-opencode 2.0 renamed the tables. The migration in the 2.0 binary runs `ALTER TABLE session RENAME TO session_v2`, and a session's turns move out of `message` and `part` into one `session_message` table — one row per turn, the role in its `type` column, an assistant turn's parts inside its `data` blob:
+opencode 2.0 moved the tables. Sessions live in `session_v2`, and a session's turns move out of `message` and `part` into one `session_message` table: one row per turn, the role in its `type` column, an assistant turn's parts inside its `data` blob:
 
 ```sql
 session_v2(id, project_id, workspace_id, parent_id, slug, directory, path, title, version, ...)
 session_message(id, session_id, type, seq, time_created, time_updated, data)
 ```
 
-A 2.0 store has no `session`, `message` or `part` table at all. Measured on opencode 2.0.12 (`@opencode/cli`), run in a throwaway HOME: the tables are `session_v2`, `session_message`, `session_inbox`, `session_pending` and the rest of the 2.0 set.
+A fresh 2.0 store has no `session`, `message` or `part` table at all. Measured on opencode 2.0.12 (`@opencode/cli`), run in a throwaway HOME: the tables are `session_v2`, `session_message`, `session_inbox`, `session_pending` and the rest of the 2.0 set.
+
+A store upgraded from 1.x keeps both sets. The 2.0 migration creates `session_v2` beside `session` and drops none of `session`, `message` or `part`. opencode's v1 migration (`packages/core/src/database/v1-migration.bun.ts`) then copies each old session into `session_v2` under the same id and rewrites its turns into `session_message`, one session per transaction; a session it has not reached yet has its turns only in `message` and `part`. One such store, from opencode 2.0.18, held 5 sessions in `session`, 10 in `session_v2`, 483 rows in `message` and 58 in `session_message` (#4151).
 
 A user row keeps its text at the top level; an assistant row holds its parts under `$.content`:
 
@@ -40,7 +42,7 @@ What changed inside a turn, measured on the same store:
 
 The message types on a 2.0 store are `user`, `assistant`, `synthetic`, `system`, `idle`, `shell`, `skill`, `compaction`, `model-switched`, `agent-switched` and `location-switched`. deja reads the first two and a compaction's summary; the rest are opencode talking to itself.
 
-deja reads both layouts and picks by asking where the turns are: `session_message` when it holds rows, `message` and `part` otherwise. The sessions come from `session_v2`, or from `session` on a store that has no `session_v2`.
+deja reads both layouts and picks by asking where the turns are: `session_message` when it holds rows, `message` and `part` otherwise. The sessions come from `session_v2`, or from `session` on a store that has no `session_v2`. A store that has `session_v2` beside `session`, `message` and `part` is read both ways at once: a session with turns in `session_message` is read from there, since that copy is the one opencode keeps writing to, and every other session in `session` is read from `message` and `part`. Session and message counts, titles, parents and the newest session come from both tables, each session counted once.
 
 The per-session diff store (`storage/session_diff/`) is a 1.x store; a 2.0 home does not write it.
 
@@ -68,7 +70,8 @@ Parts with `type: "text"` are messages; the role comes from `message.data.role`.
 - **MCP**: `deja install opencode` adds a `mcp.deja` entry of type `local` to `opencode.json` (or `opencode.jsonc` when that is the one present) in `$XDG_CONFIG_HOME/opencode`, else `~/.config/opencode`.
 - **Skill**: `~/.config/opencode/skills/deja-history/SKILL.md`.
 - **Command**: `~/.config/opencode/commands/deja.md`, invoked as `/deja`.
-- **Auto-recall**: `deja install opencode-auto` also writes a plugin, `~/.config/opencode/plugins/deja.js`. It puts the session digest into the first system block (`experimental.chat.system.transform`), appends per-prompt recall to the last user message (`experimental.chat.messages.transform`), adds recall to a spawned `task` agent's prompt (`tool.execute.before`), appends a file's history or a failed command's earlier fix to the tool output (`tool.execute.after`), and runs `deja hook-precompact` at `experimental.session.compacting`. The plugin shape follows the store: 2.0 loads only a default export, 1.x only a named one.
+- **Auto-recall**: `deja install opencode-auto` also writes a plugin, `~/.config/opencode/plugins/deja.js`. It puts the session digest into the first system block (`experimental.chat.system.transform`), appends per-prompt recall to the last user message (`experimental.chat.messages.transform`), adds recall to a spawned `task` agent's prompt (`tool.execute.before`), appends a file's history or a failed command's earlier fix to the tool output (`tool.execute.after`), and runs `deja hook-precompact` at `experimental.session.compacting`. The plugin shape follows the installed opencode's major version (`opencode --version`, or `DEJA_OPENCODE_MAJOR` where the binary is not on `PATH`), and the store's layout when neither answers: 2.0 loads only a default `{ id, setup }`, 1.x a named export. `DEJA_OPENCODE_MAJOR` picks the plugin and nothing else; the store is read by its tables.
+- **Package**: the `opencode-deja` npm package ships `index.js` for 1.x and `server.js`, exported as `opencode-deja/server`, for 2.x. 2.x resolves that subpath first and wants a default `{ id, setup }`; 1.x from 1.3.4 resolves it too and calls its `server`; older 1.x loads `index.js`. In `opencode.json` it goes under `plugin` on 1.x and `plugins` on 2.x.
 - **Resume**: `opencode -s <id>`, run in the session's directory.
 
 ## Known quirks and drift
@@ -79,4 +82,4 @@ Parts with `type: "text"` are messages; the role comes from `message.data.role`.
 - A missing database must not be passed to SQLite because the CLI would create it.
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 
-**Last verified:** 2026-09-22
+**Last verified:** 2026-09-30
