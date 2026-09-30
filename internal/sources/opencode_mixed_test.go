@@ -137,6 +137,59 @@ func TestOpencodeReadsAStoreHoldingBothLayouts(t *testing.T) {
 	}
 }
 
+// A session opened and left empty is often the newest row, and reading it
+// alone is what made doctor call a working store parsed-zero (#4151). The
+// newest session with turns answers instead, on every layout.
+func TestOpencodeNewestSkipsASessionWithNoTurns(t *testing.T) {
+	empty := func(t *testing.T, db, table string) {
+		t.Helper()
+		// Newer than anything the fixtures hold, and with no turns.
+		sql := `insert into ` + table + `(id, directory, title, time_created, time_updated) values('empty','/w','New session',1799999999000,1799999999000);`
+		if out, err := exec.Command("sqlite3", db, sql).CombinedOutput(); err != nil {
+			t.Fatalf("sqlite: %v %s", err, out)
+		}
+	}
+	cases := []struct {
+		name  string
+		db    func(t *testing.T) string
+		table string
+		want  string
+	}{
+		{"mixed", opencodeMixedFixture, "session_v2", "new"},
+		{"mixed, empty 1.x row", opencodeMixedFixture, "session", "new"},
+		{"2.x", opencodeV2Fixture, "session_v2", "s1"},
+		{"1.x", opencodeV1Fixture, "session", "s1"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := c.db(t)
+			empty(t, db, c.table)
+			ss, err := ParseOpencodeNewest(db)
+			if err != nil || len(ss) != 1 || ss[0].ID != c.want || len(ss[0].Messages) == 0 {
+				t.Fatalf("newest = %+v err=%v, want %s with its turns", ss, err, c.want)
+			}
+		})
+	}
+}
+
+func opencodeV1Fixture(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("sqlite3"); err != nil {
+		t.Skip("sqlite3 not installed")
+	}
+	db := filepath.Join(t.TempDir(), "opencode.db")
+	script := `create table session(id text primary key, directory text, title text, time_created integer, time_updated integer);
+create table message(id text primary key, session_id text, time_created integer, data text);
+create table part(id text primary key, message_id text, data text);
+insert into session values('s1','/w','the payments suite',1767409200000,1767409300000);
+insert into message values('m1','s1',1767409201000,'{"role":"user","time":{"created":1767409201000}}');
+insert into part values('p1','m1','{"type":"text","text":"why does TestRetry flake","time":{"start":1767409201000}}');`
+	if out, err := exec.Command("sqlite3", db, script).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite setup: %v %s", err, out)
+	}
+	return db
+}
+
 // A session prefix and a search reach both layouts.
 func TestOpencodeMixedStoreAnswersWhereClauses(t *testing.T) {
 	db := opencodeMixedFixture(t)

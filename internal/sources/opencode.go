@@ -567,13 +567,24 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	q := "select id from " + opencodeSessionTable(db) + " order by time_created desc limit 1"
-	if opencodeSchemaOf(db).legacy {
-		// The newest of either layout: a store mid-migration can have its
-		// latest work in the old tables or the new.
-		q = "select id from (select id,time_created from session union all " +
-			"select id,time_created from " + opencodeSessionTable(db) + ") order by time_created desc limit 1"
+	// The newest session that has turns. opencode writes the session row
+	// before the first message, so a session opened and left empty is often
+	// the newest, and reading it alone told doctor the store parsed to zero
+	// (#4151). Both lookups ride opencode's own session_id indexes.
+	sc := opencodeSchemaOf(db)
+	v1 := "select id,time_created from session s where exists (select 1 from message m where m.session_id=s.id)"
+	v2 := "select id,time_created from " + sc.sessionTable + " s where exists (select 1 from session_message x " +
+		"where x.session_id=s.id and x.type in " + opencodeTurnTypes + ")"
+	from := v1
+	switch {
+	case sc.legacy:
+		// Either layout: a store mid-migration can have its latest work in
+		// the old tables or the new.
+		from = v1 + " union all " + v2
+	case sc.v2:
+		from = v2
 	}
+	q := "select id from (" + from + ") order by time_created desc limit 1"
 	probe, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	var whyNot bytes.Buffer

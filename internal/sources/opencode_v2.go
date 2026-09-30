@@ -8,10 +8,16 @@ import (
 	"time"
 )
 
-// opencode 2.0 renamed the tables deja reads. Its migration runs `ALTER TABLE
-// session RENAME TO session_v2`, and a session's turns move out of `message`
-// and `part` into one `session_message` table, whose `type` column carries what
-// the role used to be and whose `data` blob carries an assistant turn's parts.
+// opencode 2.0 moved the tables deja reads. Sessions live in `session_v2`, and
+// a session's turns move out of `message` and `part` into one `session_message`
+// table, whose `type` column carries what the role used to be and whose `data`
+// blob carries an assistant turn's parts. The migration that brings this in
+// (20260804233008_loose_psylocke) renames `session` to `session_v2` only on a
+// store from the 2.0 prerelease lineage; on a 1.x store it creates `session_v2`
+// beside `session` (below), and drops and rebuilds `session_message` with a
+// foreign key to `session_v2`; on the prerelease path the rename carries the
+// existing key along. So a turn in `session_message` always has a `session_v2`
+// row.
 //
 // Both layouts are read, because of how a store that has moved fails: every
 // query finds the old tables gone and the harness errors with `no such table:
