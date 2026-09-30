@@ -46,6 +46,13 @@
     <summary>No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.</summary>
   </entry>
   <entry>
+    <title>Codex CLI history: view, search and sync it — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/codex-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html"></link>
+    <updated>2026-09-30T00:00:00Z</updated>
+    <summary>Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.</summary>
+  </entry>
+  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"></link>
     <updated>2026-09-30T00:00:00Z</updated>
     <summary>How to give Codex CLI recall over every coding agent&#39;s sessions on this machine — the MCP server, the hook it has to approve, and the plugin marketplace.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Command Code: past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html"></link>
-    <updated>2026-09-30T00:00:00Z</updated>
-    <summary>Command Code logs a session per project and starts each one cold. deja wires its MCP server, hooks, skill and command, and indexes every agent here.</summary>
   </entry>
 </feed>

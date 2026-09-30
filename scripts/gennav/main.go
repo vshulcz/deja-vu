@@ -57,6 +57,7 @@ var groups = []group{
 	{title: "Session history", fold: true, links: []link{
 		{"where-sessions-are-stored.html", "Where history lives"},
 		{"find-a-session.html", "Finding a session"},
+		{"codex-history.html", "Codex history"},
 		{"resume-a-session.html", "Resuming a session"},
 		{"export-conversations.html", "Exporting sessions"},
 		{"sync-across-machines.html", "Across machines"},

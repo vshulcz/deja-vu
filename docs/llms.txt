@@ -38,6 +38,7 @@ Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/de
 - [Resuming a session](https://vshulcz.github.io/deja-vu/guide/resume-a-session.html): find it across every agent, reopen it in the one that owns it
 - [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
 - [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
+- [Codex CLI history](https://vshulcz.github.io/deja-vu/guide/codex-history.html): where Codex keeps sessions, the .jsonl.zst rollouts grep misses after a week, jq and sqlite3 recipes, search and sync
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
 - [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
 - [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically

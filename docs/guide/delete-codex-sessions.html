@@ -33,7 +33,7 @@
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-09-15"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Codex sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "Delete its rollout file: rm ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl. The sessions directory is dated, so one day's work is one directory, and rm -rf ~/.codex/sessions removes every session. Prompt history is a separate file, ~/.codex/history.jsonl, and survives that."}}, {"@type": "Question", "name": "Where does Codex CLI store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: rollouts at sessions/YYYY/MM/DD/rollout-*.jsonl as append-only JSONL, and prompt history at history.jsonl. Codex inside Xcode uses ~/Library/Developer/Xcode/CodingAssistant/codex instead."}}, {"@type": "Question", "name": "Does deleting a Codex rollout remove the prompt from history?", "acceptedAnswer": {"@type": "Answer", "text": "No. history.jsonl holds your prompts independently of the rollouts, with no assistant replies and no project metadata, so a prompt can survive the session it belongs to. Delete both if you want it gone."}}, {"@type": "Question", "name": "Does Codex CLI delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing sweeps them on a schedule the way Claude Code's cleanupPeriodDays does; the rollout files stay until you remove them."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "Run codex delete with its id, or delete its rollout file under ~/.codex/sessions/YYYY/MM/DD/; rollouts older than a week are compressed to rollout-*.jsonl.zst. The sessions directory is dated, so one day's work is one directory, and rm -rf ~/.codex/sessions removes every session. Prompt history is a separate file, ~/.codex/history.jsonl, and survives that."}}, {"@type": "Question", "name": "Where does Codex CLI store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: rollouts at sessions/YYYY/MM/DD/rollout-*.jsonl as append-only JSONL, and prompt history at history.jsonl. Codex inside Xcode uses ~/Library/Developer/Xcode/CodingAssistant/codex instead."}}, {"@type": "Question", "name": "Does deleting a Codex rollout remove the prompt from history?", "acceptedAnswer": {"@type": "Answer", "text": "No. history.jsonl holds your prompts independently of the rollouts, with no assistant replies and no project metadata, so a prompt can survive the session it belongs to. Delete both if you want it gone."}}, {"@type": "Question", "name": "Does Codex CLI delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing sweeps them on a schedule the way Claude Code's cleanupPeriodDays does; the rollout files stay until you remove them."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -60,9 +60,10 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
@@ -141,12 +142,12 @@
 <p>Codex writes each session to disk as it runs. The store is <code>${CODEX_HOME:-~/.codex}</code>, and there are two separate things in it: the rollouts, which are the conversations, and <code>history.jsonl</code>, which is your prompts. Deleting one does not touch the other — that is the part people get wrong.</p>
 
 <h2>How to delete Codex sessions</h2>
-<p>There is no command; the sessions are files. The path is dated, so a day of work is a directory.</p>
+<p>Current Codex has a command for one session, <code>codex delete &lt;id&gt;</code>, and <code>codex archive &lt;id&gt;</code> to hide one without deleting it. Beyond that the sessions are files. The path is dated, so a day of work is a directory, and a rollout older than a week has been compressed to <code>.jsonl.zst</code>, which a pattern ending in <code>.jsonl</code> does not match.</p>
 <pre># what is there, newest first
-ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl | head
+ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl* | head
 
 # one session
-rm ~/.codex/sessions/2026/09/15/rollout-&lt;id&gt;.jsonl
+rm ~/.codex/sessions/2026/09/15/rollout-*&lt;id&gt;.jsonl*
 
 # one day
 rm -rf ~/.codex/sessions/2026/09/15
@@ -166,7 +167,7 @@ rm ~/.codex/history.jsonl</pre>
 <p>The rollouts are what any later search over your own work reads — including <code>codex resume</code>, which lists what is on disk. Delete them and the record of what the agent ran goes with them: the commands, their output, and the edits, none of which are recoverable from a summary.</p>
 <p>deja indexes these files along with every other agent's on the machine, so a decision made in Codex answers a question asked in Claude Code or Cursor. A session it has already indexed stays searchable after the file goes; only <code>deja forget</code> drops one on purpose. That is a reason to index before deleting, not a reason to keep gigabytes.</p>
 
-<p><a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="memory-for-codex.html">Giving Codex recall over the rest</a></p>
+<p><a href="codex-history.html">Reading and searching Codex history</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="session-files-on-disk.html">The same question for Claude Code</a> · <a href="memory-for-codex.html">Giving Codex recall over the rest</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>
 </div>

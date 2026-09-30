@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex CLI history: view, search and sync it — deja-vu</title>
+<meta name="description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Codex CLI history: view, search and sync it">
+<meta property="og:description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/codex-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Codex CLI history: view, search and sync it">
+<meta name="twitter:description" content="Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex CLI history: view, search and sync it", "description": "Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-30", "dateModified": "2026-09-30"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Codex CLI history", "item": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where is Codex CLI history stored?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: one rollout file per session at sessions/YYYY/MM/DD/rollout-*.jsonl, compressed to .jsonl.zst after seven days, archived sessions in archived_sessions/, your prompts alone in history.jsonl, and the resume picker's session list in state_5.sqlite."}}, {"@type": "Question", "name": "How do I search my Codex history?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume lists sessions by title but does not search inside them. grep works on .jsonl rollouts but misses the .jsonl.zst ones older than a week; zstdgrep reads those. deja-vu indexes both, plus archived sessions, and ranks results: deja --harness codex \"your query\"."}}, {"@type": "Question", "name": "Can I sync Codex history between machines?", "acceptedAnswer": {"@type": "Answer", "text": "Codex keeps history local. deja sync ssh <host> carries deja's index of it to another machine, where it is searchable with deja; it does not add sessions to that machine's codex resume picker."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold" open><summary>Session history <span class="n">9</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html" aria-current="page">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Codex CLI history: where it is, how to read it, how to search it</h1>
+<p class="pagelede">every session is on disk; Codex lists them, it does not search them<span class="mins" data-mins></span></p>
+
+<p>Codex keeps every session you run. What it does not have is a way to ask which session had the fix, or to look at them outside the resume picker. The files are plain enough that <code>jq</code> and <code>sqlite3</code> go a long way, and a week in, one detail breaks the obvious <code>grep</code>.</p>
+
+<h2>Where Codex keeps it</h2>
+<p>Everything is under <code>${CODEX_HOME:-~/.codex}</code>:</p>
+<ul>
+<li><code>sessions/YYYY/MM/DD/rollout-&lt;time&gt;-&lt;id&gt;.jsonl</code>: one file per session, the whole conversation, appended as it runs. The first line is <code>session_meta</code>, with the session id and the working directory.</li>
+<li>After seven days Codex compresses a rollout in the background to <code>rollout-….jsonl.zst</code>. Codex reads both forms. Anything that looks for <code>*.jsonl</code> stops seeing sessions older than a week.</li>
+<li><code>archived_sessions/</code>: sessions you archived, same format.</li>
+<li><code>history.jsonl</code>: your prompts only, one line each, with the session id. No replies, no commands.</li>
+<li><code>state_5.sqlite</code>: the session list the resume picker reads, with title, working directory, git branch, token count and an archived flag. The number in the name moves with Codex releases.</li>
+</ul>
+
+<h2>What Codex gives you</h2>
+<pre>codex resume                 # picker, sessions started in this directory
+codex resume --all           # every directory
+codex resume --last          # straight into the most recent one
+codex resume --include-non-interactive   # codex exec runs too
+codex fork                   # a copy of an old session to continue from
+codex archive &lt;id&gt;           # hide it; codex unarchive brings it back
+codex delete &lt;id&gt;            # gone for good</pre>
+<p>The picker shows titles and first messages. It does not look inside the conversations, and it only knows about Codex.</p>
+
+<h2>Reading it without any tool</h2>
+<p>The last few sessions, with where they ran:</p>
+<pre>for f in $(ls -t ~/.codex/sessions/*/*/*/rollout-*.jsonl | head -10); do
+  jq -r 'select(.type=="session_meta") | .payload | "\(.timestamp[:16])  \(.cwd)  \(.id)"' "$f"
+done</pre>
+<p>The same list from the picker's database, read-only:</p>
+<pre>sqlite3 -readonly ~/.codex/state_5.sqlite "
+SELECT datetime(updated_at, 'unixepoch', 'localtime'), substr(title, 1, 50), cwd
+FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 20;"</pre>
+<p>What you typed in one session, from the prompt log. It holds interactive sessions only; prompts given to <code>codex exec</code> are not in it:</p>
+<pre>jq -r 'select(.session_id=="&lt;id&gt;") | .text' ~/.codex/history.jsonl</pre>
+<p>Which sessions mention something, including the compressed ones:</p>
+<pre>grep -l "pgbouncer" ~/.codex/sessions/*/*/*/rollout-*.jsonl
+zstdgrep -l "pgbouncer" ~/.codex/sessions/*/*/*/rollout-*.jsonl.zst</pre>
+<p>That works for one word you remember exactly. It gets slow over months of history, has no ranking, and misses the session where you said it differently.</p>
+
+<h2>Searching it</h2>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes these files, compressed ones and archived ones included, with the history of every other agent on the machine. It only reads them.</p>
+<pre>deja index
+deja --harness codex "pgbouncer prepared statement"   # ranked, with the session id
+deja last 20 --harness codex                           # recent sessions, any directory
+deja show &lt;id&gt;                                         # the conversation
+deja resume &lt;id&gt;                                       # the command that reopens it in Codex
+deja view                                              # all of it as one local HTML page</pre>
+<p>Drop <code>--harness codex</code> and the same search covers Claude Code, Cursor, opencode and the rest, which is usually where the answer turns out to be. Credentials are stripped as the index is built. A session deja has indexed stays searchable after <code>codex delete</code> or a cleanup; <code>deja forget</code> removes it on purpose.</p>
+<p>To have Codex look this up itself at the start of a session, rather than you running the search, see <a href="memory-for-codex.html">memory for Codex</a>.</p>
+
+<h2>On more than one machine</h2>
+<p>Codex keeps its history local, and <code>codex resume</code> only lists what is on this disk. deja can carry its index between machines over SSH, with no service in between:</p>
+<pre>deja sync ssh devbox        # push this machine's sessions there
+deja sync ssh devbox --both # and pull its sessions here</pre>
+<p>What arrives is searchable with <code>deja</code> on the other side. It does not add sessions to the other machine's resume picker. <a href="sync-across-machines.html">Across machines</a> has the details.</p>
+
+<p><a href="delete-codex-sessions.html">Deleting Codex sessions</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="resume-a-session.html">Resuming a session</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>
