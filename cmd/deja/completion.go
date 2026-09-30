@@ -74,17 +74,17 @@ _deja_completion() {
             if [[ "$prev" == "--harness" ]]; then
                 COMPREPLY=( $(compgen -W "$harnesses" -- "$cur") )
             elif [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "--all --json --harness --project --since" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--all --json --harness --project --since --attribution --git-note" -- "$cur") )
             else
                 COMPREPLY=( $(compgen -f -- "$cur") )
             fi
             ;;
         bench)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "recall context" -- "$cur") )
+                COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
             elif [[ "$action" == "recall" ]]; then
                 COMPREPLY=( $(compgen -W "--json" -- "$cur") )
-            elif [[ "$action" == "context" ]]; then
+            elif [[ "$action" == "context" || "$action" == "prompt" || "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
             ;;
@@ -110,7 +110,10 @@ _deja_completion() {
         index)
             COMPREPLY=( $(compgen -W "--rebuild -rebuild --quiet -quiet" -- "$cur") )
             ;;
-        install|uninstall)
+        install)
+            COMPREPLY=( $(compgen -W "$install_targets --no-guidance --no-index --force" -- "$cur") )
+            ;;
+        uninstall)
             COMPREPLY=( $(compgen -W "$install_targets --no-guidance" -- "$cur") )
             ;;
         last)
@@ -125,8 +128,24 @@ _deja_completion() {
         remember)
             COMPREPLY=( $(compgen -W "--project --tag" -- "$cur") )
             ;;
+        rules)
+            if (( COMP_CWORD == 2 )); then
+                COMPREPLY=( $(compgen -W "sync status candidates" -- "$cur") )
+            elif [[ "$action" == "candidates" && "$prev" != "--limit" && "$prev" != "--since" ]]; then
+                COMPREPLY=( $(compgen -W "--json --limit --since" -- "$cur") )
+            else
+                COMPREPLY=()
+            fi
+            ;;
         resume)
             COMPREPLY=( $(compgen -W "--exec" -- "$cur") )
+            ;;
+        secrets)
+            if [[ "$prev" == "--limit" ]]; then
+                COMPREPLY=()
+            else
+                COMPREPLY=( $(compgen -W "--limit --json --scrub --dry-run" -- "$cur") )
+            fi
             ;;
         stats)
             if [[ "$prev" == "--harness" ]]; then
@@ -137,11 +156,17 @@ _deja_completion() {
             ;;
         sync)
             if (( COMP_CWORD == 2 )); then
-                COMPREPLY=( $(compgen -W "export import ssh" -- "$cur") )
+                COMPREPLY=( $(compgen -W "export import ssh forget" -- "$cur") )
             elif [[ "$action" == "export" ]]; then
-                COMPREPLY=( $(compgen -W "--full" -- "$cur") )
+                if [[ "$prev" == "--peer" ]]; then
+                    COMPREPLY=()
+                else
+                    COMPREPLY=( $(compgen -W "--full --include-imported --peer" -- "$cur") )
+                fi
             elif [[ "$action" == "ssh" ]]; then
-                COMPREPLY=( $(compgen -W "--pull --full" -- "$cur") )
+                COMPREPLY=( $(compgen -W "--pull --full --both" -- "$cur") )
+            elif [[ "$action" == "forget" ]]; then
+                COMPREPLY=()
             else
                 COMPREPLY=( $(compgen -d -- "$cur") )
             fi
@@ -226,11 +251,11 @@ _deja() {
 
   case "$words[2]" in
     blame)
-      _arguments '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
+      _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; requires --attribution]' '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
       ;;
     bench)
       if (( CURRENT == 3 )); then
-        _values 'benchmark' recall context
+        _values 'benchmark' recall context prompt block ingest read
       elif [[ "$words[3]" == "recall" ]]; then
         _arguments '--json[print JSON]'
       else
@@ -255,7 +280,10 @@ _deja() {
     index)
       _arguments '--rebuild[force a full rebuild]' '-rebuild[force a full rebuild]' '--quiet[say nothing when it worked]' '-quiet[say nothing when it worked]'
       ;;
-    install|uninstall)
+    install)
+      _arguments '--no-guidance[skip guidance files]' '--no-index[skip indexing]' '--force[replace edited guidance files]' "1:target:($install_targets)"
+      ;;
+    uninstall)
       _arguments '--no-guidance[skip guidance files]' "1:target:($install_targets)"
       ;;
     last)
@@ -264,21 +292,33 @@ _deja() {
     remember)
       _arguments '--project=[note project]:project:' '*--tag=[tag the note, repeatable]:tag:' '1:text:'
       ;;
+    rules)
+      if (( CURRENT == 3 )); then
+        _values 'rules action' sync status candidates
+      elif [[ "$words[3]" == "candidates" ]]; then
+        _arguments '--json[print JSON]' '--limit=[maximum candidates]:count:' '--since=[filter by age]:duration:'
+      fi
+      ;;
     resume)
       _arguments '--exec[launch the native harness]' '1:session ID prefix:'
+      ;;
+    secrets)
+      _arguments '--limit=[maximum findings]:count:' '--json[print JSON]' '--scrub[rewrite files to remove secrets]' '--dry-run[show what --scrub would change]'
       ;;
     stats)
       _arguments '--json[print JSON]' '--impact[measured impact report]' '--year[your last twelve months in one screen]' '--html=[write HTML timeline]:path:_files' '--redaction[include redaction facts]' '--card=[write SVG card]:path:_files' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '--role=[filter by role]:role:(%ROLES%)'
       ;;
     sync)
       if (( CURRENT == 3 )); then
-        _values 'sync action' export import ssh
+        _values 'sync action' export import ssh forget
       elif [[ "$words[3]" == "export" ]]; then
-        _arguments '--full[export all records]' '1:directory:_files -/'
+        _arguments '--full[export all records]' '--include-imported[include records received from other machines]' '--peer=[destination peer name]:peer:' '1:directory:_files -/'
       elif [[ "$words[3]" == "import" ]]; then
         _arguments '1:directory:_files -/'
+      elif [[ "$words[3]" == "forget" ]]; then
+        _arguments '1:host:'
       else
-        _arguments '--pull[pull from the remote]' '--full[transfer all records]' '1:host:'
+        _arguments '--pull[pull from the remote]' '--full[transfer all records]' '--both[transfer in both directions]' '1:host:'
       fi
       ;;
     show)
@@ -314,26 +354,28 @@ complete -c deja -n '__deja_needs_command' -l limit -r -d 'Max sessions to retur
 complete -c deja -n '__fish_seen_subcommand_from search' -l limit -r -d 'Max sessions to return (1-100)'
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l attribution -d 'Show line attribution'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l git-note -d 'Write attribution as a git note; requires --attribution'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
 complete -c deja -n '__fish_seen_subcommand_from blame' -l json
 complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
-complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context' -a 'recall context'
+complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
 complete -c deja -n '__fish_seen_subcommand_from recall' -l json
-complete -c deja -n '__fish_seen_subcommand_from context' -l json
-complete -c deja -n '__fish_seen_subcommand_from context' -l seed -r
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l json
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
-complete -c deja -n '__fish_seen_subcommand_from forget' -l list
-complete -c deja -n '__fish_seen_subcommand_from forget' -l dry-run
-complete -c deja -n '__fish_seen_subcommand_from forget' -l session -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l project -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l before -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l unforget -r
-complete -c deja -n '__fish_seen_subcommand_from forget' -l all-matches
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l list
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l dry-run
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l session -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l project -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l before -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l unforget -r
+complete -c deja -n '__fish_seen_subcommand_from forget; and not __fish_seen_subcommand_from sync' -l all-matches
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l to -r -a '%HANDOFF_TARGETS%'
 complete -c deja -n '__fish_seen_subcommand_from handoff' -l exec
 complete -c deja -n '__fish_seen_subcommand_from hook-context' -l plain
@@ -342,6 +384,8 @@ complete -c deja -n '__fish_seen_subcommand_from hook-context' -l notes
 complete -c deja -n '__fish_seen_subcommand_from index' -l rebuild
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -a '%INSTALL_TARGETS% --all --auto'
 complete -c deja -n '__fish_seen_subcommand_from install uninstall' -l no-guidance
+complete -c deja -n '__fish_seen_subcommand_from install' -l no-index -d 'Skip indexing'
+complete -c deja -n '__fish_seen_subcommand_from install' -l force -d 'Replace edited guidance files'
 complete -c deja -n '__fish_seen_subcommand_from show' -l json
 complete -c deja -n '__fish_seen_subcommand_from show' -l harness -r -a '%HARNESSES%'
 complete -c deja -n '__fish_seen_subcommand_from show' -l offset -r
@@ -354,7 +398,15 @@ complete -c deja -n '__fish_seen_subcommand_from last' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from last' -l role -r -a '%ROLES%'
 complete -c deja -n '__fish_seen_subcommand_from remember' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from remember' -l tag -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from sync status candidates' -f -a 'sync status candidates'
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l json
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l limit -r
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l json
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l scrub -d 'Rewrite files to remove secrets'
+complete -c deja -n '__fish_seen_subcommand_from secrets' -l dry-run -d 'Show what --scrub would change'
 complete -c deja -n '__fish_seen_subcommand_from stats' -l json
 complete -c deja -n '__fish_seen_subcommand_from stats' -l impact
 complete -c deja -n '__fish_seen_subcommand_from stats' -l year
@@ -365,12 +417,15 @@ complete -c deja -n '__fish_seen_subcommand_from stats' -l harness -r -a '%HARNE
 complete -c deja -n '__fish_seen_subcommand_from stats' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from stats' -l role -r -a '%ROLES%'
-complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from export import ssh' -a 'export import ssh'
+complete -c deja -n '__fish_seen_subcommand_from sync; and not __fish_seen_subcommand_from rules; and not __fish_seen_subcommand_from export import ssh forget' -a 'export import ssh forget'
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l include-imported
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from export' -l peer -r
 complete -c deja -n '__fish_seen_subcommand_from export' -l full
 complete -c deja -n '__fish_seen_subcommand_from export' -F
 complete -c deja -n '__fish_seen_subcommand_from import' -F
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l pull
 complete -c deja -n '__fish_seen_subcommand_from ssh' -l full
+complete -c deja -n '__fish_seen_subcommand_from sync; and __fish_seen_subcommand_from ssh' -l both
 `
 
 const powershellCompletion = `# PowerShell completion for deja
@@ -407,10 +462,10 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
         $candidates = switch ($command) {
             'blame' {
                 if ($previous -eq '--harness') { $harnesses }
-                else { @('--all', '--json', '--harness', '--project', '--since') }
+                else { @('--all', '--json', '--harness', '--project', '--since', '--attribution', '--git-note') }
             }
             'bench' {
-                if ($argumentPosition -eq 1) { @('recall', 'context') }
+                if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
                 elseif ($action -eq 'recall') { @('--json') }
                 else { @('--json', '--seed') }
             }
@@ -423,23 +478,33 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'hook-context' { @('--plain', '--once', '--notes') }
             'index' { @('--rebuild', '-rebuild') }
-            { $_ -in @('install', 'uninstall') } { $installTargets + @('--no-guidance') }
+            'install' { $installTargets + @('--no-guidance', '--no-index', '--force') }
+            'uninstall' { $installTargets + @('--no-guidance') }
             'last' {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { @('user', 'assistant', 'tool') }
                 else { @('--json', '--from', '--harness', '--project', '--since', '--role') }
             }
             'remember' { @('--project', '--tag') }
+            'rules' {
+                if ($argumentPosition -eq 1) { @('sync', 'status', 'candidates') }
+                elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
+                else { @() }
+            }
             'resume' { @('--exec') }
+            'secrets' {
+                if ($previous -eq '--limit') { @() }
+                else { @('--limit', '--json', '--scrub', '--dry-run') }
+            }
             'stats' {
                 if ($previous -eq '--harness') { $harnesses }
                 elseif ($previous -eq '--role') { @('user', 'assistant', 'tool') }
                 else { @('--json', '--impact', '--html', '--redaction', '--card', '--harness', '--project', '--since', '--role') }
             }
             'sync' {
-                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh') }
-                elseif ($action -eq 'export') { @('--full') }
-                elseif ($action -eq 'ssh') { @('--pull', '--full') }
+                if ($argumentPosition -eq 1) { @('export', 'import', 'ssh', 'forget') }
+                elseif ($action -eq 'export' -and $previous -ne '--peer') { @('--full', '--include-imported', '--peer') }
+                elseif ($action -eq 'ssh') { @('--pull', '--full', '--both') }
                 else { @() }
             }
             'show' {

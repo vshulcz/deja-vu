@@ -156,6 +156,7 @@
 <div class="grp">Evidence</div>
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html" aria-current="page">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
 <a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
@@ -176,7 +177,7 @@
 <tr><td>Stored as</td><td class="us">verbatim, redacted</td><td>LLM facts</td><td>memory blocks</td><td>markdown</td><td>SQL rows</td><td>LLM summaries</td><td>events + vectors</td></tr>
 <tr><td>Needs LLM/embedding key</td><td class="us y">no</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>model or API</td></tr>
 <tr><td>Background process</td><td class="us y">none</td><td>server / cloud</td><td>server</td><td>server / cloud</td><td>cloud by default, your own database opt-in</td><td>worker</td><td>daemon, ports</td></tr>
-<tr><td>Coding agents</td><td class="us">35 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>MCP: Claude Code, Cursor, Codex, Warp, Antigravity</td><td>Claude Code, opencode, Antigravity, Grok Bot, OpenClaw</td><td>via hooks</td></tr>
+<tr><td>Coding agents</td><td class="us">35 native parsers (Claude Code, Codex, opencode, Cursor, Goose, OpenClaw…)</td><td>via SDK/MCP</td><td>own runtime</td><td>adapters</td><td>MCP: Claude Code, Cursor, Codex, Warp, Antigravity</td><td>Claude Code, Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot, OpenClaw</td><td>via hooks</td></tr>
 <tr><td>Cross-machine sync</td><td class="us y">✓ SSH, no cloud</td><td>cloud</td><td>server-side</td><td>cloud / self-host</td><td>cloud, or your own database</td><td>cloud (cmem.ai)</td><td>peer-to-peer mesh</td></tr>
 <tr><td>Recall provenance</td><td class="us y">✓ log + receipts</td><td class="n">—</td><td>partial</td><td class="n">—</td><td>queryable rows</td><td>viewer</td><td>dashboard</td></tr>
 <tr><td>Retrieval</td><td class="us">tiered lexical, optional embeddings</td><td>vector + graph</td><td>agent + vector</td><td>embeddings</td><td>SQL + vector</td><td>vector</td><td>hybrid RRF</td></tr>
@@ -237,7 +238,7 @@
 <p><b>Mem0 / Memori</b> — you are building an application and want to give <em>your users</em> memory through an API. deja has no SDK; it is not for app-embedded memory.</p>
 <p><b>Letta</b> — you want a full agent runtime with self-editing memory and you're happy living inside it. deja is the opposite bet: memory only, bring whatever agent you already use.</p>
 <p><b>memU</b> — you want curated, distilled knowledge files and don't mind the agent doing the distilling. deja keeps the verbatim record and searches it instead.</p>
-<p><b>claude-mem</b> — you prefer compressed summaries over raw history. It installs into Claude Code, opencode, Antigravity, Grok Bot and OpenClaw gateways; deja parses 35 agents and keeps recall lossless.</p>
+<p><b>claude-mem</b> — you prefer compressed summaries over raw history. It installs into Claude Code, Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot and OpenClaw gateways; deja parses 35 agents and keeps recall lossless. <a href="claude-mem-alternative.html">The two side by side</a>.</p>
 <p><b>agentmemory</b> — it publishes 95.2% R@5 on LongMemEval-S with the harness in its own repository, imports the Claude Code transcripts you already have, and syncs peer to peer. It wants a daemon on ports and a model or an API key; deja is one binary with neither, and reads thirty-five harnesses rather than one. On the <a href="day-zero.html">day-zero corpus</a> the two are measured side by side.</p>
 <p><b>MemPalace</b> — the closest overlap by far, and the honest comparison is narrow: it also reads Claude Code sessions off disk and also keeps them verbatim. It brings a local embedding model and a vector store; deja is one binary with neither, parses 35 harnesses rather than three, and adds the things built around a code history specifically — <code>deja blame</code>, SSH sync, sanitized digests. If you want semantic paraphrase matching and don't mind a Python install with a 300&nbsp;MB model, theirs is the better fit.</p>
 <p><b>cognee / Graphiti</b> — you want a knowledge graph with entities, relationships and time-valid facts to reason over, and you accept a database and an LLM key as the price. deja does not build a graph; it searches what was said.</p>
