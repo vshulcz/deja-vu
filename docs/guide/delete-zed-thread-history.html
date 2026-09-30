@@ -119,6 +119,7 @@
 <div class="grp">Evidence</div>
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
 <a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
@@ -136,7 +137,7 @@
 <p>A Flatpak install uses <code>FLATPAK_XDG_DATA_HOME</code> for its data root. A custom Zed data directory also changes this location. Check the data directory used by the instance whose history you want to remove.</p>
 <p><code>~/.config/zed</code> is a configuration directory, not the thread store. It contains settings and keymaps; deleting it will not clear the built-in agent's conversations.</p>
 <h2>Deleting one thread</h2>
-<p>Open the Agent Panel's thread history, find the thread and use <strong>Delete Thread</strong>, the trash control. Zed updates its history metadata and asks the owning agent to delete the session when that agent supports deletion. For the built-in agent, deletion also removes the thread's subagent descendants.</p>
+<p>Open <strong>Thread History</strong> in the threads sidebar and find the thread. If it is not archived, use <strong>Archive Thread</strong> first. The trash control, <strong>Delete Thread</strong>, appears on archived threads; use it to delete the archived thread. Zed updates its history metadata and asks the owning agent to delete the session when that agent supports deletion. For the built-in agent, deletion also removes the thread's subagent descendants.</p>
 <p>Keep any work you need before deleting a thread. Deleting conversation history is not an undo operation for edits in your working project. External agents may handle deletion differently; use their own history tools when needed.</p>
 <h2>Deleting all built-in agent thread contents</h2>
 <ol>
