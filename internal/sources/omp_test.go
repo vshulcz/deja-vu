@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseOmpFile(t *testing.T) {
+	t.Setenv("DEJA_INDEX_PATHS", "1")
 	root := t.TempDir()
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("USERPROFILE", os.Getenv("HOME"))
@@ -46,21 +47,24 @@ func TestParseOmpFile(t *testing.T) {
 	if s.Project != claudeProjectName(pathToProjectKey("/Users/halo/Code/pleasure-course")) {
 		t.Fatalf("project = %q, want %q", s.Project, claudeProjectName(pathToProjectKey("/Users/halo/Code/pleasure-course")))
 	}
-	// user + assistant(text only, thinking/toolCall skipped) + tool output + assistant
-	if len(s.Messages) != 4 {
-		t.Fatalf("want 4 messages, got %d: %#v", len(s.Messages), s.Messages)
+	// Speech, the read tool path, and tool output retain their own roles.
+	if len(s.Messages) != 5 {
+		t.Fatalf("want 5 messages, got %d: %#v", len(s.Messages), s.Messages)
 	}
 	if s.Messages[0].Role != "user" || s.Messages[0].Text != "download the videos" {
 		t.Fatalf("message[0] = %#v", s.Messages[0])
 	}
 	if s.Messages[1].Role != "assistant" || s.Messages[1].Text != "reading the list" {
-		t.Fatalf("message[1] = %#v (thinking/toolCall must be skipped)", s.Messages[1])
+		t.Fatalf("message[1] = %#v (thinking must be skipped)", s.Messages[1])
 	}
-	if s.Messages[2].Role != RoleToolOutput || s.Messages[2].Text != "some file output" {
-		t.Fatalf("message[2] = %#v, want tool output", s.Messages[2])
+	if s.Messages[2].Role != RoleFiles || s.Messages[2].Text != filepath.Join("/Users/halo/Code/pleasure-course", "anastasia.md") {
+		t.Fatalf("message[2] = %#v, want read path", s.Messages[2])
 	}
-	if s.Messages[3].Role != "assistant" || s.Messages[3].Text != "done" {
-		t.Fatalf("message[3] = %#v", s.Messages[3])
+	if s.Messages[3].Role != RoleToolOutput || s.Messages[3].Text != "some file output" {
+		t.Fatalf("message[3] = %#v, want tool output", s.Messages[3])
+	}
+	if s.Messages[4].Role != "assistant" || s.Messages[4].Text != "done" {
+		t.Fatalf("message[4] = %#v", s.Messages[4])
 	}
 }
 

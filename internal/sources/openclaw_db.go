@@ -134,6 +134,7 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	project := "openclaw-" + openclawDBAgent(db)
 	var out []model.Session
 	var s *model.Session
+	cwd := ""
 	flush := func() {
 		if s != nil && len(s.Messages) > 0 {
 			out = append(out, *s)
@@ -152,13 +153,14 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		rows++
 		if s == nil || s.ID != r.SessionID {
 			flush()
+			cwd = ""
 			s = &model.Session{Harness: "openclaw", ID: r.SessionID, Project: project, Path: db}
 		}
 		var m map[string]any
 		if err := json.Unmarshal([]byte(r.Event), &m); err != nil {
 			continue
 		}
-		piShapedLine(s, m, true)
+		piShapedLine(s, m, true, &cwd)
 	}
 	flush()
 	if _, err := dec.Token(); err != nil && err != io.EOF {

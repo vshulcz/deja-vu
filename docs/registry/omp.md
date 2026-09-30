@@ -85,8 +85,9 @@ Messages use a wrapper envelope:
 ### Content
 
 `message.content` is an array of typed blocks. deja extracts `text` from blocks
-where `"type": "text"`. Blocks with `"type": "thinking"`, `"type": "toolCall"`,
-or `"type": "image"` are skipped.
+where `"type": "text"`. Thinking and image blocks are skipped. The shared pi parser extracts commands from `bash`, file paths from `read`, and file paths and written-line hashes from `write`, subject to the corresponding `DEJA_INDEX_*` switches. Numeric line selectors in `read` paths, such as `src/foo.go:10-20`, are removed before indexing the file path. Relative tool paths resolve against the session header's `cwd`.
+
+For `edit`, replaced spans and written-line hashes are extracted from replace-mode `path` with `old_string`/`new_string`, and pi-style `oldText`/`newText` or `edits`. The default hashline mode and other patch modes carry an `input` patch instead; that patch format is not extracted by this reader. Their tool-result text remains searchable as tool output. This support does not provide restore or attribution records for every omp edit mode. The argument shapes are checked against [omp's edit schemas](https://github.com/can1357/oh-my-pi/blob/64445e5f4f0457d94d2914cedc18b214aed7e8a9/packages/coding-agent/src/edit/schemas.ts).
 
 ### Timestamps
 
