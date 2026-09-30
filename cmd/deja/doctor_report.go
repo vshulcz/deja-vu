@@ -62,6 +62,7 @@ type doctorStore struct {
 type doctorComponent struct {
 	State string `json:"state"`
 	Path  string `json:"path,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 // doctorAutoStatus is one auto-recall wiring, in the same four states the text
@@ -372,10 +373,7 @@ func collectDoctorReport(lookup doctorVersionLookup, dir string) doctorReport {
 	report.MCP = collectDoctorMCP()
 	report.AutoRecall = collectDoctorAutoRecall()
 	report.Commands = collectDoctorCommands()
-	report.SQLite3.State = "missing"
-	if sources.SQLite3Available() {
-		report.SQLite3.State = "ok"
-	}
+	report.SQLite3 = doctorSQLite3()
 	report.Git.State = "missing"
 	if _, err := exec.LookPath("git"); err == nil {
 		report.Git.State = "ok"
@@ -433,6 +431,19 @@ func firstDeniedDir(paths []string) (string, bool) {
 		}
 	}
 	return "", whole
+}
+
+// doctorSQLite3 is `ok`, `missing`, or `broken`: on PATH and not answering a
+// query, which reads every database store as empty.
+func doctorSQLite3() doctorComponent {
+	switch problem := sources.SQLite3Problem(); {
+	case problem == "":
+		return doctorComponent{State: "ok"}
+	case sources.SQLite3Broken():
+		path, _ := exec.LookPath("sqlite3")
+		return doctorComponent{State: "broken", Path: path, Error: problem}
+	}
+	return doctorComponent{State: "missing"}
 }
 
 // storeNeedsSQLite3 names the harnesses deja reads through the sqlite3 CLI.
@@ -759,6 +770,7 @@ func inspectDoctorStore(check doctorStoreCheck) (doctorStore, time.Time) {
 	// naming the missing CLI itself (#792).
 	if parseErr != nil && storeNeedsSQLite3(check.name) && !sources.SQLite3Available() {
 		store.State = "needs-sqlite3"
+		store.Skipped = sources.SQLite3Problem()
 		return store, mod
 	}
 	// A parser that refuses to read the store is the loudest thing doctor can

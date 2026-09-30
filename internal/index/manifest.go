@@ -514,7 +514,10 @@ func toolsChanged(m Manifest) bool {
 		return false
 	}
 	hadSQLite, hadZstd := parseToolFingerprint(m.ToolFingerprint)
-	return (sources.SQLite3Available() && !hadSQLite) || (sources.ZstdAvailable() && !hadZstd)
+	// Asked only when the index lacked the tool, so a fresh index does not pay
+	// for a sqlite3 probe on every check. A sqlite3 that is on PATH and broken
+	// counts as absent, so repairing it reads the stores it had emptied.
+	return (!hadSQLite && sources.SQLite3Available()) || (!hadZstd && sources.ZstdAvailable())
 }
 
 // parseToolFingerprint reads back what toolFingerprint wrote. An unreadable one
@@ -539,13 +542,11 @@ func priorToolFingerprint(dir string) string {
 // what a terminal build knew, or the next terminal run reads it as a tool newly
 // gained and rebuilds — every time.
 func mergedToolFingerprint(prior string) string {
-	sqlite, zstd := sources.SQLite3Available(), sources.ZstdAvailable()
+	hadSQLite, hadZstd := false, false
 	if prior != "" {
-		hadSQLite, hadZstd := parseToolFingerprint(prior)
-		sqlite = sqlite || hadSQLite
-		zstd = zstd || hadZstd
+		hadSQLite, hadZstd = parseToolFingerprint(prior)
 	}
-	return toolFingerprint(sqlite, zstd)
+	return toolFingerprint(hadSQLite || sources.SQLite3Available(), hadZstd || sources.ZstdAvailable())
 }
 
 // toolFingerprint names the external CLIs available to this build. Two states

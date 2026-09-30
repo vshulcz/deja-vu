@@ -54,7 +54,9 @@ func TestOpencodeLoadersWithFakeSQLiteAndMalformedOutput(t *testing.T) {
 	if err := os.WriteFile(db, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !SQLite3Available() {
+	// Resolved, not SQLite3Available: the fake answers these loaders' queries
+	// and nothing else, so it would fail the probe.
+	if p, err := exec.LookPath("sqlite3"); err != nil || p != script {
 		t.Fatal("fake sqlite3 not found")
 	}
 	for name, load := range map[string]func() []model.Session{

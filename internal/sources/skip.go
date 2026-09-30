@@ -6,7 +6,8 @@ import (
 )
 
 // SkipReason says why a harness deja can see on disk produced nothing. That is
-// a missing external tool: six stores are read through the sqlite3 CLI, and an
+// a missing external tool, or a sqlite3 on PATH that does not answer (see
+// SQLite3Problem): the database stores are read through the sqlite3 CLI, and an
 // index run that names every harness it read while staying silent about the
 // one it could not made an empty deja look like an empty history (#794).
 //
@@ -55,9 +56,6 @@ func SkipReason(harness string) string {
 		}
 		return ""
 	}
-	if SQLite3Available() {
-		return ""
-	}
 	var present bool
 	switch harness {
 	case "opencode":
@@ -74,17 +72,29 @@ func SkipReason(harness string) string {
 		// explain (#3643).
 		present = fileExists(KiloDB())
 	case "goose":
-		for _, db := range GooseDBs() {
-			if fileExists(db) {
-				present = true
-				break
-			}
-		}
+		present = anyFileExists(GooseDBs())
+	case "crush":
+		present = anyFileExists(CrushDBs())
+	case "openclaw":
+		present = anyFileExists(OpenClawAgentDBs())
+	case "zcode":
+		present = fileExists(ZCodeDB())
 	}
+	// Checked after the store: a harness with no database on this machine has
+	// nothing to explain, and asking sqlite3 would cost a process for nothing.
 	if !present {
 		return ""
 	}
-	return "sqlite3 CLI not found"
+	return SQLite3Problem()
+}
+
+func anyFileExists(paths []string) bool {
+	for _, p := range paths {
+		if fileExists(p) {
+			return true
+		}
+	}
+	return false
 }
 
 // anyZstdFramed reports whether any of these files is a zstd frame rather than
@@ -102,12 +112,14 @@ func zedSkipReason() string {
 	if !fileExists(ZedDB()) {
 		return ""
 	}
-	sqlite, zstd := SQLite3Available(), ZstdAvailable()
+	problem, zstd := SQLite3Problem(), ZstdAvailable()
 	switch {
-	case !sqlite && !zstd:
+	case problem == SQLite3NotFound && !zstd:
 		return "sqlite3 and zstd CLIs not found"
-	case !sqlite:
-		return "sqlite3 CLI not found"
+	case problem != "" && !zstd:
+		return problem + "; zstd CLI not found"
+	case problem != "":
+		return problem
 	case !zstd:
 		return "zstd CLI not found"
 	}

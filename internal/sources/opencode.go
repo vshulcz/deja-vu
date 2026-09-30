@@ -17,13 +17,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// SQLite3Available reports whether the sqlite3 CLI the opencode parser
-// shells out to is on PATH.
-func SQLite3Available() bool {
-	_, err := exec.LookPath("sqlite3")
-	return err == nil
-}
-
 // OpencodeDB mirrors upstream's path logic: XDG_DATA_HOME is honored on Linux
 // only (opencode's xdg-basedir dependency ignores it elsewhere).
 func OpencodeDB() string {

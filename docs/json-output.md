@@ -494,7 +494,8 @@ is gone), `excluded` (the harness is in the exclude list, so nothing was read),
 `unreadable` (which adds an `error` with what the parser said), `parsed-zero`,
 `denied` (which adds a `denied` field naming the unreadable path),
 `needs-sqlite3` and `needs-zstd` (which add a `skipped` field saying which CLI
-is missing when the store was skipped for it); an existing but empty store
+is missing when the store was skipped for it, or which sqlite3 on PATH did not
+answer a probe query); an existing but empty store
 directory reports `missing`. A store also carries `indexed_sessions`
 and, when it holds peer-synced work, `indexed_from_elsewhere`; a store whose
 permission walk was cut short or blocked carries `partial` or `unchecked`. A
@@ -502,7 +503,8 @@ store holding transcripts the index has no state for at all carries `never_read`
 with how many — the count is absent when there are none, and goes away after an
 indexing pass.
 `sqlite3` and `git` are the two tools deja shells out to, each `ok` or
-`missing`: sqlite3 reads every database-backed store (opencode and the schemas
+`missing`, and sqlite3 can also be `broken` (with `path` and `error`) when the
+binary on PATH does not answer `select json_object('deja',1);`. sqlite3 reads every database-backed store (opencode and the schemas
 that borrow it, Cursor, Goose, Zed, Crush, Hermes, Grok, OpenClaw), and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
 

@@ -510,6 +510,12 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			if store.Partial {
 				what = "store is only partly readable — part of it"
 			}
+			// A sqlite3 that is installed and does not answer needs fixing, not
+			// installing, and the reader needs to know which binary it is.
+			if strings.Contains(store.Skipped, "sqlite3 at ") {
+				fmt.Fprintf(w, "  warning      %s %s needs a working sqlite3 CLI: %s; fix or replace it, then run `deja index`\n", store.Name, what, store.Skipped)
+				continue
+			}
 			fmt.Fprintf(w, "  warning      %s %s needs %s — install it, then run `deja index`\n", store.Name, what, toolFromSkip(store.Skipped))
 		}
 	}
@@ -1069,7 +1075,16 @@ func doctorDBPrereqNote(sqlite bool) string {
 	if sqlite {
 		return ""
 	}
-	return " but the sqlite3 CLI is missing — those sessions are unavailable"
+	return " but the sqlite3 CLI is " + sqliteGap() + " — those sessions are unavailable"
+}
+
+// sqliteGap words what is wrong with sqlite3 for a row that has no room for the
+// whole problem; the Tools section names the binary and what it did.
+func sqliteGap() string {
+	if sources.SQLite3Broken() {
+		return "not working"
+	}
+	return "missing"
 }
 
 func doctorSQLiteDetail(db string, sqlite bool) string {
@@ -1079,7 +1094,7 @@ func doctorSQLiteDetail(db string, sqlite bool) string {
 	}
 	d := humanBytes(fi.Size())
 	if !sqlite {
-		d += ", sqlite3 CLI missing — sessions unavailable"
+		d += ", sqlite3 CLI " + sqliteGap() + " — sessions unavailable"
 	}
 	return d
 }
@@ -1089,7 +1104,7 @@ func doctorGooseDetail(sqlite bool) string {
 	if fi, err := os.Stat(sources.GooseDB()); err == nil && fi.Size() > 0 {
 		seg := humanBytes(fi.Size()) + " SQLite"
 		if !sqlite {
-			seg += ", sqlite3 CLI missing — modern sessions unavailable"
+			seg += ", sqlite3 CLI " + sqliteGap() + " — modern sessions unavailable"
 		}
 		parts = append(parts, seg)
 	}
@@ -1108,7 +1123,7 @@ func doctorCursorDetail(sqlite bool) string {
 		}
 		seg := fmt.Sprintf("%s IDE %s", doctorCount(len(dbs), "store"), humanBytes(size))
 		if !sqlite {
-			seg += ", sqlite3 CLI missing — IDE sessions unavailable"
+			seg += ", sqlite3 CLI " + sqliteGap() + " — IDE sessions unavailable"
 		}
 		parts = append(parts, seg)
 	}
@@ -1153,11 +1168,21 @@ func doctorAntigravityLocation() string {
 
 func doctorTools(w io.Writer) {
 	fmt.Fprintln(w, "Tools:")
+	// Found and working are not the same thing: a wrapper that drops its
+	// arguments or a stub that prints nothing reads every store as empty, and
+	// this line said "found" beside a row of parsed-zero stores.
 	status := "not found"
-	if sources.SQLite3Available() {
+	problem := sources.SQLite3Problem()
+	switch {
+	case problem == "":
 		status = "found"
+	case sources.SQLite3Broken():
+		status = "found but not working"
 	}
 	fmt.Fprintf(w, "  %-12s %s (needed for opencode and Cursor IDE stores)\n", "sqlite3", status)
+	if sources.SQLite3Broken() {
+		fmt.Fprintf(w, "  warning      %s; every database store reads as empty until it is fixed\n", problem)
+	}
 	// git is not optional decoration: without it a hit loses the line saying
 	// its files have changed since, project names lose worktree identity, and
 	// the session-start hook loses the task signal. All three degrade in

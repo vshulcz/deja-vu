@@ -51,7 +51,7 @@ against the loader list.
 
 File-based sources are parsed with a worker pool sized to `runtime.NumCPU()`. Results are collected by input file index and then appended in sorted path order, so parsing can be parallel while index writes stay deterministic.
 
-Every SQLite store above is read through the local `sqlite3` command — opencode's and the schemas that borrow it, Cursor IDE state, Goose, Zed, Crush, Kiro, Hermes, and the databases Grok and OpenClaw keep beside their JSONL. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency.
+Every SQLite store above is read through the local `sqlite3` command — opencode's and the schemas that borrow it, Cursor IDE state, Goose, Zed, Crush, Kiro, Hermes, and the databases Grok and OpenClaw keep beside their JSONL. Cursor CLI transcripts are plain JSONL. There is no CGO SQLite dependency. Before trusting it, deja asks the `sqlite3` on PATH one JSON query per process: a wrapper that drops its arguments or a stub that prints nothing would otherwise read every store as empty, so a binary that does not answer is reported by path, as a missing one is.
 
 Every one of those reads carries a wall-clock budget, ten minutes by default. One sqlite3 child once ran 13m54s with 0.75s of CPU in deja itself, and nothing in the tree set a deadline, so the run looked hung rather than slow. A store that runs out is an ordinary read error: the harness reports as unreadable, `deja doctor` names it, and the rest of the index still builds. `DEJA_STORE_TIMEOUT` takes a duration, and a zero or negative one turns the cap off for someone who would rather wait than lose a store.
 

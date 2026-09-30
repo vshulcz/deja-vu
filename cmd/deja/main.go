@@ -3355,7 +3355,7 @@ func printSources(dir string) {
 			note = "\t(permissions not fully checked — too many directories to walk)"
 		}
 		if it.name == "cursor" && len(sources.CursorDBs()) > 0 && !sources.SQLite3Available() {
-			note = "\t(sqlite3 CLI not found — Cursor IDE sessions unavailable)"
+			note = "\t(" + sources.SQLite3Problem() + " — Cursor IDE sessions unavailable)"
 		}
 		// Zed needs zstd as well as sqlite3: sqlite3 alone opens the store and
 		// reads nothing out of it, since every thread body is a compressed
@@ -3453,7 +3453,7 @@ func printSources(dir string) {
 	}
 	note = ""
 	if size > 0 && !sources.SQLite3Available() {
-		note = "\t(sqlite3 CLI not found — opencode sessions unavailable)"
+		note = "\t(" + sources.SQLite3Problem() + " — opencode sessions unavailable)"
 	}
 	if n := projectExcludePatterns(); n > 0 {
 		note += fmt.Sprintf("\texcluded-patterns=%d", n)

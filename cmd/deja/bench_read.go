@@ -74,8 +74,8 @@ func runBenchRead(args []string) error {
 func measureRead(seed int64) (readReport, error) {
 	corpus := bench.Generate(seed)
 	report := readReport{CorpusHash: corpus.Hash, Seed: seed}
-	if !sources.SQLite3Available() {
-		report.Skipped = "sqlite3 is not installed, and the database-backed stores are read through it"
+	if problem := sources.SQLite3Problem(); problem != "" {
+		report.Skipped = "the database-backed stores are read through sqlite3, and it is unusable here: " + problem
 		return report, nil
 	}
 	dir, err := os.MkdirTemp("", "deja-bench-read-")
