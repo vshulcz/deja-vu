@@ -69,8 +69,9 @@ export function mcpWired(text) {
     const mcp = (config && config.mcp) || {}
     const entry = mcp.deja || (mcp.servers && mcp.servers.deja)
     // A server kept in the file but switched off offers nothing, so the
-    // tools here are not a second copy of it.
-    return Boolean(entry) && entry.enabled !== false
+    // tools here are not a second copy of it. 1.x switches it off with
+    // `enabled: false`, 2.x with `disabled: true`.
+    return Boolean(entry) && entry.enabled !== false && entry.disabled !== true
   } catch {
     return false
   }

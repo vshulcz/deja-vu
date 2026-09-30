@@ -39,7 +39,7 @@ jobs:
           node-version: 22
 
       - name: The plugin has to parse
-        run: node --check index.js && node --check lib.js
+        run: node --check index.js && node --check server.js && node --check lib.js
 
       - run: npm test
 

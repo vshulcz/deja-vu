@@ -29,6 +29,9 @@ async function setup(ctx) {
       for (const [name, spec] of Object.entries(specs)) {
         tools.add({
           name,
+          // Only a codemode: false tool is offered to the model directly; the
+          // rest sit behind the code-mode `execute` tool, as built-ins do not.
+          options: { codemode: false },
           description: spec.description,
           input: jsonSchema(spec.args),
           execute: async (input) => ({ content: await spec.execute(input || {}) }),

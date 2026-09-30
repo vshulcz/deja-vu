@@ -35,6 +35,10 @@ test("2.x keeps the MCP server under mcp.servers", () => {
   assert.equal(mcpWired(`{"mcp": {"servers": {"deja": {"command": ["deja", "mcp"]}}}}`), true)
   assert.equal(mcpWired(`{"mcp": {"servers": {"deja": {"command": ["deja", "mcp"], "enabled": false}}}}`), false)
   assert.equal(mcpWired(`{"mcp": {"servers": {"other": {}}}}`), false)
+  // 2.x switches a server off with `disabled`, not `enabled`.
+  assert.equal(mcpWired(`{"mcp": {"servers": {"deja": {"command": ["deja", "mcp"], "disabled": true}}}}`), false)
+  assert.equal(mcpWired(`{"mcp": {"servers": {"deja": {"command": ["deja", "mcp"], "disabled": false}}}}`), true)
+  assert.equal(mcpWired(`{"mcp": {"deja": {"command": ["deja", "mcp"], "disabled": true}}}`), false)
 })
 
 test("the helpers read 2.x's shapes", () => {
@@ -121,6 +125,9 @@ test("setup wires every channel the 1.x hooks have onto 2.x's seams", async () =
       tools.map((t) => t.name),
       ["deja_recall", "deja_session", "deja_blame", "deja_fix", "deja_how", "deja_remember"],
     )
+    // 2.x offers a tool to the model directly only when codemode is false;
+    // otherwise it hides behind the code-mode `execute` tool.
+    for (const t of tools) assert.deepEqual(t.options, { codemode: false }, `${t.name} is not a direct tool`)
     const recall = tools[0]
     assert.deepEqual(recall.input.required, ["query"])
     assert.deepEqual(await recall.execute({ query: "flake" }), { content: "found it" })
