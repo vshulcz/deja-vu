@@ -65,7 +65,9 @@ export function configPaths(env, home) {
 export function mcpWired(text) {
   try {
     const config = JSON.parse(stripJSONComments(String(text || "")))
-    const entry = config && config.mcp && config.mcp.deja
+    // 1.x keeps servers directly under `mcp`, 2.x under `mcp.servers`.
+    const mcp = (config && config.mcp) || {}
+    const entry = mcp.deja || (mcp.servers && mcp.servers.deja)
     // A server kept in the file but switched off offers nothing, so the
     // tools here are not a second copy of it.
     return Boolean(entry) && entry.enabled !== false
@@ -144,4 +146,69 @@ export function clampLimit(value, fallback = 5) {
   const asked = Number(value)
   if (!Number.isFinite(asked)) return fallback
   return Math.min(20, Math.max(1, Math.trunc(asked)))
+}
+
+// TOOL_SPECS is where the plugin leaves its tool list on the hooks it returns,
+// for the 2.x entry to register. A symbol, so 1.x never reads it as a hook.
+export const TOOL_SPECS = Symbol.for("opencode-deja.tools")
+
+// zodTools builds the 1.x tool table from the specs, through opencode's own
+// helper and the zod it re-exports.
+export function zodTools(tool, specs) {
+  const schema = tool.schema
+  const out = {}
+  for (const [name, spec] of Object.entries(specs)) {
+    const args = {}
+    for (const [key, arg] of Object.entries(spec.args)) {
+      let field = arg.type === "number" ? schema.number() : schema.string()
+      if (arg.optional) field = field.optional()
+      args[key] = field.describe(arg.description)
+    }
+    out[name] = tool({ description: spec.description, args, execute: spec.execute })
+  }
+  return out
+}
+
+// jsonSchema is a spec's arguments in the form 2.x takes a tool's input.
+export function jsonSchema(args) {
+  const properties = {}
+  const required = []
+  for (const [key, arg] of Object.entries(args)) {
+    properties[key] = { type: arg.type, description: arg.description }
+    if (!arg.optional) required.push(key)
+  }
+  return { type: "object", properties, required }
+}
+
+// v1Messages shows 2.x's request messages in the 1.x shape lastUserText reads.
+// The parts are 2.x's own content objects, so text appended to one lands in
+// the request.
+export function v1Messages(messages, sessionID) {
+  const list = Array.isArray(messages) ? messages : []
+  return list.map((m) => ({
+    info: { role: m?.role, sessionID: sessionID || "" },
+    parts: Array.isArray(m?.content) ? m.content : [],
+  }))
+}
+
+// resultText is the text a finished 2.x tool call returned: `content` is a
+// string or a list of blocks, and a tool may leave only `output`.
+export function resultText(result) {
+  const r = result || {}
+  if (typeof r.content === "string") return r.content
+  if (Array.isArray(r.content)) {
+    return r.content
+      .filter((c) => c?.type === "text")
+      .map((c) => c.text)
+      .join("\n")
+  }
+  return typeof r.output === "string" ? r.output : ""
+}
+
+// v1ToolName is the 1.x name for a 2.x tool, where the two differ in a way the
+// hooks look at: the spawn tool and the shell.
+export function v1ToolName(name) {
+  if (name === "subagent") return "task"
+  if (name === "shell") return "bash"
+  return name
 }

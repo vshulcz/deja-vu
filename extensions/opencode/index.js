@@ -5,6 +5,9 @@
 // this machine, including months before deja existed. The index is deja's; this
 // file is the seam: six tools the model can call, plus recall that arrives
 // without being asked for.
+//
+// This is the 1.x plugin. opencode 2.x loads server.js, which runs this same
+// function and wires its hooks to 2.x's seams.
 
 import { createRequire } from "node:module"
 import { execFile } from "node:child_process"
@@ -22,6 +25,8 @@ import {
   contributions,
   lastUserText,
   mcpWired,
+  TOOL_SPECS,
+  zodTools,
 } from "./lib.js"
 
 const require = createRequire(import.meta.url)
@@ -169,74 +174,80 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // copy `deja install` keeps current; this package fills the gaps.
   const adds = contributions(installerWiring(), config)
 
-  if (adds.tools && tool) {
-    const schema = tool.schema
-    hooks.tool = {
-      deja_recall: tool({
-        description:
-          "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing anything that may already exist. Match on the most specific token available: an exact error string, function name, file path or flag.",
-        args: {
-          query: schema.string().describe("Specific tokens to match. Several words are ANDed."),
-          limit: schema.number().optional().describe("How many sessions to return. Default 5."),
-        },
-        async execute(args) {
-          const limit = String(clampLimit(args.limit))
-          return answer(await ask(argv("search", ["--json", "--limit", limit], args.query)))
-        },
-      }),
-      deja_session: tool({
-        description:
-          "A full digest of the single best-matching past session — what was tried, what was decided, what it cost. Use after deja_recall when the reasoning behind an earlier decision matters, not just that it happened.",
-        args: {
-          query: schema.string().describe("A query, or a session id prefix returned by deja_recall."),
-        },
-        async execute(args) {
-          return answer(await ask(argv("ctx", [], args.query)))
-        },
-      }),
-      deja_blame: tool({
-        description:
-          "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
-        args: {
-          path: schema.string().describe("Path to the file, absolute or relative to the project."),
-        },
-        async execute(args) {
-          return answer(await ask(argv("blame", ["--json"], args.path)))
-        },
-      }),
-      deja_fix: tool({
-        description:
-          "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase — the match is on the error's own words.",
-        args: {
-          error: schema.string().describe("The failing output, copied as it was printed."),
-        },
-        async execute(args) {
-          return answer(await ask(argv("fix", [], args.error)))
-        },
-      }),
-      deja_how: tool({
-        description:
-          "The real invocation this machine uses for a build, test, deploy or script, with the flags it actually ran, ordered by how many sessions ran it. A guessed command is plausible and fails on this setup.",
-        args: {
-          what: schema.string().describe("The thing to run: a tool, a task, a script name."),
-        },
-        async execute(args) {
-          return answer(await ask(argv("how", [], args.what)))
-        },
-      }),
-      deja_remember: tool({
-        description:
-          "Store one durable decision once it is settled, as a single self-contained fact that will make sense months later. Not transcripts, not a summary of the conversation, and not anything already obvious from the code.",
-        args: {
-          text: schema.string().describe("The decision, in one or two sentences, with the reason it was taken."),
-        },
-        async execute(args) {
-          const written = await ask(argv("remember", [], args.text))
-          if (!installed) return MISSING
-          return written || "deja did not record that."
-        },
-      }),
-    }
+  // The six tools, described once. opencode 1.x takes them through its zod
+  // helper and 2.x as JSON Schema (server.js), so the arguments are plain
+  // data and each side builds its own.
+  const specs = {
+    deja_recall: {
+      description:
+        "Search this machine's own past AI coding sessions — every agent used on it, including months before deja was installed. Use before debugging an error or re-implementing anything that may already exist. Match on the most specific token available: an exact error string, function name, file path or flag.",
+      args: {
+        query: { type: "string", description: "Specific tokens to match. Several words are ANDed." },
+        limit: { type: "number", optional: true, description: "How many sessions to return. Default 5." },
+      },
+      async execute(args) {
+        const limit = String(clampLimit(args.limit))
+        return answer(await ask(argv("search", ["--json", "--limit", limit], args.query)))
+      },
+    },
+    deja_session: {
+      description:
+        "A full digest of the single best-matching past session — what was tried, what was decided, what it cost. Use after deja_recall when the reasoning behind an earlier decision matters, not just that it happened.",
+      args: {
+        query: { type: "string", description: "A query, or a session id prefix returned by deja_recall." },
+      },
+      async execute(args) {
+        return answer(await ask(argv("ctx", [], args.query)))
+      },
+    },
+    deja_blame: {
+      description:
+        "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
+      args: {
+        path: { type: "string", description: "Path to the file, absolute or relative to the project." },
+      },
+      async execute(args) {
+        return answer(await ask(argv("blame", ["--json"], args.path)))
+      },
+    },
+    deja_fix: {
+      description:
+        "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase — the match is on the error's own words.",
+      args: {
+        error: { type: "string", description: "The failing output, copied as it was printed." },
+      },
+      async execute(args) {
+        return answer(await ask(argv("fix", [], args.error)))
+      },
+    },
+    deja_how: {
+      description:
+        "The real invocation this machine uses for a build, test, deploy or script, with the flags it actually ran, ordered by how many sessions ran it. A guessed command is plausible and fails on this setup.",
+      args: {
+        what: { type: "string", description: "The thing to run: a tool, a task, a script name." },
+      },
+      async execute(args) {
+        return answer(await ask(argv("how", [], args.what)))
+      },
+    },
+    deja_remember: {
+      description:
+        "Store one durable decision once it is settled, as a single self-contained fact that will make sense months later. Not transcripts, not a summary of the conversation, and not anything already obvious from the code.",
+      args: {
+        text: { type: "string", description: "The decision, in one or two sentences, with the reason it was taken." },
+      },
+      async execute(args) {
+        const written = await ask(argv("remember", [], args.text))
+        if (!installed) return MISSING
+        return written || "deja did not record that."
+      },
+    },
+  }
+
+  if (adds.tools) {
+    // Under a symbol, so 1.x, which reads its hooks by name, never sees it.
+    hooks[TOOL_SPECS] = specs
+    if (tool) hooks.tool = zodTools(tool, specs)
   }
 
   if (!adds.recall) return hooks

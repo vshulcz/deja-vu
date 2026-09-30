@@ -20,6 +20,14 @@ embeddings, no network path unless you ask for one.
 }
 ```
 
+That is opencode 1.x. On 2.x the list is `plugins`:
+
+```json
+{
+  "plugins": ["opencode-deja"]
+}
+```
+
 opencode installs the package on start. The deja binary comes with it, but a
 deja you installed yourself always wins — see [Which binary](#which-binary).
 
@@ -45,7 +53,8 @@ Six tools the model can call:
 And recall nobody has to ask for:
 
 - the project's recent sessions are pushed onto the system prompt once per
-  session, with a one-time toast so you know memory arrived;
+  session, with a one-time toast so you know memory arrived (1.x only: a
+  2.x server plugin has no channel to the TUI);
 - each prompt gets a relevance pass of its own — silent when nothing matches;
 - a spawned agent gets recall in its own instructions, since it never sees the
   system prompt or a user prompt;
@@ -60,6 +69,14 @@ And recall nobody has to ask for:
 ```json
 {
   "plugin": [["opencode-deja", { "autoRecall": false, "tools": true }]]
+}
+```
+
+On 2.x:
+
+```json
+{
+  "plugins": [{ "package": "opencode-deja", "options": { "autoRecall": false, "tools": true } }]
 }
 ```
 

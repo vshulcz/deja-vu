@@ -6,10 +6,12 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
+    "./server": "./server.js",
     "./package.json": "./package.json"
   },
   "files": [
     "index.js",
+    "server.js",
     "lib.js",
     "README.md",
     "LICENSE"
