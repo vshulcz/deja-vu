@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
+<meta name="description" content="No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="claude-mem alternative for Codex, Cursor, opencode">
+<meta property="og:description" content="No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="claude-mem alternative for Codex, Cursor, opencode">
+<meta name="twitter:description" content="No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "claude-mem alternative for Codex, Cursor, opencode", "description": "No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.", "url": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-09-29"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "claude-mem alternative", "item": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a claude-mem alternative that works without an API key?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu indexes the session files Claude Code, Codex, Cursor, opencode and 31 other agents already write, verbatim and with secrets redacted, and serves them back over MCP and session-start hooks. No model writes the memory, so it needs no key, no sign-in and no background worker."}}, {"@type": "Question", "name": "Does claude-mem remember sessions from before it was installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. It records through hooks from install on, so on the first day it has nothing to answer from. deja-vu reads the transcripts already on disk, so older sessions are searchable right after the first index."}}, {"@type": "Question", "name": "Can I run deja-vu and claude-mem together?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu only reads the agents' session files and never touches ~/.claude-mem. Both add context at session start; deja install --all wires deja without its session-start recall if two blocks is too much."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">13</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html" aria-current="page">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>A claude-mem alternative for Codex, Cursor and opencode</h1>
+<p class="pagelede">memory built from the transcripts already on disk, with no model writing it<span class="mins" data-mins></span></p>
+
+<p>claude-mem is the memory plugin most people meet first. It has 95k stars, and it now installs into Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot and OpenClaw as well as Claude Code. It watches sessions through hooks and has a model write summaries of what happened, which the next session gets back.</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> takes the other route. Every coding agent already writes its sessions to disk; deja indexes those files as they are and hands the relevant turns back to whichever agent is running. Nothing writes the memory, so nothing has to be paid to write it, and the history from before you installed it is there on the first day.</p>
+
+<h2>What differs</h2>
+<table>
+<tr><th></th><th>deja-vu</th><th>claude-mem</th></tr>
+<tr><td>Where memory comes from</td><td>the session files each agent already keeps, including everything from before install</td><td>hooks record sessions from install on</td></tr>
+<tr><td>Who writes it</td><td>nobody: transcripts are indexed as written, with secrets redacted</td><td>a model summarises each session: claude-mem's hosted observer (sign-in, 14-day trial), your OpenRouter or Gemini key, or your Anthropic plan</td></tr>
+<tr><td>Runs in the background</td><td>nothing</td><td>a worker on Bun with an HTTP port, and Chroma for vector search</td></tr>
+<tr><td>Install</td><td>one 18.6 MB binary</td><td><code>npx claude-mem install</code>, which pulls Bun and uv if missing</td></tr>
+<tr><td>Agents</td><td>35, read natively</td><td>Claude Code, Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot, OpenClaw</td></tr>
+<tr><td>Tool definitions sent with every request</td><td>477 tokens, 1 tool</td><td>2,307 tokens, 15 tools</td></tr>
+<tr><td>Search</td><td>lexical, optional embeddings</td><td>SQLite FTS5 and Chroma vectors</td></tr>
+<tr><td>Browse it</td><td><code>deja view</code>, one local HTML file</td><td>web viewer served by the worker</td></tr>
+<tr><td>License</td><td>MIT</td><td>Apache-2.0</td></tr>
+</table>
+<p>The claude-mem column is from its README and repository at v13.28.0, read on September 29, 2026. The token counts were measured on September 24 against claude-mem 13.25.3; the method is on the <a href="day-zero.html">day-zero page</a>. Corrections welcome: open an issue.</p>
+
+<h2>The first day</h2>
+<p>Memory that records forward is empty on the day you install it. On the day-zero corpus, 19,195 real sessions and 100 questions whose answers are somewhere in them, claude-mem answers none, and that is its design rather than a fault: it has not recorded anything yet. deja builds its index over the same pile in 17.6 seconds and puts the right session first for 19 questions and in the top fifty for 65. The <a href="day-zero.html">same table</a> has six other tools that read existing history.</p>
+
+<h2>What a summary keeps</h2>
+<p>A summary is cheaper to inject and drops whatever the writer did not think mattered: the exact error text, the flag, the command that failed before the one that worked. deja keeps the turns, so <code>deja fix "&lt;error&gt;"</code> returns what was run after the same error last time, and <code>deja blame path:line</code> the session that wrote the line. The cost is the other side of it: the record is bigger than a summary, and lexical search misses paraphrases an embedding would catch. The <a href="benchmarks.html">benchmarks page</a> shows where.</p>
+
+<h2>When claude-mem fits better</h2>
+<ul>
+<li>You want short observations curated for you rather than a searchable record, with semantic search on by default, and a model writing them is fine.</li>
+<li>You started with coding agents recently, so there is little history on disk to read anyway.</li>
+</ul>
+
+<h2>Switching, or running both</h2>
+<pre>brew install deja-vu
+# or: curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p><code>--auto</code> wires every agent it finds on the machine: the MCP server, session-start recall where the agent has hooks, and the first index, so sessions from months ago answer in the next session you open. Per-agent details are under <a href="memory-for-codex.html">Codex</a>, <a href="memory-for-cursor.html">Cursor</a> and <a href="memory-for-opencode.html">opencode</a>.</p>
+<p>The two do not get in each other's way. deja only reads the agents' session files and never touches <code>~/.claude-mem</code>. Both add context when a session opens, though, so with both on the agent gets two blocks. If that is more than you want, <code>deja install --all</code> wires the same agents without the session-start recall, and deja answers only when the agent asks.</p>
+
+<p><a href="compare.html">Every memory tool, compared</a> · <a href="day-zero.html">Day zero</a> · <a href="token-cost.html">What memory costs</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

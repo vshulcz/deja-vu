@@ -39,6 +39,13 @@
     <summary>Reproducible, honest measurements of deja&#39;s search quality and the token cost of reaching working context — run them yourself.</summary>
   </entry>
   <entry>
+    <title>claude-mem alternative for Codex, Cursor, opencode — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"></link>
+    <updated>2026-09-29T00:00:00Z</updated>
+    <summary>No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.</summary>
+  </entry>
+  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
