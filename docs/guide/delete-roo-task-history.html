@@ -119,6 +119,7 @@
 <div class="grp">Evidence</div>
 <a href="benchmarks.html">Benchmarks</a>
 <a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
 <a href="day-zero.html">Day zero</a>
 <div class="grp">Reference</div>
 <a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
@@ -144,14 +145,14 @@
 <p>In History, clear the search and choose all workspaces if you want more than the current workspace. Enter selection mode, select all tasks and review the selected count before using the batch-delete control.</p>
 <p>For an offline reset, close the editor and stop any Roo CLI process using the store. Back up the resolved <code>tasks/</code> directory, then remove that directory, including its <code>_index.json</code>. Leave the containing extension storage and settings directories alone. Repeat only for other host stores whose history you also want to remove; deleting one does not clear the others.</p>
 <h2>What you lose</h2>
-<p>You lose the local conversation and task metadata needed to reopen that work. Deleting through Roo can also remove associated checkpoints and subtasks. Removing the offline task tree does not perform that checkpoint cleanup. Neither operation rolls back edits already made in your working project, nor does it erase exported copies or data retained by a model provider.</p>
+<p>You lose the local conversation and task metadata needed to reopen that work. Deleting through Roo can also remove associated checkpoints and subtasks. Removing the default <code>tasks/</code> tree also removes its per-task checkpoints at <code>tasks/&lt;taskId&gt;/checkpoints/</code>. It leaves the legacy shared checkpoint repository at <code>&lt;globalStorage&gt;/checkpoints/&lt;workspaceHash&gt;</code>. With <code>customStoragePath</code> set, checkpoints still use the host's default global storage, so removing only the custom task tree leaves those checkpoints too. Neither operation rolls back edits already made in your working project, nor does it erase exported copies or data retained by a model provider.</p>
 <h2>Keeping it searchable instead</h2>
 <p><a href="getting-started.html">Install deja</a> to search Roo history alongside your other agents' conversations without deleting it:</p>
 <pre>deja index
 deja "Roo task about the refactor"</pre>
 <p>The reader follows the supported host stores and custom storage paths. <a href="privacy.html">Indexing and search stay local</a>, and <code>deja forget</code> removes sessions from deja's index. Treat a separate backup as your recovery copy; a search index is not Roo's complete task state.</p>
 <h2>Sources</h2>
-<p>Checked against Roo Code's <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/utils/storage.ts">storage resolution</a>, <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/core/webview/ClineProvider.ts">task deletion</a> and <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/webview-ui/src/components/history/HistoryView.tsx">History view</a>. The <a href="../registry/roo.html">Roo format registry</a> records deja's CLI and editor discovery paths.</p>
+<p>Checked against Roo Code's <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/utils/storage.ts">storage resolution</a>, <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/core/webview/ClineProvider.ts">task deletion</a>, <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/webview-ui/src/components/history/HistoryView.tsx">History view</a> and <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/services/checkpoints/ShadowCheckpointService.ts#L436-L447">checkpoint locations</a>. The <a href="../registry/roo.html">Roo format registry</a> records deja's CLI and editor discovery paths.</p>
 <p><a href="where-sessions-are-stored.html">Where history lives</a> | <a href="memory-for-roo.html">Memory for Roo Code</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>
