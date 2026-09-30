@@ -120,6 +120,7 @@ var groups = []group{
 	{title: "Evidence", links: []link{
 		{"benchmarks.html", "Benchmarks"},
 		{"compare.html", "Compare"},
+		{"claude-mem-alternative.html", "claude-mem alternative"},
 		{"day-zero.html", "Day zero"},
 	}},
 	{title: "Reference", links: []link{
