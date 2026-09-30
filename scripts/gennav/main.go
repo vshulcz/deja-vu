@@ -74,6 +74,7 @@ var groups = []group{
 		{"delete-gemini-cli-history.html", "Gemini CLI"},
 		{"delete-opencode-session-history.html", "opencode"},
 		{"delete-cline-task-history.html", "Cline"},
+		{"delete-roo-task-history.html", "Roo Code"},
 		{"delete-kilo-code-task-history.html", "Kilo Code"},
 		{"delete-amp-thread-history.html", "Amp"},
 		{"delete-continue-session-history.html", "Continue"},
