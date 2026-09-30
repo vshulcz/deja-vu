@@ -82,9 +82,7 @@ _deja_completion() {
         bench)
             if (( COMP_CWORD == 2 )); then
                 COMPREPLY=( $(compgen -W "recall context prompt block ingest read" -- "$cur") )
-            elif [[ "$action" == "recall" ]]; then
-                COMPREPLY=( $(compgen -W "--json" -- "$cur") )
-            elif [[ "$action" == "context" || "$action" == "prompt" || "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
+            elif [[ "$action" == "recall" || "$action" == "context" || "$action" == "prompt"|| "$action" == "block" || "$action" == "ingest" || "$action" == "read" ]]; then
                 COMPREPLY=( $(compgen -W "--json --seed" -- "$cur") )
             fi
             ;;
@@ -251,13 +249,11 @@ _deja() {
 
   case "$words[2]" in
     blame)
-      _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; requires --attribution]' '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
+      _arguments '--attribution[show line attribution]' '--git-note[write attribution as a git note; implies --attribution]' '--all[include all matching sessions]' '--json[print JSON]' '--harness=[filter by harness]:harness:($harnesses)' '--project=[filter by project]:project:' '--since=[filter by age]:duration:' '1:path:_files'
       ;;
     bench)
       if (( CURRENT == 3 )); then
         _values 'benchmark' recall context prompt block ingest read
-      elif [[ "$words[3]" == "recall" ]]; then
-        _arguments '--json[print JSON]'
       else
         _arguments '--json[print JSON]' '--seed=[benchmark seed]:seed:'
       fi
@@ -355,7 +351,7 @@ complete -c deja -n '__fish_seen_subcommand_from search' -l limit -r -d 'Max ses
 
 complete -c deja -n '__fish_seen_subcommand_from completion' -a 'bash zsh fish powershell pwsh'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l attribution -d 'Show line attribution'
-complete -c deja -n '__fish_seen_subcommand_from blame' -l git-note -d 'Write attribution as a git note; requires --attribution'
+complete -c deja -n '__fish_seen_subcommand_from blame' -l git-note -d 'Write attribution as a git note; implies --attribution'
 complete -c deja -n '__fish_seen_subcommand_from blame' -l all
 complete -c deja -n '__fish_seen_subcommand_from blame' -l json
 complete -c deja -n '__fish_seen_subcommand_from blame' -l harness -r -a '%HARNESSES%'
@@ -363,9 +359,8 @@ complete -c deja -n '__fish_seen_subcommand_from blame' -l project -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from blame' -F
 complete -c deja -n '__fish_seen_subcommand_from bench; and not __fish_seen_subcommand_from recall context prompt block ingest read' -a 'recall context prompt block ingest read'
-complete -c deja -n '__fish_seen_subcommand_from recall' -l json
-complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l json
-complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from context prompt block ingest read' -l seed -r
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l json
+complete -c deja -n '__fish_seen_subcommand_from bench; and __fish_seen_subcommand_from recall context prompt block ingest read' -l seed -r
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l json
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l offline
 complete -c deja -n '__fish_seen_subcommand_from doctor' -l deep
@@ -466,7 +461,6 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
             }
             'bench' {
                 if ($argumentPosition -eq 1) { @('recall', 'context', 'prompt', 'block', 'ingest', 'read') }
-                elseif ($action -eq 'recall') { @('--json') }
                 else { @('--json', '--seed') }
             }
             'completion' { @('bash', 'zsh', 'fish', 'powershell', 'pwsh') }
