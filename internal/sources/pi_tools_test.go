@@ -12,7 +12,6 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-const piToolsHeader = `{"type":"session","id":"tools","timestamp":"2026-01-02T03:04:05Z","cwd":"/fixture/project"}` + "\n"
 const piToolsMessage = `{"type":"message","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[
 {"type":"toolCall","name":"read","arguments":{"path":"src/read.go"}},
 {"type":"toolCall","name":"edit","arguments":{"path":"src/edit.go","oldText":"legacy before","newText":"legacy after with enough detail for attribution"}},
@@ -42,12 +41,13 @@ func piToolRoles(messages []model.Message) map[string][]string {
 	return out
 }
 
-func checkPiToolRecords(t *testing.T, messages []model.Message) {
+func checkPiToolRecords(t *testing.T, messages []model.Message, cwd string) {
 	t.Helper()
 	got := piToolRoles(messages)
+	read, edit, write := filepath.Join(cwd, "src/read.go"), filepath.Join(cwd, "src/edit.go"), filepath.Join(cwd, "src/new.go")
 	want := map[string][]string{
-		RoleFiles:   {"src/read.go\nsrc/edit.go\nsrc/new.go"},
-		RoleEdit:    {"src/edit.go\nlegacy before", "src/edit.go\nfirst before", "src/edit.go\nsecond before"},
+		RoleFiles:   {read + "\n" + edit + "\n" + write},
+		RoleEdit:    {edit + "\nlegacy before", edit + "\nfirst before", edit + "\nsecond before"},
 		RoleCommand: {"$ go test ./..."},
 	}
 	for role, texts := range want {
@@ -58,7 +58,7 @@ func checkPiToolRecords(t *testing.T, messages []model.Message) {
 	if len(got[RoleWrote]) != 4 {
 		t.Fatalf("written records = %q, want four", got[RoleWrote])
 	}
-	for i, path := range []string{"src/edit.go", "src/edit.go", "src/edit.go", "src/new.go"} {
+	for i, path := range []string{edit, edit, edit, write} {
 		line := []string{"legacy after with enough detail for attribution", "first after with enough detail for attribution", "second after with enough detail for attribution", "package newfile with enough detail for attribution"}[i]
 		hash, ok := HashWrittenLine(line)
 		if recordedPath, has := WroteRecordHas(got[RoleWrote][i], hash); !ok || !has || recordedPath != path {
@@ -77,8 +77,14 @@ func TestPiToolCallsAcrossReadersAndOffsets(t *testing.T) {
 		compact.WriteString(line)
 	}
 	message := compact.String() + "\n"
+	cwd := t.TempDir()
+	headerJSON, err := json.Marshal(map[string]any{"type": "session", "id": "tools", "timestamp": "2026-01-02T03:04:05Z", "cwd": cwd})
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := string(headerJSON) + "\n"
 	path := filepath.Join(t.TempDir(), "tools.jsonl")
-	if err := os.WriteFile(path, []byte(piToolsHeader+message+message), 0600); err != nil {
+	if err := os.WriteFile(path, []byte(header+message+message), 0600); err != nil {
 		t.Fatal(err)
 	}
 	readers := []struct {
@@ -100,14 +106,14 @@ func TestPiToolCallsAcrossReadersAndOffsets(t *testing.T) {
 			if err != nil || len(full) != 1 {
 				t.Fatalf("full parse = %v, %v", full, err)
 			}
-			tail, err := reader.offset(path, int64(len(piToolsHeader)+len(message)))
+			tail, err := reader.offset(path, int64(len(header)+len(message)))
 			if err != nil || len(tail) != 1 {
 				t.Fatalf("incremental parse = %v, %v", tail, err)
 			}
 			if tail[0].ID != "tools" || tail[0].Harness != reader.name {
 				t.Fatalf("session identity = %+v", tail[0])
 			}
-			checkPiToolRecords(t, tail[0].Messages)
+			checkPiToolRecords(t, tail[0].Messages, cwd)
 			n := len(tail[0].Messages)
 			if len(full[0].Messages) != 2*n || !reflect.DeepEqual(full[0].Messages[n:], tail[0].Messages) {
 				t.Fatal("incremental parse must contain only the newly appended turn")
@@ -128,7 +134,7 @@ func TestPiToolCallSwitches(t *testing.T) {
 				t.Fatal(err)
 			}
 			var s model.Session
-			piShapedLine(&s, event, false)
+			piShapedLine(&s, event, false, new(string))
 			roles := piToolRoles(s.Messages)
 			if len(roles[tc.role]) != 0 {
 				t.Fatalf("disabled %s retained: %q", tc.role, roles[tc.role])
@@ -153,7 +159,7 @@ func TestPiMalformedToolCallsAndSpeech(t *testing.T) {
 				t.Fatal(err)
 			}
 			var s model.Session
-			piShapedLine(&s, event, false)
+			piShapedLine(&s, event, false, new(string))
 			if len(s.Messages) != 1 || s.Messages[0].Text != "still readable" {
 				t.Fatalf("messages = %+v", s.Messages)
 			}
@@ -164,8 +170,19 @@ func TestPiMalformedToolCallsAndSpeech(t *testing.T) {
 func TestPiToolCallsInOpenClawSQLite(t *testing.T) {
 	piToolsEnvironment(t)
 	_, db := openclawTestDB(t)
-	escaped := strings.ReplaceAll(piToolsMessage, "'", "''")
-	cmd := exec.Command("sqlite3", db, "UPDATE transcript_events SET event_json='"+escaped+"' WHERE seq=2;")
+	// A different cwd per database session must not leak into the next one.
+	cwds := map[string]string{"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d": t.TempDir(), "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e": t.TempDir()}
+	var updates strings.Builder
+	for id, cwd := range cwds {
+		header, err := json.Marshal(map[string]any{"type": "session", "id": id, "cwd": cwd})
+		if err != nil {
+			t.Fatal(err)
+		}
+		updates.WriteString("UPDATE transcript_events SET event_json='" + strings.ReplaceAll(string(header), "'", "''") + "' WHERE seq=0 AND session_id='" + id + "';")
+	}
+	escaped := strings.ReplaceAll(strings.ReplaceAll(piToolsMessage, `"name":"bash"`, `"name":"exec"`), "'", "''")
+	updates.WriteString("UPDATE transcript_events SET event_json='" + escaped + "' WHERE seq=2;")
+	cmd := exec.Command("sqlite3", db, updates.String())
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("update fixture: %v: %s", err, out)
 	}
@@ -176,7 +193,7 @@ func TestPiToolCallsInOpenClawSQLite(t *testing.T) {
 	found := false
 	for _, s := range sessions {
 		if len(piToolRoles(s.Messages)[RoleCommand]) > 0 {
-			checkPiToolRecords(t, s.Messages)
+			checkPiToolRecords(t, s.Messages, cwds[s.ID])
 			found = true
 		}
 	}

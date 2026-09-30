@@ -57,7 +57,9 @@ Messages use a wrapper envelope:
 
 ### Content
 
-`message.content` is an array of typed blocks. deja extracts `text` from blocks where `"type": "text"`. Thinking blocks are skipped. Assistant `toolCall` blocks for `bash`, `read`, `edit`, and `write` also feed command, file-path, replaced-span, and written-line records. Both legacy `oldText`/`newText` edits and the `edits` array are supported. The `DEJA_INDEX_COMMANDS`, `DEJA_INDEX_PATHS`, `DEJA_INDEX_EDITS`, and `DEJA_INDEX_WRITES` switches apply as they do for Claude Code.
+`message.content` is an array of typed blocks. deja extracts `text` from blocks where `"type": "text"`. Thinking blocks are skipped. Assistant `toolCall` blocks for `bash`, `read`, `edit`, and `write` also feed command, file-path, replaced-span, and written-line records. Both legacy `oldText`/`newText` edits and the `edits` array are supported. As in pi, `edits` can also be one object or a JSON string encoding an object or array. Relative tool paths resolve against the session header's `cwd`, including during incremental indexing; without a header cwd their recorded spelling is kept. The `DEJA_INDEX_COMMANDS`, `DEJA_INDEX_PATHS`, `DEJA_INDEX_EDITS`, and `DEJA_INDEX_WRITES` switches apply as they do for Claude Code.
+
+The edit argument shapes are checked against [pi's argument preparation](https://github.com/badlogic/pi-mono/blob/1b347794e2a630e4359f2584f4eea388145d0ddf/packages/coding-agent/src/core/tools/edit.ts#L103-L133).
 
 ### Timestamps
 

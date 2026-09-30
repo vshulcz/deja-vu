@@ -1,10 +1,10 @@
 package index
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -22,9 +22,15 @@ func TestPiToolRecordsSurviveIncrementalIndexing(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(sessions, "tools.jsonl")
-	header := `{"type":"session","id":"pi-tools","timestamp":"2026-01-02T03:04:05Z"}` + "\n"
+	cwd := filepath.Join(root, "project")
+	pool := filepath.Join(cwd, "src", "pool.go")
+	headerJSON, err := json.Marshal(map[string]any{"type": "session", "id": "pi-tools", "timestamp": "2026-01-02T03:04:05Z", "cwd": cwd})
+	if err != nil {
+		t.Fatal(err)
+	}
+	header := string(headerJSON) + "\n"
 	turn := func(minute int) string {
-		return fmt.Sprintf(`{"type":"message","timestamp":"2026-01-02T03:%02d:06Z","message":{"role":"assistant","content":[{"type":"toolCall","name":"edit","arguments":{"path":"src/pool.go","edits":[{"oldText":"replaced span %d","newText":"pool capacity increased for request %d"}]}},{"type":"toolCall","name":"bash","arguments":{"command":"go test ./..."}}]}}`+"\n", minute, minute, minute)
+		return fmt.Sprintf(`{"type":"message","timestamp":"2026-01-02T03:%02d:06Z","message":{"role":"assistant","content":[{"type":"toolCall","name":"edit","arguments":{"path":"src/pool.go","edits":"[{\"oldText\":\"replaced span %d\",\"newText\":\"pool capacity increased for request %d\"}]"}},{"type":"toolCall","name":"bash","arguments":{"command":"go test ./..."}}]}}`+"\n", minute, minute, minute)
 	}
 	if err := os.WriteFile(path, []byte(header+turn(4)), 0600); err != nil {
 		t.Fatal(err)
@@ -64,7 +70,7 @@ func TestPiToolRecordsSurviveIncrementalIndexing(t *testing.T) {
 				commands++
 			}
 		case sources.RoleFiles:
-			if strings.Contains(m.Text, "src/pool.go") {
+			if m.Text == pool {
 				paths++
 			}
 		case sources.RoleEdit:
@@ -72,7 +78,7 @@ func TestPiToolRecordsSurviveIncrementalIndexing(t *testing.T) {
 		case sources.RoleWrote:
 			for _, minute := range []int{4, 5} {
 				hash, _ := sources.HashWrittenLine(fmt.Sprintf("pool capacity increased for request %d", minute))
-				if p, ok := sources.WroteRecordHas(m.Text, hash); ok && p == "src/pool.go" {
+				if p, ok := sources.WroteRecordHas(m.Text, hash); ok && p == pool {
 					wrote[minute] = true
 				}
 			}
@@ -82,7 +88,7 @@ func TestPiToolRecordsSurviveIncrementalIndexing(t *testing.T) {
 		t.Errorf("file-path records = %d, want 2", paths)
 	}
 	for _, minute := range []int{4, 5} {
-		if !edits[fmt.Sprintf("src/pool.go\nreplaced span %d", minute)] {
+		if !edits[fmt.Sprintf("%s\nreplaced span %d", pool, minute)] {
 			t.Errorf("restore span missing for turn %d", minute)
 		}
 		if !wrote[minute] {

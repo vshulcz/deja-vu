@@ -3,6 +3,7 @@ package sources
 import (
 	"encoding/json"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -48,7 +49,8 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Project: project,
 		Path:    path,
 	}
-	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) { piShapedLine(&s, m, useHeaderCwd) })
+	cwd := ""
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) { piShapedLine(&s, m, useHeaderCwd, &cwd) })
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
@@ -58,11 +60,12 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 // piShapedLine folds one transcript line into s: the session header and the
 // user/assistant/toolResult messages. Shared by the JSONL transcripts and
 // OpenClaw's SQLite store, whose event_json rows are the same lines.
-func piShapedLine(s *model.Session, m map[string]any, useHeaderCwd bool) {
+func piShapedLine(s *model.Session, m map[string]any, useHeaderCwd bool, cwd *string) {
 	typ, _ := m["type"].(string)
 	switch typ {
 	case "session":
 		applyPiHeader(s, m, useHeaderCwd)
+		*cwd, _ = m["cwd"].(string)
 	case "message":
 		msg, ok := m["message"].(map[string]any)
 		if !ok {
@@ -90,7 +93,7 @@ func piShapedLine(s *model.Session, m map[string]any, useHeaderCwd bool) {
 			s.Messages = append(s.Messages, model.Message{Role: outRole, Text: txt, Time: t})
 		}
 		if role == "assistant" {
-			raw := piToolCalls(msg["content"])
+			raw := piToolCalls(msg["content"], *cwd, s.Harness)
 			if IndexToolPaths() {
 				if paths := claudeToolPaths(raw); paths != "" {
 					s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: paths, Time: t})
@@ -152,8 +155,9 @@ func PiProjectDirBase(path string) string {
 
 // piToolCalls adapts known pi tool arguments to the shared extractors. Keeping
 // their filtering and size limits also keeps restore and blame records aligned
-// with the other harnesses. Paths retain the spelling recorded by the agent.
-func piToolCalls(content any) json.RawMessage {
+// with the other harnesses. Relative paths resolve against the session header,
+// including when an incremental scan fetches that header separately.
+func piToolCalls(content any, cwd, harness string) json.RawMessage {
 	blocks, _ := content.([]any)
 	var calls []map[string]any
 	for _, block := range blocks {
@@ -168,33 +172,74 @@ func piToolCalls(content any) json.RawMessage {
 		var name string
 		input := map[string]any{}
 		switch part["name"] {
-		case "bash":
+		case "bash", "exec":
 			name = "Bash"
 			input["command"] = args["command"]
 		case "read":
 			name = "Read"
-			input["file_path"] = args["path"]
 		case "write":
 			name = "Write"
-			input["file_path"], input["content"] = args["path"], args["content"]
+			input["content"] = args["content"]
 		case "edit":
 			name = "MultiEdit"
-			input["file_path"] = args["path"]
-			input["old_string"], input["new_string"] = args["oldText"], args["newText"]
+			input["old_string"] = piEditString(args, "oldText", "old_string")
+			input["new_string"] = piEditString(args, "newText", "new_string")
 			var edits []map[string]any
-			items, _ := args["edits"].([]any)
-			for _, item := range items {
+			for _, item := range piEdits(args["edits"]) {
 				if edit, ok := item.(map[string]any); ok {
-					edits = append(edits, map[string]any{"old_string": edit["oldText"], "new_string": edit["newText"]})
+					edits = append(edits, map[string]any{
+						"old_string": piEditString(edit, "oldText", "old_string"),
+						"new_string": piEditString(edit, "newText", "new_string"),
+					})
 				}
 			}
 			input["edits"] = edits
 		default:
 			continue
 		}
+		if name != "Bash" {
+			path, _ := args["path"].(string)
+			if harness == "omp" && name == "Read" {
+				path = ompReadLineSelector.ReplaceAllString(path, "")
+			}
+			if path != "" && cwd != "" && !filepath.IsAbs(path) {
+				path = filepath.Join(cwd, path)
+			}
+			input["file_path"] = path
+		}
 		calls = append(calls, map[string]any{"type": "tool_use", "name": name, "input": input})
 	}
 	// The input comes from decoded JSON, so all copied values are encodable.
 	raw, _ := json.Marshal(calls)
 	return raw
+}
+
+// omp read records numeric line selectors in the path argument. Other
+// harnesses may use colons literally, so only omp reads lose this suffix.
+var ompReadLineSelector = regexp.MustCompile(`:(?:[0-9]+(?:-[0-9]*)?|-[0-9]+)$`)
+
+func piEditString(edit map[string]any, primary, alternate string) string {
+	if value, ok := edit[primary].(string); ok {
+		return value
+	}
+	value, _ := edit[alternate].(string)
+	return value
+}
+
+// Pi accepts edits as an array, one object, or JSON encoding either shape.
+// The transcript can retain the original arguments before that coercion.
+func piEdits(value any) []any {
+	if encoded, ok := value.(string); ok {
+		if json.Unmarshal([]byte(encoded), &value) != nil {
+			return nil
+		}
+	}
+	switch value := value.(type) {
+	case []any:
+		return value
+	case map[string]any:
+		return []any{value}
+	default:
+		return nil
+	}
 }
