@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delete Roo Code task history</title>
+<meta name="description" content="Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Delete Roo Code task history">
+<meta property="og:description" content="Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Delete Roo Code task history">
+<meta name="twitter:description" content="Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Delete Roo Code task history","description":"Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.","url":"https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html","inLanguage":"en","author":{"@type":"Person","name":"vshulcz"},"publisher":{"@type":"Person","name":"vshulcz"},"datePublished":"2026-09-29","dateModified":"2026-09-29","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"}}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc"><aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold"><summary>Session history <span class="n">8</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+</details>
+<details class="grpfold" open><summary>Deleting sessions <span class="n">14</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html" aria-current="page">Roo Code</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside><article>
+<h1>How to delete Roo Code task history, and what you lose</h1>
+<p class="pagelede">Start with the editor that ran the task; each host can have its own history<span class="mins" data-mins></span></p>
+<p>Roo Code keeps a directory for each task. Deleting a task in its history view also updates the history index; removing a conversation JSON file alone is not the same operation.</p>
+<h2>Where the tasks are</h2>
+<p>For the VS Code extension, look under the host's <code>User/globalStorage/rooveterinaryinc.roo-cline/tasks/</code> directory:</p>
+<table><thead><tr><th>VS Code host</th><th>Default task directory</th></tr></thead><tbody>
+<tr><td>macOS</td><td><code>~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/tasks/</code></td></tr>
+<tr><td>Linux</td><td><code>~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/tasks/</code></td></tr>
+<tr><td>Windows</td><td><code>%APPDATA%\Code\User\globalStorage\rooveterinaryinc.roo-cline\tasks\</code></td></tr>
+</tbody></table>
+<p>Code Insiders, VSCodium, Cursor and Windsurf have separate user-data directories. A custom host user-data directory changes the prefix too. Finding no tasks in VS Code's default path does not mean another editor's history is empty.</p>
+<p>Each <code>&lt;taskId&gt;</code> directory contains <code>api_conversation_history.json</code>, the conversation, and <code>history_item.json</code>, the metadata used by the history list. The <code>tasks/_index.json</code> file indexes task metadata. Task directories can contain additional UI messages and other state.</p>
+<p>Check the host's <code>User/settings.json</code> for <code>roo-cline.customStoragePath</code>. A usable custom value replaces the storage base, so its tasks are under <code>&lt;customStoragePath&gt;/tasks/</code>. Roo falls back to the host's default storage if the configured directory is unusable. The Roo CLI uses the same layout under <code>~/.vscode-mock/global-storage/tasks/</code>.</p>
+<h2>Deleting one task</h2>
+<p>Open Roo Code's History view in the editor that owns the task, find the task and use its delete control. Review the confirmation, including any subtasks, before accepting. Roo's delete path can remove child tasks and associated checkpoint state as well as the task directory. Export or back up anything you need first.</p>
+<p>Use that UI path instead of removing only <code>api_conversation_history.json</code>: leaving the task metadata and index behind can leave a history entry without a conversation to reopen.</p>
+<h2>Deleting all task history</h2>
+<p>In History, clear the search and choose all workspaces if you want more than the current workspace. Enter selection mode, select all tasks and review the selected count before using the batch-delete control.</p>
+<p>For an offline reset, close the editor and stop any Roo CLI process using the store. Back up the resolved <code>tasks/</code> directory, then remove that directory, including its <code>_index.json</code>. Leave the containing extension storage and settings directories alone. Repeat only for other host stores whose history you also want to remove; deleting one does not clear the others.</p>
+<h2>What you lose</h2>
+<p>You lose the local conversation and task metadata needed to reopen that work. Deleting through Roo can also remove associated checkpoints and subtasks. Removing the default <code>tasks/</code> tree also removes its per-task checkpoints at <code>tasks/&lt;taskId&gt;/checkpoints/</code>. It leaves the legacy shared checkpoint repository at <code>&lt;globalStorage&gt;/checkpoints/&lt;workspaceHash&gt;</code>. With <code>customStoragePath</code> set, checkpoints still use the host's default global storage, so removing only the custom task tree leaves those checkpoints too. Neither operation rolls back edits already made in your working project, nor does it erase exported copies or data retained by a model provider.</p>
+<h2>Keeping it searchable instead</h2>
+<p><a href="getting-started.html">Install deja</a> to search Roo history alongside your other agents' conversations without deleting it:</p>
+<pre>deja index
+deja "Roo task about the refactor"</pre>
+<p>The reader follows the supported host stores and custom storage paths. <a href="privacy.html">Indexing and search stay local</a>, and <code>deja forget</code> removes sessions from deja's index. Treat a separate backup as your recovery copy; a search index is not Roo's complete task state.</p>
+<h2>Sources</h2>
+<p>Checked against Roo Code's <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/utils/storage.ts">storage resolution</a>, <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/core/webview/ClineProvider.ts">task deletion</a>, <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/webview-ui/src/components/history/HistoryView.tsx">History view</a> and <a href="https://github.com/RooCodeInc/Roo-Code/blob/b867ec9145750d0ae1ff7f02d35406e9bf2a0b16/src/services/checkpoints/ShadowCheckpointService.ts#L436-L447">checkpoint locations</a>. The <a href="../registry/roo.html">Roo format registry</a> records deja's CLI and editor discovery paths.</p>
+<p><a href="where-sessions-are-stored.html">Where history lives</a> | <a href="memory-for-roo.html">Memory for Roo Code</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article></div></div>
+</body></html>

@@ -165,11 +165,11 @@
     <summary>opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.</summary>
   </entry>
   <entry>
-    <title>Delete Zed agent thread history</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html"></link>
+    <title>Delete Roo Code task history</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html"></link>
     <updated>2026-09-30T00:00:00Z</updated>
-    <summary>Find Zed agent threads in threads.db, delete one through the history view, or remove the built-in agent database with Zed closed. Know what is lost.</summary>
+    <summary>Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.</summary>
   </entry>
   <entry>
     <title>Does Claude Code remember previous conversations? — deja-vu</title>
