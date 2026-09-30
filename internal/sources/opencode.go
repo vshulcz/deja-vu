@@ -131,10 +131,9 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
-	if opencodeV2(db) {
-		return ParseOpencodeDBWhere(db, opencodeV2SinceWhere(t), 0)
-	}
-	return ParseOpencodeDBWhere(db, opencodeSinceWhere(t), 0)
+	// Each layout is bounded by its own columns, and a store holding both
+	// reads both.
+	return parseOpencodeLayouts("opencode", db, opencodeSinceWhere(t), opencodeV2SinceWhere(t), 0)
 }
 
 // opencodeSinceWhere bounds a read to what changed after the watermark. Shared
@@ -155,15 +154,79 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 // `OpenCodeSchemaConfig::kilo` — so the harness a session belongs to is the
 // only difference (#3643).
 func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Session, error) {
+	return parseOpencodeLayouts(harness, db, where, where, limit)
+}
+
+// parseOpencodeLayouts reads a store with the clause each layout needs: where1
+// for the 1.x projection, where2 for the 2.x one. A store upgraded from 1.x
+// holds both, and each of its sessions is read from one of them (#4151).
+func parseOpencodeLayouts(harness, db, where1, where2 string, limit int) ([]model.Session, error) {
 	// The sqlite3 CLI CREATES a missing database file on open — never let it.
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
+	schema := opencodeSchemaOf(db)
+	by := map[string]*model.Session{}
+	rows := 0
+	if !schema.v2 || schema.legacy {
+		w := where1
+		if schema.legacy {
+			w = opencodeNotMoved + w
+		}
+		n, err := readOpencodeRows(harness, db, opencodeV1Query(w, limit), by)
+		if err != nil {
+			return nil, err
+		}
+		rows += n
+	}
+	if schema.v2 {
+		n, err := readOpencodeRows(harness, db, opencodeV2Query(schema.sessionTable, where2, limit), by)
+		if err != nil {
+			return nil, err
+		}
+		rows += n
+	}
+	if rows == 0 {
+		return nil, nil
+	}
+	var out []model.Session
+	for _, s := range by {
+		out = append(out, *s)
+	}
+	// A subagent run is its own session with parent_id naming the spawner —
+	// 922 of 1472 on one store; read without it, every child listed as a
+	// person's own session (#3301). Read beside the rows, best effort: a store
+	// from before the column keeps its sessions standalone.
+	if parents := opencodeParents(db); len(parents) > 0 {
+		for i := range out {
+			if p := parents[out[i].ID]; p != "" {
+				out[i].Kind = "subagent"
+				out[i].Parent = p
+			}
+		}
+	}
+	// opencode names every session, and for the 922 subagent runs of one real
+	// store that name is the only short thing about them — the first user line
+	// there is the whole brief (#3315). Read beside the rows, not in the main
+	// projection: a store from before the column would fail the whole query
+	// and take the harness with it.
+	if titles := opencodeTitles(db); len(titles) > 0 {
+		for i := range out {
+			if t := titles[out[i].ID]; t != "" {
+				out[i].Title = t
+			}
+		}
+	}
+	return out, nil
+}
+
+// opencodeV1Query is the 1.x projection: sessions in `session`, turns in
+// `message`, their content in `part`.
+func opencodeV1Query(where string, limit int) string {
 	lim := ""
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
 	}
-	schema := opencodeSchemaOf(db)
 	// Narrow projection: shipping full m.data/p.data JSON blobs through the
 	// sqlite3 pipe on multi-GB stores takes minutes; extracting just the
 	// needed scalars keeps the dump to tens of MB and seconds.
@@ -244,9 +307,12 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
 		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
-	if schema.v2 {
-		q = opencodeV2Query(schema.sessionTable, where, limit)
-	}
+	return q
+}
+
+// readOpencodeRows runs one projection and folds its rows into by, keyed by
+// session id. It returns how many rows came back.
+func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int, error) {
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	// What sqlite3 says when it refuses, not merely that it did. "exit status
@@ -256,15 +322,14 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 	cmd.Stderr = &whyNot
 	dec, err := sqliteRows(cmd)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	by := map[string]*model.Session{}
 	rows := 0
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
 			_ = cmd.Wait()
-			return nil, fmt.Errorf("bad sqlite json: %w", err)
+			return rows, fmt.Errorf("bad sqlite json: %w", err)
 		}
 		rows++
 		id, _ := r["id"].(string)
@@ -385,7 +450,7 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 	}
 	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
-		return nil, err
+		return rows, err
 	}
 	if err := cmd.Wait(); err != nil {
 		if rows == 0 {
@@ -394,67 +459,41 @@ func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Sessio
 			// changed its schema. Reporting the second as "no sessions" makes
 			// a whole harness disappear from recall while doctor still calls
 			// the store healthy.
-			return nil, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
+			return 0, fmt.Errorf("opencode: query failed, the store schema may have changed: %w",
 				withStderr(err, &whyNot))
 		}
-		return nil, err
+		return rows, err
 	}
-	if rows == 0 {
-		return nil, nil
-	}
-	var out []model.Session
-	for _, s := range by {
-		out = append(out, *s)
-	}
-	// A subagent run is its own session with parent_id naming the spawner —
-	// 922 of 1472 on one store; read without it, every child listed as a
-	// person's own session (#3301). Read beside the rows, best effort: a store
-	// from before the column keeps its sessions standalone.
-	if parents := opencodeParents(db); len(parents) > 0 {
-		for i := range out {
-			if p := parents[out[i].ID]; p != "" {
-				out[i].Kind = "subagent"
-				out[i].Parent = p
-			}
-		}
-	}
-	// opencode names every session, and for the 922 subagent runs of one real
-	// store that name is the only short thing about them — the first user line
-	// there is the whole brief (#3315). Read beside the rows, not in the main
-	// projection: a store from before the column would fail the whole query
-	// and take the harness with it.
-	if titles := opencodeTitles(db); len(titles) > 0 {
-		for i := range out {
-			if t := titles[out[i].ID]; t != "" {
-				out[i].Title = t
-			}
-		}
-	}
-	return out, nil
+	return rows, nil
 }
 
 // opencodeParents maps a session id to its parent's, for the sessions that
 // have one. The column arrived with subagents; a query that fails is a store
 // without it, and nothing is stamped.
 func opencodeParents(db string) map[string]string {
-	cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'parent_id',parent_id) from `+
-		opencodeSessionTable(db)+` where parent_id is not null and parent_id <> ''`)
-	defer stopRead()
-	b, err := cmd.Output()
-	if err != nil || len(b) == 0 {
-		return nil
-	}
-	rows, err := sqliteObjects[struct {
-		ID     string `json:"id"`
-		Parent string `json:"parent_id"`
-	}](b)
-	if err != nil {
-		return nil
-	}
-	m := make(map[string]string, len(rows))
-	for _, r := range rows {
-		if r.ID != "" && r.Parent != "" && r.ID != r.Parent {
-			m[r.ID] = r.Parent
+	var m map[string]string
+	for _, table := range opencodeSessionTables(db) {
+		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'parent_id',parent_id) from `+
+			table+` where parent_id is not null and parent_id <> ''`)
+		b, err := cmd.Output()
+		stopRead()
+		if err != nil || len(b) == 0 {
+			continue
+		}
+		rows, err := sqliteObjects[struct {
+			ID     string `json:"id"`
+			Parent string `json:"parent_id"`
+		}](b)
+		if err != nil {
+			continue
+		}
+		if m == nil {
+			m = make(map[string]string, len(rows))
+		}
+		for _, r := range rows {
+			if r.ID != "" && r.Parent != "" && r.ID != r.Parent {
+				m[r.ID] = r.Parent
+			}
 		}
 	}
 	return m
@@ -465,10 +504,19 @@ func OpencodeCounts() (sessions, messages int, err error) {
 		return 0, 0, nil
 	}
 	q := "select (select count(*) from session),(select count(*) from part where json_extract(data,'$.type')='text')"
-	if opencodeV2(OpencodeDB()) {
+	switch sc := opencodeSchemaOf(OpencodeDB()); {
+	case sc.legacy:
+		// Both layouts, each session once: the ids the v1 migration copied
+		// are in both session tables, and their turns count where the parser
+		// reads them from.
+		q = "select (select count(*) from (select id from session union select id from " + sc.sessionTable + "))," +
+			"(select count(*) from part p join message m on m.id=p.message_id join session s on s.id=m.session_id " +
+			"where json_extract(p.data,'$.type')='text'" + opencodeNotMoved + ")" +
+			"+(select count(*) from session_message where type in ('user','assistant'))"
+	case sc.v2:
 		// A 2.x turn holds its parts in its own blob, so the second figure is
 		// the turns that carry words rather than the text parts under them.
-		q = "select (select count(*) from " + opencodeSessionTable(OpencodeDB()) +
+		q = "select (select count(*) from " + sc.sessionTable +
 			"),(select count(*) from session_message where type in ('user','assistant'))"
 	}
 	cmd, stopRead := sqliteReadCmd(OpencodeDB(), q)
@@ -519,7 +567,14 @@ func ParseOpencodeNewest(db string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	probe, stopRead := sqliteReadCmd(db, "select id from "+opencodeSessionTable(db)+" order by time_created desc limit 1")
+	q := "select id from " + opencodeSessionTable(db) + " order by time_created desc limit 1"
+	if opencodeSchemaOf(db).legacy {
+		// The newest of either layout: a store mid-migration can have its
+		// latest work in the old tables or the new.
+		q = "select id from (select id,time_created from session union all " +
+			"select id,time_created from " + opencodeSessionTable(db) + ") order by time_created desc limit 1"
+	}
+	probe, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	var whyNot bytes.Buffer
 	probe.Stderr = &whyNot
@@ -558,27 +613,32 @@ func opencodeSynthetic(v any) bool {
 // opencodeTitles maps a session id to the name opencode gave it, for the names
 // worth having. A store without the column stamps nothing.
 func opencodeTitles(db string) map[string]string {
-	cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'title',title) from `+
-		opencodeSessionTable(db)+` where title is not null and title <> ''`)
-	defer stopRead()
-	b, err := cmd.Output()
-	if err != nil || len(b) == 0 {
-		return nil
-	}
-	rows, err := sqliteObjects[struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}](b)
-	if err != nil {
-		return nil
-	}
-	out := make(map[string]string, len(rows))
-	for _, r := range rows {
-		t := strings.TrimSpace(r.Title)
-		if r.ID == "" || opencodeThinTitle(t) {
+	var out map[string]string
+	for _, table := range opencodeSessionTables(db) {
+		cmd, stopRead := sqliteReadCmd(db, `select json_object('id',id,'title',title) from `+
+			table+` where title is not null and title <> ''`)
+		b, err := cmd.Output()
+		stopRead()
+		if err != nil || len(b) == 0 {
 			continue
 		}
-		out[r.ID] = t
+		rows, err := sqliteObjects[struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+		}](b)
+		if err != nil {
+			continue
+		}
+		if out == nil {
+			out = make(map[string]string, len(rows))
+		}
+		for _, r := range rows {
+			t := strings.TrimSpace(r.Title)
+			if r.ID == "" || opencodeThinTitle(t) {
+				continue
+			}
+			out[r.ID] = t
+		}
 	}
 	return out
 }

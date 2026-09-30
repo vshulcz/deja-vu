@@ -23,11 +23,23 @@ import (
 // Measured against opencode 2.0.12 (`@opencode/cli`) run in a throwaway home:
 // the store has `session_v2`, `session_message`, `session_inbox` and
 // `session_pending`, and no `session`, `message` or `part`.
+//
+// A store upgraded from 1.x keeps both (#4151). The 2.0 migration creates
+// `session_v2` beside the old `session` and never drops `session`, `message` or
+// `part`; the v1 migration (packages/core/src/database/v1-migration.bun.ts)
+// copies each old session into `session_v2` under the same id and writes its
+// turns into `session_message`, one session per transaction. Until that has
+// run for a session, its turns are only in `message` and `part`. So such a
+// store is read both ways, and a session with turns in `session_message` is
+// read from there only: that copy is the one opencode keeps writing to.
 
 // opencodeSchema says where a store keeps its sessions and its turns.
 type opencodeSchema struct {
 	v2           bool   // the conversation is in session_message
 	sessionTable string // session_v2 on a 2.0 store, session before it
+	// legacy is a 2.0 store that still holds 1.x sessions in session,
+	// message and part, read beside the 2.0 ones.
+	legacy bool
 }
 
 // opencodeSchemaCache keeps one answer per store file, because the schema is
@@ -54,7 +66,7 @@ func opencodeSchemaOf(db string) opencodeSchema {
 func readOpencodeSchema(db string) opencodeSchema {
 	out := opencodeSchema{sessionTable: "session"}
 	b, err := sqliteOutput(db, `select group_concat(name) from sqlite_master where type='table' `+
-		`and name in ('session','session_v2','session_message')`)
+		`and name in ('session','session_v2','session_message','message','part')`)
 	if err != nil {
 		return out
 	}
@@ -70,12 +82,36 @@ func readOpencodeSchema(db string) opencodeSchema {
 	}
 	// A 1.18.3 store can hold only switch events here while message and part
 	// still hold every turn, so count only the row types this reader can project.
-	n, err := sqliteOutput(db, `select count(*) from session_message where type in ('user','assistant','compaction')`)
+	n, err := sqliteOutput(db, `select count(*) from session_message where type in `+opencodeTurnTypes)
 	if err != nil {
 		return out
 	}
 	out.v2 = strings.TrimSpace(string(n)) != "0"
+	if out.v2 && have["session_v2"] && have["session"] && have["message"] && have["part"] {
+		out.sessionTable = "session_v2"
+		out.legacy = true
+	}
 	return out
+}
+
+// opencodeTurnTypes are the session_message rows the 2.x reader projects. A
+// session with any of them is read from there.
+const opencodeTurnTypes = `('user','assistant','compaction')`
+
+// opencodeNotMoved keeps the 1.x reader off a session whose turns are already
+// in session_message, so a session the v1 migration copied is read once.
+const opencodeNotMoved = ` and not exists (select 1 from session_message x ` +
+	`where x.session_id=s.id and x.type in ` + opencodeTurnTypes + `)`
+
+// opencodeSessionTables are the tables the reads beside the projection ask:
+// one, or on a store that holds both layouts the old one and then the new, so
+// a session in both takes its name and parent from the copy opencode updates.
+func opencodeSessionTables(db string) []string {
+	sc := opencodeSchemaOf(db)
+	if sc.legacy {
+		return []string{"session", sc.sessionTable}
+	}
+	return []string{sc.sessionTable}
 }
 
 // opencodeV2 reports whether the conversation in a store is kept the 2.x way.
@@ -168,7 +204,9 @@ func opencodeV2SinceWhere(t time.Time) string {
 }
 
 // opencodeSessionTable is the table sessions live in, for the reads beside the
-// main projection — the newest id, the parents, the titles, the counts.
+// main projection — the newest id, the parents, the titles, the counts. On a
+// store that holds both layouts it is the 2.0 one; opencodeSessionTables names
+// both.
 func opencodeSessionTable(db string) string { return opencodeSchemaOf(db).sessionTable }
 
 // OpencodeStoreIsV2 reports whether the store at db keeps its turns in the 2.0

@@ -446,6 +446,8 @@ var opencodeVersionMajorReal = func() int {
 	// The escape hatch for a machine where the binary is not on PATH under
 	// that name — a shell alias, a bun run, a wrapper script — and for a test
 	// that must not depend on which opencode the developer happens to have.
+	// It picks the plugin install writes and nothing else: the store reader
+	// looks at the tables, whatever version is installed.
 	if v := os.Getenv("DEJA_OPENCODE_MAJOR"); v != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
 			return n
