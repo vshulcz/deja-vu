@@ -21,8 +21,9 @@ func TestAStoreRefusalCarriesWhatSqliteSaid(t *testing.T) {
 	}
 	db := filepath.Join(t.TempDir(), "opencode.db")
 	// A real database missing the column the first probe reads, which is the
-	// shape a schema change arrives in.
-	mk := exec.Command("sqlite3", db, "create table session(id text, directory text);")
+	// shape a schema change arrives in. The probe asks message too, for the
+	// newest session with turns, so that table is there.
+	mk := exec.Command("sqlite3", db, "create table session(id text, directory text); create table message(id text, session_id text);")
 	if out, err := mk.CombinedOutput(); err != nil {
 		t.Fatalf("could not build the fixture: %v: %s", err, out)
 	}
