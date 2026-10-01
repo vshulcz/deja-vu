@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -75,5 +76,55 @@ func TestResolveEncodedPathNeverReturnsEmptySegments(t *testing.T) {
 	base := claudeEncodePath(filepath.Join(root, "007")) + "---------"
 	if got := ResolveEncodedPath(base); strings.Contains(got, string(filepath.Separator)+string(filepath.Separator)) || strings.HasSuffix(got, string(filepath.Separator)) {
 		t.Errorf("resolved %q to %q", base, got)
+	}
+}
+
+// A folder has one project whichever of its files is read first. A long
+// session whose head was written from elsewhere sits beside subagents that
+// carry the folder's own directory; the name came from whichever file a run
+// opened first, so a rebuild and an incremental run disagreed.
+func TestAClaudeFolderHasOneProjectWhicheverFileIsReadFirst(t *testing.T) {
+	home := t.TempDir()
+	work := filepath.Join(home, "w", "проект é")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, "projects", claudeEncodePath(work))
+	main := filepath.Join(dir, "aaaa.jsonl")
+	sub := filepath.Join(dir, "aaaa", "subagents", "agent-1.jsonl")
+	for path, cwd := range map[string]string{main: "/somewhere/else", sub: work} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(`{"type":"user","cwd":"`+cwd+`","message":{"role":"user","content":"x"}}`+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, first := range [][]string{{main, sub}, {sub, main}} {
+		claudeCWDNameCache = sync.Map{}
+		var names []string
+		for _, p := range first {
+			names = append(names, claudeProjectNameFor(p))
+		}
+		for _, n := range names {
+			if n != "w/проект é" {
+				t.Errorf("reading %v first named the folder %q, want w/проект é", filepath.Base(first[0]), n)
+			}
+		}
+	}
+}
+
+// Claude Code encodes per UTF-16 unit and cuts a long name at 200 with a hash
+// after it; a cwd outside the BMP or over that length is still recognised.
+func TestClaudeFolderIsFollowsClaudesEncoding(t *testing.T) {
+	if !claudeFolderIs("/a/😀", "-a---") {
+		t.Errorf("an emoji is two UTF-16 units, so two dashes: %q", claudeEncodePath("/a/😀"))
+	}
+	long := "/" + strings.Repeat("x", 250)
+	if !claudeFolderIs(long, claudeEncodePath(long)[:200]+"-1a2b3c") {
+		t.Error("a cwd over 200 characters did not match its cut folder name")
+	}
+	if claudeFolderIs("/elsewhere", "-work-app") {
+		t.Error("an unrelated cwd matched")
 	}
 }
