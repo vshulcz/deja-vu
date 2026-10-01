@@ -230,19 +230,26 @@ func copilotChatDropJSONSiblings(files []string) []string {
 func copilotChatReplay(path string, data []byte) (map[string]any, bool) {
 	var state any
 	n := 0
-	for _, raw := range strings.Split(string(data), "\n") {
+	lines := strings.Split(string(data), "\n")
+	for i, raw := range lines {
 		line := string(trimJSONSpace([]byte(raw)))
 		if line == "" {
 			continue
 		}
-		n++
 		var entry map[string]any
 		d := json.NewDecoder(strings.NewReader(line))
 		d.UseNumber()
 		if d.Decode(&entry) != nil {
+			// VS Code appends while a reply streams: a last line with no
+			// newline yet is a write in progress, not a broken file, and the
+			// lines before it are the session (#4229).
+			if i == len(lines)-1 && n > 0 {
+				break
+			}
 			diagMalformedLine(path)
 			return nil, false
 		}
+		n++
 		kind, ok := numberVal(entry["kind"])
 		if !ok {
 			diagMalformedLine(path)
