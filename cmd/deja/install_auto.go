@@ -83,9 +83,11 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	if err == nil && uninstall && a != "unchanged" {
+	if err == nil && a != "unchanged" {
 		// Codex's approval of each hook is pinned by position in its
-		// config.toml; see codex_hook_trust.go.
+		// config.toml; see codex_hook_trust.go. Install moves hooks too: a
+		// second copy of deja's entry it drops shifts the reader's hooks
+		// after it up a place (#4227).
 		err = moveCodexHookTrust(path, before, root)
 	}
 	return installResult{Path: path, Action: a}, err
@@ -1023,7 +1025,7 @@ func dejaHookEntry(entry map[string]any) bool {
 		// Both tool subcommands are spelled out: the match wants the whole
 		// token, so "hook-tool" does not find "hook-tool-after".
 		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity",
-			"hook-tool", "hook-tool-after", "hook-spawn"} {
+			"hook-tool", "hook-tool-after", "hook-spawn", "hook-session-end"} {
 			if isDejaHookCommand(cmd, "deja "+sub) {
 				return true
 			}
