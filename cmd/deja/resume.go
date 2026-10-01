@@ -61,6 +61,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if err := resumeGoneError(s); err != nil {
+		return err
+	}
 	if !doExec {
 		if note := resumeCaveats[s.Harness]; note != "" {
 			// stderr, so `$(deja resume …)` still composes: the command is the
