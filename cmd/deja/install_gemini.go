@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -156,8 +157,7 @@ func disableGeminiHooksIfOurs() error {
 	if !blockWasAdded(path, "hooksConfig") {
 		return nil
 	}
-	exts, _ := filepath.Glob(filepath.Join(sources.GeminiHome(), "extensions", "*", "hooks", "hooks.json"))
-	if len(exts) > 0 {
+	if geminiOtherHooks() {
 		return nil
 	}
 	old, err := readConfig(path)
@@ -174,6 +174,10 @@ func disableGeminiHooksIfOurs() error {
 		forgetBlockAdded(path, "hooksConfig")
 		return nil
 	}
+	// Hooks the reader keeps in settings.json itself run on the switch too.
+	if _, ok := root["hooks"]; ok {
+		return nil
+	}
 	text := string(old)
 	open := zedTopLevelOpen(text)
 	if open < 0 {
@@ -185,11 +189,41 @@ func disableGeminiHooksIfOurs() error {
 	}
 	cut := zedEntrySpan(text, found)
 	next := text[:cut[0]] + text[cut[1]:]
+	// The last key has no comma behind it to take, so the one in front of it
+	// goes instead; Gemini parses settings.json strictly once comments are
+	// stripped, and a trailing comma breaks the file.
+	if !strings.Contains(text[found.valueEnd:cut[1]], ",") {
+		blank := stripJSONComments(text)
+		i := cut[0] - 1
+		for i >= 0 && strings.ContainsRune(" \t\r\n", rune(blank[i])) {
+			i--
+		}
+		if i >= 0 && blank[i] == ',' {
+			next = text[:i] + text[i+1:cut[0]] + text[cut[1]:]
+		}
+	}
 	if _, err := writeIfChanged(path, old, []byte(next)); err != nil {
 		return err
 	}
 	forgetBlockAdded(path, "hooksConfig")
 	return nil
+}
+
+// geminiOtherHooks reports whether anything besides deja's extension runs on
+// the switch: another extension with hooks/hooks.json, or a linked extension,
+// whose hooks live at its source and are not visible from here.
+func geminiOtherHooks() bool {
+	exts := filepath.Join(sources.GeminiHome(), "extensions")
+	if m, _ := filepath.Glob(filepath.Join(exts, "*", "hooks", "hooks.json")); len(m) > 0 {
+		return true
+	}
+	metas, _ := filepath.Glob(filepath.Join(exts, "*", ".gemini-extension-install.json"))
+	for _, p := range metas {
+		if b, err := os.ReadFile(p); err == nil && bytes.Contains(b, []byte(`"link"`)) {
+			return true
+		}
+	}
+	return false
 }
 
 // enableGeminiHooks flips the master switch. Without it the extension is
@@ -199,6 +233,11 @@ func enableGeminiHooks() error {
 	old, err := readConfig(path)
 	if err != nil {
 		return err
+	}
+	if cfg, present := geminiHooksConfig(old); present && !(len(cfg) == 1 && cfg["enabled"] == true) {
+		// The reader's own object — a switch they set to false, a key
+		// beside it: not deja's to take back later.
+		forgetBlockAdded(path, "hooksConfig")
 	}
 	if !geminiHasHooksConfig(old) {
 		// Recorded before the write, which is the only moment the absence
@@ -278,4 +317,16 @@ func geminiHasHooksConfig(b []byte) bool {
 	}
 	_, ok := root["hooksConfig"]
 	return ok
+}
+
+// geminiHooksConfig is settings.json's hooksConfig object and whether the key
+// is there at all.
+func geminiHooksConfig(b []byte) (map[string]any, bool) {
+	var root map[string]any
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+		return nil, false
+	}
+	v, ok := root["hooksConfig"]
+	cfg, _ := v.(map[string]any)
+	return cfg, ok
 }

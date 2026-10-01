@@ -116,3 +116,102 @@ func TestUninstallTakesBackTheGeminiSwitchItAdded(t *testing.T) {
 		t.Fatal("uninstall turned off a switch the reader had on before installing")
 	}
 }
+
+// Plain JSON, the shape most settings files have: install writes the switch in
+// front of mcpServers, uninstall drops mcpServers, and the switch ends up the
+// last key. Cutting it must not leave the comma before it behind — Gemini
+// rejects the file.
+func TestUninstallLeavesValidJSONWhenTheSwitchIsLast(t *testing.T) {
+	hermeticEnv(t)
+	path := filepath.Join(sources.GeminiHome(), "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{"ui":{"theme":"GitHub"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "gemini-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "uninstall", "gemini"); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal(b, &root); err != nil {
+		t.Fatalf("uninstall left settings.json Gemini cannot parse (%v):\n%s", err, b)
+	}
+	if _, ok := root["hooksConfig"]; ok {
+		t.Errorf("the switch deja added is still there:\n%s", b)
+	}
+}
+
+// Hooks the reader wrote into settings.json, or a linked extension whose
+// hooks live at its source, also run on the switch: uninstall leaves it on.
+func TestUninstallKeepsTheGeminiSwitchOtherHooksNeed(t *testing.T) {
+	for name, seed := range map[string]func(t *testing.T, path string){
+		"settings hooks": func(t *testing.T, path string) {
+			if err := os.WriteFile(path, []byte(`{"hooks":{"BeforeTool":[]}}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"linked extension": func(t *testing.T, path string) {
+			meta := filepath.Join(sources.GeminiHome(), "extensions", "mine", ".gemini-extension-install.json")
+			if err := os.MkdirAll(filepath.Dir(meta), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(meta, []byte(`{"source":"/src/mine","type":"link"}`), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			hermeticEnv(t)
+			path := filepath.Join(sources.GeminiHome(), "settings.json")
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			seed(t, path)
+			if _, err := captureRun(t, "install", "gemini-auto", "--no-index"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := captureRun(t, "uninstall", "gemini"); err != nil {
+				t.Fatal(err)
+			}
+			if !geminiHooksEnabled() {
+				t.Fatal("uninstall turned off a switch other hooks still run on")
+			}
+		})
+	}
+}
+
+// deja added the switch, the reader then changed it; a reinstall must not
+// leave deja believing the object is still its own.
+func TestReinstallForgetsASwitchTheReaderChanged(t *testing.T) {
+	hermeticEnv(t)
+	path := filepath.Join(sources.GeminiHome(), "settings.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "gemini-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if !blockWasAdded(path, "hooksConfig") {
+		t.Fatal("install did not record the switch it added")
+	}
+	if err := os.WriteFile(path, []byte(`{"hooksConfig":{"enabled":true,"notifications":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureRun(t, "install", "gemini-auto", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if blockWasAdded(path, "hooksConfig") {
+		t.Error("the reader's object is still recorded as deja's")
+	}
+}
