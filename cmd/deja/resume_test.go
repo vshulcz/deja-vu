@@ -184,6 +184,16 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	encoded := strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
 	id := "de875c53-88ae-4e73-8953-9813479364d8"
 	path := filepath.Join(tmp, "projects", encoded, "agent-transcripts", id, id+".jsonl")
+	// cursor-agent opens the chat from chats/<md5 of the directory>/<id>.
+	t.Setenv("CURSOR_CONFIG_DIR", tmp)
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", tmp)
+	store := filepath.Join(tmp, "chats", sources.CursorChatBucket(real), id, "store.db")
+	if err := os.MkdirAll(filepath.Dir(store), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	dir, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Project: "app", Path: path})
 	if err != nil {

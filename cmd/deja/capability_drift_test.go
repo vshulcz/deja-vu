@@ -316,6 +316,27 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		t.Setenv("DEJA_ROO_CLI_ROOT", root)
 		s.Path = filepath.Join(dir, "api_conversation_history.json")
 	}
+	if harness == "cursor" {
+		// cursor-agent opens a chat from chats/<md5 of its directory>/<id>,
+		// so the directory and the chat both have to be there (#4193).
+		cli := t.TempDir()
+		cwd := filepath.Join(cli, "app")
+		chat := filepath.Join(cli, "chats", sources.CursorChatBucket(cwd), s.ID)
+		if err := os.MkdirAll(chat, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(cwd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for name, body := range map[string]string{"meta.json": `{"cwd":` + jsonString(cwd) + `}`, "store.db": ""} {
+			if err := os.WriteFile(filepath.Join(chat, name), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+		t.Setenv("CURSOR_CONFIG_DIR", cli)
+		s.Path = filepath.Join(cli, "projects", "app", "agent-transcripts", s.ID, s.ID+".jsonl")
+	}
 	if harness == "kilocode" {
 		// Only the CLI half of Kilo's store resumes, and the reader tells the
 		// two apart by the path: the database is the CLI's, a task file under

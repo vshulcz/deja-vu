@@ -210,14 +210,20 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "cursor":
 		if strings.HasSuffix(s.Path, ".jsonl") {
 			// A CLI transcript is named after the chat id `--resume` takes.
-			// cursor-agent finds a chat under the md5 of the directory it is
-			// started in, so this has to run in the one the chat ran in, and
-			// without it there is no command that reopens the chat (#4193).
+			// `cursor-agent --resume <id>` looks for the chat only under the
+			// md5 of the directory it is started in, so the command has to
+			// run in the one the chat ran in and the chat has to be there;
+			// otherwise it opens an empty chat (#4193).
+			short := digest.Short(s.ID)
 			dir := cursorProjectDirFor(s)
-			if dir != "" {
-				if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
-					return "", "", fmt.Errorf("cursor chat %s ran in %s, which is gone, and cursor-agent finds a chat by the directory it ran in — `deja show %s` has the conversation", digest.Short(s.ID), dir, digest.Short(s.ID))
-				}
+			if dir == "" {
+				return "", "", fmt.Errorf("cursor chat %s: the directory it ran in is not recorded, and `cursor-agent --resume <id>` finds a chat only from there — `cursor-agent --resume` with no id lists chats from every directory, and `deja show %s` has the conversation", short, short)
+			}
+			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+				return "", "", fmt.Errorf("cursor chat %s ran in %s, which is gone — `deja show %s` has the conversation", short, dir, short)
+			}
+			if _, err := os.Stat(filepath.Join(sources.CursorCLIHome(), "chats", sources.CursorChatBucket(dir), s.ID, "store.db")); err != nil {
+				return "", "", fmt.Errorf("cursor chat %s is no longer in cursor-agent's store — `deja show %s` has the conversation", short, short)
 			}
 			return dir, "cursor-agent --resume " + s.ID, nil
 		}
@@ -367,7 +373,9 @@ func cursorProjectDirFor(s model.Session) string {
 	if s.Path == "" {
 		return ""
 	}
-	if cwd := sources.CursorChatCWD(s.Path); cwd != "" {
+	// Only a directory the chat is filed under: one read from a meta.json
+	// whose folder is not its md5 sends cursor-agent to an empty chat.
+	if cwd, verified := sources.CursorChatCWD(s.Path); verified {
 		return cwd
 	}
 	base := sources.CursorTranscriptProjectDirBase(s.Path)

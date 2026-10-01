@@ -34,6 +34,9 @@ func seedCursorChat(t *testing.T, cli, cwd, id string) string {
 	if err := os.WriteFile(filepath.Join(chat, "meta.json"), []byte(`{"schemaVersion":1,"cwd":`+jsonString(cwd)+`}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(chat, "store.db"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	return tp
 }
 
@@ -45,6 +48,7 @@ func TestResumeCursorTakesTheDirectoryFromTheChat(t *testing.T) {
 	tmp := t.TempDir()
 	cli := filepath.Join(tmp, "cursor")
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+	t.Setenv("CURSOR_CONFIG_DIR", cli)
 	for i, name := range []string{"my.app", "проект", "two words"} {
 		cwd := filepath.Join(tmp, "work", name)
 		if err := os.MkdirAll(cwd, 0o755); err != nil {
@@ -73,5 +77,46 @@ func TestResumeCursorTakesTheDirectoryFromTheChat(t *testing.T) {
 	tp := seedCursorChat(t, cli, cwd, id)
 	if _, _, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Path: tp}); err == nil || !strings.Contains(err.Error(), "deja show") {
 		t.Fatalf("a chat whose directory is gone: err = %v", err)
+	}
+
+	// The chat is no longer in cursor-agent's store although the directory is
+	// there: the command would open an empty chat.
+	cwd = filepath.Join(tmp, "work", "kept.app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	id = "5b0c1a7e-2f4d-4c1b-9a3e-7d2f1c0b9e98"
+	tp = seedCursorChat(t, cli, cwd, id)
+	if err := os.Remove(filepath.Join(cli, "chats", sources.CursorChatBucket(cwd), id, "store.db")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Path: tp}); err == nil || !strings.Contains(err.Error(), "deja show") {
+		t.Fatalf("a chat gone from the store: err = %v", err)
+	}
+}
+
+// A meta.json under a folder that is not the md5 of its cwd is a copy: the
+// project can come from it, the cd cannot, because cursor-agent would look in
+// a different folder.
+func TestResumeCursorTrustsOnlyAChatFiledUnderItsDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	cli := filepath.Join(tmp, "cursor")
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+	t.Setenv("CURSOR_CONFIG_DIR", cli)
+	cwd := filepath.Join(tmp, "work", "my.app")
+	if err := os.MkdirAll(cwd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	id := "5b0c1a7e-2f4d-4c1b-9a3e-7d2f1c0b9e97"
+	tp := seedCursorChat(t, cli, cwd, id)
+	right := filepath.Join(cli, "chats", sources.CursorChatBucket(cwd))
+	if err := os.Rename(right, filepath.Join(cli, "chats", "0123456789abcdef0123456789abcdef")); err != nil {
+		t.Fatal(err)
+	}
+	if got, verified := sources.CursorChatCWD(tp); got != cwd || verified {
+		t.Fatalf("CursorChatCWD = %q %v, want %q unverified", got, verified, cwd)
+	}
+	if _, _, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Path: tp}); err == nil {
+		t.Fatal("resume printed a cd into a directory cursor-agent would not find the chat under")
 	}
 }
