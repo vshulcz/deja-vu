@@ -48,3 +48,34 @@ func TestGeminiToolCallsBecomeCommandAndToolOutput(t *testing.T) {
 		t.Errorf("user turns = %q, want the typed prompt alone", users)
 	}
 }
+
+// A failed run_shell_command carries its status the way a Codex or opencode
+// command does (#4208). Shapes from Gemini CLI 0.60.0: the call on the gemini
+// record with its result inline, and the result again on the next user record.
+func TestGeminiFailedCommandCarriesItsExitCode(t *testing.T) {
+	_, chats := geminiTree(t)
+	lines := `{"sessionId":"sess-exit-1","projectHash":"abc","startTime":"2026-10-01T12:51:00.000Z","lastUpdated":"2026-10-01T12:51:10.000Z","kind":"main"}
+{"id":"u1","timestamp":"2026-10-01T12:51:01.000Z","type":"user","content":[{"text":"show the last commit"}]}
+{"id":"g1","timestamp":"2026-10-01T12:51:02.000Z","type":"gemini","content":"","model":"luna","toolCalls":[{"id":"run_shell_command__1","name":"run_shell_command","args":{"command":"git log --oneline -1","description":"log"},"result":[{"functionResponse":{"id":"run_shell_command__1","name":"run_shell_command","response":{"output":"<untrusted_context>\nOutput: fatal: your current branch 'master' does not have any commits yet\nExit Code: 128\nProcess Group PGID: 98713\n</untrusted_context>"}}}],"status":"success"},{"id":"run_shell_command__2","name":"run_shell_command","args":{"command":"git status --short"},"result":[{"functionResponse":{"id":"run_shell_command__2","name":"run_shell_command","response":{"output":"Output: (empty)\nExit Code: 0"}}}],"status":"success"}]}
+{"id":"u2","timestamp":"2026-10-01T12:51:03.000Z","type":"user","content":[{"functionResponse":{"id":"run_shell_command__1","name":"run_shell_command","response":{"output":"<untrusted_context>\nOutput: fatal: your current branch 'master' does not have any commits yet\nExit Code: 128\nProcess Group PGID: 98713\n</untrusted_context>"}}},{"functionResponse":{"id":"run_shell_command__2","name":"run_shell_command","response":{"output":"Output: (empty)\nExit Code: 0"}}}]}
+{"id":"g2","timestamp":"2026-10-01T12:51:04.000Z","type":"gemini","content":"No commits yet.","model":"luna"}
+`
+	p := filepath.Join(chats, "session-2026-10-01T12-51-sess-exit-1.jsonl")
+	if err := os.WriteFile(p, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseGeminiFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v, %d sessions", err, len(ss))
+	}
+	var cmds []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand {
+			cmds = append(cmds, m.Text)
+		}
+	}
+	want := []string{"$ git log --oneline -1  → exit 128", "$ git status --short"}
+	if strings.Join(cmds, "|") != strings.Join(want, "|") {
+		t.Fatalf("commands = %q, want %q", cmds, want)
+	}
+}

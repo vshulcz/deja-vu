@@ -2,8 +2,11 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -216,6 +219,9 @@ func geminiSessionShell(path, id, startTime, lastUpdated string) model.Session {
 }
 
 func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
+	// A shell call's command record, by call id, so the exit status its
+	// result reports can ride on it.
+	shellAt := map[string]int{}
 	for _, m := range msgs {
 		role := ""
 		switch m.Type {
@@ -238,14 +244,101 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		// reader serves both.
 		if work := geminiWorkRecords(m, t); len(work) > 0 {
 			s.Touch(t)
+			start := len(s.Messages)
 			s.Messages = append(s.Messages, work...)
+			geminiNoteShellCalls(s, m, start, shellAt)
 		}
+		geminiNoteExits(s, m, shellAt)
 		text := geminiContentText(m.Content)
 		if text == "" {
 			continue
 		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
+	}
+}
+
+// geminiExit is the status run_shell_command reports in its result:
+// "Exit Code: 128". Codex, opencode and Cursor commands carry `→ exit N` on a
+// non-zero exit, which is what the failed-command recall reads; a Gemini
+// failure read like a success without it (#4208).
+var geminiExit = regexp.MustCompile(`(?m)^Exit Code: (\d+)`)
+
+type geminiCall struct {
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Args   map[string]any `json:"args"`
+	Result []struct {
+		FunctionResponse *geminiResponse `json:"functionResponse"`
+	} `json:"result"`
+}
+
+type geminiResponse struct {
+	ID       string `json:"id"`
+	Response struct {
+		Output string `json:"output"`
+		Error  string `json:"error"`
+	} `json:"response"`
+}
+
+// geminiNoteShellCalls maps each shell call in m to the command record it
+// produced among s.Messages[start:].
+func geminiNoteShellCalls(s *model.Session, m geminiMessage, start int, shellAt map[string]int) {
+	var calls []geminiCall
+	if len(m.ToolCalls) == 0 || json.Unmarshal(m.ToolCalls, &calls) != nil {
+		return
+	}
+	used := map[int]bool{}
+	for _, c := range calls {
+		cmd, _ := c.Args["command"].(string)
+		if c.ID == "" || !qwenDialect.isShellTool(c.Name) || cmd == "" {
+			continue
+		}
+		for i := start; i < len(s.Messages); i++ {
+			if !used[i] && s.Messages[i].Role == RoleCommand && s.Messages[i].Text == "$ "+cmd {
+				shellAt[c.ID], used[i] = i, true
+				break
+			}
+		}
+	}
+}
+
+// geminiNoteExits appends a non-zero exit to the command it belongs to, from
+// the call's own result or from the functionResponse record that follows.
+func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int) {
+	var resps []*geminiResponse
+	var calls []geminiCall
+	if len(m.ToolCalls) > 0 && json.Unmarshal(m.ToolCalls, &calls) == nil {
+		for _, c := range calls {
+			for _, r := range c.Result {
+				resps = append(resps, r.FunctionResponse)
+			}
+		}
+	}
+	var blocks []struct {
+		FunctionResponse *geminiResponse `json:"functionResponse"`
+	}
+	if json.Unmarshal(m.Content, &blocks) == nil {
+		for _, b := range blocks {
+			resps = append(resps, b.FunctionResponse)
+		}
+	}
+	for _, r := range resps {
+		if r == nil {
+			continue
+		}
+		i, ok := shellAt[r.ID]
+		if !ok {
+			continue
+		}
+		mm := geminiExit.FindStringSubmatch(r.Response.Output + "\n" + r.Response.Error)
+		if mm == nil {
+			continue
+		}
+		if code, err := strconv.Atoi(mm[1]); err == nil && code > 0 {
+			s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+		}
+		delete(shellAt, r.ID) // once: the result arrives on both records
 	}
 }
 

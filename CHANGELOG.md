@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A failed Gemini CLI command is indexed with its exit status (`$ git log …  → exit 128`), the way Codex, opencode and Cursor commands are, so the failed-command recall sees it (#4208).
 - Deleting a Cursor, Copilot CLI or Kimi session keeps it searchable, as a deleted Claude transcript already was. Those clients keep each session in its own directory, and the pass read the directory going with it as a store that was uninstalled, dropped the session and suggested reconnecting a disk (#4195).
 - `deja doctor` reads a config with comments, trailing commas or a byte-order mark, so an opencode MCP entry whose deja binary is gone is reported as such (`binary_missing`) instead of `wired` when `opencode.json` carries a comment (#4197).
 - After a Homebrew upgrade, the wiring repair keeps MCP entries on the `bin/deja` link instead of rewriting them to the versioned `Cellar` path, which the next upgrade removed. Entries that still worked are left alone, and the "rewrote its wiring" line no longer appears for them (#4189).
