@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -889,9 +890,15 @@ func cachedHookDigestFor(dir, fromPayload, exclude string) (string, int, int64, 
 		}
 	}
 	if exclude == "" {
-		e := hookDigestEntryFor(dir, cwd)
-		writeHookCacheEntry(dir, cwd, e)
-		return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
+		// The digest goes out now and the resume variants come from the
+		// detached refresh: rendering one per served session here put them
+		// on the startup path of every first start in a project.
+		digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, "")
+		writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
+		if len(ids) > 0 {
+			requestHookRefresh(dir, cwd)
+		}
+		return digest, sessions, raw, taskMatched, withheld, ids, projects
 	}
 	// A resume against an entry without the digest that leaves it out. The
 	// cache is the project's, read by every session that opens in it; one
@@ -911,8 +918,10 @@ func writeHookCacheEntry(dir, cwd string, e hookCacheEntry) {
 		return
 	}
 	e.At, e.CWD, e.Gate = time.Now(), cwd, hookGate()
+	// Renamed into place: a hook reading while the refresh writes would
+	// otherwise see a torn entry and rebuild.
 	if b, err := json.Marshal(e); err == nil {
-		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
+		_ = atomicfile.Write(hookCachePath(dir, cwd), b, 0o600)
 	}
 }
 
@@ -1012,12 +1021,11 @@ func withProjectsOf(names []string, ss []model.Session) []string {
 	return out
 }
 
-// hookDigestBuilds counts digest builds, for tests that need to tell a cache
-// hit from a rebuild.
-var hookDigestBuilds atomic.Int64
+// hookDigestRenders counts digests rendered, for tests that need to tell a
+// cache hit from a rebuild.
+var hookDigestRenders atomic.Int64
 
 func hookDigestBuild(dir, fromPayload, exclude string, variants bool) (entry hookCacheEntry) {
-	hookDigestBuilds.Add(1)
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -1150,6 +1158,7 @@ func hookDigestBuild(dir, fromPayload, exclude string, variants bool) (entry hoo
 	// Each variant works on its own copy: the steps below sort and trim in
 	// place, and the next variant has to start from the order the store gave.
 	render := func(exclude string) hookCacheEntry {
+		hookDigestRenders.Add(1)
 		ss := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return exclude != "" && s.ID == exclude })
 		// A subagent run is the parent's work seen from inside, and what it says
 		// on its own is the process talk a spawned agent produces — "Sending
