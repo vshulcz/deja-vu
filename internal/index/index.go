@@ -305,7 +305,13 @@ import (
 // transcripts: `credential` 171→49, openai-key 137→189, github-token 87→123.
 // The same values were masked before and after; a store built before this
 // keeps the old labels until it re-reads its sources (#536).
-const version = 53
+// 54 keeps what a Claude subagent changed. Its run was cut to the task and the
+// answer, and the edit, written and file records went with the prose, so blame
+// never named the subagent that changed a file: 1,668 edits on one machine,
+// none indexed (#4163). Paths inside a Claude Code worktree were also dropped
+// as the agent's own files (#4164). A finished subagent transcript is never
+// re-read, so only a rebuild brings either in.
+const version = 54
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

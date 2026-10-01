@@ -794,7 +794,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		} else if short := countSubagentFiles(seen); short > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 			// Read, but not in full: what a reader needs to know is which half
 			// of those files is searchable, and how to get the rest (#3009).
-			detail += fmt.Sprintf(", %d subagent transcripts read as task and answer — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
+			detail += fmt.Sprintf(", %d subagent transcripts read as task, answer and what they changed — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
 		}
 		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)

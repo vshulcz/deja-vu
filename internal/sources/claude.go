@@ -192,10 +192,19 @@ func KeepSubagentTail(ms []model.Message) []model.Message {
 		return ms
 	}
 	tail := len(ms) - SubagentTailKept
+	// A files record names everything a turn opened, reads included, so it is
+	// kept only for a turn that also changed something: the read-only
+	// exploring a subagent does stays out with the prose.
+	changed := map[int64]bool{}
+	for _, m := range ms[1:tail] {
+		if m.Role == RoleEdit || m.Role == RoleWrote {
+			changed[m.Time.UnixNano()] = true
+		}
+	}
 	kept := make([]model.Message, 0, SubagentTailKept+1)
 	kept = append(kept, ms[0])
 	for _, m := range ms[1:tail] {
-		if m.Role == RoleEdit || m.Role == RoleWrote || m.Role == RoleFiles {
+		if m.Role == RoleEdit || m.Role == RoleWrote || (m.Role == RoleFiles && changed[m.Time.UnixNano()]) {
 			kept = append(kept, m)
 		}
 	}

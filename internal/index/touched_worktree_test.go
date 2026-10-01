@@ -17,6 +17,8 @@ func TestFilesInAClaudeWorktreeCountAsTouched(t *testing.T) {
 		{Role: roleFiles, Text: wt},
 		{Role: roleFiles, Text: "/Users/x/.claude/projects/p/notes.md"},
 		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/.git/HEAD"},
+		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/build.log"},
+		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/node_modules/x/index.js"},
 	}
 	got := topTouchedFiles(ms)
 	if len(got) != 1 || got[0] != wt {

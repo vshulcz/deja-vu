@@ -32,7 +32,12 @@ func TestASubagentKeepsItsEditsWhenItsMiddleIsCut(t *testing.T) {
 		return string(b) + "\n"
 	}
 	body := rec("user", "move Recommended out of idea.go", 0)
-	for i := 1; i <= 10; i++ {
+	for i := 11; i <= 15; i++ {
+		body += rec("assistant", []any{
+			map[string]any{"type": "tool_use", "id": fmt.Sprintf("r%d", i), "name": "Read", "input": map[string]any{"file_path": fmt.Sprintf("/repo/only-read-%d.go", i)}},
+		}, i)
+	}
+	for i := 16; i <= 25; i++ {
 		body += rec("assistant", []any{
 			map[string]any{"type": "text", "text": "reading another file"},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("t%d", i), "name": "Edit", "input": map[string]any{
@@ -67,6 +72,11 @@ func TestASubagentKeepsItsEditsWhenItsMiddleIsCut(t *testing.T) {
 	}
 	if count[RoleFiles] == 0 {
 		t.Error("the files the child touched are gone")
+	}
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleFiles && strings.Contains(m.Text, "only-read-") {
+			t.Errorf("a file the child only read came back: %q", m.Text)
+		}
 	}
 	if n := strings.Count(strings.Join(prose, "\n"), "reading another file"); n > SubagentTailKept {
 		t.Errorf("the middle's prose came back with the edits: %d turns", n)
