@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `deja doctor` reads a config with comments or trailing commas the way the client does, so an opencode MCP entry whose deja binary is gone is reported as such (`binary_missing`) instead of `wired` when `opencode.json` carries a comment (#4197).
+- `deja doctor` reads a config with comments, trailing commas or a byte-order mark, so an opencode MCP entry whose deja binary is gone is reported as such (`binary_missing`) instead of `wired` when `opencode.json` carries a comment (#4197).
 - Cursor CLI sessions carry what their tools returned: the command output and the exit status of a failed command, read from the chat store beside the transcript, which records only the calls. On the machine this was measured on, tool output went from 0% of Cursor sessions to 53%. The index rebuilds once (#4187).
 - `deja resume` refuses a session whose transcript the agent has deleted, and points at `deja show`, which still has it; it printed a command the agent then failed ("No saved session found" from Codex). An archived or compressed Codex rollout still resumes (#4185).
 - `deja uninstall codex-auto` takes out the trust pins Codex wrote in `config.toml` when you approved deja's hooks, and moves the pins of your own hooks to where those hooks now sit. Left behind, they kept the file from coming back as it was and let a reinstall start already trusted (#4183).

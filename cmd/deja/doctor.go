@@ -1415,7 +1415,7 @@ func dejaCommandMissing(path string) string {
 // thing in TOML, YAML and JSONC, and adding a parser per format to answer one
 // question is not worth the surface.
 func dejaCommandIn(path string) string {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return ""
 	}
@@ -1503,7 +1503,7 @@ func dejaCommandIn(path string) string {
 func mcpServerMaps(root map[string]any) []map[string]any {
 	var out []map[string]any
 	// context_servers is Zed's spelling of the same map (#3683).
-	for _, key := range []string{"mcpServers", "mcp", "servers", "context_servers"} {
+	for _, key := range []string{"mcpServers", "mcp", "servers", "context_servers", ampServersKey} {
 		m, _ := root[key].(map[string]any)
 		if m == nil {
 			continue
@@ -1523,9 +1523,9 @@ var quotedPathUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
 
 // commandValue matches a `command` or `cmd` key and the value after it, in the
 // three shapes these configs come in: JSON and JSONC quote the key, TOML uses
-// `=`, YAML uses `:` and quotes nothing. A JSONC file that will not parse as
-// JSON — zed's settings, which carry comments — reaches this too, so the whole
-// text is scanned rather than a line at a time.
+// `=`, YAML uses `:` and quotes nothing. A file that does not parse even as
+// JSONC — JSON5, YAML, TOML — reaches this too, so the whole text is scanned
+// rather than a line at a time.
 var commandValue = regexp.MustCompile(`"?(?:command|cmd)"?\s*[:=]\s*(?:"([^"\n]*)"|'([^'\n]*)'|([^",\n}]+))`)
 
 // mcpEntryDejaCommand is mcpEntryRunsDeja's answer to "which one": the same
@@ -1668,9 +1668,9 @@ func dejaBlockOpens(trimmed string) (opens, beside bool) {
 		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
 		return true, true
 	}
-	// A quoted JSON key, for the files that do not parse as JSON: Zed's
-	// settings carry comments, so the whole text is read a line at a time, and
-	// its server key is `deja-context-server` rather than `deja` (#3683).
+	// A quoted JSON key, for the files that do not parse even as JSONC, which
+	// are read a line at a time; Zed's server key is `deja-context-server`
+	// rather than `deja` (#3683).
 	if key, ok := jsonKeyOpening(trimmed); ok && strings.HasPrefix(strings.ToLower(key), "deja") {
 		return true, false
 	}
@@ -1786,7 +1786,7 @@ func dshPatchPath() string {
 // key: dsh has no MCP config of its own, it has an ordered list of patch
 // entries, and deja's is `mcp-deja`.
 func doctorDSHWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1796,7 +1796,7 @@ func doctorDSHWired(path string) bool {
 // doctorZCodeWired reads `mcp.servers`, one level deeper than the `mcpServers`
 // the rest of this table uses.
 func doctorZCodeWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1877,7 +1877,7 @@ func vsCodeExtensionMCPPath(extension string) string {
 // the two halves were given the same id. A machine that has not reinstalled
 // since is still wired, and should not be told otherwise.
 func doctorZedWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1914,7 +1914,7 @@ func doctorOpencodeConfigPath() string {
 
 // doctorOpenClawWired checks openclaw.json's nested mcp.servers map.
 func doctorOpenClawWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1959,7 +1959,7 @@ func doctorJSONWired(key string) func(string) bool {
 
 func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bool {
 	return func(path string) bool {
-		b, err := os.ReadFile(path)
+		b, err := readConfig(path)
 		if err != nil {
 			return false
 		}
@@ -1996,7 +1996,7 @@ func doctorJSONDejaKeys(key string) func(string) []string {
 
 func doctorJSONDejaKeysIn(pick func(map[string]any) map[string]any) func(string) []string {
 	return func(path string) []string {
-		b, err := os.ReadFile(path)
+		b, err := readConfig(path)
 		if err != nil {
 			return nil
 		}
@@ -2061,7 +2061,7 @@ func doctorTOMLWired(path string) bool {
 // say — is not MCP wiring; and args count as well as command, since Windows
 // wiring runs deja behind a `cmd /c` shim.
 func doctorTOMLDejaKeys(path string) []string {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return nil
 	}
