@@ -3729,6 +3729,22 @@ func jsoncFirstCodeLine(body []string) int {
 	return -1
 }
 
+// jsoncCommentAbove walks back from line i over the `//` lines directly above
+// it: a comment there is about that entry, and an entry written between the
+// two took it over (#4203). A line inside a block comment is not one of them.
+func jsoncCommentAbove(body []string, i int) int {
+	opensInBlock := make([]bool, len(body))
+	inBlock := false
+	for j, line := range body {
+		opensInBlock[j] = inBlock
+		_, inBlock, _ = jsoncCodeOf(line, inBlock)
+	}
+	for i > 0 && !opensInBlock[i-1] && strings.HasPrefix(strings.TrimSpace(body[i-1]), "//") {
+		i--
+	}
+	return i
+}
+
 // jsoncLastCodeLine finds the last line of a .jsonc block that a parser would
 // read as code, and where that code ends on it. It returns -1 when the block
 // holds nothing but comments and blank lines.
@@ -4136,7 +4152,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			at := len(body)
 			if i := jsoncFirstCodeLine(body); i >= 0 {
 				entry += ","
-				at = i
+				at = jsoncCommentAbove(body, i)
 			}
 			body = append(body[:at:at], append([]string{entry}, body[at:]...)...)
 		}
