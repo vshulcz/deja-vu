@@ -326,6 +326,9 @@ type doctorMCPStatus struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
 	Path  string `json:"path"`
+	// BinaryMissing is the auto_recall field of the same name: the entry is
+	// wired and names a deja binary that is no longer there (#4177).
+	BinaryMissing bool `json:"binary_missing,omitempty"`
 }
 
 type doctorCommandStatus struct {
@@ -911,7 +914,13 @@ func collectDoctorMCP() []doctorMCPStatus {
 				state = "wired"
 			}
 		}
-		out = append(out, doctorMCPStatus{Name: config.name, State: state, Path: config.path})
+		row := doctorMCPStatus{Name: config.name, State: state, Path: config.path}
+		// The check the text report has made since #2216: declared is not the
+		// same as able to start.
+		if state == "wired" && dejaCommandMissing(config.path) != "" {
+			row.BinaryMissing = true
+		}
+		out = append(out, row)
 	}
 	return out
 }

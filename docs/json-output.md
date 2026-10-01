@@ -526,7 +526,9 @@ entry: `untrusted` (codex has never been shown it and runs no hook at all) or
 `disabled`.
 
 `mcp` rows are `wired`, `not-wired` (the config file is there without a deja
-server in it) or `config-missing`.
+server in it) or `config-missing`. A `wired` row carries `binary_missing` when
+its entry names a deja binary that is no longer there, so the harness cannot
+start the server.
 
 `commands` is the third thing an install writes: the `/deja` a user types, one
 row per harness. `state` is `written`, `missing`, `someone else's` for a file
