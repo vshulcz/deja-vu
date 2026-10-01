@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/testenv"
 )
 
 func TestMain(m *testing.M) {
@@ -24,6 +26,7 @@ func TestMain(m *testing.M) {
 		"XDG_CONFIG_HOME":         "",
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
+		"LOCALAPPDATA":            filepath.Join(root, "AppData", "Local"),
 		// A developer with DEJA_INDEX_DIR exported reads their own index
 		// here, and the suite went red on their machine only.
 		"DEJA_INDEX_DIR":       "",
@@ -50,11 +53,8 @@ func TestMain(m *testing.M) {
 	// time.Local under -race (#2206). A test that wants the real path can put
 	// it back for itself.
 	doctorLookup = offlineLookup
-	for key, value := range stores {
-		if err := os.Setenv(key, value); err != nil {
-			panic(err)
-		}
-	}
+	// DEJA_NO_HOME_ARGS is how TestNoHomeHelperProcess reaches its own child.
+	testenv.Scrub(stores, "DEJA_NO_HOME_ARGS")
 	code := m.Run()
 	_ = os.RemoveAll(root)
 	os.Exit(code)

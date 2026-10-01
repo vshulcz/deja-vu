@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/testenv"
 )
 
 func TestMain(m *testing.M) {
@@ -51,11 +52,9 @@ func TestMain(m *testing.M) {
 		"DEJA_GROK_ROOT":        filepath.Join(root, "grok"),
 		"DEJA_QWEN_ROOT":        filepath.Join(root, "qwen"),
 	}
-	for key, value := range stores {
-		if err := os.Setenv(key, value); err != nil {
-			panic(err)
-		}
-	}
+	// DEJA_PASS_* carry a parent's stores into the child it spawns
+	// (cross_process_pass_test.go); DEJA492_* opt into the real-corpus test.
+	testenv.Scrub(stores, "DEJA_PASS_", "DEJA492_")
 	code := m.Run()
 	_ = os.RemoveAll(root)
 	os.Exit(code)
