@@ -64,9 +64,12 @@
 <h2 id="resume">Resume</h2>
 <p>CLI chats only. A transcript is named after the chat id <code>cursor-agent --resume</code></p>
 <p>takes, and the command runs in the project directory because Cursor lists chats</p>
-<p>per workspace — deja prints <code>cd &lt;project&gt; &amp;&amp; cursor-agent --resume &lt;id&gt;</code>, the</p>
-<p>directory recovered from the encoded path (Cursor writes it without the leading</p>
-<p>separator, <code>Users-x-app</code>). Live-verified: the resumed chat answered from its own</p>
+<p>per workspace — it looks a chat up under <code>chats/&lt;md5 of the cwd&gt;/&lt;id&gt;</code> — so deja</p>
+<p>prints <code>cd &lt;project&gt; &amp;&amp; cursor-agent --resume &lt;id&gt;</code>, the directory read from the</p>
+<p>chat&#39;s <code>meta.json</code>, whose folder is that md5. The encoded transcript folder is</p>
+<p>only the fallback: it blanks a dot, a space or a non-ASCII character and cuts a</p>
+<p>long path with a hash, so it cannot be read back for those. A chat whose</p>
+<p>directory is gone is refused with <code>deja show</code> instead. Live-verified: the resumed chat answered from its own</p>
 <p>history. IDE chats carry a composer id from <code>state.vscdb</code> that the CLI does not</p>
 <p>take, so those still reopen only in the editor.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>

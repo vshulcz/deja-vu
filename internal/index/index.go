@@ -320,7 +320,11 @@ import (
 // [A-Za-z0-9] took its project from the folder name, where those characters
 // are blanked, and landed under the parent; it now reads the recorded cwd
 // (#4175). Projects are set when a transcript is read, so a rebuild.
-const version = 56
+//
+// 57: a Cursor CLI session takes its project from the chat's meta.json cwd;
+// the folder name blanks a dot, a space or a non-ASCII character, so those
+// were filed under a split or empty name (#4193). A rebuild.
+const version = 57
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

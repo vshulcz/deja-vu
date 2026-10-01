@@ -52,9 +52,12 @@ deja does not read it, because on the machine where it was decoded reading it ad
 
 CLI chats only. A transcript is named after the chat id `cursor-agent --resume`
 takes, and the command runs in the project directory because Cursor lists chats
-per workspace — deja prints `cd <project> && cursor-agent --resume <id>`, the
-directory recovered from the encoded path (Cursor writes it without the leading
-separator, `Users-x-app`). Live-verified: the resumed chat answered from its own
+per workspace — it looks a chat up under `chats/<md5 of the cwd>/<id>` — so deja
+prints `cd <project> && cursor-agent --resume <id>`, the directory read from the
+chat's `meta.json`, whose folder is that md5. The encoded transcript folder is
+only the fallback: it blanks a dot, a space or a non-ASCII character and cuts a
+long path with a hash, so it cannot be read back for those. A chat whose
+directory is gone is refused with `deja show` instead. Live-verified: the resumed chat answered from its own
 history. IDE chats carry a composer id from `state.vscdb` that the CLI does not
 take, so those still reopen only in the editor.
 

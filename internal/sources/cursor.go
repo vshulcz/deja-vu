@@ -455,6 +455,9 @@ func cursorTurnTime(text string) (time.Time, bool) {
 // back to a path with a greedy existence-checked walk; hyphens in real dir
 // names survive because the literal branch is tried when the split fails.
 func cursorTranscriptProject(path string) string {
+	if cwd := CursorChatCWD(path); cwd != "" {
+		return projectName(cwd)
+	}
 	dir := filepath.Clean(path)
 	for !strings.EqualFold(filepath.Base(filepath.Dir(dir)), "projects") {
 		parent := filepath.Dir(dir)
