@@ -209,8 +209,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	// A child run comes in as the task it was handed and the answer it came
-	// back with, unless the reader asked for the whole thing (#3009).
+	// A child run comes in as the task it was handed, the answer it came back
+	// with and what it changed, unless the reader asked for the whole thing
+	// (#3009, #4163).
 	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}

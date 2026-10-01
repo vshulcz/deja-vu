@@ -12,6 +12,7 @@ import (
 // listed it (#4164). The scratch files under .claude/ still stay out.
 func TestFilesInAClaudeWorktreeCountAsTouched(t *testing.T) {
 	wt := "/repo/.claude/worktrees/agent-a1/apps/promptidea/idea.go"
+	nested := "/repo/.claude/worktrees/agent-a1/.claude/worktrees/agent-b2/pkg/pool.go"
 	ms := []model.Message{
 		{Role: roleFiles, Text: wt},
 		{Role: roleFiles, Text: wt},
@@ -19,9 +20,11 @@ func TestFilesInAClaudeWorktreeCountAsTouched(t *testing.T) {
 		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/.git/HEAD"},
 		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/build.log"},
 		{Role: roleFiles, Text: "/repo/.claude/worktrees/agent-a1/node_modules/x/index.js"},
+		{Role: roleFiles, Text: nested},
+		{Role: roleFiles, Text: nested},
 	}
 	got := topTouchedFiles(ms)
-	if len(got) != 1 || got[0] != wt {
-		t.Fatalf("touched = %q, want only the worktree source file", got)
+	if len(got) != 2 || got[0] != wt && got[1] != wt {
+		t.Fatalf("touched = %q, want the two worktree source files", got)
 	}
 }

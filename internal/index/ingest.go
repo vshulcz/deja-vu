@@ -2176,9 +2176,7 @@ func agentOwnedFile(p string) bool {
 	// and holds the repository's own source: the edits in it are the work,
 	// not the agent's bookkeeping. Only the .claude/ segment is forgiven;
 	// every other rule still applies inside it (#4164).
-	if i := strings.Index(p, "/.claude/worktrees/"); i >= 0 {
-		p = p[:i] + "/" + p[i+len("/.claude/worktrees/"):]
-	}
+	p = strings.ReplaceAll(p, "/.claude/worktrees/", "/")
 	for _, seg := range []string{"/scratchpad/", "/tasks/", "/.claude/", "/.cache/", "/claude-501/", "/node_modules/", "/.git/"} {
 		if strings.Contains(p, seg) {
 			return true

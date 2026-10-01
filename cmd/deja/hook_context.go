@@ -1044,7 +1044,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 	// A subagent run is the parent's work seen from inside, and what it says
 	// on its own is the process talk a spawned agent produces — "Sending
 	// verdict", "Worktrees cleaned up". Indexing already treats these runs as
-	// secondary (#3009 keeps only the task and the answer); the digest picked
+	// secondary (#3009 keeps the task, the answer and the edits); the digest picked
 	// them like any other session and let one lead the block ahead of the
 	// session that settled the work (#3368). Kept only when the project has
 	// nothing else: a subagent's transcript still beats an empty digest.

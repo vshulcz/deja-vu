@@ -192,20 +192,34 @@ func KeepSubagentTail(ms []model.Message) []model.Message {
 		return ms
 	}
 	tail := len(ms) - SubagentTailKept
-	// A files record names everything a turn opened, reads included, so it is
-	// kept only for a turn that also changed something: the read-only
-	// exploring a subagent does stays out with the prose.
-	changed := map[int64]bool{}
+	// A files record names everything a turn opened, reads included, so only
+	// the paths the child changed are kept from it — the ones an edit or a
+	// write in the middle names on its first line. The read-only exploring a
+	// subagent does stays out with the prose.
+	changed := map[string]bool{}
 	for _, m := range ms[1:tail] {
 		if m.Role == RoleEdit || m.Role == RoleWrote {
-			changed[m.Time.UnixNano()] = true
+			path, _, _ := strings.Cut(m.Text, "\n")
+			changed[path] = true
 		}
 	}
 	kept := make([]model.Message, 0, SubagentTailKept+1)
 	kept = append(kept, ms[0])
 	for _, m := range ms[1:tail] {
-		if m.Role == RoleEdit || m.Role == RoleWrote || (m.Role == RoleFiles && changed[m.Time.UnixNano()]) {
+		switch m.Role {
+		case RoleEdit, RoleWrote:
 			kept = append(kept, m)
+		case RoleFiles:
+			var paths []string
+			for _, p := range strings.Split(m.Text, "\n") {
+				if changed[p] {
+					paths = append(paths, p)
+				}
+			}
+			if len(paths) > 0 {
+				m.Text = strings.Join(paths, "\n")
+				kept = append(kept, m)
+			}
 		}
 	}
 	return append(kept, ms[tail:]...)

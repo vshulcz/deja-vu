@@ -42,6 +42,7 @@ func TestASubagentKeepsItsEditsWhenItsMiddleIsCut(t *testing.T) {
 			map[string]any{"type": "text", "text": "reading another file"},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("t%d", i), "name": "Edit", "input": map[string]any{
 				"file_path": "/repo/idea.go", "old_string": fmt.Sprintf("old line %d", i), "new_string": fmt.Sprintf("\tSource Source // set to USER for every idea published from bot %d", i)}},
+			map[string]any{"type": "tool_use", "id": fmt.Sprintf("m%d", i), "name": "Read", "input": map[string]any{"file_path": fmt.Sprintf("/repo/only-read-beside-%d.go", i)}},
 			map[string]any{"type": "tool_use", "id": fmt.Sprintf("b%d", i), "name": "Bash", "input": map[string]any{"command": fmt.Sprintf("go test ./... # %d", i)}},
 		}, i)
 		body += rec("user", []any{map[string]any{"type": "tool_result", "tool_use_id": fmt.Sprintf("b%d", i), "content": "ok  repo 0.1s"}}, i)
