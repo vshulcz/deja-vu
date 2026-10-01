@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A VS Code Copilot Chat session stays in the index while VS Code is writing its last line; a half-written tail used to drop the whole chat from search and `show` until the next pass (#4229).
 - A failed Gemini CLI command is indexed with its exit status (`$ git log …  → exit 128`), the way Codex, opencode and Cursor commands are, so the failed-command recall sees it. The index rebuilds once (#4208).
 - `deja resume` refuses an opencode or Kilo CLI session that was deleted in the agent and points at `deja show`; it printed `opencode -s <id>`, which failed with "Session not found" (#4205).
 - `deja install opencode-auto` writes its entry above the comment on your first MCP server instead of between the two, where the comment read as describing deja (#4203).
