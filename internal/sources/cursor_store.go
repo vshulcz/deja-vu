@@ -1,9 +1,11 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -18,95 +20,131 @@ import (
 // the chat's store.db beside it (see cursor_chats.go for the layout), so a
 // Cursor session was indexed as a list of commands nobody knew the outcome of
 // — `deja fix`, the post-command hook and `deja tests` read exactly that
-// (#4187). The transcript's tool_use parts carry no id, so a call is paired
-// with the store's by its tool name and arguments, the earliest unused first;
-// the store also holds calls the transcript leaves out (GetDynamicTools), so
-// position alone would pair the wrong ones.
+// (#4187).
+//
+// The transcript's tool_use parts carry no id, so a call is paired with the
+// store's by its tool name and arguments. The store also holds calls the
+// transcript leaves out (GetDynamicTools), so position alone would pair the
+// wrong ones; and the store is only the chat's latest branch, so a call it
+// lost to a rewind must not take the result of a later identical one. Pairing
+// walks both in order and only forward: each transcript call takes the next
+// matching store call after the last one paired.
 
 // cursorToolResult is one call from the store with what it returned.
 type cursorToolResult struct {
 	key  string // tool name and canonical arguments
 	text string
-	used bool
 }
 
-// cursorToolResults is a chat's calls in the order they were made.
-type cursorToolResults []*cursorToolResult
+// cursorToolResults is a chat's calls in the order they were made, and how far
+// pairing has got through them.
+type cursorToolResults struct {
+	calls []cursorToolResult
+	next  int
+}
 
-// take returns the result of the earliest unused call with this name and
-// these arguments.
-func (rs cursorToolResults) take(name string, args map[string]any) (string, bool) {
+// take returns the result of the next call after the last one paired with
+// this name and these arguments.
+func (rs *cursorToolResults) take(name string, args map[string]any) (string, bool) {
+	if rs == nil {
+		return "", false
+	}
 	k := cursorCallKey(name, args)
-	for _, r := range rs {
-		if !r.used && r.key == k {
-			r.used = true
-			return r.text, true
+	for i := rs.next; i < len(rs.calls); i++ {
+		if rs.calls[i].key == k {
+			rs.next = i + 1
+			return rs.calls[i].text, true
 		}
 	}
 	return "", false
 }
 
+// cursorCallKey is a call's name and arguments as one comparable string. Both
+// sides decode numbers as json.Number, so `1e21` marshals back as written on
+// each, and map keys marshal sorted.
 func cursorCallKey(name string, args map[string]any) string {
-	b, _ := json.Marshal(args) // map keys marshal sorted
+	b, _ := json.Marshal(args)
 	return name + "\x00" + string(b)
 }
 
+// cursorDiscoveryTools are calls Cursor makes to list what an MCP server
+// offers. Their results are the servers' own descriptions — deja's among them
+// — and indexing those would put deja's text in every session that used it.
+var cursorDiscoveryTools = map[string]bool{"GetMcpTools": true, "GetDynamicTools": true}
+
 // cursorStoreFor finds the store.db of the chat a transcript belongs to: the
-// chat id is the transcript's name.
+// chat id is the transcript's name. A chat id under two workspace hashes — a
+// copied ~/.cursor — takes the store written last.
 func cursorStoreFor(transcript string) string {
 	id := strings.TrimSuffix(filepath.Base(transcript), ".jsonl")
-	if id == "" || strings.ContainsAny(id, `*?[\/`) {
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
 		return ""
 	}
-	m, _ := filepath.Glob(filepath.Join(CursorCLIRoot(), "chats", "*", id, "store.db"))
-	if len(m) == 0 {
+	chats := filepath.Join(CursorCLIRoot(), "chats")
+	ws, err := os.ReadDir(chats)
+	if err != nil {
 		return ""
 	}
-	return m[0]
+	best := ""
+	var bestTime time.Time
+	for _, w := range ws {
+		if !w.IsDir() {
+			continue
+		}
+		p := filepath.Join(chats, w.Name(), id, "store.db")
+		fi, err := os.Stat(p)
+		if err != nil || !fi.Mode().IsRegular() {
+			continue
+		}
+		if best == "" || fi.ModTime().After(bestTime) {
+			best, bestTime = p, fi.ModTime()
+		}
+	}
+	return best
 }
 
 // cursorStoreResults reads a chat store's tool calls and their results in
-// message order. Anything it cannot read — a store that is encrypted, a
-// tree in another shape — yields nothing, and the session keeps what the
+// message order. Anything it cannot read — a store that is encrypted, a tree
+// in another shape — yields nothing, and the session keeps what the
 // transcript has.
-func cursorStoreResults(db string) cursorToolResults {
-	rows, err := cursorQuery(db, `SELECT json_object('v', CAST(value AS TEXT)) FROM meta`)
+func cursorStoreResults(db string) *cursorToolResults {
+	if db == "" {
+		return nil
+	}
+	root := cursorStoreRoot(db)
+	if root == "" {
+		return nil
+	}
+	rows, err := cursorQuery(db, `SELECT json_object('h', hex(data)) FROM blobs WHERE lower(id) = '`+root+`'`)
+	if err != nil || len(rows) == 0 {
+		return nil
+	}
+	h, _ := rows[0]["h"].(string)
+	rootBlob, err := hex.DecodeString(h)
 	if err != nil {
 		return nil
 	}
-	root := ""
+	// Only the messages that hold a tool part, as text: the store keeps every
+	// root the chat ever had, and each lists every message before it, so
+	// reading all of it grows with the square of the chat's length. The
+	// filter is the bytes `"tool-`.
+	rows, err = cursorQuery(db, `SELECT json_object('id', lower(id), 'd', CAST(data AS TEXT)) FROM blobs WHERE instr(data, X'22746F6F6C2D') > 0`)
+	if err != nil {
+		return nil
+	}
+	data := make(map[string]string, len(rows))
 	for _, r := range rows {
-		v, _ := r["v"].(string)
-		b, err := hex.DecodeString(strings.TrimSpace(v))
-		if err != nil {
-			b = []byte(v)
-		}
-		var meta struct {
-			Root string `json:"latestRootBlobId"`
-		}
-		if json.Unmarshal(b, &meta) == nil && meta.Root != "" {
-			root = meta.Root
-			break
-		}
-	}
-	if root == "" || !isHexID(root) {
-		return nil
-	}
-	blobs, err := cursorQuery(db, `SELECT json_object('id', id, 'h', hex(data)) FROM blobs`)
-	if err != nil {
-		return nil
-	}
-	data := make(map[string][]byte, len(blobs))
-	for _, r := range blobs {
 		id, _ := r["id"].(string)
-		h, _ := r["h"].(string)
-		if b, err := hex.DecodeString(h); err == nil {
-			data[strings.ToLower(id)] = b
-		}
+		d, _ := r["d"].(string)
+		data[id] = d
 	}
-	var out cursorToolResults
-	calls := map[string]*cursorToolResult{}
-	for _, child := range protoChildIDs(data[strings.ToLower(root)]) {
+	out := &cursorToolResults{}
+	calls := map[string]int{}
+	for _, child := range protoChildIDs(rootBlob) {
+		d, ok := data[child]
+		if !ok {
+			continue
+		}
 		var msg struct {
 			Content []struct {
 				Type       string          `json:"type"`
@@ -116,22 +154,49 @@ func cursorStoreResults(db string) cursorToolResults {
 				Result     json.RawMessage `json:"result"`
 			} `json:"content"`
 		}
-		if json.Unmarshal(data[child], &msg) != nil {
+		dec := json.NewDecoder(strings.NewReader(d))
+		dec.UseNumber()
+		if dec.Decode(&msg) != nil {
 			continue
 		}
 		for _, p := range msg.Content {
+			if p.ToolCallID == "" {
+				continue
+			}
+			i, seen := calls[p.ToolCallID]
 			switch {
-			case p.ToolCallID == "":
-			case p.Type == "tool-call" && calls[p.ToolCallID] == nil:
-				r := &cursorToolResult{key: cursorCallKey(p.ToolName, p.Args)}
-				calls[p.ToolCallID] = r
-				out = append(out, r)
-			case p.Type == "tool-result" && calls[p.ToolCallID] != nil:
-				calls[p.ToolCallID].text = cursorResultText(p.Result)
+			case p.Type == "tool-call" && !seen:
+				calls[p.ToolCallID] = len(out.calls)
+				out.calls = append(out.calls, cursorToolResult{key: cursorCallKey(p.ToolName, p.Args)})
+			case p.Type == "tool-result" && seen && !cursorDiscoveryTools[p.ToolName]:
+				out.calls[i].text = cursorResultText(p.Result)
 			}
 		}
 	}
 	return out
+}
+
+// cursorStoreRoot is the id of the chat's latest root blob, from meta's
+// hex-encoded JSON.
+func cursorStoreRoot(db string) string {
+	rows, err := cursorQuery(db, `SELECT json_object('v', CAST(value AS TEXT)) FROM meta`)
+	if err != nil {
+		return ""
+	}
+	for _, r := range rows {
+		v, _ := r["v"].(string)
+		b, err := hex.DecodeString(strings.TrimSpace(v))
+		if err != nil {
+			b = []byte(v)
+		}
+		var meta struct {
+			Root string `json:"latestRootBlobId"`
+		}
+		if json.Unmarshal(b, &meta) == nil && isHexID(meta.Root) {
+			return strings.ToLower(meta.Root)
+		}
+	}
+	return ""
 }
 
 func isHexID(s string) bool {
@@ -203,7 +268,7 @@ func cursorResultText(raw json.RawMessage) string {
 	if json.Unmarshal(raw, &s) == nil {
 		return s
 	}
-	return strings.TrimSpace(string(raw))
+	return string(bytes.TrimSpace(raw))
 }
 
 // cursorShellExit reads the status Cursor writes at the top of a Shell
@@ -234,24 +299,26 @@ func cursorExitCode(text string) (int, bool) {
 //
 //	Shell state (cwd, env vars) persists for subsequent calls.
 //
-// The output is cut at the last fence, so a fence the command printed itself
-// stays in.
+// The fence is cut at its own length, from the end, so a fence the command
+// printed itself stays in.
 func cursorShellOutput(text string) string {
 	t := strings.TrimSpace(text)
-	i := strings.Index(t, "Command output:")
-	if i < 0 {
-		return t
+	if i := strings.Index(t, "Command output:"); i >= 0 {
+		t = strings.TrimSpace(t[i+len("Command output:"):])
+	} else if loc := cursorShellExit.FindStringIndex(t); loc != nil {
+		t = strings.TrimSpace(t[loc[1]:])
 	}
-	t = strings.TrimSpace(t[i+len("Command output:"):])
-	if strings.HasPrefix(t, "```") {
-		t = t[len("```"):]
-		if j := strings.LastIndex(t, "```"); j >= 0 {
+	if n := len(t) - len(strings.TrimLeft(t, "`")); n >= 3 {
+		fence := t[:n]
+		t = t[n:]
+		if j := strings.LastIndex(t, fence); j >= 0 {
 			t = t[:j]
 		}
 	}
 	return strings.TrimSpace(t)
 }
 
+// cursorCallsTools reports whether a turn holds a tool call.
 func cursorCallsTools(content any) bool {
 	items, _ := content.([]any)
 	for _, it := range items {
@@ -263,9 +330,9 @@ func cursorCallsTools(content any) bool {
 }
 
 // cursorToolTurn records one assistant turn's commands and, from the store,
-// what each call returned: a failed command's exit status on the command, and
-// the output itself as tool output.
-func cursorToolTurn(s *model.Session, content any, results cursorToolResults, at time.Time) {
+// what each call returned: the exit status on the command, as Claude's are,
+// and the output itself as tool output.
+func cursorToolTurn(s *model.Session, content any, results *cursorToolResults, at time.Time) {
 	items, _ := content.([]any)
 	for _, it := range items {
 		name, in, ok := toolPart(it, cursorDialect)
@@ -287,7 +354,7 @@ func cursorToolTurn(s *model.Session, content any, results cursorToolResults, at
 			continue
 		}
 		if shell {
-			if code, ok := cursorExitCode(out); ok && code > 0 && cmdAt >= 0 {
+			if code, ok := cursorExitCode(out); ok && cmdAt >= 0 {
 				s.Messages[cmdAt].Text += fmt.Sprintf("  → exit %d", code)
 			}
 			out = cursorShellOutput(out)

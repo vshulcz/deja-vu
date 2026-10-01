@@ -252,6 +252,7 @@
         "${XDG_CONFIG_HOME}/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "%APPDATA%/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl",
+        "${CURSOR_CONFIG_DIR:-~/.cursor}/chats/*/*/store.db",
         "${DEJA_CURSOR_ROOT}",
         "${DEJA_CURSOR_CLI_ROOT}"
       ],
@@ -269,7 +270,7 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "sqlite3 (IDE chats)"
+        "prereq": "sqlite3 (IDE chats, CLI tool output)"
       },
       "gaps": {}
     },

@@ -366,8 +366,8 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 	at := fileTime
 	stamped := false
 	// The chat store's results, read on the first turn that calls a tool.
-	var results cursorToolResults
-	read := false
+	var results *cursorToolResults
+	read := !IndexCommands() && !IndexToolOutput()
 	err = scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role != "user" && role != "assistant" {
