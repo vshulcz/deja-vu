@@ -366,8 +366,7 @@ func HarnessKeptCounts(dir string) map[string]int {
 			_, err := os.Stat(meta.Path)
 			g = os.IsNotExist(err)
 			if g {
-				_, derr := os.Stat(filepath.Dir(meta.Path))
-				g = derr == nil
+				g = deletedFromLiveStore(meta.Path)
 			}
 			gone[meta.Path] = g
 		}
