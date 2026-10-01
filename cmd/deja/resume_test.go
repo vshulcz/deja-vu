@@ -251,13 +251,19 @@ func TestResumeGeminiRunsInTheProjectDirectory(t *testing.T) {
 	if err != nil || cmd != "gemini --resume a5bc80ac-786c" || dir != work {
 		t.Fatalf("resume = (%q, %q, %v), want the command run in %q", dir, cmd, err, work)
 	}
-	// projects.json maps the same folder; it wins when the two disagree.
+	// projects.json is the fallback when the folder keeps no .project_root.
 	other := filepath.Join(t.TempDir(), "other")
 	if err := os.MkdirAll(other, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	reg := `{"projects":{` + jsonString(other) + `:"app"}}`
 	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(reg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if dir, _, _ := resumeCommand(s); dir != work {
+		t.Fatalf("dir = %q, want .project_root's %q over the registry", dir, work)
+	}
+	if err := os.Remove(filepath.Join(root, "tmp", "app", ".project_root")); err != nil {
 		t.Fatal(err)
 	}
 	if dir, _, _ := resumeCommand(s); dir != other {

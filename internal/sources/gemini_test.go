@@ -168,3 +168,56 @@ func TestGeminiResumeSnapshotKeepsTheHookedPrompt(t *testing.T) {
 		t.Fatalf("turns out of order: %s", got)
 	}
 }
+
+// Compression, a split tool turn and a turn rewritten under its id all reach
+// the reader as Gemini's own history; the snapshot is taken in its order and
+// nothing is doubled (#4214 review).
+func TestGeminiSnapshotsFollowGeminisHistory(t *testing.T) {
+	_, chats := geminiTree(t)
+	parse := func(name, lines string) string {
+		t.Helper()
+		p := filepath.Join(chats, name)
+		if err := os.WriteFile(p, []byte(lines), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ss, err := ParseGeminiFile(p)
+		if err != nil || len(ss) != 1 {
+			t.Fatalf("parse %s: %v, %d sessions", name, err, len(ss))
+		}
+		var all []string
+		for _, m := range ss[0].Messages {
+			all = append(all, m.Text)
+		}
+		return strings.Join(all, " | ")
+	}
+	head := `{"sessionId":"s-%s","projectHash":"abc","startTime":"2026-10-01T13:00:00.000Z","lastUpdated":"2026-10-01T13:00:00.000Z","kind":"main"}` + "\n"
+	msg := func(id, typ, text string) string {
+		return `{"id":"` + id + `","timestamp":"2026-10-01T13:00:01.000Z","type":"` + typ + `","content":[{"text":"` + text + `"}]}`
+	}
+	set := func(ms ...string) string { return `{"$set":{"messages":[` + strings.Join(ms, ",") + `]}}` + "\n" }
+
+	// Compression: the kept tail comes back under new ids.
+	got := parse("session-2026-10-01T13-00-s-compress.jsonl", strings.Replace(head, "%s", "compress", 1)+
+		msg("u1", "user", "first question alpha")+"\n"+msg("g1", "gemini", "first answer alpha")+"\n"+
+		msg("u2", "user", "second question beta")+"\n"+msg("g2", "gemini", "second answer beta")+"\n"+
+		set(msg("n1", "user", "summary of earlier"), msg("n2", "user", "second question beta"), msg("n3", "gemini", "second answer beta"))+
+		msg("u3", "user", "third")+"\n")
+	if strings.Count(got, "second question beta") != 1 || !strings.HasSuffix(got, "third") {
+		t.Errorf("compression doubled the tail: %s", got)
+	}
+
+	// A turn new to the snapshot lands where the snapshot puts it.
+	got = parse("session-2026-10-01T13-00-s-split.jsonl", strings.Replace(head, "%s", "split", 1)+
+		msg("q1", "user", "q one")+"\n"+msg("a1", "gemini", "a one")+"\n"+msg("q2", "user", "q two")+"\n"+
+		set(msg("q1", "user", "q one"), msg("mid", "gemini", "the middle"), msg("a1", "gemini", "a one"), msg("q2", "user", "q two")))
+	if got != "q one | the middle | a one | q two" {
+		t.Errorf("snapshot order lost: %s", got)
+	}
+
+	// The same id written twice is one turn.
+	got = parse("session-2026-10-01T13-00-s-rewrite.jsonl", strings.Replace(head, "%s", "rewrite", 1)+
+		msg("q1", "user", "q one")+"\n"+msg("a1", "gemini", "thinking")+"\n"+msg("a1", "gemini", "the answer")+"\n")
+	if got != "q one | the answer" {
+		t.Errorf("a rewritten turn was kept twice: %s", got)
+	}
+}

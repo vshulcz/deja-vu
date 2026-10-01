@@ -140,6 +140,15 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 	var s model.Session
 	started := false
 	var msgs []geminiMessage
+	msgAt := map[string]int{} // id -> index in msgs, rebuilt when msgs is
+	reindex := func() {
+		msgAt = make(map[string]int, len(msgs))
+		for i, m := range msgs {
+			if m.ID != "" {
+				msgAt[m.ID] = i
+			}
+		}
+	}
 	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		if !started {
 			id, _ := m["sessionId"].(string)
@@ -179,6 +188,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 					}
 				}
 				msgs = mergeGeminiSnapshot(msgs, snap)
+				reindex()
 			}
 			return
 		}
@@ -186,6 +196,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 			for i := len(msgs) - 1; i >= 0; i-- {
 				if msgs[i].ID == rid {
 					msgs = msgs[:i]
+					reindex()
 					break
 				}
 			}
@@ -194,7 +205,15 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 		raw, _ := json.Marshal(m)
 		var gm geminiMessage
 		if json.Unmarshal(raw, &gm) == nil && gm.Type != "" {
-			msgs = append(msgs, gm)
+			// A turn written again under its id — a gemini turn once its
+			// toolCalls arrive — replaces the earlier line, as Gemini's own
+			// loader does.
+			if i, ok := msgAt[gm.ID]; ok && gm.ID != "" && i < len(msgs) && msgs[i].ID == gm.ID {
+				msgs[i] = gm
+			} else {
+				msgAt[gm.ID] = len(msgs)
+				msgs = append(msgs, gm)
+			}
 		}
 	})
 	if !started {
@@ -207,36 +226,56 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 	return []model.Session{s}, err
 }
 
-// mergeGeminiSnapshot folds a $set snapshot into the turns read so far: a
-// turn the snapshot carries takes the snapshot's copy, one it leaves out
-// stays where it was, and turns new to it follow in its order.
+// mergeGeminiSnapshot applies a $set snapshot to the turns read so far. The
+// snapshot is Gemini's own history and is taken in its order — compression,
+// rollback and masking all rewrite it that way — with one exception: on
+// --resume Gemini rebuilds history without the user turns its loader ignores
+// (isIgnoredUserContent: empty, or starting with <hook_context>,
+// <session_context>, / or ?), and a prompt deja's recall was prepended to is
+// one of them (#4214). Those turns go back in, before the next turn read
+// earlier that the snapshot kept.
 func mergeGeminiSnapshot(msgs, snap []geminiMessage) []geminiMessage {
 	if len(msgs) == 0 {
 		return snap
 	}
-	byID := map[string]geminiMessage{}
+	inSnap := map[string]bool{}
 	for _, m := range snap {
-		if m.ID == "" {
-			// Nothing to match turns by: the snapshot stands as written.
-			return snap
+		if m.ID != "" {
+			inSnap[m.ID] = true
 		}
-		byID[m.ID] = m
 	}
-	out := make([]geminiMessage, 0, len(msgs)+len(snap))
-	seen := map[string]bool{}
+	// Each dropped turn waits for the next old turn the snapshot still holds.
+	before := map[string][]geminiMessage{}
+	var tail, pending []geminiMessage
 	for _, m := range msgs {
-		if r, ok := byID[m.ID]; ok {
-			m = r
+		switch {
+		case m.ID != "" && inSnap[m.ID]:
+			if len(pending) > 0 {
+				before[m.ID] = append(before[m.ID], pending...)
+				pending = nil
+			}
+		case geminiResumeDrops(m):
+			pending = append(pending, m)
 		}
-		seen[m.ID] = true
+	}
+	tail = pending
+	out := make([]geminiMessage, 0, len(snap)+len(tail))
+	for _, m := range snap {
+		out = append(out, before[m.ID]...)
 		out = append(out, m)
 	}
-	for _, m := range snap {
-		if !seen[m.ID] {
-			out = append(out, m)
-		}
+	return append(out, tail...)
+}
+
+// geminiResumeDrops mirrors Gemini's isIgnoredUserContent: the user turns its
+// resume leaves out of the history it writes back.
+func geminiResumeDrops(m geminiMessage) bool {
+	if m.Type != "user" || m.ID == "" {
+		return false
 	}
-	return out
+	t := strings.TrimSpace(geminiContentText(m.Content))
+	return t == "" || strings.HasPrefix(t, "/") || strings.HasPrefix(t, "?") ||
+		strings.HasPrefix(t, "<session_context>") || strings.HasPrefix(t, "<hook_context>")
 }
 
 func geminiSessionShell(path, id, startTime, lastUpdated string) model.Session {
@@ -351,18 +390,19 @@ func geminiProjectName(path string) string {
 }
 
 // GeminiProjectDir is the directory a Gemini CLI session ran in, from the
-// store's own records: projects.json maps it to the project folder, and the
-// folder keeps it in .project_root. "" when neither names one — older stores
+// store's own records: the project folder keeps it in .project_root, and
+// projects.json maps it to the folder. "" when neither names one — older stores
 // key the folder by a hash of the path and keep nothing to invert.
 func GeminiProjectDir(path string) string {
 	idDir := geminiIDDir(path)
-	if dir := geminiProjectFromRegistry(filepath.Base(idDir)); dir != "" {
-		return dir
-	}
+	// .project_root first: Gemini treats it as the authority and deletes a
+	// projects.json entry that disagrees with it.
 	if b, err := os.ReadFile(filepath.Join(idDir, ".project_root")); err == nil {
-		return strings.TrimSpace(string(b))
+		if dir := strings.TrimSpace(string(b)); dir != "" {
+			return dir
+		}
 	}
-	return ""
+	return geminiProjectFromRegistry(filepath.Base(idDir))
 }
 
 // geminiIDDir is .../tmp/<id> for a chat file under it.
