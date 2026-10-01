@@ -294,7 +294,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	if workspace != "" {
 		s.Project = projectName(workspace)
 	} else if harness == "claude" {
-		s.Project = claudeProjectName(claudeProjectDir(originalPath))
+		s.Project = claudeProjectNameFor(originalPath)
 	} else {
 		s.Project = projectName(filepath.Dir(originalPath))
 	}

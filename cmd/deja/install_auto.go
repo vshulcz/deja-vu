@@ -67,6 +67,10 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
+	// What the file held before, for the trust pins below: a second parse
+	// rather than a copy, since the update edits the maps in place.
+	var before map[string]any
+	_ = json.Unmarshal(old, &before)
 	for _, h := range codexHookWiring {
 		updateCodexHook(root, h.Event, hookRun(exe, h.Sub), h.Matcher, uninstall)
 	}
@@ -79,6 +83,11 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
+	if err == nil && uninstall && a != "unchanged" {
+		// Codex's approval of each hook is pinned by position in its
+		// config.toml; see codex_hook_trust.go.
+		err = moveCodexHookTrust(path, before, root)
+	}
 	return installResult{Path: path, Action: a}, err
 }
 

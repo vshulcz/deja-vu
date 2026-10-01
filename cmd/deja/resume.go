@@ -339,11 +339,7 @@ func claudeProjectDirFor(s model.Session) string {
 	if s.Path == "" {
 		return ""
 	}
-	base := sources.ClaudeProjectDirBase(s.Path)
-	if base == "" {
-		return ""
-	}
-	return sources.ResolveEncodedPath(base)
+	return sources.ClaudeSessionDir(s.Path)
 }
 
 // qwenProjectDirFor recovers the original working directory from the
