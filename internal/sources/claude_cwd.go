@@ -105,7 +105,10 @@ func claudeProjectNameFor(path string) string {
 		}
 	}
 	if name == "" {
-		name = claudeProjectName(dir)
+		// Not cached: a new transcript's first line can be a snapshot with no
+		// cwd, and the decoded name kept for it would outlive the cwd landing
+		// in a long-lived process such as deja mcp (#4225).
+		return claudeProjectName(dir)
 	}
 	claudeCWDNameCache.Store(dir, name)
 	return name

@@ -128,3 +128,33 @@ func TestClaudeFolderIsFollowsClaudesEncoding(t *testing.T) {
 		t.Error("an unrelated cwd matched")
 	}
 }
+
+// A folder read before any of its transcripts carries cwd — a new session
+// whose only line is a file-history snapshot — is named from the folder for
+// that read only. Caching the decoded name kept a long-lived process such as
+// deja mcp filing the folder under its parent until restart (#4225).
+func TestAClaudeFolderReadBeforeItsCWDLandsIsNamedOnceItDoes(t *testing.T) {
+	home := t.TempDir()
+	work := filepath.Join(home, "w", "проект")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(home, "projects", claudeEncodePath(work))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claudeCWDNameCache = sync.Map{}
+	path := filepath.Join(dir, "aaaa.jsonl")
+	snap := `{"type":"file-history-snapshot","messageId":"m0","snapshot":{"trackedFileBackups":{}}}` + "\n"
+	if err := os.WriteFile(path, []byte(snap), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	claudeProjectNameFor(path)
+	user := `{"type":"user","cwd":` + jsonString(work) + `,"message":{"role":"user","content":"x"}}` + "\n"
+	if err := os.WriteFile(path, []byte(snap+user), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := claudeProjectNameFor(path); got != "w/проект" {
+		t.Errorf("after cwd landed the folder is %q, want w/проект", got)
+	}
+}
