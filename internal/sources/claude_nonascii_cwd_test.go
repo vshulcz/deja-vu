@@ -128,4 +128,3 @@ func TestClaudeFolderIsFollowsClaudesEncoding(t *testing.T) {
 		t.Error("an unrelated cwd matched")
 	}
 }
-
