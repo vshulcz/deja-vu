@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -202,5 +203,67 @@ func bumpMtime(t *testing.T, path string) {
 	later := time.Now().Add(2 * time.Second)
 	if err := os.Chtimes(path, later, later); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The original deleted — Gemini's own cleanup, or by hand — in the same pass
+// the stub arrives beside it. The stub is not the transcript moving: the
+// rename rule took it for one, the deleted file's records went, and the row
+// was left on a file with nothing in it, even after a rebuild.
+func TestGeminiResumeStubIsNotARenameOfADeletedTranscript(t *testing.T) {
+	// Alone, the pass takes the append path; with another Gemini transcript
+	// changed beside it, the replacement path and its rename rule.
+	for _, withChange := range []bool{false, true} {
+		t.Run(map[bool]string{false: "append path", true: "replacement path"}[withChange], func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			real := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
+			write(t, real, geminiOriginal()+geminiResumedTail())
+			other := filepath.Join(geminiChats(), "session-2026-09-30T10-00-0badc0de.jsonl")
+			otherHeader := `{"sessionId":"0badc0de","startTime":"2026-09-30T10:00:00Z","lastUpdated":"2026-09-30T10:00:00Z"}` + "\n"
+			write(t, other, otherHeader+`{"id":"o1","timestamp":"2026-09-30T10:00:01Z","type":"user","content":[{"text":"the cache warms on boot"}]}`+"\n")
+			dir := filepath.Join(tmp, "idx")
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(real); err != nil {
+				t.Fatal(err)
+			}
+			write(t, filepath.Join(geminiChats(), "session-2026-10-01T13-07-008140a7.jsonl"), geminiStub())
+			if withChange {
+				appendFile(t, other, `{"id":"o2","timestamp":"2026-09-30T10:00:02Z","type":"gemini","content":"It does."}`+"\n")
+				bumpMtime(t, other)
+			}
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			assertResumedSessionHeld(t, dir, real, "schema migration")
+			if err := Ensure(dir, "", true, nil); err != nil {
+				t.Fatal(err)
+			}
+			assertResumedSessionHeld(t, dir, real, "schema migration")
+		})
+	}
+}
+
+// The empty-transcript rule is for pairs that would be reported as a clash.
+// A store pair attributeSession already knows keeps its own answer, and a held
+// row with text but no words (emoji, punctuation) is still a conversation.
+func TestClaimSessionOnlyOverridesAClash(t *testing.T) {
+	empty := model.Session{Harness: "goose", ID: "g", Path: "/h/.local/share/goose/sessions/sessions.db",
+		Messages: []model.Message{{Role: "user", Text: "  "}}}
+	held := SessionMeta{Harness: "goose", ID: "g", Path: "/h/.local/share/goose/sessions/g.jsonl", Words: 3}
+	if owns, collided := claimSession(held, empty); !owns || collided {
+		t.Errorf("goose db over its jsonl: owns=%v collided=%v, want the store rule (owns, no clash)", owns, collided)
+	}
+
+	text := model.Session{Harness: "gemini", ID: "x", Path: "/c/session-a-x.jsonl",
+		Messages: []model.Message{{Role: "user", Text: "the pool deadlocked"}}}
+	emoji := SessionMeta{Harness: "gemini", ID: "x", Path: "/c/session-b-x.jsonl", Words: 0}
+	if _, collided := claimSession(emoji, text); !collided {
+		t.Error("a held row of emoji gave up the id without a clash being reported")
+	}
+	stub := SessionMeta{Harness: "gemini", ID: "x", Path: "/c/session-b-x.jsonl", NoText: true}
+	if owns, collided := claimSession(stub, text); !owns || collided {
+		t.Errorf("over a row with no text: owns=%v collided=%v, want owns, no clash", owns, collided)
 	}
 }

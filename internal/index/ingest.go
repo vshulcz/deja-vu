@@ -2014,7 +2014,7 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), Settled: sessionSettled(s),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
 		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
@@ -2084,6 +2084,9 @@ func extendDerived(meta *SessionMeta, ms []model.Message) {
 		return
 	}
 	meta.Counted += len(tail)
+	if meta.NoText && holdsText(model.Session{Messages: tail}) {
+		meta.NoText = false
+	}
 	meta.LastMsg = messageFingerprint(ms[len(ms)-1])
 	meta.Words += sessionWords(tail)
 	// Capped like the full build caps: a plain union grows on every append,
@@ -2616,18 +2619,20 @@ func ReportEvictedFiles() int {
 // leaves a file holding only the preamble deja strips, under the id of the
 // transcript it appends to. Sort order handed that file the row, and with no
 // records under it the session was dropped from the index (#4213). Either
-// side can be the empty one, since either can be read first; Words is what
-// the held row still says about its text.
+// side can be the empty one, since either can be read first. Only where the
+// pair would be reported as a clash: the store pairs attributeSession knows
+// (goose, opencode, codex) keep their own rule.
 func claimSession(held SessionMeta, s model.Session) (owns, collided bool) {
-	if held.Path != "" && s.Path != "" && held.Path != s.Path {
+	owns, collided = attributeSession(held, s)
+	if collided {
 		if !holdsText(s) {
 			return false, false
 		}
-		if held.Words == 0 {
+		if held.NoText {
 			return true, false
 		}
 	}
-	return attributeSession(held, s)
+	return owns, collided
 }
 
 // attributeSession decides which of two transcripts sharing an id owns the
@@ -2678,10 +2683,11 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 }
 
 // holdsText reports whether any message of s has text left to index once
-// plumbing is stripped. Called on redacted sessions.
+// plumbing is stripped. Stripping is idempotent, so it answers the same before
+// and after preRedactSessions.
 func holdsText(s model.Session) bool {
 	for _, m := range s.Messages {
-		if strings.TrimSpace(m.Text) != "" {
+		if strings.TrimSpace(stripSelfRecall(m.Text)) != "" {
 			return true
 		}
 	}
@@ -3622,16 +3628,22 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// Only when the arrival sits in the same directory: two projects can
 	// share a filename-derived id (#699), and that is a collision, not the
 	// kept session moving.
+	// An arrival with nothing to index is not the kept session moving: Gemini
+	// CLI's resume stub lands beside the transcript it shares an id with, and
+	// taking it for a rename dropped the deleted transcript's records (#4213).
 	arrivedIn := map[string]string{}
 	for _, r := range replacements {
-		arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+		if holdsText(r) {
+			arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+		}
 	}
 	// A session kept in a directory of its own moves with the directory, so
 	// the arrival is never beside the old path; its id is a UUID, which two
 	// projects do not share by accident, so the id alone says it moved.
 	for key, meta := range old.Sessions {
-		movedDir := arrivedIn[key] == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
-		if kept[meta.Path] && replaceKeys[key] && movedDir {
+		at, arrived := arrivedIn[key]
+		movedDir := at == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
+		if kept[meta.Path] && arrived && movedDir {
 			removed[meta.Path] = true
 			delete(files, meta.Path)
 			delete(kept, meta.Path)
@@ -4118,7 +4130,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// searchable — so ask the filesystem instead. A recorded path that
 			// is not there cannot own the row, and without this the row kept
 			// the dead path and was marked as sharing its id with it (#1086).
-			if meta.Path != "" && s.Path != "" && meta.Path != s.Path {
+			// Not for an arrival with nothing to index: that is Gemini's resume
+			// stub beside a deleted transcript, not the transcript moving (#4213).
+			if meta.Path != "" && s.Path != "" && meta.Path != s.Path && holdsText(s) {
 				if _, err := os.Lstat(meta.Path); err != nil {
 					meta.Path = ""
 				}

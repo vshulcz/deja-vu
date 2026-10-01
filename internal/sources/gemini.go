@@ -73,27 +73,40 @@ func LoadGemini() []model.Session {
 }
 
 // A session resumed from an old .json gets rewritten as .jsonl — keep the
-// jsonl (richer, current) when both exist. Two files of the same format are
-// both kept: resuming a .jsonl session leaves a second .jsonl under the same id
+// jsonl (richer, current) when both exist, whatever it holds: a rewind can
+// leave it shorter than the stale .json. Two files of the same format are both
+// kept: resuming a .jsonl session leaves a second .jsonl under the same id
 // holding only the preamble, and keeping the later one dropped the whole
-// conversation (#4213). The index decides which of those owns the row.
+// conversation (#4213). The index decides which of those owns the row. A
+// .json and a .jsonl not named after each other keep the one with more.
 func dedupeGeminiSessions(ss []model.Session) []model.Session {
-	best := map[string]int{}
+	seen := map[string][]int{}
 	var out []model.Session
+next:
 	for _, s := range ss {
 		key := s.Harness + ":" + s.ID
-		if i, ok := best[key]; ok {
-			newJSONL, heldJSONL := strings.HasSuffix(s.Path, ".jsonl"), strings.HasSuffix(out[i].Path, ".jsonl")
-			switch {
-			case newJSONL == heldJSONL:
-				out = append(out, s)
-			case newJSONL && len(s.Messages) >= len(out[i].Messages),
-				heldJSONL && len(s.Messages) > len(out[i].Messages):
-				out[i] = s
+		newJSONL := strings.HasSuffix(s.Path, ".jsonl")
+		// The file it was rewritten from, or into.
+		for _, i := range seen[key] {
+			switch out[i].Path {
+			case s.Path + "l":
+				continue next
+			case strings.TrimSuffix(s.Path, "l"):
+				if newJSONL {
+					out[i] = s
+					continue next
+				}
 			}
-			continue
 		}
-		best[key] = len(out)
+		for _, i := range seen[key] {
+			if heldJSONL := strings.HasSuffix(out[i].Path, ".jsonl"); heldJSONL != newJSONL {
+				if newJSONL && len(s.Messages) >= len(out[i].Messages) || heldJSONL && len(s.Messages) > len(out[i].Messages) {
+					out[i] = s
+				}
+				continue next
+			}
+		}
+		seen[key] = append(seen[key], len(out))
 		out = append(out, s)
 	}
 	return out

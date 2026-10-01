@@ -520,6 +520,12 @@ type SessionMeta struct {
 	// before it existed decodes with it zero and ranking falls back to what it
 	// can see.
 	Words int `json:",omitempty"`
+	// NoText marks a row whose transcript had nothing left to index once
+	// plumbing was stripped, so a transcript holding the conversation under
+	// the same id takes the row instead of being reported as a clash (#4213).
+	// Words cannot say it: a row of emoji has text and no words. Additive: an
+	// older manifest decodes with it false, the answer it always gave.
+	NoText bool `json:",omitempty"`
 	// Counted is how many of this session's messages the derived fields above
 	// already include, and LastMsg fingerprints the newest of them.
 	//

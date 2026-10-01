@@ -140,6 +140,31 @@ func TestGeminiDedupeKeepsAResumedTranscript(t *testing.T) {
 	if len(out) != 1 || !strings.HasSuffix(out[0].Path, ".jsonl") {
 		t.Fatalf("the .json replaced its .jsonl rewrite: %#v", out)
 	}
+	// A rewind after the rewrite leaves the .jsonl shorter than the .json it
+	// came from; it is still the current one, in either order.
+	for _, in := range [][]model.Session{
+		{{Harness: "gemini", ID: "w", Path: "/a/session-w.json", Messages: msgs(6)}, {Harness: "gemini", ID: "w", Path: "/a/session-w.jsonl", Messages: msgs(3)}},
+		{{Harness: "gemini", ID: "w", Path: "/a/session-w.jsonl", Messages: msgs(3)}, {Harness: "gemini", ID: "w", Path: "/a/session-w.json", Messages: msgs(6)}},
+	} {
+		out = dedupeGeminiSessions(in)
+		if len(out) != 1 || out[0].Path != "/a/session-w.jsonl" {
+			t.Fatalf("the stale .json won over its rewound .jsonl rewrite: %#v", out)
+		}
+	}
+	// And with the resume stub beside them, the rewrite still pairs with the
+	// file it was named after.
+	out = dedupeGeminiSessions([]model.Session{
+		{Harness: "gemini", ID: "w", Path: "/a/session-a-stub.jsonl", Messages: msgs(1)},
+		{Harness: "gemini", ID: "w", Path: "/a/session-w.json", Messages: msgs(6)},
+		{Harness: "gemini", ID: "w", Path: "/a/session-w.jsonl", Messages: msgs(3)},
+	})
+	var paths []string
+	for _, s := range out {
+		paths = append(paths, s.Path)
+	}
+	if got := strings.Join(paths, " "); !strings.Contains(got, "/a/session-w.jsonl") || strings.Contains(got, "/a/session-w.json ") || strings.HasSuffix(got, ".json") {
+		t.Fatalf("stub, .json and its rewrite kept %s, want the rewrite and not the .json", got)
+	}
 }
 
 func TestGeminiMessageTimeFallback(t *testing.T) {
