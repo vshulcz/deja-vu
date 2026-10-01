@@ -69,3 +69,25 @@ func TestCursorChatMissesDoNotRescanChats(t *testing.T) {
 		t.Fatalf("chat added in a new bucket = %q, %v", cwd, ok)
 	}
 }
+
+// A chats/ mtime ahead of the clock — a ~/.cursor copied from a machine whose
+// clock ran fast, a network share with skew — read as changed at every miss,
+// and each miss rescanned all of chats/ again.
+func TestCursorChatMissesTrustAChatsDirFromTheFuture(t *testing.T) {
+	cli := t.TempDir()
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+	chats := filepath.Join(cli, "chats")
+	dir := filepath.Join(chats, CursorChatBucket("/work/p"), "chat-1")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ahead := time.Now().Add(time.Hour)
+	_ = os.Chtimes(chats, ahead, ahead)
+	before := cursorChatIndex.scans
+	for i := 0; i < 20; i++ {
+		CursorChatCWD(filepath.Join(cli, "projects", "work-p", "agent-transcripts", fmt.Sprintf("gone-%d", i), fmt.Sprintf("gone-%d.jsonl", i)))
+	}
+	if n := cursorChatIndex.scans - before; n != 1 {
+		t.Fatalf("20 misses with chats/ an hour ahead scanned it %d times, want 1", n)
+	}
+}

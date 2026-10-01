@@ -131,5 +131,12 @@ func cursorChatStale(chats string) bool {
 	if err != nil {
 		return !ix.mtime.IsZero()
 	}
-	return !fi.ModTime().Equal(ix.mtime) || !ix.mtime.Before(ix.scanned.Add(-cursorChatTick))
+	if !fi.ModTime().Equal(ix.mtime) {
+		return true
+	}
+	// Only an mtime near the scan, not one ahead of it: a ~/.cursor copied
+	// from a machine whose clock ran fast, or a clock stepped back, would
+	// otherwise rescan on every miss.
+	d := ix.mtime.Sub(ix.scanned)
+	return d >= -cursorChatTick && d <= cursorChatTick
 }
