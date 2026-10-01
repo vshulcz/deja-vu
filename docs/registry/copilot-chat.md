@@ -26,7 +26,7 @@ Edits are `textEditGroup` parts: a `uri` and a list of lists of `{text, range}`,
   in here: Copilot Chat fires no session-start or per-prompt hook, so nothing
   arrives unasked.
 - **Auto-recall**: none in the hook sense — Copilot Chat has no session-start or per-prompt event. The instructions file is what makes recall arrive without being asked for.
-- **Resume**: Chat: Show Chats… in the editor, not a command.
+- **Resume**: Chat: Show Chats… in the editor, not a command. The list holds only the open workspace’s chats; `deja resume <id>` names the folder to open first.
 - **Handoff**: paste.
 
 **Last verified:** 2026-09-20

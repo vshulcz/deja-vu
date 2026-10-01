@@ -566,6 +566,34 @@ func copilotChatProjectFromWorkspace(sessionPath string) string {
 	return ""
 }
 
+// CopilotChatWorkspaceDir is the folder (or .code-workspace file) the chat at
+// sessionPath belongs to, as a local path, or "" for an empty-window chat or a
+// remote workspace. VS Code keeps chat history per workspace, so this is what
+// has to be open for the chat to be listed again.
+func CopilotChatWorkspaceDir(sessionPath string) string {
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(sessionPath)), "workspace.json"))
+	if err != nil {
+		return ""
+	}
+	var m map[string]any
+	if json.Unmarshal(b, &m) != nil {
+		return ""
+	}
+	for _, k := range []string{"folder", "workspace"} {
+		s, _ := m[k].(string)
+		u, err := url.Parse(s)
+		if err != nil || u.Scheme != "file" || u.Path == "" {
+			continue
+		}
+		p := u.Path
+		if runtime.GOOS == "windows" && len(p) >= 3 && p[0] == '/' && p[2] == ':' {
+			p = p[1:]
+		}
+		return filepath.FromSlash(p)
+	}
+	return ""
+}
+
 func copilotChatProjectFromURI(uri string) string {
 	if uri == "" {
 		return ""

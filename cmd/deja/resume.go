@@ -343,6 +343,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "copilot":
 		return "", "copilot --resume=" + s.ID, nil
 	case "copilot-chat":
+		// VS Code lists only the open workspace's chats, so the folder comes
+		// first (#4223).
+		if dir := sources.CopilotChatWorkspaceDir(s.Path); dir != "" {
+			return "", "", fmt.Errorf("copilot-chat sessions reopen in VS Code: open the workspace (code %s), then Chat: Show Chats", shellQuoteIfNeeded(dir))
+		}
 		return "", "", fmt.Errorf("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)

@@ -240,7 +240,7 @@
         },
         "resume": {
           "state": "impossible",
-          "why": "sessions reopen from Chat: Show Chats in the editor, not a command deja can print"
+          "why": "sessions reopen from Chat: Show Chats in the editor, not a command deja can print; deja resume names the workspace to open first, since the list holds only that workspace's chats"
         }
       }
     },
