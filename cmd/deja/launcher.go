@@ -169,7 +169,7 @@ func dejaLauncherScript(exe string) string {
 // launcherWellKnown is where the supported installers leave the binary. A
 // variable so a test can take the machine's own deja out of the list it is
 // exercising.
-var launcherWellKnown = []string{"/usr/local/bin/deja", "/opt/homebrew/bin/deja", "/usr/bin/deja"}
+var launcherWellKnown = []string{"/usr/local/bin/deja", "/opt/homebrew/bin/deja", "/home/linuxbrew/.linuxbrew/bin/deja", "/usr/bin/deja"}
 
 // launcherCandidates are the paths tried before the PATH, the install's own
 // first. The rest are where the three supported installers leave the binary,
