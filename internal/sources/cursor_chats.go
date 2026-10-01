@@ -21,6 +21,8 @@ import (
 // The transcript holds every turn the store does, bar the `<user_info>`
 // environment preamble it leaves out on purpose (#3772), but none of the tool
 // results; cursor_store.go reads those from here (#4187).
+// meta.json's cwd gives the project and the resume directory
+// (cursor_chat_cwd.go, #4193).
 //
 // What matters is the day that stops being true. If a Cursor release keeps
 // writing chats and stops writing `agent-transcripts`, every CLI session goes
