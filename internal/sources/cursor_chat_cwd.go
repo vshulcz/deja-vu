@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Cursor names a CLI project folder by blanking every character of the working
@@ -59,13 +60,18 @@ func CursorChatBucket(cwd string) string {
 }
 
 // cursorChatIndex maps a chat id to the buckets holding it, built once per
-// chats/ directory and again when an id is not in it: every transcript parse
-// asks, and listing chats/ for each of them was a directory read per bucket
-// per transcript on a rebuild.
+// chats/ directory: every transcript parse asks, and listing chats/ for each
+// of them was a directory read per bucket per transcript on a rebuild. An id
+// not in it is looked for again only when chats/ or one of its buckets has
+// changed since, which is how a chat started after the scan shows up in a
+// long-lived process; rescanning on every miss read all of chats/ once per
+// transcript whose chat is gone (#4226).
 var cursorChatIndex struct {
 	sync.Mutex
-	root string
-	ids  map[string][]string
+	root   string
+	ids    map[string][]string
+	mtimes map[string]time.Time // chats/ ("") and each bucket, as scanned
+	scans  int
 }
 
 func cursorChatBuckets(chats, id string) []string {
@@ -75,18 +81,47 @@ func cursorChatBuckets(chats, id string) []string {
 		if b, ok := cursorChatIndex.ids[id]; ok {
 			return b
 		}
+		if !cursorChatChanged(chats) {
+			return nil
+		}
 	}
+	cursorChatIndex.scans++
 	ids := map[string][]string{}
+	mtimes := map[string]time.Time{}
+	if fi, err := os.Stat(chats); err == nil {
+		mtimes[""] = fi.ModTime()
+	}
 	buckets, _ := os.ReadDir(chats)
 	for _, w := range buckets {
-		entries, err := os.ReadDir(filepath.Join(chats, w.Name()))
+		dir := filepath.Join(chats, w.Name())
+		fi, err := os.Stat(dir)
 		if err != nil {
 			continue
 		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		mtimes[w.Name()] = fi.ModTime()
 		for _, e := range entries {
 			ids[e.Name()] = append(ids[e.Name()], w.Name())
 		}
 	}
 	cursorChatIndex.root, cursorChatIndex.ids = chats, ids
+	cursorChatIndex.mtimes = mtimes
 	return ids[id]
+}
+
+// cursorChatChanged reports whether chats/ may hold a chat the index has not
+// seen: chats/ or a bucket in it has a different mtime from the scan. A new
+// chat lands in a new bucket, which changes chats/, or in an existing one,
+// which changes that bucket.
+func cursorChatChanged(chats string) bool {
+	for name, was := range cursorChatIndex.mtimes {
+		fi, err := os.Stat(filepath.Join(chats, name))
+		if err != nil || !fi.ModTime().Equal(was) {
+			return true
+		}
+	}
+	return len(cursorChatIndex.mtimes) == 0
 }
