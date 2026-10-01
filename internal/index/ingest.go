@@ -634,7 +634,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -1429,12 +1432,13 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 // the user never sent — still got a row, so `deja last` printed a blank line
 // for it, `show` printed a header with nothing under it, and the counters
 // disagreed: brief and doctor read the manifest and stats reads the records
-// (1159 against 1157 on my store) (#868).
+// (1159 against 1157 on my store) (#868). The build counts the empty
+// transcripts as it reads them, not the rows dropped here: an empty transcript
+// sharing an id with one that holds text leaves no empty row behind (#4213).
 func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 	for key := range m.Sessions {
 		if !wrote[key] {
 			delete(m.Sessions, key)
-			emptied.Add(1)
 		}
 	}
 }
@@ -1577,7 +1581,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -2604,6 +2611,25 @@ func ReportEvictedFiles() int {
 	return int(evicted.Swap(0))
 }
 
+// claimSession is attributeSession for a session read this pass. A transcript
+// with nothing to index is not a second conversation: Gemini CLI's resume
+// leaves a file holding only the preamble deja strips, under the id of the
+// transcript it appends to. Sort order handed that file the row, and with no
+// records under it the session was dropped from the index (#4213). Either
+// side can be the empty one, since either can be read first; Words is what
+// the held row still says about its text.
+func claimSession(held SessionMeta, s model.Session) (owns, collided bool) {
+	if held.Path != "" && s.Path != "" && held.Path != s.Path {
+		if !holdsText(s) {
+			return false, false
+		}
+		if held.Words == 0 {
+			return true, false
+		}
+	}
+	return attributeSession(held, s)
+}
+
 // attributeSession decides which of two transcripts sharing an id owns the
 // manifest row, and whether they collided at all. Lexicographically smallest
 // path wins, so the answer does not depend on which file was read first.
@@ -2649,6 +2675,17 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 		}
 	}
 	return s.Path < held.Path, true
+}
+
+// holdsText reports whether any message of s has text left to index once
+// plumbing is stripped. Called on redacted sessions.
+func holdsText(s model.Session) bool {
+	for _, m := range s.Messages {
+		if strings.TrimSpace(m.Text) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // isCodexHistory reports whether a path is Codex's prompt log rather than a
@@ -3778,7 +3815,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if removed[held.Path] {
 			held.Path = ""
 		}
-		owns, collided := attributeSession(held, s)
+		owns, collided := claimSession(held, s)
 		if collided {
 			collisions.Add(1)
 		}
@@ -4086,7 +4123,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					meta.Path = ""
 				}
 			}
-			owns, collided := attributeSession(meta, s)
+			owns, collided := claimSession(meta, s)
 			if collided {
 				collisions.Add(1)
 				meta.Shared = true

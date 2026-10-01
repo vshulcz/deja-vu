@@ -114,6 +114,34 @@ func TestGeminiDedupePrefersJSONL(t *testing.T) {
 	}
 }
 
+// Resuming a .jsonl session leaves a second .jsonl under its id holding only
+// the preamble. Neither replaces the other here, and a .jsonl with fewer
+// messages than the .json it shares an id with does not replace it (#4213).
+func TestGeminiDedupeKeepsAResumedTranscript(t *testing.T) {
+	msgs := func(n int) []model.Message { return make([]model.Message, n) }
+	out := dedupeGeminiSessions([]model.Session{
+		{Harness: "gemini", ID: "r", Path: "/a/session-13-04-r.jsonl", Messages: msgs(6)},
+		{Harness: "gemini", ID: "r", Path: "/a/session-13-07-r.jsonl", Messages: msgs(1)},
+	})
+	if len(out) != 2 {
+		t.Fatalf("kept %d of two .jsonl transcripts sharing an id, want both", len(out))
+	}
+	out = dedupeGeminiSessions([]model.Session{
+		{Harness: "gemini", ID: "o", Path: "/a/session-o.json", Messages: msgs(6)},
+		{Harness: "gemini", ID: "o", Path: "/a/session-o-stub.jsonl", Messages: msgs(1)},
+	})
+	if len(out) != 1 || !strings.HasSuffix(out[0].Path, ".json") {
+		t.Fatalf("a preamble-only .jsonl replaced the .json holding the conversation: %#v", out)
+	}
+	out = dedupeGeminiSessions([]model.Session{
+		{Harness: "gemini", ID: "o", Path: "/a/session-o.jsonl", Messages: msgs(6)},
+		{Harness: "gemini", ID: "o", Path: "/a/session-o.json", Messages: msgs(6)},
+	})
+	if len(out) != 1 || !strings.HasSuffix(out[0].Path, ".jsonl") {
+		t.Fatalf("the .json replaced its .jsonl rewrite: %#v", out)
+	}
+}
+
 func TestGeminiMessageTimeFallback(t *testing.T) {
 	_, chats := geminiTree(t)
 	doc := `{"sessionId":"s1","startTime":"2026-07-15T10:00:00.000Z","lastUpdated":"2026-07-15T10:00:00.000Z","messages":[{"id":"m1","type":"user","content":"no timestamp here"}]}`

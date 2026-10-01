@@ -73,14 +73,22 @@ func LoadGemini() []model.Session {
 }
 
 // A session resumed from an old .json gets rewritten as .jsonl — keep the
-// jsonl (richer, current) when both exist.
+// jsonl (richer, current) when both exist. Two files of the same format are
+// both kept: resuming a .jsonl session leaves a second .jsonl under the same id
+// holding only the preamble, and keeping the later one dropped the whole
+// conversation (#4213). The index decides which of those owns the row.
 func dedupeGeminiSessions(ss []model.Session) []model.Session {
 	best := map[string]int{}
 	var out []model.Session
 	for _, s := range ss {
 		key := s.Harness + ":" + s.ID
 		if i, ok := best[key]; ok {
-			if strings.HasSuffix(s.Path, ".jsonl") {
+			newJSONL, heldJSONL := strings.HasSuffix(s.Path, ".jsonl"), strings.HasSuffix(out[i].Path, ".jsonl")
+			switch {
+			case newJSONL == heldJSONL:
+				out = append(out, s)
+			case newJSONL && len(s.Messages) >= len(out[i].Messages),
+				heldJSONL && len(s.Messages) > len(out[i].Messages):
 				out[i] = s
 			}
 			continue
