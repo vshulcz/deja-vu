@@ -160,7 +160,12 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 			}
 			// Newer Gemini CLI builds write the message state inside $set
 			// snapshots (sometimes the only message-bearing lines in the
-			// file). A $set replaces the state collected so far.
+			// file). A snapshot is merged by id rather than taken whole:
+			// on --resume Gemini writes back its rebuilt history, which
+			// leaves out every user turn starting with <hook_context> —
+			// the prompts deja's own recall was attached to — and they
+			// left the index with it (#4214). $rewindTo is the record that
+			// takes turns out.
 			if list, ok := patch["messages"].([]any); ok {
 				var snap []geminiMessage
 				for _, item := range list {
@@ -173,9 +178,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 						snap = append(snap, gm)
 					}
 				}
-				if len(snap) > 0 || len(list) == 0 {
-					msgs = snap
-				}
+				msgs = mergeGeminiSnapshot(msgs, snap)
 			}
 			return
 		}
@@ -202,6 +205,38 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// mergeGeminiSnapshot folds a $set snapshot into the turns read so far: a
+// turn the snapshot carries takes the snapshot's copy, one it leaves out
+// stays where it was, and turns new to it follow in its order.
+func mergeGeminiSnapshot(msgs, snap []geminiMessage) []geminiMessage {
+	if len(msgs) == 0 {
+		return snap
+	}
+	byID := map[string]geminiMessage{}
+	for _, m := range snap {
+		if m.ID == "" {
+			// Nothing to match turns by: the snapshot stands as written.
+			return snap
+		}
+		byID[m.ID] = m
+	}
+	out := make([]geminiMessage, 0, len(msgs)+len(snap))
+	seen := map[string]bool{}
+	for _, m := range msgs {
+		if r, ok := byID[m.ID]; ok {
+			m = r
+		}
+		seen[m.ID] = true
+		out = append(out, m)
+	}
+	for _, m := range snap {
+		if !seen[m.ID] {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 func geminiSessionShell(path, id, startTime, lastUpdated string) model.Session {
