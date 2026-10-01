@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `deja resume` on an opencode session whose directory has been deleted prints `opencode -s <id>` without the `cd`, which failed before opencode started; opencode reopens the session from any directory (#4201).
+- `deja resume` on an opencode session whose directory has been deleted prints `opencode -s <id>` without the `cd`, which failed before opencode started; opencode reopens the session from any directory. Kilo CLI sessions get the same treatment, and resume says on stderr which directory the session will run in (#4201).
 - After a Homebrew upgrade, the wiring repair keeps MCP entries on the `bin/deja` link instead of rewriting them to the versioned `Cellar` path, which the next upgrade removed. Entries that still worked are left alone, and the "rewrote its wiring" line no longer appears for them (#4189).
 - Cursor CLI sessions carry what their tools returned: the command output and the exit status of a failed command, read from the chat store beside the transcript, which records only the calls. On the machine this was measured on, tool output went from 0% of Cursor sessions to 53%. The index rebuilds once (#4187).
 - `deja resume` refuses a session whose transcript the agent has deleted, and points at `deja show`, which still has it; it printed a command the agent then failed ("No saved session found" from Codex). An archived or compressed Codex rollout still resumes (#4185).

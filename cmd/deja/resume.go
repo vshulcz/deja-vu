@@ -64,6 +64,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err := resumeGoneError(s); err != nil {
 		return err
 	}
+	if note := resumeDirGoneNote(s, dir); note != "" {
+		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
+	}
 	if !doExec {
 		if note := resumeCaveats[s.Harness]; note != "" {
 			// stderr, so `$(deja resume …)` still composes: the command is the
@@ -137,16 +140,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		return "", "codex resume " + s.ID, nil
 	case "opencode":
-		dir := ""
 		// opencode sessions carry their project directory. opencode reopens a
 		// session from anywhere, so a deleted one is left out rather than
 		// printed as a cd that fails (#4201).
-		if s.Path != "" && s.Path != sources.OpencodeDB() {
-			if fi, err := os.Stat(s.Path); err == nil && fi.IsDir() {
-				dir = s.Path
-			}
-		}
-		return dir, "opencode -s " + s.ID, nil
+		return existingDir(s.Path), "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
 	case "kilocode":
@@ -167,8 +164,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		// And in the directory it ran in, the way the opencode case does with
 		// the same field: Kilo is OpenCode vendored and a CLI session carries
-		// its own working directory.
-		return s.Path, "kilo -s " + s.ID, nil
+		// its own working directory — when it is still there (#4201).
+		return existingDir(s.Path), "kilo -s " + s.ID, nil
 	case "continue":
 		// `cn --fork <sessionId>` loads the session by id straight out of the
 		// store deja reads — `historyManager.load` opens
@@ -336,6 +333,31 @@ func resumeCommand(s model.Session) (string, string, error) {
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}
+}
+
+// existingDir is p when it is a directory on this machine, else "": a cd into
+// one that is gone stops the command before the harness starts.
+func existingDir(p string) string {
+	if p == "" {
+		return ""
+	}
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		return p
+	}
+	return ""
+}
+
+// resumeDirGoneNote says where a session whose directory is gone will run:
+// opencode and Kilo reopen it from anywhere, and their tools then work in the
+// directory the command is run from.
+func resumeDirGoneNote(s model.Session, dir string) string {
+	if dir != "" || s.Path == "" || (s.Harness != "opencode" && s.Harness != "kilocode") {
+		return ""
+	}
+	if _, err := os.Stat(s.Path); !os.IsNotExist(err) {
+		return ""
+	}
+	return fmt.Sprintf("the directory this session ran in is gone (%s); it reopens in the one you run the command from", s.Path)
 }
 
 // claudeProjectDirFor recovers the original working directory from the
