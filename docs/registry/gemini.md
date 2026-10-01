@@ -29,7 +29,8 @@ mentions only `latest` and an index, but the CLI's own error names
 the directory it ran in — anywhere else it says "No previous sessions found
 for this project" — so the command runs there. 0.60 records that directory
 in `~/.gemini/projects.json` and in the project folder's `.project_root`; a
-store that keys the folder by a hash of the path alone gets no `cd`.
+store that keys the folder by a hash of the path alone gets no `cd`, and a
+recorded directory that is gone is refused with a pointer to `deja show`.
 
 ## Known quirks and drift
 

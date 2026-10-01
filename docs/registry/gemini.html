@@ -54,7 +54,8 @@
 <p>the directory it ran in — anywhere else it says &#34;No previous sessions found</p>
 <p>for this project&#34; — so the command runs there. 0.60 records that directory</p>
 <p>in <code>~/.gemini/projects.json</code> and in the project folder&#39;s <code>.project_root</code>; a</p>
-<p>store that keys the folder by a hash of the path alone gets no <code>cd</code>.</p>
+<p>store that keys the folder by a hash of the path alone gets no <code>cd</code>, and a</p>
+<p>recorded directory that is gone is refused with a pointer to <code>deja show</code>.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>A resumed legacy <code>.json</code> session can be rewritten as <code>.jsonl</code>. deja deduplicates by session ID and prefers JSONL.</li>

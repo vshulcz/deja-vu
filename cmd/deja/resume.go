@@ -226,8 +226,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// else it says "No previous sessions found for this project" (#4211).
 		// Current stores record that directory in projects.json and
 		// .project_root; an older one keyed by a hash of it has nothing to
-		// invert, and gets no cd.
-		return existingDir(sources.GeminiProjectDir(s.Path)), "gemini --resume " + s.ID, nil
+		// invert, and gets no cd. A recorded directory that is gone is
+		// refused, as qwen's is (#4259).
+		dir, err := recordedResumeDir(s, sources.GeminiProjectDir(s.Path), "gemini --resume")
+		if err != nil {
+			return "", "", err
+		}
+		return dir, "gemini --resume " + s.ID, nil
 	case "cursor":
 		if strings.HasSuffix(s.Path, ".jsonl") {
 			// A CLI transcript is named after the chat id `--resume` takes.
@@ -351,8 +356,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "openclaw chat --session " + key, nil
 	case "kimi":
 		// In the directory the session was created in: Kimi Code refuses a
-		// session from anywhere else (#4274).
-		return existingDir(sources.KimiSessionDir(s.Path)), "kimi --session " + s.ID, nil
+		// session from anywhere else (#4274), so a workDir that is gone is
+		// refused rather than printed without the cd.
+		dir, err := recordedResumeDir(s, sources.KimiSessionDir(s.Path), "kimi --session")
+		if err != nil {
+			return "", "", err
+		}
+		return dir, "kimi --session " + s.ID, nil
 	case "goose":
 		return "", "goose session --resume --session-id " + s.ID, nil
 	case "crush":
@@ -384,6 +394,20 @@ func resumeCommand(s model.Session) (string, string, error) {
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
 	}
+}
+
+// recordedResumeDir is the directory a session recorded, for an agent that
+// opens a session only from there: dir when it exists, an error naming
+// `deja show` when it is gone, and "" when nothing was recorded.
+func recordedResumeDir(s model.Session, dir, command string) (string, error) {
+	if dir == "" {
+		return "", nil
+	}
+	if existingDir(dir) == "" {
+		short := digest.Short(s.ID)
+		return "", fmt.Errorf("%s session %s ran in %s, which is gone, and `%s` finds a session only from there — `deja show %s` has the conversation", s.Harness, short, dir, command, short)
+	}
+	return dir, nil
 }
 
 // existingDir is p when it is a directory on this machine, else "": a cd into

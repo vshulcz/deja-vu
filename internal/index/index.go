@@ -353,6 +353,16 @@ import (
 // only the path (#4265).
 //
 // 60 also: a failed Kimi Code command carries its exit status (#4262).
+//
+// 60 also: an encoded project folder whose path has a "_", "." or space
+// resolves back to its directory, so sessions named from the folder (Qwen
+// Code and Claude Code without a cwd, Cursor CLI, pi, omp and the rest) get
+// the real project: `my_org/app`, not `org/app` (#4402).
+//
+// 60 also: an index that let Gemini's resume stub take a session's row lost
+// that session's records, and only a re-read brings them back (#4213); an
+// opencode reply written during a pass is read only when its session is
+// touched again (#4207). Hermes compaction copies count once (#4296).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

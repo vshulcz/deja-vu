@@ -27,7 +27,8 @@ scope.
   digest rides the first prompt rather than a session-start hook.
 - **Resume**: `kimi --session <sessionId>`, run in the `workDir` from the
   session's `state.json`: Kimi refuses a session from any other directory
-  (verified live on 0.28.1).
+  (verified live on 0.28.1). A `workDir` that is gone is refused with a
+  pointer to `deja show`.
 - **Handoff**: exec, `kimi -p`.
 
 Requested and specified by [@yearth](https://github.com/yearth) in

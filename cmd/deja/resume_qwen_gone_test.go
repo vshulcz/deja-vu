@@ -106,7 +106,13 @@ func TestResumeQwenTrustsTheRecordedDirectoryOverTheFolderName(t *testing.T) {
 // A transcript from before qwen recorded cwd still resumes from the folder
 // name when that resolves on disk.
 func TestResumeQwenWithoutARecordedCWDUsesTheFolder(t *testing.T) {
-	tmp := t.TempDir()
+	// The long form: Windows hands out a temp dir under its 8.3 name
+	// (RUNNER~1), which no directory listing carries, so the folder name
+	// never resolved back to it.
+	tmp, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	root := filepath.Join(tmp, "qwen")
 	t.Setenv("DEJA_QWEN_ROOT", root)
 	real := filepath.Join(tmp, "projects", "app")

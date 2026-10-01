@@ -213,7 +213,7 @@ func TestCrushResumeRunsInTheProject(t *testing.T) {
 
 // Kimi Code refuses a session from any directory but the one it was created
 // in, so the command cds into the workDir state.json records; one that is gone
-// gets no cd (#4274).
+// is refused with a pointer to deja show, since the bare command fails too.
 func TestResumeKimiRunsInTheSessionDirectory(t *testing.T) {
 	tmp := t.TempDir()
 	project := filepath.Join(tmp, "proj-kimi")
@@ -244,8 +244,8 @@ func TestResumeKimiRunsInTheSessionDirectory(t *testing.T) {
 	}
 
 	writeState(filepath.Join(tmp, "gone"))
-	if dir, _, _ := resumeCommand(model.Session{Harness: "kimi", ID: id, Path: path}); dir != "" {
-		t.Fatalf("dir = %q for a workDir that no longer exists, want none", dir)
+	if dir, cmd, err := resumeCommand(model.Session{Harness: "kimi", ID: id, Path: path}); err == nil || !strings.Contains(err.Error(), "deja show") {
+		t.Fatalf("resume = (%q, %q, %v) for a workDir that no longer exists, want a refusal naming deja show", dir, cmd, err)
 	}
 }
 
@@ -336,12 +336,13 @@ func TestResumeGeminiRunsInTheProjectDirectory(t *testing.T) {
 	if dir, _, _ := resumeCommand(s); dir != other {
 		t.Fatalf("dir = %q, want the registry's %q", dir, other)
 	}
-	// A directory that is gone gets no cd.
+	// A directory that is gone is refused: gemini would not find the
+	// session from anywhere else.
 	if err := os.RemoveAll(other); err != nil {
 		t.Fatal(err)
 	}
-	if dir, _, _ := resumeCommand(s); dir != "" {
-		t.Fatalf("dir = %q for a directory that is gone", dir)
+	if dir, cmd, err := resumeCommand(s); err == nil || !strings.Contains(err.Error(), "deja show") {
+		t.Fatalf("resume = (%q, %q, %v) for a directory that is gone, want a refusal naming deja show", dir, cmd, err)
 	}
 }
 
