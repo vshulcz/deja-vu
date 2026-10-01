@@ -27,8 +27,16 @@ func resumeGoneError(s model.Session) error {
 
 // transcriptGone reports whether the file a session was read from has left
 // the disk. Only per-session transcript files count: a database or a working
-// directory in Path says nothing about one session.
+// directory in Path says nothing about one session, so the database stores
+// are asked by id.
 func transcriptGone(s model.Session) bool {
+	// opencode and Kilo keep every session in one database, and Path is the
+	// directory it ran in, so the database is asked instead: `opencode -s`
+	// on a deleted id says "Session not found", and 2.x starts an empty
+	// session under it (#4205).
+	if s.Harness == "opencode" || s.Harness == "kilocode" {
+		return sources.OpencodeStoreLacks(s.Harness, s.ID)
+	}
 	if s.Path == "" || !isTranscriptFile(s.Path) {
 		return false
 	}
