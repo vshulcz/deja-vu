@@ -19,6 +19,7 @@ func TestRedirects(t *testing.T) {
 		"GIT_EXEC_PATH":                false,
 		"XDG_CACHE_HOME":               false,
 		"TERM":                         false,
+		"DEJA_MCP_ORPHAN_HELPER":       false,
 	} {
 		if got := Redirects(name); got != want {
 			t.Errorf("Redirects(%q) = %v, want %v", name, got, want)

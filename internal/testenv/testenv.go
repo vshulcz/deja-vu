@@ -28,8 +28,11 @@ var toolchain = map[string]bool{
 var secrets = []string{"GITHUB_TOKEN", "OPENAI_API_KEY"}
 
 // Redirects reports whether name can point deja at something outside the test.
+// A name ending in _HELPER is a test talking to a copy of its own binary
+// (DEJA_MCP_ORPHAN_HELPER), so it is never scrubbed: losing it made that child
+// exit at once, which only Windows noticed.
 func Redirects(name string) bool {
-	if toolchain[name] {
+	if toolchain[name] || strings.HasSuffix(name, "_HELPER") {
 		return false
 	}
 	for _, s := range secrets {
@@ -44,7 +47,8 @@ func Redirects(name string) bool {
 // of keep, then sets pinned. Hand-kept lists drifted twice: the notes keys
 // (#1141) and HERMES_HOME (#4178) were honoured by the code before any
 // TestMain cleared them, and the suite wrote into the developer's real stores.
-// keep is for the variables a test passes to a copy of its own binary.
+// keep is for the variables a test passes to a copy of its own binary under
+// a name that does not end in _HELPER.
 func Scrub(pinned map[string]string, keep ...string) {
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -22,7 +23,7 @@ func TestScrubHelperProcess(t *testing.T) {
 	}
 	for _, kv := range os.Environ() {
 		if name, value, _ := strings.Cut(kv, "="); strings.HasPrefix(value, "/leak/") {
-			os.Stdout.WriteString("LEAK " + name + "\n")
+			fmt.Println("LEAK " + name)
 		}
 	}
 }
