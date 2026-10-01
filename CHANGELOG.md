@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Cursor CLI sessions carry what their tools returned: the command output and the exit status of a failed command, read from the chat store beside the transcript, which records only the calls. On the machine this was measured on, tool output went from 0% of Cursor sessions to 53%. The index rebuilds once (#4187).
 - An interactive Codex session is filed under the directory it ran in and `deja resume` reopens it. The incremental pass read `history.jsonl` on its own, so the prompt line took the session: project `history`, the prompt shown twice, and resume refusing it as an exec entry. The index rebuilds once (#4180).
 - `deja doctor --json` marks an MCP entry that names a deja binary that is no longer there with `"binary_missing": true`, as the `auto_recall` rows already did; the text report said so and the JSON read plain `wired` (#4177).
 - `deja blame` names the Claude subagent that changed a file. A subagent run is indexed as its task and its answer, and the edits went with the rest of the middle, so the 1,668 subagent edits on the machine this was measured on were never indexed. Files changed inside a Claude Code worktree (`.claude/worktrees/`) were also skipped as the agent's own files. The index rebuilds once to pick up finished subagent runs (#4163, #4164).

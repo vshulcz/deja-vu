@@ -315,7 +315,11 @@ import (
 // 55: an interactive Codex session was owned by its history.jsonl line and
 // filed under the project "history" (#4180); the row is decided when a session
 // is written, so a rebuild.
-const version = 55
+//
+// 56: a Cursor CLI session gains its tool results from the chat store — exit
+// status on a failed command and the output it printed (#4187). A finished
+// transcript is never re-read, so a rebuild.
+const version = 56
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

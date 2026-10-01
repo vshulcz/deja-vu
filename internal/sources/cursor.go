@@ -331,9 +331,9 @@ func epochMS(v any) time.Time {
 
 // cursorDialect is Cursor CLI's tool vocabulary, read off transcripts its own
 // binary wrote: `Read`, `Write`, `StrReplace`, `Delete` name a file under
-// `path` (not Claude's `file_path`), and the shell tool is `Shell`. Cursor
-// records no tool results at all, so its transcripts yield files, commands and
-// replaced spans but never tool output.
+// `path` (not Claude's `file_path`), and the shell tool is `Shell`. The
+// transcript records no tool results; those come from the chat store beside
+// it (cursor_store.go).
 var cursorDialect = toolDialect{
 	pathKey:   "path",
 	pathTools: map[string]bool{"Read": true, "Write": true, "StrReplace": true, "Delete": true},
@@ -365,6 +365,9 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 	// holding turns a month apart read as one day.
 	at := fileTime
 	stamped := false
+	// The chat store's results, read on the first turn that calls a tool.
+	var results cursorToolResults
+	read := false
 	err = scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role != "user" && role != "assistant" {
@@ -401,11 +404,10 @@ func ParseCursorTranscript(path string) ([]model.Session, error) {
 				s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: at})
 			}
 		}
-		if IndexCommands() {
-			for _, cmd := range commandsIn(msg["content"], cursorDialect) {
-				s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: at})
-			}
+		if !read && cursorCallsTools(msg["content"]) {
+			results, read = cursorStoreResults(cursorStoreFor(path)), true
 		}
+		cursorToolTurn(&s, msg["content"], results, at)
 	})
 	if !stamped {
 		s.Touch(fileTime)
