@@ -157,3 +157,24 @@ func TestCodexTrustMovesIsFastOnALongHooksFile(t *testing.T) {
 		t.Errorf("last hook moved to %v, want group 2998", to)
 	}
 }
+
+// Text inside a multi-line string is not a header, and a comment at the end
+// of the file is not part of the last pin.
+func TestRewriteCodexHookTrustReadsTOMLNotLines(t *testing.T) {
+	file := "/h/hooks.json"
+	paths := map[string]bool{file: true}
+	moves := map[codexHookPos]*codexHookPos{{"session_start", 0, 0}: nil, {"session_start", 1, 0}: {"session_start", 0, 0}}
+	in := "[profile]\ninstr = \"\"\"\n[hooks.state.\"/h/hooks.json:session_start:0:0\"]\n\"\"\"\n"
+	if got := rewriteCodexHookTrust(in, paths, moves); got != in {
+		t.Errorf("a line inside a multi-line string was read as a pin:\n%q", got)
+	}
+
+	in = "model = \"x\"\n\n[hooks.state.\"/h/hooks.json:session_start:0:0\"]\ntrusted_hash = \"x\"\n# keep me at eof\n"
+	if got, want := rewriteCodexHookTrust(in, paths, moves), "model = \"x\"\n# keep me at eof\n"; got != want {
+		t.Errorf("comment at the end of the file:\ngot  %q\nwant %q", got, want)
+	}
+
+	if got := quoteTOMLKey("a\x7fb\"c\\d", false); got != `"a\u007Fb\"c\\d"` {
+		t.Errorf("TOML quoting: %s", got)
+	}
+}

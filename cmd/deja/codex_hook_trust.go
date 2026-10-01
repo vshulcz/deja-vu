@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -141,8 +142,14 @@ type trustTable struct {
 func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHookPos]*codexHookPos) string {
 	lines := strings.SplitAfter(cfg, "\n")
 	var tables []trustTable
+	inString := ""
 	for i, line := range lines {
-		if !strings.HasPrefix(strings.TrimSpace(line), "[") {
+		// A line inside a multi-line string is text, whatever it starts
+		// with: reading `[hooks.state."…"]` in a prompt as a header cut the
+		// file from there on.
+		opened := inString
+		inString = multilineStringAfter(line, inString)
+		if opened != "" || !strings.HasPrefix(strings.TrimSpace(line), "[") {
 			continue
 		}
 		if len(tables) > 0 {
@@ -153,12 +160,10 @@ func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHoo
 		tables = append(tables, t)
 	}
 	// A comment written just above a header belongs to that header's table,
-	// not to the table that ends there: dropping a pin must not take it.
+	// not to the table that ends there, and one at the end of the file belongs
+	// to the file: dropping a pin must take neither.
 	for ti := range tables {
 		t := &tables[ti]
-		if ti+1 >= len(tables) {
-			continue
-		}
 		end := t.end
 		for end > t.start+1 {
 			l := strings.TrimSpace(lines[end-1])
@@ -333,10 +338,77 @@ func codexTrustKey(line string) (key string, at, to int, literal, ok bool) {
 
 // quoteTOMLKey writes a key back in the form it was read in.
 func quoteTOMLKey(key string, literal bool) string {
-	if literal && !strings.ContainsAny(key, "'\n") {
+	if literal && !strings.ContainsAny(key, "'\n\r") {
 		return "'" + key + "'"
 	}
-	return strconv.Quote(key)
+	// A TOML basic string: Go's quoting writes \x7f, which TOML has no
+	// escape for.
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range key {
+		switch r {
+		case '"':
+			b.WriteString(`\"`)
+		case '\\':
+			b.WriteString(`\\`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '\t':
+			b.WriteString(`\t`)
+		default:
+			if r < 0x20 || r == 0x7f {
+				fmt.Fprintf(&b, `\u%04X`, r)
+				continue
+			}
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+
+// multilineStringAfter says which multi-line string delimiter, if any, is
+// still open at the end of line, given the one open at its start.
+func multilineStringAfter(line, open string) string {
+	for i := 0; i < len(line); {
+		if open != "" {
+			j := strings.Index(line[i:], open)
+			if j < 0 {
+				return open
+			}
+			i += j + 3
+			open = ""
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line[i:], `"""`):
+			open = `"""`
+			i += 3
+		case strings.HasPrefix(line[i:], "'''"):
+			open = "'''"
+			i += 3
+		case line[i] == '#':
+			return ""
+		case line[i] == '"':
+			// A one-line basic string: skip it whole, escapes and all.
+			end := endOfJSONString([]byte(line), i)
+			if end < 0 {
+				return ""
+			}
+			i = end
+		case line[i] == '\'':
+			end := strings.IndexByte(line[i+1:], '\'')
+			if end < 0 {
+				return ""
+			}
+			i += end + 2
+		default:
+			i++
+		}
+	}
+	return open
 }
 
 // parseCodexTrustKey splits "<file>:<event>:<i>:<j>" from the right, so a path
