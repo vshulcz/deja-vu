@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- After a Homebrew upgrade, the wiring repair keeps MCP entries on the `bin/deja` link instead of rewriting them to the versioned `Cellar` path, which the next upgrade removed. Entries that still worked are left alone, and the "rewrote its wiring" line no longer appears for them (#4189).
 - An interactive Codex session is filed under the directory it ran in and `deja resume` reopens it. The incremental pass read `history.jsonl` on its own, so the prompt line took the session: project `history`, the prompt shown twice, and resume refusing it as an exec entry. The index rebuilds once (#4180).
 - `deja doctor --json` marks an MCP entry that names a deja binary that is no longer there with `"binary_missing": true`, as the `auto_recall` rows already did; the text report said so and the JSON read plain `wired` (#4177).
 - `deja blame` names the Claude subagent that changed a file. A subagent run is indexed as its task and its answer, and the edits went with the rest of the middle, so the 1,668 subagent edits on the machine this was measured on were never indexed. Files changed inside a Claude Code worktree (`.claude/worktrees/`) were also skipped as the agent's own files. The index rebuilds once to pick up finished subagent runs (#4163, #4164).

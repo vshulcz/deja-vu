@@ -198,7 +198,7 @@ func recordWiring(targets []string, uninstall bool) {
 		}
 	}
 	sort.Strings(kept)
-	exe, _ := os.Executable()
+	exe, _ := runningExe()
 	exe, _ = filepath.Abs(exe)
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
@@ -329,6 +329,30 @@ func underTempDir(p string) bool {
 	return false
 }
 
+// runningExe is os.Executable, a variable so a test can run the repair as a
+// binary reached through a link.
+var runningExe = os.Executable
+
+// stableExe is the path to write for the running binary: a link that resolves
+// to it where there is one, the binary itself otherwise. A package manager
+// keeps each release in a versioned directory and moves a link to the new one
+// — Homebrew's Cellar and bin/deja — so an entry naming the resolved binary
+// breaks on the next upgrade and one naming the link does not (#4189). The
+// link the binary was started through comes first; Linux reports the resolved
+// binary as the executable, so the places the installers leave one are tried
+// after it.
+func stableExe(invoked, exe string) string {
+	for _, c := range append([]string{invoked}, launcherCandidates("")...) {
+		if c == "" || c == exe {
+			continue
+		}
+		if r, err := filepath.EvalSymlinks(c); err == nil && r == exe {
+			return c
+		}
+	}
+	return exe
+}
+
 // refreshWiringAfterUpgrade rewrites the recorded targets when the binary that
 // wrote them is not the one running now. It returns the targets it changed, so
 // a caller with somewhere to print can say so; the hook paths call it and stay
@@ -342,11 +366,12 @@ func refreshWiringAfterUpgrade() []string {
 	if len(st.Targets) == 0 || version == "" {
 		return nil
 	}
-	exe, err := os.Executable()
+	invoked, err := runningExe()
 	if err != nil {
 		return nil
 	}
-	exe, _ = filepath.Abs(exe)
+	invoked, _ = filepath.Abs(invoked)
+	exe := invoked
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
@@ -394,8 +419,10 @@ func refreshWiringAfterUpgrade() []string {
 	}
 	var changed []string
 	failed := false
+	// Compared resolved, written through the link.
+	write := stableExe(invoked, exe)
 	for _, target := range st.Targets {
-		res, err := installTarget(target, exe, false)
+		res, err := installTarget(target, write, false)
 		if err != nil {
 			// A harness the user has since removed is not an error worth
 			// surfacing: the next install run will drop it from the record.
@@ -407,7 +434,7 @@ func refreshWiringAfterUpgrade() []string {
 			stuckWiring = append(stuckWiring, target)
 			continue
 		}
-		cr, cerr := refreshCommandFile(target, exe)
+		cr, cerr := refreshCommandFile(target, write)
 		if cerr != nil {
 			failed = true
 			stuckWiring = append(stuckWiring, target)

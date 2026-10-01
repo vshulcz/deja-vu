@@ -43,7 +43,12 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claudeJSON, []byte(strings.ReplaceAll(string(before), moved, wired.Exe)), 0o644); err != nil {
+	// The entry names the binary as it was started, which on macOS is the
+	// /var spelling of the /private/var path the record holds.
+	invoked, _ := os.Executable()
+	invoked, _ = filepath.Abs(invoked)
+	old := strings.ReplaceAll(strings.ReplaceAll(string(before), moved, wired.Exe), invoked, wired.Exe)
+	if err := os.WriteFile(claudeJSON, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
