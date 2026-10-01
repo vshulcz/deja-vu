@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `deja index` no longer says "no agent history was found" when the transcript it just reported deleted is still held and searchable (#4221).
+- `deja uninstall gemini` takes `hooksConfig.enabled` back out of `settings.json` when install added it and no other extension has hooks, so the file comes back byte for byte. A switch you had on before, or one another extension runs on, stays (#4216).
 - A failed Gemini CLI command is indexed with its exit status (`$ git log …  → exit 128`), the way Codex, opencode and Cursor commands are, so the failed-command recall sees it. The index rebuilds once (#4208).
 - `deja resume` refuses an opencode or Kilo CLI session that was deleted in the agent and points at `deja show`; it printed `opencode -s <id>`, which failed with "Session not found" (#4205).
 - `deja install opencode-auto` writes its entry above the comment on your first MCP server instead of between the two, where the comment read as describing deja (#4203).
