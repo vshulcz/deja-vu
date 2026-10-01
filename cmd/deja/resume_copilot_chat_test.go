@@ -35,6 +35,13 @@ func TestResumeCopilotChatNamesTheFolderToOpen(t *testing.T) {
 		t.Fatalf("resume does not name the folder %s: %v", proj, err)
 	}
 
+	// The newer extension writes GitHub.copilot-chat/transcripts/<id>.jsonl
+	// under the same storage hash.
+	s.Path = filepath.Join(ws, "GitHub.copilot-chat", "transcripts", "11111111-2222-3333-4444-555555555555.jsonl")
+	if _, _, err := resumeCommand(s); err == nil || !strings.Contains(err.Error(), shellQuoteIfNeeded(proj)) {
+		t.Fatalf("a transcript-format chat does not name the folder %s: %v", proj, err)
+	}
+
 	// An empty-window chat has no folder: the plain line stays.
 	s.Path = filepath.Join(root, "globalStorage", "emptyWindowChatSessions", "x.json")
 	if _, _, err := resumeCommand(s); err == nil || !strings.Contains(err.Error(), "Show Chats") || strings.Contains(err.Error(), "code ") {

@@ -571,7 +571,13 @@ func copilotChatProjectFromWorkspace(sessionPath string) string {
 // remote workspace. VS Code keeps chat history per workspace, so this is what
 // has to be open for the chat to be listed again.
 func CopilotChatWorkspaceDir(sessionPath string) string {
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(sessionPath)), "workspace.json"))
+	// chatSessions/<id>.json sits two levels under the storage hash,
+	// GitHub.copilot-chat/transcripts/<id>.jsonl three.
+	ws := filepath.Dir(filepath.Dir(sessionPath))
+	if filepath.Base(ws) == "GitHub.copilot-chat" {
+		ws = filepath.Dir(ws)
+	}
+	b, err := os.ReadFile(filepath.Join(ws, "workspace.json"))
 	if err != nil {
 		return ""
 	}
