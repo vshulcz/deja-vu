@@ -316,7 +316,7 @@ func mergeGeminiSnapshot(msgs, snap []geminiMessage) []geminiMessage {
 		}
 	}
 	tail = pending
-	out := make([]geminiMessage, 0, len(snap)+len(tail))
+	var out []geminiMessage
 	for _, m := range snap {
 		out = append(out, before[m.ID]...)
 		out = append(out, m)
