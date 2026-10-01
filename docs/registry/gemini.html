@@ -46,14 +46,15 @@
 {&#34;id&#34;:&#34;message-1&#34;,&#34;timestamp&#34;:&#34;2026-07-17T09:00:01Z&#34;,&#34;type&#34;:&#34;gemini&#34;,&#34;content&#34;:[{&#34;text&#34;:&#34;The configuration is valid.&#34;}]}</code></pre>
 <p><code>type: &#34;user&#34;</code> maps to <code>user</code>; <code>gemini</code> and <code>model</code> map to <code>assistant</code>. Other types, including informational and error events, are ignored. Content is a string or an array of parts with <code>text</code>. All documented timestamps are RFC 3339; a missing message timestamp falls back to session start.</p>
 <h2 id="wiring">Wiring</h2>
-<p><code>deja install gemini</code> adds the server under <code>mcpServers</code> in <code>~/.gemini/settings.json</code> and writes the shared skill <code>~/.agents/skills/deja-history/SKILL.md</code>. There is no command file: Gemini&#39;s command namespace is flat, the MCP server&#39;s own prompt is already <code>/deja</code>, and each skill is listed as a command too. <code>deja install gemini-auto</code> adds the same plus an extension at <code>~/.gemini/extensions/deja/</code>, because Gemini loads hooks from extensions and not from <code>settings.json</code>, and only with <code>hooksConfig.enabled</code> set, which install turns on. Uninstall takes the switch back out when install added it and no other extension has hooks; otherwise it stays on and uninstall says so. The extension wires <code>SessionStart</code> (<code>deja hook-context</code>), <code>BeforeAgent</code> (<code>hook-prompt</code>) and <code>AfterTool</code> on <code>run_shell_command</code> (<code>hook-tool-after</code>); timeouts are in milliseconds.</p>
+<p><code>deja install gemini</code> adds the server under <code>mcpServers</code> in <code>~/.gemini/settings.json</code> and writes the shared skill <code>~/.agents/skills/deja-history/SKILL.md</code>. There is no command file: Gemini&#39;s command namespace is flat, the MCP server&#39;s own prompt is already <code>/deja</code>, and each skill is listed as a command too. <code>deja install gemini-auto</code> adds the same plus an extension at <code>~/.gemini/extensions/deja/</code>, because Gemini loads hooks from extensions and not from <code>settings.json</code>, and only with <code>hooksConfig.enabled</code> set, which install turns on. Uninstall takes the switch back out when install added it and no other extension has hooks; otherwise it stays on and uninstall says so. The extension wires <code>SessionStart</code> (<code>deja hook-context</code>), <code>BeforeAgent</code> (<code>hook-prompt</code>), <code>AfterTool</code> on <code>run_shell_command</code> (<code>hook-tool-after</code>) and <code>SessionEnd</code> (<code>hook-session-end</code>, which tells MCP recall the session is over and may be answered with); timeouts are in milliseconds.</p>
 <h2 id="resume">Resume</h2>
 <p><code>gemini --resume &lt;uuid&gt;</code> takes the session id deja indexes — the <code>--help</code> text</p>
 <p>mentions only <code>latest</code> and an index, but the CLI&#39;s own error names</p>
-<p><code>--resume {uuid}</code> and 0.55.1 accepts one. No <code>cd</code>: gemini scopes the lookup by</p>
-<p>a hash of the working directory and stores only the hash, so there is nothing</p>
-<p>to invert into a path. From the wrong directory it says &#34;No previous sessions</p>
-<p>found for this project&#34; rather than opening someone else&#39;s.</p>
+<p><code>--resume {uuid}</code> and 0.55.1 accepts one. gemini finds a session only from</p>
+<p>the directory it ran in — anywhere else it says &#34;No previous sessions found</p>
+<p>for this project&#34; — so the command runs there. 0.60 records that directory</p>
+<p>in <code>~/.gemini/projects.json</code> and in the project folder&#39;s <code>.project_root</code>; a</p>
+<p>store that keys the folder by a hash of the path alone gets no <code>cd</code>.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>A resumed legacy <code>.json</code> session can be rewritten as <code>.jsonl</code>. deja deduplicates by session ID and prefers JSONL.</li>

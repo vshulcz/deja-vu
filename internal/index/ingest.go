@@ -634,7 +634,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -1429,12 +1432,13 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 // the user never sent — still got a row, so `deja last` printed a blank line
 // for it, `show` printed a header with nothing under it, and the counters
 // disagreed: brief and doctor read the manifest and stats reads the records
-// (1159 against 1157 on my store) (#868).
+// (1159 against 1157 on my store) (#868). The build counts the empty
+// transcripts as it reads them, not the rows dropped here: an empty transcript
+// sharing an id with one that holds text leaves no empty row behind (#4213).
 func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 	for key := range m.Sessions {
 		if !wrote[key] {
 			delete(m.Sessions, key)
-			emptied.Add(1)
 		}
 	}
 }
@@ -1577,7 +1581,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -2007,7 +2014,7 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), Settled: sessionSettled(s),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
 		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
@@ -2077,6 +2084,9 @@ func extendDerived(meta *SessionMeta, ms []model.Message) {
 		return
 	}
 	meta.Counted += len(tail)
+	if meta.NoText && holdsText(model.Session{Messages: tail}) {
+		meta.NoText = false
+	}
 	meta.LastMsg = messageFingerprint(ms[len(ms)-1])
 	meta.Words += sessionWords(tail)
 	// Capped like the full build caps: a plain union grows on every append,
@@ -2604,6 +2614,27 @@ func ReportEvictedFiles() int {
 	return int(evicted.Swap(0))
 }
 
+// claimSession is attributeSession for a session read this pass. A transcript
+// with nothing to index is not a second conversation: Gemini CLI's resume
+// leaves a file holding only the preamble deja strips, under the id of the
+// transcript it appends to. Sort order handed that file the row, and with no
+// records under it the session was dropped from the index (#4213). Either
+// side can be the empty one, since either can be read first. Only where the
+// pair would be reported as a clash: the store pairs attributeSession knows
+// (goose, opencode, codex) keep their own rule.
+func claimSession(held SessionMeta, s model.Session) (owns, collided bool) {
+	owns, collided = attributeSession(held, s)
+	if collided {
+		if !holdsText(s) {
+			return false, false
+		}
+		if held.NoText {
+			return true, false
+		}
+	}
+	return owns, collided
+}
+
 // attributeSession decides which of two transcripts sharing an id owns the
 // manifest row, and whether they collided at all. Lexicographically smallest
 // path wins, so the answer does not depend on which file was read first.
@@ -2649,6 +2680,55 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 		}
 	}
 	return s.Path < held.Path, true
+}
+
+// coversKept reports whether an arrival holds what the kept row indexed, which
+// a moved transcript does and a different file under the same id does not. The
+// test is the row's last message: a move carries it, and so does a move that
+// grew on the way. Gemini CLI's resume stub gains turns of its own after the
+// transcript it was resumed from is deleted, and taking it for the move threw
+// away that transcript's records for good (#4213). A count alone would not do:
+// the stub can outgrow a short transcript. A row from before LastMsg was kept
+// has nothing to compare, so it falls back to the count.
+func coversKept(r model.Session, meta SessionMeta) bool {
+	if meta.LastMsg == 0 {
+		return len(r.Messages) >= meta.Counted
+	}
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		m := r.Messages[i]
+		// Fingerprinted as stored: the row's was taken after redaction, and
+		// the arrival has not been redacted yet.
+		m.Text, _, _ = indexedText(m.Text)
+		if messageFingerprint(m) == meta.LastMsg {
+			return true
+		}
+		// The command may have been indexed before its result landed; the
+		// re-read adds the exit status to the same message. Codex compressing a
+		// rollout in place is still the move, so match it without the suffix.
+		if base := exitSuffix.ReplaceAllString(m.Text, ""); base != m.Text {
+			m.Text = base
+			if messageFingerprint(m) == meta.LastMsg {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// exitSuffix is the status the parsers append to a command once its result is
+// read: "  → exit N".
+var exitSuffix = regexp.MustCompile(`  → exit -?\d+$`)
+
+// holdsText reports whether any message of s has text left to index once
+// plumbing is stripped. Stripping is idempotent, so it answers the same before
+// and after preRedactSessions.
+func holdsText(s model.Session) bool {
+	for _, m := range s.Messages {
+		if strings.TrimSpace(stripSelfRecall(m.Text)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // isCodexHistory reports whether a path is Codex's prompt log rather than a
@@ -3585,16 +3665,33 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// Only when the arrival sits in the same directory: two projects can
 	// share a filename-derived id (#699), and that is a collision, not the
 	// kept session moving.
-	arrivedIn := map[string]string{}
-	for _, r := range replacements {
-		arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+	// An arrival with nothing to index is not the kept session moving: Gemini
+	// CLI's resume stub lands beside the transcript it shares an id with, and
+	// taking it for a rename dropped the deleted transcript's records (#4213).
+	arrivals := map[string][]int{}
+	for i, r := range replacements {
+		if holdsText(r) {
+			key := r.Harness + ":" + r.ID
+			arrivals[key] = append(arrivals[key], i)
+		}
 	}
 	// A session kept in a directory of its own moves with the directory, so
 	// the arrival is never beside the old path; its id is a UUID, which two
 	// projects do not share by accident, so the id alone says it moved.
 	for key, meta := range old.Sessions {
-		movedDir := arrivedIn[key] == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
-		if kept[meta.Path] && replaceKeys[key] && movedDir {
+		if !kept[meta.Path] {
+			continue
+		}
+		ownDir := sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
+		moved := false
+		for _, i := range arrivals[key] {
+			r := replacements[i]
+			if (ownDir || filepath.Dir(r.Path) == filepath.Dir(meta.Path)) && coversKept(r, meta) {
+				moved = true
+				break
+			}
+		}
+		if moved {
 			removed[meta.Path] = true
 			delete(files, meta.Path)
 			delete(kept, meta.Path)
@@ -3778,7 +3875,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if removed[held.Path] {
 			held.Path = ""
 		}
-		owns, collided := attributeSession(held, s)
+		owns, collided := claimSession(held, s)
 		if collided {
 			collisions.Add(1)
 		}
@@ -4081,12 +4178,32 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// searchable — so ask the filesystem instead. A recorded path that
 			// is not there cannot own the row, and without this the row kept
 			// the dead path and was marked as sharing its id with it (#1086).
-			if meta.Path != "" && s.Path != "" && meta.Path != s.Path {
+			// Not for an arrival with nothing to index: that is Gemini's resume
+			// stub beside a deleted transcript, not the transcript moving (#4213).
+			if meta.Path != "" && s.Path != "" && meta.Path != s.Path && holdsText(s) {
 				if _, err := os.Lstat(meta.Path); err != nil {
 					meta.Path = ""
 				}
 			}
-			owns, collided := attributeSession(meta, s)
+			owns, collided := claimSession(meta, s)
+			// A row with nothing to index that changes hands describes the
+			// stub, not the transcript taking it over: folding the transcript
+			// in on top counted the stub's preamble too, one more message than
+			// a rebuild of the same files gives (#4213). Start the row over
+			// from the session that owns it, as the full build does.
+			// Only for a file read whole: a known file hands over its tail,
+			// which is not the session. The span stays what both files cover,
+			// as the full build keeps it.
+			if owns && meta.NoText && meta.Path != s.Path && !known {
+				prev := meta
+				meta = metaWithOrd(metaForSession(s), prev.Ord)
+				if !prev.Started.IsZero() && (meta.Started.IsZero() || prev.Started.Before(meta.Started)) {
+					meta.Started = prev.Started
+				}
+				if prev.Updated.After(meta.Updated) {
+					meta.Updated = prev.Updated
+				}
+			}
 			if collided {
 				collisions.Add(1)
 				meta.Shared = true
@@ -4677,6 +4794,21 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 	return 0
 }
 
+// indexedText is a message's text as the index stores it: plumbing stripped,
+// NFC-canonicalised (this path does not go through redactForIngest, #1098),
+// redacted, then cut to maxIndexedText on a rune boundary.
+func indexedText(text string) (string, redact.Counts, bool) {
+	redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(text)))
+	if len(redacted) <= maxIndexedText {
+		return redacted, counts, false
+	}
+	cut := maxIndexedText
+	for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+		cut--
+	}
+	return redacted[:cut], counts, true
+}
+
 // preRedactSessions redacts every message concurrently before the write
 // loop. Redaction is regex-heavy and was the serial bottleneck of a cold
 // build; the write loop stays sequential (append-only log), but by the time
@@ -4700,15 +4832,8 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 			for si := range jobs {
 				s := &ss[si]
 				for mi := range s.Messages {
-					// NFC-canonicalise here too: this is the bulk write path and
-					// does not go through redactForIngest (#1098).
-					redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(s.Messages[mi].Text)))
-					if len(redacted) > maxIndexedText {
-						cut := maxIndexedText
-						for cut > 0 && !utf8.RuneStart(redacted[cut]) {
-							cut--
-						}
-						redacted = redacted[:cut]
+					redacted, counts, clipped := indexedText(s.Messages[mi].Text)
+					if clipped {
 						mu.Lock()
 						countClipped(m, s.Path, 1)
 						mu.Unlock()

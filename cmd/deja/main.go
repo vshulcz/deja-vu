@@ -243,6 +243,10 @@ var commands = map[string]command{
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
+	"hook-session-end": func(dir string, _ []string) error {
+		runHookSessionEnd(dir, os.Stdin)
+		return nil
+	},
 	"hook-plan": func(dir string, _ []string) error {
 		if sayIfTypedByHand("hook-plan") {
 			return nil
@@ -616,8 +620,21 @@ func cmdIndex(dir string, rest []string) error {
 	// the step whose whole job is filling memory returned to the prompt after
 	// a bare "indexing ..." line, and the state (no history anywhere, or a
 	// store behind a permission wall) only surfaced on the next command.
-	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
-		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+	// Only when the index is empty too: a pass that found no transcript left
+	// on disk still holds the sessions it keeps searchable, and the line
+	// above has just said so (#4221).
+	//
+	// A store behind a permission wall is still named when the index holds
+	// other sessions, without the "nothing to index" half: that line is the
+	// only pointer to the store this pass could not read.
+	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 {
+		denied := deniedStoreCount()
+		switch {
+		case indexIsEmpty(dir) && (denied > 0 || noAgentHistoryFound()):
+			fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+		case denied > 0:
+			fmt.Fprintln(os.Stderr, deniedStoresLine(denied, index.ReportEvictedFiles()))
+		}
 	}
 	if !quiet {
 		maybeFirstIndexGreeting(dir)
@@ -4056,6 +4073,7 @@ var helpHidden = map[string]bool{
 	"hook-goose-prompt": true,
 	"hook-precompact":   true,
 	"hook-refresh":      true,
+	"hook-session-end":  true,
 	"reasonix-ext":      true,
 	"warmup-status":     true,
 }
@@ -4282,6 +4300,14 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 	return errors.New(refusal)
 }
 
+// indexIsEmpty reports whether the index holds no session at all. An index
+// that cannot be counted counts as empty on purpose, so the caller falls back
+// to the empty-index hint it printed before.
+func indexIsEmpty(dir string) bool {
+	n, err := index.SessionCount(dir)
+	return err != nil || n == 0
+}
+
 // emptyIndexReason opens the empty-index sentence. "Nothing to index yet" is
 // for a machine deja has never seen history from; a run that has just evicted a
 // store says what went away instead, because the line above it has already told
@@ -4292,6 +4318,18 @@ func emptyIndexReason(b index.BuildSummary, evicted int) string {
 			evicted, pluralS(evicted), pluralWhich(evicted)))
 	}
 	return emptyIndexHint("nothing to index yet")
+}
+
+// deniedStoresLine names the stores deja could not read on a pass whose index
+// still holds sessions, with the files the pass evicted when there were any.
+func deniedStoresLine(denied, evicted int) string {
+	line := fmt.Sprintf("%d store%s could not be read (permission denied); `deja doctor` names %s",
+		denied, pluralS(denied), pluralWhich(denied))
+	if evicted > 0 {
+		line = fmt.Sprintf("%d indexed file%s went away with the store that held %s — %s",
+			evicted, pluralS(evicted), pluralWhich(evicted), line)
+	}
+	return "deja: " + line
 }
 
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
