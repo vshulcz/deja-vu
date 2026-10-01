@@ -32,7 +32,7 @@ func TestAClaudeSessionInANonASCIIDirectoryKeepsItsProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "11111111-2222-4333-8444-555555555555.jsonl")
-	line := `{"type":"user","sessionId":"11111111-2222-4333-8444-555555555555","cwd":"` + work + `","timestamp":"2026-09-20T10:00:00Z","uuid":"u1","message":{"role":"user","content":"кэш живёт в «ёлке»"}}` + "\n"
+	line := `{"type":"user","sessionId":"11111111-2222-4333-8444-555555555555","cwd":` + jsonString(work) + `,"timestamp":"2026-09-20T10:00:00Z","uuid":"u1","message":{"role":"user","content":"кэш живёт в «ёлке»"}}` + "\n"
 	if err := os.WriteFile(path, []byte(line), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestAClaudeFolderHasOneProjectWhicheverFileIsReadFirst(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(`{"type":"user","cwd":"`+cwd+`","message":{"role":"user","content":"x"}}`+"\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(`{"type":"user","cwd":`+jsonString(cwd)+`,"message":{"role":"user","content":"x"}}`+"\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -128,3 +128,4 @@ func TestClaudeFolderIsFollowsClaudesEncoding(t *testing.T) {
 		t.Error("an unrelated cwd matched")
 	}
 }
+
