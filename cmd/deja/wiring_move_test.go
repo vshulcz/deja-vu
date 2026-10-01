@@ -47,7 +47,13 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	// /var spelling of the /private/var path the record holds.
 	invoked, _ := os.Executable()
 	invoked, _ = filepath.Abs(invoked)
-	old := strings.ReplaceAll(strings.ReplaceAll(string(before), moved, wired.Exe), invoked, wired.Exe)
+	// As JSON holds it, too: on Windows the separators are escaped.
+	old := string(before)
+	for _, p := range []string{moved, invoked} {
+		esc := func(s string) string { return strings.Trim(jsonString(s), `"`) }
+		old = strings.ReplaceAll(old, esc(p), esc(wired.Exe))
+		old = strings.ReplaceAll(old, p, wired.Exe)
+	}
 	if err := os.WriteFile(claudeJSON, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
