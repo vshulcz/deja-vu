@@ -241,7 +241,7 @@ func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 // reference the typed parser is proved against — including on a real store,
 // where the shapes nobody thought of live.
 func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, error) {
-	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(claudeProjectDir(path)), Path: path}
+	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectNameFor(path), Path: path}
 	// Where each Bash call's record landed, so the result that arrives in a
 	// later record can stamp its outcome onto it.
 	commandAt := map[string][]int{}
@@ -437,6 +437,15 @@ func resolveEncodedPath(base string) string {
 	}
 	var try func(done, seg string, i int) string
 	try = func(done, seg string, i int) string {
+		// An empty segment is a character the encoding blanked, not a
+		// directory: closing it as one handed back the parent with slashes
+		// on, "007///////" (#4175).
+		if seg == "" {
+			if i == len(parts) {
+				return ""
+			}
+			return try(done, seg+"-"+parts[i], i+1)
+		}
 		if i == len(parts) {
 			p := done + string(filepath.Separator) + seg
 			if fi, err := os.Stat(p); err == nil && fi.IsDir() {

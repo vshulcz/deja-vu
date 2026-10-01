@@ -316,10 +316,15 @@ import (
 // filed under the project "history" (#4180); the row is decided when a session
 // is written, so a rebuild.
 //
-// 56: a Cursor CLI session gains its tool results from the chat store — exit
-// status on a failed command and the output it printed (#4187). A finished
+// 56: a Claude Code session run in a directory with characters outside
+// [A-Za-z0-9] took its project from the folder name, where those characters
+// are blanked, and landed under the parent; it now reads the recorded cwd
+// (#4175). Projects are set when a transcript is read, so a rebuild.
+//
+// 57: a Cursor CLI session gains its tool results from the chat store — the
+// exit status on a command and the output it printed (#4187). A finished
 // transcript is never re-read, so a rebuild.
-const version = 56
+const version = 57
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

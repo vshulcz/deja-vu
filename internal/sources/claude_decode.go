@@ -101,7 +101,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
-		Project: claudeProjectName(claudeProjectDir(path)),
+		Project: claudeProjectNameFor(path),
 		Path:    path,
 	}
 	err := scan(func(line []byte) {

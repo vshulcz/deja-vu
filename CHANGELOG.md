@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Cursor CLI sessions carry what their tools returned: the command output and the exit status of a failed command, read from the chat store beside the transcript, which records only the calls. On the machine this was measured on, tool output went from 0% of Cursor sessions to 53%. The index rebuilds once (#4187).
+- `deja uninstall codex-auto` takes out the trust pins Codex wrote in `config.toml` when you approved deja's hooks, and moves the pins of your own hooks to where those hooks now sit. Left behind, they kept the file from coming back as it was and let a reinstall start already trusted (#4183).
 - An interactive Codex session is filed under the directory it ran in and `deja resume` reopens it. The incremental pass read `history.jsonl` on its own, so the prompt line took the session: project `history`, the prompt shown twice, and resume refusing it as an exec entry. The index rebuilds once (#4180).
 - `deja doctor --json` marks an MCP entry that names a deja binary that is no longer there with `"binary_missing": true`, as the `auto_recall` rows already did; the text report said so and the JSON read plain `wired` (#4177).
 - `deja blame` names the Claude subagent that changed a file. A subagent run is indexed as its task and its answer, and the edits went with the rest of the middle, so the 1,668 subagent edits on the machine this was measured on were never indexed. Files changed inside a Claude Code worktree (`.claude/worktrees/`) were also skipped as the agent's own files. The index rebuilds once to pick up finished subagent runs (#4163, #4164).
 - Installing and uninstalling no longer re-sorts the keys of a hook entry you wrote on one line in `~/.claude/settings.json` (or any JSON config deja edits): entries inside a block deja adds to keep their text, so an install followed by an uninstall gives the file back byte for byte (#4167).
+- A Claude Code session run in a directory named with characters outside A–Z and 0–9 (Cyrillic, CJK, accents, spaces) is filed under that directory rather than its parent, so recall in that directory finds it, and `deja resume` cds into it instead of `parent///////`. The index rebuilds once (#4175).
 
 ## [0.21.4] - 2026-09-29
 
