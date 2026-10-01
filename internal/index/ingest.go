@@ -891,6 +891,7 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		return out
 	}
 	want := map[string]bool{}
+	var present map[string]bool
 	for _, p := range sortedKeys(m.Files) {
 		if p == syncImportPath {
 			continue // importedSessions carries these
@@ -912,6 +913,16 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		}
 		if !deletedFromLiveStore(p) {
 			continue
+		}
+		// Moved with its directory, not deleted: the session is read from
+		// where it is now (#4195).
+		if d := goneSessionDir(p); d != "" {
+			if present == nil {
+				present = sessionDirsUnder(files)
+			}
+			if present[filepath.Base(d)] {
+				continue
+			}
 		}
 		want[p] = true
 	}
@@ -3442,9 +3453,17 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		}
 	}
 	gone = stores
+	// A session directory that turns up under another parent in the same pass
+	// moved rather than went: its id is its name. Keeping the old copy then
+	// made the session its own second copy, and the append path below, which
+	// takes over once nothing is removed, has no pairing to catch it.
+	arrivedDirs := sessionDirsUnder(changed)
 	kept := map[string]bool{}
 	for p := range removed {
 		if !deletedFromLiveStore(p) {
+			continue
+		}
+		if d := goneSessionDir(p); d != "" && arrivedDirs[filepath.Base(d)] {
 			continue
 		}
 		if of, ok := old.Files[p]; ok {
@@ -3570,8 +3589,12 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	for _, r := range replacements {
 		arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
 	}
+	// A session kept in a directory of its own moves with the directory, so
+	// the arrival is never beside the old path; its id is a UUID, which two
+	// projects do not share by accident, so the id alone says it moved.
 	for key, meta := range old.Sessions {
-		if kept[meta.Path] && replaceKeys[key] && arrivedIn[key] == filepath.Dir(meta.Path) {
+		movedDir := arrivedIn[key] == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
+		if kept[meta.Path] && replaceKeys[key] && movedDir {
 			removed[meta.Path] = true
 			delete(files, meta.Path)
 			delete(kept, meta.Path)
@@ -4465,9 +4488,13 @@ func missingTrees(removed map[string]bool) []missingTree {
 	return out
 }
 
-// sessionDirName is a session id in a directory name: Cursor's and Copilot's
-// are the id, Kimi's is session_<id>.
-var sessionDirName = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+// sessionDirName is a directory named for one session: the id itself
+// (Cursor, Copilot CLI, Antigravity, a Claude transcript's sidecar), Kimi's
+// session_<id>, DeepSeek's session-<id>, Kiro's sess_<id>. Anchored, because
+// an encoded working directory under a store root carries a UUID whenever the
+// directory did — a temp dir, a sandbox — and that folder is a project, not a
+// session.
+var sessionDirName = regexp.MustCompile(`^(?:session[_-]|sess_)?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // deletedFromLiveStore reports whether a file no longer on disk was deleted
 // from a store that is still there — the client's cleanup or a deletion by
@@ -4475,17 +4502,43 @@ var sessionDirName = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-
 // away whole: its directory is still there, or the directory that went with
 // it was one session's (#4195).
 func deletedFromLiveStore(p string) bool {
+	if _, err := os.Stat(filepath.Dir(p)); err == nil {
+		return true
+	}
+	return goneSessionDir(p) != ""
+}
+
+// sessionDirsUnder names the session directories the given files sit in.
+func sessionDirsUnder(files map[string]FileState) map[string]bool {
+	out := map[string]bool{}
+	for p := range files {
+		for d, i := filepath.Dir(p), 0; i < 4; d, i = filepath.Dir(d), i+1 {
+			if b := filepath.Base(d); sessionDirName.MatchString(b) {
+				out[b] = true
+			}
+		}
+	}
+	return out
+}
+
+// goneSessionDir is the session directory that went with a file, when the
+// topmost directory missing above it is one session's under a parent that is
+// still there; "" otherwise.
+func goneSessionDir(p string) string {
 	dir := filepath.Dir(p)
 	if _, err := os.Stat(dir); err == nil {
-		return true
+		return ""
 	}
 	for {
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return false
+			return ""
 		}
 		if _, err := os.Stat(parent); err == nil {
-			return deletedSessionDir(dir)
+			if deletedSessionDir(dir) {
+				return dir
+			}
+			return ""
 		}
 		dir = parent
 	}
