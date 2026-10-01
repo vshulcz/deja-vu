@@ -76,7 +76,7 @@ func TestOpencodeJSONCGivesTheConfigBackAsItWas(t *testing.T) {
 }
 
 // A comment the reader put above their first entry belongs to that entry, so
-// our own goes under it rather than between the two.
+// our own goes above it rather than between the two (#4203).
 func TestOpencodeJSONCLeavesALeadingCommentWhereItWas(t *testing.T) {
 	before := `{
   "mcp": {
@@ -99,7 +99,7 @@ func TestOpencodeJSONCLeavesALeadingCommentWhereItWas(t *testing.T) {
 			deja = i
 		}
 	}
-	if comment < 0 || deja < 0 || comment > deja {
-		t.Fatalf("our entry went above the reader's comment:\n%s", out)
+	if comment < 0 || deja < 0 || deja > comment {
+		t.Fatalf("our entry went between the reader's comment and its entry:\n%s", out)
 	}
 }
