@@ -138,8 +138,13 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "codex resume " + s.ID, nil
 	case "opencode":
 		dir := ""
+		// opencode sessions carry their project directory. opencode reopens a
+		// session from anywhere, so a deleted one is left out rather than
+		// printed as a cd that fails (#4201).
 		if s.Path != "" && s.Path != sources.OpencodeDB() {
-			dir = s.Path // opencode sessions carry their project directory
+			if fi, err := os.Stat(s.Path); err == nil && fi.IsDir() {
+				dir = s.Path
+			}
 		}
 		return dir, "opencode -s " + s.ID, nil
 	case "antigravity":
