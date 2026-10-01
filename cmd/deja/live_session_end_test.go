@@ -122,19 +122,16 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 			t.Errorf("install rewrote the reader's own entry; want it as written:\n%s\n--- in\n%s", block, b)
 		}
 	}
-	// One second: Claude Code holds /exit for the largest SessionEnd timeout
-	// it finds, the reader's slow hooks included.
-	bounded := false
+	// No timeout: Claude Code then gives the hook its SessionEnd default of
+	// 1.5 s, and a timeout of ours would only cut that budget or, larger,
+	// hold every /exit and /clear the reader makes.
 	for _, e := range settingsHooks(t, b)["SessionEnd"].([]any) {
 		for _, h := range e.(map[string]any)["hooks"].([]any) {
 			h := h.(map[string]any)
-			if strings.HasSuffix(h["command"].(string), " hook-session-end") {
-				bounded = h["timeout"] == float64(1)
+			if _, has := h["timeout"]; has && strings.HasSuffix(h["command"].(string), " hook-session-end") {
+				t.Errorf("deja's SessionEnd entry carries a timeout: %v", h["timeout"])
 			}
 		}
-	}
-	if !bounded {
-		t.Errorf("deja's SessionEnd entry is not bounded at one second:\n%s", b)
 	}
 	if st := claudeHookWiringState(); st.state != "wired" {
 		t.Errorf("doctor reads %q (missing %v) after a fresh install", st.state, st.missing)
@@ -251,5 +248,85 @@ func TestAForkDoesNotGetItsSourceBackAsRecall(t *testing.T) {
 	}
 	if !strings.Contains(got, "earlier-3") {
 		t.Errorf("a session that asked the same thing at another time was hidden as a copy:\n%s", got)
+	}
+}
+
+// forkStore writes Claude transcripts under one project and builds the index.
+func forkStore(t *testing.T, sessions map[string][][3]string) string {
+	t.Helper()
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-w-p")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for id, turns := range sessions {
+		var body strings.Builder
+		for _, turn := range turns {
+			b, _ := json.Marshal(map[string]any{"type": turn[0], "sessionId": id, "cwd": "/w/p", "timestamp": turn[1],
+				"message": map[string]any{"role": turn[0], "content": turn[2]}})
+			body.Write(b)
+			body.WriteByte('\n')
+		}
+		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(body.String()), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+const forkOpening = "The golden test in internal/store never runs here. Find the exact command that runs it and proof that it passes."
+
+// A fork that went on to its own work and ended is history, even while the
+// session it was forked from is open again: it shares that session's opening,
+// not its transcript.
+func TestAForkThatWentOnIsNotHiddenWhenItsSourceResumes(t *testing.T) {
+	opened := "2026-09-30T10:00:00.123Z"
+	dir := forkStore(t, map[string][][3]string{
+		"src-1": {{"user", opened, forkOpening}, {"assistant", "2026-09-30T10:00:05.000Z", "Looking at the Makefile now."},
+			{"user", "2026-10-01T09:00:00.000Z", "back to this, what did the Makefile say"}},
+		"fork-2": {{"user", opened, forkOpening}, {"assistant", "2026-09-30T10:00:05.000Z", "Looking at the Makefile now."},
+			{"user", "2026-09-30T10:05:00.000Z", "the websocket reconnect test is flaky, fix the backoff jitter"},
+			{"assistant", "2026-09-30T10:09:00.000Z", "Raised the reconnect backoff jitter to 250ms; the websocket reconnect test passes 50 of 50."}},
+	})
+	q := json.RawMessage(`{"query":"websocket reconnect backoff jitter"}`)
+	before, err := callMCPTool(dir, "recall", q)
+	if err != nil {
+		t.Fatalf("recall: %v", err)
+	}
+	if !strings.Contains(before, "fork-2") {
+		t.Fatalf("with nothing live the fork is not found, so this proves nothing:\n%s", before)
+	}
+	markSessionLive(dir, "src-1")
+	got, err := callMCPTool(dir, "recall", q)
+	if err != nil {
+		t.Fatalf("recall: %v", err)
+	}
+	if !strings.Contains(got, "fork-2") {
+		t.Errorf("a fork that did its own work was hidden as a copy of the live session:\n%s", got)
+	}
+}
+
+// Two sessions that open on the same millisecond with different openings —
+// a subagent batch, siblings started together — are not copies of each other.
+func TestASessionOpenedTheSameInstantOnSomethingElseIsNotHidden(t *testing.T) {
+	opened := "2026-09-30T10:00:00.123Z"
+	dir := forkStore(t, map[string][][3]string{
+		"src-1": {{"user", opened, forkOpening},
+			{"assistant", "2026-09-30T10:02:00.000Z", "Run SVC_FIXTURES=$PWD/fixtures make test — that runs the golden test in internal/store and it passes."}},
+		"par-3": {{"user", opened, "rename the config loader and update every caller in cmd/"}},
+	})
+	markSessionLive(dir, "par-3")
+	got, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"golden test internal/store never runs"}`))
+	if err != nil {
+		t.Fatalf("recall: %v", err)
+	}
+	if !strings.Contains(got, "src-1") {
+		t.Errorf("a session that only shares the live one's start time was hidden:\n%s", got)
 	}
 }

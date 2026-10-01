@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"sort"
+	"strconv"
 )
 
 // Nested key order, for the objects the reader wrote. reorderTopLevel puts the
@@ -12,23 +13,23 @@ import (
 // under it — `matcher` after `hooks`, `command` before `type` — and an
 // uninstall could not hand the file back as it was (#4210).
 //
-// An object keeps the reader's order when the file holds the same object, key
-// for key and value for value: that is one deja did not touch. One deja
-// changed keeps it too when it sits where only one object can, outside any
-// array — the `hooks` map an event was added to — with keys deja added after
-// the reader's. Anything else is deja's own and comes out as marshalling
-// writes it.
+// Outside any array an object has one place, its path, and keeps the order the
+// file had there, with keys deja added after the reader's. Inside an array an
+// object is matched by value: the same object, key for key and value for
+// value, is one deja did not touch, and copies with one value take the orders
+// the file gave them in the order they appear. Anything else is deja's own and
+// comes out as marshalling writes it.
 
 // keyOrders is what the reader's file says about key order.
 type keyOrders struct {
-	byValue map[string][]string // canonical JSON of an object -> its keys as written
-	byPath  map[string][]string // path of an object outside any array -> its keys
+	byPath  map[string][]string   // path of an object outside any array -> its keys
+	byValue map[string][][]string // canonical JSON of an object in an array -> its key orders, in file order
 }
 
-// readKeyOrders walks the old file. ok is false when it is not plain JSON,
-// and the caller then keeps the order marshalling gives.
+// readKeyOrders walks the old file. ok is false when it is not plain JSON, and
+// the caller then keeps the order marshalling gives.
 func readKeyOrders(old []byte) (keyOrders, bool) {
-	ko := keyOrders{byValue: map[string][]string{}, byPath: map[string][]string{}}
+	ko := keyOrders{byPath: map[string][]string{}, byValue: map[string][][]string{}}
 	if len(bytes.TrimSpace(old)) == 0 {
 		return ko, false
 	}
@@ -39,78 +40,111 @@ func readKeyOrders(old []byte) (keyOrders, bool) {
 	return ko, true
 }
 
-func (ko keyOrders) read(dec *json.Decoder, path string, inArray bool) (any, error) {
+// childPath quotes each segment, so a key holding a slash or a bracket cannot
+// pass for two segments.
+func childPath(path, key string) string { return path + "/" + strconv.Quote(key) }
+
+// read returns the canonical JSON of what it read when inside an array — the
+// only place it is wanted — built from the members' so nothing is marshalled
+// twice.
+func (ko keyOrders) read(dec *json.Decoder, path string, inArray bool) ([]byte, error) {
 	tok, err := dec.Token()
 	if err != nil {
 		return nil, err
 	}
 	d, ok := tok.(json.Delim)
 	if !ok {
-		return tok, nil
-	}
-	switch d {
-	case '{':
-		obj := map[string]any{}
-		var keys []string
-		for dec.More() {
-			k, err := dec.Token()
-			if err != nil {
-				return nil, err
-			}
-			name, _ := k.(string)
-			v, err := ko.read(dec, path+"."+name, inArray)
-			if err != nil {
-				return nil, err
-			}
-			if _, dup := obj[name]; !dup {
-				keys = append(keys, name)
-			}
-			obj[name] = v
-		}
-		if _, err := dec.Token(); err != nil {
-			return nil, err
-		}
-		if canon, err := json.Marshal(obj); err == nil {
-			if _, seen := ko.byValue[string(canon)]; !seen {
-				ko.byValue[string(canon)] = keys
-			}
-		}
 		if !inArray {
-			ko.byPath[path] = keys
+			return nil, nil
 		}
-		return obj, nil
-	case '[':
-		arr := []any{}
-		for dec.More() {
-			v, err := ko.read(dec, path+"[]", true)
+		return json.Marshal(tok)
+	}
+	if d == '[' {
+		var b bytes.Buffer
+		b.WriteByte('[')
+		for i := 0; dec.More(); i++ {
+			c, err := ko.read(dec, path+"[]", true)
 			if err != nil {
 				return nil, err
 			}
-			arr = append(arr, v)
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.Write(c)
 		}
 		if _, err := dec.Token(); err != nil {
 			return nil, err
 		}
-		return arr, nil
+		b.WriteByte(']')
+		return b.Bytes(), nil
 	}
-	return nil, nil
+	var keys []string
+	members := map[string][]byte{}
+	for dec.More() {
+		k, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		name, _ := k.(string)
+		c, err := ko.read(dec, childPath(path, name), inArray)
+		if err != nil {
+			return nil, err
+		}
+		if _, dup := members[name]; !dup {
+			keys = append(keys, name)
+		}
+		members[name] = c
+	}
+	if _, err := dec.Token(); err != nil {
+		return nil, err
+	}
+	if !inArray {
+		ko.byPath[path] = keys
+		return nil, nil
+	}
+	c := canonObject(members)
+	ko.byValue[string(c)] = append(ko.byValue[string(c)], keys)
+	return c, nil
 }
 
-// orderFor is the key order to write an object in.
-func (ko keyOrders) orderFor(obj map[string]any, path string, inArray bool) []string {
-	sorted := make([]string, 0, len(obj))
-	for k := range obj {
-		sorted = append(sorted, k)
+// canonObject is json.Marshal's form of an object whose members are already in
+// that form: keys sorted, no space.
+func canonObject(members map[string][]byte) []byte {
+	keys := make([]string, 0, len(members))
+	n := 2
+	for k, v := range members {
+		keys = append(keys, k)
+		n += len(k) + len(v) + 4
 	}
-	sort.Strings(sorted)
-	if canon, err := json.Marshal(obj); err == nil {
-		if keys, ok := ko.byValue[string(canon)]; ok && len(keys) == len(obj) {
-			return keys
+	sort.Strings(keys)
+	b := bytes.NewBuffer(make([]byte, 0, n))
+	b.WriteByte('{')
+	for i, k := range keys {
+		if i > 0 {
+			b.WriteByte(',')
 		}
+		name, _ := json.Marshal(k)
+		b.Write(name)
+		b.WriteByte(':')
+		b.Write(members[k])
 	}
-	if inArray {
-		return sorted
+	b.WriteByte('}')
+	return b.Bytes()
+}
+
+func sortedMapKeys(obj map[string]any) []string {
+	out := make([]string, 0, len(obj))
+	for k := range obj {
+		out = append(out, k)
 	}
+	sort.Strings(out)
+	return out
+}
+
+// pathOrder is the order for an object outside any array: the reader's keys as
+// they had them, then whatever deja added, sorted.
+func (ko keyOrders) pathOrder(obj map[string]any, path string) []string {
+	sorted := sortedMapKeys(obj)
 	written, ok := ko.byPath[path]
 	if !ok {
 		return sorted
@@ -131,12 +165,22 @@ func (ko keyOrders) orderFor(obj map[string]any, path string, inArray bool) []st
 	return out
 }
 
+// valueOrder takes the next order the file gave an object of this value.
+func (ko keyOrders) valueOrder(obj map[string]any, canon []byte) []string {
+	q := ko.byValue[string(canon)]
+	if len(q) == 0 {
+		return sortedMapKeys(obj)
+	}
+	ko.byValue[string(canon)] = q[1:]
+	return q[0]
+}
+
 // marshalOrdered is json.MarshalIndent with the reader's key order kept where
-// orderFor finds one. The compact form is built here and indented by the
+// the file gives one. The compact form is built here and indented by the
 // standard library, so spacing and escaping are what MarshalIndent writes.
 func marshalOrdered(ko keyOrders, v any, indent string) ([]byte, error) {
 	var b bytes.Buffer
-	if err := ko.write(&b, v, "", false); err != nil {
+	if _, err := ko.write(&b, v, "", false); err != nil {
 		return nil, err
 	}
 	var out bytes.Buffer
@@ -146,42 +190,76 @@ func marshalOrdered(ko keyOrders, v any, indent string) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-func (ko keyOrders) write(b *bytes.Buffer, v any, path string, inArray bool) error {
+// write appends v's compact JSON to b. Inside an array it also returns v's
+// canonical JSON, which an enclosing object needs to find its order.
+func (ko keyOrders) write(b *bytes.Buffer, v any, path string, inArray bool) ([]byte, error) {
 	switch t := v.(type) {
 	case map[string]any:
+		if !inArray {
+			b.WriteByte('{')
+			for i, k := range ko.pathOrder(t, path) {
+				if i > 0 {
+					b.WriteByte(',')
+				}
+				name, _ := json.Marshal(k)
+				b.Write(name)
+				b.WriteByte(':')
+				if _, err := ko.write(b, t[k], childPath(path, k), false); err != nil {
+					return nil, err
+				}
+			}
+			b.WriteByte('}')
+			return nil, nil
+		}
+		// The members first, each on its own: the order can only be looked up
+		// once the whole value is known.
+		text := make(map[string][]byte, len(t))
+		canon := make(map[string][]byte, len(t))
+		for k, e := range t {
+			var mb bytes.Buffer
+			c, err := ko.write(&mb, e, "", true)
+			if err != nil {
+				return nil, err
+			}
+			text[k], canon[k] = mb.Bytes(), c
+		}
+		c := canonObject(canon)
 		b.WriteByte('{')
-		for i, k := range ko.orderFor(t, path, inArray) {
+		for i, k := range ko.valueOrder(t, c) {
 			if i > 0 {
 				b.WriteByte(',')
 			}
-			name, err := json.Marshal(k)
-			if err != nil {
-				return err
-			}
+			name, _ := json.Marshal(k)
 			b.Write(name)
 			b.WriteByte(':')
-			if err := ko.write(b, t[k], path+"."+k, inArray); err != nil {
-				return err
-			}
+			b.Write(text[k])
 		}
 		b.WriteByte('}')
+		return c, nil
 	case []any:
+		var cb bytes.Buffer
 		b.WriteByte('[')
+		cb.WriteByte('[')
 		for i, e := range t {
 			if i > 0 {
 				b.WriteByte(',')
+				cb.WriteByte(',')
 			}
-			if err := ko.write(b, e, path+"[]", true); err != nil {
-				return err
+			c, err := ko.write(b, e, path+"[]", true)
+			if err != nil {
+				return nil, err
 			}
+			cb.Write(c)
 		}
 		b.WriteByte(']')
+		cb.WriteByte(']')
+		return cb.Bytes(), nil
 	default:
 		s, err := json.Marshal(t)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		b.Write(bytes.TrimRight(s, "\n"))
+		b.Write(s)
+		return s, nil
 	}
-	return nil
 }

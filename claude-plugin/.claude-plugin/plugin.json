@@ -90,7 +90,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-session-end",
-            "timeout": 1,
             "statusMessage": "Marking this session as ended…"
           }
         ]
