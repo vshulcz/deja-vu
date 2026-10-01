@@ -1,0 +1,71 @@
+package main
+
+import (
+	"errors"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
+)
+
+// deja keeps a session searchable after the agent deletes its transcript
+// (#2970, #3529), so resume is offered sessions the agent no longer has, and
+// the command it printed failed in the agent: codex said "No saved session
+// found" (#4185). A session whose own transcript file is gone is refused with
+// where it can still be read.
+func resumeGoneError(s model.Session) error {
+	if !transcriptGone(s) {
+		return nil
+	}
+	return errors.New("session " + digest.Short(s.ID) + " is no longer in " + s.Harness +
+		"'s own store (deleted or expired), so it cannot be reopened there — `deja show " + digest.Short(s.ID) + "` still has it")
+}
+
+// transcriptGone reports whether the file a session was read from has left
+// the disk. Only per-session transcript files count: a database or a working
+// directory in Path says nothing about one session.
+func transcriptGone(s model.Session) bool {
+	if s.Path == "" || !isTranscriptFile(s.Path) {
+		return false
+	}
+	if _, err := os.Stat(s.Path); !errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+	// Codex moves its own rollouts: `codex archive` into archived_sessions,
+	// and a background pass compresses one a week old to .jsonl.zst. Either
+	// way `codex resume` still finds it.
+	if s.Harness == "codex" && codexRolloutExists(s.ID) {
+		return false
+	}
+	return true
+}
+
+func isTranscriptFile(p string) bool {
+	for _, ext := range []string{".jsonl", ".jsonl.zst", ".json"} {
+		if strings.HasSuffix(strings.ToLower(p), ext) {
+			return true
+		}
+	}
+	return false
+}
+
+func codexRolloutExists(id string) bool {
+	if id == "" || strings.ContainsAny(id, `*?[\/`) {
+		return false
+	}
+	for _, root := range sources.CodexRoots() {
+		for _, pattern := range []string{
+			filepath.Join(root, "sessions", "*", "*", "*", "rollout-*"+id+".jsonl*"),
+			filepath.Join(root, "archived_sessions", "rollout-*"+id+".jsonl*"),
+		} {
+			if m, _ := filepath.Glob(pattern); len(m) > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
