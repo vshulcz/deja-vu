@@ -97,3 +97,83 @@ func TestWiringRepairFindsTheLinkWhenTheExecutableIsResolved(t *testing.T) {
 		t.Fatalf("stableExe = %s, want the binary itself %s", got, real)
 	}
 }
+
+// A link in a temp directory is not a stable path: the repair would trade a
+// binary that stays for a link that goes with the directory.
+func TestWiringRepairSkipsALinkInATempDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	real, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	real, _ = filepath.EvalSymlinks(real)
+	link := filepath.Join(home, "scratch", "tmp", "deja")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	was := exeIsTemporary
+	t.Cleanup(func() { exeIsTemporary = was })
+	exeIsTemporary = func(p string) bool {
+		return strings.Contains(p, string(filepath.Separator)+"tmp"+string(filepath.Separator))
+	}
+	if got := stableExe(link, real); got != real {
+		t.Fatalf("stableExe = %s, want the binary %s rather than a temp link", got, real)
+	}
+}
+
+// The configs name the link; remove it and they are dead while the binary is
+// still where the record says, so the repair has to look at the link too.
+func TestWiringRepairNoticesTheLinkItWroteIsGone(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlinks need privileges on Windows")
+	}
+	hermeticEnv(t)
+	home := os.Getenv("HOME")
+	if err := os.MkdirAll(filepath.Join(home, ".cursor"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	real, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	real, _ = filepath.EvalSymlinks(real)
+	link := filepath.Join(home, ".local", "bin", "deja")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { runningExe = os.Executable })
+	runningExe = func() (string, error) { return link, nil }
+	if _, err := captureRun(t, "install", "cursor", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if st := readWiringState(); st.Written != link || st.Exe != real {
+		t.Fatalf("record exe=%s written=%s, want %s through %s", st.Exe, st.Written, real, link)
+	}
+
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	runningExe = func() (string, error) { return real, nil }
+	refreshWiringAfterUpgrade()
+
+	b, err := os.ReadFile(filepath.Join(home, ".cursor", "mcp.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), jsonString(real)) {
+		t.Fatalf("the entry still names the removed link:\n%s", b)
+	}
+	if st := readWiringState(); st.Written != "" {
+		t.Fatalf("record still names a link: %q", st.Written)
+	}
+}

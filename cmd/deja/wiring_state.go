@@ -64,7 +64,26 @@ type wiringState struct {
 	// a second one beside it (#3421). The record is what makes the answer
 	// certain rather than a guess about names.
 	Exes []string `json:"exes,omitempty"`
+	// Written is the path the configs name when it is not Exe itself: a link
+	// that resolves to it, which survives the upgrade that replaces Exe
+	// (#4189). Remove the link and the configs are dead while Exe is still
+	// there, so the repair checks this too.
+	Written string `json:"written,omitempty"`
 }
+
+// writtenStillResolves reports whether the path the configs name still leads
+// to exe.
+func (st wiringState) writtenStillResolves(exe string) bool {
+	if st.Written == "" {
+		return true
+	}
+	r, err := filepath.EvalSymlinks(st.Written)
+	return err == nil && r == exe
+}
+
+// wiringWrittenExe is the path this run wrote into configs, when the repair
+// chose a link; recordWiring keeps it as Written.
+var wiringWrittenExe string
 
 // wiringExeHistory bounds the remembered paths. Ten covers a machine that
 // reinstalls often; beyond that the oldest is dropped.
@@ -198,10 +217,20 @@ func recordWiring(targets []string, uninstall bool) {
 		}
 	}
 	sort.Strings(kept)
-	exe, _ := runningExe()
-	exe, _ = filepath.Abs(exe)
+	invoked, _ := runningExe()
+	invoked, _ = filepath.Abs(invoked)
+	exe := invoked
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
+	}
+	// What the configs were given: install writes the binary as it was
+	// started, the repair whatever stableExe chose.
+	written := invoked
+	if wiringWrittenExe != "" {
+		written = wiringWrittenExe
+	}
+	if written == exe {
+		written = ""
 	}
 	// Uninstalling everything on a machine that was never wired would otherwise
 	// create the record on the way out — a file left behind by the command that
@@ -263,8 +292,9 @@ func recordWiring(targets []string, uninstall bool) {
 	sort.Strings(blocks)
 	exes := append([]string(nil), st.Exes...)
 	next := wiringState{Version: version, Targets: kept, Created: created, Dirs: dirs, Snapshots: snapshots,
-		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir()}
+		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir(), Written: written}
 	rememberWrittenExe(&next, exe)
+	rememberWrittenExe(&next, written)
 	st = next
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
@@ -343,7 +373,9 @@ var runningExe = os.Executable
 // after it.
 func stableExe(invoked, exe string) string {
 	for _, c := range append([]string{invoked}, launcherCandidates("")...) {
-		if c == "" || c == exe {
+		// A link in a temp directory goes when the directory does, which is
+		// what the resolved path was guarded against.
+		if c == "" || c == exe || exeIsTemporary(c) {
 			continue
 		}
 		if r, err := filepath.EvalSymlinks(c); err == nil && r == exe {
@@ -377,7 +409,7 @@ func refreshWiringAfterUpgrade() []string {
 	}
 	// Either the version or the path: a binary that moved writes the same
 	// version into configs that now name a file which is not there (#773).
-	if st.Version == version && (st.Exe == "" || st.Exe == exe) {
+	if st.Version == version && (st.Exe == "" || st.Exe == exe) && st.writtenStillResolves(exe) {
 		return nil
 	}
 	// But not a binary that will be gone tomorrow. The repair exists because
@@ -421,6 +453,8 @@ func refreshWiringAfterUpgrade() []string {
 	failed := false
 	// Compared resolved, written through the link.
 	write := stableExe(invoked, exe)
+	wiringWrittenExe = write
+	defer func() { wiringWrittenExe = "" }()
 	for _, target := range st.Targets {
 		res, err := installTarget(target, write, false)
 		if err != nil {
