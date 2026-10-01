@@ -103,6 +103,15 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 					"timeout": 10000,
 				}},
 			}},
+			// Fired on exit — `gemini -p` included — and on /clear, which starts
+			// a new session id. Drops the session's live stamp so the next
+			// session's MCP recall can answer with it (#4210).
+			"SessionEnd": []any{map[string]any{
+				"hooks": []any{map[string]any{
+					"type": "command", "command": hookRun(exe, "hook-session-end"),
+					"timeout": 10000,
+				}},
+			}},
 		},
 	}, "", "  ")
 	if err != nil {

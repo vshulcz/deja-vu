@@ -19,7 +19,7 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 
 ## Wiring
 
-`deja install gemini` adds the server under `mcpServers` in `~/.gemini/settings.json` and writes the shared skill `~/.agents/skills/deja-history/SKILL.md`. There is no command file: Gemini's command namespace is flat, the MCP server's own prompt is already `/deja`, and each skill is listed as a command too. `deja install gemini-auto` adds the same plus an extension at `~/.gemini/extensions/deja/`, because Gemini loads hooks from extensions and not from `settings.json`, and only with `hooksConfig.enabled` set, which install turns on. The extension wires `SessionStart` (`deja hook-context`), `BeforeAgent` (`hook-prompt`) and `AfterTool` on `run_shell_command` (`hook-tool-after`); timeouts are in milliseconds.
+`deja install gemini` adds the server under `mcpServers` in `~/.gemini/settings.json` and writes the shared skill `~/.agents/skills/deja-history/SKILL.md`. There is no command file: Gemini's command namespace is flat, the MCP server's own prompt is already `/deja`, and each skill is listed as a command too. `deja install gemini-auto` adds the same plus an extension at `~/.gemini/extensions/deja/`, because Gemini loads hooks from extensions and not from `settings.json`, and only with `hooksConfig.enabled` set, which install turns on. The extension wires `SessionStart` (`deja hook-context`), `BeforeAgent` (`hook-prompt`), `AfterTool` on `run_shell_command` (`hook-tool-after`) and `SessionEnd` (`hook-session-end`, which tells MCP recall the session is over and may be answered with); timeouts are in milliseconds.
 
 ## Resume
 

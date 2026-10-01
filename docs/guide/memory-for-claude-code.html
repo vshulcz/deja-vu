@@ -151,7 +151,7 @@
 
 <h2>Adding recall</h2>
 <pre>deja install claude-auto</pre>
-<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and five hooks in <code>~/.claude/settings.json</code>: SessionStart, so a new session opens already carrying what the last ones settled; UserPromptSubmit, which searches for what the prompt is about; PreToolUse, which names a file's or command's prior decision before the action and puts memory into a spawned subagent's instructions; PostToolUse, which answers a failed command with what ran after the same error here before; and PreCompact. The MCP server on its own is <code>deja install claude-code</code>.</p>
+<p>That writes three things: the deja MCP server into <code>~/.claude.json</code>, a <code>/deja</code> command at <code>~/.claude/commands/deja.md</code>, and six hooks in <code>~/.claude/settings.json</code>: SessionStart, so a new session opens already carrying what the last ones settled; UserPromptSubmit, which searches for what the prompt is about; PreToolUse, which names a file's or command's prior decision before the action and puts memory into a spawned subagent's instructions; PostToolUse, which answers a failed command with what ran after the same error here before; PreCompact; and SessionEnd, so the session just closed is one the next session's MCP recall can answer with. The MCP server on its own is <code>deja install claude-code</code>.</p>
 <p>This repository is also a Claude plugin marketplace, if you would rather install it the way Claude Code installs everything else:</p>
 <pre>claude plugin marketplace add vshulcz/deja-vu
 claude plugin install deja-vu@deja-vu</pre>

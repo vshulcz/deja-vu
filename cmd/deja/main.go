@@ -243,6 +243,10 @@ var commands = map[string]command{
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
+	"hook-session-end": func(dir string, _ []string) error {
+		runHookSessionEnd(dir, os.Stdin)
+		return nil
+	},
 	"hook-plan": func(dir string, _ []string) error {
 		if sayIfTypedByHand("hook-plan") {
 			return nil
@@ -4056,6 +4060,7 @@ var helpHidden = map[string]bool{
 	"hook-goose-prompt": true,
 	"hook-precompact":   true,
 	"hook-refresh":      true,
+	"hook-session-end":  true,
 	"reasonix-ext":      true,
 	"warmup-status":     true,
 }
