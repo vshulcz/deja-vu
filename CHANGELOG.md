@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Deleting a Cursor, Copilot CLI or Kimi session keeps it searchable, as a deleted Claude transcript already was. Those clients keep each session in its own directory, and the pass read the directory going with it as a store that was uninstalled, dropped the session and suggested reconnecting a disk (#4195).
 - `deja resume` refuses a session whose transcript the agent has deleted, and points at `deja show`, which still has it; it printed a command the agent then failed ("No saved session found" from Codex). An archived or compressed Codex rollout still resumes (#4185).
 - `deja uninstall codex-auto` takes out the trust pins Codex wrote in `config.toml` when you approved deja's hooks, and moves the pins of your own hooks to where those hooks now sit. Left behind, they kept the file from coming back as it was and let a reinstall start already trusted (#4183).
 - An interactive Codex session is filed under the directory it ran in and `deja resume` reopens it. The incremental pass read `history.jsonl` on its own, so the prompt line took the session: project `history`, the prompt shown twice, and resume refusing it as an exec entry. The index rebuilds once (#4180).

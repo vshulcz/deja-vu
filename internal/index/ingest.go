@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
 	"strconv"
@@ -909,7 +910,7 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		if _, err := os.Lstat(p); err == nil {
 			continue // on disk after all, just not in this pass's set
 		}
-		if _, err := os.Stat(filepath.Dir(p)); err != nil {
+		if !deletedFromLiveStore(p) {
 			continue
 		}
 		want[p] = true
@@ -3430,9 +3431,20 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// over transcripts can offer against a 30-day default, and `deja forget`
 	// is the deliberate path for a session that must go (#2970). A tree that
 	// is gone whole is an uninstall or a move, and is dropped as before.
+	// Cursor, Copilot CLI and Kimi keep each session in a directory of its
+	// own, so deleting one takes the directory with the file. A missing tree
+	// named after a session, under a parent that is still there, is that
+	// deletion and not a store that went away (#4195).
+	stores := gone[:0]
+	for _, g := range gone {
+		if g.mount || g.renamed != "" || !deletedSessionDir(g.dir) {
+			stores = append(stores, g)
+		}
+	}
+	gone = stores
 	kept := map[string]bool{}
 	for p := range removed {
-		if _, err := os.Stat(filepath.Dir(p)); err != nil {
+		if !deletedFromLiveStore(p) {
 			continue
 		}
 		if of, ok := old.Files[p]; ok {
@@ -4451,6 +4463,42 @@ func missingTrees(removed map[string]bool) []missingTree {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].dir < out[j].dir })
 	return out
+}
+
+// sessionDirName is a session id in a directory name: Cursor's and Copilot's
+// are the id, Kimi's is session_<id>.
+var sessionDirName = regexp.MustCompile(`[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}`)
+
+// deletedFromLiveStore reports whether a file no longer on disk was deleted
+// from a store that is still there — the client's cleanup or a deletion by
+// hand, which the index keeps (#2970) — rather than with a store that went
+// away whole: its directory is still there, or the directory that went with
+// it was one session's (#4195).
+func deletedFromLiveStore(p string) bool {
+	dir := filepath.Dir(p)
+	if _, err := os.Stat(dir); err == nil {
+		return true
+	}
+	for {
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		if _, err := os.Stat(parent); err == nil {
+			return deletedSessionDir(dir)
+		}
+		dir = parent
+	}
+}
+
+// deletedSessionDir reports whether a missing directory is one session's,
+// deleted from a store that is still there.
+func deletedSessionDir(dir string) bool {
+	if !sessionDirName.MatchString(filepath.Base(dir)) {
+		return false
+	}
+	_, err := os.Stat(filepath.Dir(dir))
+	return err == nil
 }
 
 func pluralFiles(n int) string {
