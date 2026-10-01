@@ -49,6 +49,7 @@ insert into cursorDiskKV values
 }
 
 func TestParseCursorTranscript(t *testing.T) {
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	tmp := t.TempDir()
 	encoded := "Users-x-work-my-app"
 	wantProject := filepath.Join("my", "app") // fallback splits on every hyphen
@@ -88,6 +89,7 @@ func TestParseCursorTranscript(t *testing.T) {
 }
 
 func TestCursorTranscriptProjectWalkUp(t *testing.T) {
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	tests := []struct {
 		name string
 		path string
@@ -136,6 +138,7 @@ func TestCursorTranscriptProjectWalkUp(t *testing.T) {
 }
 
 func TestCursorTranscriptsSkipSubagents(t *testing.T) {
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	root := t.TempDir()
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", root)
 	base := filepath.Join(root, "projects", "Users-x-app", "agent-transcripts", "s1")
@@ -180,6 +183,7 @@ func TestCursorTranscriptsPathMatchingIsCaseInsensitive(t *testing.T) {
 // Every field differs from Claude's — `path` not `file_path`, `Shell` not
 // `Bash` — which is why the dialect exists.
 func TestCursorTranscriptWorkRecords(t *testing.T) {
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	dir := filepath.Join(t.TempDir(), "projects", "Users-me-app", "agent-transcripts", "s-work")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -226,6 +230,7 @@ func TestCursorTranscriptWorkRecords(t *testing.T) {
 }
 
 func TestCursorWorkRecordsRespectTheirSwitches(t *testing.T) {
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", t.TempDir()) // no chats/ of the machine's own
 	dir := filepath.Join(t.TempDir(), "projects", "Users-me-app", "agent-transcripts", "s-off")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)

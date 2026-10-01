@@ -304,7 +304,10 @@ export default {
       try {
         const key = event.sessionID || "default"
         if (!cache.has(key)) {
-          const raw = await runHook("hook-context", undefined, cwd)
+          // The session id rides along so the digest leaves this session
+          // out: the context hook runs after the first message is stored,
+          // and the index can already hold it (#4199).
+          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", cwd }), cwd)
           let digest = ""
           try {
             digest = JSON.parse(raw)?.hookSpecificOutput?.additionalContext || ""
@@ -541,7 +544,10 @@ export const DejaRecall = async ({ $, client, directory }) => {
       try {
         const key = input.sessionID || "default"
         if (!cache.has(key)) {
-          const raw = await $%scd ${cwd} && %q %s%s.text()
+          // The session id rides along so the digest leaves this session
+          // out: the transform runs after the first message is stored, and
+          // the index can already hold it (#4199).
+          const raw = await $%scd ${cwd} && echo ${JSON.stringify({ session_id: input.sessionID || "", cwd })} | %q %s%s.text()
           let ctx = "", receipt = ""
           try {
             const parsed = JSON.parse(raw)

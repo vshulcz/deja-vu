@@ -525,7 +525,7 @@ func refreshGooseHintsFor(cwd string) error {
 	if recallIsOff() {
 		return clearGooseRecall()
 	}
-	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
+	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd, "")
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(startLead(gooseLead) + digest)
