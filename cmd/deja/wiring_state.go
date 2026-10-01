@@ -651,4 +651,8 @@ func blockWasAdded(path, name string) bool {
 	return slices.Contains(readWiringState().Blocks, key)
 }
 
-func forgetBlockAdded(path, name string) { blocksForgottenThisRun[blockKey(path, name)] = true }
+func forgetBlockAdded(path, name string) {
+	key := blockKey(path, name)
+	blocksForgottenThisRun[key] = true
+	blocksAddedThisRun = slices.DeleteFunc(blocksAddedThisRun, func(b string) bool { return b == key })
+}

@@ -17,10 +17,17 @@ import (
 // sorts map keys (#2640).
 //
 // Two of those are cheap to give back and this is the one place all fourteen
-// pass through. What it does not give back is an inline object or array staying
+// pass through; the key order of the reader's own nested objects is the third
+// (json_key_order.go). What it does not give back is an inline object or array staying
 // inline: that needs the writer to stop round-tripping at all.
 func marshalConfigLike(old []byte, root map[string]any) ([]byte, error) {
-	next, err := json.MarshalIndent(root, "", jsonIndentOf(old))
+	var next []byte
+	var err error
+	if ko, ok := readKeyOrders(old); ok {
+		next, err = marshalOrdered(ko, root, jsonIndentOf(old))
+	} else {
+		next, err = json.MarshalIndent(root, "", jsonIndentOf(old))
+	}
 	if err != nil {
 		return nil, err
 	}
