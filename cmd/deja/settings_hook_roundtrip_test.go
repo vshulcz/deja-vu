@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // A hook array the reader wrote on one line goes back on one line when deja
@@ -70,5 +72,95 @@ func TestAnInlineArrayEntryThatMovedKeepsItsText(t *testing.T) {
 	got := string(keepInlineBlocks(old, next))
 	if !strings.Contains(got, `{"b": 1, "a": 2}`) {
 		t.Errorf("the reader's entry lost its text when it moved:\n%s", got)
+	}
+}
+
+// The block deja changes keeps the reader's key order and spacing too, not
+// only the entries inside it: a hooks object on one line, and a minified file.
+func TestInstallAndUninstallKeepTheShapeOfTheBlockDejaChanges(t *testing.T) {
+	cmd := "/opt/deja/deja-hook hook-tool"
+	for name, orig := range map[string]string{
+		"one-line hooks": `{
+  "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "a"}]}], "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "b"}]}]}
+}
+`,
+		"minified": `{"model":"opus","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"b"}]}]}}
+`,
+	} {
+		path := filepath.Join(t.TempDir(), "settings.json")
+		if err := os.WriteFile(path, []byte(orig), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		for _, uninstall := range []bool{false, true} {
+			if _, err := installSettingsHookCmd(path, "PreToolUse", "Bash|Edit", 30, cmd, uninstall); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if back, _ := os.ReadFile(path); string(back) != orig {
+			t.Errorf("%s: install then uninstall did not give the file back\nwant:\n%s\ngot:\n%s", name, orig, back)
+		}
+	}
+}
+
+// Two entries equal in value but written differently each come back once, in
+// their own places, when deja's entry goes in ahead of them and out again.
+func TestEqualEntriesWrittenDifferentlyStayApart(t *testing.T) {
+	old := []byte(`{
+  "list": [
+    {"a": 1},
+    {"b": 1, "c": 2},
+    {"c": 2, "b": 1}
+  ]
+}
+`)
+	next := []byte(`{
+  "list": [
+    {
+      "a": 1
+    },
+    {
+      "deja": true
+    },
+    {
+      "b": 1,
+      "c": 2
+    },
+    {
+      "b": 1,
+      "c": 2
+    }
+  ]
+}
+`)
+	got := string(keepInlineBlocks(old, next))
+	if !strings.Contains(got, "{\"b\": 1, \"c\": 2},\n    {\"c\": 2, \"b\": 1}") {
+		t.Errorf("equal entries were swapped or merged:\n%s", got)
+	}
+}
+
+// A long array with deja's entry added ahead of the reader's stays linear: the
+// lookup by value decoded every entry again for every entry it moved.
+func TestALongArrayWithAMovedEntryStaysFast(t *testing.T) {
+	var o, n strings.Builder
+	o.WriteString("{\n  \"list\": [\n")
+	n.WriteString("{\n  \"list\": [\n    {\n      \"deja\": true\n    },\n")
+	const count = 3000
+	for i := 0; i < count; i++ {
+		sep := ","
+		if i == count-1 {
+			sep = ""
+		}
+		fmt.Fprintf(&o, "    {\"name\": \"e%d\", \"id\": %d}%s\n", i, i, sep)
+		fmt.Fprintf(&n, "    {\n      \"id\": %d,\n      \"name\": \"e%d\"\n    }%s\n", i, i, sep)
+	}
+	o.WriteString("  ]\n}\n")
+	n.WriteString("  ]\n}\n")
+	start := time.Now()
+	got := string(keepInlineBlocks([]byte(o.String()), []byte(n.String())))
+	if took := time.Since(start); took > 2*time.Second {
+		t.Errorf("%d entries took %v", count, took)
+	}
+	if !strings.Contains(got, `{"name": "e2999", "id": 2999}`) {
+		t.Errorf("the moved entries lost their text")
 	}
 }
