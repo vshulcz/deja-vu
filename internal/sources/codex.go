@@ -251,16 +251,38 @@ func codexOnePerSession(files []string) []string {
 	return out
 }
 
+// codexRolloutIDs is the set of sessions with a rollout under root, read from
+// the file names alone: rollout-<stamp>-<uuid>.jsonl, where the uuid is the
+// session id history.jsonl names.
+func codexRolloutIDs(root string) map[string]bool {
+	const uuidLen = 36
+	ids := map[string]bool{}
+	for _, dir := range codexSessionDirs(root) {
+		for _, f := range walkFiles(dir, codexRolloutWanted) {
+			if name := codexSessionID(f); len(name) >= uuidLen {
+				ids[name[len(name)-uuidLen:]] = true
+			}
+		}
+	}
+	return ids
+}
+
 func ParseCodexHistory(path string) ([]model.Session, error) {
 	return ParseCodexHistoryFromOffset(path, 0)
 }
 
 func ParseCodexHistoryFromOffset(path string, offset int64) ([]model.Session, error) {
+	// A line whose session has a rollout repeats that rollout's prompt, a
+	// moment earlier and to the second, so nothing collapses the pair. The
+	// full build has dropped those since history.jsonl was first read; the
+	// per-file pass read the file on its own and kept them, and the session
+	// came out twice-asked and owned by the history line (#4180).
+	rollouts := codexRolloutIDs(filepath.Dir(path))
 	var out []model.Session
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		id, _ := m["session_id"].(string)
 		txt, _ := m["text"].(string)
-		if id == "" || txt == "" {
+		if id == "" || txt == "" || rollouts[id] {
 			return
 		}
 		t := parseTimeAny(m["ts"])
