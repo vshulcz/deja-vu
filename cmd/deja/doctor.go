@@ -266,11 +266,18 @@ func doctorWiringExe(w io.Writer) {
 	if st.Exe == "" || len(st.Targets) == 0 {
 		return
 	}
-	if _, err := os.Stat(st.Exe); err == nil {
+	// The configs name the link when the repair wrote one (#4189), and a
+	// link that still resolves is wiring that works, whatever became of the
+	// binary it led to before.
+	named := st.Exe
+	if st.Written != "" {
+		named = st.Written
+	}
+	if _, err := os.Stat(named); err == nil {
 		return
 	}
 	fmt.Fprintf(w, "  %-12s %-11s configs name %s, which is not there — `deja install %s` rewrites them for this binary\n",
-		"wiring", "stale", st.Exe, strings.Join(st.Targets, " "))
+		"wiring", "stale", named, strings.Join(st.Targets, " "))
 }
 
 // doctorCodexHook reports the codex session-start hook state. Codex gates
