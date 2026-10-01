@@ -1420,7 +1420,10 @@ func dejaCommandIn(path string) string {
 		return ""
 	}
 	var root map[string]any
-	if json.Unmarshal(b, &root) == nil {
+	// JSONC first-class: opencode takes comments and trailing commas in its
+	// config, and a strict read sent those to the line scan below, which
+	// does not know opencode's list-shaped command (#4197).
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) == nil {
 		for _, m := range mcpServerMaps(root) {
 			for _, v := range m {
 				if cmd := mcpEntryDejaCommand(v); cmd != "" {
@@ -1802,7 +1805,7 @@ func doctorZCodeWired(path string) bool {
 			Servers map[string]any `json:"servers"`
 		} `json:"mcp"`
 	}
-	if json.Unmarshal(b, &root) != nil {
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return false
 	}
 	for _, v := range root.MCP.Servers {
@@ -1916,7 +1919,7 @@ func doctorOpenClawWired(path string) bool {
 		return false
 	}
 	var root map[string]any
-	if json.Unmarshal(b, &root) != nil {
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return strings.Contains(string(b), `"deja"`)
 	}
 	mcp, _ := root["mcp"].(map[string]any)
@@ -1961,8 +1964,8 @@ func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bo
 			return false
 		}
 		var root map[string]any
-		if json.Unmarshal(b, &root) != nil {
-			// jsonc or otherwise unparseable — fall back to a substring probe.
+		if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+			// Unparseable even as JSONC — fall back to a substring probe.
 			return strings.Contains(string(b), `"deja"`)
 		}
 		m := pick(root)
