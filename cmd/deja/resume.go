@@ -206,12 +206,12 @@ func resumeCommand(s model.Session) (string, string, error) {
 		dir := filepath.Dir(s.Path)
 		return "", "", fmt.Errorf("aider has no session resume — run aider in %s and it continues the same history", dir)
 	case "gemini":
-		// No cd: gemini scopes its session list by a hash of the working
-		// directory, and the store keeps only that hash — there is nothing to
-		// invert back into a path. Run from the wrong directory it says "No
-		// previous sessions found for this project" rather than opening the
-		// wrong one.
-		return "", "gemini --resume " + s.ID, nil
+		// gemini finds a session only from the directory it ran in: anywhere
+		// else it says "No previous sessions found for this project" (#4211).
+		// Current stores record that directory in projects.json and
+		// .project_root; an older one keyed by a hash of it has nothing to
+		// invert, and gets no cd.
+		return existingDir(sources.GeminiProjectDir(s.Path)), "gemini --resume " + s.ID, nil
 	case "cursor":
 		if strings.HasSuffix(s.Path, ".jsonl") {
 			// A CLI transcript is named after the chat id `--resume` takes.
@@ -343,6 +343,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "copilot":
 		return "", "copilot --resume=" + s.ID, nil
 	case "copilot-chat":
+		// VS Code lists only the open workspace's chats, so the folder comes
+		// first (#4223).
+		if dir := sources.CopilotChatWorkspaceDir(s.Path); dir != "" {
+			return "", "", fmt.Errorf("copilot-chat sessions reopen in VS Code: open the workspace (code %s), then Chat: Show Chats", shellQuoteIfNeeded(dir))
+		}
 		return "", "", fmt.Errorf("copilot-chat sessions reopen from Chat: Show Chats, not the terminal")
 	default:
 		return "", "", fmt.Errorf("don't know how to resume %q sessions", s.Harness)
