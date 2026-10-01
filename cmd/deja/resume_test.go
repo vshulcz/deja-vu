@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/url"
 	"os"
 	"os/exec"
@@ -194,6 +195,11 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	if err := os.WriteFile(store, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The folder name does not decode back to a Windows path; meta.json names it.
+	meta, _ := json.Marshal(map[string]string{"cwd": real})
+	if err := os.WriteFile(filepath.Join(filepath.Dir(store), "meta.json"), meta, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	dir, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Project: "app", Path: path})
 	if err != nil {
@@ -202,7 +208,7 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	if cmd != "cursor-agent --resume "+id {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	if runtime.GOOS != "windows" && dir != real {
+	if dir != real {
 		t.Fatalf("dir = %q, want the project directory %q", dir, real)
 	}
 
