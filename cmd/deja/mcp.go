@@ -1395,7 +1395,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 			return text, 1, id.size, []string{id.session}, nil, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: hiddenFromRecall(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveSessionIDs(dir)}
 	stale, err := index.EnsureForSearchStale(dir, o, mcpProgress())
 	if err != nil {
 		return "", 0, 0, nil, nil, err
@@ -1937,7 +1937,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 			return text, 1, id.size, []string{id.session}, nil, id.note, nil
 		}
 	}
-	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: hiddenFromRecall(dir)}
+	o := search.Options{Query: nfcfold.Compose(q), Harness: harness, All: true, RecallWorn: usage.WornSessions(dir), ExcludeSessions: liveSessionIDs(dir)}
 	if stale, err := index.EnsureForSearchStale(dir, o, mcpProgress()); err != nil {
 		return "", 0, 0, nil, nil, "", err
 	} else if stale {
