@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A failed Gemini CLI command is indexed with its exit status (`$ git log …  → exit 128`), the way Codex, opencode and Cursor commands are, so the failed-command recall sees it. The index rebuilds once (#4208).
+- `deja resume` refuses an opencode or Kilo CLI session that was deleted in the agent and points at `deja show`; it printed `opencode -s <id>`, which failed with "Session not found" (#4205).
+- `deja install opencode-auto` writes its entry above the comment on your first MCP server instead of between the two, where the comment read as describing deja (#4203).
+- `deja resume` on an opencode session whose directory has been deleted prints `opencode -s <id>` without the `cd`, which failed before opencode started; opencode reopens the session from any directory. Kilo CLI sessions get the same treatment, and resume says on stderr which directory the session will run in (#4201).
+- opencode no longer gets its own opening prompt back as recalled history. The plugin asks for the session digest after the first message is stored, and it now sends its session id so the digest leaves that session out (#4199).
 - `deja resume` on a Cursor CLI chat `cd`s into the directory the chat ran in when its path has a dot, a space or a non-ASCII character. cursor-agent finds a chat by that directory, and the command came out without the `cd`. Those sessions also get their real project name, and a chat whose directory is gone or that cursor-agent no longer has is refused with `deja show`. The index rebuilds once (#4193).
 - Deleting a Cursor, Copilot CLI or Kimi session keeps it searchable, as a deleted Claude transcript already was. Those clients keep each session in its own directory, and the pass read the directory going with it as a store that was uninstalled, dropped the session and suggested reconnecting a disk (#4195).
 - `deja doctor` reads a config with comments, trailing commas or a byte-order mark, so an opencode MCP entry whose deja binary is gone is reported as such (`binary_missing`) instead of `wired` when `opencode.json` carries a comment (#4197).

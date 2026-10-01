@@ -26,6 +26,10 @@ func TestResumeCommandPerHarness(t *testing.T) {
 	claudePath := filepath.Join("/claude/projects", encoded, "abc.jsonl")
 	grokPath := filepath.Join(tmp, "grok-sessions", url.PathEscape(real), "019f-grok", "updates.jsonl")
 
+	aFile := filepath.Join(tmp, "ses_3.json")
+	if err := os.WriteFile(aFile, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name    string
 		s       model.Session
@@ -37,6 +41,11 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
+		// opencode reopens a session from any directory; a cd into a deleted one
+		// stopped the command before it started (#4201).
+		{"opencode with its dir gone", model.Session{Harness: "opencode", ID: "ses_2", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "opencode -s ses_2", ""},
+		{"opencode path that is a file", model.Session{Harness: "opencode", ID: "ses_3", Project: "f", Path: aFile}, "", "opencode -s ses_3", ""},
+		{"kilo with its dir gone", model.Session{Harness: "kilocode", ID: "ses_4", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "kilo -s ses_4", ""},
 		{"grok build session", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
 		{"grok-dev row", model.Session{Harness: "grok", ID: "019f-dev", Project: "my-app", Path: filepath.Join(tmp, "grok.db")}, "", "", "grok-dev store"},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
