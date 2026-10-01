@@ -25,10 +25,11 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 
 `gemini --resume <uuid>` takes the session id deja indexes — the `--help` text
 mentions only `latest` and an index, but the CLI's own error names
-`--resume {uuid}` and 0.55.1 accepts one. No `cd`: gemini scopes the lookup by
-a hash of the working directory and stores only the hash, so there is nothing
-to invert into a path. From the wrong directory it says "No previous sessions
-found for this project" rather than opening someone else's.
+`--resume {uuid}` and 0.55.1 accepts one. gemini finds a session only from
+the directory it ran in — anywhere else it says "No previous sessions found
+for this project" — so the command runs there. 0.60 records that directory
+in `~/.gemini/projects.json` and in the project folder's `.project_root`; a
+store that keys the folder by a hash of the path alone gets no `cd`.
 
 ## Known quirks and drift
 

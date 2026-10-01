@@ -309,23 +309,39 @@ func geminiContentText(raw json.RawMessage) string {
 // projects.json reverse mapping first, then a .project_root marker, then the
 // raw id (slug or hash).
 func geminiProjectName(path string) string {
+	if dir := GeminiProjectDir(path); dir != "" {
+		return projectName(dir)
+	}
+	return filepath.Base(geminiIDDir(path))
+}
+
+// GeminiProjectDir is the directory a Gemini CLI session ran in, from the
+// store's own records: projects.json maps it to the project folder, and the
+// folder keeps it in .project_root. "" when neither names one — older stores
+// key the folder by a hash of the path and keep nothing to invert.
+func GeminiProjectDir(path string) string {
+	idDir := geminiIDDir(path)
+	if dir := geminiProjectFromRegistry(filepath.Base(idDir)); dir != "" {
+		return dir
+	}
+	if b, err := os.ReadFile(filepath.Join(idDir, ".project_root")); err == nil {
+		return strings.TrimSpace(string(b))
+	}
+	return ""
+}
+
+// geminiIDDir is .../tmp/<id> for a chat file under it.
+func geminiIDDir(path string) string {
 	idDir := filepath.Dir(filepath.Dir(path)) // .../tmp/<id>
 	// subagent files nest one deeper: chats/<parent>/<sid>.jsonl
 	if filepath.Base(filepath.Dir(path)) != "chats" && filepath.Base(idDir) == "chats" {
 		idDir = filepath.Dir(idDir)
 	}
-	id := filepath.Base(idDir)
-	if mapped := geminiProjectFromRegistry(id); mapped != "" {
-		return mapped
-	}
-	if b, err := os.ReadFile(filepath.Join(idDir, ".project_root")); err == nil {
-		if p := strings.TrimSpace(string(b)); p != "" {
-			return projectName(p)
-		}
-	}
-	return id
+	return idDir
 }
 
+// geminiProjectFromRegistry is the directory projects.json maps to this
+// project id.
 func geminiProjectFromRegistry(id string) string {
 	b, err := os.ReadFile(filepath.Join(GeminiRoot(), "projects.json"))
 	if err != nil {
@@ -339,7 +355,7 @@ func geminiProjectFromRegistry(id string) string {
 	}
 	for path, pid := range doc.Projects {
 		if pid == id {
-			return projectName(path)
+			return path
 		}
 	}
 	return ""

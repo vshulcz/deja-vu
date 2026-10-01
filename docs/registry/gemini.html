@@ -50,10 +50,11 @@
 <h2 id="resume">Resume</h2>
 <p><code>gemini --resume &lt;uuid&gt;</code> takes the session id deja indexes — the <code>--help</code> text</p>
 <p>mentions only <code>latest</code> and an index, but the CLI&#39;s own error names</p>
-<p><code>--resume {uuid}</code> and 0.55.1 accepts one. No <code>cd</code>: gemini scopes the lookup by</p>
-<p>a hash of the working directory and stores only the hash, so there is nothing</p>
-<p>to invert into a path. From the wrong directory it says &#34;No previous sessions</p>
-<p>found for this project&#34; rather than opening someone else&#39;s.</p>
+<p><code>--resume {uuid}</code> and 0.55.1 accepts one. gemini finds a session only from</p>
+<p>the directory it ran in — anywhere else it says &#34;No previous sessions found</p>
+<p>for this project&#34; — so the command runs there. 0.60 records that directory</p>
+<p>in <code>~/.gemini/projects.json</code> and in the project folder&#39;s <code>.project_root</code>; a</p>
+<p>store that keys the folder by a hash of the path alone gets no <code>cd</code>.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>A resumed legacy <code>.json</code> session can be rewritten as <code>.jsonl</code>. deja deduplicates by session ID and prefers JSONL.</li>
