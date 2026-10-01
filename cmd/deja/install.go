@@ -3559,7 +3559,8 @@ func updateOpencodeJSONCNested(old []byte, exe string, uninstall bool) ([]byte, 
 // lines carries `"deja"` on its first one only; dropping just that line left
 // the rest of it in the block and the config stopped parsing (#2394), so the
 // entry is bounded by counting braces the way the block itself is.
-func dropJSONCEntry(lines []string, key string) (body, dropped []string, wasLast bool) {
+func dropJSONCEntry(lines []string, key string) (body, dropped []string, wasLast bool, at int) {
+	at = -1
 	name := `"` + key + `"`
 	// On the code a parser reads, not the raw line. A comment that only names
 	// deja — a parked entry someone commented out, a note saying who wrote the
@@ -3579,6 +3580,9 @@ func dropJSONCEntry(lines []string, key string) (body, dropped []string, wasLast
 			}
 			continue
 		}
+		if at < 0 {
+			at = len(body)
+		}
 		dropped = append(dropped, lines[i])
 		wasLast = true
 		depth := jsoncBraceDelta(code)
@@ -3590,7 +3594,7 @@ func dropJSONCEntry(lines []string, key string) (body, dropped []string, wasLast
 			depth += jsoncBraceDelta(c)
 		}
 	}
-	return body, dropped, wasLast
+	return body, dropped, wasLast, at
 }
 
 // jsoncEntryIsNested reports whether the key opens an entry below the top
@@ -3714,9 +3718,7 @@ func jsoncEntryKeyOf(code string) (key, rest string) {
 }
 
 // jsoncFirstCodeLine finds the first line of a .jsonc block that a parser
-// would read as code, so our entry goes under any comment the reader wrote
-// above their first one rather than between the comment and what it annotates.
-// It returns -1 when the block holds no code at all.
+// would read as code. It returns -1 when the block holds no code at all.
 func jsoncFirstCodeLine(body []string) int {
 	inBlock := false
 	for i, line := range body {
@@ -3727,6 +3729,26 @@ func jsoncFirstCodeLine(body []string) int {
 		}
 	}
 	return -1
+}
+
+// jsoncLineOpensInBlock reports whether line i starts inside a /* */ comment.
+func jsoncLineOpensInBlock(body []string, i int) bool {
+	inBlock := false
+	for j := 0; j < i; j++ {
+		_, inBlock, _ = jsoncCodeOf(body[j], inBlock)
+	}
+	return inBlock
+}
+
+// jsoncBlockCommentStart is the line that opens the block comment line i
+// starts inside.
+func jsoncBlockCommentStart(body []string, i int) int {
+	for j := i - 1; j >= 0; j-- {
+		if !jsoncLineOpensInBlock(body, j) {
+			return j
+		}
+	}
+	return 0
 }
 
 // jsoncCommentAbove walks back from line i over the `//` lines directly above
@@ -4101,7 +4123,7 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 		if !uninstall && jsoncEntryIsNested(block, key) {
 			return nil, "", fmt.Errorf("opencode config keeps its servers under \"mcp.servers\"; deja edits the top of the \"mcp\" block and would move the entry there — add the deja server by hand")
 		}
-		body, dropped, wasLast := dropJSONCEntry(block, key)
+		body, dropped, wasLast, droppedAt := dropJSONCEntry(block, key)
 		// What the reader put on our own entry is theirs: an environment
 		// pointing at a store on another disk, an entry switched off. The
 		// parsed path has merged those since #2479; this one rewrote the line
@@ -4152,7 +4174,18 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 			at := len(body)
 			if i := jsoncFirstCodeLine(body); i >= 0 {
 				entry += ","
-				at = jsoncCommentAbove(body, i)
+				switch {
+				case droppedAt >= 0 && droppedAt <= i:
+					// Ours was already first: back where it was, under the
+					// comment the reader wrote on it.
+					at = droppedAt
+				case jsoncLineOpensInBlock(body, i):
+					// The first code follows a block comment that closes on
+					// its line; above that comment, not inside it.
+					at = jsoncBlockCommentStart(body, i)
+				default:
+					at = jsoncCommentAbove(body, i)
+				}
 			}
 			body = append(body[:at:at], append([]string{entry}, body[at:]...)...)
 		}

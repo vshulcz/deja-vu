@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -46,5 +47,31 @@ func TestOpencodeEntryGoesAboveTheCommentOfTheFirstServer(t *testing.T) {
 	}
 	if i, j := strings.Index(string(next), `"deja"`), strings.Index(string(next), "*/"); i < j {
 		t.Fatalf("deja's entry went inside a block comment:\n%s", next)
+	}
+
+	// A comment the reader wrote on deja's own entry stays on it when the
+	// entry is rewritten, rather than moving to the next server.
+	ownOld := "{\n  \"mcp\": {\n    // deja: my memory\n    \"deja\": {\"type\":\"local\",\"command\":[\"/old/deja\",\"mcp\"]},\n    \"a\": {\"type\":\"local\"}\n  }\n}\n"
+	next, _, err = updateOpencodeJSONC([]byte(ownOld), "/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(next), "// deja: my memory\n    \"deja\"") {
+		t.Fatalf("the comment on deja's entry moved off it:\n%s", next)
+	}
+
+	// The first code line starts inside a block comment that closes on it:
+	// the entry goes above the comment, where a parser reads it.
+	inOld := "{\n  \"mcp\": {\n    /* start\n    end */ \"a\": {\"type\":\"local\"}\n  }\n}\n"
+	next, _, err = updateOpencodeJSONC([]byte(inOld), "/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(jsoncToJSON(string(next))), &root); err != nil {
+		t.Fatalf("%v:\n%s", err, next)
+	}
+	if mcp, _ := root["mcp"].(map[string]any); mcp["deja"] == nil {
+		t.Fatalf("deja's entry went into a comment:\n%s", next)
 	}
 }
