@@ -81,17 +81,10 @@ func cursorStoreFor(transcript string) string {
 		return ""
 	}
 	chats := filepath.Join(CursorCLIRoot(), "chats")
-	ws, err := os.ReadDir(chats)
-	if err != nil {
-		return ""
-	}
 	best := ""
 	var bestTime time.Time
-	for _, w := range ws {
-		if !w.IsDir() {
-			continue
-		}
-		p := filepath.Join(chats, w.Name(), id, "store.db")
+	for _, bucket := range cursorChatBuckets(chats, id) {
+		p := filepath.Join(chats, bucket, id, "store.db")
 		fi, err := os.Stat(p)
 		if err != nil || !fi.Mode().IsRegular() {
 			continue

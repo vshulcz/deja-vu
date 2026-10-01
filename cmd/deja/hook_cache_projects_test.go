@@ -20,7 +20,7 @@ func TestTheHookCacheKeepsTheProjectsBehindTheDigest(t *testing.T) {
 	cwd := filepath.Join(tmp, "proj")
 	writeHookCache(dir, cwd, "a digest", 2, 10, nil, 0, []string{"claude:s1"}, []string{"acme-api"})
 
-	_, _, _, _, _, ids, projects := cachedHookDigestFor(dir, cwd)
+	_, _, _, _, _, ids, projects := cachedHookDigestFor(dir, cwd, "")
 	if len(ids) != 1 || ids[0] != "claude:s1" {
 		t.Fatalf("session ids came back as %v", ids)
 	}

@@ -324,7 +324,11 @@ import (
 // 57: a Cursor CLI session gains its tool results from the chat store — the
 // exit status on a command and the output it printed (#4187). A finished
 // transcript is never re-read, so a rebuild.
-const version = 57
+//
+// 58: a Cursor CLI session takes its project from the chat's meta.json cwd;
+// the folder name blanks a dot, a space or a non-ASCII character, so those
+// were filed under a split or empty name (#4193). A rebuild.
+const version = 58
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

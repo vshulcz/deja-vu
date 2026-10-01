@@ -71,13 +71,13 @@ func TestSessionStartSaysSomethingNewTheSecondTime(t *testing.T) {
 	}
 
 	cwd := filepath.Join(os.TempDir(), "wide")
-	first, n, _, _, _, firstIDs, _ := hookDigestResultFor(dir, cwd)
+	first, n, _, _, _, firstIDs, _ := hookDigestResultFor(dir, cwd, "")
 	if n == 0 || strings.TrimSpace(first) == "" {
 		t.Fatal("the first session start served nothing to compare")
 	}
 	rememberInjectedIDsFor(dir, sessionStartKeyPrefix+"agent-one", hookProjectKey(cwd), firstIDs)
 
-	_, _, _, _, _, secondIDs, _ := hookDigestResultFor(dir, cwd)
+	_, _, _, _, _, secondIDs, _ := hookDigestResultFor(dir, cwd, "")
 	if len(secondIDs) == 0 {
 		t.Fatal("the second session start went quiet")
 	}

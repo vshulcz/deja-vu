@@ -64,6 +64,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err := resumeGoneError(s); err != nil {
 		return err
 	}
+	if note := resumeDirGoneNote(s, dir); note != "" {
+		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
+	}
 	if !doExec {
 		if note := resumeCaveats[s.Harness]; note != "" {
 			// stderr, so `$(deja resume …)` still composes: the command is the
@@ -137,11 +140,10 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		return "", "codex resume " + s.ID, nil
 	case "opencode":
-		dir := ""
-		if s.Path != "" && s.Path != sources.OpencodeDB() {
-			dir = s.Path // opencode sessions carry their project directory
-		}
-		return dir, "opencode -s " + s.ID, nil
+		// opencode sessions carry their project directory. opencode reopens a
+		// session from anywhere, so a deleted one is left out rather than
+		// printed as a cd that fails (#4201).
+		return existingDir(s.Path), "opencode -s " + s.ID, nil
 	case "antigravity":
 		return "", "agy --conversation " + s.ID, nil
 	case "kilocode":
@@ -162,8 +164,8 @@ func resumeCommand(s model.Session) (string, string, error) {
 		}
 		// And in the directory it ran in, the way the opencode case does with
 		// the same field: Kilo is OpenCode vendored and a CLI session carries
-		// its own working directory.
-		return s.Path, "kilo -s " + s.ID, nil
+		// its own working directory — when it is still there (#4201).
+		return existingDir(s.Path), "kilo -s " + s.ID, nil
 	case "continue":
 		// `cn --fork <sessionId>` loads the session by id straight out of the
 		// store deja reads — `historyManager.load` opens
@@ -213,8 +215,22 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "cursor":
 		if strings.HasSuffix(s.Path, ".jsonl") {
 			// A CLI transcript is named after the chat id `--resume` takes.
-			// Cursor lists chats per workspace, so this runs in the project.
-			return cursorProjectDirFor(s), "cursor-agent --resume " + s.ID, nil
+			// `cursor-agent --resume <id>` looks for the chat only under the
+			// md5 of the directory it is started in, so the command has to
+			// run in the one the chat ran in and the chat has to be there;
+			// otherwise it opens an empty chat (#4193).
+			short := digest.Short(s.ID)
+			dir := cursorProjectDirFor(s)
+			if dir == "" {
+				return "", "", fmt.Errorf("cursor chat %s: the directory it ran in is not recorded, and `cursor-agent --resume <id>` finds a chat only from there — `cursor-agent --resume` with no id lists chats from every directory, and `deja show %s` has the conversation", short, short)
+			}
+			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+				return "", "", fmt.Errorf("cursor chat %s ran in %s, which is gone — `deja show %s` has the conversation", short, dir, short)
+			}
+			if _, err := os.Stat(filepath.Join(sources.CursorCLIHome(), "chats", sources.CursorChatBucket(dir), s.ID, "store.db")); err != nil {
+				return "", "", fmt.Errorf("cursor chat %s is no longer in cursor-agent's store — `deja show %s` has the conversation", short, short)
+			}
+			return dir, "cursor-agent --resume " + s.ID, nil
 		}
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
@@ -333,6 +349,31 @@ func resumeCommand(s model.Session) (string, string, error) {
 	}
 }
 
+// existingDir is p when it is a directory on this machine, else "": a cd into
+// one that is gone stops the command before the harness starts.
+func existingDir(p string) string {
+	if p == "" {
+		return ""
+	}
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		return p
+	}
+	return ""
+}
+
+// resumeDirGoneNote says where a session whose directory is gone will run:
+// opencode and Kilo reopen it from anywhere, and their tools then work in the
+// directory the command is run from.
+func resumeDirGoneNote(s model.Session, dir string) string {
+	if dir != "" || s.Path == "" || (s.Harness != "opencode" && s.Harness != "kilocode") {
+		return ""
+	}
+	if _, err := os.Stat(s.Path); !os.IsNotExist(err) {
+		return ""
+	}
+	return fmt.Sprintf("the directory this session ran in is gone (%s); it reopens in the one you run the command from", s.Path)
+}
+
 // claudeProjectDirFor recovers the original working directory from the
 // transcript location when the encoded project dir still exists on disk.
 func claudeProjectDirFor(s model.Session) string {
@@ -361,6 +402,11 @@ func qwenProjectDirFor(s model.Session) string {
 func cursorProjectDirFor(s model.Session) string {
 	if s.Path == "" {
 		return ""
+	}
+	// Only a directory the chat is filed under: one read from a meta.json
+	// whose folder is not its md5 sends cursor-agent to an empty chat.
+	if cwd, verified := sources.CursorChatCWD(s.Path); verified {
+		return cwd
 	}
 	base := sources.CursorTranscriptProjectDirBase(s.Path)
 	if base == "" {

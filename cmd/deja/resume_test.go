@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/url"
 	"os"
 	"os/exec"
@@ -25,6 +26,10 @@ func TestResumeCommandPerHarness(t *testing.T) {
 	claudePath := filepath.Join("/claude/projects", encoded, "abc.jsonl")
 	grokPath := filepath.Join(tmp, "grok-sessions", url.PathEscape(real), "019f-grok", "updates.jsonl")
 
+	aFile := filepath.Join(tmp, "ses_3.json")
+	if err := os.WriteFile(aFile, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		name    string
 		s       model.Session
@@ -36,6 +41,11 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
+		// opencode reopens a session from any directory; a cd into a deleted one
+		// stopped the command before it started (#4201).
+		{"opencode with its dir gone", model.Session{Harness: "opencode", ID: "ses_2", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "opencode -s ses_2", ""},
+		{"opencode path that is a file", model.Session{Harness: "opencode", ID: "ses_3", Project: "f", Path: aFile}, "", "opencode -s ses_3", ""},
+		{"kilo with its dir gone", model.Session{Harness: "kilocode", ID: "ses_4", Project: "gone", Path: filepath.Join(tmp, "projects", "gone")}, "", "kilo -s ses_4", ""},
 		{"grok build session", model.Session{Harness: "grok", ID: "019f-grok", Project: "my-app", Path: grokPath}, real, "grok --resume 019f-grok", ""},
 		{"grok-dev row", model.Session{Harness: "grok", ID: "019f-dev", Project: "my-app", Path: filepath.Join(tmp, "grok.db")}, "", "", "grok-dev store"},
 		{"imported", model.Session{Harness: "claude", ID: "imported-9f5", Project: "imported:my-app"}, "", "", "another machine"},
@@ -184,6 +194,21 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	encoded := strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
 	id := "de875c53-88ae-4e73-8953-9813479364d8"
 	path := filepath.Join(tmp, "projects", encoded, "agent-transcripts", id, id+".jsonl")
+	// cursor-agent opens the chat from chats/<md5 of the directory>/<id>.
+	t.Setenv("CURSOR_CONFIG_DIR", tmp)
+	t.Setenv("DEJA_CURSOR_CLI_ROOT", tmp)
+	store := filepath.Join(tmp, "chats", sources.CursorChatBucket(real), id, "store.db")
+	if err := os.MkdirAll(filepath.Dir(store), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(store, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The folder name does not decode back to a Windows path; meta.json names it.
+	meta, _ := json.Marshal(map[string]string{"cwd": real})
+	if err := os.WriteFile(filepath.Join(filepath.Dir(store), "meta.json"), meta, 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	dir, cmd, err := resumeCommand(model.Session{Harness: "cursor", ID: id, Project: "app", Path: path})
 	if err != nil {
@@ -192,7 +217,7 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	if cmd != "cursor-agent --resume "+id {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	if runtime.GOOS != "windows" && dir != real {
+	if dir != real {
 		t.Fatalf("dir = %q, want the project directory %q", dir, real)
 	}
 

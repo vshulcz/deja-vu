@@ -72,7 +72,7 @@ Parts with `type: "text"` are messages; the role comes from `message.data.role`.
 - **Command**: `~/.config/opencode/commands/deja.md`, invoked as `/deja`.
 - **Auto-recall**: `deja install opencode-auto` also writes a plugin, `~/.config/opencode/plugins/deja.js`. It puts the session digest into the first system block (`experimental.chat.system.transform`), appends per-prompt recall to the last user message (`experimental.chat.messages.transform`), adds recall to a spawned `task` agent's prompt (`tool.execute.before`), appends a file's history or a failed command's earlier fix to the tool output (`tool.execute.after`), and runs `deja hook-precompact` at `experimental.session.compacting`. The plugin shape follows the installed opencode's major version (`opencode --version`, or `DEJA_OPENCODE_MAJOR` where the binary is not on `PATH`), and the store's layout when neither answers: 2.0 loads only a default `{ id, setup }`, 1.x a named export. `DEJA_OPENCODE_MAJOR` picks the plugin and nothing else; the store is read by its tables.
 - **Package**: the `opencode-deja` npm package ships `index.js` for 1.x and `server.js`, exported as `opencode-deja/server`, for 2.x. 2.x resolves that subpath first and wants a default `{ id, setup }`; 1.x from 1.3.4 resolves it too and calls its `server`; older 1.x loads `index.js`. In `opencode.json` it goes under `plugin` on 1.x and `plugins` on 2.x.
-- **Resume**: `opencode -s <id>`, run in the session's directory.
+- **Resume**: `opencode -s <id>`, run in the session's directory, or from the current one when that directory is gone.
 
 ## Known quirks and drift
 
