@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A Cursor agent gets the file's history before it edits, as Claude Code does: the pre-edit hook now knows Cursor's `StrReplace`, `Write` and `Delete` and reads the file from `path` (#4191).
 - `deja uninstall codex-auto` takes out the trust pins Codex wrote in `config.toml` when you approved deja's hooks, and moves the pins of your own hooks to where those hooks now sit. Left behind, they kept the file from coming back as it was and let a reinstall start already trusted (#4183).
 - An interactive Codex session is filed under the directory it ran in and `deja resume` reopens it. The incremental pass read `history.jsonl` on its own, so the prompt line took the session: project `history`, the prompt shown twice, and resume refusing it as an exec entry. The index rebuilds once (#4180).
 - `deja doctor --json` marks an MCP entry that names a deja binary that is no longer there with `"binary_missing": true`, as the `auto_recall` rows already did; the text report said so and the JSON read plain `wired` (#4177).

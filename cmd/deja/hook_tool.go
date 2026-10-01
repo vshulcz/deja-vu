@@ -71,6 +71,8 @@ type toolHookInput struct {
 	ToolInput     struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
+		// Cursor names the file `path` (#4191).
+		Path string `json:"path"`
 	} `json:"tool_input"`
 	SessionID      string `json:"session_id"`
 	ConversationID string `json:"conversation_id"`
@@ -93,6 +95,7 @@ func (i *toolHookInput) adopt() {
 	i.ToolName = adoptGrok(i.ToolName, i.grokEnvelope.ToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
+	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.ToolInput.Path)
 }
 
 // hookToolShape is how the answer is framed on the way out. Claude Code's hook
@@ -287,6 +290,8 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		"search_replace", "write",
 		// Crush names its editors in lowercase.
 		"edit", "multiedit",
+		// Cursor's, which arrive under its own names, not Claude's (#4191).
+		"StrReplace", "Delete",
 		// pi and omp have no pre-tool seam: the only handler whose return the
 		// model reads is the one holding a finished tool result. An edit there
 		// is already made, so the file's history goes out on their lowercase
