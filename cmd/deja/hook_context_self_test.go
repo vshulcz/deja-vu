@@ -46,6 +46,14 @@ func TestSessionStartLeavesOutTheSessionAsking(t *testing.T) {
 	if !strings.Contains(out, "ledger export") {
 		t.Fatalf("leaving the session out took the rest of the digest with it:\n%s", out)
 	}
+	// The project cache is shared: the next session to open still sees it.
+	if out := run(`{"session_id":"third","cwd":"/tmp/app"}`); !strings.Contains(out, "glimmerquest") {
+		t.Fatalf("the digest cached without the asker hid it from the next session:\n%s", out)
+	}
+	// After a compaction the lead sends the agent to its own session's id.
+	if out := run(`{"session_id":"live-session","source":"compact","cwd":"/tmp/app"}`); !strings.Contains(out, "glimmerquest") {
+		t.Fatalf("a compacted session lost itself from the digest:\n%s", out)
+	}
 }
 
 // Both plugin shapes name the session when they ask for the digest.
@@ -60,7 +68,7 @@ func TestOpencodePluginsNameTheSessionToTheDigest(t *testing.T) {
 				continue
 			}
 			calls++
-			if !strings.Contains(line, "session_id") {
+			if !strings.Contains(line, `session_id: input.sessionID || ""`) && !strings.Contains(line, `session_id: event.sessionID || ""`) {
 				t.Errorf("%s plugin asks for the digest without the session id: %s", name, strings.TrimSpace(line))
 			}
 		}

@@ -402,7 +402,13 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), input.SessionID)
+	// The session asking is left out of its own digest (#4199), except after a
+	// compaction: the lead there points the agent at that session's id.
+	self := input.SessionID
+	if input.Source == "compact" {
+		self = ""
+	}
+	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), self)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -852,7 +858,13 @@ func cachedHookDigestFor(dir, fromPayload, exclude string) (string, int, int64, 
 		}
 	}
 	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, exclude)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
+	if exclude == "" {
+		writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
+	} else {
+		// The cache is the project's, read by every session that opens in it;
+		// one without the asker would hide that session from the next one.
+		requestHookRefresh(dir, cwd)
+	}
 	return digest, sessions, raw, taskMatched, withheld, ids, projects
 }
 
