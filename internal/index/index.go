@@ -311,7 +311,11 @@ import (
 // none indexed (#4163). Paths inside a Claude Code worktree were also dropped
 // as the agent's own files (#4164). A finished subagent transcript is never
 // re-read, so only a rebuild brings either in.
-const version = 54
+//
+// 55: an interactive Codex session was owned by its history.jsonl line and
+// filed under the project "history" (#4180); the row is decided when a session
+// is written, so a rebuild.
+const version = 55
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
