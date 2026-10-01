@@ -267,3 +267,96 @@ func TestClaimSessionOnlyOverridesAClash(t *testing.T) {
 		t.Errorf("over a row with no text: owns=%v collided=%v, want owns, no clash", owns, collided)
 	}
 }
+
+// The original deleted while the stub beside it stays, then the stub gains a
+// turn of its own. Now an arrival with text in the same directory, it was
+// taken for the deleted transcript moving, and the transcript's records went
+// for good — a rebuild has nothing to bring them back from.
+func TestGeminiResumedStubIsNotARenameOfTheDeletedTranscript(t *testing.T) {
+	for _, withChange := range []bool{false, true} {
+		t.Run(map[bool]string{false: "append path", true: "replacement path"}[withChange], func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			real := filepath.Join(geminiChats(), "session-2026-10-01T13-04-008140a7.jsonl")
+			stub := filepath.Join(geminiChats(), "session-2026-10-01T13-07-008140a7.jsonl")
+			write(t, real, geminiOriginal()+geminiResumedTail())
+			write(t, stub, geminiStub())
+			other := filepath.Join(geminiChats(), "session-2026-09-30T10-00-0badc0de.jsonl")
+			write(t, other, `{"sessionId":"0badc0de","startTime":"2026-09-30T10:00:00Z","lastUpdated":"2026-09-30T10:00:00Z"}`+"\n"+
+				`{"id":"o1","timestamp":"2026-09-30T10:00:01Z","type":"user","content":[{"text":"the cache warms on boot"}]}`+"\n")
+			dir := filepath.Join(tmp, "idx")
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(real); err != nil {
+				t.Fatal(err)
+			}
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			appendFile(t, stub, `{"id":"u3","timestamp":"2026-10-01T13:09:00.000Z","type":"user","content":[{"text":"backfill the tenants table next"}]}`+"\n")
+			bumpMtime(t, stub)
+			if withChange {
+				appendFile(t, other, `{"id":"o2","timestamp":"2026-09-30T10:00:02Z","type":"gemini","content":"It does."}`+"\n")
+				bumpMtime(t, other)
+			}
+			found := func(stage string) {
+				t.Helper()
+				for _, q := range []string{"schema migration", "tenants table"} {
+					ss, err := Search(dir, search.Options{Query: q, All: true})
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(ss) != 1 || ss[0].ID != resumeID {
+						t.Errorf("%s: %q found %d sessions, want the resumed one", stage, q, len(ss))
+					}
+				}
+			}
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			found("after the stub grew")
+			if err := Ensure(dir, "", true, nil); err != nil {
+				t.Fatal(err)
+			}
+			found("after a rebuild")
+		})
+	}
+}
+
+// The stub indexed on its own, then the transcript arrives. The row changes
+// hands; folding the transcript into the stub's row counted the stub's
+// preamble on top, one more message than a rebuild of the same files.
+func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
+	tmp := hermeticIndexEnv(t)
+	write(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl"),
+		claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
+	dir := filepath.Join(tmp, "idx")
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(geminiChats(), "session-z-008140a7.jsonl"), geminiStub())
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), geminiOriginal()+geminiResumedTail())
+	if err := Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	row := func() SessionMeta {
+		t.Helper()
+		m, err := readManifest(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Sessions["gemini:"+resumeID]
+	}
+	got := row()
+	if err := Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	want := row()
+	if got.Counted != want.Counted || got.Words != want.Words || got.LastMsg != want.LastMsg || got.NoText != want.NoText || !got.Started.Equal(want.Started) || got.Path != want.Path {
+		t.Errorf("row after the transcript arrived: Counted=%d Words=%d Started=%v Path=%s; a rebuild gives Counted=%d Words=%d Started=%v Path=%s",
+			got.Counted, got.Words, got.Started, got.Path, want.Counted, want.Words, want.Started, want.Path)
+	}
+}

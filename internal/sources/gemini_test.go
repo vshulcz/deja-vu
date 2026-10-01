@@ -3,6 +3,7 @@ package sources
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -164,6 +165,33 @@ func TestGeminiDedupeKeepsAResumedTranscript(t *testing.T) {
 	}
 	if got := strings.Join(paths, " "); !strings.Contains(got, "/a/session-w.jsonl") || strings.Contains(got, "/a/session-w.json ") || strings.HasSuffix(got, ".json") {
 		t.Fatalf("stub, .json and its rewrite kept %s, want the rewrite and not the .json", got)
+	}
+}
+
+// With a resume stub and the real .jsonl both held, an older .json named after
+// neither is weighed against the conversation, not against whichever .jsonl
+// happened to be read first: read stub-first it replaced the stub and sat
+// beside the transcript it is an older copy of.
+func TestGeminiDedupeIgnoresReadOrder(t *testing.T) {
+	msgs := func(n int) []model.Message { return make([]model.Message, n) }
+	files := []model.Session{
+		{Harness: "gemini", ID: "x", Path: "/a/a-stub.jsonl", Messages: msgs(1)},
+		{Harness: "gemini", ID: "x", Path: "/a/b-real.jsonl", Messages: msgs(12)},
+		{Harness: "gemini", ID: "x", Path: "/a/c-old.json", Messages: msgs(5)},
+	}
+	for _, order := range [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+		var in []model.Session
+		for _, i := range order {
+			in = append(in, files[i])
+		}
+		var paths []string
+		for _, s := range dedupeGeminiSessions(in) {
+			paths = append(paths, s.Path)
+		}
+		sort.Strings(paths)
+		if got := strings.Join(paths, " "); got != "/a/a-stub.jsonl /a/b-real.jsonl" {
+			t.Errorf("read in order %v kept %s, want the stub and the real .jsonl", order, got)
+		}
 	}
 }
 

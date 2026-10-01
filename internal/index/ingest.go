@@ -2682,6 +2682,30 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 	return s.Path < held.Path, true
 }
 
+// coversKept reports whether an arrival holds what the kept row indexed, which
+// a moved transcript does and a different file under the same id does not. The
+// test is the row's last message: a move carries it, and so does a move that
+// grew on the way. Gemini CLI's resume stub gains turns of its own after the
+// transcript it was resumed from is deleted, and taking it for the move threw
+// away that transcript's records for good (#4213). A count alone would not do:
+// the stub can outgrow a short transcript. A row from before LastMsg was kept
+// has nothing to compare, so it falls back to the count.
+func coversKept(r model.Session, meta SessionMeta) bool {
+	if meta.LastMsg == 0 {
+		return len(r.Messages) >= meta.Counted
+	}
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		m := r.Messages[i]
+		// Fingerprinted as stored: the row's was taken after redaction, and
+		// the arrival has not been redacted yet.
+		m.Text, _, _ = indexedText(m.Text)
+		if messageFingerprint(m) == meta.LastMsg {
+			return true
+		}
+	}
+	return false
+}
+
 // holdsText reports whether any message of s has text left to index once
 // plumbing is stripped. Stripping is idempotent, so it answers the same before
 // and after preRedactSessions.
@@ -3631,19 +3655,30 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// An arrival with nothing to index is not the kept session moving: Gemini
 	// CLI's resume stub lands beside the transcript it shares an id with, and
 	// taking it for a rename dropped the deleted transcript's records (#4213).
-	arrivedIn := map[string]string{}
-	for _, r := range replacements {
+	arrivals := map[string][]int{}
+	for i, r := range replacements {
 		if holdsText(r) {
-			arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+			key := r.Harness + ":" + r.ID
+			arrivals[key] = append(arrivals[key], i)
 		}
 	}
 	// A session kept in a directory of its own moves with the directory, so
 	// the arrival is never beside the old path; its id is a UUID, which two
 	// projects do not share by accident, so the id alone says it moved.
 	for key, meta := range old.Sessions {
-		at, arrived := arrivedIn[key]
-		movedDir := at == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
-		if kept[meta.Path] && arrived && movedDir {
+		if !kept[meta.Path] {
+			continue
+		}
+		ownDir := sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
+		moved := false
+		for _, i := range arrivals[key] {
+			r := replacements[i]
+			if (ownDir || filepath.Dir(r.Path) == filepath.Dir(meta.Path)) && coversKept(r, meta) {
+				moved = true
+				break
+			}
+		}
+		if moved {
 			removed[meta.Path] = true
 			delete(files, meta.Path)
 			delete(kept, meta.Path)
@@ -4138,6 +4173,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				}
 			}
 			owns, collided := claimSession(meta, s)
+			// A row with nothing to index that changes hands describes the
+			// stub, not the transcript taking it over: folding the transcript
+			// in on top counted the stub's preamble too, one more message than
+			// a rebuild of the same files gives (#4213). Start the row over
+			// from the session that owns it, as the full build does.
+			if owns && meta.NoText && meta.Path != s.Path {
+				meta = metaWithOrd(metaForSession(s), meta.Ord)
+			}
 			if collided {
 				collisions.Add(1)
 				meta.Shared = true
@@ -4728,6 +4771,21 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 	return 0
 }
 
+// indexedText is a message's text as the index stores it: plumbing stripped,
+// NFC-canonicalised (this path does not go through redactForIngest, #1098),
+// redacted, then cut to maxIndexedText on a rune boundary.
+func indexedText(text string) (string, redact.Counts, bool) {
+	redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(text)))
+	if len(redacted) <= maxIndexedText {
+		return redacted, counts, false
+	}
+	cut := maxIndexedText
+	for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+		cut--
+	}
+	return redacted[:cut], counts, true
+}
+
 // preRedactSessions redacts every message concurrently before the write
 // loop. Redaction is regex-heavy and was the serial bottleneck of a cold
 // build; the write loop stays sequential (append-only log), but by the time
@@ -4751,15 +4809,8 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 			for si := range jobs {
 				s := &ss[si]
 				for mi := range s.Messages {
-					// NFC-canonicalise here too: this is the bulk write path and
-					// does not go through redactForIngest (#1098).
-					redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(s.Messages[mi].Text)))
-					if len(redacted) > maxIndexedText {
-						cut := maxIndexedText
-						for cut > 0 && !utf8.RuneStart(redacted[cut]) {
-							cut--
-						}
-						redacted = redacted[:cut]
+					redacted, counts, clipped := indexedText(s.Messages[mi].Text)
+					if clipped {
 						mu.Lock()
 						countClipped(m, s.Path, 1)
 						mu.Unlock()

@@ -80,39 +80,72 @@ func LoadGemini() []model.Session {
 // leave it shorter than the stale .json. Two files of the same format are both
 // kept: resuming a .jsonl session leaves a second .jsonl under the same id
 // holding only the preamble, and keeping the later one dropped the whole
-// conversation (#4213). The index decides which of those owns the row. A
-// .json and a .jsonl not named after each other keep the one with more.
+// conversation (#4213). The index decides which of those owns the row. A .json
+// named after no .jsonl is weighed against the largest .jsonl of its id and
+// replaces it only with more messages; weighing it against the first one read
+// let it replace a resume stub and sit beside the real transcript. Decided per
+// id over every file, so the answer does not depend on read order.
 func dedupeGeminiSessions(ss []model.Session) []model.Session {
-	seen := map[string][]int{}
-	var out []model.Session
-next:
-	for _, s := range ss {
+	byKey := map[string][]int{}
+	for i, s := range ss {
 		key := s.Harness + ":" + s.ID
-		newJSONL := strings.HasSuffix(s.Path, ".jsonl")
-		// The file it was rewritten from, or into.
-		for _, i := range seen[key] {
-			switch out[i].Path {
-			case s.Path + "l":
-				continue next
-			case strings.TrimSuffix(s.Path, "l"):
-				if newJSONL {
-					out[i] = s
-					continue next
+		byKey[key] = append(byKey[key], i)
+	}
+	drop := map[int]bool{}
+	for _, idx := range byKey {
+		if len(idx) < 2 {
+			continue
+		}
+		paths := map[string]bool{}
+		for _, i := range idx {
+			paths[ss[i].Path] = true
+		}
+		bestJ, bestN := -1, -1
+		var jsons []int
+		for _, i := range idx {
+			if strings.HasSuffix(ss[i].Path, ".jsonl") {
+				if bestJ < 0 || larger(ss[i], ss[bestJ]) {
+					bestJ = i
 				}
+				continue
+			}
+			if paths[ss[i].Path+"l"] {
+				// Its own rewrite is held.
+				drop[i] = true
+				continue
+			}
+			jsons = append(jsons, i)
+			if bestN < 0 || larger(ss[i], ss[bestN]) {
+				bestN = i
 			}
 		}
-		for _, i := range seen[key] {
-			if heldJSONL := strings.HasSuffix(out[i].Path, ".jsonl"); heldJSONL != newJSONL {
-				if newJSONL && len(s.Messages) >= len(out[i].Messages) || heldJSONL && len(s.Messages) > len(out[i].Messages) {
-					out[i] = s
-				}
-				continue next
-			}
+		if bestJ < 0 {
+			continue
 		}
-		seen[key] = append(seen[key], len(out))
-		out = append(out, s)
+		for _, i := range jsons {
+			drop[i] = true
+		}
+		if bestN >= 0 && len(ss[bestN].Messages) > len(ss[bestJ].Messages) {
+			drop[bestN] = false
+			drop[bestJ] = true
+		}
+	}
+	out := make([]model.Session, 0, len(ss))
+	for i, s := range ss {
+		if !drop[i] {
+			out = append(out, s)
+		}
 	}
 	return out
+}
+
+// larger orders two files of one id by message count, then by path, so the
+// pick does not depend on which was read first.
+func larger(a, b model.Session) bool {
+	if len(a.Messages) != len(b.Messages) {
+		return len(a.Messages) > len(b.Messages)
+	}
+	return a.Path < b.Path
 }
 
 func ParseGeminiFile(path string) ([]model.Session, error) {
