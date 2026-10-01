@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -54,18 +55,22 @@ func codexHookPositions(root map[string]any) map[codexHookPos]string {
 // of one entry keep their order.
 func codexTrustMoves(before, after map[string]any) map[codexHookPos]*codexHookPos {
 	was, now := codexHookPositions(before), codexHookPositions(after)
-	taken := map[codexHookPos]bool{}
+	// Free positions per event and text, in order: one pass over each side.
+	free := map[string][]codexHookPos{}
+	for _, q := range sortedHookPositions(now) {
+		k := q.event + "\x00" + now[q]
+		free[k] = append(free[k], q)
+	}
 	moves := map[codexHookPos]*codexHookPos{}
 	for _, p := range sortedHookPositions(was) {
-		moves[p] = nil
-		for _, q := range sortedHookPositions(now) {
-			if q.event == p.event && !taken[q] && now[q] == was[p] {
-				taken[q] = true
-				q := q
-				moves[p] = &q
-				break
-			}
+		k := p.event + "\x00" + was[p]
+		if qs := free[k]; len(qs) > 0 {
+			q := qs[0]
+			free[k] = qs[1:]
+			moves[p] = &q
+			continue
 		}
+		moves[p] = nil
 	}
 	return moves
 }
@@ -75,22 +80,17 @@ func sortedHookPositions(m map[codexHookPos]string) []codexHookPos {
 	for p := range m {
 		out = append(out, p)
 	}
-	for i := 1; i < len(out); i++ {
-		for j := i; j > 0 && hookPosLess(out[j], out[j-1]); j-- {
-			out[j], out[j-1] = out[j-1], out[j]
+	sort.Slice(out, func(i, j int) bool {
+		a, b := out[i], out[j]
+		if a.event != b.event {
+			return a.event < b.event
 		}
-	}
+		if a.group != b.group {
+			return a.group < b.group
+		}
+		return a.hook < b.hook
+	})
 	return out
-}
-
-func hookPosLess(a, b codexHookPos) bool {
-	if a.event != b.event {
-		return a.event < b.event
-	}
-	if a.group != b.group {
-		return a.group < b.group
-	}
-	return a.hook < b.hook
 }
 
 // moveCodexHookTrust rewrites the pins in codex's config.toml for the hooks
@@ -104,6 +104,11 @@ func moveCodexHookTrust(hooksPath string, before, after map[string]any) error {
 	next := rewriteCodexHookTrust(string(old), codexHookPathSpellings(hooksPath), codexTrustMoves(before, after))
 	if next == string(old) {
 		return nil
+	}
+	if next == "" {
+		// Nothing but codex's pins was in it. writeIfChanged takes an empty
+		// result to mean the file should go, and this file is codex's.
+		return os.WriteFile(cfgPath, nil, 0o600)
 	}
 	_, err = writeIfChanged(cfgPath, old, []byte(next))
 	return err
@@ -119,32 +124,73 @@ func codexHookPathSpellings(p string) map[string]bool {
 	return out
 }
 
+// trustTable is one table of the config: its lines, and for a pin the key and
+// where the quoted key sits in the header line.
+type trustTable struct {
+	start, end   int // lines[start:end], header first
+	header       string
+	key          string
+	keyAt, keyTo int  // byte offsets of the quoted key in lines[start]
+	literal      bool // written as a TOML literal string, 'like this'
+	pin          bool
+}
+
 // rewriteCodexHookTrust re-keys or drops each pin for the given hooks file and
 // takes out a [hooks.state] header nothing is left under. Everything else in
-// the file is passed through as it was.
+// the file — comments included — is passed through as it was.
 func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHookPos]*codexHookPos) string {
 	lines := strings.SplitAfter(cfg, "\n")
-	type table struct {
-		start, end int // lines[start:end], header first
-		header     string
-	}
-	var tables []table
+	var tables []trustTable
 	for i, line := range lines {
-		if strings.HasPrefix(strings.TrimSpace(line), "[") {
-			if len(tables) > 0 {
-				tables[len(tables)-1].end = i
-			}
-			tables = append(tables, table{start: i, end: len(lines), header: strings.TrimSpace(line)})
-		}
-	}
-	drop := map[int]bool{}
-	rename := map[int]string{}
-	for ti, t := range tables {
-		key, ok := codexTrustKey(t.header)
-		if !ok {
+		if !strings.HasPrefix(strings.TrimSpace(line), "[") {
 			continue
 		}
-		pos, file, ok := parseCodexTrustKey(key)
+		if len(tables) > 0 {
+			tables[len(tables)-1].end = i
+		}
+		t := trustTable{start: i, end: len(lines), header: strings.TrimSpace(tomlCode(line))}
+		t.key, t.keyAt, t.keyTo, t.literal, t.pin = codexTrustKey(line)
+		tables = append(tables, t)
+	}
+	// A comment written just above a header belongs to that header's table,
+	// not to the table that ends there: dropping a pin must not take it.
+	for ti := range tables {
+		t := &tables[ti]
+		if ti+1 >= len(tables) {
+			continue
+		}
+		end := t.end
+		for end > t.start+1 {
+			l := strings.TrimSpace(lines[end-1])
+			if l == "" || strings.HasPrefix(l, "#") {
+				end--
+				continue
+			}
+			break
+		}
+		// end is past the last line of content; keep the blanks right after it
+		// with this table, and leave the comment run (and any blanks inside
+		// it) in front of the next header.
+		firstComment := -1
+		for i := end; i < t.end; i++ {
+			if strings.HasPrefix(strings.TrimSpace(lines[i]), "#") {
+				firstComment = i
+				break
+			}
+		}
+		if firstComment >= 0 {
+			t.end = firstComment
+		}
+	}
+
+	drop := map[int]bool{}
+	rename := map[int]string{}
+	targets := map[string]bool{}
+	for ti, t := range tables {
+		if !t.pin {
+			continue
+		}
+		pos, file, ok := parseCodexTrustKey(t.key)
 		if !ok || !paths[file] {
 			continue
 		}
@@ -158,12 +204,22 @@ func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHoo
 		}
 		if *to != pos {
 			nk := file + ":" + to.event + ":" + strconv.Itoa(to.group) + ":" + strconv.Itoa(to.hook)
-			eol := lines[t.start][len(strings.TrimRight(lines[t.start], "\r\n")):]
-			rename[t.start] = `[hooks.state.` + strconv.Quote(nk) + `]` + eol
+			rename[ti] = nk
+			targets[nk] = true
 		}
 	}
 	if len(drop) == 0 && len(rename) == 0 {
 		return cfg
+	}
+	// A pin already sitting where another is moving to — a stale one codex
+	// never cleared — would make the key appear twice, and codex refuses a
+	// config with a duplicate table.
+	for ti, t := range tables {
+		if t.pin && targets[t.key] && !drop[ti] {
+			if _, moving := rename[ti]; !moving {
+				drop[ti] = true
+			}
+		}
 	}
 	// A [hooks.state] header with nothing of its own and no pin left under it
 	// was written by codex for the pins just taken out.
@@ -180,11 +236,11 @@ func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHoo
 			}
 		}
 	}
-	var b strings.Builder
+
 	skip := map[int]bool{}
-	// A table runs to the next header, so the blank line that separates it
-	// from the next table goes with it. Tables at the end of the file have no
-	// next one: there the blank codex put in front of the first of them goes.
+	// Tables at the end of the file have no next one whose leading blank line
+	// they would take: there the blank codex put in front of the first of
+	// them goes.
 	lastKept := -1
 	for ti := range tables {
 		if !drop[ti] {
@@ -202,18 +258,22 @@ func rewriteCodexHookTrust(cfg string, paths map[string]bool, moves map[codexHoo
 			skip[t.start-1] = true
 		}
 	}
+	var b strings.Builder
+	renameAt := map[int]int{}
+	for ti := range rename {
+		renameAt[tables[ti].start] = ti
+	}
 	for i, line := range lines {
 		if skip[i] {
 			continue
 		}
-		if r, ok := rename[i]; ok {
-			line = r
+		if ti, ok := renameAt[i]; ok {
+			t := tables[ti]
+			line = line[:t.keyAt] + quoteTOMLKey(rename[ti], t.literal) + line[t.keyTo:]
 		}
 		b.WriteString(line)
 	}
 	out := b.String()
-	// What was dropped from the end leaves the file ending where its last
-	// table ended, with the newline it had.
 	if strings.HasSuffix(cfg, "\n") && !strings.HasSuffix(out, "\n") && out != "" {
 		out += "\n"
 	}
@@ -229,14 +289,54 @@ func blankLines(lines []string) bool {
 	return true
 }
 
-// codexTrustKey is the quoted key of a [hooks.state."…"] header.
-func codexTrustKey(header string) (string, bool) {
-	header = tomlCode(header)
-	if !strings.HasPrefix(header, `[hooks.state."`) || !strings.HasSuffix(header, `"]`) {
-		return "", false
+// codexTrustKey reads the key of a [hooks.state.<key>] header line, in either
+// TOML string form: codex writes "…" where it can and '…' for a path with a
+// backslash in it, which is every path on Windows.
+func codexTrustKey(line string) (key string, at, to int, literal, ok bool) {
+	i := strings.Index(line, "[")
+	rest := line[i+1:]
+	trimmed := strings.TrimLeft(rest, " \t")
+	if !strings.HasPrefix(trimmed, "hooks.state.") {
+		return "", 0, 0, false, false
 	}
-	key, err := strconv.Unquote(header[len(`[hooks.state.`) : len(header)-1])
-	return key, err == nil
+	at = i + 1 + (len(rest) - len(trimmed)) + len("hooks.state.")
+	if at >= len(line) {
+		return "", 0, 0, false, false
+	}
+	switch line[at] {
+	case '\'':
+		end := strings.IndexByte(line[at+1:], '\'')
+		if end < 0 {
+			return "", 0, 0, false, false
+		}
+		to = at + 1 + end + 1
+		key, literal = line[at+1:to-1], true
+	case '"':
+		end := endOfJSONString([]byte(line), at)
+		if end < 0 {
+			return "", 0, 0, false, false
+		}
+		to = end
+		k, err := strconv.Unquote(line[at:to])
+		if err != nil {
+			return "", 0, 0, false, false
+		}
+		key = k
+	default:
+		return "", 0, 0, false, false
+	}
+	if !strings.HasPrefix(strings.TrimSpace(line[to:]), "]") {
+		return "", 0, 0, false, false
+	}
+	return key, at, to, literal, true
+}
+
+// quoteTOMLKey writes a key back in the form it was read in.
+func quoteTOMLKey(key string, literal bool) string {
+	if literal && !strings.ContainsAny(key, "'\n") {
+		return "'" + key + "'"
+	}
+	return strconv.Quote(key)
 }
 
 // parseCodexTrustKey splits "<file>:<event>:<i>:<j>" from the right, so a path

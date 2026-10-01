@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 // Codex pins each approved hook in config.toml by its place in hooks.json. An
@@ -99,4 +100,60 @@ func readString(t *testing.T, p string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// The shapes a review found broken in the first cut of #4183.
+func TestRewriteCodexHookTrustKeepsWhatIsNotAPin(t *testing.T) {
+	file := "/h/.codex/hooks.json"
+	paths := map[string]bool{file: true}
+	pin := func(pos string, extra string) string {
+		return "[hooks.state." + strconv.Quote(file+":"+pos) + "]" + extra + "\ntrusted_hash = \"" + pos + "\"\n"
+	}
+	gone := map[codexHookPos]*codexHookPos{{"session_start", 0, 0}: nil}
+	up := &codexHookPos{"session_start", 0, 0}
+
+	// A comment above the next table stays with it.
+	in := "model = \"x\"\n\n[hooks.state]\n\n" + pin("session_start:0:0", "") + "\n# my work profile\n[profiles.work]\nmodel = \"y\"\n"
+	if got, want := rewriteCodexHookTrust(in, paths, gone), "model = \"x\"\n\n# my work profile\n[profiles.work]\nmodel = \"y\"\n"; got != want {
+		t.Errorf("comment above the next table:\ngot  %q\nwant %q", got, want)
+	}
+
+	// A move onto a key a stale pin already holds does not write it twice.
+	moves := map[codexHookPos]*codexHookPos{{"session_start", 0, 0}: nil, {"session_start", 1, 0}: up}
+	in = "[hooks.state]\n\n" + pin("session_start:0:0", "") + "\n" + pin("session_start:1:0", "") + "\n" + pin("session_start:0:0", "")
+	got := rewriteCodexHookTrust(in, paths, moves)
+	if n := strings.Count(got, strconv.Quote(file+":session_start:0:0")); n != 1 {
+		t.Errorf("key written %d times:\n%s", n, got)
+	}
+	if !strings.Contains(got, `trusted_hash = "session_start:1:0"`) {
+		t.Errorf("the moved pin was lost:\n%s", got)
+	}
+
+	// A literal-string key — codex's form for a path with a backslash — is
+	// read, and a renamed one is written back the same way with its comment.
+	win := `C:\Users\x\.codex\hooks.json`
+	lit := "[hooks.state.'" + win + ":session_start:1:0'] # mine\r\ntrusted_hash = \"b\"\r\n"
+	got = rewriteCodexHookTrust(lit, map[string]bool{win: true}, map[codexHookPos]*codexHookPos{{"session_start", 1, 0}: up})
+	if want := "[hooks.state.'" + win + ":session_start:0:0'] # mine\r\ntrusted_hash = \"b\"\r\n"; got != want {
+		t.Errorf("literal key:\ngot  %q\nwant %q", got, want)
+	}
+}
+
+// Matching positions stays linear in the hooks: an insertion sort inside the
+// loop made 1,500 hooks take seconds.
+func TestCodexTrustMovesIsFastOnALongHooksFile(t *testing.T) {
+	var groups []any
+	for i := 0; i < 3000; i++ {
+		groups = append(groups, map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "c" + strconv.Itoa(i)}}})
+	}
+	before := map[string]any{"hooks": map[string]any{"SessionStart": groups}}
+	after := map[string]any{"hooks": map[string]any{"SessionStart": groups[1:]}}
+	start := time.Now()
+	moves := codexTrustMoves(before, after)
+	if took := time.Since(start); took > time.Second {
+		t.Errorf("3000 hooks took %v", took)
+	}
+	if to := moves[codexHookPos{"session_start", 2999, 0}]; to == nil || to.group != 2998 {
+		t.Errorf("last hook moved to %v, want group 2998", to)
+	}
 }
