@@ -10,8 +10,8 @@ import (
 
 // A transcript whose chat is gone from chats/ re-read all of chats/ on every
 // lookup, so a rebuild with 500 of them read it 500 times (#4226). A miss is
-// answered from the index while chats/ is as it was scanned, and a chat
-// written after the scan, in a new bucket or an existing one, is still found.
+// answered from the index while it is fresh, and a chat written after the
+// scan, in a new bucket or an existing one, is still found.
 func TestCursorChatMissesDoNotRescanChats(t *testing.T) {
 	cli := t.TempDir()
 	t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
@@ -56,9 +56,13 @@ func TestCursorChatMissesDoNotRescanChats(t *testing.T) {
 		t.Fatalf("1 present + 50 gone lookups scanned chats/ %d times, want 1", n)
 	}
 
+	// A chat added to a bucket in the clock tick of the scan leaves the
+	// bucket's mtime as it was; on HFS+ or FAT that tick is a second or two.
 	writeChat("/work/p7", "late-same-bucket")
+	_ = os.Chtimes(filepath.Join(chats, CursorChatBucket("/work/p7")), old, old)
+	cursorChatIndex.scanned = cursorChatIndex.scanned.Add(-cursorChatFresh)
 	if cwd, ok := CursorChatCWD(transcript("late-same-bucket")); cwd != "/work/p7" || !ok {
-		t.Fatalf("chat added to an existing bucket = %q, %v", cwd, ok)
+		t.Fatalf("chat added to an existing bucket, once the index aged out = %q, %v", cwd, ok)
 	}
 	writeChat("/work/new", "late-new-bucket")
 	if cwd, ok := CursorChatCWD(transcript("late-new-bucket")); cwd != "/work/new" || !ok {

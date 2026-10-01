@@ -61,18 +61,30 @@ func CursorChatBucket(cwd string) string {
 
 // cursorChatIndex maps a chat id to the buckets holding it, built once per
 // chats/ directory: every transcript parse asks, and listing chats/ for each
-// of them was a directory read per bucket per transcript on a rebuild. An id
-// not in it is looked for again only when chats/ or one of its buckets has
-// changed since, which is how a chat started after the scan shows up in a
-// long-lived process; rescanning on every miss read all of chats/ once per
-// transcript whose chat is gone (#4226).
+// of them was a directory read per bucket per transcript on a rebuild. A miss
+// rescanned all of chats/ too, once per transcript whose chat is gone (#4226),
+// so a miss is answered from the index while it is fresh: younger than
+// cursorChatFresh, and chats/ not changed since the scan. A chat started in a
+// new bucket changes chats/ and is found at once; one added to an existing
+// bucket, which changes only that bucket, is found once the index ages out.
 var cursorChatIndex struct {
 	sync.Mutex
-	root   string
-	ids    map[string][]string
-	mtimes map[string]time.Time // chats/ ("") and each bucket, as scanned
-	scans  int
+	root    string
+	ids     map[string][]string
+	mtime   time.Time // of chats/, as scanned
+	scanned time.Time
+	scans   int
 }
+
+// cursorChatFresh is how long a miss is answered from the index. It also
+// covers a filesystem whose directory mtimes tick in seconds (HFS+, ext3,
+// FAT), where a chat added in the second of the scan leaves chats/ as it was.
+const cursorChatFresh = 2 * time.Second
+
+// cursorChatTick is how close to the scan a chats/ mtime is treated as one
+// the scan may not have seen all of, on a filesystem whose clock ticks in
+// milliseconds.
+const cursorChatTick = 10 * time.Millisecond
 
 func cursorChatBuckets(chats, id string) []string {
 	cursorChatIndex.Lock()
@@ -81,47 +93,43 @@ func cursorChatBuckets(chats, id string) []string {
 		if b, ok := cursorChatIndex.ids[id]; ok {
 			return b
 		}
-		if !cursorChatChanged(chats) {
+		if !cursorChatStale(chats) {
 			return nil
 		}
 	}
 	cursorChatIndex.scans++
-	ids := map[string][]string{}
-	mtimes := map[string]time.Time{}
+	scanned := time.Now()
+	var mtime time.Time
 	if fi, err := os.Stat(chats); err == nil {
-		mtimes[""] = fi.ModTime()
+		mtime = fi.ModTime()
 	}
+	ids := map[string][]string{}
 	buckets, _ := os.ReadDir(chats)
 	for _, w := range buckets {
-		dir := filepath.Join(chats, w.Name())
-		fi, err := os.Stat(dir)
+		entries, err := os.ReadDir(filepath.Join(chats, w.Name()))
 		if err != nil {
 			continue
 		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			continue
-		}
-		mtimes[w.Name()] = fi.ModTime()
 		for _, e := range entries {
 			ids[e.Name()] = append(ids[e.Name()], w.Name())
 		}
 	}
 	cursorChatIndex.root, cursorChatIndex.ids = chats, ids
-	cursorChatIndex.mtimes = mtimes
+	cursorChatIndex.mtime, cursorChatIndex.scanned = mtime, scanned
 	return ids[id]
 }
 
-// cursorChatChanged reports whether chats/ may hold a chat the index has not
-// seen: chats/ or a bucket in it has a different mtime from the scan. A new
-// chat lands in a new bucket, which changes chats/, or in an existing one,
-// which changes that bucket.
-func cursorChatChanged(chats string) bool {
-	for name, was := range cursorChatIndex.mtimes {
-		fi, err := os.Stat(filepath.Join(chats, name))
-		if err != nil || !fi.ModTime().Equal(was) {
-			return true
-		}
+// cursorChatStale reports whether a miss has to look at chats/ again: the
+// index has aged out, chats/ has changed since the scan, or it changed so
+// close to the scan that the scan may have missed part of it.
+func cursorChatStale(chats string) bool {
+	ix := &cursorChatIndex
+	if time.Since(ix.scanned) >= cursorChatFresh {
+		return true
 	}
-	return len(cursorChatIndex.mtimes) == 0
+	fi, err := os.Stat(chats)
+	if err != nil {
+		return !ix.mtime.IsZero()
+	}
+	return !fi.ModTime().Equal(ix.mtime) || !ix.mtime.Before(ix.scanned.Add(-cursorChatTick))
 }
