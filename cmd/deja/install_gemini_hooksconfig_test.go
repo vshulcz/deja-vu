@@ -215,3 +215,38 @@ func TestReinstallForgetsASwitchTheReaderChanged(t *testing.T) {
 		t.Error("the reader's object is still recorded as deja's")
 	}
 }
+
+// The cut must leave valid JSON whatever shape the reader gave the file:
+// the switch last, first with its comma on the next line, or behind a
+// comment.
+func TestDisableGeminiHooksKeepsEveryShapeValid(t *testing.T) {
+	for _, in := range []string{
+		`{"ui":{"theme":"GitHub"},"hooksConfig":{"enabled":true}}`,
+		"{\"hooksConfig\":{\"enabled\":true}\n, \"b\":1}",
+		`{"hooksConfig":{"enabled":true} /*c*/, "b":1}`,
+		"{\"a\":1, // x\n \"hooksConfig\":{\"enabled\":true}\n}",
+		`{"hooksConfig":{"enabled":true}}`,
+	} {
+		hermeticEnv(t)
+		path := filepath.Join(sources.GeminiHome(), "settings.json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(in), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		noteBlockAdded(path, "hooksConfig")
+		if err := disableGeminiHooksIfOurs(); err != nil {
+			t.Fatal(err)
+		}
+		b, _ := os.ReadFile(path)
+		var root map[string]any
+		if err := json.Unmarshal([]byte(stripJSONComments(string(b))), &root); err != nil {
+			t.Errorf("%q came out as %q, which Gemini cannot parse: %v", in, b, err)
+			continue
+		}
+		if _, ok := root["hooksConfig"]; ok {
+			t.Errorf("%q: the switch is still there: %q", in, b)
+		}
+	}
+}

@@ -189,17 +189,25 @@ func disableGeminiHooksIfOurs() error {
 	}
 	cut := zedEntrySpan(text, found)
 	next := text[:cut[0]] + text[cut[1]:]
-	// The last key has no comma behind it to take, so the one in front of it
-	// goes instead; Gemini parses settings.json strictly once comments are
-	// stripped, and a trailing comma breaks the file.
+	// No comma right behind the value: the last key, whose comma is the one in
+	// front of it, or a hand-edited file with the comma further on, behind a
+	// newline or a comment. Gemini parses settings.json strictly once comments
+	// are stripped, so a comma left over breaks the file.
 	if !strings.Contains(text[found.valueEnd:cut[1]], ",") {
 		blank := stripJSONComments(text)
 		i := cut[0] - 1
 		for i >= 0 && strings.ContainsRune(" \t\r\n", rune(blank[i])) {
 			i--
 		}
-		if i >= 0 && blank[i] == ',' {
+		j := cut[1]
+		for j < len(blank) && strings.ContainsRune(" \t\r\n", rune(blank[j])) {
+			j++
+		}
+		switch {
+		case i >= 0 && blank[i] == ',':
 			next = text[:i] + text[i+1:cut[0]] + text[cut[1]:]
+		case j < len(blank) && blank[j] == ',':
+			next = text[:cut[0]] + text[cut[1]:j] + text[j+1:]
 		}
 	}
 	if _, err := writeIfChanged(path, old, []byte(next)); err != nil {
