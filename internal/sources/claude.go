@@ -182,13 +182,24 @@ const SubagentTailKept = 4
 // are what it concluded. The middle is the reading and the searching — verbose,
 // often duplicated in the parent's summary, and the reason these files were
 // skipped whole.
+//
+// What the child changed stays: its edit, wrote and files records are what
+// blame, attribution and restore read, they are small, and nothing else holds
+// them. Cut with the prose, blame never named the subagent that changed a file
+// (#4163).
 func KeepSubagentTail(ms []model.Message) []model.Message {
 	if len(ms) <= SubagentTailKept+1 {
 		return ms
 	}
+	tail := len(ms) - SubagentTailKept
 	kept := make([]model.Message, 0, SubagentTailKept+1)
 	kept = append(kept, ms[0])
-	return append(kept, ms[len(ms)-SubagentTailKept:]...)
+	for _, m := range ms[1:tail] {
+		if m.Role == RoleEdit || m.Role == RoleWrote || m.Role == RoleFiles {
+			kept = append(kept, m)
+		}
+	}
+	return append(kept, ms[tail:]...)
 }
 
 func ParseClaudeFile(path string) ([]model.Session, error) {

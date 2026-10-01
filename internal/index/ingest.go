@@ -2172,6 +2172,12 @@ func mergeTouched(have, add []string) []string {
 // stored paths held no repository file at all for a session whose work was
 // entirely in one.
 func agentOwnedFile(p string) bool {
+	// A worktree Claude Code made for an isolated agent sits under .claude/
+	// and holds the repository's own source: the edits in it are the work,
+	// not the agent's bookkeeping (#4164).
+	if strings.Contains(p, "/.claude/worktrees/") {
+		return strings.Contains(p, "/.git/") || strings.Contains(p, "/node_modules/")
+	}
 	for _, seg := range []string{"/scratchpad/", "/tasks/", "/.claude/", "/.cache/", "/claude-501/", "/node_modules/", "/.git/"} {
 		if strings.Contains(p, seg) {
 			return true
