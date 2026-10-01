@@ -2625,7 +2625,24 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 			return !newIsDiff, false
 		}
 	}
+	// Codex writes an interactive session to its rollout and a line of it to
+	// history.jsonl under the same id. The rollout holds the conversation and
+	// the directory it ran in; the history line holds the prompt and the
+	// project "history". Sort order gave the row to history.jsonl, so a TUI
+	// session was filed outside its project and resume refused it as an exec
+	// entry (#4180).
+	if s.Harness == "codex" {
+		if newIsHist, heldIsHist := isCodexHistory(s.Path), isCodexHistory(held.Path); newIsHist != heldIsHist {
+			return !newIsHist, false
+		}
+	}
 	return s.Path < held.Path, true
+}
+
+// isCodexHistory reports whether a path is Codex's prompt log rather than a
+// rollout. Named, for the reason isGooseStore gives.
+func isCodexHistory(path string) bool {
+	return strings.EqualFold(filepath.Base(path), "history.jsonl")
 }
 
 // isOpencodeDiff reports whether a path is one of opencode's per-session diff
