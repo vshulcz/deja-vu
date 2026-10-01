@@ -619,8 +619,18 @@ func cmdIndex(dir string, rest []string) error {
 	// Only when the index is empty too: a pass that found no transcript left
 	// on disk still holds the sessions it keeps searchable, and the line
 	// above has just said so (#4221).
-	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) && indexIsEmpty(dir) {
-		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+	//
+	// A store behind a permission wall is still named when the index holds
+	// other sessions, without the "nothing to index" half: that line is the
+	// only pointer to the store this pass could not read.
+	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 {
+		denied := deniedStoreCount()
+		switch {
+		case indexIsEmpty(dir) && (denied > 0 || noAgentHistoryFound()):
+			fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+		case denied > 0:
+			fmt.Fprintln(os.Stderr, deniedStoresLine(denied, index.ReportEvictedFiles()))
+		}
 	}
 	if !quiet {
 		maybeFirstIndexGreeting(dir)
@@ -4285,7 +4295,9 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 	return errors.New(refusal)
 }
 
-// indexIsEmpty reports whether the index holds no session at all.
+// indexIsEmpty reports whether the index holds no session at all. An index
+// that cannot be counted counts as empty on purpose, so the caller falls back
+// to the empty-index hint it printed before.
 func indexIsEmpty(dir string) bool {
 	n, err := index.SessionCount(dir)
 	return err != nil || n == 0
@@ -4301,6 +4313,18 @@ func emptyIndexReason(b index.BuildSummary, evicted int) string {
 			evicted, pluralS(evicted), pluralWhich(evicted)))
 	}
 	return emptyIndexHint("nothing to index yet")
+}
+
+// deniedStoresLine names the stores deja could not read on a pass whose index
+// still holds sessions, with the files the pass evicted when there were any.
+func deniedStoresLine(denied, evicted int) string {
+	line := fmt.Sprintf("%d store%s could not be read (permission denied); `deja doctor` names %s",
+		denied, pluralS(denied), pluralWhich(denied))
+	if evicted > 0 {
+		line = fmt.Sprintf("%d indexed file%s went away with the store that held %s — %s",
+			evicted, pluralS(evicted), pluralWhich(evicted), line)
+	}
+	return "deja: " + line
 }
 
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
