@@ -1836,6 +1836,18 @@ func hookStatusMessage(event string) string {
 	return ""
 }
 
+// hookTimeoutFor is the timeout deja writes for an event, in seconds; zero
+// leaves the harness default. SessionEnd only: Claude Code holds /exit and
+// /clear for the largest SessionEnd timeout it finds (1.5 s when none is set),
+// so a long one here would let the reader's own slow SessionEnd hook hold the
+// exit that long. deja's takes 10-20 ms.
+func hookTimeoutFor(event string) int {
+	if event == "SessionEnd" {
+		return 1
+	}
+	return 0
+}
+
 // hookCommandKind says whose a hook command is. The word "deja" anywhere in the
 // line is not the test: a tool living under /home/deja is somebody else's, and
 // a line the reader wrote around deja's own invocation is theirs even though it
@@ -2158,6 +2170,9 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 				if msg := hookStatusMessage(event); msg != "" {
 					h["statusMessage"] = msg
 				}
+				if t := hookTimeoutFor(event); t > 0 {
+					h["timeout"] = t
+				}
 				adoptMatcher(entry, hs, matcher)
 			}
 			kept = append(kept, hAny)
@@ -2177,6 +2192,9 @@ func updateClaudeHook(root map[string]any, event, cmd, matcher string, uninstall
 		h := map[string]any{"type": "command", "command": cmd}
 		if msg := hookStatusMessage(event); msg != "" {
 			h["statusMessage"] = msg
+		}
+		if t := hookTimeoutFor(event); t > 0 {
+			h["timeout"] = t
 		}
 		entry := map[string]any{"hooks": []any{h}}
 		if matcher != "" {

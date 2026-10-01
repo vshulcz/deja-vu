@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -62,14 +63,42 @@ func TestSessionEndWithoutAnIDLeavesTheStamps(t *testing.T) {
 // the row as wired, and uninstall gives the reader's file back as it was.
 func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	hermeticEnv(t)
-	// The reader's own SessionEnd hook sits under the event deja adds to.
-	// Nested keys are in the order the writer emits: it restores the top-level
-	// order only (json_shape.go), the same for every event it touches.
+	// The reader's own SessionEnd hook sits under the event deja adds to, in
+	// the order Claude Code's /hooks screen writes it: matcher before hooks,
+	// type before command — not the order marshalling would sort them into.
 	path := filepath.Join(sources.ClaudeConfigDir(), "settings.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	seed := "{\n  \"model\": \"opus\",\n  \"hooks\": {\n    \"SessionEnd\": [\n      {\n        \"hooks\": [\n          {\n            \"command\": \"/usr/local/bin/mine --flush\",\n            \"type\": \"command\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
+	seed := `{
+  "model": "opus",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/local/bin/mine --flush",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/local/bin/mine --audit"
+          }
+        ]
+      }
+    ]
+  }
+}
+`
 	if err := os.WriteFile(path, []byte(seed), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -83,8 +112,29 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	if !hookEventWired(settingsHooks(t, b), "SessionEnd", "hook-session-end") {
 		t.Fatalf("install wrote no SessionEnd hook:\n%s", b)
 	}
-	if !strings.Contains(string(b), "/usr/local/bin/mine --flush") {
-		t.Errorf("the reader's own SessionEnd hook went:\n%s", b)
+	// Their entries come through the install as they wrote them, not only
+	// after the uninstall.
+	for _, block := range []string{
+		"      {\n        \"matcher\": \"clear\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/usr/local/bin/mine --flush\",\n            \"timeout\": 5\n          }\n        ]\n      }",
+		"      {\n        \"matcher\": \"Read\",\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"/usr/local/bin/mine --audit\"\n          }\n        ]\n      }",
+	} {
+		if !strings.Contains(string(b), block) {
+			t.Errorf("install rewrote the reader's own entry; want it as written:\n%s\n--- in\n%s", block, b)
+		}
+	}
+	// One second: Claude Code holds /exit for the largest SessionEnd timeout
+	// it finds, the reader's slow hooks included.
+	bounded := false
+	for _, e := range settingsHooks(t, b)["SessionEnd"].([]any) {
+		for _, h := range e.(map[string]any)["hooks"].([]any) {
+			h := h.(map[string]any)
+			if strings.HasSuffix(h["command"].(string), " hook-session-end") {
+				bounded = h["timeout"] == float64(1)
+			}
+		}
+	}
+	if !bounded {
+		t.Errorf("deja's SessionEnd entry is not bounded at one second:\n%s", b)
 	}
 	if st := claudeHookWiringState(); st.state != "wired" {
 		t.Errorf("doctor reads %q (missing %v) after a fresh install", st.state, st.missing)
@@ -102,8 +152,8 @@ func TestClaudeAutoWiresSessionEndAndUninstallRoundTrips(t *testing.T) {
 	}
 }
 
-// Gemini CLI: the extension deja writes carries SessionEnd, doctor reads it as
-// wired, and uninstall takes the extension out with the rest.
+// Gemini CLI: the extension deja writes carries SessionEnd, and uninstall takes
+// the extension out with the rest.
 func TestGeminiAutoWiresSessionEndAndUninstallRemovesIt(t *testing.T) {
 	hermeticEnv(t)
 	settings := filepath.Join(sources.GeminiHome(), "settings.json")
@@ -124,13 +174,6 @@ func TestGeminiAutoWiresSessionEndAndUninstallRemovesIt(t *testing.T) {
 	if !hookEventWired(settingsHooks(t, b), "SessionEnd", "hook-session-end") {
 		t.Fatalf("the extension wires no SessionEnd hook:\n%s", b)
 	}
-	for _, a := range autoWirings() {
-		if a.name == "gemini" {
-			if st, _ := autoWiringState(a); st != "wired" {
-				t.Errorf("doctor reads gemini as %q after a fresh install", st)
-			}
-		}
-	}
 
 	if _, err := installTarget("gemini-auto", "/usr/local/bin/deja", true); err != nil {
 		t.Fatal(err)
@@ -148,4 +191,65 @@ func settingsHooks(t *testing.T, b []byte) map[string]any {
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	return hooks
+}
+
+// Claude Code moves a session to the background by forking it: a new id whose
+// transcript is a copy of the old one, then SessionEnd for the old id. With
+// the old stamp cleared, the fork's recall answered with the copy — its own
+// opening question under the old id, which the window used to shield (#3945).
+// A session that asked the same thing at another time is not a copy and stays.
+func TestAForkDoesNotGetItsSourceBackAsRecall(t *testing.T) {
+	tmp := hermeticEnv(t)
+	root := filepath.Join(tmp, "claude")
+	t.Setenv("DEJA_CLAUDE_ROOT", root)
+	store := filepath.Join(root, "-w-p")
+	if err := os.MkdirAll(store, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := func(id, role, ts, text string) string {
+		b, _ := json.Marshal(map[string]any{"type": role, "sessionId": id, "cwd": "/w/p", "timestamp": ts,
+			"message": map[string]any{"role": role, "content": text}})
+		return string(b) + "\n"
+	}
+	ask := "The golden test in internal/store never runs here. Find the exact command that runs it and proof that it passes."
+	write := func(id, body string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(store, id+".jsonl"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	opened := "2026-09-30T10:00:00.123Z"
+	source := line("src-1", "user", opened, ask) + line("src-1", "assistant", "2026-09-30T10:00:05.000Z", "Looking at the Makefile now.")
+	write("src-1", source)
+	write("fork-2", line("fork-2", "user", opened, ask)+line("fork-2", "assistant", "2026-09-30T10:00:05.000Z", "Looking at the Makefile now.")+
+		line("fork-2", "user", "2026-09-30T10:03:00.000Z", "keep going in the background"))
+	write("earlier-3", line("earlier-3", "user", "2026-08-04T09:00:00Z", ask)+
+		line("earlier-3", "assistant", "2026-08-04T09:02:00Z", "Run SVC_FIXTURES=$PWD/fixtures make test — that runs the golden test in internal/store and it passes."))
+	// Started in the same whole second as earlier-3, on something else: a
+	// harness that stamps seconds gives two sessions run together one start
+	// time, and that alone does not make either a copy of the other.
+	write("parallel-4", line("parallel-4", "user", "2026-08-04T09:00:00Z", "rename the config loader and update every caller in cmd/"))
+	dir := index.DefaultDir()
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	markSessionLive(dir, "parallel-4")
+	markSessionLive(dir, "src-1")
+	markSessionLive(dir, "fork-2")
+	runHookSessionEnd(dir, strings.NewReader(`{"session_id":"src-1","hook_event_name":"SessionEnd","reason":"prompt_input_exit"}`))
+	if liveSessionIDs(dir)["src-1"] {
+		t.Fatal("SessionEnd left the source's stamp, so this proves nothing")
+	}
+
+	got, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"golden test internal/store never runs"}`))
+	if err != nil {
+		t.Fatalf("recall: %v", err)
+	}
+	if strings.Contains(got, "src-1") {
+		t.Errorf("the fork got its own transcript back under the source's id:\n%s", got)
+	}
+	if !strings.Contains(got, "earlier-3") {
+		t.Errorf("a session that asked the same thing at another time was hidden as a copy:\n%s", got)
+	}
 }

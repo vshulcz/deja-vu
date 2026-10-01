@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -177,6 +178,19 @@ func liveSessionIDs(dir string) map[string]bool {
 	return out
 }
 
+// hiddenFromRecall is what the MCP surfaces leave out: the live sessions and
+// the indexed copies they were forked from. Ending a session clears its stamp,
+// and Claude Code ends one when it moves it to the background — into a fork
+// that carries the same transcript under a new id. Without the copies, that
+// fork's recall answered with its own opening question (#3945, #4210).
+func hiddenFromRecall(dir string) map[string]bool {
+	live := liveSessionIDs(dir)
+	for id := range index.CopiesOf(dir, live) {
+		live[id] = true
+	}
+	return live
+}
+
 // withoutLiveSessions drops the sessions an agent is inside from a result.
 //
 // Only the MCP surfaces use it. On the CLI the reader is a person who may well
@@ -189,7 +203,7 @@ func liveSessionIDs(dir string) map[string]bool {
 // question ranks first by wording however it is weighted, so demotion left it
 // on a page of five (#3945).
 func withoutLiveSessions(dir string, ss []model.Session) []model.Session {
-	live := liveSessionIDs(dir)
+	live := hiddenFromRecall(dir)
 	if len(live) == 0 {
 		return ss
 	}
