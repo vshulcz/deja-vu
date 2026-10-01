@@ -178,7 +178,7 @@ func (st inlineStyle) of(was []byte) inlineStyle {
 }
 
 func (st *inlineStyle) readFrom(was []byte) (colon, comma bool) {
-	for i := 0; i < len(was) && !(colon && comma); i++ {
+	for i := 0; i < len(was) && (!colon || !comma); i++ {
 		switch was[i] {
 		case '"':
 			end := endOfJSONString(was, i)
