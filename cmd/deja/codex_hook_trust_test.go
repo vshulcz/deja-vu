@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -176,5 +177,51 @@ func TestRewriteCodexHookTrustReadsTOMLNotLines(t *testing.T) {
 
 	if got := quoteTOMLKey("a\x7fb\"c\\d", false); got != `"a\u007Fb\"c\\d"` {
 		t.Errorf("TOML quoting: %s", got)
+	}
+}
+
+// An install that drops a second copy of deja's entry moves the reader's hook
+// after it up a place, and the pin at that place is the dropped copy's. The
+// pins have to follow on install as they do on uninstall (#4227).
+func TestInstallDroppingADuplicateMovesTheReadersPin(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CODEX_HOME", "")
+	t.Setenv("DEJA_CODEX_ROOT", "")
+	codex := filepath.Join(home, ".codex")
+	if err := os.MkdirAll(codex, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	hooksPath := filepath.Join(codex, "hooks.json")
+	cfgPath := filepath.Join(codex, "config.toml")
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	var root map[string]any
+	if err := json.Unmarshal([]byte(readString(t, hooksPath)), &root); err != nil {
+		t.Fatal(err)
+	}
+	hooks := root["hooks"].(map[string]any)
+	ups := hooks["UserPromptSubmit"].([]any)
+	mine := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": "~/bin/mine.sh"}}}
+	hooks["UserPromptSubmit"] = []any{ups[0], ups[0], mine}
+	b, _ := json.MarshalIndent(root, "", "  ")
+	if err := os.WriteFile(hooksPath, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	pin := func(g int, hash string) string {
+		return "\n[hooks.state." + strconv.Quote(hooksPath+":user_prompt_submit:"+strconv.Itoa(g)+":0") + "]\ntrusted_hash = \"sha256:" + hash + "\"\n"
+	}
+	cfg := "model = \"luna\"\n\n[hooks.state]\n"
+	if err := os.WriteFile(cfgPath, []byte(cfg+pin(0, "deja")+pin(1, "copy")+pin(2, "mine")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := installCodexHooks("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := readString(t, cfgPath), cfg+pin(0, "deja")+pin(1, "mine"); got != want {
+		t.Errorf("after install config.toml is\n%s\nwant\n%s", got, want)
 	}
 }
