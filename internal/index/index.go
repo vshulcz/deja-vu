@@ -328,7 +328,10 @@ import (
 // 58: a Cursor CLI session takes its project from the chat's meta.json cwd;
 // the folder name blanks a dot, a space or a non-ASCII character, so those
 // were filed under a split or empty name (#4193). A rebuild.
-const version = 58
+//
+// 59: a failed Gemini CLI command carries its exit status (#4208); a
+// finished chat file is not re-read, so a rebuild.
+const version = 59
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
