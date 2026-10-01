@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Resuming a recent session reads the session-start digest from the cache instead of rebuilding it, and keeps doing so after the cache refreshes; a resume took 24-41 ms against 0.1-0.2 ms for a new session (#4224).
+- `deja install codex-auto` that drops a second copy of deja's hook moves the Codex trust pins of your hooks after it along with them, so your hook keeps its approval instead of picking up the dropped copy's pin (#4227).
+- A Claude Code session in a non-ASCII directory whose first transcript had no `cwd` line yet when `deja mcp` first read it is filed under that directory once the line lands, not under its parent until the server restarts (#4225).
+- A Gemini CLI session resumed with `gemini --resume` stays in the index. Resuming leaves a second file under the same id holding only the context preamble, and that file took the id, so search, `show` and `last` lost the session (#4213).
+- A session that ended a few minutes ago shows up in the next session's MCP recall. deja hid every session its hooks had touched in the last 20 minutes as one an agent was still inside; Claude Code and Gemini CLI now get a `SessionEnd` hook that clears that mark when the session closes, including a one-shot `gemini -p`. Installing or uninstalling hooks also keeps the key order of your own entries in `settings.json` instead of sorting them (#4210).
+- `deja index` no longer says "no agent history was found" when the transcript it just reported deleted is still held and searchable (#4221).
+- `deja resume` on a VS Code Copilot Chat session names the workspace to open (`code <folder>`) before Chat: Show Chats; the list holds only the open workspace's chats, so from any other folder the session was not there (#4223).
+- A VS Code Copilot Chat session stays in the index while VS Code is writing its last line; a half-written tail used to drop the whole chat from search and `show` until the next pass (#4229).
+- A resumed Gemini CLI session keeps the prompts deja's per-prompt recall was attached to. Gemini leaves those turns out of the history it writes back on `--resume`, and deja dropped them with it. The index rebuilds once (#4214).
+- `deja resume` on a Gemini CLI session runs `gemini --resume` in the directory the session ran in, read from `projects.json` / `.project_root`; from anywhere else Gemini answered "No previous sessions found for this project" (#4211).
 - `deja uninstall gemini` takes `hooksConfig.enabled` back out of `settings.json` when install added it and no other extension has hooks, so the file comes back byte for byte. A switch you had on before, or one another extension runs on, stays (#4216).
 - A failed Gemini CLI command is indexed with its exit status (`$ git log …  → exit 128`), the way Codex, opencode and Cursor commands are, so the failed-command recall sees it. The index rebuilds once (#4208).
 - `deja resume` refuses an opencode or Kilo CLI session that was deleted in the agent and points at `deja show`; it printed `opencode -s <id>`, which failed with "Session not found" (#4205).
