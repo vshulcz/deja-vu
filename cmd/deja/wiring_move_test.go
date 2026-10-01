@@ -43,7 +43,18 @@ func TestWiringRepairFollowsAMovedBinary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(claudeJSON, []byte(strings.ReplaceAll(string(before), moved, wired.Exe)), 0o644); err != nil {
+	// The entry names the binary as it was started, which on macOS is the
+	// /var spelling of the /private/var path the record holds.
+	invoked, _ := os.Executable()
+	invoked, _ = filepath.Abs(invoked)
+	// As JSON holds it, too: on Windows the separators are escaped.
+	old := string(before)
+	for _, p := range []string{moved, invoked} {
+		esc := func(s string) string { return strings.Trim(jsonString(s), `"`) }
+		old = strings.ReplaceAll(old, esc(p), esc(wired.Exe))
+		old = strings.ReplaceAll(old, p, wired.Exe)
+	}
+	if err := os.WriteFile(claudeJSON, []byte(old), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
