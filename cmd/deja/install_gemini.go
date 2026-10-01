@@ -251,7 +251,7 @@ func enableGeminiHooks() error {
 	if err != nil {
 		return err
 	}
-	if cfg, present := geminiHooksConfig(old); present && !(len(cfg) == 1 && cfg["enabled"] == true) {
+	if cfg, present := geminiHooksConfig(old); present && (len(cfg) != 1 || cfg["enabled"] != true) {
 		// The reader's own object — a switch they set to false, a key
 		// beside it: not deja's to take back later.
 		forgetBlockAdded(path, "hooksConfig")

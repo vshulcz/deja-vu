@@ -228,9 +228,60 @@ func TestResumeCursorSplitsCLIFromIDE(t *testing.T) {
 	}
 }
 
-// gemini takes the session uuid deja indexes, and scopes the lookup to a hash
-// of the working directory it cannot invert — so the command carries no cd.
+// gemini finds a session only from the directory it ran in (#4211); the
+// store records it in projects.json and in the project folder's .project_root.
+func TestResumeGeminiRunsInTheProjectDirectory(t *testing.T) {
+	root := filepath.Join(t.TempDir(), ".gemini")
+	t.Setenv("DEJA_GEMINI_ROOT", root)
+	work := filepath.Join(t.TempDir(), "проект app")
+	chats := filepath.Join(root, "tmp", "app", "chats")
+	for _, d := range []string{work, chats} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := filepath.Join(chats, "session-2026-10-01T12-50-a5bc80ac.jsonl")
+	s := model.Session{Harness: "gemini", ID: "a5bc80ac-786c", Project: "app", Path: path}
+
+	// .project_root alone, as the folder writes it.
+	if err := os.WriteFile(filepath.Join(root, "tmp", "app", ".project_root"), []byte(work), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir, cmd, err := resumeCommand(s)
+	if err != nil || cmd != "gemini --resume a5bc80ac-786c" || dir != work {
+		t.Fatalf("resume = (%q, %q, %v), want the command run in %q", dir, cmd, err, work)
+	}
+	// projects.json is the fallback when the folder keeps no .project_root.
+	other := filepath.Join(t.TempDir(), "other")
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	reg := `{"projects":{` + jsonString(other) + `:"app"}}`
+	if err := os.WriteFile(filepath.Join(root, "projects.json"), []byte(reg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if dir, _, _ := resumeCommand(s); dir != work {
+		t.Fatalf("dir = %q, want .project_root's %q over the registry", dir, work)
+	}
+	if err := os.Remove(filepath.Join(root, "tmp", "app", ".project_root")); err != nil {
+		t.Fatal(err)
+	}
+	if dir, _, _ := resumeCommand(s); dir != other {
+		t.Fatalf("dir = %q, want the registry's %q", dir, other)
+	}
+	// A directory that is gone gets no cd.
+	if err := os.RemoveAll(other); err != nil {
+		t.Fatal(err)
+	}
+	if dir, _, _ := resumeCommand(s); dir != "" {
+		t.Fatalf("dir = %q for a directory that is gone", dir)
+	}
+}
+
+// An older store keys the project folder by a hash of the path and records
+// nothing to invert — the command carries no cd.
 func TestResumeGeminiPrintsNoDirectory(t *testing.T) {
+	t.Setenv("DEJA_GEMINI_ROOT", t.TempDir())
 	dir, cmd, err := resumeCommand(model.Session{Harness: "gemini", ID: "a5bc80ac-786c", Project: "app", Path: "/g/tmp/app/chats/s.jsonl"})
 	if err != nil {
 		t.Fatalf("gemini resume: %v", err)
