@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `deja blame` names the Claude subagent that changed a file. A subagent run is indexed as its task and its answer, and the edits went with the rest of the middle, so the 1,668 subagent edits on the machine this was measured on were never indexed. Files changed inside a Claude Code worktree (`.claude/worktrees/`) were also skipped as the agent's own files. The index rebuilds once to pick up finished subagent runs (#4163, #4164).
+- Installing and uninstalling no longer re-sorts the keys of a hook entry you wrote on one line in `~/.claude/settings.json` (or any JSON config deja edits): entries inside a block deja adds to keep their text, so an install followed by an uninstall gives the file back byte for byte (#4167).
 
 ## [0.21.4] - 2026-09-29
 

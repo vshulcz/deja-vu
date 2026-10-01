@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 // A config holds blocks the reader wrote on one line — a counter table, a
@@ -25,6 +26,7 @@ func keepInlineBlocks(old, next []byte) []byte {
 	if len(inline) == 0 {
 		return next
 	}
+	items := inlineArrayItems(old)
 	found := scanContainers(next)
 	sort.Slice(found, func(i, j int) bool { return found[i].start < found[j].start })
 	type rewrite struct {
@@ -34,10 +36,13 @@ func keepInlineBlocks(old, next []byte) []byte {
 	var edits []rewrite
 	covered := -1
 	for _, c := range found {
-		was, ok := inline[c.path]
-		if !ok || c.start < covered {
+		if c.start < covered {
 			// Nested inside a block already going back on one line: it comes
 			// along with that one.
+			continue
+		}
+		was, ok := inline[c.path]
+		if !ok && (!c.viaArray || len(items[arrayOf(c.path)]) == 0) {
 			continue
 		}
 		if !bytes.ContainsRune(next[c.start:c.end], '\n') {
@@ -48,13 +53,22 @@ func keepInlineBlocks(old, next []byte) []byte {
 		// sorts keys, so re-inlining alone would hand back the same block with
 		// its fields shuffled — a rewrite of their line either way.
 		switch {
-		case sameJSONValue(was, flat):
+		case ok && sameJSONValue(was, flat):
 			flat = was
 		case c.viaArray:
 			// Inside an array the path is a position, and an entry that moved —
 			// deja's own added ahead of it, or taken out — would be matched
-			// against a neighbour. Only an exact value match is evidence there.
-			continue
+			// against a neighbour. Only an exact value match is evidence there,
+			// so look for one among the entries the array had.
+			if flat = sameArrayItem(items, c.path, flat); flat == nil {
+				continue
+			}
+		default:
+			// Changed, so it cannot go back as it was — but what inside it is
+			// still the reader's can. Compacting the whole block re-sorted the
+			// reader's own hook entry beside the one deja added, and an
+			// uninstall then had no original left to restore (#4167).
+			flat = relined(next, c, found, inline, items)
 		}
 		edits = append(edits, rewrite{c.start, c.end, flat})
 		covered = c.end
@@ -67,6 +81,80 @@ func keepInlineBlocks(old, next []byte) []byte {
 		next = append(next[:e.start:e.start], tail...)
 	}
 	return next
+}
+
+// relined puts container c of next on one line, giving back the reader's own
+// text for every block inside it whose value they wrote that way.
+func relined(next []byte, c jsonContainer, found []jsonContainer, inline map[string][]byte, items map[string][][]byte) []byte {
+	flat := compactJSONText(next[c.start:c.end])
+	if was, ok := inline[c.path]; ok && sameJSONValue(was, flat) {
+		return was
+	}
+	if c.viaArray {
+		if was := sameArrayItem(items, c.path, flat); was != nil {
+			return was
+		}
+	}
+	var out []byte
+	at := c.start
+	i := sort.Search(len(found), func(i int) bool { return found[i].start > c.start })
+	for ; i < len(found) && found[i].start < c.end; i++ {
+		d := found[i]
+		if d.start < at {
+			// Inside a child already given back whole.
+			continue
+		}
+		out = append(out, compactJSONText(next[at:d.start])...)
+		out = append(out, relined(next, d, found, inline, items)...)
+		at = d.end
+	}
+	return append(out, compactJSONText(next[at:c.end])...)
+}
+
+// inlineArrayItems maps each array to the entries the reader wrote in it on a
+// single line, by the path of the array rather than the entry's position.
+func inlineArrayItems(b []byte) map[string][][]byte {
+	out := map[string][][]byte{}
+	for _, c := range scanContainers(b) {
+		parent, last := splitJSONPath(c.path)
+		if strings.HasPrefix(last, "#") && !bytes.ContainsRune(b[c.start:c.end], '\n') {
+			out[parent] = append(out[parent], b[c.start:c.end])
+		}
+	}
+	return out
+}
+
+// sameArrayItem is the reader's text for an array entry with this value, or
+// nil when the array held no such entry on one line.
+func sameArrayItem(items map[string][][]byte, path string, flat []byte) []byte {
+	parent, last := splitJSONPath(path)
+	if !strings.HasPrefix(last, "#") {
+		return nil
+	}
+	for _, was := range items[parent] {
+		if sameJSONValue(was, flat) {
+			return was
+		}
+	}
+	return nil
+}
+
+// arrayOf is the path of the array an entry sits in, or "" when the last step
+// is a name.
+func arrayOf(path string) string {
+	parent, last := splitJSONPath(path)
+	if !strings.HasPrefix(last, "#") {
+		return ""
+	}
+	return parent
+}
+
+func splitJSONPath(path string) (parent, last string) {
+	i := strings.LastIndexByte(path, 0)
+	if i < 0 {
+		return "", path
+	}
+	return path[:i], path[i+1:]
 }
 
 // sameJSONValue reports whether two blocks say the same thing, whatever order
