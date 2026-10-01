@@ -262,7 +262,30 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 // "Exit Code: 128". Codex, opencode and Cursor commands carry `→ exit N` on a
 // non-zero exit, which is what the failed-command recall reads; a Gemini
 // failure read like a success without it (#4208).
-var geminiExit = regexp.MustCompile(`(?m)^Exit Code: (\d+)`)
+var geminiExit = regexp.MustCompile(`^Exit Code: (\d+)$`)
+
+// geminiExitCode reads the status from the footer Gemini writes after the
+// output — Exit Code (only when non-zero), then Signal, Background PIDs and
+// the process group — so a line the command printed itself is not taken for
+// it. 0 when the footer carries none.
+func geminiExitCode(out string) int {
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		l := strings.TrimSpace(lines[i])
+		if m := geminiExit.FindStringSubmatch(l); m != nil {
+			code, _ := strconv.Atoi(m[1])
+			return code
+		}
+		footer := l == "" || l == "</untrusted_context>"
+		for _, label := range []string{"Signal: ", "Background PIDs: ", "Process Group PGID: "} {
+			footer = footer || strings.HasPrefix(l, label)
+		}
+		if !footer {
+			return 0
+		}
+	}
+	return 0
+}
 
 type geminiCall struct {
 	ID     string         `json:"id"`
@@ -290,8 +313,13 @@ func geminiNoteShellCalls(s *model.Session, m geminiMessage, start int, shellAt 
 	}
 	used := map[int]bool{}
 	for _, c := range calls {
+		if c.ID == "" {
+			continue
+		}
+		// An id seen again belongs to this call now, recorded or not.
+		delete(shellAt, c.ID)
 		cmd, _ := c.Args["command"].(string)
-		if c.ID == "" || !qwenDialect.isShellTool(c.Name) || cmd == "" {
+		if !qwenDialect.isShellTool(c.Name) || cmd == "" {
 			continue
 		}
 		for i := start; i < len(s.Messages); i++ {
@@ -331,11 +359,11 @@ func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int) 
 		if !ok {
 			continue
 		}
-		mm := geminiExit.FindStringSubmatch(r.Response.Output + "\n" + r.Response.Error)
-		if mm == nil {
-			continue
+		code := geminiExitCode(r.Response.Output)
+		if code == 0 {
+			code = geminiExitCode(r.Response.Error)
 		}
-		if code, err := strconv.Atoi(mm[1]); err == nil && code > 0 {
+		if code > 0 {
 			s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
 		}
 		delete(shellAt, r.ID) // once: the result arrives on both records
