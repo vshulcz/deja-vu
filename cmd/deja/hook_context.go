@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -401,7 +402,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// environment, so a host that sends the payload without exporting
 	// CLAUDE_PROJECT_DIR got no memory at all — indistinguishable from having
 	// none (#759).
-	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots))
+	digest, sessions, raw, taskMatched, withheld, servedIDs, servedProjects := cachedHookDigestFor(dir, hookProjectPath(input.CWD, input.WorkspaceRoots), input.SessionID)
 	if digest == "" {
 		// No session from this project, which is the usual state in a new
 		// checkout — and exactly where knowing what this machine is missing
@@ -809,14 +810,18 @@ func hookCWD(fromPayload string) string {
 }
 
 func cachedHookDigest(dir string) (string, int, int64, []string, int, []string, []string) {
-	return cachedHookDigestFor(dir, "")
+	return cachedHookDigestFor(dir, "", "")
 }
 
 // cachedHookDigestFor is cachedHookDigest for a caller that was told which
 // project the call is about. The payload is that authority: deja used to write
 // it into its own environment and read it back, which answered a second payload
 // in the same process with the first one's project (#2182, #2185).
-func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
+//
+// exclude is the session asking. A harness whose session-start seam runs
+// after the first message is stored — opencode's system transform — would
+// otherwise be served its own opening prompt as history (#4199).
+func cachedHookDigestFor(dir, fromPayload, exclude string) (string, int, int64, []string, int, []string, []string) {
 	cwd := hookCWD(fromPayload)
 	if recallIsOff() {
 		return "", 0, 0, nil, 0, nil, nil
@@ -837,7 +842,7 @@ func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string,
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {
 		var e hookCacheEntry
-		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && e.Gate == gate {
+		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && e.Gate == gate && !slices.Contains(e.IDs, exclude) {
 			if time.Since(e.At) >= hookDigestTTL {
 				// Serve stale instantly; a detached self-refresh rebuilds
 				// the cache off the startup path.
@@ -846,7 +851,7 @@ func cachedHookDigestFor(dir, fromPayload string) (string, int, int64, []string,
 			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd)
+	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, exclude)
 	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
 	return digest, sessions, raw, taskMatched, withheld, ids, projects
 }
@@ -921,7 +926,7 @@ func hookDigest(dir string) string {
 }
 
 func hookDigestResult(dir string) (string, int, int64, []string, int, []string, []string) {
-	return hookDigestResultFor(dir, "")
+	return hookDigestResultFor(dir, "", "")
 }
 
 // hookDigestResultFor is hookDigestResult for a caller that was told which
@@ -947,7 +952,7 @@ func withProjectsOf(names []string, ss []model.Session) []string {
 	return out
 }
 
-func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string, int, []string, []string) {
+func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, []string, int, []string, []string) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -1033,7 +1038,7 @@ func hookDigestResultFor(dir, fromPayload string) (string, int, int64, []string,
 				continue
 			}
 			k := s.Harness + ":" + s.ID
-			if seen[k] {
+			if seen[k] || (exclude != "" && s.ID == exclude) {
 				continue
 			}
 			seen[k] = true
