@@ -53,16 +53,20 @@ func keepInlineBlocks(old, next []byte) []byte {
 		// sorts keys, so re-inlining alone would hand back the same block with
 		// its fields shuffled — a rewrite of their line either way.
 		switch {
-		case c.viaArray:
-			// Inside an array the path is a position, and an entry that moved —
-			// deja's own added ahead of it, or taken out — would be matched
-			// against a neighbour. Only an exact value match is evidence there,
-			// so look for one among the entries the array had.
+		case arrayOf(c.path) != "":
+			// An entry of an array: its path is a position, and an entry that
+			// moved — deja's own added ahead of it, or taken out — would be
+			// matched against a neighbour. Only an exact value match is
+			// evidence there, so look for one among the entries the array had.
 			if flat = items.take(c.path, flat); flat == nil {
 				continue
 			}
-		case sameJSONValue(was, flat):
+		case ok && sameJSONValue(was, flat):
 			flat = was
+		case c.viaArray:
+			// Changed, and reached through an array position, so the reader's
+			// block at this path may be a neighbour's: leave it expanded.
+			continue
 		default:
 			// Changed, so it cannot go back as it was — but what inside it is
 			// still the reader's can (#4167).

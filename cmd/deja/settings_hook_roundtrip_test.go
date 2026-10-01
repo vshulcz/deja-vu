@@ -164,3 +164,34 @@ func TestALongArrayWithAMovedEntryStaysFast(t *testing.T) {
 		t.Errorf("the moved entries lost their text")
 	}
 }
+
+// A one-line block under a key of an array entry — the inner hooks list of the
+// reader's Stop hook — is not an array entry itself, and goes back as written.
+func TestAOneLineBlockInsideAnArrayEntryIsKept(t *testing.T) {
+	orig := `{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [{"type": "command", "command": "~/bin/notify.sh"}]
+      }
+    ]
+  }
+}
+`
+	path := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(path, []byte(orig), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := "/opt/deja/deja-hook hook-tool"
+	for _, uninstall := range []bool{false, true} {
+		if _, err := installSettingsHookCmd(path, "PreToolUse", "Bash|Edit", 30, cmd, uninstall); err != nil {
+			t.Fatal(err)
+		}
+		if b, _ := os.ReadFile(path); !strings.Contains(string(b), `"hooks": [{"type": "command", "command": "~/bin/notify.sh"}]`) {
+			t.Errorf("uninstall=%v expanded the reader's one-line list:\n%s", uninstall, b)
+		}
+	}
+	if back, _ := os.ReadFile(path); string(back) != orig {
+		t.Errorf("install then uninstall did not give the file back\nwant:\n%s\ngot:\n%s", orig, back)
+	}
+}
