@@ -515,7 +515,8 @@ without anyone asking, one row per harness deja can wire. `state` is `wired`,
 `stale` (the file is there and nothing in it calls deja, which is how a dead
 integration looks), `missing`, or `plugin` (the harness carries its own).
 `binary_missing` marks a row whose entries name a deja binary that is no longer
-there — what an upgrade leaves behind, with every hook exiting 127.
+there — what an upgrade leaves behind, with every hook exiting 127. An `mcp` row carries the same field when the server entry names a deja
+binary that is gone: still `wired`, and the harness cannot start it.
 
 The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
 event by event, so they have two states of their own: `out of date` (some of the
