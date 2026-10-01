@@ -616,7 +616,10 @@ func cmdIndex(dir string, rest []string) error {
 	// the step whose whole job is filling memory returned to the prompt after
 	// a bare "indexing ..." line, and the state (no history anywhere, or a
 	// store behind a permission wall) only surfaced on the next command.
-	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
+	// Only when the index is empty too: a pass that found no transcript left
+	// on disk still holds the sessions it keeps searchable, and the line
+	// above has just said so (#4221).
+	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) && indexIsEmpty(dir) {
 		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
 	}
 	if !quiet {
@@ -4280,6 +4283,12 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 		return errors.New(strings.TrimPrefix(emptyIndexHint(subject+", and nothing is indexed yet"), "deja: "))
 	}
 	return errors.New(refusal)
+}
+
+// indexIsEmpty reports whether the index holds no session at all.
+func indexIsEmpty(dir string) bool {
+	n, err := index.SessionCount(dir)
+	return err != nil || n == 0
 }
 
 // emptyIndexReason opens the empty-index sentence. "Nothing to index yet" is
