@@ -2702,9 +2702,22 @@ func coversKept(r model.Session, meta SessionMeta) bool {
 		if messageFingerprint(m) == meta.LastMsg {
 			return true
 		}
+		// The command may have been indexed before its result landed; the
+		// re-read adds the exit status to the same message. Codex compressing a
+		// rollout in place is still the move, so match it without the suffix.
+		if base := exitSuffix.ReplaceAllString(m.Text, ""); base != m.Text {
+			m.Text = base
+			if messageFingerprint(m) == meta.LastMsg {
+				return true
+			}
+		}
 	}
 	return false
 }
+
+// exitSuffix is the status the parsers append to a command once its result is
+// read: "  → exit N".
+var exitSuffix = regexp.MustCompile(`  → exit -?\d+$`)
 
 // holdsText reports whether any message of s has text left to index once
 // plumbing is stripped. Stripping is idempotent, so it answers the same before
@@ -4178,8 +4191,18 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// in on top counted the stub's preamble too, one more message than
 			// a rebuild of the same files gives (#4213). Start the row over
 			// from the session that owns it, as the full build does.
-			if owns && meta.NoText && meta.Path != s.Path {
-				meta = metaWithOrd(metaForSession(s), meta.Ord)
+			// Only for a file read whole: a known file hands over its tail,
+			// which is not the session. The span stays what both files cover,
+			// as the full build keeps it.
+			if owns && meta.NoText && meta.Path != s.Path && !known {
+				prev := meta
+				meta = metaWithOrd(metaForSession(s), prev.Ord)
+				if !prev.Started.IsZero() && (meta.Started.IsZero() || prev.Started.Before(meta.Started)) {
+					meta.Started = prev.Started
+				}
+				if prev.Updated.After(meta.Updated) {
+					meta.Updated = prev.Updated
+				}
 			}
 			if collided {
 				collisions.Add(1)

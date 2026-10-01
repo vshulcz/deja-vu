@@ -2,6 +2,7 @@ package index
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -327,6 +328,15 @@ func TestGeminiResumedStubIsNotARenameOfTheDeletedTranscript(t *testing.T) {
 // hands; folding the transcript into the stub's row counted the stub's
 // preamble on top, one more message than a rebuild of the same files.
 func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
+	// With and without the resumed turns: without them the transcript ends
+	// before the stub was written, and the row's span has to keep the stub's.
+	// The stub sorts first, so the rebuild reads it first and merges its span.
+	for name, real := range map[string]string{"resumed": geminiOriginal() + geminiResumedTail(), "ends before the stub": geminiOriginal()} {
+		t.Run(name, func(t *testing.T) { transcriptTakesStubRow(t, real) })
+	}
+}
+
+func transcriptTakesStubRow(t *testing.T, real string) {
 	tmp := hermeticIndexEnv(t)
 	write(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl"),
 		claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
@@ -334,11 +344,11 @@ func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(geminiChats(), "session-z-008140a7.jsonl"), geminiStub())
+	write(t, filepath.Join(geminiChats(), "session-a-008140a7.jsonl"), geminiStub())
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), geminiOriginal()+geminiResumedTail())
+	write(t, filepath.Join(geminiChats(), "session-b-008140a7.jsonl"), real)
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -355,8 +365,114 @@ func TestGeminiTranscriptTakingAStubRowMatchesARebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := row()
-	if got.Counted != want.Counted || got.Words != want.Words || got.LastMsg != want.LastMsg || got.NoText != want.NoText || !got.Started.Equal(want.Started) || got.Path != want.Path {
-		t.Errorf("row after the transcript arrived: Counted=%d Words=%d Started=%v Path=%s; a rebuild gives Counted=%d Words=%d Started=%v Path=%s",
-			got.Counted, got.Words, got.Started, got.Path, want.Counted, want.Words, want.Started, want.Path)
+	if got.Counted != want.Counted || got.Words != want.Words || got.LastMsg != want.LastMsg || got.NoText != want.NoText ||
+		!got.Started.Equal(want.Started) || !got.Updated.Equal(want.Updated) || got.Path != want.Path {
+		t.Errorf("row after the transcript arrived: Counted=%d Words=%d Started=%v Updated=%v Path=%s; a rebuild gives Counted=%d Words=%d Started=%v Updated=%v Path=%s",
+			got.Counted, got.Words, got.Started, got.Updated, got.Path, want.Counted, want.Words, want.Started, want.Updated, want.Path)
 	}
 }
+
+// A move whose last command got its result in between: the re-read appends
+// "  → exit N" to the message the row fingerprinted, and the move was taken
+// for a second file under the same id — the row stayed on the dead path,
+// marked shared, and both copies of the command stayed in the records.
+func TestAMoveThatAddsAnExitStatusIsStillAMove(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		before, after   func(t *testing.T) (old, moved string)
+		key, staleQuery string
+	}{
+		{name: "codex rollout compressed in place", key: "codex:cx-1", staleQuery: "go test",
+			before: func(t *testing.T) (string, string) {
+				if _, err := exec.LookPath("zstd"); err != nil {
+					t.Skip("zstd not installed")
+				}
+				dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "31")
+				p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-cx-1.jsonl")
+				write(t, p, codexRolloutHead)
+				return p, p + ".zst"
+			},
+			after: func(t *testing.T) (string, string) {
+				dir := filepath.Join(os.Getenv("DEJA_CODEX_ROOT"), "sessions", "2026", "07", "31")
+				p := filepath.Join(dir, "rollout-2026-07-31T00-00-00-cx-1.jsonl")
+				appendFile(t, p, `{"timestamp":"2026-07-31T00:00:03Z","type":"response_item","payload":{"type":"function_call_output","call_id":"c1","output":"Process exited with code 1\nOutput:\nFAIL\n"}}`+"\n")
+				if out, err := exec.Command("zstd", "-q", "--rm", p).CombinedOutput(); err != nil {
+					t.Fatalf("zstd: %v %s", err, out)
+				}
+				return p, p + ".zst"
+			}},
+		{name: "gemini json rewritten as jsonl", key: "gemini:sess-mv-1", staleQuery: "git log",
+			before: func(t *testing.T) (string, string) {
+				p := filepath.Join(geminiChats(), "session-2026-10-01T12-51-sess-mv-1.json")
+				write(t, p, geminiJSONBeforeResult)
+				return p, strings.TrimSuffix(p, ".json") + ".jsonl"
+			},
+			after: func(t *testing.T) (string, string) {
+				p := filepath.Join(geminiChats(), "session-2026-10-01T12-51-sess-mv-1.json")
+				if err := os.Remove(p); err != nil {
+					t.Fatal(err)
+				}
+				write(t, p+"l", geminiJSONLWithResult)
+				return p, p + "l"
+			}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmp := hermeticIndexEnv(t)
+			tc.before(t)
+			// An unrelated transcript that shrinks, so the pass takes the
+			// replacement path and its rename rule.
+			other := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "other.jsonl")
+			write(t, other, claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause")+
+				claudeLine("s-other", "2026-01-02T03:04:06Z", "and the backoff is capped"))
+			dir := filepath.Join(tmp, "idx")
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			old, moved := tc.after(t)
+			write(t, other, claudeLine("s-other", "2026-01-02T03:04:05Z", "the exporter retries without a pause"))
+			if err := Ensure(dir, "", false, nil); err != nil {
+				t.Fatal(err)
+			}
+			m, err := readManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := m.Sessions[tc.key]
+			if row.Path != moved || row.Shared {
+				t.Errorf("row on %s shared=%v, want it moved to %s and not shared", row.Path, row.Shared, moved)
+			}
+			if _, ok := m.Files[old]; ok {
+				t.Errorf("the old path %s is still held", old)
+			}
+			var cmds []string
+			recs, err := ReadRecords(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, r := range recs {
+				if r.Record.Key == tc.key && strings.Contains(r.Record.Text, tc.staleQuery) {
+					cmds = append(cmds, r.Record.Text)
+				}
+			}
+			if len(cmds) != 1 || !strings.Contains(cmds[0], "→ exit") {
+				t.Errorf("command records = %q, want the one with its exit status", cmds)
+			}
+		})
+	}
+}
+
+const codexRolloutHead = `{"timestamp":"2026-07-31T00:00:00Z","type":"session_meta","payload":{"id":"cx-1","session_id":"cx-1","cwd":"/w/app"}}
+{"timestamp":"2026-07-31T00:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"run the tests"}]}}
+{"timestamp":"2026-07-31T00:00:02Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"c1","arguments":"{\"cmd\":\"go test ./...\",\"workdir\":\"/w/app\"}"}}
+`
+
+const geminiShellCall = `{"id":"run_shell_command__1","name":"run_shell_command","args":{"command":"git log --oneline -1"}`
+
+const geminiJSONBeforeResult = `{"sessionId":"sess-mv-1","projectHash":"abc","startTime":"2026-10-01T12:51:00.000Z","lastUpdated":"2026-10-01T12:51:02.000Z","messages":[
+{"id":"u1","timestamp":"2026-10-01T12:51:01.000Z","type":"user","content":[{"text":"show the last commit"}]},
+{"id":"g1","timestamp":"2026-10-01T12:51:02.000Z","type":"gemini","content":"","toolCalls":[` + geminiShellCall + `,"status":"executing"}]}]}`
+
+const geminiJSONLWithResult = `{"sessionId":"sess-mv-1","projectHash":"abc","startTime":"2026-10-01T12:51:00.000Z","lastUpdated":"2026-10-01T12:51:03.000Z","kind":"main"}
+{"id":"u1","timestamp":"2026-10-01T12:51:01.000Z","type":"user","content":[{"text":"show the last commit"}]}
+{"id":"g1","timestamp":"2026-10-01T12:51:02.000Z","type":"gemini","content":"","toolCalls":[` + geminiShellCall + `,"result":[{"functionResponse":{"id":"run_shell_command__1","name":"run_shell_command","response":{"output":"Output: fatal: no commits\nExit Code: 128"}}}],"status":"success"}]}
+`
