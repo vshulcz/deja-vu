@@ -58,7 +58,7 @@ func TestParseOmpFile(t *testing.T) {
 	if s.Messages[1].Role != "assistant" || s.Messages[1].Text != "reading the list" {
 		t.Fatalf("message[1] = %#v (thinking must be skipped)", s.Messages[1])
 	}
-	if want := filepath.Join("/Users/halo/Code/pleasure-course", "anastasia.md"); s.Messages[2].Role != RoleFiles || s.Messages[2].Text != want {
+	if want := "/Users/halo/Code/pleasure-course/anastasia.md"; s.Messages[2].Role != RoleFiles || s.Messages[2].Text != want {
 		t.Fatalf("message[2] = %#v, want the file the read named, resolved against the cwd", s.Messages[2])
 	}
 	if s.Messages[3].Role != RoleToolOutput || s.Messages[3].Text != "some file output" {

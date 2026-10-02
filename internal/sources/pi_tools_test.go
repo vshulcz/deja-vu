@@ -82,7 +82,7 @@ func TestPiShapedToolCallsAreIndexed(t *testing.T) {
 	}
 	s := ss[0]
 	files := strings.Join(rolesOf(s, RoleFiles), "\n")
-	cfg := filepath.Join("/work/app", "retry.cfg")
+	cfg := "/work/app/retry.cfg"
 	for _, want := range []string{cfg, "/work/app/NOTES.md"} {
 		if !strings.Contains(files, want) {
 			t.Errorf("files rows %q do not name %s", files, want)
@@ -130,7 +130,7 @@ func TestPiShapedToolCallsFromOffset(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("parse: %v, %d sessions", err, len(ss))
 	}
-	if edits := rolesOf(ss[0], RoleEdit); len(edits) != 1 || !strings.HasPrefix(edits[0], filepath.Join("/work/app", "retry.cfg")+"\n") {
+	if edits := rolesOf(ss[0], RoleEdit); len(edits) != 1 || !strings.HasPrefix(edits[0], "/work/app/retry.cfg"+"\n") {
 		t.Errorf("edit spans from offset = %q", edits)
 	}
 }
@@ -150,7 +150,7 @@ func TestGjcHashlineEditsAreIndexed(t *testing.T) {
 		t.Fatalf("parse: %v, %d sessions", err, len(ss))
 	}
 	s := ss[0]
-	cfg := filepath.Join("/work/app", "retry.cfg")
+	cfg := "/work/app/retry.cfg"
 	if files := rolesOf(s, RoleFiles); len(files) != 1 || files[0] != cfg {
 		t.Errorf("files rows = %q, want the one file the hashline edit named", files)
 	}
