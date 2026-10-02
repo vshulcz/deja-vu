@@ -177,7 +177,7 @@ Each of those phases names itself on stderr before it starts, repeats every ten 
 
 - fresh manifest: do nothing;
 - version or scope mismatch: rebuild. Two versions are tracked: the content version, which moves when deja derives something new from a transcript, and the on-disk format, which moves only when an older layout would be mis-read. A store whose content version is stale is re-read but keeps answering from what it has; only a format mismatch makes search say it cannot answer yet;
-- append-only JSONL/opencode changes: append new records and update touched buckets;
+- append-only JSONL changes: append new records and update touched buckets. A harness whose sessions are re-read whole when they change (opencode, Kilo, ZCode, Cursor, Grok, Zed, Hermes, OpenClaw, Crush, goose) replaces those sessions instead (#4207, #4450);
 - removed files or non-append changes: rewrite the index while preserving unchanged records and replacing changed sessions.
 
 A file takes the append path only when the prefix deja already read is still

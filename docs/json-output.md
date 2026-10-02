@@ -179,7 +179,7 @@ when empty:
 
 | Field | Meaning |
 |---|---|
-| `path` | file the session was read from — the transcript, or the store for the database-backed harnesses; opencode is the exception and gives the project directory it ran in |
+| `path` | file the session was read from — the transcript, or the store for the database-backed harnesses; opencode, Kilo CLI and ZCode CLI are the exception and give the project directory it ran in |
 | `title` | first user turn, elided to terminal width |
 | `agent_title` | `title` came from the assistant because the session has no user turn |
 | `touched` | the few files this session worked on most |
@@ -589,7 +589,7 @@ every harness.
 
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a
-finding: nothing about the index is wrong, and a rebuild would lose them.
+finding: nothing about the index is wrong, and a rebuild keeps them.
 
 Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `--offline`), or `unknown`. `policy.state` is `default`, `active` or
