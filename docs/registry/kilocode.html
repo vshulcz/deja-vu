@@ -78,7 +78,9 @@
 <p>Task JSON: one document per task, an array of <code>{role, content}</code> turns in Cline&#39;s</p>
 <p>shape, with the user&#39;s first turn wrapped in <code>&lt;task&gt;…&lt;/task&gt;</code>. <code>history_item.json</code></p>
 <p>supplies the id, the millisecond timestamp and the workspace, which is what names</p>
-<p>the project; without it the task&#39;s directory mtime is the base time.</p>
+<p>the project; without it the task&#39;s directory mtime is the base time. A</p>
+<p><code>history_item.json</code> written or changed after the transcript re-reads the task</p>
+<p>(#4446).</p>
 <p>SQLite: <code>session</code> joined to <code>message</code> and <code>part</code>, exactly as OpenCode writes it —</p>
 <p>see <a href="opencode.html">OpenCode</a> for the field-by-field description.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>

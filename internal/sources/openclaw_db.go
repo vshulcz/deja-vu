@@ -134,31 +134,36 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	project := "openclaw-" + openclawDBAgent(db)
 	var out []model.Session
 	var s *model.Session
+	var r *piReader
 	flush := func() {
+		if r != nil {
+			r.finish()
+		}
 		if s != nil && len(s.Messages) > 0 {
 			out = append(out, *s)
 		}
 		s = nil
 	}
 	for dec.More() {
-		var r struct {
+		var row struct {
 			SessionID string `json:"session_id"`
 			Event     string `json:"event_json"`
 		}
-		if err := dec.Decode(&r); err != nil {
+		if err := dec.Decode(&row); err != nil {
 			_ = cmd.Wait()
 			return nil, fmt.Errorf("bad sqlite json: %w", err)
 		}
 		rows++
-		if s == nil || s.ID != r.SessionID {
+		if s == nil || s.ID != row.SessionID {
 			flush()
-			s = &model.Session{Harness: "openclaw", ID: r.SessionID, Project: project, Path: db}
+			s = &model.Session{Harness: "openclaw", ID: row.SessionID, Project: project, Path: db}
+			r = newPiReader(s, true)
 		}
 		var m map[string]any
-		if err := json.Unmarshal([]byte(r.Event), &m); err != nil {
+		if err := json.Unmarshal([]byte(row.Event), &m); err != nil {
 			continue
 		}
-		piShapedLine(s, m, true)
+		r.line(m)
 	}
 	flush()
 	if _, err := dec.Token(); err != nil && err != io.EOF {

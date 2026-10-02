@@ -11,7 +11,9 @@ parsing is pi's — including the directory per project. Its own binary builds
 that path in `getDefaultSessionDirPath`: `<agent>/sessions/--<encoded cwd>--`,
 where the encoding is the working directory with the separators replaced by
 dashes and a `--` on each end. A session file directly under the root is read
-too, and then the header's `cwd` is what names the project.
+too. Either way the header's `cwd` is what names the project, by its last two
+segments, rather than encoded and decoded back, which could not tell `my-app`
+from `my/app` (#4427, #4457).
 
 **Last verified:** 2026-09-17
 
@@ -20,7 +22,14 @@ too, and then the header's `cwd` is what names the project.
 - Resume: `kimchi --session <id>`. Its own argument parser rewrites
   `--resume <selector>` to `--session <id>` (`src/cli-args.ts`), so the id
   deja indexes is the selector Kimchi takes — `deja resume` prints that
-  command rather than handing over a paste.
+  command rather than handing over a paste. It runs in the directory the
+  header's `cwd` names: Kimchi 1.5 finds a session from anywhere, but outside
+  its project asks to fork it instead of reopening it (#4400).
+- **Sub-agent runs** of the `Agent` tool are transcripts of their own beside
+  the parent, marked by `parentSession` on the header and a
+  `kimchi:subagent-session` entry after it. They are skipped, as Claude Code's,
+  Cursor's and gjc's sub-agents are; `DEJA_INCLUDE_SUBAGENTS=1` takes them. A
+  fork carries `parentSession` alone and stays a session (#4401).
 - A session file directly under the root has no encoded project directory to
   read a name from, so the header line's `cwd` names the project there — the
   same choice omp and prime-agent make (#3678).

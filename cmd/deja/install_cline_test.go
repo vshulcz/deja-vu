@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,5 +89,67 @@ func TestInstallClineIsIdempotentAndRemovable(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(home, ".cline", "plugins", "deja")); !os.IsNotExist(err) {
 		t.Fatalf("plugin survived uninstall: %v", err)
+	}
+}
+
+// Cline loads a plugin's skills/ and takes its name only from a package.json
+// whose cline.plugins lists the entry file. Without one the deja-history skill
+// was never loaded and Settings > Plugins listed the plugin as "index" (#4316).
+func TestInstallClineWritesAPackageManifest(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLINE_DIR", "")
+	t.Setenv("CLINE_DATA_DIR", "")
+	if _, err := installClineAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	dir := filepath.Join(home, ".cline", "plugins", "deja")
+	b, err := os.ReadFile(filepath.Join(dir, "package.json"))
+	if err != nil {
+		t.Fatalf("no package.json beside the plugin: %v", err)
+	}
+	var pkg struct {
+		Name  string `json:"name"`
+		Cline struct {
+			Plugins []string `json:"plugins"`
+		} `json:"cline"`
+	}
+	if err := json.Unmarshal(b, &pkg); err != nil {
+		t.Fatalf("package.json: %v\n%s", err, b)
+	}
+	if pkg.Name != "deja" || len(pkg.Cline.Plugins) != 1 || pkg.Cline.Plugins[0] != "./index.js" {
+		t.Fatalf("package.json does not name the plugin entry: %s", b)
+	}
+	again, err := installClineAuto("/bin/deja", false)
+	if err != nil || again.Action != "unchanged" {
+		t.Fatalf("reinstall: %q %v", again.Action, err)
+	}
+	if _, err := installClineAuto("/bin/deja", true); err != nil {
+		t.Fatalf("uninstall: %v", err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("plugin directory survived uninstall: %v", err)
+	}
+}
+
+// The skill install writes for Cline is guidance, and doctor said
+// "unsupported" about it before and after install (#4317).
+func TestGuidanceStatusSeesTheClineSkill(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CLINE_DIR", "")
+	t.Setenv("CLINE_DATA_DIR", "")
+	if got := guidanceStatus("cline"); got != "missing" {
+		t.Fatalf("before install: guidance %q, want missing", got)
+	}
+	if _, err := installClineAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	for _, h := range []string{"cline", "cline-auto"} {
+		if got := guidanceStatus(h); got != "written" {
+			t.Fatalf("after install: %s guidance %q, want written", h, got)
+		}
 	}
 }

@@ -49,7 +49,7 @@ func TestCodexRolloutWorkRecords(t *testing.T) {
 		t.Errorf("tool output = %q, want the body without the framing", byRole[RoleToolOutput])
 	}
 	files := strings.Join(byRole[RoleFiles], "\n")
-	for _, want := range []string{filepath.Join("/w/app", "main.go"), filepath.Join("/w/app", "notes.txt")} {
+	for _, want := range []string{"/w/app/main.go", "/w/app/notes.txt"} {
 		if !strings.Contains(files, want) {
 			t.Errorf("files = %q, want %q resolved against the session cwd", files, want)
 		}
@@ -385,7 +385,7 @@ func TestCodexReadsCLIAndXcodeRootsAsOneHarness(t *testing.T) {
 	for _, session := range got {
 		byPath[session.Path] = session
 	}
-	if byPath[cliPath].ID != "cli-id" || byPath[xcodePath].ID != "xcode-id" || byPath[xcodePath].Project != "xcode" {
+	if byPath[cliPath].ID != "cli-id" || byPath[xcodePath].ID != "xcode-id" || byPath[xcodePath].Project != "projects/xcode" {
 		t.Fatalf("sessions by path=%#v", byPath)
 	}
 	if len(CodexFiles()) != 2 {
@@ -531,7 +531,7 @@ func TestCodexForkKeepsItsOwnThreadID(t *testing.T) {
 	if ss[0].ID != "child" {
 		t.Errorf("id = %q, want the rollout's own thread", ss[0].ID)
 	}
-	if ss[0].Project != "child" {
+	if ss[0].Project != "w/child" {
 		t.Errorf("project = %q, want the child's own cwd", ss[0].Project)
 	}
 }
@@ -581,7 +581,7 @@ func TestCodexAppendResolvesPatchPathsAgainstTheHeadCWD(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("offset parse: %v %#v", err, ss)
 	}
-	want := filepath.Join("/w/child", "app/main.go")
+	want := "/w/child/app/main.go"
 	found := false
 	for _, msg := range ss[0].Messages {
 		if msg.Role == RoleFiles && strings.Contains(msg.Text, want) {

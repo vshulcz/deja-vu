@@ -70,6 +70,10 @@ type Session struct {
 	// promoted note stopped looking like one across a machine boundary and the
 	// rules written for notes stopped applying to it (#975).
 	OrigID string `json:"orig_id,omitempty"`
+	// FormerID is the id an older deja gave this session, when a parser has
+	// since changed how it names them. Only the tombstone check reads it: a
+	// session forgotten under the old id stays forgotten under the new one.
+	FormerID string `json:"-"`
 	// From is the machine this session was worked on, when it arrived by sync.
 	// Empty for local work and for batches written by a deja that did not
 	// stamp an origin.

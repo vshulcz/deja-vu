@@ -97,7 +97,9 @@ func ParseKiloDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseKiloDB(db)
 	}
-	return parseOpencodeSchemaDB("kilocode", db, opencodeSinceWhere(t), 0)
+	// This read returns touched sessions whole, which is why the store is in
+	// rereadsWholeSessions in internal/index: appended, they doubled (#4396).
+	return parseOpencodeSchemaDBSince("kilocode", db, t)
 }
 
 // KiloSessionFiles lists what a Kilo install has on disk: the task transcripts

@@ -143,7 +143,7 @@
 <p>Command Code writes a JSONL log per project under <code>~/.commandcode/projects/</code> and reads none of it back: a new session knows nothing about the last one, or about what you did in Claude Code or Cursor in the same repo. This page is about adding that.</p>
 
 <h2>What Command Code already has</h2>
-<p>The project logs, and four user-scoped surfaces under <code>~/.commandcode</code>: <code>mcp.json</code> for servers, <code>settings.json</code> for hooks in Claude's shape, <code>skills/&lt;name&gt;/SKILL.md</code>, and <code>commands/&lt;name&gt;.md</code> for slash commands. No resume flag is documented, so deja hands you a paste rather than a command that may not exist.</p>
+<p>The project logs, and four user-scoped surfaces under <code>~/.commandcode</code>: <code>mcp.json</code> for servers, <code>settings.json</code> for hooks in Claude's shape, <code>skills/&lt;name&gt;/SKILL.md</code>, and <code>commands/&lt;name&gt;.md</code> for slash commands. <code>deja resume</code> prints <code>cmd --resume &lt;id&gt;</code> in the directory the session ran in, the only one it finds the id from. When that directory is gone it prints <code>cmd --session &lt;id&gt;</code>, which finds the session from anywhere.</p>
 
 <h2>Adding recall</h2>
 <pre>deja install commandcode-auto</pre>

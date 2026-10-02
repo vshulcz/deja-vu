@@ -315,9 +315,9 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 | gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | なし |
 | Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | 貼り付け | なし |
-| Command Code | ✅ | ✅ | ✅ | ✅ | ? | 貼り付け | なし |
-| ZCode | ✅ | ✅ | ? | ? | ? | 貼り付け | CLI データベース用の sqlite3 |
-| Kiro | ✅ | — | ✕ | ? | ✅ | 貼り付け | なし |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | なし |
+| ZCode | ✅ | ✅ | ? | ? | ✅ | 貼り付け | CLI データベース用の sqlite3 |
+| Kiro | ✅ | — | ✕ | ? | ✅ | 貼り付け | CLI データベース用の sqlite3 |
 | Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | CLI ストア用の sqlite3 |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | roo CLI（エディターのタスクはエディターで再開） |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | 貼り付け | sqlite3 + zstd |

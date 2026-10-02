@@ -81,7 +81,7 @@ func TestParseDeepSeekFile(t *testing.T) {
 	if s.ID != "eaf5c9ac-0e47-4d2f-b982-8bae306062d1" {
 		t.Errorf("id = %q; the header's id wins over the directory name", s.ID)
 	}
-	if s.Project != "pgbouncer-lab" {
+	if s.Project != "work/pgbouncer-lab" {
 		t.Errorf("project = %q; it comes from the header's cwd", s.Project)
 	}
 	if s.Title != "pgbouncer pool size" {
@@ -92,7 +92,7 @@ func TestParseDeepSeekFile(t *testing.T) {
 	for _, m := range s.Messages {
 		roles = append(roles, m.Role)
 	}
-	want := []string{"user", "assistant", "tool-output", "assistant"}
+	want := []string{"user", "assistant", "files", "tool-output", "assistant"}
 	if strings.Join(roles, ",") != strings.Join(want, ",") {
 		t.Fatalf("roles = %v, want %v:\n%+v", roles, want, s.Messages)
 	}
@@ -104,11 +104,14 @@ func TestParseDeepSeekFile(t *testing.T) {
 	if strings.Contains(s.Messages[1].Text, "надо открыть конфиг") {
 		t.Error("the model's reasoning was recalled as something it said")
 	}
-	if s.Messages[2].Text != "pgbouncer pool_size = 40" {
-		t.Errorf("tool output = %q", s.Messages[2].Text)
+	if s.Messages[2].Text != "/work/pgbouncer-lab/notes.txt" {
+		t.Errorf("files = %q; the read call names the file", s.Messages[2].Text)
 	}
-	if s.Messages[3].Text != "держим 40 на шард" {
-		t.Errorf("final answer = %q", s.Messages[3].Text)
+	if s.Messages[3].Text != "pgbouncer pool_size = 40" {
+		t.Errorf("tool output = %q", s.Messages[3].Text)
+	}
+	if s.Messages[4].Text != "держим 40 на шард" {
+		t.Errorf("final answer = %q", s.Messages[4].Text)
 	}
 	for i, m := range s.Messages {
 		if m.Time.IsZero() {
@@ -165,11 +168,11 @@ func TestParseDeepSeekFileReadsZstdFrames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || len(ss[0].Messages) != 4 {
+	if len(ss) != 1 || len(ss[0].Messages) != 5 {
 		t.Fatalf("compressed session read as %+v", ss)
 	}
-	if ss[0].Messages[3].Text != "держим 40 на шард" {
-		t.Errorf("answer = %q", ss[0].Messages[3].Text)
+	if ss[0].Messages[4].Text != "держим 40 на шард" {
+		t.Errorf("answer = %q", ss[0].Messages[4].Text)
 	}
 }
 
@@ -183,5 +186,25 @@ func TestDeepSeekSessionFilesFindsBothEncodings(t *testing.T) {
 	}
 	if got := LoadDeepSeek(); len(got) != 1 {
 		t.Fatalf("LoadDeepSeek = %d sessions", len(got))
+	}
+}
+
+// dsh takes an empty DSH_HOME as unset and expands a leading ~, so deja has to
+// read the same two values the same way or it looks for sessions and profiles
+// in a directory dsh never writes (#4390).
+func TestDSHHomeReadsDSHHomeTheWayDshDoes(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	for _, c := range []struct{ value, want string }{
+		{"", filepath.Join(home, ".dsh")},
+		{"~", home},
+		{"~/.dsh-alt", filepath.Join(home, ".dsh-alt")},
+		{filepath.Join(home, "elsewhere"), filepath.Join(home, "elsewhere")},
+	} {
+		t.Setenv("DSH_HOME", c.value)
+		if got := DSHHome(); got != c.want {
+			t.Errorf("DSH_HOME=%q: DSHHome = %q, want %q", c.value, got, c.want)
+		}
 	}
 }

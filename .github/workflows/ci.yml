@@ -83,7 +83,13 @@ jobs:
           # index layout, and this workflow. Nobody labels a parser change
           # `windows`, because it does not look like one — #3467 grew a printed
           # table past a windows pipe's buffer and deadlocked the suite on main.
-          files=$(gh pr diff "$PR" --repo "$REPO" --name-only)
+          # `gh pr diff` refuses a diff of more than 300 files, which failed
+          # this job and skipped every test leg behind it (#4511). The files
+          # API pages up to 3000; a branch past that takes the suite.
+          files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename')
+          if [ "$(printf '%s\n' "$files" | wc -l)" -ge 3000 ]; then
+            full "the diff is too large to list"
+          fi
           want=$(printf '%s\n' "$files" | grep -E \
             -e '^internal/sources/' \
             -e '^internal/index/' \

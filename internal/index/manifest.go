@@ -366,8 +366,7 @@ func HarnessKeptCounts(dir string) map[string]int {
 			_, err := os.Stat(meta.Path)
 			g = os.IsNotExist(err)
 			if g {
-				_, derr := os.Stat(filepath.Dir(meta.Path))
-				g = derr == nil
+				g = deletedFromLiveStore(meta.Path)
 			}
 			gone[meta.Path] = g
 		}
@@ -589,6 +588,11 @@ func recordsIntact(dir string, m Manifest) bool {
 // scanRecords skips a record whose Key is absent from m.Sessions, and a
 // half-flushed tail decodes to a short read that eachRecord treats as a clean
 // end. So the extra bytes contribute nothing rather than a wrong answer.
+//
+// Not quite nothing: an incremental pass also appends records for sessions
+// the manifest already holds (a live transcript that grew), and those keys do
+// resolve. A keyless full scan during a pass can return them a moment before
+// the manifest commits them.
 func recordsReadable(dir string, m Manifest) bool {
 	return recordsIntactSized(dir, m, true)
 }
@@ -742,7 +746,13 @@ func DamageReason(dir string) string {
 		// damage; the next call sees the new one.
 		return ""
 	}
-	return recordsDamage(dir, m2, false)
+	// Longer is tolerated here and only here. An incremental pass appends to
+	// records.bin under the lock and commits the manifest after, and a pass
+	// outlasts the swap window: the strict recheck turned MCP recall away as
+	// "indexing" for 17 of 60 calls made during one, over a complete snapshot
+	// (#4266). Without the lock a longer log is a crash tail, which the check
+	// above still reports, so the warmup repairs it rather than a tool call.
+	return recordsDamage(dir, m2, true)
 }
 
 // RebuildInProgress reports whether another process holds the index lock. A

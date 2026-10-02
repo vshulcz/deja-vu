@@ -38,7 +38,7 @@
 <article>
 <h1>aider session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>aider appends Markdown to <code>.aider.chat.history.md</code> in its launch directory. The default home file is <code>~/.aider.chat.history.md</code>; <code>AIDER_CHAT_HISTORY_FILE</code> relocates it. deja also scans each directory in the platform path-list variable <code>DEJA_AIDER_ROOTS</code>, to two levels below each root.</p>
+<p>aider appends Markdown to <code>.aider.chat.history.md</code> at the git root it runs in (the launch directory outside a repo), so <code>~/.aider.chat.history.md</code> exists only for a launch from home; <code>AIDER_CHAT_HISTORY_FILE</code> relocates it. deja reads the home file, <code>AIDER_CHAT_HISTORY_FILE</code>, every project <code>deja aider</code> has started aider in (listed in <code>~/.config/deja/aider-projects</code>), and each directory in the platform path-list variable <code>DEJA_AIDER_ROOTS</code>, to two levels below each root.</p>
 <p>One history file contains multiple sessions. A session begins with:</p>
 <pre><code class="language-markdown"># aider chat started at 2026-07-17 09:00:00
 
@@ -48,8 +48,8 @@ The query misses the tenant predicate.
 
 &gt; Applied edit to query.go</code></pre>
 <h2 id="message-mapping">Message mapping</h2>
-<p>Outside fenced code blocks, <code>#### </code> starts or continues a user message. Plain Markdown is assistant output. Lines beginning with <code>&gt; </code> are tool or system output and are not indexed; neither are unprefixed lines directly under one (the rest of that output block), nor anything before the session&#39;s first <code>#### </code> line (the banner and the <code>--verbose</code> dump). A <code>#### </code> line that is one of aider&#39;s own commands (<code>/add</code>, <code>/undo</code>, <code>/clear</code>, …) is dropped; <code>/ask</code> and <code>/code</code> keep their text. Blank lines remain part of the current message.</p>
-<p>The header timestamp uses local time with layout <code>YYYY-MM-DD HH:MM:SS</code>. aider does not store message timestamps, so every message receives the session start. It does not store a session ID; deja derives a stable ID from the history path and the session&#39;s ordinal in that file.</p>
+<p>Outside fenced code blocks, <code>#### </code> starts or continues a user message. Plain Markdown is assistant output. Lines beginning with <code>&gt; </code> are tool or system output and are not indexed as messages; neither are unprefixed lines directly under one (the rest of that output block), nor anything before the session&#39;s first <code>#### </code> line (the banner and the <code>--verbose</code> dump). Of the output, <code>Applied edit to X</code>, <code>Added X to the chat</code> and <code>Added X to read-only files</code> become a <code>files</code> record for X (relative to the history&#39;s directory), and <code>Running X</code> a <code>command</code> record. A <code>#### </code> line that is one of aider&#39;s own commands (<code>/add</code>, <code>/undo</code>, <code>/clear</code>, …) is dropped; <code>/run X</code>, <code>!X</code> and <code>/test X</code> become a <code>command</code> record for X and <code>/git X</code> one for <code>git X</code>. <code>/ask</code>, <code>/code</code> and <code>/context</code> are dropped too: aider logs their question again as its own <code>#### </code> line. Blank lines remain part of the current message.</p>
+<p>The header timestamp uses local time with layout <code>YYYY-MM-DD HH:MM:SS</code>. aider does not store message timestamps, so every message receives the session start. It does not store a session ID; deja derives a stable ID from the history path and the session&#39;s start time (<code>aider-&lt;path hash&gt;-&lt;YYYYMMDDTHHMMSS&gt;</code>, with <code>-2</code> and on for a second launch in the same second, and the ordinal in the file when the header does not parse). The ordinal alone was the ID until #4332: a new history at the path of a deleted one restarted it and overwrote the sessions deja kept.</p>
 <h2 id="skills">Skills</h2>
 <p>None, and there is nothing to build on. aider loads instruction files rather</p>
 <p>than offering a catalogue an agent picks from: <code>--read</code> (and a CONVENTIONS.md by</p>
@@ -62,6 +62,8 @@ The query misses the tenant predicate.
 <li><code>&lt;blank&gt;</code> after the user prefix represents an empty line.</li>
 <li>Tool output terminates an assistant block but does not become a message.</li>
 <li>Moving a history file changes deja&#39;s derived session IDs because the path is part of the ID.</li>
+<li>aider loads none of the history back into a new chat unless started with <code>--restore-chat-history</code>, and that loads the whole file, every session in it. <code>deja resume</code> refuses the session and names that flag in its message rather than claiming to reopen one session.</li>
+<li>A session that leaves the file — the file was deleted and aider started a new one, or someone cut it by hand — stays in the index, as a deleted transcript does; <code>deja forget &lt;id&gt;</code> drops it.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-07-27</p>
 

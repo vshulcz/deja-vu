@@ -149,13 +149,13 @@
 <pre>deja install aider</pre>
 <p>Three things, all reversible with <code>deja uninstall aider</code>:</p>
 <ul>
-<li><b>An entry under <code>read:</code></b> in <code>~/.aider.conf.yml</code>, pointing at <code>~/.config/deja/aider-context.md</code>. Whatever was already in that list stays, including the scalar and flow spellings of it.</li>
+<li><b>An entry under <code>read:</code></b> in <code>~/.aider.conf.yml</code>, pointing at <code>~/.config/deja/aider-context.md</code>. Whatever was already in that list stays, including the scalar and flow spellings of it, which install writes out as a block list and uninstall puts back as they were.</li>
 <li><b>The context file itself</b>, written during the install rather than on first use: aider refuses to start when a configured read file is missing, and the first session should not be the one that finds that out.</li>
 <li><b>The shared skill</b> at <code>~/.agents/skills/deja-search/SKILL.md</code>, which the other agents on this machine read.</li>
 </ul>
 <p>Then start aider through deja, with the arguments you would have given it:</p>
 <pre>deja aider --model sonnet src/api.py</pre>
-<p>It refreshes the context file, says what it put there — <code>deja: recalled 7 past sessions into aider's read-only context</code> — and hands over to aider. The wrapper exists because nothing inside aider can do the refresh: <code>/run</code> stops on <code>Add 0.0k tokens of command output to the chat?</code> even when the output is empty, so wiring it to startup would cost a keystroke every session. Plain <code>aider</code> still reads the file; it reads whatever the last <code>deja aider</code> left in it, and that is what <code>deja doctor</code> says on the row for it.</p>
+<p>It refreshes the context file, says what it put there — <code>deja: recalled 7 past sessions into aider's read-only context</code> — and hands over to aider. The wrapper exists because nothing inside aider can do the refresh: <code>/run</code> stops on <code>Add 0.0k tokens of command output to the chat?</code> even when the output is empty, so wiring it to startup would cost a keystroke every session. Every aider on the machine reads that one file, so the digest is there only while the aider <code>deja aider</code> started runs, and its lead names the directory it was built for. Plain <code>aider</code> reads the placeholder, not another project's sessions.</p>
 
 <h2>What arrives</h2>
 <p>A digest of what this machine already knows about the project — the decisions, the commands that worked, the errors that came back — as one read-only file in every message of the session. When there is no history yet the file says so, rather than being absent and stopping aider from starting. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>

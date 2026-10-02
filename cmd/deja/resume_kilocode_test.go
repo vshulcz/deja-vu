@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,8 +14,11 @@ import (
 // the path with the database refused every CLI session, which is the only half
 // `kilo -s` is for (#3677).
 func TestKiloResumeTellsTheCLIFromTheExtension(t *testing.T) {
-	hermeticEnv(t)
-	cli := model.Session{Harness: "kilocode", ID: "ses_abc123", Path: "/work/api"}
+	work := filepath.Join(hermeticEnv(t), "work", "api")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cli := model.Session{Harness: "kilocode", ID: "ses_abc123", Path: work}
 	dir, cmd, err := resumeCommand(cli)
 	if err != nil {
 		t.Fatalf("a CLI session was refused: %v", err)
@@ -22,7 +26,7 @@ func TestKiloResumeTellsTheCLIFromTheExtension(t *testing.T) {
 	if cmd != "kilo -s ses_abc123" {
 		t.Errorf("command = %q", cmd)
 	}
-	if dir != "/work/api" {
+	if dir != work {
 		t.Errorf("dir = %q, want the session's own directory", dir)
 	}
 

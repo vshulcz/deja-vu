@@ -59,6 +59,13 @@ func installHermesPlugin(exe string, uninstall bool) (installResult, error) {
 	// A discovered plugin is listed as "not enabled" and never loaded until
 	// its name is in plugins.enabled, so the installer puts it there rather
 	// than leaving the user a second step nothing tells them about.
+	//
+	// Unless the reader took it out: `hermes plugins disable deja` moves the
+	// name to plugins.disabled, and listing it under enabled again turned it
+	// back on and left it in both lists (#4472).
+	if hermesPluginDisabled() {
+		return installResult{Path: dir, Action: a, Note: "left deja's plugin switched off, the way it was — `hermes plugins enable deja` turns it back on"}, nil
+	}
 	if err := setHermesPluginEnabled(true); err != nil {
 		return installResult{}, err
 	}
@@ -213,21 +220,36 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	next := removeHermesMCPBlock(lfText(old))
+	var note string
 	if !uninstall {
 		pad, ok := hermesBlockIndent(next)
 		if !ok {
 			pad = "  "
 		}
+		on := "true"
+		if yamlEntrySwitchedOff(lfText(old), "mcp_servers:", "deja") {
+			on, note = "false", switchedOffNote
+		}
 		entry := pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
-			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: true\n"
-		if i := strings.Index(next, "\nmcp_servers:\n"); i >= 0 {
-			at := i + len("\nmcp_servers:\n")
+			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: " + on + "\n"
+		if next != "" && !strings.HasSuffix(next, "\n") {
+			next += "\n"
+		}
+		at, err := yamlTopKeyEnd(next, "mcp_servers:")
+		if err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if at >= 0 {
 			next = next[:at] + entry + next[at:]
 		} else {
-			if next != "" && !strings.HasSuffix(next, "\n") {
-				next += "\n"
+			// Before a `...` document end, where #4260 puts the plugins block
+			// too: a key after it is a second document Hermes cannot parse.
+			block := "\nmcp_servers:\n" + entry
+			if i := strings.LastIndex("\n"+next, "\n...\n"); i >= 0 {
+				next = next[:i] + strings.TrimPrefix(block, "\n") + next[i:]
+			} else {
+				next += block
 			}
-			next += "\nmcp_servers:\n" + entry
 			noteBlockAdded(path, "mcp_servers")
 		}
 	} else if blockWasAdded(path, "mcp_servers") {
@@ -244,7 +266,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	// was the only writer that did not, so a config whose deja block ended it
 	// came back without one (#2606, #2730).
 	a, werr := writeIfChanged(path, old, []byte(keepTrailingNewline(lfText(old), next)))
-	return installResult{Path: path, Action: a}, werr
+	return installResult{Path: path, Action: a, Note: note}, werr
 }
 
 // removeHermesMCPBlock drops our entry and nothing else: the block ends at the
@@ -260,15 +282,18 @@ func removeHermesMCPBlock(s string) string {
 	child := -1
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
-		if strings.TrimSpace(line) == "mcp_servers:" && yamlIndentWidth(line) == 0 {
+		if yamlKeyLine(line, "mcp_servers:") && yamlIndentWidth(line) == 0 {
 			inBlock, child = true, -1
 			out = append(out, line)
 			continue
 		}
-		if inBlock && strings.TrimSpace(line) != "" && yamlIndentWidth(line) == 0 {
+		// A comment is at whatever indent its writer liked, so it neither
+		// ends the block nor sets the servers' indent (#4289).
+		entry := strings.TrimSpace(line) != "" && !strings.HasPrefix(strings.TrimSpace(line), "#")
+		if inBlock && entry && yamlIndentWidth(line) == 0 {
 			inBlock, child = false, -1
 		}
-		if inBlock && child < 0 && strings.TrimSpace(line) != "" {
+		if inBlock && child < 0 && entry {
 			child = yamlIndentWidth(line)
 		}
 		if !inBlock || strings.TrimSpace(line) != "deja:" || yamlIndentWidth(line) != child {
@@ -311,11 +336,13 @@ func removeHermesMCPBlock(s string) string {
 func hermesBlockIndent(s string) (string, bool) {
 	lines := strings.Split(s, "\n")
 	for i, line := range lines {
-		if strings.TrimSpace(line) != "mcp_servers:" || yamlIndentWidth(line) != 0 {
+		if !yamlKeyLine(line, "mcp_servers:") || yamlIndentWidth(line) != 0 {
 			continue
 		}
 		for _, next := range lines[i+1:] {
-			if strings.TrimSpace(next) == "" {
+			// A comment sits at whatever indent its writer liked; the
+			// servers' own indent is the first entry's (#4289).
+			if strings.TrimSpace(next) == "" || strings.HasPrefix(strings.TrimSpace(next), "#") {
 				continue
 			}
 			if yamlIndentWidth(next) == 0 {
@@ -326,50 +353,4 @@ func hermesBlockIndent(s string) (string, bool) {
 		return "", false
 	}
 	return "", false
-}
-
-// setHermesPluginEnabled adds or removes deja from plugins.enabled, touching
-// only that one list entry so the rest of the file — comments included —
-// stays byte-identical.
-func setHermesPluginEnabled(on bool) error {
-	path := filepath.Join(sources.HermesHome(), "config.yaml")
-	old, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) && !on {
-			return nil
-		}
-		if !os.IsNotExist(err) {
-			return err
-		}
-	}
-	s := lfText(old)
-	listed := strings.Contains(s, "\n    - deja\n")
-	switch {
-	case on && listed, !on && !listed:
-		return nil
-	case !on:
-		s = strings.Replace(s, "\n    - deja", "", 1)
-		// And the block itself, when deja is what put it there. Taking back
-		// only the entry left `plugins:\n  enabled:` behind on every machine
-		// that had no plugins block — an empty key that parses as null — while
-		// the MCP writer one function above already drops what it created
-		// (#2604, #2672). A block the reader wrote stays, empty or not.
-		if blockWasAdded(path, "plugins") {
-			s = strings.Replace(s, "\nplugins:\n  enabled:\n", "\n", 1)
-			s = strings.TrimSuffix(s, "\n\n") + "\n"
-			forgetBlockAdded(path, "plugins")
-		}
-	case strings.Contains(s, "\nplugins:\n  enabled:\n"):
-		s = strings.Replace(s, "\nplugins:\n  enabled:\n", "\nplugins:\n  enabled:\n    - deja\n", 1)
-	case strings.Contains(s, "\nplugins:\n  enabled: []\n"):
-		s = strings.Replace(s, "\nplugins:\n  enabled: []\n", "\nplugins:\n  enabled:\n    - deja\n", 1)
-	default:
-		if s != "" && !strings.HasSuffix(s, "\n") {
-			s += "\n"
-		}
-		s += "\nplugins:\n  enabled:\n    - deja\n"
-		noteBlockAdded(path, "plugins")
-	}
-	_, err = writeIfChanged(path, old, []byte(s))
-	return err
 }

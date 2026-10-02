@@ -13,7 +13,7 @@ import (
 func TestUninstallZCodeLeavesNoContainerItAdded(t *testing.T) {
 	hermeticEnv(t)
 	home := os.Getenv("HOME")
-	path := filepath.Join(home, ".zcode", "cli", "config.json")
+	path := filepath.Join(home, ".zcode", "cli", "setting.json")
 	for _, target := range []string{"zcode", "zcode-auto"} {
 		if _, err := captureRun(t, "install", target, "--no-index"); err != nil {
 			t.Fatalf("install %s: %v", target, err)
@@ -46,7 +46,7 @@ func TestUninstallZCodeLeavesNoContainerItAdded(t *testing.T) {
 func TestUninstallZCodeKeepsWhatTheReaderHad(t *testing.T) {
 	hermeticEnv(t)
 	home := os.Getenv("HOME")
-	path := filepath.Join(home, ".zcode", "cli", "config.json")
+	path := filepath.Join(home, ".zcode", "cli", "setting.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

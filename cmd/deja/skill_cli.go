@@ -55,7 +55,7 @@ When recalled history genuinely helps — a reused fix, a skipped re-debug, even
 
 - Result windows are bounded. Do not report corpus-wide counts, or claim a complete audit, from the number of hits you got back.
 - If ` + "`deja`" + ` is not on PATH or the index is empty, say that history search is unavailable. Do not invent what it might have found.
-- Work a subagent did is in the index as its task and its answer, not in full. A Claude Task or a Cursor subagent writes its turns and tool calls to its own transcript, and the parent keeps only the launch and a summary — so a hit on the parent can look complete while the run itself is elsewhere. ` + "`DEJA_INCLUDE_SUBAGENTS=1`" + ` takes the whole child transcript in; Cursor's are still left out by default.
+- Work a subagent did is in the index as its task, its answer and the edits it made, not in full. A Claude Task or a Cursor subagent writes its turns and tool calls to its own transcript, and the parent keeps only the launch and a summary — so a hit on the parent can look complete while the run itself is elsewhere. ` + "`DEJA_INCLUDE_SUBAGENTS=1`" + ` takes the whole child transcript in; Cursor's are still left out by default.
 - Vary the wording and try a second query before concluding nothing is there. Exact tokens match best, so an error string beats a paraphrase of it.` + "\n\n" + rulesSkillSection
 
 // cliSkillPath is the cross-agent skills directory, the same one the MCP skill
@@ -66,9 +66,14 @@ func cliSkillPath() string {
 }
 
 // cliSkillMeta is what a skill registry reads to know what the skill needs:
-// ClawHub serves this file as vshulcz/deja-search and checks the declared
-// binary and install specs against what the skill does. The agentskills.io
-// shape, so other readers ignore it.
+// ClawHub serves skills/deja-search as vshulcz/deja-search and checks the
+// declared binary and install specs against what the skill does. It is
+// OpenClaw's nested shape, which the Agent Skills spec does not allow: there
+// metadata maps strings to strings, and Crush drops a skill whose metadata
+// does not decode that way (#4378). So only the registry copy carries it; the
+// file deja installs into ~/.agents/skills, which Crush reads, goes without.
+// OpenClaw reads that directory too and loads a skill with no metadata.openclaw
+// block as always eligible, which is right on a machine deja was installed on.
 const cliSkillMeta = `metadata:
   openclaw:
     homepage: https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html
@@ -84,6 +89,11 @@ const cliSkillMeta = `metadata:
         bins: [deja]`
 
 func cliSkillFile() string {
+	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n---\n\n" + cliSkillBody + "\n"
+}
+
+// cliSkillRegistryFile is the copy in the repository, the one ClawHub publishes.
+func cliSkillRegistryFile() string {
 	return "---\nname: " + cliSkillName + "\ndescription: " + cliSkillDesc + "\n" + cliSkillMeta + "\n---\n\n" + cliSkillBody + "\n"
 }
 

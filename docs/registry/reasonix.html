@@ -46,7 +46,7 @@
 <li><strong>Read overrides</strong>: <code>DEJA_REASONIX_ROOT</code> replaces the state root; pointed at a <code>sessions</code> directory it reads that directory alone</li>
 <li><strong>Format</strong>: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope</li>
 <li><strong>Needs</strong>: the <code>zstd</code> CLI for 1.x sessions; nothing for JSONL</li>
-<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command</li>
+<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace, or whose workspace is gone, is resumed by its file path from anywhere, and a 1.x session whose workspace is gone is refused with <code>deja show</code> (#4459). 1.x sessions in the global or desktop store have no resume command</li>
 </ul>
 <p>Reasonix is a Go coding agent built around DeepSeek&#39;s prefix cache. The</p>
 <p>layout above comes from its own resolver, <code>internal/contract/config</code></p>
@@ -64,7 +64,8 @@
 <p>host added context or cut a result for the model, and that is what is indexed.</p>
 <p>Beside each transcript sits <code>&lt;id&gt;.jsonl.meta</code>, which carries <code>created_at</code>,</p>
 <p><code>updated_at</code>, <code>workspace_root</code> and the titles (<code>custom_title</code>, <code>topic_title</code>,</p>
-<p><code>name</code>). The session&#39;s clock and project come from there.</p>
+<p><code>name</code>). The session&#39;s clock and project come from there, and a rename that</p>
+<p>rewrites only this file re-reads the session (#4446).</p>
 <h2 id="1-x-session-directories">1.x session directories</h2>
 <p>Reasonix 1.x (npm <code>reasonix</code> 1.x, branch <code>main-v2</code>) keeps each session as a</p>
 <p>directory: <code>manifest.json</code> (<code>sessionId</code>, <code>createdAt</code>, <code>codec</code></p>

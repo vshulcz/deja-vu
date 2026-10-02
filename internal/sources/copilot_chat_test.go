@@ -363,7 +363,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
 		".jsonl")
 	ss, err := ParseCopilotChatFile(posix)
-	if err != nil || len(ss) != 1 || ss[0].Project != "registry-demo" {
+	if err != nil || len(ss) != 1 || ss[0].Project != "tmp/registry-demo" {
 		t.Fatalf("posix project = %#v, %v", ss, err)
 	}
 
@@ -373,7 +373,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
 		".jsonl")
 	ss, err = ParseCopilotChatFile(win)
-	if err != nil || len(ss) != 1 || ss[0].Project != "demo" {
+	if err != nil || len(ss) != 1 || ss[0].Project != "proj/demo" {
 		t.Fatalf("windows c%%3A project = %#v, %v", ss, err)
 	}
 
@@ -383,7 +383,7 @@ func TestCopilotChatProjectFromWorkspaceJSON(t *testing.T) {
 			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000)+`]}}`+"\n",
 		".jsonl")
 	ss, err = ParseCopilotChatFile(multi)
-	if err != nil || len(ss) != 1 || ss[0].Project != "multi.code-workspace" {
+	if err != nil || len(ss) != 1 || ss[0].Project != "tmp/multi.code-workspace" {
 		t.Fatalf("workspace uri project = %#v, %v", ss, err)
 	}
 }
@@ -397,7 +397,7 @@ func TestCopilotChatEmptyWindowWorkingDirectory(t *testing.T) {
 			copilotChatReq("r", "q", "a", 1763727104742, 1763727400000) + `]}}`,
 	})
 	ss, err := ParseCopilotChatFile(p)
-	if err != nil || len(ss) != 1 || ss[0].Project != "other-proj" {
+	if err != nil || len(ss) != 1 || ss[0].Project != "tmp/other-proj" {
 		t.Fatalf("empty-window project = %#v, %v", ss, err)
 	}
 }

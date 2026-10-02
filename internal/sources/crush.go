@@ -121,7 +121,11 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	where := ""
 	if !t.IsZero() {
-		where = " where " + newerThanEpoch("s.updated_at", t)
+		// The watermark is the newest turn's whole second, and a turn written
+		// later in that second moves updated_at to the same second: a strict >
+		// never asks for it (#4381). Sessions come back whole, so the second
+		// re-offered costs a re-read of what is already held, nothing more.
+		where = " where " + newerThanEpoch("s.updated_at", t.Add(-time.Second))
 	}
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. A parts column is stored JSON.
@@ -228,14 +232,52 @@ func crushMessages(role, parts string, at time.Time) []model.Message {
 			// The arguments are a JSON string of the tool's own schema, so the
 			// command and the path are one decode away rather than in columns.
 			var args struct {
-				Command  string `json:"command"`
-				FilePath string `json:"file_path"`
+				Command   string `json:"command"`
+				FilePath  string `json:"file_path"`
+				OldString string `json:"old_string"`
+				NewString string `json:"new_string"`
+				Content   string `json:"content"`
+				Edits     []struct {
+					OldString string `json:"old_string"`
+					NewString string `json:"new_string"`
+				} `json:"edits"`
 			}
 			if json.Unmarshal([]byte(p.Data.Input), &args) != nil {
 				continue
 			}
 			if IndexToolPaths() && args.FilePath != "" {
 				out = append(out, model.Message{Role: RoleFiles, Text: crushPlainText(args.FilePath), Time: at})
+			}
+			// edit, multiedit and write carry both sides of the change, which is
+			// what restore and blame read (#4377). Only those three: a view
+			// names a file it did not change.
+			switch p.Data.Name {
+			case "edit", "multiedit", "write":
+				path := crushPlainText(args.FilePath)
+				old := []string{args.OldString}
+				written := []string{args.NewString, args.Content}
+				for _, e := range args.Edits {
+					old = append(old, e.OldString)
+					written = append(written, e.NewString)
+				}
+				if IndexEdits() && path != "" && !strings.ContainsAny(path, "\n\r") {
+					for _, span := range old {
+						if span == "" {
+							continue
+						}
+						if len(span) > editSpanMax {
+							span = span[:editSpanMax]
+						}
+						out = append(out, model.Message{Role: RoleEdit, Text: path + "\n" + crushPlainText(span), Time: at})
+					}
+				}
+				if IndexWrites() {
+					for _, w := range written {
+						if rec := WroteRecord(path, w); rec != "" {
+							out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: at})
+						}
+					}
+				}
 			}
 			if !IndexCommands() || p.Data.Name != "bash" {
 				continue

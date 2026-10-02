@@ -316,7 +316,7 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 			return "", nil
 		}
 		return "Bash", map[string]string{"command": args.Command}
-	case name == "write_file", name == "edit_file", name == "multi_edit":
+	case name == "read_file", name == "write_file", name == "edit_file", name == "multi_edit":
 		p := strings.TrimSpace(args.Path)
 		if p == "" {
 			return "", nil
@@ -324,7 +324,12 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 		if !filepath.IsAbs(p) && workspace != "" {
 			p = filepath.Join(workspace, p)
 		}
-		tool := map[string]string{"write_file": "Write", "edit_file": "Edit", "multi_edit": "MultiEdit"}[name]
+		// read_file goes out as the lowercase `read` pi and omp send: this
+		// hook holds a finished result, so on an edit the line arrives after
+		// the write, and Reasonix refuses an edit on a file the session has
+		// not read. The read is the last step where the line can still change
+		// what gets written (#4410).
+		tool := map[string]string{"read_file": "read", "write_file": "Write", "edit_file": "Edit", "multi_edit": "MultiEdit"}[name]
 		return tool, map[string]string{"file_path": p}
 	}
 	return "", nil

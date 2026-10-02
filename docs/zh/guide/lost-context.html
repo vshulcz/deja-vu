@@ -36,7 +36,7 @@
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code 丢了上下文：怎么找回来", "description": "崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-24", "dateModified": "2026-09-24"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "上下文丢了", "item": "https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "编程智能体把上下文弄丢了怎么办？", "acceptedAnswer": {"@type": "Answer", "text": "用 deja 加上一个你记得的词，去搜它已经写在磁盘上的会话记录；或者用 deja ctx 拿最匹配那次会话的摘要。三十五个智能体里有二十八个还可以用 deja resume 重新打开。"}}, {"@type": "Question", "name": "崩溃之后上下文还能找回来吗？", "acceptedAnswer": {"@type": "Answer", "text": "会话记录可以。智能体在进行中就把每一轮写到磁盘上。崩溃毁掉的是模型正在用的上下文，不是那个文件。"}}, {"@type": "Question", "name": "怎么让它不再丢？", "acceptedAnswer": {"@type": "Answer", "text": "deja install --auto 会在会话开始时和每次提问时接上召回，所以新开的窗口已经知道这个项目最近的决定。"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "编程智能体把上下文弄丢了怎么办？", "acceptedAnswer": {"@type": "Answer", "text": "用 deja 加上一个你记得的词，去搜它已经写在磁盘上的会话记录；或者用 deja ctx 拿最匹配那次会话的摘要。三十五个智能体里有三十个还可以用 deja resume 重新打开。"}}, {"@type": "Question", "name": "崩溃之后上下文还能找回来吗？", "acceptedAnswer": {"@type": "Answer", "text": "会话记录可以。智能体在进行中就把每一轮写到磁盘上。崩溃毁掉的是模型正在用的上下文，不是那个文件。"}}, {"@type": "Question", "name": "怎么让它不再丢？", "acceptedAnswer": {"@type": "Answer", "text": "deja install --auto 会在会话开始时和每次提问时接上召回，所以新开的窗口已经知道这个项目最近的决定。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -75,7 +75,7 @@
 deja "你正在做的那件事"</pre>
 <p><code>deja wip</code> 回答的是一次接不上前文的会话的第一个问题：我刚才在做什么。答案来自这个目录里上一次会话自己的记录——任务是什么、定下了什么、进行中的文件有哪些、最后跑的是哪条命令、它失败了没有。这些都没有单独存过，每次都是从那份记录里算出来的。</p>
 <p>搜索覆盖这台机器上每个智能体的历史，所以上下文原来在哪个工具里并不重要，那个工具是不是还在，也不重要。<code>deja ctx &lt;query&gt;</code> 把最匹配的一次会话收成一份摘要，而不是一整面记录。要贴进新窗口的，就是这份摘要。</p>
-<p>如果丢掉上下文的那个工具支持，<code>deja resume &lt;id&gt;</code> 会打印重新打开那次对话的确切命令，而且是在那次对话所属的目录里。三十五个智能体里，有二十八个支持。</p>
+<p>如果丢掉上下文的那个工具支持，<code>deja resume &lt;id&gt;</code> 会打印重新打开那次对话的确切命令，而且是在那次对话所属的目录里。三十五个智能体里，有三十个支持。</p>
 
 <h2>让下一次不再丢</h2>
 <pre>deja install --auto</pre>
