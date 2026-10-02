@@ -527,6 +527,7 @@ func cmdIndex(dir string, rest []string) error {
 		// agent memory is on its way (#839).
 		clearWarmupSentinel()
 		fmt.Fprintf(said, "deja: index is up to date (%d session%s)\n", n, pluralS(n))
+		printRetentionDue(said, time.Now())
 		// "Up to date" is the most misleading place to stay quiet about it:
 		// nothing changed on disk, so this is exactly where an exclusion set
 		// after the build looks applied and is not.
@@ -570,6 +571,9 @@ func cmdIndex(dir string, rest []string) error {
 		fresh, n := index.UpToDate(dir, "")
 		fmt.Fprintln(said, indexQuietOutcome(fresh, n))
 	}
+	// After the counts, beside the "no longer on disk" line the build printed:
+	// the sessions a harness is about to delete, which the index keeps.
+	printRetentionDue(said, time.Now())
 	// Two transcripts can carry the same harness:id — two files with the same
 	// name in different projects. Both stay searchable, but one manifest row
 	// holds them, so one project name covers both. Silence was the worst part

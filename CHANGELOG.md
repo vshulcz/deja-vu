@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `deja index` and `deja doctor` say how many sessions Claude Code, Gemini CLI or Hermes will delete with its own cleanup in the next 7 days, read from that harness's retention setting (`cleanupPeriodDays`, `general.sessionRetention`, `sessions.retention_days`). deja keeps them searchable after the files go. Nothing is printed when nothing is due or the harness has no timed cleanup.
 - `deja install deepseek-auto` gives dsh the point-of-action notes other harnesses get: after a `read`, `edit` or `write` the model hears what past sessions settled about that file, and after a `bash` that fails, the fix this machine found for the same error before. The plugin uses dsh's `tools/post-execute` seam; run the install again to get it (#4293).
 - `deja install kiro-auto` writes a `deja` agent for kiro-cli whose `agentSpawn` hook puts the project digest in front of the model and whose `userPromptSubmit` hook adds recall for each prompt. Start it with `kiro-cli chat --agent deja`, or make it the default with `kiro-cli agent set-default deja`; deja leaves your default agent alone (#4304).
 - `deja install kilocode-auto` starts each Kilo CLI session with the project digest. Kilo kept opencode's plugin loader, so it writes opencode's plugin into `~/.config/kilo/plugins`, always in the 1.x shape Kilo loads, next to everything `deja install kilocode` writes (#4398).
