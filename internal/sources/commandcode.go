@@ -101,13 +101,18 @@ func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session,
 }
 
 // commandCodeDialect is the tool vocabulary in command-code 1.73.4's bundle:
-// Claude's input keys under snake_case names.
+// Claude's input keys under snake_case names. 1.74.0 runs commands through
+// shell_command and monitor_command as {command, args[]} and powershell
+// {command}, and read_file's paths list takes globs beside files (#4540).
 var commandCodeDialect = toolDialect{
-	pathKey:     "file_path",
-	pathTools:   map[string]bool{"read_file": true, "edit_file": true, "write_file": true, "read_multiple_files": true},
-	pathListKey: "paths",
-	shellTool:   "shell_command",
-	editTools:   map[string]bool{"edit_file": true, "write_file": true},
+	pathKey:       "file_path",
+	pathTools:     map[string]bool{"read_file": true, "edit_file": true, "write_file": true, "read_multiple_files": true},
+	pathListKey:   "paths",
+	pathListGlobs: true,
+	shellTool:     "shell_command",
+	shellTools:    map[string]bool{"shell_command": true, "powershell": true, "monitor_command": true},
+	argsKey:       "args",
+	editTools:     map[string]bool{"edit_file": true, "write_file": true},
 }
 
 // commandCodeMessage reads one v3 envelope. A user-role message made of

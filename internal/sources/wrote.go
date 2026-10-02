@@ -3,6 +3,7 @@ package sources
 import (
 	"hash/fnv"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -135,6 +136,30 @@ func WroteRecordHas(record string, want uint64) (path string, has bool) {
 	return path, false
 }
 
+// withoutElisions drops the placeholder lines a model writes for the code it
+// left alone — "// ... existing code ...", "# ... rest of code ...",
+// "<!-- ... -->" — from an edit that sends only the changed stretches, as
+// Continue's edit_existing_file and Kilo Code's fast_edit_file do. They are
+// not lines the file was given (#4529).
+func withoutElisions(text string) string {
+	if !strings.Contains(text, "...") && !strings.Contains(text, "…") {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	out := lines[:0]
+	for _, line := range lines {
+		if !elisionLine(line) {
+			out = append(out, line)
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// elisionLine is a line that is only an elision: a comment that opens with an
+// ellipsis, or text that opens and closes with one. A bare "..." is code in
+// Python and is kept.
+var elisionLine = regexp.MustCompile(`^\s*(?:(?:\{/\*|<!--|//|/\*|--|#|;)\s*(?:\.\.\.|…)(?:.*(?:\.\.\.|…))?|(?:\.\.\.|…)\s*\S.*(?:\.\.\.|…))\s*(?:\*/\}|\*/|-->)?\s*$`).MatchString
+
 // addedLinesOfPatch is the written side of an apply_patch payload: the lines it
 // adds, per file. The mirror of patchSpans, which takes the removed ones.
 func addedLinesOfPatch(patch string) []string {
@@ -197,10 +222,141 @@ func applyPatch(patch string, resolve func(string) string) (files, spans, wrote 
 	return files, spans, wrote
 }
 
+// unifiedPatch is applyPatch for a unified diff, the `--- a/x` / `+++ b/x`
+// format CodeWhale's apply_patch takes (#4538): the files its headers name,
+// the lines each hunk removed and the lines it added. A non-empty override is
+// the file every hunk goes to, whatever the headers say, the way a call's own
+// path argument retargets the patch. Hunk bodies are read by the line counts
+// in their headers, so a removed line that starts with "--" is not taken for
+// the next file's header unless a "+++ " line follows it; a hunk ends early at
+// the next @@ or file header, and one without counts runs to them.
+func unifiedPatch(patch, override string, resolve func(string) string) (files, spans, wrote []string) {
+	if resolve == nil {
+		resolve = func(p string) string { return p }
+	}
+	lines := strings.Split(patch, "\n")
+	cur, oldHeader := "", ""
+	var added []string
+	seen := map[string]bool{}
+	flush := func() {
+		if rec := WroteRecord(cur, strings.Join(added, "\n")); cur != "" && rec != "" {
+			wrote = append(wrote, rec)
+		}
+		added = nil
+	}
+	open := func(p string) {
+		flush()
+		cur = p
+		if p != "" && !seen[p] {
+			seen[p] = true
+			files = append(files, p)
+		}
+	}
+	if override != "" {
+		open(resolve(override))
+	}
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		switch {
+		case strings.HasPrefix(line, "--- "):
+			oldHeader = line[4:]
+		case strings.HasPrefix(line, "+++ "):
+			p := unifiedDiffPath(line[4:])
+			if p == "" {
+				p = unifiedDiffPath(oldHeader)
+			}
+			oldHeader = ""
+			if override == "" && p != "" {
+				open(resolve(p))
+			}
+		case strings.HasPrefix(line, "@@"):
+			oldN, newN, counted := unifiedHunkCounts(line)
+			var removed []string
+			j := i + 1
+			for ; j < len(lines); j++ {
+				l := lines[j]
+				if counted && oldN <= 0 && newN <= 0 {
+					break
+				}
+				// A miscounted header does not carry the hunk past the next
+				// one or the next file's headers; CodeWhale applies such a
+				// patch the same way (apply_patch.rs parse_hunk_header).
+				if strings.HasPrefix(l, "@@") || strings.HasPrefix(l, "diff ") ||
+					(strings.HasPrefix(l, "--- ") && j+1 < len(lines) && strings.HasPrefix(lines[j+1], "+++ ")) {
+					break
+				}
+				switch {
+				case strings.HasPrefix(l, "-"):
+					removed = append(removed, l[1:])
+					oldN--
+				case strings.HasPrefix(l, "+"):
+					added = append(added, l[1:])
+					newN--
+				case strings.HasPrefix(l, `\`):
+					// "\ No newline at end of file"
+				default:
+					oldN--
+					newN--
+				}
+			}
+			i = j - 1
+			if span := strings.Join(removed, "\n"); cur != "" && strings.TrimSpace(span) != "" {
+				if len(span) > editSpanMax {
+					span = span[:editSpanMax]
+				}
+				spans = append(spans, cur+"\n"+span)
+			}
+		}
+	}
+	flush()
+	return files, spans, wrote
+}
+
+// unifiedHunkCounts reads the old and new line counts off "@@ -a,b +c,d @@";
+// a count left out is 1. counted is false for a bare "@@".
+func unifiedHunkCounts(header string) (oldN, newN int, counted bool) {
+	m := unifiedHunkHeader.FindStringSubmatch(header)
+	if m == nil {
+		return 0, 0, false
+	}
+	count := func(s string) int {
+		if s == "" {
+			return 1
+		}
+		n, _ := strconv.Atoi(s)
+		return n
+	}
+	return count(m[1]), count(m[2]), true
+}
+
+var unifiedHunkHeader = regexp.MustCompile(`^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@`)
+
+// unifiedDiffPath is the file a `---` or `+++` header names: the timestamp
+// after a tab and the a/ or b/ prefix off, and "" for /dev/null.
+func unifiedDiffPath(raw string) string {
+	raw, _, _ = strings.Cut(raw, "\t")
+	raw = strings.TrimSpace(raw)
+	if raw == "/dev/null" || raw == "dev/null" {
+		return ""
+	}
+	if p, ok := strings.CutPrefix(raw, "a/"); ok {
+		return p
+	}
+	if p, ok := strings.CutPrefix(raw, "b/"); ok {
+		return p
+	}
+	return raw
+}
+
 // applyPatchRecords is applyPatch as the records a reader appends, under the
 // switches every reader honours.
 func applyPatchRecords(patch string, resolve func(string) string, t time.Time) []model.Message {
 	files, spans, wrote := applyPatch(patch, resolve)
+	return patchRecords(files, spans, wrote, t)
+}
+
+// patchRecords turns what a patch says into the records a reader appends.
+func patchRecords(files, spans, wrote []string, t time.Time) []model.Message {
 	var out []model.Message
 	if IndexToolPaths() && len(files) > 0 {
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(files, "\n"), Time: t})
@@ -220,7 +376,7 @@ func applyPatchRecords(patch string, resolve func(string) string, t time.Time) [
 
 // applyPatchInputs is the patch body of every apply_patch call among blocks.
 // Roo names the argument `patch`; Cline's CLI and extension name it `input`
-// (#4503, #4504).
+// (#4503, #4504), Amp `patchText` (#4527).
 func applyPatchInputs(blocks []any, d toolDialect) []string {
 	var out []string
 	for _, it := range blocks {
@@ -228,7 +384,7 @@ func applyPatchInputs(blocks []any, d toolDialect) []string {
 		if !ok || name != "apply_patch" {
 			continue
 		}
-		for _, k := range []string{"patch", "input"} {
+		for _, k := range []string{"patch", "input", "patchText"} {
 			if p, _ := in[k].(string); p != "" {
 				out = append(out, p)
 				break

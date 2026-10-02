@@ -611,6 +611,14 @@ type toolDialect struct {
 	// commandKey names the argument holding the command. Empty means
 	// "command"; cline's run_commands takes "commands", a list.
 	commandKey string
+	// commandKeyAlt is a second name for it, read when commandKey is absent:
+	// Amp's Bash takes `cmd` and its shell_command `command` (#4527). Empty
+	// means commandKey alone.
+	commandKeyAlt string
+	// argsKey names an argument list that follows the command, the way the
+	// client shows it: Command Code's shell_command {command: "go", args:
+	// ["test", "./..."]} ran `go test ./...` (#4540). Empty means none.
+	argsKey string
 	// pathListKey names an argument holding several files at once — cline's
 	// read_files takes "files", whose elements each name a path under pathKey.
 	// Empty means a call names at most one file.
@@ -927,10 +935,16 @@ func commandStrings(in map[string]any, d toolDialect) []string {
 	if key == "" {
 		key = "command"
 	}
+	if _, ok := in[key]; !ok && d.commandKeyAlt != "" {
+		key = d.commandKeyAlt
+	}
 	switch v := in[key].(type) {
 	case string:
 		if strings.TrimSpace(v) == "" {
 			return nil
+		}
+		if d.argsKey != "" {
+			v += CommandArgs(in[d.argsKey])
 		}
 		return []string{v}
 	case []any:
@@ -945,6 +959,29 @@ func commandStrings(in map[string]any, d toolDialect) []string {
 		return out
 	}
 	return nil
+}
+
+// CommandArgs is an argument list as the suffix it puts on a command line,
+// " a b", read as Command Code's formatArgsSuffix shows it: a list joined by
+// spaces, or a string as it is. The tool hooks read the same arguments.
+func CommandArgs(v any) string {
+	switch a := v.(type) {
+	case string:
+		if a != "" {
+			return " " + a
+		}
+	case []any:
+		var parts []string
+		for _, it := range a {
+			if s, ok := it.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		if len(parts) > 0 {
+			return " " + strings.Join(parts, " ")
+		}
+	}
+	return ""
 }
 
 // HarnessAuthored reports whether a role marks text the harness wrote to the

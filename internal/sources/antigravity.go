@@ -117,6 +117,9 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 	// Records already taken from a planner's tool_calls, so the step that
 	// runs the call and names it again in its header is not a second run.
 	fromCalls := map[model.Message]int{}
+	// What a write_to_file call is about to write, by file, until the step
+	// that ran it says it did (#4528).
+	pendingWrites := map[string]string{}
 	cwd := ""
 	// The commands the latest planner row asked for, where they sit, waiting
 	// for the step that says how each ended. A step carries no call id, so
@@ -144,6 +147,12 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 			calls, c = antigravityToolCalls(m["tool_calls"], t)
 			if cwd == "" {
 				cwd = c
+			}
+			if calls, _ := m["tool_calls"].([]any); len(calls) > 0 {
+				// A planner row's steps follow it before the next row: a
+				// write still waiting here is one whose step failed.
+				clear(pendingWrites)
+				antigravityNoteWrites(m["tool_calls"], pendingWrites)
 			}
 		}
 		text, _ := m["content"].(string)
@@ -179,8 +188,9 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		// only the source made shell dumps into assistant speech: 333 of 369
 		// MODEL rows on this machine, 90%, ranked as things the agent said.
 		if role == "assistant" {
+			step := antigravityStep(str(m["type"]), text, t)
 			own := -1
-			for _, rec := range antigravityStep(str(m["type"]), text, t) {
+			for _, rec := range step {
 				key := model.Message{Role: rec.Role, Text: rec.Text}
 				if (rec.Role == RoleCommand || rec.Role == RoleFiles) && fromCalls[key] > 0 {
 					fromCalls[key]--
@@ -193,6 +203,9 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 			}
 			if code, ok := antigravityExitCode(str(m["type"]), text); ok {
 				running = antigravityStampExit(s.Messages, running, asked, own, antigravityField(text, "Task Description:"), code)
+			}
+			if str(m["type"]) == "CODE_ACTION" && str(m["status"]) == "DONE" {
+				s.Messages = append(s.Messages, antigravityTakeWrite(text, step, pendingWrites, t)...)
 			}
 			s.Messages = append(s.Messages, antigravityTakeCalls(calls, fromCalls)...)
 			return
@@ -374,6 +387,54 @@ func antigravityRunCalls(v any) int {
 		}
 	}
 	return n
+}
+
+// antigravityNoteWrites keeps the content of the latest write_to_file call
+// for each file it names. The CODE_ACTION step that runs the call says
+// "Created file" and carries no diff block — 1 of 50 did on the store this was read off — so
+// CodeContent is the only record of what the file was given (#4528).
+func antigravityNoteWrites(v any, pending map[string]string) {
+	calls, _ := v.([]any)
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		if args == nil || str(call["name"]) != "write_to_file" {
+			continue
+		}
+		p := decodeURIPath(strings.TrimPrefix(antigravityArg(args, "TargetFile"), "file://"))
+		if p != "" {
+			pending[p] = antigravityArg(args, "CodeContent")
+		}
+	}
+}
+
+// antigravityTakeWrite is the wrote record of a write_to_file call, once a
+// finished CODE_ACTION step names its file. A step that failed names none, so
+// a write that never happened is not recorded; one whose step had a diff
+// block already gave its written side. The step answers the latest call for
+// its file: an earlier one still waiting is a call whose step failed, and
+// its content never reached the file.
+func antigravityTakeWrite(text string, step []model.Message, pending map[string]string, t time.Time) []model.Message {
+	// Only the step that created the file: a replace step on the same path
+	// with no diff block did not run the write.
+	if antigravityField(text, "Created file") == "" {
+		return nil
+	}
+	p := antigravityPath(text)
+	content, ok := pending[p]
+	if !ok {
+		return nil
+	}
+	delete(pending, p)
+	for _, rec := range step {
+		if rec.Role == RoleWrote {
+			return nil
+		}
+	}
+	if rec := WroteRecord(p, content); rec != "" && IndexWrites() {
+		return []model.Message{{Role: RoleWrote, Text: rec, Time: t}}
+	}
+	return nil
 }
 
 // antigravityArg reads one call argument. On disk each value is JSON in its

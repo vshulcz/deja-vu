@@ -80,9 +80,20 @@
 <p>supplies the id, the millisecond timestamp and the workspace, which is what names</p>
 <p>the project; without it the task&#39;s directory mtime is the base time. A</p>
 <p><code>history_item.json</code> written or changed after the transcript re-reads the task</p>
-<p>(#4446).</p>
+<p>(#4446). Tool calls are read as Roo&#39;s are (see <a href="roo.html">Roo Code</a>), plus Kilo</p>
+<p>Code&#39;s own: <code>search_and_replace</code> with an <code>operations</code> list of literal</p>
+<p><code>search</code>/<code>replace</code> pairs, <code>fast_edit_file</code> with <code>target_file</code> and a</p>
+<p><code>code_edit</code> whose <code>// ... existing code ...</code> lines are dropped before its</p>
+<p>written lines are hashed, <code>write_file</code> (the alias of <code>write_to_file</code> kept in</p>
+<p>history), and <code>delete_file</code> and <code>generate_image</code>, which name a file (#4535).</p>
 <p>SQLite: <code>session</code> joined to <code>message</code> and <code>part</code>, exactly as OpenCode writes it —</p>
-<p>see <a href="opencode.html">OpenCode</a> for the field-by-field description.</p>
+<p>see <a href="opencode.html">OpenCode</a> for the field-by-field description. Kilo CLI adds</p>
+<p>tools of its own, read beside OpenCode&#39;s: <code>background_process</code> gives a command</p>
+<p>from <code>command</code> when its <code>action</code> is <code>start</code> or <code>monitor</code> (the other actions</p>
+<p>name a process by <code>id</code>), <code>notebook_read</code> a file from <code>path</code>, and</p>
+<p><code>notebook_edit</code> a file from <code>path</code> and written lines from <code>source</code> when its</p>
+<p><code>action</code> is <code>insert</code> or <code>replace</code>. A notebook path relative to the session</p>
+<p>directory is put under it (#4534).</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Resume: <code>kilo -s &lt;id&gt;</code> for a session from the CLI store — &#34;session id to</li>

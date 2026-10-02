@@ -60,6 +60,12 @@
 <p>and has no <code>is_error</code>; that code goes on the command the result answers as</p>
 <p><code>→ exit N</code>. A clean run writes no such line and gets no code. A result that</p>
 <p>lands in a later index pass than its call is read with the call (#4539).</p>
+<p>1.74 adds <code>powershell</code> (<code>command</code>)</p>
+<p>and <code>monitor_command</code>, and <code>shell_command</code> and <code>monitor_command</code> take an <code>args</code></p>
+<p>list beside <code>command</code>; the command is recorded with its arguments as the client</p>
+<p>shows it, <code>go test ./...</code> for <code>{command: &#34;go&#34;, args: [&#34;test&#34;, &#34;./...&#34;]}</code>.</p>
+<p><code>read_file</code> takes a <code>paths</code> list too, where an entry with <code>*</code>, <code>?</code>, <code>[</code> or <code>{</code></p>
+<p>is a glob the client expands, not a file, and is left out (#4540).</p>
 <p>The older shape, one flat <code>role</code>/<code>content</code>/<code>timestamp</code>/<code>sessionId</code> line per</p>
 <p>message, is still read. The client migrates such a file to v3 in place the</p>
 <p>next time it opens the session and keeps the old copy as <code>&lt;session&gt;.v2.bak</code>.</p>
@@ -94,7 +100,9 @@
 <p>600-second maximum. And the tool matcher is a regex over Command Code&#39;s own</p>
 <p>display names — <code>SHELL</code>, <code>READ</code>, <code>EDIT</code>, <code>WRITE</code>, <code>SEARCH</code>, <code>GLOB</code>, <code>LIST</code></p>
 <p>— so a Claude-shaped <code>Bash</code> matcher never fires at all. Both are pinned by</p>
-<p>tests.</p>
+<p>tests. The matcher is case-insensitive, so <code>SHELL</code> also fires on</p>
+<p><code>powershell</code>; the hook payload carries the internal tool name and</p>
+<p><code>tool_input.args</code> after <code>command</code>, and both are read (#4540).</p>
 <ul>
 <li>There is no per-prompt event: the four documented are <code>SessionStart</code>,</li>
 </ul>

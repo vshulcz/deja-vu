@@ -23,7 +23,14 @@ record, a `tool_result` becomes tool output, error runs included. Since 0.9.6
 new turns use `read`, `write`, `edit` and `bash`, where `edit` takes
 `edits[{oldText,newText}]` (also sent as a JSON string, or as one top-level
 `oldText`/`newText` pair, both read the same way); the older `read_file`, `write_file` and `edit_file`
-names are still read for sessions saved before. A failed `bash` result has
+names are still read for sessions saved before. Commands also run through
+`terminal/run` (a PTY session) and `task_shell_start` (a background task), both
+under `command`, and are read as commands (#4538). `apply_patch` takes a
+unified diff (`--- a/x` / `+++ b/x`, not codex's `*** Begin Patch`) under
+`patch`, retargeted to `path` when that is set, or whole files under `replace`
+(deprecated alias `changes`) as `{path, content}`; the files, each hunk's
+removed lines and the added lines or contents are read, paths under the
+workspace. A call whose `tool_result` has `is_error` is not recorded (#4538). A failed `bash` result has
 `is_error` and ends "Command exited with code N"; the command it answers, by
 `tool_use_id`, carries that as `→ exit N` (#4537).
 

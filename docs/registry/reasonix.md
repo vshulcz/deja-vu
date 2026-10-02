@@ -21,7 +21,12 @@ A line is `{role, content, …}` with `role` one of `system`, `user`,
 v0.x builds wrote OpenAI's nested `{id, type, function: {name, arguments}}`
 instead, and both are read. `bash` becomes a command record, `read_file`,
 `write_file`, `edit_file` and `multi_edit` become file records, and the edits
-keep the replaced span. A `tool` line is tool output. `system` lines and user
+keep the replaced span. `notebook_edit`, `delete_range` and `delete_symbol`
+name their file under `path` and `move_file` two, under `source_path` and
+`destination_path`; `notebook_edit`'s `new_source` is the written side unless
+its `edit_mode` is `delete`, and `delete_range`, which names only anchors, has
+its removed lines read from the unified diff its result returns — a call that
+failed returns an error and gives none (#4541). A `tool` line is tool output. `system` lines and user
 lines marked `host_authored` are dropped: the host wrote them, not the person.
 Where `raw_content` is set on a user or tool line it is the text before the
 host added context or cut a result for the model, and that is what is indexed.
@@ -92,7 +97,9 @@ Reasonix takes everything as one plugin package (`reasonix-plugin.json`,
   approval) get nothing. Reasonix stores the typed text as `raw_content`, and
   that is what deja indexes. At `tool.after` it adds the pre-tool line for a
   shell command (`bash`, or `pwsh` and `powershell` on Windows) or a file
-  write, and when a command failed, what fixed the same failure before. Both
+  write — `write_file`, `edit_file`, `multi_edit`, `notebook_edit`,
+  `delete_range`, `delete_symbol`, and `move_file` under the file it moved
+  from (#4541) — and when a command failed, what fixed the same failure before. Both
   go after the output; for output Reasonix will cut to a CI summary (first
   and last eight lines) they go in front, on one line. At
   `compaction.prepare` it adds deja's record of the folded turns, read from

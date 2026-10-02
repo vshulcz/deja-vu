@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -179,14 +180,20 @@ func LoadReasonix() []model.Session {
 }
 
 // reasonixDialect is what Reasonix calls its tools (internal/tools/builtin).
+// notebook_edit writes a cell's new_source unless its edit_mode is delete,
+// delete_range and delete_symbol name the file they cut from, and move_file
+// names two (reasonixMovePaths); delete_range's removed lines are in its
+// result (reasonixRangeCalls) (#4541).
 var reasonixDialect = toolDialect{
 	pathKey: "path",
 	pathTools: map[string]bool{
 		"read_file": true, "write_file": true, "edit_file": true, "multi_edit": true,
+		"notebook_edit": true, "delete_range": true, "delete_symbol": true,
 	},
 	shellTool: "bash",
-	editTools: map[string]bool{"edit_file": true, "multi_edit": true, "write_file": true},
+	editTools: map[string]bool{"edit_file": true, "multi_edit": true, "write_file": true, "notebook_edit": true},
 	oldKey:    "old_string",
+	newKeyAlt: "new_source",
 }
 
 // reasonixMeta is the union of the current `.jsonl.meta` and the v0.x
@@ -332,6 +339,7 @@ func ParseReasonixMessages(lines [][]byte, at time.Time) model.Session {
 // turns stay two records (#3333).
 func reasonixLineReader(s *model.Session, start time.Time) func(map[string]any) {
 	clock := start.Add(-time.Millisecond)
+	ranges := reasonixRangeCalls{}
 	return func(m map[string]any) {
 		role, _ := m["role"].(string)
 		if role == "" {
@@ -364,8 +372,14 @@ func reasonixLineReader(s *model.Session, start time.Time) func(map[string]any) 
 					s.Touch(ts)
 					s.Messages = append(s.Messages, rec)
 				}
+				ranges.note(m["tool_calls"])
 			}
 		case "tool":
+			id, _ := m["tool_call_id"].(string)
+			for _, rec := range ranges.spans(id, text, ts) {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, rec)
+			}
 			if text != "" && IndexToolOutput() {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(text), Time: ts})
@@ -399,7 +413,8 @@ func reasonixToolUses(v any) []any {
 		if name == "" || in == nil {
 			continue
 		}
-		out = append(out, map[string]any{"type": "tool_use", "name": name, "input": in})
+		id, _ := c.(map[string]any)["id"].(string)
+		out = append(out, map[string]any{"type": "tool_use", "id": id, "name": name, "input": in})
 	}
 	return out
 }
@@ -411,7 +426,7 @@ func reasonixWorkRecords(v any, ts time.Time) []model.Message {
 	}
 	var out []model.Message
 	if IndexToolPaths() {
-		if p := toolPathsIn(blocks, reasonixDialect); p != "" {
+		if p := reasonixMovePaths(blocks, toolPathsIn(blocks, reasonixDialect)); p != "" {
 			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
 		}
 	}
@@ -429,6 +444,62 @@ func reasonixWorkRecords(v any, ts time.Time) []model.Message {
 		for _, cmd := range commandsIn(blocks, reasonixDialect) {
 			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
 		}
+	}
+	return out
+}
+
+// reasonixMovePaths adds both files of each move_file call {source_path,
+// destination_path} to a files record (#4541).
+func reasonixMovePaths(blocks []any, record string) string {
+	paths := []string{}
+	if record != "" {
+		paths = strings.Split(record, "\n")
+	}
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, reasonixDialect)
+		if !ok || name != "move_file" {
+			continue
+		}
+		for _, k := range []string{"source_path", "destination_path"} {
+			if p, _ := in[k].(string); p != "" && !strings.ContainsAny(p, "\n\r") && !slices.Contains(paths, p) {
+				paths = append(paths, p)
+			}
+		}
+	}
+	return strings.Join(paths, "\n")
+}
+
+// reasonixRangeCalls is the file of each delete_range call by call id. The
+// call names only anchors; the unified diff its result carries holds the
+// lines it removed, and a call that failed carries an error instead of a
+// diff (#4541).
+type reasonixRangeCalls map[string]string
+
+func (r reasonixRangeCalls) note(toolCalls any) {
+	for _, it := range reasonixToolUses(toolCalls) {
+		m := it.(map[string]any)
+		in, _ := m["input"].(map[string]any)
+		id, _ := m["id"].(string)
+		if p, _ := in["path"].(string); m["name"] == "delete_range" && id != "" && p != "" {
+			r[id] = p
+		}
+	}
+}
+
+// spans is the edit records of the delete_range call a result answers.
+func (r reasonixRangeCalls) spans(callID, result string, ts time.Time) []model.Message {
+	path, ok := r[callID]
+	if !ok {
+		return nil
+	}
+	delete(r, callID)
+	if !IndexEdits() || strings.ContainsAny(path, "\n\r") {
+		return nil
+	}
+	_, spans, _ := unifiedPatch(result, path, nil)
+	var out []model.Message
+	for _, span := range spans {
+		out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
 	}
 	return out
 }

@@ -307,7 +307,10 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 				OldString string `json:"old_string"`
 				NewString string `json:"new_string"`
 				Content   string `json:"content"`
-				Edits     []struct {
+				// lsp_replace_symbol's new text and what to do with it.
+				Replacement string `json:"replacement"`
+				Action      string `json:"action"`
+				Edits       []struct {
 					OldString string `json:"old_string"`
 					NewString string `json:"new_string"`
 				} `json:"edits"`
@@ -319,13 +322,19 @@ func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResu
 				out = append(out, crushRecord{Message: model.Message{Role: RoleFiles, Text: crushPlainText(args.FilePath), Time: at}})
 			}
 			// edit, multiedit and write carry both sides of the change, which is
-			// what restore and blame read (#4377). Only those three: a view
-			// names a file it did not change.
+			// what restore and blame read (#4377), and lsp_replace_symbol the
+			// written one. Only those: a view names a file it did not change.
 			switch p.Data.Name {
-			case "edit", "multiedit", "write":
+			case "edit", "multiedit", "write", "lsp_replace_symbol":
 				path := crushPlainText(args.FilePath)
 				old := []string{args.OldString}
 				written := []string{args.NewString, args.Content}
+				// lsp_replace_symbol writes its replacement in place of the
+				// symbol, before it or after it; a delete writes nothing. The
+				// replaced symbol is only in the result's metadata (#4533).
+				if args.Action != "delete" {
+					written = append(written, args.Replacement)
+				}
 				for _, e := range args.Edits {
 					old = append(old, e.OldString)
 					written = append(written, e.NewString)

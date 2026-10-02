@@ -60,7 +60,14 @@
 <p>new turns use <code>read</code>, <code>write</code>, <code>edit</code> and <code>bash</code>, where <code>edit</code> takes</p>
 <p><code>edits[{oldText,newText}]</code> (also sent as a JSON string, or as one top-level</p>
 <p><code>oldText</code>/<code>newText</code> pair, both read the same way); the older <code>read_file</code>, <code>write_file</code> and <code>edit_file</code></p>
-<p>names are still read for sessions saved before. A failed <code>bash</code> result has</p>
+<p>names are still read for sessions saved before. Commands also run through</p>
+<p><code>terminal/run</code> (a PTY session) and <code>task_shell_start</code> (a background task), both</p>
+<p>under <code>command</code>, and are read as commands (#4538). <code>apply_patch</code> takes a</p>
+<p>unified diff (<code>--- a/x</code> / <code>+++ b/x</code>, not codex&#39;s <code>*** Begin Patch</code>) under</p>
+<p><code>patch</code>, retargeted to <code>path</code> when that is set, or whole files under <code>replace</code></p>
+<p>(deprecated alias <code>changes</code>) as <code>{path, content}</code>; the files, each hunk&#39;s</p>
+<p>removed lines and the added lines or contents are read, paths under the</p>
+<p>workspace. A call whose <code>tool_result</code> has <code>is_error</code> is not recorded (#4538). A failed <code>bash</code> result has</p>
 <p><code>is_error</code> and ends &#34;Command exited with code N&#34;; the command it answers, by</p>
 <p><code>tool_use_id</code>, carries that as <code>→ exit N</code> (#4537).</p>
 <p><code>thinking</code> blocks are dropped. So are the <code>system</code> and <code>developer</code> roles:</p>

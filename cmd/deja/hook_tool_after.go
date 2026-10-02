@@ -192,7 +192,8 @@ func isCommandTool(name string) bool {
 		"PowerShell", "powershell",
 		"run_shell_command", "run_terminal_command", "run_commands",
 		// Command Code's payload carries the internal name, not the SHELL its
-		// matcher sees (#4371).
+		// matcher sees (#4371); that matcher is a case-insensitive regex, so it
+		// fires on powershell too (#4540).
 		"shell_command":
 		return true
 	}

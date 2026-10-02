@@ -265,10 +265,11 @@ func TestGeminiReadManyFilesDirectoriesAndRelativePaths(t *testing.T) {
 	}
 }
 
-// The glob filter is read_many_files' own: Command Code's read_multiple_files
-// takes plain paths, and a Next.js route file is named with brackets (#4494).
+// The glob filter is opt-in per dialect: a list of plain paths keeps a Next.js
+// route file named with brackets (#4494). Command Code opts in, since 1.74
+// expands any entry with *, ?, [ or { as a glob (isGlobPattern, #4540).
 func TestPathListKeepsBracketedFiles(t *testing.T) {
-	got := toolPathStrings(map[string]any{"paths": []any{"/tmp/proj/app/[id]/page.tsx"}}, commandCodeDialect)
+	got := toolPathStrings(map[string]any{"paths": []any{"/tmp/proj/app/[id]/page.tsx"}}, toolDialect{pathListKey: "paths"})
 	if len(got) != 1 || got[0] != "/tmp/proj/app/[id]/page.tsx" {
 		t.Errorf("paths = %q, want the bracketed route file", got)
 	}

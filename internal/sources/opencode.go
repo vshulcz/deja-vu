@@ -331,7 +331,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`when 'integer' then json_extract(m.data,'$.summary') ` +
 		`when 'text' then substr(json_extract(m.data,'$.summary'),1,8) end,` +
 		`'path',` + opencodeV1Path(harness) + `,` +
-		`'cmd',json_extract(p.data,'$.state.input.command'),` +
+		`'cmd',` + opencodeV1Command(harness) + `,` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
 		opencodeV1EditFields(harness) +
 		// The output of a bash call and its exit status. Only bash: `read`
@@ -394,6 +394,14 @@ func opencodeV1EditFields(harness string) string {
 		nw += `,json_extract(p.data,'$.state.input.new_string'),` +
 			`case when json_extract(p.data,'$.tool')='Write' then json_extract(p.data,'$.state.input.content') end`
 	}
+	if harness == "kilocode" {
+		// Kilo CLI's notebook_edit {path, action, kind, source}: insert and
+		// replace write source into a cell; delete and create write none of
+		// it (#4534).
+		path += `when json_extract(p.data,'$.tool')='notebook_edit' then json_extract(p.data,'$.state.input.path') `
+		nw += `,case when json_extract(p.data,'$.tool')='notebook_edit' and json_extract(p.data,'$.state.input.action') in ('insert','replace') ` +
+			`then json_extract(p.data,'$.state.input.source') end`
+	}
 	return `'editpath',case ` + path + `end,` +
 		`'old',` + old + `,` +
 		`'new',coalesce(` + nw + `),` +
@@ -412,6 +420,10 @@ func opencodeV1Tools(harness string) string {
 	if harness == "zcode" {
 		names = append(names, "Bash", "Read", "Edit", "Write")
 	}
+	if harness == "kilocode" {
+		// Kilo CLI 7.8's own tools beside opencode's (#4534).
+		names = append(names, "background_process", "notebook_edit", "notebook_read")
+	}
 	var b strings.Builder
 	for _, name := range names {
 		fmt.Fprintf(&b, ` or (instr(substr(p.data,1,200),'"tool":"%s"')>0 and json_extract(p.data,'$.tool')='%s')`, name, name)
@@ -419,9 +431,26 @@ func opencodeV1Tools(harness string) string {
 	return b.String()
 }
 
+// opencodeV1Command is the command a part ran. Kilo CLI's background_process
+// takes one only to start or monitor a process; its other actions name a
+// process by id (#4534).
+func opencodeV1Command(harness string) string {
+	cmd := `json_extract(p.data,'$.state.input.command')`
+	if harness != "kilocode" {
+		return cmd
+	}
+	return `case when json_extract(p.data,'$.tool')='background_process' ` +
+		`and coalesce(json_extract(p.data,'$.state.input.action'),'') not in ('start','monitor') then null else ` + cmd + ` end`
+}
+
 // opencodeV1Path is the file a read opened: `filePath` in opencode's read,
-// `file_path` in ZCode's Read.
+// `file_path` in ZCode's Read, and the notebook Kilo CLI's notebook_read and
+// notebook_edit name under `path` (#4534).
 func opencodeV1Path(harness string) string {
+	if harness == "kilocode" {
+		return `case when json_extract(p.data,'$.tool')='read' then json_extract(p.data,'$.state.input.filePath') ` +
+			`when json_extract(p.data,'$.tool') in ('notebook_read','notebook_edit') then json_extract(p.data,'$.state.input.path') end`
+	}
 	if harness != "zcode" {
 		return `case when json_extract(p.data,'$.tool')='read' then json_extract(p.data,'$.state.input.filePath') end`
 	}
@@ -478,8 +507,12 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		if path := str(r["path"]); path != "" && IndexToolPaths() {
 			t := partTime(r)
 			s.Touch(t)
-			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: path, Time: t})
-			continue
+			s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: kiloNotebookPath(harness, path, s.Path), Time: t})
+			// A notebook edit names its file and writes a cell, so it goes on
+			// to the edit below.
+			if str(r["old"]) == "" && str(r["new"]) == "" {
+				continue
+			}
 		}
 		if cmd := str(r["cmd"]); cmd != "" {
 			t := partTime(r)
@@ -522,7 +555,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 			if opencodeSynthetic(r["refused"]) {
 				continue
 			}
-			path := str(r["editpath"])
+			path := kiloNotebookPath(harness, str(r["editpath"]), s.Path)
 			t := partTime(r)
 			if path != "" && old != "" && IndexEdits() {
 				span := old
@@ -598,6 +631,16 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		return rows, err
 	}
 	return rows, nil
+}
+
+// kiloNotebookPath puts a Kilo CLI path relative to the session directory
+// onto it: the notebook tools take one relative to the request directory, where
+// opencode's own tools take absolute paths (#4534).
+func kiloNotebookPath(harness, path, dir string) string {
+	if harness != "kilocode" {
+		return path
+	}
+	return resolveToolPath(path, dir)
 }
 
 // opencodeParents maps a session id to its parent's, for the sessions that

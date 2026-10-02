@@ -27,9 +27,14 @@ A thread's `messages` are retained only for `user` and `assistant` roles. Within
 each message, blocks with `type: "text"` are joined in order. `tool_use` blocks
 become work records: `Bash` (`cmd`) a command, `Read`, `edit_file` and
 `create_file` (`path`) the files touched, `edit_file`'s `old_str`/`new_str` an
-edit span and the written side, `create_file`'s `content` the written side. A
-`tool_result` block holds a `run`; its `result.output` (or a string result, or
-the run's error) is kept as tool output, and a finished `Bash` run's
+edit span and the written side, `create_file`'s `content` the written side.
+Models that get `shell_command` (`command`, `workdir`) and `apply_patch`
+(`patchText`, the `*** Begin Patch` format) have those read too: a command, and
+the patch's files, removed lines and added lines, relative paths under the
+thread's workspace. A patch whose run ended `error`, `rejected-by-user` or
+`cancelled` is not recorded (#4527). A `tool_result` block holds a `run`; its
+`result.output` (or a string result, or the run's error) is kept as tool
+output; a finished `Bash` run's
 `result.exitCode` goes on the command as `→ exit N` (Amp's `-1`, no code from
 the process, is left off) (#4530).
 

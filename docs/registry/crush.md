@@ -16,7 +16,10 @@ A message's `parts` column is a JSON array of `{type, data}`. `text` carries
 arguments, so the shell command and the edited path are one decode further in.
 `edit` and `multiedit` (an `edits` array) carry `old_string` and `new_string`,
 and `write` carries `content`; those become the replaced span and the written
-lines that `deja restore` and `deja blame` read (#4377).
+lines that `deja restore` and `deja blame` read (#4377). `lsp_replace_symbol`
+writes its `replacement` in place of a symbol, before it or after it, and is
+read as written lines unless its `action` is `delete`; the replaced symbol is
+only in the result's metadata (#4533).
 `tool_result` carries what the tool printed with a `<cwd>…</cwd>` tag appended,
 which is the same directory on every line in the store and is stripped rather
 than indexed — left in, a search for the project name would match every tool

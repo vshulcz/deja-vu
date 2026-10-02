@@ -64,9 +64,14 @@
 <p>each message, blocks with <code>type: &#34;text&#34;</code> are joined in order. <code>tool_use</code> blocks</p>
 <p>become work records: <code>Bash</code> (<code>cmd</code>) a command, <code>Read</code>, <code>edit_file</code> and</p>
 <p><code>create_file</code> (<code>path</code>) the files touched, <code>edit_file</code>&#39;s <code>old_str</code>/<code>new_str</code> an</p>
-<p>edit span and the written side, <code>create_file</code>&#39;s <code>content</code> the written side. A</p>
-<p><code>tool_result</code> block holds a <code>run</code>; its <code>result.output</code> (or a string result, or</p>
-<p>the run&#39;s error) is kept as tool output, and a finished <code>Bash</code> run&#39;s</p>
+<p>edit span and the written side, <code>create_file</code>&#39;s <code>content</code> the written side.</p>
+<p>Models that get <code>shell_command</code> (<code>command</code>, <code>workdir</code>) and <code>apply_patch</code></p>
+<p>(<code>patchText</code>, the <code>*** Begin Patch</code> format) have those read too: a command, and</p>
+<p>the patch&#39;s files, removed lines and added lines, relative paths under the</p>
+<p>thread&#39;s workspace. A patch whose run ended <code>error</code>, <code>rejected-by-user</code> or</p>
+<p><code>cancelled</code> is not recorded (#4527). A <code>tool_result</code> block holds a <code>run</code>; its</p>
+<p><code>result.output</code> (or a string result, or the run&#39;s error) is kept as tool</p>
+<p>output; a finished <code>Bash</code> run&#39;s</p>
 <p><code>result.exitCode</code> goes on the command as <code>→ exit N</code> (Amp&#39;s <code>-1</code>, no code from</p>
 <p>the process, is left off) (#4530).</p>
 <p>A user message is stamped with <code>meta.sentAt</code> (Unix milliseconds) and an</p>

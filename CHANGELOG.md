@@ -184,6 +184,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Cline CLI session records what its editor wrote, including a file it created, and the files, replaced text and written lines of an `apply_patch` edit, so `deja blame` can attribute them (#4503).
 - A Cline VS Code task keeps both sides of a `replace_in_file` edit written with Cline's `------- SEARCH` / `+++++++ REPLACE` markers, and the files and both sides of an `apply_patch` edit, whose patch Cline passes as `input` (#4504).
 - A `kiro-cli --v3` or Kiro IDE session keeps its tool calls: the commands it ran, the files it read, wrote, appended to or deleted, and the replaced text and written lines of each edit. Only the results' text was kept (#4506).
+- An Amp thread keeps its `shell_command` runs as commands and its `apply_patch` edits as files, replaced text and written lines; a patch or edit you rejected or cancelled is left out. Only `Bash` and `edit_file` were read (#4527).
+- A file Antigravity created with `write_to_file` gets its written lines, so `deja blame` can attribute it. The step that runs the call carries no diff, and the content in the call was not read (#4528).
+- A Continue IDE edit made with `edit_existing_file` gets its written lines, without the `// ... existing code ...` placeholders, so `deja blame` can attribute it; only the path was kept. A call you canceled, or one still waiting for approval or acceptance, is no longer recorded as an edit (#4529).
+- A Roo Code or Kilo Code edit made through `search_and_replace` with `edit`'s `old_string` and `new_string`, the alias current Roo offers MiniMax models, leaves edit and written-line records, not just the path (#4531).
+- A Roo Code or Kilo Code `read_file` call in the legacy `files: [{path}]` form records the files it read; it recorded none (#4531).
+- A Crush `lsp_replace_symbol` edit gets its written lines, so `deja blame` can attribute the new symbol; only the file was recorded (#4533).
+- A Kilo CLI session keeps the commands it ran with `background_process` and the notebooks it read and edited with `notebook_read` and `notebook_edit`, with the cells an edit wrote. Those calls left no record (#4534).
+- A Kilo Code extension task keeps what its own tools changed: each pair of a `search_and_replace` `operations` list, the lines a `fast_edit_file` wrote, a `write_file`, and the files `delete_file` and `generate_image` named. They left nothing or only the path (#4535).
+- A CodeWhale command run through `terminal/run` or `task_shell_start` is recorded as a command; only `bash` and `exec_shell` were (#4538).
+- A CodeWhale `apply_patch` edit keeps its files, replaced text and written lines, from a unified diff or from whole-file `replace` entries, so `deja restore` and `blame` see it; at most the `path` argument was recorded. A patch that failed is left out (#4538).
+- A Command Code session keeps commands run through `shell_command` with an `args` list, `powershell` and `monitor_command`, the arguments included, and a glob in `read_file`'s `paths` is no longer stored as a file the session read (#4540).
+- Command Code's tool hooks speak for `powershell` and look a `shell_command` up with its `args`, not by the bare program name; the hook fired on both and said nothing or looked up the wrong command (#4540).
+- A Reasonix session keeps the files it changed with `notebook_edit`, `delete_range`, `delete_symbol` and `move_file` (both paths), the cell a notebook edit wrote and the lines a `delete_range` removed, so `deja files`, `blame` and `restore` see them (#4541).
+- With `deja install reasonix-auto`, a file's history also arrives after a Reasonix `notebook_edit`, `delete_range`, `delete_symbol` or `move_file`; the hook ran for them and said nothing (#4541).
 
 ## [0.21.4] - 2026-09-29
 

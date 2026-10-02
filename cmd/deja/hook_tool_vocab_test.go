@@ -83,3 +83,21 @@ func TestGrokFailedCommandGetsTheFixPair(t *testing.T) {
 		t.Errorf("grok-auto wires no PostToolUse hook-tool-after:\n%s", b)
 	}
 }
+
+// commandcode-auto's SHELL matcher is a case-insensitive regex, so it fires on
+// powershell as well as shell_command, and shell_command can carry its
+// arguments as a list: the hook ran and looked up `go` alone, or nothing
+// (#4540).
+func TestHookToolKnowsCommandCodePowershellAndArgs(t *testing.T) {
+	if !isCommandTool("powershell") {
+		t.Error("powershell is not read as a command tool")
+	}
+	var in toolHookInput
+	if err := json.Unmarshal([]byte(`{"tool_name":"shell_command","tool_input":{"command":"go","args":["test","./retry/..."]}}`), &in); err != nil {
+		t.Fatal(err)
+	}
+	in.adopt()
+	if in.ToolInput.Command != "go test ./retry/..." {
+		t.Errorf("command = %q, want the arguments after it", in.ToolInput.Command)
+	}
+}

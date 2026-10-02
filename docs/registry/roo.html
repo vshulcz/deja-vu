@@ -60,7 +60,11 @@
 <p>nothing rather than guessing where it ended. Current Roo also offers</p>
 <p><code>search_replace</code>, <code>edit_file</code> and <code>edit</code>, which take <code>old_string</code> and</p>
 <p><code>new_string</code> under <code>file_path</code>, and <code>apply_patch</code>, whose paths and <code>-</code>/<code>+</code> lines</p>
-<p>are read out of the patch body.</p>
+<p>are read out of the patch body. <code>search_and_replace</code> is kept as an alias of</p>
+<p><code>edit</code> and written under the alias with <code>edit</code>&#39;s arguments, which are read as</p>
+<p><code>edit</code>&#39;s (#4531). <code>read_file</code> still takes the legacy</p>
+<p><code>files: [{path, lineRanges}]</code> form, stored with <code>_legacyFormat: true</code>; each</p>
+<p><code>path</code> is a file record (#4531).</p>
 <p>An <code>execute_command</code> result opens with its status, &#34;Command executed in</p>
 <p>terminal within working directory &#39;…&#39;. Exit code: N&#34; (a failure puts &#34;Command</p>
 <p>execution was not successful, …&#34; there and the code on the next line), and the</p>

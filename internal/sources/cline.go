@@ -402,13 +402,17 @@ var clineDialect = toolDialect{
 // shared helper: apply_diff carries a SEARCH/REPLACE block, not an
 // old_string. Current Roo adds search_replace, edit_file and edit, which name
 // the file `file_path`, and apply_patch, whose paths are in the patch body
-// (#4419).
+// (#4419). read_file still takes the legacy files[{path, lineRanges}] form
+// (#4531). Kilo Code adds write_file, fast_edit_file under target_file,
+// delete_file and generate_image (#4535).
 var rooDialect = toolDialect{
-	pathKey:    "path",
-	pathKeyAlt: "file_path",
+	pathKey:     "path",
+	pathKeyAlt:  "file_path",
+	pathListKey: "files",
 	pathTools: map[string]bool{"read_file": true, "write_to_file": true, "apply_diff": true,
 		"insert_content": true, "search_and_replace": true, "replace_in_file": true,
-		"search_replace": true, "edit_file": true, "edit": true},
+		"search_replace": true, "edit_file": true, "edit": true,
+		"write_file": true, "fast_edit_file": true, "delete_file": true, "generate_image": true},
 	shellTool: "execute_command",
 	editTools: map[string]bool{},
 }
@@ -427,6 +431,7 @@ func rooWorkRecords(raw json.RawMessage, ts time.Time, workspace string, xmlEra 
 	if xmlEra {
 		blocks = rooWithXMLCalls(blocks)
 	}
+	rooFoldTargetFile(blocks)
 	var out []model.Message
 	if IndexToolPaths() {
 		if p := rooResolvePaths(rooPatchPaths(blocks, toolPathsIn(blocks, rooDialect)), workspace); p != "" {

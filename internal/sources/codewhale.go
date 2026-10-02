@@ -114,7 +114,8 @@ func CodeWhaleSidecarFiles() []string {
 // codeWhaleDialect is what CodeWhale calls its tools. The shell tool answers to
 // three names on the wire — the canonical exec_shell and the bash aliases every
 // model already knows — and the file tools take `path`. apply_patch carries a
-// patch rather than a replaced span, so it names a file and no edit. Since
+// unified diff or whole files rather than a replaced span; codeWhalePatchRecords
+// reads it (#4538). Since
 // 0.9.6 new turns use read, write and edit instead, and edit takes
 // edits[{oldText,newText}]; the older names stay for sessions saved before
 // (#4360).
@@ -123,10 +124,12 @@ var codeWhaleDialect = toolDialect{
 	pathTools: map[string]bool{
 		"read": true, "write": true, "edit": true,
 		"read_file": true, "write_file": true, "edit_file": true,
-		"fim_edit": true, "apply_patch": true, "str_replace": true,
+		"fim_edit": true, "str_replace": true,
 	},
-	shellTool:  "exec_shell",
-	shellTools: map[string]bool{"exec_shell": true, "bash": true, "Bash": true},
+	shellTool: "exec_shell",
+	// terminal/run runs a command in a PTY session and task_shell_start as a
+	// background task, both under `command` (#4538).
+	shellTools: map[string]bool{"exec_shell": true, "bash": true, "Bash": true, "terminal/run": true, "task_shell_start": true},
 	editTools: map[string]bool{
 		"edit": true, "write": true,
 		"edit_file": true, "fim_edit": true, "str_replace": true,
@@ -145,10 +148,12 @@ type codeWhaleSession struct {
 		Workspace string    `json:"workspace"`
 		Parent    string    `json:"parent_session_id"`
 	} `json:"metadata"`
-	Messages []struct {
-		Role    string          `json:"role"`
-		Content json.RawMessage `json:"content"`
-	} `json:"messages"`
+	Messages []codeWhaleMessage `json:"messages"`
+}
+
+type codeWhaleMessage struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
 }
 
 // CodeWhaleWorkspace is the workspace a saved session was worked in, from its
@@ -201,6 +206,7 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		s.Kind = "subagent"
 		s.Parent = doc.Metadata.Parent
 	}
+	failed := codeWhaleFailedCalls(doc.Messages)
 	start := doc.Metadata.CreatedAt
 	if start.IsZero() {
 		start = doc.Metadata.UpdatedAt
@@ -229,6 +235,10 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		}
 		from := len(s.Messages)
 		for _, rec := range codeWhaleWorkRecords(m.Content, ts) {
+			s.Touch(ts)
+			s.Messages = append(s.Messages, rec)
+		}
+		for _, rec := range codeWhalePatchRecords(m.Content, failed, doc.Metadata.Workspace, ts) {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, rec)
 		}
@@ -291,6 +301,87 @@ func codeWhaleWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 	if IndexToolOutput() {
 		for _, body := range clineToolResults(blocks) {
 			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(body), Time: ts})
+		}
+	}
+	return out
+}
+
+// codeWhalePatchRecords reads the apply_patch calls in one message. The tool
+// (tools/apply_patch.rs) takes a unified diff under `patch`, retargeted to
+// `path` when that is set, or whole files under `replace` (or its deprecated
+// alias `changes`) as {path, content}. Paths are relative to the workspace.
+// A call that came back as an error changed nothing (#4538).
+func codeWhalePatchRecords(raw json.RawMessage, failed map[string]bool, workspace string, ts time.Time) []model.Message {
+	if !bytes.Contains(raw, []byte(`"apply_patch"`)) {
+		return nil
+	}
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	resolve := func(p string) string { return resolveToolPath(p, workspace) }
+	var out []model.Message
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, codeWhaleDialect)
+		if !ok || name != "apply_patch" {
+			continue
+		}
+		if id, _ := it.(map[string]any)["id"].(string); failed[id] {
+			continue
+		}
+		if patch, _ := in["patch"].(string); patch != "" {
+			// file_path and filePath are folded onto path before it runs
+			// (file.rs PATH_ALIASES).
+			path := ""
+			for _, k := range []string{"path", "file_path", "filePath"} {
+				if path, _ = in[k].(string); path != "" {
+					break
+				}
+			}
+			files, spans, wrote := unifiedPatch(patch, path, resolve)
+			out = append(out, patchRecords(files, spans, wrote, ts)...)
+			continue
+		}
+		entries, _ := in["replace"].([]any)
+		if len(entries) == 0 {
+			entries, _ = in["changes"].([]any)
+		}
+		var files, wrote []string
+		for _, e := range entries {
+			m, _ := e.(map[string]any)
+			path, _ := m["path"].(string)
+			if path == "" || strings.ContainsAny(path, "\n\r") {
+				continue
+			}
+			path = resolve(path)
+			files = append(files, path)
+			content, _ := m["content"].(string)
+			if rec := WroteRecord(path, content); rec != "" {
+				wrote = append(wrote, rec)
+			}
+		}
+		out = append(out, patchRecords(files, nil, wrote, ts)...)
+	}
+	return out
+}
+
+// codeWhaleFailedCalls is the id of every call whose tool_result is an error.
+func codeWhaleFailedCalls(msgs []codeWhaleMessage) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range msgs {
+		if !bytes.Contains(m.Content, []byte(`"is_error"`)) {
+			continue
+		}
+		var blocks []struct {
+			Type    string `json:"type"`
+			ID      string `json:"tool_use_id"`
+			IsError bool   `json:"is_error"`
+		}
+		_ = json.Unmarshal(m.Content, &blocks)
+		for _, b := range blocks {
+			if b.Type == "tool_result" && b.IsError {
+				out[b.ID] = true
+			}
 		}
 	}
 	return out

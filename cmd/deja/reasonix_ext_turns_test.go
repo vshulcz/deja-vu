@@ -168,6 +168,23 @@ func TestReasonixExtMapsFileToolsToTheirPaths(t *testing.T) {
 	}
 }
 
+// Reasonix 1.39.6's other file-changing tools reach the file line too:
+// notebook_edit, delete_range and delete_symbol under path, move_file under
+// the file it moved from (#4541).
+func TestReasonixExtMapsTheOtherFileTools(t *testing.T) {
+	for _, c := range []struct{ name, args, tool, path string }{
+		{"notebook_edit", `{"path":"retry.ipynb","new_source":"x","edit_mode":"replace"}`, "NotebookEdit", "retry.ipynb"},
+		{"delete_range", `{"path":"retry.go","start_anchor":"a","end_anchor":"b"}`, "Edit", "retry.go"},
+		{"delete_symbol", `{"path":"retry.go","name":"legacyRetry","kind":"func"}`, "Edit", "retry.go"},
+		{"move_file", `{"source_path":"jitter.go","destination_path":"backoff/jitter.go"}`, "Edit", "jitter.go"},
+	} {
+		tool, in := rxHookToolInput(c.name, c.args, "/work")
+		if tool != c.tool || in["file_path"] != filepath.Join("/work", c.path) {
+			t.Errorf("%s = %s %v, want %s on %s", c.name, tool, in, c.tool, filepath.Join("/work", c.path))
+		}
+	}
+}
+
 func TestReasonixExtCarriesContextIntoTheCompactionSummary(t *testing.T) {
 	calls := fakeRxHooks(t, func(sub string, _ map[string]any) (string, error) {
 		if sub == "hook-context" {

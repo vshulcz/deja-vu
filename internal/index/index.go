@@ -551,6 +551,44 @@ import (
 //
 // 60 also: a prime ipython cell's details.diffs leave files, edit and wrote
 // records (#4526).
+// 60 also: an Amp shell_command call is a command and an apply_patch call
+// leaves files, edit and wrote records (#4527).
+//
+// 60 also: an Antigravity write_to_file call leaves a wrote record of its
+// CodeContent once its step finishes (#4528).
+//
+// 60 also: a Continue edit_existing_file call leaves a wrote record of its
+// changes, and a canceled edit leaves none (#4529).
+//
+// 60 also: a Roo or Kilo search_and_replace call with old_string and
+// new_string leaves edit and wrote records (#4531).
+//
+// 60 also: a Roo or Kilo read_file call in the legacy files[] form leaves a
+// files record (#4531).
+//
+// 60 also: a Crush lsp_replace_symbol call leaves a wrote record of its
+// replacement (#4533).
+//
+// 60 also: a Kilo CLI background_process start or monitor is a command, and
+// notebook_read and notebook_edit leave files and wrote records (#4534).
+//
+// 60 also: a Kilo Code task's search_and_replace operations[], fast_edit_file
+// and write_file leave files, edit and wrote records, and delete_file and
+// generate_image files records (#4535).
+//
+// 60 also: a CodeWhale terminal/run or task_shell_start call is a command
+// (#4538).
+//
+// 60 also: a CodeWhale apply_patch call leaves files, edit and wrote records
+// from its unified diff or replace[] entries (#4538).
+//
+// 60 also: a Command Code shell_command with args[], powershell or
+// monitor_command call is a command, and a read_file glob is not a file
+// (#4540).
+//
+// 60 also: a Reasonix notebook_edit, delete_range, delete_symbol or move_file
+// call leaves files records, notebook_edit a wrote record and delete_range an
+// edit record from its result's diff (#4541).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

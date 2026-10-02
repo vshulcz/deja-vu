@@ -23,6 +23,12 @@ opens with "Exit code: N" (or "Exit code: N (No matches found)" and the like)
 and has no `is_error`; that code goes on the command the result answers as
 `→ exit N`. A clean run writes no such line and gets no code. A result that
 lands in a later index pass than its call is read with the call (#4539).
+1.74 adds `powershell` (`command`)
+and `monitor_command`, and `shell_command` and `monitor_command` take an `args`
+list beside `command`; the command is recorded with its arguments as the client
+shows it, `go test ./...` for `{command: "go", args: ["test", "./..."]}`.
+`read_file` takes a `paths` list too, where an entry with `*`, `?`, `[` or `{`
+is a glob the client expands, not a file, and is left out (#4540).
 
 The older shape, one flat `role`/`content`/`timestamp`/`sessionId` line per
 message, is still read. The client migrates such a file to v3 in place the
@@ -53,7 +59,9 @@ next time it opens the session and keeps the old copy as `<session>.v2.bak`.
   600-second maximum. And the tool matcher is a regex over Command Code's own
   display names — `SHELL`, `READ`, `EDIT`, `WRITE`, `SEARCH`, `GLOB`, `LIST`
   — so a Claude-shaped `Bash` matcher never fires at all. Both are pinned by
-  tests.
+  tests. The matcher is case-insensitive, so `SHELL` also fires on
+  `powershell`; the hook payload carries the internal tool name and
+  `tool_input.args` after `command`, and both are read (#4540).
 - There is no per-prompt event: the four documented are `SessionStart`,
   `PreToolUse`, `PostToolUse` and `Stop`, so the digest rides SessionStart and
   the rest is the tool-time pair.

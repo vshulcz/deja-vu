@@ -74,6 +74,9 @@ type toolHookInput struct {
 		// Claude's NotebookEdit names its file here and not under file_path
 		// (#4489).
 		NotebookPath string `json:"notebook_path"`
+		// Command Code's shell_command runs command with these after it
+		// (#4540).
+		Args any `json:"args"`
 	} `json:"tool_input"`
 	SessionID      string `json:"session_id"`
 	ConversationID string `json:"conversation_id"`
@@ -98,6 +101,9 @@ func (i *toolHookInput) adopt() {
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
 	if i.ToolInput.FilePath == "" {
 		i.ToolInput.FilePath = i.ToolInput.NotebookPath
+	}
+	if isCommandTool(i.ToolName) && strings.TrimSpace(i.ToolInput.Command) != "" {
+		i.ToolInput.Command += sources.CommandArgs(i.ToolInput.Args)
 	}
 }
 
