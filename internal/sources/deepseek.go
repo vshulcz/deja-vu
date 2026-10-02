@@ -3,9 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -41,6 +39,14 @@ import (
 // Reasoning blocks in that array are the model thinking out loud, not what it
 // told the person, so they stay out of the transcript.
 //
+// A tool call is written twice too: as a tool-call block in that
+// assistant/message and as its own `tool/call` event. Only the event is read,
+// so a call is counted once (#4291). What the call is credited with waits for
+// its `tool/result`: an edit or write counts only when the result came back
+// and is not an error (a denied or aborted call comes back as one), and a bash
+// result carries its exit status as a trailing `[exit code: N]` marker rather
+// than as an error.
+//
 // Tool output is its own event, `tool/result`, whose content nests a
 // tool-result block around the text.
 //
@@ -48,9 +54,11 @@ import (
 // answered, called a tool, and failed before answering.
 
 // DSHHome is the harness's own home directory, following its DSH_HOME variable.
+// dsh expands a leading ~ in it, so deja does too: taken literally,
+// DSH_HOME=~/.dsh-alt sent deja to ./~/.dsh-alt (#4390).
 func DSHHome() string {
 	if p := os.Getenv("DSH_HOME"); p != "" {
-		return p
+		return expandTilde(p)
 	}
 	return filepath.Join(Home(), ".dsh")
 }
@@ -78,8 +86,22 @@ func isDeepSeekLog(p string) bool {
 	return false
 }
 
+// DeepSeekSessionFiles leaves out Cherry Studio's dsh store. Cherry runs dsh
+// with DSH_HOME pointed into its own data dir, so a deja it starts inherits that
+// root and listed those logs under both harnesses (#4342).
 func DeepSeekSessionFiles() []string {
-	return walkFiles(DeepSeekRoot(), isDeepSeekLog)
+	files := walkFiles(DeepSeekRoot(), isDeepSeekLog)
+	cherry := cherryStudioDshRoots()
+	if len(cherry) == 0 {
+		return files
+	}
+	out := files[:0]
+	for _, p := range files {
+		if !underAnyRoot(p, cherry) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func LoadDeepSeek() []model.Session {
@@ -102,6 +124,8 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 	// the deltas are all there is.
 	var pending []string
 	var pendingAt time.Time
+	cwd := ""
+	calls := map[string]*deepSeekCall{}
 	flush := func() {
 		text := strings.TrimSpace(strings.Join(pending, ""))
 		pending = nil
@@ -130,8 +154,9 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 			if id, _ := e["id"].(string); id != "" {
 				s.ID = strings.TrimPrefix(id, "session-")
 			}
-			if cwd, _ := e["cwd"].(string); cwd != "" {
-				s.Project = projectName(cwd)
+			if dir, _ := e["cwd"].(string); dir != "" {
+				cwd = dir
+				s.Project = projectName(dir)
 			}
 			s.Touch(parseTimeAny(e["createdAt"]))
 		case "session/title":
@@ -181,10 +206,26 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 			}
 		case "step/end", "turn/end":
 			flush()
+		case "tool/call":
+			flush()
+			now, call := deepSeekWorkRecords(data, cwd, at)
+			if id, _ := data["callId"].(string); id != "" && call != nil {
+				// The commands are the last of what the call stands for now.
+				call.commandAt = len(s.Messages) + len(now) - call.commands
+				calls[id] = call
+			}
+			s.Messages = append(s.Messages, now...)
 		case "tool/result":
 			flush()
 			msg, _ := data["message"].(map[string]any)
-			if text := deepSeekToolText(msg["content"]); text != "" {
+			text := deepSeekToolText(msg["content"])
+			source, _ := msg["source"].(map[string]any)
+			id, _ := source["callId"].(string)
+			if call := calls[id]; call != nil && !deepSeekResultFailed(msg["content"]) {
+				delete(calls, id)
+				s.Messages = append(s.Messages, call.settle(s.Messages, text)...)
+			}
+			if text != "" {
 				s.Messages = append(s.Messages, model.Message{Role: "tool-output", Text: text, Time: at})
 				s.Touch(at)
 			}
@@ -195,6 +236,149 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// deepSeekDialect is dsh's tool vocabulary, read off its bundled tools: bash
+// (pwsh on Windows) takes `command`, and read, read_image, write and edit take
+// `file_path` with Claude's old_string/new_string/content.
+var deepSeekDialect = toolDialect{
+	pathKey:    "file_path",
+	pathTools:  map[string]bool{"read": true, "read_image": true, "write": true, "edit": true, "str_replace_editor": true},
+	shellTools: map[string]bool{"bash": true, "pwsh": true},
+	editTools:  map[string]bool{"write": true, "edit": true, "str_replace_editor": true},
+}
+
+// deepSeekCall is one tool call waiting for its result: the records that only
+// a clean result confirms, and where its command records sit.
+type deepSeekCall struct {
+	held []model.Message
+	// commands records sit at commandAt and after.
+	commands, commandAt int
+	background          bool
+	// view is a str_replace_editor view, whose path may be a directory; only
+	// the result says which.
+	view bool
+}
+
+// settle is what a clean result releases. The commands get the exit status the
+// result's marker names, written the way every other harness's are; a result
+// that was killed or timed out names none, and nothing is invented for it.
+func (c *deepSeekCall) settle(msgs []model.Message, text string) []model.Message {
+	if code, ok := deepSeekExitCode(text); ok && !c.background {
+		for i := c.commandAt; i < c.commandAt+c.commands && i < len(msgs); i++ {
+			if msgs[i].Role == RoleCommand && !strings.Contains(msgs[i].Text, "  → exit ") {
+				msgs[i].Text += "  → exit " + code
+			}
+		}
+	}
+	// A view of a directory answers with a listing; a file it read answers
+	// with its numbered content.
+	if c.view && !strings.HasPrefix(text, "Here's the content of ") {
+		return nil
+	}
+	return c.held
+}
+
+// deepSeekExitCode reads the status off a bash result: the last line is
+// `[exit code: N]` for a nonzero exit, and a clean exit has no marker at all.
+// A result over dsh's spill cap carries a "(Omitted N bytes. …)" notice after
+// it, which is set aside first. A result ending in a marker that names no exit
+// (timed out, killed, sandbox) or in the persistent shell's reset notice is
+// not stamped; any other last line, bracketed or not, is the command's own.
+func deepSeekExitCode(text string) (string, bool) {
+	text = strings.TrimRight(text, "\n")
+	if i := strings.LastIndex(text, "\n"); strings.Contains(text[i+1:], " Full formatted result stored at: ") {
+		text = strings.TrimRight(text[:max(i, 0)], "\n")
+		if text == "" {
+			return "", false
+		}
+	}
+	last := text[strings.LastIndex(text, "\n")+1:]
+	if code, ok := strings.CutPrefix(last, "[exit code: "); ok {
+		return strings.TrimSuffix(code, "]"), strings.HasSuffix(code, "]")
+	}
+	for _, p := range []string{"[timed out after ", "[killed by signal: ", "[sandbox: ", "[shell ", "The persistent bash shell was reset;"} {
+		if strings.HasPrefix(last, p) {
+			return "", false
+		}
+	}
+	return "0", true
+}
+
+// deepSeekResultFailed reports whether a tool result is marked an error.
+func deepSeekResultFailed(v any) bool {
+	blocks, _ := v.([]any)
+	for _, b := range blocks {
+		block, _ := b.(map[string]any)
+		if bad, _ := block["isError"].(bool); bad {
+			return true
+		}
+	}
+	return false
+}
+
+// deepSeekWorkRecords turns one tool/call event into work records: the files
+// and command records it stands for now, and the edit and wrote records its
+// result has to confirm. The call is rewritten into the tool_use shape the
+// shared extractors read, as qwen's is.
+func deepSeekWorkRecords(data map[string]any, cwd string, t time.Time) ([]model.Message, *deepSeekCall) {
+	name, _ := data["name"].(string)
+	args, _ := data["arguments"].(map[string]any)
+	if raw, ok := data["arguments"].(string); ok {
+		_ = json.Unmarshal([]byte(raw), &args)
+	}
+	if name == "" || args == nil {
+		return nil, nil
+	}
+	call := &deepSeekCall{}
+	if name == "str_replace_editor" {
+		// The editor names its file `path` and its spans old_str, new_str and
+		// file_text, and its `command` is view/create/str_replace, not a shell.
+		call.view = args["command"] == "view"
+		args = map[string]any{
+			"file_path":  args["path"],
+			"old_string": args["old_str"],
+			"new_string": args["new_str"],
+			"content":    args["file_text"],
+		}
+	}
+	// dsh resolves a relative path against the session's directory, and so
+	// does this: "retry.go" alone is out of reach of restore and blame.
+	if p, _ := args["file_path"].(string); p != "" {
+		args["file_path"] = resolveToolPath(p, cwd)
+	}
+	calls := []any{map[string]any{"type": "tool_use", "name": name, "input": args}}
+	var now []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(calls, deepSeekDialect); p != "" {
+			rec := model.Message{Role: RoleFiles, Text: p, Time: t}
+			if call.view {
+				call.held = append(call.held, rec)
+			} else {
+				now = append(now, rec)
+			}
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(calls, deepSeekDialect) {
+			call.held = append(call.held, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(calls, deepSeekDialect) {
+			call.held = append(call.held, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	if IndexCommands() {
+		cmds := commandsIn(calls, deepSeekDialect)
+		call.commands = len(cmds)
+		// A background run answers with an acknowledgement, not an exit.
+		call.background, _ = args["run_in_background"].(bool)
+		for _, cmd := range cmds {
+			now = append(now, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+		}
+	}
+	return now, call
 }
 
 // deepSeekSpokenByUser separates what a person typed from what a plugin spliced
@@ -289,14 +473,5 @@ func readDeepSeekLog(path string) ([]byte, error) {
 	if len(raw) == 0 {
 		return nil, nil
 	}
-	cmd := exec.Command("zstd", "-d", "-c", "-q")
-	cmd.Stdin = bytes.NewReader(raw)
-	var out, errBuf bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errBuf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("deepseek: zstd -d %s: %w: %s", filepath.Base(path), err,
-			strings.TrimSpace(errBuf.String()))
-	}
-	return out.Bytes(), nil
+	return zstdDecodeFile(path, "deepseek", raw)
 }

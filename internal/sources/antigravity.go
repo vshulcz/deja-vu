@@ -113,6 +113,10 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	s := model.Session{Harness: "antigravity", ID: id, Project: antigravityProject(id), Path: path}
+	// Records already taken from a planner's tool_calls, so the step that
+	// runs the call and names it again in its header is not a second run.
+	fromCalls := map[model.Message]int{}
+	cwd := ""
 	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		role := ""
 		source, _ := m["source"].(string)
@@ -124,28 +128,45 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		default:
 			return
 		}
-		text, _ := m["content"].(string)
-		if strings.TrimSpace(text) == "" {
-			return
-		}
-		if role == "user" {
-			text = cleanAntigravityUserContent(text)
-		}
-		if strings.TrimSpace(text) == "" {
-			return
-		}
-		text = capParsedMessage(text)
 		t, _ := time.Parse(time.RFC3339Nano, str(m["created_at"]))
 		if t.IsZero() {
 			t = s.Started
 		}
+		var calls []model.Message
+		if role == "assistant" {
+			var c string
+			calls, c = antigravityToolCalls(m["tool_calls"], t)
+			if cwd == "" {
+				cwd = c
+			}
+		}
+		text, _ := m["content"].(string)
+		if role == "user" {
+			text = cleanAntigravityUserContent(text)
+		}
+		if strings.TrimSpace(text) == "" && len(calls) == 0 {
+			return
+		}
 		s.Touch(t)
+		if strings.TrimSpace(text) == "" {
+			s.Messages = append(s.Messages, antigravityTakeCalls(calls, fromCalls)...)
+			return
+		}
+		text = capParsedMessage(text)
 		// A step's kind decides what it is, not its source. Antigravity puts
 		// prose and tool transcripts in the same MODEL stream, and reading
 		// only the source made shell dumps into assistant speech: 333 of 369
 		// MODEL rows on this machine, 90%, ranked as things the agent said.
 		if role == "assistant" {
-			s.Messages = append(s.Messages, antigravityStep(str(m["type"]), text, t)...)
+			for _, rec := range antigravityStep(str(m["type"]), text, t) {
+				key := model.Message{Role: rec.Role, Text: rec.Text}
+				if (rec.Role == RoleCommand || rec.Role == RoleFiles) && fromCalls[key] > 0 {
+					fromCalls[key]--
+					continue
+				}
+				s.Messages = append(s.Messages, rec)
+			}
+			s.Messages = append(s.Messages, antigravityTakeCalls(calls, fromCalls)...)
 			return
 		}
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
@@ -156,6 +177,8 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 	if s.Project == "-" || s.Project == "" {
 		if p := antigravityProjectFromFiles(s.Messages); p != "" {
 			s.Project = p
+		} else if cwd != "" {
+			s.Project = projectName(cwd)
 		}
 	}
 	return []model.Session{s}, err
@@ -225,6 +248,65 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 		}
 	}
 	return out
+}
+
+// antigravityToolCalls reads the structured calls a planner row carries —
+// the args the client hands its own PreToolUse hooks. The RUN_COMMAND step
+// after a call does not always name the command, and without this the command
+// was lost whenever it did not (#4358). The edit tools' diff stays with their
+// CODE_ACTION step; the call gives only the file. Returns the first Cwd too.
+func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
+	calls, _ := v.([]any)
+	var out []model.Message
+	cwd := ""
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		if args == nil {
+			continue
+		}
+		switch str(call["name"]) {
+		case "run_command":
+			cmd := strings.TrimSpace(antigravityArg(args, "CommandLine"))
+			if cwd == "" {
+				cwd = antigravityArg(args, "Cwd")
+			}
+			if cmd != "" && IndexCommands() && worthIndexing(cmd) {
+				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+			}
+		case "view_file", "replace_file_content", "multi_replace_file_content", "write_to_file":
+			p := antigravityArg(args, "AbsolutePath")
+			if p == "" {
+				p = antigravityArg(args, "TargetFile")
+			}
+			p = decodeURIPath(strings.TrimPrefix(p, "file://"))
+			if p != "" && IndexToolPaths() {
+				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
+		}
+	}
+	return out, cwd
+}
+
+// antigravityArg reads one call argument. On disk each value is JSON in its
+// own right — CommandLine is `"go test ./..."` with the quotes — so a value
+// that decodes as a JSON string is that string; a bare one is taken as it is.
+func antigravityArg(args map[string]any, key string) string {
+	v := str(args[key])
+	var decoded string
+	if strings.HasPrefix(v, `"`) && json.Unmarshal([]byte(v), &decoded) == nil {
+		return decoded
+	}
+	return v
+}
+
+// antigravityTakeCalls keeps the records from a row's calls and notes each,
+// so the step that later names the same call adds nothing.
+func antigravityTakeCalls(calls []model.Message, seen map[model.Message]int) []model.Message {
+	for _, c := range calls {
+		seen[model.Message{Role: c.Role, Text: c.Text}]++
+	}
+	return calls
 }
 
 // antigravityField reads a labelled line out of a step's header.
@@ -377,7 +459,7 @@ func antigravityProject(id string) string {
 				continue
 			}
 			for _, uri := range c.Summary.WorkspaceURIs {
-				if w, ok := strings.CutPrefix(uri, "file://"); ok && w != "" {
+				if w, ok := fileURIPath(uri); ok {
 					return projectName(w)
 				}
 			}
@@ -409,13 +491,29 @@ func antigravityProject(id string) string {
 }
 
 // isAbsolutePath accepts both conventions, not the host's. A synced store
-// holds whatever the machine that wrote it used.
+// holds whatever the machine that wrote it used. A leading `\` is rooted too:
+// Windows reads \tmp\x against the current drive, never against a cwd.
 func isAbsolutePath(p string) bool {
-	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\\`) {
+	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) {
 		return true
 	}
 	// C:\src or C:/src
 	return len(p) > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
+}
+
+// resolveToolPath puts a tool call's path relative to the session's cwd onto
+// that cwd, and leaves a rooted one as written. filepath.IsAbs is the host's
+// rule, and on Windows it is false for /tmp/proj/retry.go, which then became
+// \tmp\proj\tmp\proj\retry.go (#4438). A slash-rooted cwd is joined with
+// slashes so the record reads the same whichever host indexed it.
+func resolveToolPath(p, cwd string) string {
+	if p == "" || cwd == "" || isAbsolutePath(p) {
+		return p
+	}
+	if strings.HasPrefix(cwd, "/") {
+		return path.Join(cwd, p)
+	}
+	return filepath.Join(cwd, p)
 }
 
 // slashed puts a path in one convention so the segment arithmetic below reads

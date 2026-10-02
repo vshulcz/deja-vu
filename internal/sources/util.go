@@ -254,11 +254,15 @@ func projectSegments(parent, base string) string {
 	return parent + "/" + base
 }
 
+// projectName is the project of a directory a client recorded, named the way
+// Claude Code's is (cwdProjectName), so one directory is one project whichever
+// agent ran there. The basename made /tmp/w/my-app "my-app" for codex and
+// "w/my-app" for claude, and --project with either missed the other (#4457).
 func projectName(path string) string {
-	if path == "" {
-		return "-"
+	if name := cwdProjectName(path); name != "" {
+		return name
 	}
-	return filepath.Base(path)
+	return "-"
 }
 
 func scanJSONL(path string, fn func(map[string]any)) error {
@@ -276,33 +280,101 @@ func scanJSONL(path string, fn func(map[string]any)) error {
 // The header is handed over again on every resume. That is safe because it is
 // metadata: the parsers read it into fields they set rather than append to.
 func scanJSONLWithHeaderFromOffset(path string, offset int64, fn func(map[string]any)) error {
+	return scanJSONLWithHeaderFromOffsetFunc(path, offset, 1, func(map[string]any) bool { return true }, fn)
+}
+
+// scanJSONLWithHeaderFromOffsetFunc is scanJSONLWithHeaderFromOffset for a
+// format whose header need not be line 1: isHeader picks it out of the first
+// lookahead lines. omp writes a title slot before its session record, and
+// taking line 1 left an omp session split in two on every resume (#4406).
+func scanJSONLWithHeaderFromOffsetFunc(path string, offset int64, lookahead int, isHeader func(map[string]any) bool, fn func(map[string]any)) error {
 	if offset > 0 {
-		if header, err := firstJSONLRecord(path); err == nil && header != nil {
+		if header := leadingJSONLHeader(path, offset, lookahead, isHeader); header != nil {
 			fn(header)
 		}
 	}
 	return scanJSONLFromOffset(path, offset, fn)
 }
 
-// firstJSONLRecord decodes the first line of a JSONL file, or nil when there
-// is none to read.
-func firstJSONLRecord(path string) (map[string]any, error) {
+// headerLookahead is how many leading lines may come before a header.
+const headerLookahead = 4
+
+// leadingJSONLHeader decodes the first of a JSONL file's leading lines that
+// isHeader accepts, looking no further than lookahead lines or the offset, or
+// nil when none is there.
+func leadingJSONLHeader(path string, offset int64, lookahead int, isHeader func(map[string]any) bool) map[string]any {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer f.Close()
-	line, err := bufio.NewReaderSize(f, 1024*1024).ReadBytes('\n')
-	if line = trimJSONSpace(line); len(line) == 0 {
-		return nil, err
+	r := bufio.NewReaderSize(io.LimitReader(f, offset), 1024*1024)
+	for range lookahead {
+		line, err := r.ReadBytes('\n')
+		if line = trimJSONSpace(line); len(line) > 0 {
+			var m map[string]any
+			d := json.NewDecoder(strings.NewReader(string(line)))
+			d.UseNumber()
+			if d.Decode(&m) == nil && isHeader(m) {
+				return m
+			}
+		}
+		if err != nil {
+			return nil
+		}
 	}
-	var m map[string]any
-	d := json.NewDecoder(strings.NewReader(string(line)))
-	d.UseNumber()
-	if d.Decode(&m) != nil {
-		return nil, nil
+	return nil
+}
+
+// readEnds is how far a read of each path may go while an index pass holds
+// it. The pass records a file's size from a stat taken before it parses, and
+// the next pass resumes from there; a parser that read on to EOF also took the
+// lines the client wrote in between, and the next pass read them again (#4442).
+var (
+	readEndsMu sync.Mutex
+	readEnds   = map[string]readEnd{}
+)
+
+// readEnd counts its holders: a pass that falls back to a rebuild holds the
+// same files again, and the inner release must not lift the outer bound.
+type readEnd struct {
+	size  int64
+	holds int
+}
+
+// LimitReads holds every transcript read of these paths to the size given
+// for each, until the returned func is called.
+func LimitReads(ends map[string]int64) (release func()) {
+	readEndsMu.Lock()
+	for p, n := range ends {
+		e := readEnds[p]
+		readEnds[p] = readEnd{size: n, holds: e.holds + 1}
 	}
-	return m, nil
+	readEndsMu.Unlock()
+	return func() {
+		readEndsMu.Lock()
+		defer readEndsMu.Unlock()
+		for p := range ends {
+			if e := readEnds[p]; e.holds > 1 {
+				e.holds--
+				readEnds[p] = e
+			} else {
+				delete(readEnds, p)
+			}
+		}
+	}
+}
+
+// boundedFrom is f read from offset, stopping at the end LimitReads holds
+// for path.
+func boundedFrom(path string, f *os.File, offset int64) io.Reader {
+	readEndsMu.Lock()
+	e, ok := readEnds[path]
+	readEndsMu.Unlock()
+	if !ok {
+		return f
+	}
+	return io.LimitReader(f, max(e.size-offset, 0))
 }
 
 func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) error {
@@ -316,7 +388,7 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(f, 1024*1024)
+	r := bufio.NewReaderSize(boundedFrom(path, f, offset), 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
 		// A UTF-8 BOM on the first line would fail the JSON decode below, so the
@@ -497,9 +569,13 @@ func parseFiles(files []string, parse func(string) ([]model.Session, error)) []m
 // `file_path` and its shell tool `Bash`, Cursor names them `path` and `Shell`.
 // Both were read off transcripts the vendor's own CLI had just written.
 type toolDialect struct {
-	pathKey   string
-	pathTools map[string]bool
-	shellTool string
+	pathKey string
+	// pathKeyAlt is a second name for the file argument, read when pathKey is
+	// absent. Roo's newer edit tools take `file_path` where its older ones take
+	// `path` (#4419). Empty means pathKey alone.
+	pathKeyAlt string
+	pathTools  map[string]bool
+	shellTool  string
 	// shellTools names every alias the shell tool answers to, when a harness
 	// has more than one. CodeWhale's canonical name is exec_shell and it also
 	// takes bash and Bash, so a run recorded under an alias was no command at
@@ -519,6 +595,11 @@ type toolDialect struct {
 	// new_string. A dialect whose key is not set records no written side —
 	// nothing wrong, just nothing to attribute from.
 	newKey string
+	// editsOldKey and editsNewKey name the same two sides inside each element
+	// of an `edits` array, when they differ from oldKey and newKey: CodeWhale's
+	// edit takes edits[{oldText,newText}] while its legacy edit_file takes
+	// old_string (#4360). Empty means oldKey and newKey.
+	editsOldKey, editsNewKey string
 	// contentKey names the argument of a whole-file write. Empty means
 	// "content". A commit that adds a file has no replaced text at all, so
 	// this is the only evidence such a line was ever in a session.
@@ -554,6 +635,20 @@ func (d toolDialect) newSpanKey() string {
 		return "new_string"
 	}
 	return d.newKey
+}
+
+func (d toolDialect) editsOldSpanKey() string {
+	if d.editsOldKey == "" {
+		return d.oldSpanKey()
+	}
+	return d.editsOldKey
+}
+
+func (d toolDialect) editsNewSpanKey() string {
+	if d.editsNewKey == "" {
+		return d.newSpanKey()
+	}
+	return d.editsNewKey
 }
 
 func (d toolDialect) contentSpanKey() string {
@@ -622,6 +717,11 @@ func toolPathStrings(in map[string]any, d toolDialect) []string {
 	if p, _ := in[d.pathKey].(string); p != "" {
 		return []string{p}
 	}
+	if d.pathKeyAlt != "" {
+		if p, _ := in[d.pathKeyAlt].(string); p != "" {
+			return []string{p}
+		}
+	}
 	if d.pathListKey == "" {
 		return nil
 	}
@@ -679,7 +779,7 @@ func editSpansIn(v any, d toolDialect) []string {
 				if !ok {
 					continue
 				}
-				o, _ := em[d.oldSpanKey()].(string)
+				o, _ := em[d.editsOldSpanKey()].(string)
 				spans = append(spans, o)
 			}
 		}
@@ -727,7 +827,7 @@ func wroteRecordsIn(v any, d toolDialect) []string {
 				if !ok {
 					continue
 				}
-				n, _ := em[d.newSpanKey()].(string)
+				n, _ := em[d.editsNewSpanKey()].(string)
 				written = append(written, n)
 			}
 		}

@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"slices"
@@ -268,6 +269,21 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			}
 			if cr.Path != "" && uninstall {
 				pruneGuidanceDirs(cr.Path)
+			}
+		}
+		// A client that keeps deja off by its own switch gets the same line
+		// doctor prints, unless the writer already said the entry is off
+		// (#4468, #4469). Once a run: gemini and gemini-auto read one file.
+		if !uninstall && !strings.Contains(r.Note, "switched off") {
+			for _, off := range installClientOffNotes(t) {
+				if saidNotes[off] {
+					continue
+				}
+				saidNotes[off] = true
+				if r.Note != "" {
+					r.Note += "; "
+				}
+				r.Note += off
 			}
 		}
 		written++
@@ -972,9 +988,19 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 // just rewired the MCP entry, and named the hook file while doing it (#2396).
 // The first write that changed something is the answer; anything else it
 // changed rides along in the note, and when nothing changed the last write
-// stands, since that is the file the target is named for.
+// stands, since that is the file the target is named for — unless only an
+// earlier one has something to say. Kiro's switched-off MCP entry read as an
+// unchanged steering file, with the note gone (#4302).
 func wroteAll(rs ...installResult) installResult {
 	out := rs[len(rs)-1]
+	if out.Note == "" {
+		for i := len(rs) - 1; i >= 0; i-- {
+			if rs[i].Path != "" && rs[i].Note != "" {
+				out = rs[i]
+				break
+			}
+		}
+	}
 	for _, r := range rs {
 		if r.Path != "" && r.Action != "unchanged" {
 			out = r
@@ -993,6 +1019,12 @@ func wroteAll(rs ...installResult) installResult {
 		out.also = append(out.also, r.Path)
 		out.also = append(out.also, r.also...)
 		if r.Action == "unchanged" {
+			// A write that changed nothing can still have something to say: an
+			// entry left switched off is off whether or not this run touched
+			// the file, and dropping the note read as a clean install (#4302).
+			if r.Note != "" {
+				also = append(also, fmt.Sprintf("%s unchanged — %s", shortHome(r.Path), r.Note))
+			}
 			continue
 		}
 		line := fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path))
@@ -1309,6 +1341,51 @@ func mcpBlock(root map[string]any, key, path string) (map[string]any, bool, erro
 	return m, true, nil
 }
 
+// snapshotIfSameJSON gives back the snapshot's bytes when the file deja is
+// about to write holds the same JSON. Marshalling cannot know how the reader
+// laid out what deja did not touch: Roo's default settings have an empty
+// mcpServers object over three lines, and an uninstall wrote it back as `{}`
+// though the .bak beside it had the original (#4423). Anything that decodes
+// differently — a server added since, a file that is not JSON — keeps next.
+// So does a file deja took nothing out of: its layout now is the reader's, not
+// the snapshot's. Numbers are compared as written, not as float64s.
+func snapshotIfSameJSON(path string, old, next []byte) []byte {
+	if bytes.Equal(old, next) {
+		return next
+	}
+	want, ok := decodeJSONExact(next)
+	if !ok {
+		return next
+	}
+	if before, ok := decodeJSONExact(old); ok && reflect.DeepEqual(before, want) {
+		return next
+	}
+	bak := path + ".bak"
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		bak = resolved + ".bak"
+	}
+	b, err := os.ReadFile(bak)
+	if err != nil {
+		return next
+	}
+	b = bytes.TrimPrefix(b, utf8BOM)
+	if have, ok := decodeJSONExact(b); !ok || !reflect.DeepEqual(want, have) {
+		return next
+	}
+	return b
+}
+
+// decodeJSONExact decodes one JSON document with its numbers kept as text.
+func decodeJSONExact(b []byte) (any, bool) {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	var v any
+	if dec.Decode(&v) != nil || dec.More() {
+		return nil, false
+	}
+	return v, true
+}
+
 // dropOwnBackup removes the snapshot beside path when the snapshot is deja's
 // own wiring and nothing else. A snapshot of the reader's config stays even
 // when the live file has come back to exactly it: that copy is theirs, and
@@ -1541,6 +1618,9 @@ func writeIfChanged(path string, old, next []byte) (string, error) {
 	// this is the one place that knows the file had one (#3696). The
 	// comparison is of the text, and the mark goes back on what is written.
 	bom := fileStartsWithBOM(path)
+	if removingWiring {
+		next = snapshotIfSameJSON(path, old, next)
+	}
 	if bytes.Equal(old, next) {
 		return "unchanged", nil
 	}
@@ -1772,6 +1852,9 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 	// followed that error before. Bash only — a failed edit does not carry a
 	// shell error signature.
 	{"PostToolUse", "hook-tool-after", "Bash"},
+	// The session is over, so its live stamp goes and the next session's MCP
+	// recall can answer with it (#4210).
+	{"SessionEnd", "hook-session-end", ""},
 }
 
 func installClaudeHook(exe string, uninstall bool) (installResult, error) {
@@ -1827,6 +1910,8 @@ func hookStatusMessage(event string) string {
 		return "Checking what this touches…"
 	case "PostToolUse":
 		return "Checking what fixed this before…"
+	case "SessionEnd":
+		return "Marking this session as ended…"
 	}
 	return ""
 }
@@ -1907,6 +1992,7 @@ var hookNames = map[string]bool{
 	"hook-precompact":   true,
 	"hook-prompt":       true,
 	"hook-refresh":      true,
+	"hook-session-end":  true,
 	"hook-tool":         true,
 	"hook-tool-after":   true,
 }
@@ -2445,6 +2531,12 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 		if s != "" {
 			s += "\n\n"
 		}
+		// The block is written fresh, so the reader's `enabled = false` on the
+		// one it replaces went with it and the next start ran deja (#4467).
+		if tomlDejaSwitchedOff(text) {
+			block = strings.TrimRight(block, "\n") + "\nenabled = false\n"
+			note = switchedOffNote
+		}
 		s += block
 	} else {
 		note = leftNamedDejaEntriesNote(foreignTOMLDejaKeys(s))
@@ -2454,6 +2546,23 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 	}
 	a, err := writeIfChanged(path, old, []byte(s))
 	return installResult{Path: path, Action: a, Note: note}, err
+}
+
+// tomlDejaSwitchedOff reports whether `[mcp_servers.deja]` carries
+// `enabled = false`, the switch codex and grok both read.
+func tomlDejaSwitchedOff(s string) bool {
+	lines := strings.Split(s, "\n")
+	for _, b := range tomlMCPBlocks(s) {
+		if b.key != "deja" {
+			continue
+		}
+		for i := b.start + 1; i < b.end; i++ {
+			if key, value, ok := tomlLineKeyValue(lines[i]); ok && key == "enabled" && value == "false" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func tomlMCPBlocks(s string) []tomlMCPBlock {
@@ -3026,9 +3135,54 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 		if note != "" {
 			note += "; "
 		}
-		note += "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+		note += switchedOffNote
 	}
 	return out, note
+}
+
+// installClientOffNotes are the lines an install adds when the client it just
+// wrote has deja switched off by a switch install does not touch, so a plain
+// `updated` does not read as working (#4468, #4469). The entry's own switch
+// is left to the writer, which knows whether it kept it.
+func installClientOffNotes(target string) []string {
+	base := strings.TrimSuffix(target, "-auto")
+	mcp, hooks := base, base
+	switch base {
+	case "claude", "claude-code":
+		mcp, hooks = "claude-code", "claude-code"
+	case "codex":
+		hooks = "codex-hook"
+	}
+	var notes []string
+	if base != target {
+		if n := clientHooksOff(hooks); n != "" {
+			notes = append(notes, n)
+		}
+	}
+	if n := clientMCPDenied(mcp); n != "" {
+		notes = append(notes, n)
+	}
+	return notes
+}
+
+// switchedOffNote is what install says over an entry the reader turned off.
+const switchedOffNote = "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+
+// keepSwitch carries the reader's off switch from the entry deja is replacing
+// onto the fresh one, for the writers that rebuild the entry rather than merge
+// into it. They dropped it, so the next client start ran deja again for
+// somebody who had switched it off (#4467). The note is "" when it was on.
+func keepSwitch(prev any, next map[string]any) string {
+	old, ok := prev.(map[string]any)
+	if !ok || !entrySwitchedOff(old) {
+		return ""
+	}
+	for _, k := range []string{"disabled", "enabled"} {
+		if v, ok := old[k]; ok {
+			next[k] = v
+		}
+	}
+	return switchedOffNote
 }
 
 // entrySwitchedOff reports whether the reader has turned this entry off.
@@ -3100,17 +3254,23 @@ func mcpCommandArgs(exe string) (string, []string) {
 
 // installCursor wires the MCP server into Cursor's global config
 // (~/.cursor/mcp.json). Gemini CLI and Antigravity use the identical
-
 // mcpServers shape in their own files.
 func installCursor(exe string, uninstall bool) (installResult, error) {
 	return installMCPJSON(filepath.Join(sources.CursorCLIHome(), "mcp.json"), exe, uninstall)
+}
+
+// copilotMCPConfigPath is where Copilot CLI reads its MCP servers. Doctor reads
+// the same file install writes; it used to read the guidance skill instead and
+// said wired with no server registered (#4232).
+func copilotMCPConfigPath() string {
+	return filepath.Join(sources.Home(), ".copilot", "mcp-config.json")
 }
 
 // installCopilotMCP wires deja into GitHub Copilot CLI's MCP registry
 // (~/.copilot/mcp-config.json). Copilot's schema differs from the common
 // mcpServers shape: entries carry a type and an enabled-tools list.
 func installCopilotMCP(exe string, uninstall bool) (installResult, error) {
-	path := filepath.Join(sources.Home(), ".copilot", "mcp-config.json")
+	path := copilotMCPConfigPath()
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err
@@ -3817,7 +3977,9 @@ func jsoncCodeOf(line string, inBlock bool) (code string, stillInBlock bool, end
 			continue
 		}
 		b.WriteByte(c)
-		if c != ' ' && c != '\t' {
+		// A CR is the end of a CRLF line, not code: a comma after it sat
+		// alone at the start of the next line in an editor.
+		if c != ' ' && c != '\t' && c != '\r' {
 			end = i + 1
 		}
 	}
@@ -4003,7 +4165,7 @@ func mergedJSONCEntryLine(dropped []string, key, exe string) (string, string) {
 		// is true whether or not this run changed anything.
 		off := ""
 		if entrySwitchedOff(merged) {
-			off = "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+			off = switchedOffNote
 		}
 		return strings.TrimSuffix(strings.TrimRight(strings.Join(dropped, "\n"), " \t"), ","), off
 	}
@@ -4212,15 +4374,17 @@ func updateOpencodeJSONC(old []byte, exe string, uninstall bool) ([]byte, string
 	if insert < 1 || strings.TrimSpace(stripJSONComments(lines[insert])) != "}" {
 		return nil, "", fmt.Errorf("opencode config is not laid out in a way deja can add to — add the deja server by hand")
 	}
-	comma := ""
-	for i := insert - 1; i >= 0; i-- {
-		trim := strings.TrimSpace(lines[i])
-		if trim != "" && !strings.HasPrefix(trim, "//") && !strings.HasSuffix(trim, ",") && trim != "{" {
-			lines[i] += ","
-			break
-		}
+	// The comma goes on the last line of code above the brace, and only when
+	// that code has none yet. Walking up past every line that already ended
+	// in one ran past a trailing comma on the last key and put a second comma
+	// on the line above it — in a nested config an opening brace, `"shim": {,`,
+	// which Kilo and opencode refuse to start with (#4399). At the end of the
+	// code rather than the line: after a // comment it is not a comma (#1695).
+	if i, end, code := jsoncLastCodeLine(lines[:insert]); i >= 0 &&
+		!strings.HasSuffix(code, ",") && !strings.HasSuffix(code, "{") {
+		lines[i] = lines[i][:end] + "," + lines[i][end:]
 	}
-	mcp := []string{comma + `  "mcp": {`, line, "  }"}
+	mcp := []string{`  "mcp": {`, line, "  }"}
 	out := append([]string{}, lines[:insert]...)
 	out = append(out, mcp...)
 	out = append(out, lines[insert:]...)
@@ -4384,6 +4548,16 @@ func withAutoTargets(targets []string) []string {
 // two commands away lists its three valid values.
 func unknownTargetError(target string) error {
 	names := installTargetNames()
+	// `kiro-auto` is one edit from `kimi-auto`, and following that hint wires a
+	// different agent. A known target with `-auto` on it is someone asking for
+	// recall wiring that target does not have (#4301).
+	if base, ok := strings.CutSuffix(strings.ToLower(strings.TrimSpace(target)), "-auto"); ok && base != "" {
+		for _, n := range names {
+			if n == base {
+				return fmt.Errorf("unknown target %q — %s has no -auto target; `deja install %s` wires it", target, base, base)
+			}
+		}
+	}
 	if near := nearestTarget(target, names); near != "" {
 		return fmt.Errorf("unknown target %q — did you mean %q? (`deja install --all` wires every agent it finds)", target, near)
 	}

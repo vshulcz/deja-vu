@@ -27,11 +27,11 @@ func TestAGlobErrorIsOnFileAgainstThePartThatHeldTheGlob(t *testing.T) {
 	acc := newCommandFailAcc()
 	for _, key := range []string{"a", "b"} {
 		acc.command(key, "go test ./... 2>&1 | grep -rn --include=*.go Flock")
-		acc.output(key, "p", "zsh:1: no matches found: --include=*.go")
+		acc.output(key, "zsh:1: no matches found: --include=*.go")
 		acc.command(key, "ls build/*.tar")
-		acc.output(key, "p", "zsh:1: no matches found: build/*.tar")
+		acc.output(key, "zsh:1: no matches found: build/*.tar")
 	}
-	got := acc.table()
+	got := acc.table(func(string) (string, bool) { return "p", true })
 	if len(got) != 1 || got[0].Head != "ls build/*.tar" {
 		t.Errorf("want only the ls glob on file, got %+v", got)
 	}
@@ -42,11 +42,11 @@ func TestAChainsErrorIsNotOnFileAgainstItsFirstCommand(t *testing.T) {
 	acc := newCommandFailAcc()
 	for _, key := range []string{"a", "b"} {
 		acc.command(key, "gh pr checks 41; go test ./internal/index")
-		acc.output(key, "p", "--- FAIL: TestLedgerRollsBack\nFAIL\n")
+		acc.output(key, "--- FAIL: TestLedgerRollsBack\nFAIL\n")
 		acc.command(key, "go test ./internal/store 2>&1 | tail -3")
-		acc.output(key, "p", "--- FAIL: TestLedgerRollsBack\nFAIL\n")
+		acc.output(key, "--- FAIL: TestLedgerRollsBack\nFAIL\n")
 	}
-	got := acc.table()
+	got := acc.table(func(string) (string, bool) { return "p", true })
 	if len(got) != 1 || got[0].Head != "go test ./internal/store" {
 		t.Errorf("want only the go test failure on file, got %+v", got)
 	}

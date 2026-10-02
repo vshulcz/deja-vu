@@ -54,9 +54,9 @@ func LoadOpencode() []model.Session {
 // line that would read one thousand on this machine. The diff is not another
 // conversation, it is the same one's account of what it changed.
 //
-// A diff whose session the database no longer holds stands on its own: opencode
-// prunes the database and leaves the diff, and what it says about a file is
-// still true.
+// A diff whose session the database no longer holds is left out: opencode
+// prunes the database and leaves the diff, and with no conversation beside it
+// there is nothing to list or blame it on.
 func withOpencodeDiffs(ss []model.Session) []model.Session {
 	files := OpencodeDiffFiles()
 	if len(files) == 0 {
@@ -157,18 +157,57 @@ func ParseOpencodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseOpencodeDBWhere(db, "", 0)
 	}
-	// Each layout is bounded by its own columns, and a store holding both
-	// reads both.
-	return parseOpencodeLayouts("opencode", db, opencodeSinceWhere(t), opencodeV2SinceWhere(t), 0)
+	return parseOpencodeSchemaDBSince("opencode", db, t)
 }
 
-// opencodeSinceWhere bounds a read to what changed after the watermark. Shared
-// with the other stores in this schema — Kilo's CLI database is one (#3643).
-func opencodeSinceWhere(t time.Time) string {
-	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
-	return fmt.Sprintf(" and (%s or m.time_created > '%s' or %s or json_extract(p.data,'$.time.start') > '%s')",
-		newerThanEpoch("m.time_created", t), rfc,
-		newerThanEpoch("json_extract(p.data,'$.time.start')", t), rfc)
+// parseOpencodeSchemaDBSince is the since read for every store in this schema.
+// Each layout is bounded by its own columns, and a store holding both reads
+// both.
+func parseOpencodeSchemaDBSince(harness, db string, t time.Time) ([]model.Session, error) {
+	// A row can be stamped a moment before the pass that missed it, and the
+	// comparison is a strict >. A session read twice replaces itself, so going
+	// back costs a re-read and nothing else (#4207).
+	t = t.Add(-opencodeSinceSlack)
+	return parseOpencodeLayouts(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceWhere(db, t), 0)
+}
+
+// opencodeSinceSlack is how far before the watermark a since read starts.
+const opencodeSinceSlack = 5 * time.Second
+
+// opencodeSinceWhere picks the sessions touched after the watermark and reads
+// each of them whole. Shared with the other stores in this schema — Kilo's CLI
+// database is one (#3643).
+//
+// Whole, because opencode creates a reply's message and text part, time.start
+// set, before the text streams in: a pass that read the part empty stamped a
+// watermark past both, and bounding rows by when they were created never asked
+// for the text again (#4207). time_updated is what moves when the text lands,
+// and a session read again replaces what the index holds for it
+// (rereadsWholeSessions), so the turns it already had are not added twice.
+func opencodeSinceWhere(db string, t time.Time) string {
+	// Each a column of its own, so the subquery reads row headers and never a
+	// blob: 3–5 s on a 3.8 GB store, against 9 s for the row-level clause.
+	touched := fmt.Sprintf("select session_id from message where %s or %s union "+
+		"select session_id from part where %s",
+		newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t),
+		newerThanEpoch("time_updated", t))
+	if !opencodeSchemaOf(db).rowsStamped {
+		// A store from before the columns: the stamps a row is created with.
+		rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
+		touched = fmt.Sprintf("select m2.session_id from message m2 join part p2 on p2.message_id=m2.id "+
+			"where %s or m2.time_created > '%s' or %s or json_extract(p2.data,'$.time.start') > '%s'",
+			newerThanEpoch("m2.time_created", t), rfc,
+			newerThanEpoch("json_extract(p2.data,'$.time.start')", t), rfc)
+	}
+	return opencodeSessionTouched("session", t, touched)
+}
+
+// opencodeSessionTouched bounds a read to the sessions in table whose own stamp
+// moved past t, and those touched names. One list for s.id to be looked up in:
+// an OR beside it made SQLite scan every part instead.
+func opencodeSessionTouched(table string, t time.Time, touched string) string {
+	return fmt.Sprintf(" and s.id in (select id from %s where %s or time_updated > '%s' union %s)",
+		table, newerThanEpoch("time_updated", t), sqlEscape(t.UTC().Format(time.RFC3339Nano)), touched)
 }
 
 func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) {
@@ -199,7 +238,7 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int) ([]mode
 		if schema.legacy {
 			w = opencodeNotMoved + w
 		}
-		n, err := readOpencodeRows(harness, db, opencodeV1Query(w, limit), by)
+		n, err := readOpencodeRows(harness, db, opencodeV1Query(harness, w, limit), by)
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +287,7 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int) ([]mode
 
 // opencodeV1Query is the 1.x projection: sessions in `session`, turns in
 // `message`, their content in `part`.
-func opencodeV1Query(where string, limit int) string {
+func opencodeV1Query(harness, where string, limit int) string {
 	lim := ""
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
@@ -291,14 +330,15 @@ func opencodeV1Query(where string, limit int) string {
 		`when 'true' then 1 ` +
 		`when 'integer' then json_extract(m.data,'$.summary') ` +
 		`when 'text' then substr(json_extract(m.data,'$.summary'),1,8) end,` +
-		`'path',json_extract(p.data,'$.state.input.filePath'),` +
+		`'path',` + opencodeV1Path(harness) + `,` +
 		`'cmd',json_extract(p.data,'$.state.input.command'),` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
+		zcodeV1Fields(harness) +
 		// The output of a bash call and its exit status. Only bash: `read`
 		// output is 119 MB of file contents on this store against 49 MB of
 		// command output, and #547 measured file bodies as the weakest slice
 		// deja could index. What a command printed is where the errors live.
-		`'out',case when json_extract(p.data,'$.tool')='bash' ` +
+		`'out',case when json_extract(p.data,'$.tool') in ('bash','Bash') ` +
 		`then json_extract(p.data,'$.state.output') end,` +
 		`'exit',json_extract(p.data,'$.state.metadata.exit'),` +
 		`'pt',json_extract(p.data,'$.time.start'),` +
@@ -332,8 +372,49 @@ func opencodeV1Query(where string, limit int) string {
 		` or (instr(substr(p.data,1,200),'"tool":"bash"')>0 ` +
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
-		`and json_extract(p.data,'$.tool')='apply_patch'))` + where + ` order by s.id,m.time_created,p.id` + lim
+		`and json_extract(p.data,'$.tool')='apply_patch')` + zcodeV1Tools(harness) + `)` +
+		where + ` order by s.id,m.time_created,p.id` + lim
 	return q
+}
+
+// zcodeV1Fields and zcodeV1Tools read ZCode's tool parts, which sit in
+// OpenCode's schema under Claude Code's names and arguments: Bash {command},
+// Read {file_path}, Edit {file_path, old_string, new_string} and Write
+// {file_path, content}. Matched only for ZCode, so opencode's own query gains
+// no clause; read as opencode's were, ZCode sessions were text alone (#4428).
+func zcodeV1Fields(harness string) string {
+	if harness != "zcode" {
+		return ""
+	}
+	return `'editpath',case when json_extract(p.data,'$.tool') in ('Edit','Write') ` +
+		`then json_extract(p.data,'$.state.input.file_path') end,` +
+		`'old',json_extract(p.data,'$.state.input.old_string'),` +
+		`'new',coalesce(json_extract(p.data,'$.state.input.new_string'),` +
+		`case when json_extract(p.data,'$.tool')='Write' then json_extract(p.data,'$.state.input.content') end),` +
+		// An Edit ZCode refused — "File has not been read yet" — changed
+		// nothing, and is not recorded as if it had.
+		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,`
+}
+
+// opencodeV1Path is the file a read opened: `filePath` in opencode's read,
+// `file_path` in ZCode's Read.
+func opencodeV1Path(harness string) string {
+	if harness != "zcode" {
+		return `json_extract(p.data,'$.state.input.filePath')`
+	}
+	return `coalesce(json_extract(p.data,'$.state.input.filePath'),case when json_extract(p.data,'$.tool')='Read' ` +
+		`then json_extract(p.data,'$.state.input.file_path') end)`
+}
+
+func zcodeV1Tools(harness string) string {
+	if harness != "zcode" {
+		return ""
+	}
+	var b strings.Builder
+	for _, name := range []string{"Bash", "Read", "Edit", "Write"} {
+		fmt.Fprintf(&b, ` or (instr(substr(p.data,1,200),'"tool":"%s"')>0 and json_extract(p.data,'$.tool')='%s')`, name, name)
+	}
+	return b.String()
 }
 
 // readOpencodeRows runs one projection and folds its rows into by, keyed by
@@ -415,6 +496,9 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		// An `edit` call hands back the text it replaced and the text it wrote,
 		// so both sides are recorded the way every other harness's edit is.
 		if old, nw := str(r["old"]), str(r["new"]); old != "" || nw != "" {
+			if opencodeSynthetic(r["refused"]) {
+				continue
+			}
 			path := str(r["editpath"])
 			t := partTime(r)
 			if path != "" && old != "" && IndexEdits() {

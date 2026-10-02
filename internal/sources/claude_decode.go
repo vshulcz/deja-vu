@@ -410,7 +410,7 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 	// Reset before returning it as well as after taking it: a pooled reader
 	// must not keep the last file open through its reference.
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
-	r.Reset(f)
+	r.Reset(boundedFrom(path, f, offset))
 	for {
 		line, err := r.ReadBytes('\n')
 		if trimmed := trimJSONSpace(line); len(trimmed) > 0 {

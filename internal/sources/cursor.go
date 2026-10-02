@@ -133,10 +133,10 @@ func LoadCursor() []model.Session {
 	return ss
 }
 
-// ParseCursorDBSince returns only messages newer than t: composers whose
-// lastUpdatedAt passed the watermark, and within them only bubbles stamped
-// after it. Bubbles without timestamps are only picked up by full rebuilds —
-// modern Cursor stamps every bubble, so the append path stays correct.
+// ParseCursorDBSince returns the composers touched after t, whole: those
+// whose lastUpdatedAt passed the watermark or that gained a bubble stamped
+// after it, each with every bubble it has. The index replaces those sessions
+// with what comes back (#4450, #4451).
 func ParseCursorDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseCursorDB(db)
@@ -181,57 +181,113 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	composerWhere := ""
-	bubbleWhere := ""
+	const bubbleSelect = `select json_object('key',cast(key as text),` +
+		`'type',json_extract(value,'$.type'),` +
+		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),` +
+		`'ts',json_extract(value,'$.timestamp'),` +
+		`'wsdir',json_extract(value,'$.workspaceProjectDir')) ` +
+		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`
+	const composerSelect = `select json_object('key',cast(key as text),` +
+		`'cid',json_extract(value,'$.composerId'),` +
+		`'name',json_extract(value,'$.name'),` +
+		`'created',json_extract(value,'$.createdAt'),` +
+		`'updated',json_extract(value,'$.lastUpdatedAt')) ` +
+		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`
+	if since.IsZero() {
+		bubbles, err := cursorQuery(db, bubbleSelect)
+		if err != nil {
+			return nil, err
+		}
+		composers, err := cursorQuery(db, composerSelect)
+		if err != nil {
+			return nil, err
+		}
+		return cursorSessions(db, composers, bubbles), nil
+	}
 	// The clause reads the units the reader does, or the two disagree about
 	// what a store holds (#2086).
-	if !since.IsZero() {
-		composerWhere = " and " + newerThanEpoch("json_extract(value,'$.lastUpdatedAt')", since)
-		bubbleWhere = " and " + newerThanEpoch("json_extract(value,'$.timestamp')", since)
-	}
+	composerWhere := " and " + newerThanEpoch("json_extract(value,'$.lastUpdatedAt')", since)
+	bubbleWhere := " and " + newerThanEpoch("json_extract(value,'$.timestamp')", since)
 	// The bubbles first, because they decide which composers are worth
 	// reading. Cursor writes a composer's lastUpdatedAt when it feels like it
 	// and the turns arrive regardless, so filtering the composers on their own
 	// stamp skipped every turn written after it — and the next pass, carrying a
 	// later watermark, excluded the bubble on its own stamp too, which loses
 	// the turn for good (#2159).
-	bubbles, err := cursorQuery(db, `select json_object('key',cast(key as text),`+
-		`'type',json_extract(value,'$.type'),`+
-		`'text',coalesce(json_extract(value,'$.text'), json_extract(value,'$.rawText')),`+
-		`'ts',json_extract(value,'$.timestamp'),`+
-		`'wsdir',json_extract(value,'$.workspaceProjectDir')) `+
-		`from cursorDiskKV where key >= 'bubbleId:' and key < 'bubbleId;' and value is not null`+bubbleWhere)
+	bubbles, err := cursorQuery(db, bubbleSelect+bubbleWhere)
 	if err != nil {
 		return nil, err
 	}
-	if composerWhere != "" {
-		switch keys := cursorComposerKeyList(bubbles); {
-		case keys == "":
-			// No bubble moved, so no composer can be pulled in by one.
-		case strings.Count(keys, ",") >= cursorComposerListMax:
-			// Past this many the list is the wrong shape for the job: the
-			// query is one argv element to sqlite3, and a long enough one is
-			// refused outright — which would turn a large pass into an error
-			// where it used to be a read. Every composer row comes back
-			// instead; they are metadata, the bubbles stay filtered, and a
-			// composer with no new turns is dropped below anyway.
-			composerWhere = ""
-		default:
-			composerWhere = " and (" + strings.TrimPrefix(composerWhere, " and ") +
-				" or key in (" + keys + "))"
+	moved := map[string]bool{}
+	switch keys := cursorComposerKeyList(bubbles); {
+	case keys == "":
+		// No bubble moved, so no composer can be pulled in by one.
+	case strings.Count(keys, ",") >= cursorComposerListMax:
+		// Past this many the list is the wrong shape for the job: the
+		// query is one argv element to sqlite3, and a long enough one is
+		// refused outright — which would turn a large pass into an error
+		// where it used to be a read. Every composer row comes back
+		// instead; they are metadata, and the ones nothing moved are
+		// dropped below.
+		composerWhere = ""
+		for _, b := range bubbles {
+			if parts := strings.SplitN(str(b["key"]), ":", 3); len(parts) == 3 {
+				moved[parts[1]] = true
+			}
 		}
+	default:
+		composerWhere = " and (" + strings.TrimPrefix(composerWhere, " and ") +
+			" or key in (" + keys + "))"
 	}
-	composers, err := cursorQuery(db, `select json_object('key',cast(key as text),`+
-		`'cid',json_extract(value,'$.composerId'),`+
-		`'name',json_extract(value,'$.name'),`+
-		`'created',json_extract(value,'$.createdAt'),`+
-		`'updated',json_extract(value,'$.lastUpdatedAt')) `+
-		`from cursorDiskKV where key >= 'composerData:' and key < 'composerData;' and value is not null`+composerWhere)
+	composers, err := cursorQuery(db, composerSelect+composerWhere)
 	if err != nil {
 		return nil, err
+	}
+	if composerWhere == "" {
+		kept := composers[:0]
+		for _, c := range composers {
+			if moved[cursorComposerID(c)] || epochMS(c["updated"]).After(since) {
+				kept = append(kept, c)
+			}
+		}
+		composers = kept
 	}
 	if len(composers) == 0 {
 		return nil, nil
+	}
+	// A touched composer comes back whole: every bubble it has, not only the
+	// new ones. The index replaces the session with what this returns, and
+	// the new turns alone left its words, asked and touched counting those
+	// turns only (#4451), while a rename, which adds no bubble, had nothing to
+	// return and kept the old title (#4450).
+	whole := ""
+	if len(composers) <= cursorComposerListMax {
+		var ranges []string
+		for _, c := range composers {
+			cid := sqlEscape(cursorComposerID(c))
+			ranges = append(ranges, "(key >= 'bubbleId:"+cid+":' and key < 'bubbleId:"+cid+";')")
+		}
+		whole = " and (" + strings.Join(ranges, " or ") + ")"
+	}
+	if bubbles, err = cursorQuery(db, bubbleSelect+whole); err != nil {
+		return nil, err
+	}
+	return cursorSessions(db, composers, bubbles), nil
+}
+
+// cursorComposerID is a composer row's id, from the row or else its key.
+func cursorComposerID(c map[string]any) string {
+	if cid := str(c["cid"]); cid != "" {
+		return cid
+	}
+	return strings.TrimPrefix(str(c["key"]), "composerData:")
+}
+
+// cursorSessions builds a session per composer from its bubbles; a composer
+// with no text is dropped.
+func cursorSessions(db string, composers, bubbles []map[string]any) []model.Session {
+	if len(composers) == 0 {
+		return nil
 	}
 	byComposer := map[string][]map[string]any{}
 	for _, b := range bubbles {
@@ -244,10 +300,7 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 	}
 	var out []model.Session
 	for _, c := range composers {
-		cid := str(c["cid"])
-		if cid == "" {
-			cid = strings.TrimPrefix(str(c["key"]), "composerData:")
-		}
+		cid := cursorComposerID(c)
 		s := model.Session{Harness: "cursor", ID: cid, Project: "-", Path: db, Title: str(c["name"])}
 		s.Touch(epochMS(c["created"]))
 		s.Touch(epochMS(c["updated"]))
@@ -279,7 +332,7 @@ func parseCursorDB(db string, since time.Time) ([]model.Session, error) {
 			out = append(out, s)
 		}
 	}
-	return out, nil
+	return out
 }
 
 func cursorQuery(db, q string) ([]map[string]any, error) {

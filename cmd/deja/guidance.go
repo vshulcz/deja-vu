@@ -347,7 +347,10 @@ func sharedSkillStillWanted(leaving string) bool {
 		if other == leaving || removingTargets[other] {
 			continue
 		}
-		if sharedSkillHarnesses[other] {
+		// cherrystudio writes the shared skill from its own install rather
+		// than through guidance, and reads it all the same (#4345). grok
+		// writes it beside GROK.md for Grok Build, which reads only that.
+		if sharedSkillHarnesses[other] || ownGuidanceFile(other) == sharedSkillPath() || other == "grok" {
 			return true
 		}
 	}
@@ -696,6 +699,10 @@ func ownGuidanceFile(harness string) string {
 		return sharedSkillPath()
 	case "kiro":
 		return kiroSteeringPath()
+	case "cline":
+		// Inside the plugin package too, loaded through its package.json
+		// (#4317).
+		return clineSkillPath()
 	case "reasonix":
 		// Inside the plugin package, which is how Reasonix loads a skill a
 		// package ships: listed as /deja:deja-history under /skills.

@@ -230,19 +230,26 @@ func copilotChatDropJSONSiblings(files []string) []string {
 func copilotChatReplay(path string, data []byte) (map[string]any, bool) {
 	var state any
 	n := 0
-	for _, raw := range strings.Split(string(data), "\n") {
+	lines := strings.Split(string(data), "\n")
+	for i, raw := range lines {
 		line := string(trimJSONSpace([]byte(raw)))
 		if line == "" {
 			continue
 		}
-		n++
 		var entry map[string]any
 		d := json.NewDecoder(strings.NewReader(line))
 		d.UseNumber()
 		if d.Decode(&entry) != nil {
+			// VS Code appends while a reply streams: a last line with no
+			// newline yet is a write in progress, not a broken file, and the
+			// lines before it are the session (#4229).
+			if i == len(lines)-1 && n > 0 {
+				break
+			}
 			diagMalformedLine(path)
 			return nil, false
 		}
+		n++
 		kind, ok := numberVal(entry["kind"])
 		if !ok {
 			diagMalformedLine(path)
@@ -566,22 +573,51 @@ func copilotChatProjectFromWorkspace(sessionPath string) string {
 	return ""
 }
 
+// CopilotChatWorkspaceDir is the folder (or .code-workspace file) the chat at
+// sessionPath belongs to, as a local path, or "" for an empty-window chat or a
+// remote workspace. VS Code keeps chat history per workspace, so this is what
+// has to be open for the chat to be listed again.
+func CopilotChatWorkspaceDir(sessionPath string) string {
+	// chatSessions/<id>.json sits two levels under the storage hash,
+	// GitHub.copilot-chat/transcripts/<id>.jsonl three.
+	ws := filepath.Dir(filepath.Dir(sessionPath))
+	if filepath.Base(ws) == "GitHub.copilot-chat" {
+		ws = filepath.Dir(ws)
+	}
+	b, err := os.ReadFile(filepath.Join(ws, "workspace.json"))
+	if err != nil {
+		return ""
+	}
+	var m map[string]any
+	if json.Unmarshal(b, &m) != nil {
+		return ""
+	}
+	for _, k := range []string{"folder", "workspace"} {
+		s, _ := m[k].(string)
+		p, ok := fileURIPath(s)
+		if !ok {
+			continue
+		}
+		if runtime.GOOS == "windows" && len(p) >= 3 && p[0] == '/' && p[2] == ':' {
+			p = p[1:]
+		}
+		return filepath.FromSlash(p)
+	}
+	return ""
+}
+
 func copilotChatProjectFromURI(uri string) string {
 	if uri == "" {
 		return ""
+	}
+	if p, ok := fileURIPath(uri); ok {
+		return projectName(p)
 	}
 	u, err := url.Parse(uri)
 	if err != nil || u.Scheme == "" {
 		return ""
 	}
-	p := u.Path
-	if u.Scheme == "file" {
-		if runtime.GOOS == "windows" && len(p) >= 3 && p[0] == '/' && p[2] == ':' {
-			p = p[1:]
-		}
-		return projectName(p)
-	}
-	p = strings.Trim(p, "/")
+	p := strings.Trim(u.Path, "/")
 	if p == "" {
 		return ""
 	}

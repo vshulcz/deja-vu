@@ -639,7 +639,10 @@ func blockKey(path, name string) string { return path + "#" + name }
 
 // noteBlockAdded records that deja, not the reader, put this container there.
 func noteBlockAdded(path, name string) {
-	blocksAddedThisRun = append(blocksAddedThisRun, blockKey(path, name))
+	key := blockKey(path, name)
+	// The later of a take-back and an add in one process is the one that holds.
+	delete(blocksForgottenThisRun, key)
+	blocksAddedThisRun = append(blocksAddedThisRun, key)
 }
 
 // blockWasAdded reports whether deja added it, in this run or an earlier one.
@@ -651,4 +654,20 @@ func blockWasAdded(path, name string) bool {
 	return slices.Contains(readWiringState().Blocks, key)
 }
 
-func forgetBlockAdded(path, name string) { blocksForgottenThisRun[blockKey(path, name)] = true }
+// blocksAddedWithPrefix lists the names deja recorded for this file that
+// start with prefix — for a record that carries a value after its name.
+func blocksAddedWithPrefix(path, prefix string) []string {
+	var names []string
+	for _, key := range append(append([]string(nil), blocksAddedThisRun...), readWiringState().Blocks...) {
+		if name, ok := strings.CutPrefix(key, blockKey(path, prefix)); ok && !blocksForgottenThisRun[key] {
+			names = append(names, prefix+name)
+		}
+	}
+	return names
+}
+
+func forgetBlockAdded(path, name string) {
+	key := blockKey(path, name)
+	blocksForgottenThisRun[key] = true
+	blocksAddedThisRun = slices.DeleteFunc(blocksAddedThisRun, func(b string) bool { return b == key })
+}

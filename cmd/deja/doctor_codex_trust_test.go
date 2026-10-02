@@ -14,7 +14,13 @@ func TestCodexApprovedHooksCountsPinsPerEvent(t *testing.T) {
 trusted_hash = "sha256:abc"
 enabled = true
 `
-	approved, pinned := codexApprovedHooks(cfg, codexHookWiring)
+	hooks := map[string]any{}
+	for _, h := range codexHookWiring {
+		hooks[h.Event] = []any{map[string]any{"hooks": []any{
+			map[string]any{"type": "command", "command": "/usr/local/bin/deja " + h.Sub},
+		}}}
+	}
+	approved, pinned := codexApprovedHooks(codexDejaPins(cfg, "/Users/x/.codex/hooks.json", hooks), codexHookWiring)
 	if pinned != len(codexHookWiring) {
 		t.Errorf("pinned = %d, want the %d events deja writes", pinned, len(codexHookWiring))
 	}
@@ -29,7 +35,7 @@ enabled = true
 		all.WriteString("[hooks.state.\"/Users/x/.codex/hooks.json:" + codexEventKey(h.Event) + ":0:0\"]\n")
 		all.WriteString("trusted_hash = \"sha256:abc\"\n")
 	}
-	if approved, pinned = codexApprovedHooks(all.String(), codexHookWiring); approved != pinned {
+	if approved, pinned = codexApprovedHooks(codexDejaPins(all.String(), "/Users/x/.codex/hooks.json", hooks), codexHookWiring); approved != pinned {
 		t.Errorf("approved = %d of %d with every event pinned", approved, pinned)
 	}
 }

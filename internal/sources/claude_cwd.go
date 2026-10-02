@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -59,6 +60,12 @@ func claudeTranscriptCWD(path, base string) string {
 	if base == "" {
 		return ""
 	}
+	return transcriptCWD(path, func(cwd string) bool { return claudeFolderIs(cwd, base) })
+}
+
+// transcriptCWD is the first cwd among the head records of a JSONL transcript
+// that fits, the check being whether its folder was named for it.
+func transcriptCWD(path string, fits func(cwd string) bool) string {
 	f, err := os.Open(path)
 	if err != nil {
 		return ""
@@ -71,7 +78,7 @@ func claudeTranscriptCWD(path, base string) string {
 			var v struct {
 				CWD string `json:"cwd"`
 			}
-			if json.Unmarshal(line, &v) == nil && v.CWD != "" && claudeFolderIs(v.CWD, base) {
+			if json.Unmarshal(line, &v) == nil && v.CWD != "" && fits(v.CWD) {
 				return v.CWD
 			}
 		}
@@ -94,24 +101,57 @@ func claudeProjectNameFor(path string) string {
 	if v, ok := claudeCWDNameCache.Load(dir); ok {
 		return v.(string)
 	}
-	name := ""
-	if cwd := claudeFolderCWD(dir); cwd != "" {
-		segs := strings.FieldsFunc(cwd, func(r rune) bool { return r == '/' || r == '\\' })
-		switch {
-		case len(segs) >= 2:
-			name = projectSegments(segs[len(segs)-2], segs[len(segs)-1])
-		case len(segs) == 1:
-			name = segs[0]
-		}
-	}
+	name := cwdProjectName(claudeFolderCWD(dir))
 	if name == "" {
-		name = claudeProjectName(dir)
+		// Not cached: a new transcript's first line can be a snapshot with no
+		// cwd, and the decoded name kept for it would outlive the cwd landing
+		// in a long-lived process such as deja mcp (#4225).
+		return claudeProjectName(dir)
 	}
 	claudeCWDNameCache.Store(dir, name)
 	return name
 }
 
 var claudeCWDNameCache sync.Map // project folder -> display name
+
+// cwdProjectName is the project named by a recorded working directory: its
+// last two segments, as a decoded folder name would give them. A file:// URI
+// is read as the path it names, escapes decoded (#4461), and a drive is not a
+// parent: C:\proj is "proj".
+func cwdProjectName(cwd string) string {
+	if p, ok := fileURIPath(cwd); ok {
+		cwd = p
+	}
+	segs := strings.FieldsFunc(cwd, func(r rune) bool { return r == '/' || r == '\\' })
+	switch {
+	case len(segs) >= 2 && !isDriveSegment(segs[len(segs)-2]):
+		return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
+	case len(segs) >= 1:
+		return segs[len(segs)-1]
+	}
+	return ""
+}
+
+func isDriveSegment(s string) bool {
+	return len(s) == 2 && s[1] == ':'
+}
+
+// fileURIPath is the path a file:// URI names, percent-escapes decoded. A UNC
+// share keeps its host, //server/share/proj, which on windows is
+// \\server\share\proj (#4462). ok is false for anything that is not a file URI.
+func fileURIPath(uri string) (string, bool) {
+	if !strings.HasPrefix(strings.ToLower(uri), "file:") {
+		return "", false
+	}
+	u, err := url.Parse(uri)
+	if err != nil || !strings.EqualFold(u.Scheme, "file") || u.Path == "" {
+		return "", false
+	}
+	if u.Host != "" && !strings.EqualFold(u.Host, "localhost") {
+		return "//" + u.Host + u.Path, true
+	}
+	return u.Path, true
+}
 
 // claudeFolderScanFiles bounds how many transcripts are opened to name one
 // folder.

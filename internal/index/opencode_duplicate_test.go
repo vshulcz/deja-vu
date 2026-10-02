@@ -90,9 +90,9 @@ func TestAnOpencodeSessionReadAgainDoesNotDouble(t *testing.T) {
 	}
 }
 
-// The other side of the same rule: a store read from a watermark hands back the
-// new turns alone, so dropping its old records by key would take the rest of the
-// session with them. This is the common case — every continued opencode session.
+// The other side of the same rule: a session read again from the watermark must
+// come back with its earlier turns, not the new one alone — the index replaces
+// what it held for it (#2033, #4207).
 func TestAContinuedOpencodeSessionKeepsItsEarlierTurns(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 CLI not available")

@@ -35,7 +35,9 @@ func TestEveryAppendableKindKeepsWhatItAlreadyHad(t *testing.T) {
 			harness: "kimi", env: "DEJA_KIMI_ROOT",
 			rel:     []string{"sessions", "wd_demo_0123456789ab", "session_fixture01", "agents", "main", "wire.jsonl"},
 			fixture: filepath.Join("..", "..", "fixtures", "registry", "kimi", "sessions", "wd_demo_0123456789ab", "session_fixture01", "agents", "main", "wire.jsonl"),
-			line:    `{"type":"context.append_loop_event","event":{"type":"content.part","uuid":"part_fx_99","turnId":"turn_fx_99","step":0,"stepUuid":"step_fx_99","part":{"type":"text","text":"appendneedle the second question"}},"time":1782295900000}`,
+			// The fixture ends mid-stream, and a part appended to that step
+			// is read whole (#4445); an assistant message closes it.
+			line: `{"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"appendneedle the second question"}]},"time":1782295900000}`,
 		},
 		{
 			harness: "omp", env: "DEJA_OMP_ROOT",

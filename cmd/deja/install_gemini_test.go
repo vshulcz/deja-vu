@@ -79,6 +79,13 @@ func TestInstallGeminiUninstallLeavesTheSwitchAlone(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	// The reader had it on before deja came.
+	if err := os.MkdirAll(filepath.Join(home, ".gemini"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".gemini", "settings.json"), []byte(`{"hooksConfig":{"enabled":true}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := installGeminiAuto("/bin/deja", false); err != nil {
 		t.Fatalf("install: %v", err)
 	}

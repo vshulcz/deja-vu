@@ -185,7 +185,7 @@ func TestCodexDualSourceDuplicateMergeBranches(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("rebuild merged codex dup: ss=%#v err=%v", ss, err)
 	}
-	if ss[0].Project != "real-project" {
+	if ss[0].Project != "p/real-project" {
 		t.Fatalf("rebuild merge did not carry real project: %#v", ss[0])
 	}
 
@@ -202,7 +202,7 @@ func TestCodexDualSourceDuplicateMergeBranches(t *testing.T) {
 	if err != nil || len(ss2) != 1 {
 		t.Fatalf("writeSessionsWithSync merged codex dup: ss=%#v err=%v", ss2, err)
 	}
-	if ss2[0].Project != "real-project" {
+	if ss2[0].Project != "p/real-project" {
 		t.Fatalf("writeSessionsWithSync merge did not carry real project: %#v", ss2[0])
 	}
 }

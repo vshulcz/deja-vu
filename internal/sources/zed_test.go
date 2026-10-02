@@ -116,7 +116,7 @@ func TestParseZedDBReadsBothStorageEncodings(t *testing.T) {
 		if got.ID != w.id || got.Title != w.title {
 			t.Fatalf("session %d = %q/%q, want %q/%q", i, got.ID, got.Title, w.id, w.title)
 		}
-		if got.Harness != "zed" || got.Project != "registry-demo" || got.Path != db {
+		if got.Harness != "zed" || got.Project != "workspace/registry-demo" || got.Path != db {
 			t.Fatalf("session %d identity = %#v", i, got)
 		}
 		if got.Started.IsZero() || got.Updated.IsZero() || !got.Started.Before(got.Updated) {
@@ -279,7 +279,7 @@ insert into threads (id,summary,updated_at,data_type,data) values
 	if len(sessions) != 1 {
 		t.Fatalf("sessions = %#v, want one", sessions)
 	}
-	if got := sessions[0].Project; got != "marketplace-price-tracker" {
+	if got := sessions[0].Project; got != "code/marketplace-price-tracker" {
 		t.Errorf("project = %q, want it read off the document's worktree path", got)
 	}
 }

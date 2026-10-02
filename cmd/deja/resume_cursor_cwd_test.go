@@ -65,7 +65,7 @@ func TestResumeCursorTakesTheDirectoryFromTheChat(t *testing.T) {
 			t.Errorf("%s: dir=%q cmd=%q, want %q", name, dir, cmd, cwd)
 		}
 		ss, err := sources.ParseCursorTranscript(tp)
-		if err != nil || len(ss) != 1 || ss[0].Project != name {
+		if err != nil || len(ss) != 1 || ss[0].Project != "work/"+name {
 			t.Errorf("%s: project = %v %v", name, ss, err)
 		}
 	}

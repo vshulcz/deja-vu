@@ -37,8 +37,8 @@ insert into cursorDiskKV values
 	if s.Harness != "cursor" || s.ID != "comp-1" || s.Title != "Fix the pager" {
 		t.Fatalf("bad meta: %#v", s)
 	}
-	if s.Project != "my-app" {
-		t.Fatalf("project = %q, want my-app", s.Project)
+	if s.Project != "work/my-app" {
+		t.Fatalf("project = %q, want work/my-app", s.Project)
 	}
 	if len(s.Messages) != 2 || s.Messages[0].Role != "user" || s.Messages[1].Role != "assistant" {
 		t.Fatalf("messages wrong: %#v", s.Messages)
@@ -59,7 +59,7 @@ func TestParseCursorTranscript(t *testing.T) {
 			t.Fatal(err)
 		}
 		encoded = strings.TrimPrefix(strings.ReplaceAll(real, string(filepath.Separator), "-"), "-")
-		wantProject = "my-app" // resolved against the real directory
+		wantProject = "work/my-app" // resolved against the real directory
 	}
 	dir := filepath.Join(tmp, "cursorcli", "projects", encoded, "agent-transcripts", "sess-1")
 	if err := os.MkdirAll(dir, 0o755); err != nil {

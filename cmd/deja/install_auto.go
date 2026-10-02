@@ -83,9 +83,11 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
-	if err == nil && uninstall && a != "unchanged" {
+	if err == nil && a != "unchanged" {
 		// Codex's approval of each hook is pinned by position in its
-		// config.toml; see codex_hook_trust.go.
+		// config.toml; see codex_hook_trust.go. Install moves hooks too: a
+		// second copy of deja's entry it drops shifts the reader's hooks
+		// after it up a place (#4227).
 		err = moveCodexHookTrust(path, before, root)
 	}
 	return installResult{Path: path, Action: a}, err
@@ -760,6 +762,11 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	// that stops them repeating outlives them, so without this the memory qwen
 	// just lost is the memory recall refuses to send again.
 	{"PreCompact", "hook-precompact", ""},
+	// The session is over, so its live stamp goes and the next session's MCP
+	// recall can answer with it (#4257). qwen-code 0.20.0 fires it on an
+	// interactive exit and from ACP; a one-shot `qwen -p` does not, so those
+	// still wait out the window.
+	{"SessionEnd", "hook-session-end", ""},
 }
 
 // qwenRetiredEvents are events deja used to write for qwen and no longer does.
@@ -1023,7 +1030,7 @@ func dejaHookEntry(entry map[string]any) bool {
 		// Both tool subcommands are spelled out: the match wants the whole
 		// token, so "hook-tool" does not find "hook-tool-after".
 		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity",
-			"hook-tool", "hook-tool-after", "hook-spawn"} {
+			"hook-tool", "hook-tool-after", "hook-spawn", "hook-session-end"} {
 			if isDejaHookCommand(cmd, "deja "+sub) {
 				return true
 			}

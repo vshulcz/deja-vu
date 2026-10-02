@@ -278,7 +278,11 @@ func ParseCodexHistoryFromOffset(path string, offset int64) ([]model.Session, er
 	// per-file pass read the file on its own and kept them, and the session
 	// came out twice-asked and owned by the history line (#4180).
 	rollouts := codexRolloutIDs(filepath.Dir(path))
+	// One session per id, not per line: the full build keeps the row of the
+	// last session it is handed under a key, so a session of two prompts was
+	// derived from its second alone (#4449).
 	var out []model.Session
+	at := map[string]int{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		id, _ := m["session_id"].(string)
 		txt, _ := m["text"].(string)
@@ -286,7 +290,14 @@ func ParseCodexHistoryFromOffset(path string, offset int64) ([]model.Session, er
 			return
 		}
 		t := parseTimeAny(m["ts"])
-		out = append(out, model.Session{Harness: "codex", ID: id, Project: "history", Path: path, Started: t, Updated: t, Messages: []model.Message{{Role: "user", Text: txt, Time: t}}})
+		i, ok := at[id]
+		if !ok {
+			i = len(out)
+			at[id] = i
+			out = append(out, model.Session{Harness: "codex", ID: id, Project: "history", Path: path})
+		}
+		out[i].Touch(t)
+		out[i].Messages = append(out[i].Messages, model.Message{Role: "user", Text: txt, Time: t})
 	})
 	return out, err
 }
@@ -308,13 +319,13 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			return nil, err
 		}
 		defer func() { _ = os.Remove(plain) }()
-		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), projectName(filepath.Dir(path)))
+		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), filepath.Base(filepath.Dir(path)))
 		for i := range ss {
 			ss[i].Path = path
 		}
 		return ss, err
 	}
-	return parseCodexRolloutPath(path, offset, codexSessionID(path), projectName(filepath.Dir(path)))
+	return parseCodexRolloutPath(path, offset, codexSessionID(path), filepath.Base(filepath.Dir(path)))
 }
 
 func parseCodexRolloutPath(path string, offset int64, id, project string) ([]model.Session, error) {
@@ -502,6 +513,23 @@ func codexCall(s *model.Session, payload map[string]any, calls map[string]int, t
 	}
 }
 
+// codexResumes sends a rollout back for a whole read when its tail holds the
+// failed exit of a command called before it (#4443).
+var codexResumes = resumesUnlessAnswering(`"function_call`, func(m map[string]any) ([]string, string) {
+	payload, _ := m["payload"].(map[string]any)
+	id, _ := payload["call_id"].(string)
+	switch typ, _ := payload["type"].(string); typ {
+	case "function_call":
+		return []string{id}, ""
+	case "function_call_output":
+		out, _ := payload["output"].(string)
+		if c := codexExit.FindStringSubmatch(out); c != nil && c[1] != "0" {
+			return nil, id
+		}
+	}
+	return nil, ""
+})
+
 // codexExit reads the outcome Codex prints above the output. exec_command says
 // "Process exited with code N" on every run including zero; apply_patch says
 // "Exit code: N".
@@ -559,10 +587,7 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 	current := ""
 	for _, line := range strings.Split(body, "\n") {
 		if m := codexPatchFile.FindStringSubmatch(line); m != nil {
-			current = strings.TrimSpace(m[1])
-			if cwd != "" && !filepath.IsAbs(current) {
-				current = filepath.Join(cwd, current)
-			}
+			current = resolveToolPath(strings.TrimSpace(m[1]), cwd)
 			if !seen[current] {
 				seen[current] = true
 				files = append(files, current)

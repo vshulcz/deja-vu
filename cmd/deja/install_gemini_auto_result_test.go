@@ -22,6 +22,14 @@ func TestGeminiAutoResultNamesTheExtension(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"theme":"GitHub"}`+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Another extension runs on the switch, so uninstall leaves it on (#4216).
+	other := filepath.Join(sources.GeminiHome(), "extensions", "other", "hooks", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(other), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(other, []byte(`{"hooks":{}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	in, err := installTarget("gemini-auto", "/bin/deja", false)
 	if err != nil {
 		t.Fatal(err)

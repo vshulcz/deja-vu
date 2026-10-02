@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -89,17 +90,26 @@ func IngestFilesReport(dir string) map[string]FileIngest {
 // file rewritten without its bad line must be able to clear its own count
 // (#2015). The per-harness map every reader asks for is the sum.
 func mergeIngestDiag(m *Manifest) {
+	reasons := sources.DiagReasons()
+	records := sources.DiagUnusableRecords()
 	malformed, failed := sources.DiagSnapshot()
 	if m.IngestFiles == nil {
 		m.IngestFiles = map[string]FileIngest{}
 	}
 	// Whatever this pass read, it read whole: its files start from nothing and
-	// take what the parsers just reported.
+	// take what the parsers just reported. A database store read from its
+	// watermark is the exception for the rows it skipped before: they are
+	// still in the store, just older than the stamp (#4341).
+	carried := map[string]FileIngest{}
 	for p := range passParsed {
+		e, ok := m.IngestFiles[p]
+		if ok && len(e.Unusable) > 0 && passFromWatermark[p] {
+			carried[p] = e
+		}
 		// The clip count for this pass was recorded during redaction, which
 		// runs before this fold, so it is not something to start over.
-		if e, ok := m.IngestFiles[p]; ok && e.Clipped > 0 {
-			m.IngestFiles[p] = FileIngest{Clipped: e.Clipped}
+		if ok && e.Clipped > 0 {
+			m.IngestFiles[p] = FileIngest{Clipped: e.Clipped, ClippedSessions: e.ClippedSessions}
 			continue
 		}
 		delete(m.IngestFiles, p)
@@ -107,6 +117,30 @@ func mergeIngestDiag(m *Manifest) {
 	for p, n := range malformed {
 		e := m.IngestFiles[p]
 		e.Malformed += n
+		m.IngestFiles[p] = e
+	}
+	for p, r := range reasons {
+		e := m.IngestFiles[p]
+		e.Reason = r
+		e.Unusable = records[p]
+		m.IngestFiles[p] = e
+	}
+	for p, old := range carried {
+		e := m.IngestFiles[p]
+		merged := maps.Clone(e.Unusable)
+		if merged == nil {
+			merged = map[string]string{}
+		}
+		for id, r := range old.Unusable {
+			if _, again := merged[id]; !again {
+				merged[id] = r
+				e.Malformed++
+			}
+		}
+		e.Unusable = merged
+		if e.Reason == "" {
+			e.Reason = old.Reason
+		}
 		m.IngestFiles[p] = e
 	}
 	for p, msg := range failed {
@@ -512,6 +546,7 @@ func rebuild(dir string, harness string, scope string, files map[string]FileStat
 }
 
 func rebuildWithTombstones(dir string, harness string, scope string, files map[string]FileState, progress io.Writer, dead map[string]bool) error {
+	defer readTo(files)()
 	// This build's counts, not the process's: see writeSessionsWithSync (#1850).
 	beginPass()
 	emptied.Store(0)
@@ -634,7 +669,10 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -981,7 +1019,10 @@ func vanishedFromStores(dir, harness string, files map[string]FileState, fresh [
 	}
 	stores := map[string]bool{}
 	for p, st := range m.Files {
-		if st.LastUpdated <= 0 {
+		// An aider history is a file and still one store of many sessions: a
+		// session that left it — the file deleted and started again — is kept
+		// by the incremental pass, and a rebuild has to keep it too (#4332).
+		if st.LastUpdated <= 0 && harnessForPath(p) != "aider" {
 			continue
 		}
 		if _, ok := files[p]; !ok {
@@ -1005,9 +1046,26 @@ func vanishedFromStores(dir, harness string, files map[string]FileState, fresh [
 	for _, s := range fresh {
 		have[s.Harness+":"+s.ID] = true
 	}
+	// An OpenCode-schema session records its project directory as its path,
+	// not the database (#2033), so the path alone carried none of them and a
+	// rebuild dropped what the incremental pass keeps (#4447). The harness
+	// names the store there, as sessionInStore has it.
+	schemaDB := map[string]bool{}
+	for h, db := range opencodeSchemaDBs {
+		if stores[db()] {
+			schemaDB[h] = true
+		}
+	}
+	inStore := func(r Record) bool {
+		if stores[r.SourcePath] {
+			return true
+		}
+		h, _, _ := strings.Cut(r.Key, ":")
+		return schemaDB[h] && inOpencodeSchemaDB(h, r.SourcePath)
+	}
 	by := map[string]*model.Session{}
 	_ = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
-		if !stores[r.SourcePath] || have[r.Key] {
+		if have[r.Key] || !inStore(r) {
 			return
 		}
 		s := by[r.Key]
@@ -1023,9 +1081,16 @@ func vanishedFromStores(dir, harness string, files map[string]FileState, fresh [
 		}
 		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 	})
+	// An aider session the file still holds under another id — the ordinal
+	// ids before #4332 — has not left it, and carrying it would index it twice.
+	started := aiderStarts(fresh)
 	out := make([]model.Session, 0, len(by))
 	for _, key := range sortedKeys(by) {
-		out = append(out, *by[key])
+		s := by[key]
+		if s.Harness == "aider" && started[aiderStart(s.Path, s.Started)] {
+			continue
+		}
+		out = append(out, *s)
 	}
 	return out
 }
@@ -1287,7 +1352,7 @@ func harnessNarration(name string, ss []model.Session, skipped string, unreadabl
 	}
 	line := fmt.Sprintf("deja: %s: %d session%s, %d message%s", label, len(ss), pluralS(len(ss)), msgs, pluralS(msgs))
 	if unreadable > 0 {
-		line += fmt.Sprintf(" — %d line%s skipped, deja could not read %s", unreadable, pluralS(unreadable), pluralThem(unreadable))
+		line += fmt.Sprintf(" — %d %s%s skipped, deja could not read %s", unreadable, sources.SkippedNoun(name), pluralS(unreadable), pluralThem(unreadable))
 	}
 	// A file deja could not read at all is the third fact of this kind, beside
 	// the refused lines and the missing tool. Without it a store that gave up
@@ -1316,7 +1381,7 @@ func nothingReadableNarration(name string, unreadable, refused int) string {
 	// line" about three thousand turns (#2232).
 	var what []string
 	if unreadable > 0 {
-		what = append(what, fmt.Sprintf("%d line%s", unreadable, pluralS(unreadable)))
+		what = append(what, fmt.Sprintf("%d %s%s", unreadable, sources.SkippedNoun(name), pluralS(unreadable)))
 	}
 	if refused > 0 {
 		what = append(what, fmt.Sprintf("%d path%s", refused, pluralS(refused)))
@@ -1398,6 +1463,7 @@ func forgetUnreadStores(files map[string]FileState) {
 }
 
 func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
+	defer readTo(files)()
 	beginPass()
 	tmp := dir + ".tmp"
 	_ = os.RemoveAll(tmp)
@@ -1429,12 +1495,13 @@ func rebuildForSearch(dir string, o query.Options, scope string, files map[strin
 // the user never sent — still got a row, so `deja last` printed a blank line
 // for it, `show` printed a header with nothing under it, and the counters
 // disagreed: brief and doctor read the manifest and stats reads the records
-// (1159 against 1157 on my store) (#868).
+// (1159 against 1157 on my store) (#868). The build counts the empty
+// transcripts as it reads them, not the rows dropped here: an empty transcript
+// sharing an id with one that holds text leaves no empty row behind (#4213).
 func dropEmptySessions(m *Manifest, wrote map[string]bool) {
 	for key := range m.Sessions {
 		if !wrote[key] {
 			delete(m.Sessions, key)
-			emptied.Add(1)
 		}
 	}
 }
@@ -1577,7 +1644,10 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 			if ord == 0 {
 				ord = nextSessionOrd(m.Sessions)
 			}
-			owns, collided := attributeSession(m.Sessions[key], s)
+			owns, collided := claimSession(m.Sessions[key], s)
+			if !holdsText(s) {
+				emptied.Add(1)
+			}
 			if collided {
 				collisions.Add(1)
 			}
@@ -2007,7 +2077,7 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), Settled: sessionSettled(s),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent,
 		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
@@ -2077,6 +2147,9 @@ func extendDerived(meta *SessionMeta, ms []model.Message) {
 		return
 	}
 	meta.Counted += len(tail)
+	if meta.NoText && holdsText(model.Session{Messages: tail}) {
+		meta.NoText = false
+	}
 	meta.LastMsg = messageFingerprint(ms[len(ms)-1])
 	meta.Words += sessionWords(tail)
 	// Capped like the full build caps: a plain union grows on every append,
@@ -2604,6 +2677,27 @@ func ReportEvictedFiles() int {
 	return int(evicted.Swap(0))
 }
 
+// claimSession is attributeSession for a session read this pass. A transcript
+// with nothing to index is not a second conversation: Gemini CLI's resume
+// leaves a file holding only the preamble deja strips, under the id of the
+// transcript it appends to. Sort order handed that file the row, and with no
+// records under it the session was dropped from the index (#4213). Either
+// side can be the empty one, since either can be read first. Only where the
+// pair would be reported as a clash: the store pairs attributeSession knows
+// (goose, opencode, codex) keep their own rule.
+func claimSession(held SessionMeta, s model.Session) (owns, collided bool) {
+	owns, collided = attributeSession(held, s)
+	if collided {
+		if !holdsText(s) {
+			return false, false
+		}
+		if held.NoText {
+			return true, false
+		}
+	}
+	return owns, collided
+}
+
 // attributeSession decides which of two transcripts sharing an id owns the
 // manifest row, and whether they collided at all. Lexicographically smallest
 // path wins, so the answer does not depend on which file was read first.
@@ -2648,13 +2742,78 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 			return !newIsHist, false
 		}
 	}
+	// A ZCode snapshot restored into the CLI database is the same
+	// conversation there under the same id, and the snapshot stays on disk
+	// unchanged, so an incremental pass never re-reads it to skip it. The
+	// database owns the row (#4432).
+	if s.Harness == "zcode" {
+		if newIsSnap, heldIsSnap := isZCodeSnapshot(s.Path), isZCodeSnapshot(held.Path); newIsSnap != heldIsSnap {
+			return !newIsSnap, false
+		}
+	}
 	return s.Path < held.Path, true
+}
+
+// coversKept reports whether an arrival holds what the kept row indexed, which
+// a moved transcript does and a different file under the same id does not. The
+// test is the row's last message: a move carries it, and so does a move that
+// grew on the way. Gemini CLI's resume stub gains turns of its own after the
+// transcript it was resumed from is deleted, and taking it for the move threw
+// away that transcript's records for good (#4213). A count alone would not do:
+// the stub can outgrow a short transcript. A row from before LastMsg was kept
+// has nothing to compare, so it falls back to the count.
+func coversKept(r model.Session, meta SessionMeta) bool {
+	if meta.LastMsg == 0 {
+		return len(r.Messages) >= meta.Counted
+	}
+	for i := len(r.Messages) - 1; i >= 0; i-- {
+		m := r.Messages[i]
+		// Fingerprinted as stored: the row's was taken after redaction, and
+		// the arrival has not been redacted yet.
+		m.Text, _, _ = indexedText(m.Text)
+		if messageFingerprint(m) == meta.LastMsg {
+			return true
+		}
+		// The command may have been indexed before its result landed; the
+		// re-read adds the exit status to the same message. Codex compressing a
+		// rollout in place is still the move, so match it without the suffix.
+		if base := exitSuffix.ReplaceAllString(m.Text, ""); base != m.Text {
+			m.Text = base
+			if messageFingerprint(m) == meta.LastMsg {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// exitSuffix is the status the parsers append to a command once its result is
+// read: "  → exit N".
+var exitSuffix = regexp.MustCompile(`  → exit -?\d+$`)
+
+// holdsText reports whether any message of s has text left to index once
+// plumbing is stripped. Stripping is idempotent, so it answers the same before
+// and after preRedactSessions.
+func holdsText(s model.Session) bool {
+	for _, m := range s.Messages {
+		if strings.TrimSpace(stripSelfRecall(m.Text)) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // isCodexHistory reports whether a path is Codex's prompt log rather than a
 // rollout. Named, for the reason isGooseStore gives.
 func isCodexHistory(path string) bool {
 	return strings.EqualFold(filepath.Base(path), "history.jsonl")
+}
+
+// isZCodeSnapshot reports whether a ZCode session's path is a snapshot an
+// older ZCode left: the CLI database's sessions carry their directory and the
+// transcripts end in .jsonl.
+func isZCodeSnapshot(path string) bool {
+	return strings.EqualFold(filepath.Ext(path), ".json")
 }
 
 // isOpencodeDiff reports whether a path is one of opencode's per-session diff
@@ -3021,7 +3180,7 @@ func redactForIngest(m *Manifest, sourcePath, text string) string {
 			cut--
 		}
 		redacted = redacted[:cut]
-		countClipped(m, sourcePath, 1)
+		countClipped(m, sourcePath, "", 1)
 	}
 	n := counts.Total()
 	if n == 0 || m == nil {
@@ -3117,21 +3276,49 @@ func carryRedactions(m *Manifest, old Manifest, skip map[string]bool) {
 //
 // The path settles it for goose and cursor, which name the database as the
 // session's path. opencode names the project directory, so nothing about its
-// path says "database" — the key names the harness, and opencode has no
-// per-file kind to confuse it with (#2033).
+// path says "database" — the key names the harness (#2033). The same holds for
+// every store read through OpenCode's schema (opencodeSchemaDBs).
 func fromDatabase(r Record) bool {
-	// The key first, and only for opencode: it has one store and no per-file
-	// kind, so nothing else carries an "opencode:" key and no path can
-	// contradict it. Asking the path first got this wrong for an opencode
+	// The key first: asking the path first got this wrong for an opencode
 	// project that lives inside another harness's root — a versioned ~/.claude,
 	// say — where harnessForPath answers with that harness's kind.
-	if h, _, ok := strings.Cut(r.Key, ":"); ok && h == "opencode" {
+	if h, _, ok := strings.Cut(r.Key, ":"); ok && inOpencodeSchemaDB(h, r.SourcePath) {
 		return true
 	}
 	// A path that names a per-file kind settles it: two transcripts in
 	// different projects can share a filename-derived id, and judging those by
 	// key erased the sibling that was never re-read (#699).
 	return storeHarness(r.SourcePath) != ""
+}
+
+// leftItsFile reports a session that a re-read file no longer holds, in a
+// harness that keeps many sessions in one file. aider appends every launch to
+// one history, and people delete it because it grows forever: the next launch
+// starts a new file at the same path, and dropping by path took every session
+// the deleted file held, which a deleted transcript keeps (#2970, #4332).
+//
+// A session the file still holds under another id has not left it: ids before
+// #4332 were ordinals, and two launches in one second are told apart by order.
+// held is aiderStarts of what the pass read.
+func leftItsFile(r Record, reread map[string]bool, meta SessionMeta, held map[string]bool) bool {
+	harness, _, _ := strings.Cut(r.Key, ":")
+	return harness == "aider" && !reread[r.Key] && !held[aiderStart(r.SourcePath, meta.Started)]
+}
+
+// aiderStarts is the history path and start time of every aider session in
+// ss, the one thing that names an aider session across a change of its id.
+func aiderStarts(ss []model.Session) map[string]bool {
+	out := map[string]bool{}
+	for _, s := range ss {
+		if s.Harness == "aider" {
+			out[aiderStart(s.Path, s.Started)] = true
+		}
+	}
+	return out
+}
+
+func aiderStart(path string, started time.Time) string {
+	return path + "\x00" + started.UTC().String()
 }
 
 // readWholeThisPass reports whether the pass re-read this record's store in
@@ -3147,6 +3334,13 @@ func readWholeThisPass(r Record) bool {
 	if len(passWholeStores) == 0 {
 		return false
 	}
+	// opencode's records name a project directory or, from older passes, a
+	// diff file; either way the session is the store's, read whole (#4207).
+	// Kilo's and ZCode's are the same store shape (#4396); a record from their
+	// transcript files is not a store's and never reaches this.
+	if h, _, ok := strings.Cut(r.Key, ":"); ok && opencodeSchemaDBs[h] != nil {
+		return passWholeStores[h]
+	}
 	if storeHarness(r.SourcePath) != "" {
 		return passWholeStores[r.SourcePath]
 	}
@@ -3159,6 +3353,12 @@ func readWholeThisPass(r Record) bool {
 // directory lock.
 var passWholeStores map[string]bool
 
+// passFromWatermark names the database stores this pass read from their
+// watermark, so only rows changed since came back. passWholeStores cannot say
+// it: zed is in there on every pass, because the threads it does hand back
+// come whole (#4341).
+var passFromWatermark map[string]bool
+
 // wholeStoresThisPass records them, under both the store path and the harness:
 // a record names the first where it can and the second otherwise.
 //
@@ -3168,13 +3368,18 @@ var passWholeStores map[string]bool
 // read the store whole may drop one because its key came back.
 func wholeStoresThisPass(changed, old map[string]FileState) {
 	passWholeStores = map[string]bool{}
+	passFromWatermark = map[string]bool{}
 	// Rebuilt here rather than kept: a store that appeared since the last pass
 	// is one the walk has to see.
 	passStores = resolveStorePaths()
+	passStoreHarness = new(sync.Map)
 	for p := range changed {
 		harness := storeHarness(p)
 		if harness == "" {
 			continue
+		}
+		if old[p].LastUpdated != 0 {
+			passFromWatermark[p] = true
 		}
 		if old[p].LastUpdated == 0 || rereadsWholeSessions(p) {
 			passWholeStores[harness] = true
@@ -3195,13 +3400,23 @@ func rereadsWholeSessions(p string) bool {
 		return true
 	}
 	switch storeHarness(p) {
-	case "grok", "zed", "hermes", "openclaw":
+	case "opencode", "kilocode", "zcode":
+		// Read by session since #4207: a reply's text lands in a part created
+		// before the last pass, so only a touched session read whole carries
+		// it, and adding that to what the index held doubled the turns. Its
+		// counts start over with each pass, the goose trade above.
+		return true
+	case "grok", "zed", "hermes", "openclaw", "crush":
 		// The same shape: each asks for the sessions touched since the stamp
 		// and hands them back whole, so what comes back replaces what the
 		// index holds for that key rather than adding to it (#2075). The
 		// clauses are session-scoped for exactly this reason — a message-scoped
 		// one returns the newest turn alone, and replacing a session with it
 		// loses the rest.
+		return true
+	case "cursor":
+		// Since #4450 and #4451 a touched composer comes back with all its
+		// bubbles, so a rename is read and the derived fields count every turn.
 		return true
 	}
 	return false
@@ -3220,14 +3435,37 @@ func storeHarness(p string) string {
 	if p == "" {
 		return ""
 	}
+	// Per path, not per record: every record of a goose or cursor store names
+	// the same database, and asking the registry again for each one was a
+	// third of a one-message pass over 5,000 sessions (#4272).
+	if h, ok := passStoreHarness.Load(p); ok {
+		return h.(string)
+	}
+	h := resolveStoreHarness(p)
+	passStoreHarness.Store(p, h)
+	return h
+}
+
+// passStoreHarness memoises storeHarness for one pass; wholeStoresThisPass
+// starts it over with passStores.
+var passStoreHarness = new(sync.Map)
+
+func resolveStoreHarness(p string) string {
 	if h, ok := passStorePaths()[p]; ok {
 		return h
 	}
 	if sources.IsHermesPGStore(p) {
 		return "hermes"
 	}
+	for h, db := range opencodeSchemaDBs {
+		if p == db() {
+			return h
+		}
+	}
 	switch harnessForPath(p) {
-	case "opencode":
+	case "opencode-diff":
+		// A diff file is read as its session from the database (#4207), so it
+		// is that store's as much as the database file is.
 		return "opencode"
 	case "cursor-db":
 		return "cursor"
@@ -3258,10 +3496,61 @@ func passStorePaths() map[string]string {
 
 var passStores map[string]string
 
+// opencodeSchemaDBs are the databases read through OpenCode's schema, by
+// harness. A session from one names its project directory as its path, not the
+// database, so only the harness in its key says where it came from. Kilo CLI
+// and ZCode vendor that schema, and knowing opencode's alone left their
+// sessions re-read whole on every write to the database and appended to the
+// records already held: a Kilo session doubled on each pass (#4396).
+var opencodeSchemaDBs = map[string]func() string{
+	"opencode": sources.OpencodeDB,
+	"kilocode": sources.KiloDB,
+	"zcode":    sources.ZCodeDB,
+}
+
+// inOpencodeSchemaDB reports whether a session of harness h whose path is p
+// came out of that harness's OpenCode-schema database.
+func inOpencodeSchemaDB(h, p string) bool {
+	db, ok := opencodeSchemaDBs[h]
+	if !ok {
+		return false
+	}
+	if p == db() {
+		return true
+	}
+	// opencode's diff files, Kilo's task files and ZCode's transcripts and
+	// snapshots carry the same harness name; anything else is a project directory. A diff
+	// record still counts as the database's through storeHarness, which files
+	// the diff path under that store.
+	return !opencodeSchemaOwnFile(h, p)
+}
+
+// opencodeSchemaOwnFile reports whether p is one of harness h's own files
+// rather than its database or a project directory. Named, for the reason
+// isGooseStore gives, and because fromDatabase asks it of every record held:
+// asking the registry what a project directory was cost ~68 µs a record.
+func opencodeSchemaOwnFile(h, p string) bool {
+	switch h {
+	case "opencode":
+		return isOpencodeDiff(p)
+	case "kilocode":
+		return strings.EqualFold(filepath.Base(p), "api_conversation_history.json")
+	case "zcode":
+		// Its transcripts, and the snapshots an older ZCode left, each
+		// rewritten whole (#4432).
+		return strings.EqualFold(filepath.Ext(p), ".jsonl") || isZCodeSnapshot(p)
+	}
+	return false
+}
+
 func resolveStorePaths() map[string]string {
 	out := map[string]string{sources.GrokDB(): "grok", sources.ZedDB(): "zed"}
 	for _, db := range sources.HermesDBs() {
 		out[db] = "hermes"
+	}
+	// One store per Crush project, each read from its own watermark (#4381).
+	for _, db := range sources.CrushDBs() {
+		out[db] = "crush"
 	}
 	return out
 }
@@ -3291,6 +3580,9 @@ func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map
 	for p, e := range old {
 		if _, ok := reread[p]; ok {
 			e.Clipped = 0
+			e.ClippedSessions = nil
+		} else {
+			e.ClippedSessions = maps.Clone(e.ClippedSessions)
 		}
 		out[p] = e
 	}
@@ -3311,6 +3603,7 @@ func beginPass() {
 	passParsed = nil
 	passRead = nil
 	passWholeStores = nil
+	passFromWatermark = nil
 }
 
 // passParsed is the set of files the pass in progress re-read. Package state
@@ -3346,6 +3639,7 @@ func parsedThisPass(files map[string]FileState) {
 }
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	defer readTo(files)()
 	// Cleared here rather than beside the other two: this build counts what
 	// went away further down, before the incremental paths reset theirs, so a
 	// reset down there would zero the number this build is about to report
@@ -3539,28 +3833,91 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	collisions.Store(0)
 	merged.Store(0)
 	lastIngestFiles = len(changed)
+	// The sessions a shared store handed back. Only those may drop a store's
+	// records by key: a per-file transcript under the same id — goose's JSONL
+	// beside its database — says nothing about what the store still holds.
+	// Judged by path after wholeStoresThisPass, which resolves the store paths.
+	storeKeys := map[string]bool{}
+	keysFrom := map[string][]string{}
+	// A live-locked or half-written store (Cursor holds its sqlite under WAL)
+	// must not fail every search. Keep the old records and the old FileState
+	// so the next run retries this file.
+	skip := func(p string, err error) {
+		if progress != nil {
+			fmt.Fprintf(progress, "deja: skipping %s this pass: %v\n", filepath.Base(p), err)
+		}
+		delete(changed, p)
+		if of, ok := old.Files[p]; ok {
+			files[p] = of
+		} else {
+			delete(files, p)
+		}
+	}
+	take := func(p string, ss []model.Session) {
+		ss = sources.FilterSessions(filterTombstoned(ss))
+		for _, s := range ss {
+			keysFrom[p] = append(keysFrom[p], s.Harness+":"+s.ID)
+		}
+		replacements = append(replacements, ss...)
+	}
+	// opencode's diff files are read after its database: each is read as its
+	// session from the database, which the since read may already have handed
+	// back with the diff folded in (#4207).
+	var diffs []string
+	fromDB := map[string]bool{}
 	for p, f := range changed {
-		ss, err := parseChangedFile(harness, p, old.Files[p])
-		if err != nil {
-			// A live-locked or half-written store (Cursor holds its sqlite
-			// under WAL) must not fail every search. Keep the old records
-			// and the old FileState so the next run retries this file.
-			if progress != nil {
-				fmt.Fprintf(progress, "deja: skipping %s this pass: %v\n", filepath.Base(p), err)
-			}
-			delete(changed, p)
-			if of, ok := old.Files[p]; ok {
-				files[p] = of
-			} else {
-				delete(files, p)
-			}
+		if harnessForPath(p) == "opencode-diff" {
+			diffs = append(diffs, p)
 			continue
 		}
-		replacements = append(replacements, sources.FilterSessions(filterTombstoned(ss))...)
+		ss, err := parseChangedFile(harness, p, old.Files[p])
+		if err != nil {
+			skip(p, err)
+			continue
+		}
+		if harnessForPath(p) == "opencode" {
+			for _, s := range ss {
+				fromDB[s.ID] = true
+			}
+		}
+		take(p, ss)
 		files[p] = f
+	}
+	var pending []string
+	for _, p := range diffs {
+		if !fromDB[strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))] {
+			pending = append(pending, p)
+		}
+		files[p] = changed[p]
+	}
+	if len(pending) > 0 {
+		// Read together: one query rather than one a file, each paying for
+		// every session's parent and title again.
+		ss, err := sources.ParseOpencodeDiffSessions(pending)
+		if err != nil {
+			for _, p := range pending {
+				skip(p, err)
+			}
+		} else {
+			at := map[string]string{}
+			for _, p := range pending {
+				at[strings.TrimSuffix(filepath.Base(p), filepath.Ext(p))] = p
+			}
+			for _, s := range ss {
+				take(at[s.ID], []model.Session{s})
+			}
+		}
 	}
 	// First, so everything below reads the same list of stores.
 	wholeStoresThisPass(changed, old.Files)
+	for p, keys := range keysFrom {
+		if storeHarness(p) == "" {
+			continue
+		}
+		for _, k := range keys {
+			storeKeys[k] = true
+		}
+	}
 	// After the loop, because a file whose parse failed is dropped from
 	// `changed` there and keeps what it already held — starting it over would
 	// throw the counts away on the one pass that could not read it.
@@ -3578,6 +3935,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true
 	}
+	aiderHeld := aiderStarts(replacements)
 	// A kept file whose session arrived again from another path is a rename,
 	// not a cleanup: the client moved the transcript, and keeping the old copy
 	// would make the session its own second copy (#1086). Those go back to
@@ -3585,16 +3943,33 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// Only when the arrival sits in the same directory: two projects can
 	// share a filename-derived id (#699), and that is a collision, not the
 	// kept session moving.
-	arrivedIn := map[string]string{}
-	for _, r := range replacements {
-		arrivedIn[r.Harness+":"+r.ID] = filepath.Dir(r.Path)
+	// An arrival with nothing to index is not the kept session moving: Gemini
+	// CLI's resume stub lands beside the transcript it shares an id with, and
+	// taking it for a rename dropped the deleted transcript's records (#4213).
+	arrivals := map[string][]int{}
+	for i, r := range replacements {
+		if holdsText(r) {
+			key := r.Harness + ":" + r.ID
+			arrivals[key] = append(arrivals[key], i)
+		}
 	}
 	// A session kept in a directory of its own moves with the directory, so
 	// the arrival is never beside the old path; its id is a UUID, which two
 	// projects do not share by accident, so the id alone says it moved.
 	for key, meta := range old.Sessions {
-		movedDir := arrivedIn[key] == filepath.Dir(meta.Path) || sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
-		if kept[meta.Path] && replaceKeys[key] && movedDir {
+		if !kept[meta.Path] {
+			continue
+		}
+		ownDir := sessionDirName.MatchString(filepath.Base(filepath.Dir(meta.Path)))
+		moved := false
+		for _, i := range arrivals[key] {
+			r := replacements[i]
+			if (ownDir || filepath.Dir(r.Path) == filepath.Dir(meta.Path)) && coversKept(r, meta) {
+				moved = true
+				break
+			}
+		}
+		if moved {
 			removed[meta.Path] = true
 			delete(files, meta.Path)
 			delete(kept, meta.Path)
@@ -3608,8 +3983,8 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// the first `deja blame` or search after a day of work prints it above
 		// the answer. Zero counts are left out rather than shown as zero.
 		line := fmt.Sprintf("deja: %s %d changed transcript%s", replacementPassMarker, len(changed), pluralS(len(changed)))
-		if len(replacements) > 0 {
-			line += fmt.Sprintf(", %d session%s replaced", len(replacements), pluralS(len(replacements)))
+		if len(replaceKeys) > 0 {
+			line += fmt.Sprintf(", %d session%s replaced", len(replaceKeys), pluralS(len(replaceKeys)))
 		}
 		if len(removed) > 0 {
 			line += fmt.Sprintf(", %d gone", len(removed))
@@ -3702,6 +4077,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return nil
 	}
 	var recErr error
+	// The sessions that lost a record here, which the command failure walk
+	// has to read again along with the ones re-read (#4288).
+	dropped := map[string]bool{}
 	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(old), func(r Record) {
 		if recErr != nil {
 			return
@@ -3709,13 +4087,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// Shared-store harnesses (opencode, cursor) are parsed since a
 		// watermark, so their untouched sessions are NOT re-emitted on a
 		// change — they must be retained, not dropped, or they vanish.
-		// Superseded sessions are handled by replaceKeys.
+		// Superseded sessions are handled by storeKeys.
 		fromStore := fromDatabase(r)
-		// replaceKeys is scoped to shared stores. A shared store is parsed since
+		// storeKeys is scoped to shared stores. A shared store is parsed since
 		// a watermark, so a superseded session's old record is not re-read and
-		// clause two never reaches it — replaceKeys is what drops it. For a
+		// clause two never reaches it — storeKeys is what drops it. For a
 		// per-file harness, a removed or changed file's old records are already
-		// dropped by the two clauses above, so applying replaceKeys there only
+		// dropped by the two clauses above, so applying a key there only
 		// hurts: two transcripts in different projects can share a filename-derived
 		// id, and dropping by key alone erased the sibling that was never re-read
 		// (#699). The record's own SourcePath decides its fate for those.
@@ -3723,8 +4101,12 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		// And only when the pass read that store whole: a store read from its
 		// watermark hands back the new turns alone, so dropping the rest by key
 		// would take the earlier turns of every continued session (#2033).
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore) || (fromStore && readWholeThisPass(r) && replaceKeys[r.Key]) {
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) {
+			dropped[r.Key] = true
 			return
+		}
+		if r.SourcePath == "" {
+			dropped[r.Key] = true // addRec does not carry it
 		}
 		recErr = addRec(r)
 	}); err != nil {
@@ -3778,7 +4160,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if removed[held.Path] {
 			held.Path = ""
 		}
-		owns, collided := attributeSession(held, s)
+		owns, collided := claimSession(held, s)
 		if collided {
 			collisions.Add(1)
 		}
@@ -3814,11 +4196,16 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		return err
 	}
 	carrySidecars(dir, tmp)
-	// After carrying, not instead of it: both of these write only when they
-	// have something to say, and the carried file is what a quiet update leaves.
+	// After carrying, not instead of it: the fixes merge writes only when it
+	// has something to say, and the carried file is what a quiet update leaves.
+	// The command table is recomputed whole, and an empty one removes the
+	// carried file, as a full build would not write it (#4441).
 	mergeFixes(dir, tmp, replacements, replaceKeys)
 	buildCommandsFromIndex(tmp)
-	buildCommandFailsFromIndex(tmp)
+	for key := range replaceKeys {
+		dropped[key] = true
+	}
+	buildCommandFailsFromIndex(tmp, carriedCommandFailState(dir, old, tmp, m.Generation, dropped), dropped)
 	buildSessionFactsFromIndex(tmp)
 	return swapIndexDir(dir, tmp)
 }
@@ -3923,9 +4310,21 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 			if _, ok := kindForPath(p); !ok {
 				return false
 			}
+			// Except a new opencode diff file: it is read as its session, whole,
+			// and that session is already in the index (#4207).
+			if storeHarness(p) == "opencode" {
+				return false
+			}
 			continue
 		}
 		if f.Size <= of.Size {
+			return false
+		}
+		// A store that hands back touched sessions whole has nothing to append:
+		// adding them to what the index holds is the doubling the replacement
+		// path exists to avoid. Defensive — sqlite rewrites its page count in
+		// the header on growth, so the prefix check below rarely passes (#4207).
+		if rereadsWholeSessions(p) {
 			return false
 		}
 		// A prior pass that indexed no complete line (a torn first line, or a lone
@@ -3960,8 +4359,37 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 		if !appendableKind(harnessForPath(p)) {
 			return false
 		}
+		// The kind can resume, but this tail may rewrite a record already
+		// stored: a Cherry Studio reply still streaming when the last pass ran
+		// (#4346).
+		if k, ok := kindForPath(p); ok && k.Resumes != nil && !k.Resumes(p, resumeOffset(of)) {
+			return false
+		}
 	}
 	return true
+}
+
+// readTo holds this pass's transcript reads to the sizes its walk recorded,
+// which is where the next pass resumes. A line the client wrote after the walk
+// was read here and again there, and the copies stayed until a rebuild
+// (#4442).
+func readTo(files map[string]FileState) func() {
+	ends := make(map[string]int64, len(files))
+	for p, f := range files {
+		if strings.HasSuffix(p, ".jsonl") {
+			ends[p] = f.Size
+		}
+	}
+	return sources.LimitReads(ends)
+}
+
+// resumeOffset is where an appended read of a known file starts: the end of
+// the last complete line indexed, or the old size when none was recorded.
+func resumeOffset(old FileState) int64 {
+	if old.SafeSize == 0 || old.SafeSize > old.Size {
+		return old.Size
+	}
+	return old.SafeSize
 }
 
 func appendIncremental(dir, harness, scope string, old Manifest, files map[string]FileState, changed map[string]FileState) (filesTouched, messages, unreadable int, err error) {
@@ -4065,7 +4493,8 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		for _, s := range ss {
 			key := s.Harness + ":" + s.ID
 			meta := m.Sessions[key]
-			if meta.ID == "" {
+			named := meta.ID != ""
+			if !named {
 				meta = metaWithOrd(metaForSession(s), nextSessionOrd(m.Sessions))
 			}
 			if meta.Started.IsZero() || (!s.Started.IsZero() && s.Started.Before(meta.Started)) {
@@ -4081,12 +4510,32 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// searchable — so ask the filesystem instead. A recorded path that
 			// is not there cannot own the row, and without this the row kept
 			// the dead path and was marked as sharing its id with it (#1086).
-			if meta.Path != "" && s.Path != "" && meta.Path != s.Path {
+			// Not for an arrival with nothing to index: that is Gemini's resume
+			// stub beside a deleted transcript, not the transcript moving (#4213).
+			if meta.Path != "" && s.Path != "" && meta.Path != s.Path && holdsText(s) {
 				if _, err := os.Lstat(meta.Path); err != nil {
 					meta.Path = ""
 				}
 			}
-			owns, collided := attributeSession(meta, s)
+			owns, collided := claimSession(meta, s)
+			// A row with nothing to index that changes hands describes the
+			// stub, not the transcript taking it over: folding the transcript
+			// in on top counted the stub's preamble too, one more message than
+			// a rebuild of the same files gives (#4213). Start the row over
+			// from the session that owns it, as the full build does.
+			// Only for a file read whole: a known file hands over its tail,
+			// which is not the session. The span stays what both files cover,
+			// as the full build keeps it.
+			if owns && meta.NoText && meta.Path != s.Path && !known {
+				prev := meta
+				meta = metaWithOrd(metaForSession(s), prev.Ord)
+				if !prev.Started.IsZero() && (meta.Started.IsZero() || prev.Started.Before(meta.Started)) {
+					meta.Started = prev.Started
+				}
+				if prev.Updated.After(meta.Updated) {
+					meta.Updated = prev.Updated
+				}
+			}
 			if collided {
 				collisions.Add(1)
 				meta.Shared = true
@@ -4115,8 +4564,16 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				// The same widening the first naming does, or a session that
 				// gets its thin title later — dsh and opencode both retitle
 				// after the fact — would keep it until an unrelated rebuild.
-				if t, _ := redact.Text(s.Title); widenThinSourceTitle(s, boundSourceTitle(s.Harness, t)) != meta.Title {
-					meta.Title = widenThinSourceTitle(s, boundSourceTitle(s.Harness, t))
+				//
+				// A thin title is widened from the session's first substantial
+				// turn, and a tail does not hold it: one appended turn renamed
+				// the session after itself. A row already named from the whole
+				// session keeps that name (#4452).
+				t, _ := redact.Text(s.Title)
+				t = boundSourceTitle(s.Harness, t)
+				fromTail := known && named && s.Harness != "deja" && thinTitle(t) && !thinTitle(meta.Title)
+				if w := widenThinSourceTitle(s, t); !fromTail && w != meta.Title {
+					meta.Title = w
 					meta.AgentTitle = s.AgentTitle
 				}
 			}
@@ -4192,7 +4649,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// one, and most appends are speech, so ask first.
 	if carriesWork(appended) {
 		buildCommandsFromIndex(dir)
-		buildCommandFailsFromIndex(dir)
+		// From the state the last update left: only the records this pass
+		// appended are read (#4288).
+		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
 		buildSessionFactsFromIndex(dir)
 	}
 	return filesTouched, messages, unreadable, nil
@@ -4256,11 +4715,7 @@ func parseAppendedFile(harness, p string, old FileState, isNew bool) (ss []model
 		}
 		return k.Parse(p, 0)
 	}
-	from := old.SafeSize
-	if from == 0 || from > old.Size {
-		from = old.Size
-	}
-	return k.ParseFrom(p, from, old.LastUpdated)
+	return k.ParseFrom(p, resumeOffset(old), old.LastUpdated)
 }
 
 // harnessForPath reports the fine-grained source kind for a path (claude,
@@ -4291,7 +4746,9 @@ func harnessForPath(p string) string {
 // (grok, hermes, zed) read their store whole on every pass, for the life of
 // the index (#2075).
 func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]SessionMeta) {
-	setStoreLastUpdated(files, sessions, "opencode", sources.OpencodeDB())
+	for h, db := range opencodeSchemaDBs {
+		setStoreLastUpdated(files, sessions, h, db())
+	}
 	setStoreLastUpdated(files, sessions, "goose", sources.GooseDB())
 	// grok's database had a since-the-watermark parser in the registry and
 	// nothing ever stamped it, so every pass read the store whole — the pass
@@ -4299,7 +4756,7 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	//
 	// Safe to stamp because ParseGrokDBSince selects messages rather than
 	// sessions and normalises both sides with a millisecond backoff (#2150),
-	// which is the opencode and cursor shape. hermes compares whole seconds
+	// which is the cursor shape. hermes compares whole seconds
 	// with a strict >, and zed returns whole threads; each needs its own fix
 	// before it can be stamped, so neither is here.
 	setStoreLastUpdated(files, sessions, "grok", sources.GrokDB())
@@ -4313,7 +4770,7 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	}
 	// zed, whose cursor selects threads rather than messages: a continued
 	// thread comes back whole, so it joins rereadsWholeSessions below in the
-	// same change — the goose shape, not the opencode one (#2075).
+	// same change — the goose shape, not the cursor one (#2075).
 	setStoreLastUpdated(files, sessions, "zed", sources.ZedDB())
 	for _, db := range sources.CursorDBs() {
 		setStoreLastUpdated(files, sessions, "cursor", db)
@@ -4324,6 +4781,12 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 	for _, db := range sources.OpenClawAgentDBs() {
 		setStoreLastUpdated(files, sessions, "openclaw", db)
 	}
+	// crush keeps one store per project and was never stamped, so one new
+	// turn re-read every session in it: 3000 replaced, 8 s (#4381). Its
+	// cursor selects sessions, so it is in rereadsWholeSessions too.
+	for _, db := range sources.CrushDBs() {
+		setStoreLastUpdated(files, sessions, "crush", db)
+	}
 }
 
 // sessionInStore reports whether a row came from the store being stamped.
@@ -4331,10 +4794,12 @@ func setDatabaseStoreWatermarks(files map[string]FileState, sessions map[string]
 // Cursor keeps one database per workspace, and both it and goose record the
 // store path in Path, so the row says which one it came from. opencode records
 // the project directory instead (#2033) — and has a single database, so there
-// the harness is the store.
+// the harness is the store, less any transcript files of its own (#4396).
 func sessionInStore(s SessionMeta, harness, db string) bool {
-	if harness == "opencode" {
-		return true
+	if _, ok := opencodeSchemaDBs[harness]; ok {
+		// Not a row the diff files gave: it carries a file's mtime, which
+		// says nothing about how far the database has been read (#4207).
+		return inOpencodeSchemaDB(harness, s.Path)
 	}
 	return s.Path == db
 }
@@ -4597,11 +5062,10 @@ func currentFilesWith(h string, old map[string]FileState) map[string]FileState {
 					fs.PrefixSample = filePrefixSample(p, fs.SafeSize)
 				}
 			}
+			if k, ok := kindForPath(p); ok && k.Sidecar != nil {
+				fs.MetadataSize, fs.MetadataMTime = k.Sidecar(p)
+			}
 			if harnessForPath(p) == "grok" {
-				if summary, err := os.Lstat(filepath.Join(filepath.Dir(p), "summary.json")); err == nil && summary.Mode()&os.ModeSymlink == 0 && !summary.IsDir() {
-					fs.MetadataSize = summary.Size()
-					fs.MetadataMTime = summary.ModTime().UnixNano()
-				}
 				if cwd, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(p)), ".cwd")); err == nil && cwd.Mode()&os.ModeSymlink == 0 && !cwd.IsDir() {
 					fs.CWDSize = cwd.Size()
 					fs.CWDMTime = cwd.ModTime().UnixNano()
@@ -4677,6 +5141,21 @@ func lastCompleteLineOffset(p string, size int64) int64 {
 	return 0
 }
 
+// indexedText is a message's text as the index stores it: plumbing stripped,
+// NFC-canonicalised (this path does not go through redactForIngest, #1098),
+// redacted, then cut to maxIndexedText on a rune boundary.
+func indexedText(text string) (string, redact.Counts, bool) {
+	redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(text)))
+	if len(redacted) <= maxIndexedText {
+		return redacted, counts, false
+	}
+	cut := maxIndexedText
+	for cut > 0 && !utf8.RuneStart(redacted[cut]) {
+		cut--
+	}
+	return redacted[:cut], counts, true
+}
+
 // preRedactSessions redacts every message concurrently before the write
 // loop. Redaction is regex-heavy and was the serial bottleneck of a cold
 // build; the write loop stays sequential (append-only log), but by the time
@@ -4700,17 +5179,10 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 			for si := range jobs {
 				s := &ss[si]
 				for mi := range s.Messages {
-					// NFC-canonicalise here too: this is the bulk write path and
-					// does not go through redactForIngest (#1098).
-					redacted, counts := redact.Text(nfcfold.Compose(stripSelfRecall(s.Messages[mi].Text)))
-					if len(redacted) > maxIndexedText {
-						cut := maxIndexedText
-						for cut > 0 && !utf8.RuneStart(redacted[cut]) {
-							cut--
-						}
-						redacted = redacted[:cut]
+					redacted, counts, clipped := indexedText(s.Messages[mi].Text)
+					if clipped {
 						mu.Lock()
-						countClipped(m, s.Path, 1)
+						countClipped(m, s.Path, s.ID, 1)
 						mu.Unlock()
 					}
 					s.Messages[mi].Text = redacted
@@ -4813,7 +5285,7 @@ func filePrefixHash(path string, n int64) uint64 {
 // countClipped records messages stored short of the transcript, against the
 // file that holds them. The caller holds the lock where one is needed;
 // redactForIngest runs single-threaded.
-func countClipped(m *Manifest, sourcePath string, n int) {
+func countClipped(m *Manifest, sourcePath, sessionID string, n int) {
 	if m == nil || n == 0 {
 		return
 	}
@@ -4835,5 +5307,11 @@ func countClipped(m *Manifest, sourcePath string, n int) {
 	}
 	e := m.IngestFiles[p]
 	e.Clipped += n
+	if sessionID != "" {
+		if e.ClippedSessions == nil {
+			e.ClippedSessions = map[string]int{}
+		}
+		e.ClippedSessions[sessionID] += n
+	}
 	m.IngestFiles[p] = e
 }

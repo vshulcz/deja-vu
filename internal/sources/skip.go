@@ -33,6 +33,13 @@ func SkipReason(harness string) string {
 		}
 		return "zstd CLI not found"
 	}
+	// Cherry Studio's dsh agent writes the same logs (#4342).
+	if harness == "cherrystudio" {
+		if ZstdAvailable() || !anyZstdFramed(CherryStudioSessionFiles()) {
+			return ""
+		}
+		return "zstd CLI not found"
+	}
 	// Codex compresses a rollout once it is seven days old, so a store can hold
 	// most of its history behind zstd — the same failure as DeepSeek Harness's,
 	// and the same rule: only the compressed ones need the tool, and a store of
@@ -79,6 +86,10 @@ func SkipReason(harness string) string {
 		present = anyFileExists(OpenClawAgentDBs())
 	case "zcode":
 		present = fileExists(ZCodeDB())
+	case "kiro":
+		// Only the headless CLI's database needs sqlite3; the transcripts
+		// are JSONL (#4300).
+		present = fileExists(KiroDB())
 	}
 	// Checked after the store: a harness with no database on this machine has
 	// nothing to explain, and asking sqlite3 would cost a process for nothing.

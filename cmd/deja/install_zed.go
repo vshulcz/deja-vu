@@ -36,7 +36,13 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	entry, err := zedEntryJSON(exe)
+	command, args := mcpCommandArgs(exe)
+	want := map[string]any{"command": command, "args": args}
+	note := ""
+	if !uninstall {
+		note = keepSwitch(zedEntryOnFile(string(old)), want)
+	}
+	entry, err := zedEntryJSON(want)
 	if err != nil {
 		return installResult{}, err
 	}
@@ -61,14 +67,29 @@ func installZedMCP(path, exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
-	return installResult{Path: path, Action: a}, werr
+	return installResult{Path: path, Action: a, Note: note}, werr
+}
+
+// zedEntryOnFile is deja's entry as the settings hold it now, under the
+// current id or the one deja used before, or nil.
+func zedEntryOnFile(text string) any {
+	for _, id := range []string{zedServerID, zedLegacyServerID} {
+		found := zedLocate(text, id)
+		if found == nil {
+			continue
+		}
+		var v any
+		if json.Unmarshal([]byte(jsoncToJSON(text[found.entry.valueOpen:found.entry.valueEnd])), &v) == nil {
+			return v
+		}
+	}
+	return nil
 }
 
 // zedEntryJSON is the server object, indented to sit at the depth Zed's own
 // settings use.
-func zedEntryJSON(exe string) (string, error) {
-	command, args := mcpCommandArgs(exe)
-	b, err := json.MarshalIndent(map[string]any{"command": command, "args": args}, "    ", "  ")
+func zedEntryJSON(entry map[string]any) (string, error) {
+	b, err := json.MarshalIndent(entry, "    ", "  ")
 	if err != nil {
 		return "", err
 	}

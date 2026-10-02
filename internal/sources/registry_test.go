@@ -360,6 +360,10 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 	return sessions
 }
 
+// registryFixturesWithCalls are the registry fixtures whose tool calls are
+// read into work records.
+var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true}
+
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()
 	if len(sessions) == 0 {
@@ -375,9 +379,14 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 		for _, message := range session.Messages {
 			// tool-output is a role the index stores and the search filters by
 			// (retrieval.go: roleToolOutput); a fixture whose harness records
-			// what a tool printed should be able to show it.
+			// what a tool printed should be able to show it. The work records a
+			// tool call leaves — files, command, edit, wrote — are allowed only
+			// for a fixture known to carry calls, so a parser that starts
+			// emitting them from prose still fails here.
 			role := message.Role
-			if (role != "user" && role != "assistant" && role != "tool-output") ||
+			work := registryFixturesWithCalls[id] &&
+				(role == RoleFiles || role == RoleCommand || role == RoleEdit || role == RoleWrote)
+			if (role != "user" && role != "assistant" && role != "tool-output" && !work) ||
 				strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
 				t.Fatalf("%s fixture produced invalid message: %#v", id, message)
 			}

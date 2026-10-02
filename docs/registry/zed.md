@@ -68,7 +68,8 @@ and a unified `diff`. 589 of the 684 have it. deja reads the diff: its removed
 lines become the replaced spans `deja restore` hands back, and its added lines
 become the written side `deja blame` attributes a line by. The whole-file texts
 beside it are up to 67 KB each and are not what stopped existing at any one
-line, so they are left alone.
+line, so they are left alone. `write_file`, which Zed 1.22 uses to create or
+overwrite a whole file, returns the same output and is read the same way.
 
 `folder_paths` is a serialized `PathList`: the workspace roots newline-joined in lexicographic order, with `folder_paths_order` holding comma-joined display indices. The first path names the project.
 

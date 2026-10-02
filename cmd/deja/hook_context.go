@@ -14,8 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -737,6 +739,34 @@ type hookCacheEntry struct {
 	// in six weeks with no record of what was in them (#2038). Old entries
 	// decode as nil and log nothing, which is what they knew.
 	IDs []string `json:"ids,omitempty"`
+	// Without holds the digest as it reads with each of IDs left out. A
+	// resumed session is left out of its own digest, and a recent one is
+	// usually in it, so without these every resume of it rebuilt the digest
+	// on the startup path and the refresh put it straight back (#4224). Old
+	// entries decode as none, and a resume falls back to building.
+	Without map[string]hookDigestVariant `json:"without,omitempty"`
+}
+
+// hookDigestVariant is a session-start digest built with one session left
+// out. Withheld is the entry's: the policy drops the same candidates either
+// way.
+type hookDigestVariant struct {
+	Digest      string   `json:"digest"`
+	Sessions    int      `json:"sessions"`
+	Raw         int64    `json:"raw"`
+	TaskMatched []string `json:"task_matched,omitempty"`
+	IDs         []string `json:"ids,omitempty"`
+	Projects    []string `json:"projects,omitempty"`
+}
+
+// servedWithout is what the entry serves to a session that must not see
+// itself, and whether it has that at all.
+func (e hookCacheEntry) servedWithout(exclude string) (hookDigestVariant, bool) {
+	if exclude == "" || !slices.Contains(e.IDs, exclude) {
+		return hookDigestVariant{Digest: e.Digest, Sessions: e.Sessions, Raw: e.Raw, TaskMatched: e.TaskMatched, IDs: e.IDs, Projects: e.Projects}, true
+	}
+	v, ok := e.Without[exclude]
+	return v, ok
 }
 
 func hookCachePath(dir, cwd string) string {
@@ -848,32 +878,50 @@ func cachedHookDigestFor(dir, fromPayload, exclude string) (string, int, int64, 
 	p := hookCachePath(dir, cwd)
 	if b, err := os.ReadFile(p); err == nil {
 		var e hookCacheEntry
-		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && e.Gate == gate && !slices.Contains(e.IDs, exclude) {
-			if time.Since(e.At) >= hookDigestTTL {
-				// Serve stale instantly; a detached self-refresh rebuilds
-				// the cache off the startup path.
-				requestHookRefresh(dir, cwd)
+		if json.Unmarshal(b, &e) == nil && e.Digest != "" && e.CWD == cwd && e.Gate == gate {
+			if v, ok := e.servedWithout(exclude); ok {
+				if time.Since(e.At) >= hookDigestTTL {
+					// Serve stale instantly; a detached self-refresh rebuilds
+					// the cache off the startup path.
+					requestHookRefresh(dir, cwd)
+				}
+				return v.Digest, v.Sessions, v.Raw, v.TaskMatched, e.Withheld, v.IDs, v.Projects
 			}
-			return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
 		}
 	}
-	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, exclude)
 	if exclude == "" {
+		// The digest goes out now and the resume variants come from the
+		// detached refresh: rendering one per served session here put them
+		// on the startup path of every first start in a project.
+		digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, "")
 		writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
-	} else {
-		// The cache is the project's, read by every session that opens in it;
-		// one without the asker would hide that session from the next one.
-		requestHookRefresh(dir, cwd)
+		if len(ids) > 0 {
+			requestHookRefresh(dir, cwd)
+		}
+		return digest, sessions, raw, taskMatched, withheld, ids, projects
 	}
+	// A resume against an entry without the digest that leaves it out. The
+	// cache is the project's, read by every session that opens in it; one
+	// without the asker would hide that session from the next one, so the
+	// refresh writes it with every variant instead.
+	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResultFor(dir, cwd, exclude)
+	requestHookRefresh(dir, cwd)
 	return digest, sessions, raw, taskMatched, withheld, ids, projects
 }
 
 func writeHookCache(dir, cwd, digest string, sessions int, raw int64, taskMatched []string, withheld int, ids, projects []string) {
-	if digest == "" {
+	writeHookCacheEntry(dir, cwd, hookCacheEntry{Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld, IDs: ids, Projects: projects})
+}
+
+func writeHookCacheEntry(dir, cwd string, e hookCacheEntry) {
+	if e.Digest == "" {
 		return
 	}
-	if b, err := json.Marshal(hookCacheEntry{At: time.Now(), CWD: cwd, Gate: hookGate(), Digest: digest, Sessions: sessions, Raw: raw, TaskMatched: taskMatched, Withheld: withheld, IDs: ids, Projects: projects}); err == nil {
-		_ = os.WriteFile(hookCachePath(dir, cwd), b, 0o600)
+	e.At, e.CWD, e.Gate = time.Now(), cwd, hookGate()
+	// Renamed into place: a hook reading while the refresh writes would
+	// otherwise see a torn entry and rebuild.
+	if b, err := json.Marshal(e); err == nil {
+		_ = atomicfile.Write(hookCachePath(dir, cwd), b, 0o600)
 	}
 }
 
@@ -927,8 +975,7 @@ func runHookRefresh(dir string) {
 	if err := index.Ensure(dir, "", false, nil); err != nil {
 		return
 	}
-	digest, sessions, raw, taskMatched, withheld, ids, projects := hookDigestResult(dir)
-	writeHookCache(dir, cwd, digest, sessions, raw, taskMatched, withheld, ids, projects)
+	writeHookCacheEntry(dir, cwd, hookDigestEntryFor(dir, ""))
 	_ = os.Remove(hookCachePath(dir, cwd) + ".refreshing")
 }
 
@@ -945,6 +992,16 @@ func hookDigestResult(dir string) (string, int, int64, []string, int, []string, 
 // project the call is about, rather than one reading it back out of the
 // environment, where a project deja itself had written stayed for every later
 // call in the process (#2182, #2185).
+func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, []string, int, []string, []string) {
+	e := hookDigestBuild(dir, fromPayload, exclude, false)
+	return e.Digest, e.Sessions, e.Raw, e.TaskMatched, e.Withheld, e.IDs, e.Projects
+}
+
+// hookDigestEntryFor is the digest as the cache keeps it: with every session
+// it serves, and as it reads with each of them left out.
+func hookDigestEntryFor(dir, fromPayload string) hookCacheEntry {
+	return hookDigestBuild(dir, fromPayload, "", true)
+}
 
 // withProjectsOf adds the projects of sessions already chosen to a name list,
 // without disturbing its order: the names the caller guessed come first, and
@@ -964,7 +1021,11 @@ func withProjectsOf(names []string, ss []model.Session) []string {
 	return out
 }
 
-func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, []string, int, []string, []string) {
+// hookDigestRenders counts digests rendered, for tests that need to tell a
+// cache hit from a rebuild.
+var hookDigestRenders atomic.Int64
+
+func hookDigestBuild(dir, fromPayload, exclude string, variants bool) (entry hookCacheEntry) {
 	withheld := 0
 	defer func() { _ = recover() }()
 	trace := os.Getenv("DEJA_TRACE") == "1"
@@ -978,7 +1039,7 @@ func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, 
 	_ = mark
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("DEJA_RECALL")))
 	if mode == search.RecallOff {
-		return "", 0, 0, nil, 0, nil, nil
+		return hookCacheEntry{}
 	}
 	// A store from an older index version must be rebuilt before it is read:
 	// this path never calls Ensure, so otherwise the first prompts after an
@@ -987,7 +1048,7 @@ func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, 
 	// manifest still describes, and this path answers from them (#800).
 	if !index.HasManifest(dir) || !index.IsCurrentVersion(dir) || index.Damaged(dir) {
 		requestWarmup(dir)
-		return "", 0, 0, nil, 0, nil, nil
+		return hookCacheEntry{}
 	}
 	cwd := fromPayload
 	if cwd == "" {
@@ -997,7 +1058,7 @@ func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, 
 		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
-			return "", 0, 0, nil, 0, nil, nil
+			return hookCacheEntry{}
 		}
 	}
 	// The two git probes (worktree list for identity, status/log for the
@@ -1050,7 +1111,7 @@ func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, 
 				continue
 			}
 			k := s.Harness + ":" + s.ID
-			if seen[k] || (exclude != "" && s.ID == exclude) {
+			if seen[k] {
 				continue
 			}
 			seen[k] = true
@@ -1058,102 +1119,143 @@ func hookDigestResultFor(dir, fromPayload, exclude string) (string, int, int64, 
 		}
 	}
 	mark("load-sessions")
-	// A subagent run is the parent's work seen from inside, and what it says
-	// on its own is the process talk a spawned agent produces — "Sending
-	// verdict", "Worktrees cleaned up". Indexing already treats these runs as
-	// secondary (#3009 keeps the task, the answer and the edits); the digest picked
-	// them like any other session and let one lead the block ahead of the
-	// session that settled the work (#3368). Kept only when the project has
-	// nothing else: a subagent's transcript still beats an empty digest.
-	if kept := withoutSubagentRuns(ss); len(kept) > 0 {
-		ss = kept
-	}
-	if len(ss) == 0 {
-		// A project can have settled decisions and no recent session left to
-		// show them (the transcript was forgotten, or aged past the window).
-		// The standing decisions still apply, so serve them alone rather than
-		// going out empty.
-		if conventions != "" {
-			return conventions, 0, 0, nil, withheld, nil, allowedNames
-		}
-		// withheld travels even with nothing to show: it is the only thing
-		// that separates "the rule hid all of it" from "no history here".
-		return "", 0, 0, nil, withheld, nil, nil
-	}
-	scores, matched := taskScores(ss, taskFiles)
-	sort.Slice(ss, func(i, j int) bool {
-		if scores[ss[i].Harness+":"+ss[i].ID] != scores[ss[j].Harness+":"+ss[j].ID] {
-			return scores[ss[i].Harness+":"+ss[i].ID] > scores[ss[j].Harness+":"+ss[j].ID]
-		}
-		return ss[i].Updated.After(ss[j].Updated)
-	})
-	if len(ss) > 12 {
-		ss = ss[:12]
-	}
-	// Digest and scoring only ever use the recent tail; hauling a marathon
-	// session's megabytes through word sets is pure waste.
-	for i := range ss {
-		if len(ss[i].Messages) > 150 {
-			ss[i].Messages = ss[i].Messages[len(ss[i].Messages)-150:]
-		}
-	}
-	mark("task-scores")
-	// A rejected session belongs last, and the mark has to travel with it: the
-	// block listed the correction as a separate item and left the session it
-	// corrects unmarked (#761).
-	ss, rejectedWarning := orderForInjection(ss)
-	ss, unseen := leadWithUnseen(dir, names, ss)
-	// A session found by where its work happened carries the name of the
-	// directory it was started in, which is not one the cwd can guess — the
-	// safe-mode filter is a name list, so the evidence that admitted the
-	// session admits its name with it (#2040). The trust policy has already
-	// had its say on each of these, one session at a time, above.
-	result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
-		Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores, Unseen: unseen})
-	mark("build-digest")
-	if result.Sessions == 0 {
-		matched = nil
-	}
-	text := result.Text
-	if rejectedWarning != "" && result.Sessions > 0 {
-		text = rejectedWarning + text
-	}
-	// Inside the cached result, not after it: this costs a manifest scan plus
-	// one session read, which is ten times the rest of the hook, and the
-	// clusters it reports change over weeks rather than turns.
+	// What every variant shares is read once: the environment block is
+	// stamped as served when it goes out, and orient reads the build's
+	// tables.
+	envDone := false
+	var envText string
 	var envFrom []string
-	if !environmentServedRecently(dir) {
-		if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
-			text += "\n" + env + "\n"
-			envFrom = from
-			// Stamped on the way out rather than by the check: the check is
-			// also made by callers that may not deliver (#1806).
-			stampEnvironmentServed(dir)
+	environment := func() (string, []string) {
+		if !envDone {
+			envDone = true
+			// Inside the cached result, not after it: this costs a manifest
+			// scan plus one session read, which is ten times the rest of the
+			// hook, and the clusters it reports change over weeks rather than
+			// turns.
+			if !environmentServedRecently(dir) {
+				if env, from := environmentBlockFrom(dir, policy.ActivationAuto); env != "" {
+					envText, envFrom = "\n"+env+"\n", from
+					// Stamped on the way out rather than by the check: the
+					// check is also made by callers that may not deliver
+					// (#1806).
+					stampEnvironmentServed(dir)
+				}
+			}
+			mark("environment")
 		}
+		return envText, envFrom
 	}
-	mark("environment")
-	// Where the work is, not what was said about it: the digest above is
-	// sessions, and an agent opening a repository it does not know spends its
-	// first turns finding the command and the files instead. Same read as the
-	// environment block, from tables the build already wrote.
-	if om := orientDigestBlock(dir, cwd, allowedNames, policy.ActivationAuto); om != "" {
-		text += "\n" + om
+	orientDone := false
+	var orient string
+	orientBlock := func() string {
+		if !orientDone {
+			orientDone = true
+			orient = orientDigestBlock(dir, cwd, allowedNames, policy.ActivationAuto)
+			mark("orient")
+		}
+		return orient
 	}
-	mark("orient")
-	// The project's standing decisions lead the block: they are the user's own
-	// settled choices, and an agent should read them before the session digest,
-	// not after. Query-independent, so a convention surfaces even when nothing
-	// in the task names it — the gap plain recall cannot close.
-	if conventions != "" {
-		text = conventions + "\n" + text
+	// Each variant works on its own copy: the steps below sort and trim in
+	// place, and the next variant has to start from the order the store gave.
+	render := func(exclude string) hookCacheEntry {
+		hookDigestRenders.Add(1)
+		ss := slices.DeleteFunc(slices.Clone(ss), func(s model.Session) bool { return exclude != "" && s.ID == exclude })
+		// A subagent run is the parent's work seen from inside, and what it says
+		// on its own is the process talk a spawned agent produces — "Sending
+		// verdict", "Worktrees cleaned up". Indexing already treats these runs as
+		// secondary (#3009 keeps the task, the answer and the edits); the digest picked
+		// them like any other session and let one lead the block ahead of the
+		// session that settled the work (#3368). Kept only when the project has
+		// nothing else: a subagent's transcript still beats an empty digest.
+		if kept := withoutSubagentRuns(ss); len(kept) > 0 {
+			ss = kept
+		}
+		if len(ss) == 0 {
+			// A project can have settled decisions and no recent session left to
+			// show them (the transcript was forgotten, or aged past the window).
+			// The standing decisions still apply, so serve them alone rather than
+			// going out empty.
+			if conventions != "" {
+				return hookCacheEntry{Digest: conventions, Withheld: withheld, Projects: allowedNames}
+			}
+			// withheld travels even with nothing to show: it is the only thing
+			// that separates "the rule hid all of it" from "no history here".
+			return hookCacheEntry{Withheld: withheld}
+		}
+		scores, matched := taskScores(ss, taskFiles)
+		sort.Slice(ss, func(i, j int) bool {
+			if scores[ss[i].Harness+":"+ss[i].ID] != scores[ss[j].Harness+":"+ss[j].ID] {
+				return scores[ss[i].Harness+":"+ss[i].ID] > scores[ss[j].Harness+":"+ss[j].ID]
+			}
+			return ss[i].Updated.After(ss[j].Updated)
+		})
+		if len(ss) > 12 {
+			ss = ss[:12]
+		}
+		// Digest and scoring only ever use the recent tail; hauling a marathon
+		// session's megabytes through word sets is pure waste.
+		for i := range ss {
+			if len(ss[i].Messages) > 150 {
+				ss[i].Messages = ss[i].Messages[len(ss[i].Messages)-150:]
+			}
+		}
+		mark("task-scores")
+		// A rejected session belongs last, and the mark has to travel with it: the
+		// block listed the correction as a separate item and left the session it
+		// corrects unmarked (#761).
+		ss, rejectedWarning := orderForInjection(ss)
+		ss, unseen := leadWithUnseen(dir, names, ss)
+		// A session found by where its work happened carries the name of the
+		// directory it was started in, which is not one the cwd can guess — the
+		// safe-mode filter is a name list, so the evidence that admitted the
+		// session admits its name with it (#2040). The trust policy has already
+		// had its say on each of these, one session at a time, above.
+		result := search.BuildAutoRecall(ss, search.AutoRecallOptions{
+			Mode: mode, ProjectNames: withProjectsOf(names, ss), TaskScores: scores, Unseen: unseen})
+		mark("build-digest")
+		if result.Sessions == 0 {
+			matched = nil
+		}
+		text := result.Text
+		if rejectedWarning != "" && result.Sessions > 0 {
+			text = rejectedWarning + text
+		}
+		env, envFrom := environment()
+		text += env
+		// Where the work is, not what was said about it: the digest above is
+		// sessions, and an agent opening a repository it does not know spends its
+		// first turns finding the command and the files instead. Same read as the
+		// environment block, from tables the build already wrote.
+		if om := orientBlock(); om != "" {
+			text += "\n" + om
+		}
+		// The project's standing decisions lead the block: they are the user's own
+		// settled choices, and an agent should read them before the session digest,
+		// not after. Query-independent, so a convention surfaces even when nothing
+		// in the task names it — the gap plain recall cannot close.
+		if conventions != "" {
+			text = conventions + "\n" + text
+		}
+		mark("conventions")
+		// The candidates that never made it into the digest were never served:
+		// counting their transcripts here inflated the distillation ratio deja
+		// prints about itself (1 session distilled, 3 sessions' bytes claimed).
+		// The projects behind what actually went out, so the injection log can be
+		// held to a rule or a forget without reading the digest's prose (#2349).
+		return hookCacheEntry{Digest: text, Sessions: result.Sessions, Raw: result.RawBytes, TaskMatched: matched, Withheld: withheld, IDs: result.IDs, Projects: digestProjects(ss, envFrom)}
 	}
-	mark("conventions")
-	// The candidates that never made it into the digest were never served:
-	// counting their transcripts here inflated the distillation ratio deja
-	// prints about itself (1 session distilled, 3 sessions' bytes claimed).
-	// The projects behind what actually went out, so the injection log can be
-	// held to a rule or a forget without reading the digest's prose (#2349).
-	return text, result.Sessions, result.RawBytes, matched, withheld, result.IDs, digestProjects(ss, envFrom)
+	entry = render(exclude)
+	if variants && entry.Digest != "" {
+		for _, id := range entry.IDs {
+			v := render(id)
+			if entry.Without == nil {
+				entry.Without = map[string]hookDigestVariant{}
+			}
+			entry.Without[id] = hookDigestVariant{Digest: v.Digest, Sessions: v.Sessions, Raw: v.Raw, TaskMatched: v.TaskMatched, IDs: v.IDs, Projects: v.Projects}
+		}
+		mark("variants")
+	}
+	return entry
 }
 
 // digestProjects names the projects a session-start digest was built from: the

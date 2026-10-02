@@ -23,6 +23,13 @@ var rooEditTools = map[string]bool{
 	"search_and_replace": true,
 	"write_to_file":      true,
 	"insert_content":     true,
+	// Current Roo's tools: the last three take old_string and new_string under
+	// `file_path`, apply_patch takes one patch for any number of files
+	// (#4419).
+	"search_replace": true,
+	"edit_file":      true,
+	"edit":           true,
+	"apply_patch":    true,
 }
 
 // rooDiffSides splits one diff payload into the replaced and the written side
@@ -112,6 +119,40 @@ func rooResolvePaths(record, workspace string) string {
 	return strings.Join(lines, "\n")
 }
 
+// rooAbsRecord is rooAbsPath over the path that heads a "path\n..." record.
+func rooAbsRecord(record, workspace string) string {
+	path, rest, _ := strings.Cut(record, "\n")
+	return rooAbsPath(path, workspace) + "\n" + rest
+}
+
+// rooPatchPaths adds the files an apply_patch call names to a files record.
+// The patch carries them in its own headers, not under an argument (#4419).
+func rooPatchPaths(blocks []any, record string) string {
+	seen := map[string]bool{}
+	var out []string
+	if record != "" {
+		out = strings.Split(record, "\n")
+		for _, p := range out {
+			seen[p] = true
+		}
+	}
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, rooDialect)
+		if !ok || name != "apply_patch" {
+			continue
+		}
+		patch, _ := in["patch"].(string)
+		for _, m := range codexPatchFile.FindAllStringSubmatch(patch, -1) {
+			p := strings.TrimSpace(m[1])
+			if p != "" && !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
 // rooEditRecords turns the edit calls in one message into the replaced side
 // ("path\nspan") and the written side (WroteRecord), in the order the calls
 // were made.
@@ -121,7 +162,20 @@ func rooEditRecords(blocks []any, workspace string) (spans, wrote []string) {
 		if !ok || !rooEditTools[name] {
 			continue
 		}
+		if name == "apply_patch" {
+			patch, _ := in["patch"].(string)
+			for _, span := range patchSpans(patch) {
+				spans = append(spans, rooAbsRecord(span, workspace))
+			}
+			for _, rec := range addedLinesOfPatch(patch) {
+				wrote = append(wrote, rooAbsRecord(rec, workspace))
+			}
+			continue
+		}
 		path, _ := in["path"].(string)
+		if path == "" {
+			path, _ = in["file_path"].(string)
+		}
 		// "path\nspan" cannot hold a path with a newline in it, the same
 		// reason the shared helper drops those edits (#2042).
 		if path == "" || strings.ContainsAny(path, "\n\r") {
@@ -163,6 +217,10 @@ func rooCallSides(name string, in map[string]any) (replaced, written []string) {
 		search, _ := in["search"].(string)
 		replace, _ := in["replace"].(string)
 		return []string{search}, []string{replace}
+	case "search_replace", "edit_file", "edit":
+		old, _ := in["old_string"].(string)
+		neu, _ := in["new_string"].(string)
+		return []string{old}, []string{neu}
 	case "write_to_file", "insert_content":
 		content, _ := in["content"].(string)
 		return nil, []string{content}

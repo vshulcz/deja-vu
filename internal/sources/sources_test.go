@@ -104,7 +104,7 @@ func TestLoadersOffsetsAndUtilityVariants(t *testing.T) {
 	if textFromContent([]any{map[string]any{"text": "a"}, map[string]any{"content": "b"}}) != "a\nb" {
 		t.Fatalf("textFromContent variant failed")
 	}
-	if projectName("") != "-" || projectName("/a/b") != "b" {
+	if projectName("") != "-" || projectName("/a/b") != "a/b" {
 		t.Fatalf("projectName failed")
 	}
 	count := 0

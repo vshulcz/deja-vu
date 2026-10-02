@@ -82,7 +82,8 @@
 <p>lines become the replaced spans <code>deja restore</code> hands back, and its added lines</p>
 <p>become the written side <code>deja blame</code> attributes a line by. The whole-file texts</p>
 <p>beside it are up to 67 KB each and are not what stopped existing at any one</p>
-<p>line, so they are left alone.</p>
+<p>line, so they are left alone. <code>write_file</code>, which Zed 1.22 uses to create or</p>
+<p>overwrite a whole file, returns the same output and is read the same way.</p>
 <p><code>folder_paths</code> is a serialized <code>PathList</code>: the workspace roots newline-joined in lexicographic order, with <code>folder_paths_order</code> holding comma-joined display indices. The first path names the project.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
