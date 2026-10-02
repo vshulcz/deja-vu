@@ -265,28 +265,30 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// session from its history. So the history comes back and the id is
 		// not the one that continues; the caveat below says so. It runs its
 		// tools in the current directory, so the fork runs in the session's
-		// workspace (#4375).
-		return existingDir(sources.ContinueSessionDir(s.Path)), "cn --fork " + s.ID, nil
+		// workspace (#4375), or says it will not when that is gone (#4460).
+		return existingDir(resumeRecordedDir(s)), "cn --fork " + s.ID, nil
 	case "commandcode":
 		// `cmd --resume <id>` (1.73.4 --help) finds the id only under the
 		// project folder of the current directory, so it runs where the
-		// session did (#4372). On Windows the bin is cmdc, as the client
-		// prints on exit.
+		// session did (#4372). `--session <id>` searches every project and
+		// continues the same transcript from wherever it runs, so that is the
+		// command when the directory is gone or unknown (#4460). On Windows
+		// the bin is cmdc, as the client prints on exit.
 		bin := "cmd"
 		if runtime.GOOS == "windows" {
 			bin = "cmdc"
 		}
-		return existingDir(sources.CommandCodeSessionDir(s.Path)), bin + " --resume " + s.ID, nil
+		if dir := existingDir(resumeRecordedDir(s)); dir != "" {
+			return dir, bin + " --resume " + s.ID, nil
+		}
+		return "", bin + " --session " + s.ID, nil
 	case "kiro":
 		// `kiro-cli chat --resume-id <sessionId>`, which Kiro's own docs give
 		// and two orchestrators drive — one of them noting it needs Kiro CLI
 		// 2.2.0 or newer. kiro-cli finds the session from anywhere but runs it
 		// in the current directory and rewrites the session's cwd to it, so
 		// the command runs where the session did (#4305).
-		dir := existingDir(sources.KiroSessionDir(s.Path))
-		if s.Path == sources.KiroDB() {
-			dir = existingDir(sources.KiroDBSessionDir(s.Path, s.ID))
-		}
+		dir := existingDir(resumeRecordedDir(s))
 		// A `sess_` id is the <workspace>/sess_<uuid> layout, which the IDE
 		// and `kiro-cli --v3` both write. V3 lists its own in session-index
 		// and takes the id back; the IDE's reopen from the app (#4307).
@@ -374,13 +376,15 @@ func resumeCommand(s model.Session) (string, string, error) {
 		return "", "", fmt.Errorf("cursor IDE chats reopen from the Cursor UI, not the terminal")
 	case "grok":
 		// Grok Build resumes by session id and scopes its session list by the
-		// working directory, so this has to run in the original project. The
-		// grok-dev store is a different product sharing ~/.grok: its rows come
-		// out of grok.db and there is no CLI to hand them to.
+		// working directory, so this runs in the original project. It reopens
+		// one from any directory too, so a deleted project is left out rather
+		// than printed as a cd that fails (#4459). The grok-dev store is a
+		// different product sharing ~/.grok: its rows come out of grok.db and
+		// there is no CLI to hand them to.
 		if !strings.HasSuffix(s.Path, "updates.jsonl") {
 			return "", "", fmt.Errorf("session %s comes from the grok-dev store, which has no terminal resume", digest.Short(s.ID))
 		}
-		return sources.GrokCWDForSession(s.Path), "grok --resume " + s.ID, nil
+		return existingDir(resumeRecordedDir(s)), "grok --resume " + s.ID, nil
 	case "cline":
 		if strings.HasPrefix(s.ID, "cline-task-") {
 			return "", "", fmt.Errorf("legacy Cline VS Code tasks reopen from the extension's history UI, not the terminal")
@@ -402,12 +406,17 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// answered "Session not found" (#4422). The path goes on the command
 		// as one word, quoted when it needs it, so a Windows workspace under
 		// an 8.3 or spaced name keeps its -w (#4455); only one no quoting
-		// carries keeps the cd alone.
+		// carries keeps the cd alone. A workspace that is gone has no task to
+		// find (#4459).
 		if id, ws := sources.RooCLITask(s.Path); id != "" {
-			if w, ok := resumeWord(ws); ok {
-				return ws, "roo -w " + w + " --session-id " + id, nil
+			dir, err := recordedResumeDir(s, ws, "roo --session-id")
+			if err != nil {
+				return "", "", err
 			}
-			return ws, "roo --session-id " + id, nil
+			if w, ok := resumeWord(dir); ok {
+				return dir, "roo -w " + w + " --session-id " + id, nil
+			}
+			return dir, "roo --session-id " + id, nil
 		}
 		return "", "", fmt.Errorf("roo tasks from the VS Code extension reopen from its history UI; only the ones the roo CLI created take --session-id")
 	case "zed":
@@ -425,7 +434,7 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// directory is the absolute workspace from the session file; the
 		// project label is a relative path that only resolved from the
 		// workspace's parent (#4362).
-		return existingDir(sources.CodeWhaleWorkspace(s.Path)), "codewhale --resume " + s.ID, nil
+		return existingDir(resumeRecordedDir(s)), "codewhale --resume " + s.ID, nil
 	case "reasonix":
 		// `--resume` looks an id up in the store of the workspace it runs in
 		// (the git root of the working directory), so it goes with that
@@ -449,13 +458,21 @@ func resumeCommand(s model.Session) (string, string, error) {
 			if !reasonixPathPattern.MatchString(s.ID) {
 				return "", "", fmt.Errorf("session id %q contains characters deja will not place in a command", s.ID)
 			}
-			return ws, "reasonix --resume " + s.ID, nil
+			dir, err := recordedResumeDir(s, ws, "reasonix --resume")
+			if err != nil {
+				return "", "", err
+			}
+			return dir, "reasonix --resume " + s.ID, nil
 		}
-		if ws := sources.ReasonixWorkspace(s.Path); ws != "" {
+		// The JSONL store sits under Reasonix's state, not the workspace, and
+		// --resume reads a file path from any directory, so a session whose
+		// workspace is gone is reached by its path, like one that had none
+		// (#4459).
+		if ws := existingDir(sources.ReasonixWorkspace(s.Path)); ws != "" {
 			return ws, "reasonix --resume " + s.ID, nil
 		}
 		if !reasonixPathPattern.MatchString(s.Path) {
-			return "", "", fmt.Errorf("session %s has no workspace and its path holds characters deja will not place in a command — run reasonix --resume with the file %s", digest.Short(s.ID), s.Path)
+			return "", "", fmt.Errorf("session %s has no workspace to run in and its path holds characters deja will not place in a command — run reasonix --resume with the file %s", digest.Short(s.ID), s.Path)
 		}
 		return "", "reasonix --resume " + s.Path, nil
 	case "qwen":
@@ -503,13 +520,23 @@ func resumeCommand(s model.Session) (string, string, error) {
 	case "crush":
 		// In the project directory, not anywhere: Crush keeps one store per
 		// project and looks for the session in the one under the current
-		// directory, so the same id resolves to nothing from elsewhere.
+		// directory, so the same id resolves to nothing from elsewhere. That
+		// store is inside the project, so a project that is gone took the
+		// session with it (#4459).
 		if !crushSessionID.MatchString(s.ID) {
 			return "", "", fmt.Errorf("session id %q is not the uuid crush --session takes", s.ID)
 		}
-		return sources.CrushProjectDir(s.Path), "crush --session " + s.ID, nil
+		dir, err := recordedResumeDir(s, sources.CrushProjectDir(s.Path), "crush --session")
+		if err != nil {
+			return "", "", err
+		}
+		return dir, "crush --session " + s.ID, nil
 	case "pi":
-		return piProjectDirFor(s), "pi --session " + s.ID, nil
+		// In the directory the header records, not one decoded from the
+		// folder name, where my-app and my/app fold to the same name. From
+		// another project pi 0.73 finds the session globally and asks to fork
+		// it (#4456).
+		return existingDir(resumeRecordedDir(s)), "pi --session " + s.ID, nil
 	case "omp":
 		return "", "omp --resume " + s.ID, nil
 	case "amp":
@@ -560,9 +587,10 @@ func existingDir(p string) string {
 }
 
 // resumeRecordedDir is the directory a session recorded running in, for the
-// harnesses whose resume command goes there when it still exists: opencode,
-// Kilo and ZCode's CLI keep it as the session's path, gjc, Kimchi, Senpi and
-// prime-agent in the transcript header.
+// harnesses whose resume command goes there when it still exists and reopens
+// it from elsewhere when it does not: opencode, Kilo and ZCode's CLI keep it
+// as the session's path, the pi family and prime-agent in the transcript
+// header, the others in a sidecar or the session file (#4459, #4460).
 func resumeRecordedDir(s model.Session) string {
 	switch s.Harness {
 	case "opencode", "kilocode":
@@ -571,20 +599,41 @@ func resumeRecordedDir(s model.Session) string {
 		if !strings.HasSuffix(s.Path, ".jsonl") && !sources.ZCodeLegacyUnderRoot(s.Path) {
 			return s.Path
 		}
-	case "gjc", "kimchi", "senpi":
+	case "pi", "gjc", "kimchi", "senpi":
 		return sources.PiHeaderCwd(s.Path)
 	case "prime":
 		return sources.PrimeSessionDir(s.Path)
+	case "grok":
+		if strings.HasSuffix(s.Path, "updates.jsonl") {
+			return sources.GrokCWDForSession(s.Path)
+		}
+	case "kiro":
+		if s.Path == sources.KiroDB() {
+			return sources.KiroDBSessionDir(s.Path, s.ID)
+		}
+		return sources.KiroSessionDir(s.Path)
+	case "continue":
+		return sources.ContinueSessionDir(s.Path)
+	case "codewhale":
+		return sources.CodeWhaleWorkspace(s.Path)
+	case "commandcode":
+		return sources.CommandCodeSessionDir(s.Path)
+	case "reasonix":
+		if sources.ReasonixStore(s.Path) == "jsonl" {
+			return sources.ReasonixWorkspace(s.Path)
+		}
 	}
 	return ""
 }
 
 // resumeDirGoneNote says where a session whose directory is gone will run:
 // opencode, Kilo and ZCode reopen it from anywhere, and their tools then work
-// in the directory the command is run from. Cline does the same, and its
-// directory is the manifest's rather than the store path's (#4318). gjc,
-// Kimchi and Senpi offer to fork it there instead, and prime-agent refuses it
-// unless told to fork (#4408).
+// in the directory the command is run from, and so do Grok, Kiro, Continue,
+// CodeWhale, Command Code and a Reasonix JSONL session (#4459, #4460). Cline
+// does the same, and its directory is the manifest's rather than the store
+// path's (#4318). pi, gjc, Kimchi and Senpi
+// offer to fork it there instead, and prime-agent refuses it unless told to
+// fork (#4408, #4456).
 func resumeDirGoneNote(s model.Session, dir string) string {
 	if dir == "" && s.Harness == "cline" && s.Path != "" {
 		if d := sources.ClineSessionDir(s.Path); d != "" {
@@ -602,7 +651,7 @@ func resumeDirGoneNote(s model.Session, dir string) string {
 	if s.Harness == "prime" {
 		return fmt.Sprintf("the directory this session ran in is gone (%s); from any other directory prime-agent refuses it unless you add --fork %s", recorded, s.ID)
 	}
-	if s.Harness == "gjc" || s.Harness == "kimchi" || s.Harness == "senpi" {
+	if s.Harness == "pi" || s.Harness == "gjc" || s.Harness == "kimchi" || s.Harness == "senpi" {
 		return fmt.Sprintf("the directory this session ran in is gone (%s); from any other directory %s offers to fork it rather than reopen it", recorded, s.Harness)
 	}
 	return fmt.Sprintf("the directory this session ran in is gone (%s); it reopens in the one you run the command from", recorded)
@@ -629,19 +678,6 @@ func cursorProjectDirFor(s model.Session) string {
 		return cwd
 	}
 	base := sources.CursorTranscriptProjectDirBase(s.Path)
-	if base == "" {
-		return ""
-	}
-	return sources.ResolveEncodedPath(base)
-}
-
-// piProjectDirFor recovers the original working directory from the
-// transcript location when the encoded project dir still exists on disk.
-func piProjectDirFor(s model.Session) string {
-	if s.Path == "" {
-		return ""
-	}
-	base := sources.PiProjectDirBase(s.Path)
 	if base == "" {
 		return ""
 	}

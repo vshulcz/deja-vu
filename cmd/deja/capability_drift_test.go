@@ -314,7 +314,8 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":"/work/app"}`
+		ws, _ := json.Marshal(t.TempDir())
+		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":` + string(ws) + `}`
 		if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -364,6 +365,9 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		// project the store sits under, so both have to be real here.
 		s.ID = "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
 		s.Path = filepath.Join(t.TempDir(), "app", ".crush", "crush.db")
+		if err := os.MkdirAll(filepath.Dir(s.Path), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if harness == "openclaw" {
 		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")

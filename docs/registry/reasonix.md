@@ -8,7 +8,7 @@
 - **Read overrides**: `DEJA_REASONIX_ROOT` replaces the state root; pointed at a `sessions` directory it reads that directory alone
 - **Format**: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope
 - **Needs**: the `zstd` CLI for 1.x sessions; nothing for JSONL
-- **Resume**: `reasonix --resume <id>`, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command
+- **Resume**: `reasonix --resume <id>`, run in the workspace the session was worked in; a JSONL session saved with no workspace, or whose workspace is gone, is resumed by its file path from anywhere, and a 1.x session whose workspace is gone is refused with `deja show` (#4459). 1.x sessions in the global or desktop store have no resume command
 
 Reasonix is a Go coding agent built around DeepSeek's prefix cache. The
 layout above comes from its own resolver, `internal/contract/config`

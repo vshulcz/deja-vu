@@ -103,7 +103,8 @@
 <li><strong>Resume</strong>: <code>crush --session &lt;uuid&gt;</code>, run in the project directory — Crush</li>
 </ul>
 <p>looks for the session in the store under the current directory and nowhere</p>
-<p>else, so the same id resolves to nothing from elsewhere.</p>
+<p>else, so the same id resolves to nothing from elsewhere. That store sits in</p>
+<p>the project, so a project that is gone is refused with <code>deja show</code> (#4459).</p>
 <ul>
 <li><strong>Handoff</strong>: exec, <code>crush run</code>.</li>
 </ul>

@@ -52,7 +52,8 @@ validation is still welcome.
   in is the ending: the flag forks, so the history comes back under a new
   session id rather than continuing the old one, and deja says so on stderr
   beside the command. The fork runs its tools in the current directory, so
-  the command goes with a `cd` into the session's `workspaceDirectory` (#4375).
+  the command goes with a `cd` into the session's `workspaceDirectory` (#4375),
+  or, with that gone, a note that the fork runs where you are (#4460).
   `cn --resume` remains the last-session shortcut, and
   the editor reopens one from its history view.
 - **Handoff**: paste.

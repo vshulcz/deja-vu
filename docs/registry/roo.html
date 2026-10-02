@@ -91,7 +91,8 @@
 </ul>
 <p>workspace, for tasks the CLI created. The <code>-w</code> matters: without it the CLI</p>
 <p>looks under the real path of its cwd, and a task created with <code>-w /tmp/...</code></p>
-<p>on macOS recorded the symlinked path. Editor tasks reopen from the extension&#39;s history UI.</p>
+<p>on macOS recorded the symlinked path. A workspace that is gone is refused</p>
+<p>with <code>deja show</code> (#4459). Editor tasks reopen from the extension&#39;s history UI.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

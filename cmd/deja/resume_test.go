@@ -198,6 +198,9 @@ func TestResumeQwenRunsInANonASCIIProjectDirectory(t *testing.T) {
 func TestCrushResumeRunsInTheProject(t *testing.T) {
 	tmp := t.TempDir()
 	project := filepath.Join(tmp, "my-app")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	path := filepath.Join(project, ".crush", "crush.db")
 	id := "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
 

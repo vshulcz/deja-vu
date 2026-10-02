@@ -101,7 +101,7 @@
 <h2 id="skill-auto-recall-command">Skill, auto-recall, command</h2>
 <p>The skill is the shared <code>~/.agents/skills/deja-history/SKILL.md</code>; pi scans that directory, and a second copy in <code>~/.pi/agent/skills</code> makes it report a collision, so install removes one an older deja left there.</p>
 <p><code>deja install pi-auto</code> writes the MCP entry and <code>~/.pi/agent/extensions/deja.ts</code>. The extension returns the session digest on the first turn and per-prompt recall after that at <code>before_agent_start</code>, adds to a <code>tool_result</code> a file&#39;s history after a <code>read</code> or the earlier fix after a failed <code>bash</code> command, runs <code>deja hook-precompact</code> at <code>session_compact</code>, and registers <code>/deja &lt;query&gt;</code>, which runs <code>deja search</code>.</p>
-<p><code>deja resume</code> prints <code>pi --session &lt;id&gt;</code>, run in the project directory when the encoded name still resolves.</p>
+<p><code>deja resume</code> prints <code>pi --session &lt;id&gt;</code>, run in the <code>cwd</code> the session header records; the folder name folds <code>/</code> into <code>-</code>, so <code>my-app</code> and <code>my/app</code> share it. With that directory gone the <code>cd</code> is left out and deja notes that pi, run from another project, offers to fork the session (#4456).</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Project directory encoding uses <code>--</code> prefix and suffix (e.g. <code>--Users-max-code-foo--</code>) compared to Claude Code&#39;s single <code>-</code> prefix. The <code>resolveEncodedPath</code> function handles both.</li>

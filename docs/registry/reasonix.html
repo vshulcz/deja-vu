@@ -46,7 +46,7 @@
 <li><strong>Read overrides</strong>: <code>DEJA_REASONIX_ROOT</code> replaces the state root; pointed at a <code>sessions</code> directory it reads that directory alone</li>
 <li><strong>Format</strong>: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope</li>
 <li><strong>Needs</strong>: the <code>zstd</code> CLI for 1.x sessions; nothing for JSONL</li>
-<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command</li>
+<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace, or whose workspace is gone, is resumed by its file path from anywhere, and a 1.x session whose workspace is gone is refused with <code>deja show</code> (#4459). 1.x sessions in the global or desktop store have no resume command</li>
 </ul>
 <p>Reasonix is a Go coding agent built around DeepSeek&#39;s prefix cache. The</p>
 <p>layout above comes from its own resolver, <code>internal/contract/config</code></p>

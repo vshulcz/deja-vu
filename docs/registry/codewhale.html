@@ -44,7 +44,7 @@
 <li><strong>Read overrides</strong>: <code>DEJA_CODEWHALE_ROOT</code> replaces the current session directory (the legacy one is still read while it exists); <code>CODEWHALE_HOME</code> moves the whole store and turns the legacy root off</li>
 <li><strong>Format</strong>: JSON — <code>{schema_version, metadata, messages}</code>, pretty-printed</li>
 <li><strong>Needs</strong>: nothing</li>
-<li><strong>Resume</strong>: <code>cd &lt;metadata.workspace&gt; &amp;&amp; codewhale --resume &lt;id&gt;</code>, the absolute workspace from the session file, with no <code>cd</code> when it is gone (#4362) — <code>--session-id</code> is its alias and <code>codewhale exec</code> takes both (checked against 0.9.13)</li>
+<li><strong>Resume</strong>: <code>cd &lt;metadata.workspace&gt; &amp;&amp; codewhale --resume &lt;id&gt;</code>, the absolute workspace from the session file, with no <code>cd</code> and a note when it is gone (#4362, #4460) — <code>--session-id</code> is its alias and <code>codewhale exec</code> takes both (checked against 0.9.13)</li>
 </ul>
 <p>CodeWhale is a terminal agent written in Rust. It shipped as <code>deepseek-tui</code></p>
 <p>until v0.8.41 and under its own name since; the provider integration did not</p>

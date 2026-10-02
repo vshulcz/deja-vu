@@ -44,6 +44,9 @@ func TestResumeRooSplitsTheCLIFromTheEditor(t *testing.T) {
 	cli := filepath.Join(tmp, "vscode-mock", "global-storage")
 	t.Setenv("DEJA_ROO_CLI_ROOT", cli)
 	work := filepath.Join(tmp, "app")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	id := "01a07bf9-8882-7703-a3fa-245deb8ea752"
 	path := rooCLITask(t, cli, id, work)
 
@@ -62,20 +65,29 @@ func TestResumeRooSplitsTheCLIFromTheEditor(t *testing.T) {
 	}
 	// A workspace with a space or a ~ in it, as a Windows profile under its
 	// 8.3 name has, is quoted rather than left off: without -w the CLI looks
-	// under the cwd's real path and misses the task (#4455). --exec reads the
-	// quoted word back as one argument.
-	spaced := `C:\Users\JOHNSM~1\My Projects\app`
+	// under the cwd's real path and misses the task (#4455).
+	spaced := filepath.Join(tmp, "JOHNSM~1", "My Projects", "app")
+	if err := os.MkdirAll(spaced, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	sid := "01a07bf9-8882-7703-a3fa-245deb8ea753"
-	want := "roo -w 'C:\\Users\\JOHNSM~1\\My Projects\\app' --session-id " + sid
+	want := "roo -w '" + spaced + "' --session-id " + sid
 	if _, cmd, err := resumeCommand(model.Session{Harness: "roo", ID: "roo-task-" + sid, Path: rooCLITask(t, cli, sid, spaced)}); err != nil || cmd != want {
 		t.Fatalf("spaced workspace: cmd = %q, err = %v, want %q", cmd, err, want)
 	}
-	if got, err := resumeArgv(want); err != nil || strings.Join(got, "|") != "roo|-w|"+spaced+"|--session-id|"+sid {
-		t.Fatalf("--exec splits %q into %q, err = %v", want, got, err)
+	// --exec reads the quoted word back as one argument, a Windows one with
+	// its backslashes included.
+	win := `C:\Users\JOHNSM~1\My Projects\app`
+	line := "roo -w '" + win + "' --session-id " + sid
+	if got, err := resumeArgv(line); err != nil || strings.Join(got, "|") != "roo|-w|"+win+"|--session-id|"+sid {
+		t.Fatalf("--exec splits %q into %q, err = %v", line, got, err)
 	}
 	// A quote has no form bash, zsh and PowerShell all read alike, so that
 	// workspace keeps the cd alone.
 	quoted := filepath.Join(tmp, "bob's app")
+	if err := os.MkdirAll(quoted, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	qid := "01a07bf9-8882-7703-a3fa-245deb8ea754"
 	if _, cmd, err := resumeCommand(model.Session{Harness: "roo", ID: "roo-task-" + qid, Path: rooCLITask(t, cli, qid, quoted)}); err != nil || cmd != "roo --session-id "+qid {
 		t.Fatalf("quoted workspace: cmd = %q, err = %v", cmd, err)

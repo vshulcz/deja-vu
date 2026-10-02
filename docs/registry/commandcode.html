@@ -43,6 +43,7 @@
 <li><strong>Read override</strong>: <code>DEJA_COMMANDCODE_ROOT</code> replaces the project root</li>
 <li><strong>Format</strong>: JSONL — a <code>session</code> header, then one <code>message</code> envelope per line</li>
 <li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: <code>cmd --resume &lt;id&gt;</code> (<code>cmdc</code> on Windows), run in the header&#39;s <code>cwd</code>, since it finds a session only under the current directory&#39;s project (#4372). With that directory gone, or none recorded, <code>cmd --session &lt;id&gt;</code>, which searches every project and continues the same transcript where you run it (checked against 1.73.4, #4460)</li>
 </ul>
 <p>Command Code writes a Claude-Code-style project directory with one transcript</p>
 <p>per session. Since 1.73 (format version 3) the first line is a header,</p>

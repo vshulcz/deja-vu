@@ -30,7 +30,8 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
 - Resume: `cd <cwd> && kiro-cli chat --resume-id <sessionId>`, which needs
   Kiro CLI 2.2.0 or newer. kiro-cli finds a session by id from any directory,
   but runs it in the current one and rewrites the header's `cwd` to it, so the
-  command runs in the directory the header names (#4305).
+  command runs in the directory the header names (#4305). With that directory
+  gone the `cd` is left out and deja notes where it will run instead (#4460).
 - **`sess_` is not only the IDE's.** `kiro-cli --v3` (2.22.0 ships the V3
   engine behind that flag) writes the same `<workspace>/sess_<uuid>` layout
   and adds each session to `~/.kiro/session-index/<workspace>.jsonl`. A

@@ -48,14 +48,15 @@ func TestResumeCommandCodeRunsInTheSessionDirectory(t *testing.T) {
 		t.Errorf("dir = %q, want the header's cwd %q", dir, proj)
 	}
 
-	// The older flat shape records no directory: the command, without a cd.
+	// The older flat shape records no directory: `--session`, which finds the
+	// id in any project, without a cd (#4460).
 	old := filepath.Join(filepath.Dir(transcript), "aaaa1111.jsonl")
 	writeResumeFile(t, old, `{"role":"user","content":"fix the retry loop","timestamp":"2026-09-16T12:00:05Z","sessionId":"aaaa1111"}`+"\n")
 	dir, cmd, err = resumeCommand(model.Session{Harness: "commandcode", ID: "aaaa1111", Path: old})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if dir != "" || cmd != bin+" --resume aaaa1111" {
+	if dir != "" || cmd != bin+" --session aaaa1111" {
 		t.Errorf("v2 session: got (%q, %q)", dir, cmd)
 	}
 
@@ -63,8 +64,8 @@ func TestResumeCommandCodeRunsInTheSessionDirectory(t *testing.T) {
 	if err := os.RemoveAll(proj); err != nil {
 		t.Fatal(err)
 	}
-	if dir, _, _ := resumeCommand(model.Session{Harness: "commandcode", ID: id, Path: transcript}); dir != "" {
-		t.Errorf("dir = %q for a directory that is gone", dir)
+	if dir, cmd, err := resumeCommand(model.Session{Harness: "commandcode", ID: id, Path: transcript}); err != nil || dir != "" || cmd != bin+" --session "+id {
+		t.Errorf("got (%q, %q, %v) for a directory that is gone, want %s --session with no cd", dir, cmd, err, bin)
 	}
 }
 

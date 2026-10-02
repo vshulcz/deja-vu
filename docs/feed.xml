@@ -207,6 +207,13 @@
     <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Grok Build stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
+    <updated>2026-10-02T00:00:00Z</updated>
+    <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Hermes stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/hermes.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
