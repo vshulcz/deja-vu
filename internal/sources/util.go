@@ -748,7 +748,7 @@ func toolPathStrings(in map[string]any, d toolDialect) []string {
 	for _, it := range items {
 		switch e := it.(type) {
 		case string:
-			if e != "" && !(d.pathListGlobs && strings.ContainsAny(e, "*?[{")) {
+			if e != "" && (!d.pathListGlobs || !strings.ContainsAny(e, "*?[{")) {
 				out = append(out, e)
 			}
 		case map[string]any:
