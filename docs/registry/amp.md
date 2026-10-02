@@ -18,7 +18,8 @@ directory, and deja reads those:
 
 Each `*.json` file is one thread. The parser uses `id` as the stable session ID,
 `title` as the session title, and the first `env.initial.trees[0].uri` when it
-is a `file://` URI to derive the project name from its final path component.
+is a `file://` URI to derive the project name from its last two path segments,
+as Claude Code does (#4457).
 If that working-directory URI is absent or not a file URI, the project falls
 back to the title.
 

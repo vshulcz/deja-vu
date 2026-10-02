@@ -56,7 +56,8 @@
 <p>only root deja reads.</p>
 <p>Each <code>*.json</code> file is one thread. The parser uses <code>id</code> as the stable session ID,</p>
 <p><code>title</code> as the session title, and the first <code>env.initial.trees[0].uri</code> when it</p>
-<p>is a <code>file://</code> URI to derive the project name from its final path component.</p>
+<p>is a <code>file://</code> URI to derive the project name from its last two path segments,</p>
+<p>as Claude Code does (#4457).</p>
 <p>If that working-directory URI is absent or not a file URI, the project falls</p>
 <p>back to the title.</p>
 <p>A thread&#39;s <code>messages</code> are retained only for <code>user</code> and <code>assistant</code> roles. Within</p>
