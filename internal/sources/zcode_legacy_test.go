@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // Before the current runtime ZCode kept each conversation as
@@ -93,5 +94,76 @@ func TestZCodeSnapshotIDIsReadOffTheMeta(t *testing.T) {
 	}
 	if got := zcodeLegacyID(tail); got != "task-2" {
 		t.Errorf("meta last: id %q, want task-2", got)
+	}
+}
+
+// A snapshot with no meta is read under its file name, and one that is not a
+// JSON object, or breaks off before its meta, has no id.
+func TestZCodeSnapshotIDWithoutAReadableMeta(t *testing.T) {
+	dir := t.TempDir()
+	for name, c := range map[string]struct{ body, want string }{
+		"task-3.json": {`{"messages":[{"role":"user","content":"fix it"}],"title":"x"}`, "task-3"},
+		"task-4.json": {`[{"meta":{"taskId":"task-4"}}]`, ""},
+		"task-5.json": {`{"messages":[{"role":"user","content":"fix`, ""},
+		"task-6.json": {`{"messages"`, ""},
+		"task-7.json": {``, ""},
+	} {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(c.body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := zcodeLegacyID(p); got != c.want {
+			t.Errorf("%s: id %q, want %q", name, got, c.want)
+		}
+	}
+	if got := zcodeLegacyID(filepath.Join(dir, "gone.json")); got != "" {
+		t.Errorf("missing snapshot: id %q, want none", got)
+	}
+}
+
+// The fingerprint says whether the CLI database holds the session a snapshot
+// was restored as, so restoring one re-reads it and the reader drops it
+// (#4448). The id is cached per file state: a rewrite is decoded again.
+func TestZCodeLegacySidecarFollowsTheRestore(t *testing.T) {
+	dir := t.TempDir()
+	snap := filepath.Join(dir, "task-1.json")
+	other := filepath.Join(dir, "task-2.json")
+	for p, body := range map[string]string{
+		snap:  `{"meta":{"taskId":"task-1","acpSessionId":"acp-9"},"messages":[]}`,
+		other: `{"meta":{"taskId":"task-2"},"messages":[]}`,
+	} {
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db := filepath.Join(dir, "db.sqlite")
+	t.Setenv("DEJA_ZCODE_DB", db)
+	if size, stamp := zcodeLegacySidecar(snap); size != 0 || stamp != 0 {
+		t.Errorf("no database = %d/%d, want nothing", size, stamp)
+	}
+	if !SQLite3Available() {
+		t.Skip("sqlite3 CLI not available")
+	}
+	if out, err := exec.Command("sqlite3", db, `create table session (id text primary key); insert into session values ('acp-9');`).CombinedOutput(); err != nil {
+		t.Fatalf("sqlite3 seed: %v %s", err, out)
+	}
+	if size, stamp := zcodeLegacySidecar(snap); size != 1 || stamp != 1 {
+		t.Errorf("restored snapshot = %d/%d, want 1/1", size, stamp)
+	}
+	if size, stamp := zcodeLegacySidecar(snap); size != 1 || stamp != 1 {
+		t.Errorf("restored snapshot read again = %d/%d, want 1/1", size, stamp)
+	}
+	if size, stamp := zcodeLegacySidecar(other); size != 0 || stamp != 0 {
+		t.Errorf("snapshot not restored = %d/%d, want nothing", size, stamp)
+	}
+	if err := os.WriteFile(snap, []byte(`{"meta":{"taskId":"task-1","acpSessionId":"acp-10"},"messages":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(snap, later, later); err != nil {
+		t.Fatal(err)
+	}
+	if size, stamp := zcodeLegacySidecar(snap); size != 0 || stamp != 0 {
+		t.Errorf("snapshot rewritten under a new id = %d/%d, want nothing", size, stamp)
 	}
 }

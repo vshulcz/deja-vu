@@ -192,6 +192,36 @@ func TestPiResumesPastACleanCommandResult(t *testing.T) {
 	}
 }
 
+// An edit result answers a call stored already: its refusal is what drops the
+// edit, so the file goes back for a whole read. A read's result changes
+// nothing, and a call made in the tail is known when its answer arrives.
+func TestPiResumesOnAnEditResultForAStoredCall(t *testing.T) {
+	call := func(id, name string) string {
+		return `{"type":"message","id":"a-` + id + `","timestamp":"2026-09-01T09:02:00Z","message":{"role":"assistant","content":[{"type":"text","text":"on it"},{"type":"toolCall","id":"` + id + `","name":"` + name + `","arguments":{"path":"retry.cfg"}}]}}` + "\n"
+	}
+	result := func(id, name string) string {
+		return `{"type":"message","id":"r-` + id + `","timestamp":"2026-09-01T09:02:01Z","message":{"role":"toolResult","toolCallId":"` + id + `","toolName":"` + name + `","content":[{"type":"text","text":"Could not find the exact text"}],"isError":true}}` + "\n"
+	}
+	head := `{"type":"session","version":3,"id":"s","timestamp":"2026-09-01T09:00:00Z","cwd":"/tmp/proj"}` + "\n"
+	for _, c := range []struct {
+		name, before, after string
+		want                bool
+	}{
+		{"edit refused a pass later", call("e1", "edit"), result("e1", "edit"), false},
+		{"result without a tool name", call("e1", "edit"), result("e1", ""), false},
+		{"read result", call("r1", "read"), result("r1", "read"), true},
+		{"edit and refusal in the tail", "", call("e2", "edit") + result("e2", "edit"), true},
+		{"a user turn", "", `{"type":"message","id":"u","timestamp":"2026-09-01T09:03:00Z","message":{"role":"user","content":[{"type":"text","text":"toolCall"}]}}` + "\n", true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			p, off := tailFile(t, "s.jsonl", head+c.before, c.after)
+			if got := piResumes(p, off); got != c.want {
+				t.Errorf("piResumes = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 // A pi-family session read on the other OS keeps its paths in the convention
 // it was written in. filepath.Join put a relative path under /work/app as
 // \work\app\retry.cfg on Windows, and joined a drive-letter path onto the cwd

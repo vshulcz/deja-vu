@@ -313,6 +313,28 @@ func TestKimiTailResumesKeepsBothRules(t *testing.T) {
 			after:  `{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"thanks"}]},"time":1790870003000}` + "\n",
 			want:   true,
 		},
+		{
+			// A call and its failure in the same tail: nothing stored
+			// misses the exit.
+			name:   "call and failure both in the tail",
+			before: `{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"s1"},"time":1790870002000}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c2","name":"Bash","args":{"command":"go vet"}},"time":1790870002100}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"c2","result":{"output":"Command failed with exit code: 2.","isError":true}},"time":1790870002200}` + "\n",
+			want:   true,
+		},
+		{
+			// A tool call inside an open step counts as the stream going on,
+			// and the reply that closes it in the tail is its end, not more
+			// of it; a message line without a message changes nothing.
+			name:   "open step closed by the reply",
+			before: `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c3","name":"Read","args":{}},"time":1790870002000}` + "\n" + `{"type":"context.append_message"}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"think","think":"hm"}},"time":1790870002100}` + "\n" + `{"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"done"}]},"time":1790870002200}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"late"}},"time":1790870002300}` + "\n",
+			want:   true,
+		},
+		{
+			name:   "tool result streamed across the offset",
+			before: `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"reading "}},"time":1790870002000}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c4","name":"Read","args":{}},"time":1790870002100}` + "\n",
+		},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "wire.jsonl")
@@ -321,6 +343,9 @@ func TestKimiTailResumesKeepsBothRules(t *testing.T) {
 			}
 			if got := kimiTailResumes(path, int64(len(head+c.before))); got != c.want {
 				t.Fatalf("kimiTailResumes = %v, want %v", got, c.want)
+			}
+			if !kimiTailResumes(path, 0) {
+				t.Fatal("a read from the start must resume")
 			}
 		})
 	}
