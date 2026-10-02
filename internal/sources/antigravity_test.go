@@ -134,7 +134,7 @@ func TestAntigravityStepSeparatesProseFromTools(t *testing.T) {
 		t.Fatalf("%v %#v", err, ss)
 	}
 	// Reachable by project: every session used to report "-".
-	if ss[0].Project != "api-gateway" {
+	if ss[0].Project != "coding/api-gateway" {
 		t.Errorf("project = %q, want the workspace from the metadata", ss[0].Project)
 	}
 	byRole := map[string][]string{}
@@ -201,7 +201,7 @@ func TestAntigravityProjectComesFromTheMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
-	if got := antigravityProject("conv-1-abc"); got != "api-gateway" {
+	if got := antigravityProject("conv-1-abc"); got != "coding/api-gateway" {
 		t.Fatalf("project = %q, want the workspace from the metadata", got)
 	}
 	// A conversation the metadata does not know still has to parse.

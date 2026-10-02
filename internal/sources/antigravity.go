@@ -459,7 +459,7 @@ func antigravityProject(id string) string {
 				continue
 			}
 			for _, uri := range c.Summary.WorkspaceURIs {
-				if w, ok := strings.CutPrefix(uri, "file://"); ok && w != "" {
+				if w, ok := fileURIPath(uri); ok {
 					return projectName(w)
 				}
 			}

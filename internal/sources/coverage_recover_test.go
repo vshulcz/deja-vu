@@ -158,7 +158,7 @@ func TestParseGrokFileFallbacksAndDefaultKind(t *testing.T) {
 	if s.ID != "load-grok-session" {
 		t.Fatalf("fallback id = %q", s.ID)
 	}
-	if s.Project != "needle-project" {
+	if s.Project != "work/needle-project" {
 		t.Fatalf("fallback cwd/project = %q", s.Project)
 	}
 	// Speech plus the tool call; only the empty-text event is filtered (#1321).

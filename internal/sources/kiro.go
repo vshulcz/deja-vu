@@ -231,7 +231,7 @@ func applyKiroCLIHeader(s *model.Session, path string) {
 		s.ID = header.SessionID
 	}
 	if header.CWD != "" {
-		s.Project = claudeProjectName(pathToProjectKey(header.CWD))
+		s.Project = projectName(header.CWD)
 	}
 }
 
@@ -528,7 +528,7 @@ func applyKiroIDEHeader(s *model.Session, path string) {
 		s.ID = header.ID
 	}
 	if len(header.WorkspacePaths) > 0 && header.WorkspacePaths[0] != "" {
-		s.Project = claudeProjectName(pathToProjectKey(header.WorkspacePaths[0]))
+		s.Project = projectName(header.WorkspacePaths[0])
 	}
 	s.Touch(parseTimeAny(header.CreatedAt))
 }

@@ -254,11 +254,15 @@ func projectSegments(parent, base string) string {
 	return parent + "/" + base
 }
 
+// projectName is the project of a directory a client recorded, named the way
+// Claude Code's is (cwdProjectName), so one directory is one project whichever
+// agent ran there. The basename made /tmp/w/my-app "my-app" for codex and
+// "w/my-app" for claude, and --project with either missed the other (#4457).
 func projectName(path string) string {
-	if path == "" {
-		return "-"
+	if name := cwdProjectName(path); name != "" {
+		return name
 	}
-	return filepath.Base(path)
+	return "-"
 }
 
 func scanJSONL(path string, fn func(map[string]any)) error {

@@ -31,7 +31,7 @@ func TestAmpDiscoveryAndIncrementalIndexParsing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(sessions) != 1 || sessions[0].Harness != "amp" || sessions[0].Project != "index-project" {
+	if len(sessions) != 1 || sessions[0].Harness != "amp" || sessions[0].Project != "tmp/index-project" {
 		t.Fatalf("parseChangedFile = %#v", sessions)
 	}
 }

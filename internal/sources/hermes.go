@@ -173,7 +173,7 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	cwds := hermesSessionCwds(db)
 	for i := range out {
 		if cwd := cwds[out[i].ID]; cwd != "" {
-			out[i].Project = claudeProjectName(pathToProjectKey(cwd))
+			out[i].Project = projectName(cwd)
 		}
 	}
 	return out, nil

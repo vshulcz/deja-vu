@@ -233,7 +233,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 				cwd = man.WorkspaceRoot
 			}
 			if cwd != "" {
-				s.Project = claudeProjectName(pathToProjectKey(cwd))
+				s.Project = projectName(cwd)
 			}
 			s.Title = strings.TrimSpace(man.Metadata.Title)
 			if s.Title == "" {
@@ -315,7 +315,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 					s.Title = firstLineTrim(m.Task)
 					if m.CWD != "" {
 						workspace = m.CWD
-						s.Project = claudeProjectName(pathToProjectKey(m.CWD))
+						s.Project = projectName(m.CWD)
 					}
 					if m.TS > 0 {
 						base = time.UnixMilli(m.TS)
@@ -637,8 +637,9 @@ func firstNonEmpty(a, b string) string {
 }
 
 // pathToProjectKey converts an absolute workspace path to the dash-encoded
-// key claudeProjectName expects, so cline/roo sessions land in the same
-// project namespace as every other harness.
+// key claudeProjectName expects. A reader that has the path itself labels it
+// with projectName instead: decoding the key back guesses between my-app and
+// my/app (#4458).
 func pathToProjectKey(p string) string {
 	// A Windows path folds the same way: backslashes are separators too, and
 	// the drive letter's colon is not a character a key carries (#3217).

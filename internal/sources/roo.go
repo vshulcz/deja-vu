@@ -313,7 +313,7 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 	if hb, err := os.ReadFile(filepath.Join(taskDir, "history_item.json")); err == nil && json.Unmarshal(hb, &item) == nil {
 		s.Title = firstLineTrim(item.Task)
 		if item.Workspace != "" {
-			s.Project = claudeProjectName(pathToProjectKey(item.Workspace))
+			s.Project = projectName(item.Workspace)
 		}
 		if item.TS > 0 {
 			base = time.UnixMilli(item.TS)

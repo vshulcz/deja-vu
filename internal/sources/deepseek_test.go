@@ -81,7 +81,7 @@ func TestParseDeepSeekFile(t *testing.T) {
 	if s.ID != "eaf5c9ac-0e47-4d2f-b982-8bae306062d1" {
 		t.Errorf("id = %q; the header's id wins over the directory name", s.ID)
 	}
-	if s.Project != "pgbouncer-lab" {
+	if s.Project != "work/pgbouncer-lab" {
 		t.Errorf("project = %q; it comes from the header's cwd", s.Project)
 	}
 	if s.Title != "pgbouncer pool size" {

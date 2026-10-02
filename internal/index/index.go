@@ -475,6 +475,13 @@ import (
 //
 // 60 also: a Cursor chat continued or renamed after a pass is read whole, so
 // its title, words, asked and touched match a rebuild (#4450, #4451).
+//
+// 60 also: codex, opencode, Kilo CLI, ZCode CLI, goose, crush, cursor, gemini,
+// kimi, grok, antigravity, amp, aider, Copilot, Copilot Chat, zed, dsh, Cline,
+// Roo, Kilo extension, Continue, CodeWhale, Kiro, Reasonix and Hermes name a
+// project by the recorded cwd's last two segments, as claude does, and decode
+// a file:// workspace first; claude and pi name a drive-root directory
+// C:\proj "proj" rather than "C:/proj" (#4457, #4458, #4461, #4462).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

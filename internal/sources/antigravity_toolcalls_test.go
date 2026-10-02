@@ -47,7 +47,7 @@ func TestAntigravityReadsTheCommandAndFilesFromToolCalls(t *testing.T) {
 		t.Errorf("files = %q, want the viewed, edited and written paths", f)
 	}
 	// No files outside the root directory: the command's Cwd names the project.
-	if p := got["project"]; p[0] != "proj" {
+	if p := got["project"]; p[0] != "tmp/proj" {
 		t.Errorf("project = %q, want the command's Cwd", p)
 	}
 }
@@ -85,7 +85,7 @@ func TestAntigravityToolCallArgsAreJSONEncoded(t *testing.T) {
 	if f := got[RoleFiles]; len(f) != 2 || f[0] != "/tmp/proj/client.go" || f[1] != "/tmp/proj/retry_test.go" {
 		t.Errorf("files = %q, want the paths unquoted", f)
 	}
-	if p := got["project"]; p[0] != "proj" {
-		t.Errorf("project = %q, want proj", p)
+	if p := got["project"]; p[0] != "tmp/proj" {
+		t.Errorf("project = %q, want tmp/proj", p)
 	}
 }

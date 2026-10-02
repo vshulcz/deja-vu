@@ -95,8 +95,8 @@ func TestGeminiProjectFromRegistry(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("ss=%v err=%v", ss, err)
 	}
-	if ss[0].Project != "cool-app" {
-		t.Fatalf("project = %q, want cool-app", ss[0].Project)
+	if ss[0].Project != "work/cool-app" {
+		t.Fatalf("project = %q, want work/cool-app", ss[0].Project)
 	}
 }
 

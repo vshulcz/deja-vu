@@ -191,7 +191,7 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		Title: firstLineTrim(doc.Metadata.Title),
 	}
 	if doc.Metadata.Workspace != "" {
-		s.Project = claudeProjectName(pathToProjectKey(doc.Metadata.Workspace))
+		s.Project = projectName(doc.Metadata.Workspace)
 	}
 	if doc.Metadata.Parent != "" {
 		// `codewhale fork` writes the source id here, and this file is the only

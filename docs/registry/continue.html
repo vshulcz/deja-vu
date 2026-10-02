@@ -56,7 +56,8 @@
 <p>and <code>workspaceDirectory</code> per session, so that date is the session&#39;s start (the</p>
 <p>file&#39;s mtime when the list has no entry); turns are laid out one second apart</p>
 <p>from the start, which is enough to order them within the session. The project name comes from</p>
-<p><code>workspaceDirectory</code>, falling back to the list entry when the document omits it.</p>
+<p><code>workspaceDirectory</code>, falling back to the list entry when the document omits it;</p>
+<p>a <code>file://</code> URI there is decoded first (#4461).</p>
 <p>Shape verified against Continue&#39;s own types (<code>core/index.d.ts</code>: <code>Session</code>,</p>
 <p><code>ChatHistoryItem</code>, <code>ChatMessage</code>) and <code>core/util/paths.ts</code>; a live-store</p>
 <p>validation is still welcome.</p>

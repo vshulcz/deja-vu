@@ -276,7 +276,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		sessions, err = parseClaudeTypedWithScanner(originalPath, compactionByteScanner(data))
 	case "codex":
 		sessions, err = parseCodexRolloutWithScanner(model.Session{
-			Harness: "codex", Project: projectName(filepath.Dir(originalPath)), Path: originalPath,
+			Harness: "codex", Project: filepath.Base(filepath.Dir(originalPath)), Path: originalPath,
 		}, false, "", compactionMapScanner(originalPath, data))
 	default:
 		return model.Session{}, ErrUnsupportedCompactionTranscript
@@ -296,7 +296,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	} else if harness == "claude" {
 		s.Project = claudeProjectNameFor(originalPath)
 	} else {
-		s.Project = projectName(filepath.Dir(originalPath))
+		s.Project = filepath.Base(filepath.Dir(originalPath))
 	}
 	return s, nil
 }

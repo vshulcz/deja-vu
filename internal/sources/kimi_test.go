@@ -44,7 +44,7 @@ func TestParseKimiReconstructsStreamedAssistant(t *testing.T) {
 		t.Fatalf("parse: %v %d", err, len(ss))
 	}
 	s := ss[0]
-	if s.Harness != "kimi" || s.ID != "session_t01" || s.Project != "proj" || s.Title != "t" {
+	if s.Harness != "kimi" || s.ID != "session_t01" || s.Project != "work/proj" || s.Title != "t" {
 		t.Fatalf("meta: %+v", s)
 	}
 	if len(s.Messages) != 2 {

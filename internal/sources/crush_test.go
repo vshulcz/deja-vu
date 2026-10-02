@@ -90,7 +90,8 @@ func TestCrushReadsEveryRoleOutOfOneSession(t *testing.T) {
 		}},
 	})
 
-	ss, err := ParseCrushDB(crushStore(t, "demo", sql))
+	db := crushStore(t, "demo", sql)
+	ss, err := ParseCrushDB(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,8 +103,8 @@ func TestCrushReadsEveryRoleOutOfOneSession(t *testing.T) {
 		t.Fatalf("session header: %#v", s)
 	}
 	// The project is the directory the store sits under, not ".crush".
-	if s.Project != "demo" {
-		t.Fatalf("project = %q, want demo", s.Project)
+	if want := filepath.Base(filepath.Dir(CrushProjectDir(db))) + "/demo"; s.Project != want {
+		t.Fatalf("project = %q, want %q", s.Project, want)
 	}
 	got := map[string]string{}
 	for _, m := range s.Messages {

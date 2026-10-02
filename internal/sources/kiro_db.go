@@ -102,7 +102,7 @@ func parseKiroDBWhere(db, where string) ([]model.Session, error) {
 		}
 		s := model.Session{Harness: "kiro", ID: r.ID, Path: db}
 		if r.Key != "" {
-			s.Project = claudeProjectName(pathToProjectKey(r.Key))
+			s.Project = projectName(r.Key)
 		}
 		kiroDBHistory(&s, r.History)
 		if len(s.Messages) == 0 {

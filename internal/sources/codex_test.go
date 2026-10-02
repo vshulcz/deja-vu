@@ -385,7 +385,7 @@ func TestCodexReadsCLIAndXcodeRootsAsOneHarness(t *testing.T) {
 	for _, session := range got {
 		byPath[session.Path] = session
 	}
-	if byPath[cliPath].ID != "cli-id" || byPath[xcodePath].ID != "xcode-id" || byPath[xcodePath].Project != "xcode" {
+	if byPath[cliPath].ID != "cli-id" || byPath[xcodePath].ID != "xcode-id" || byPath[xcodePath].Project != "projects/xcode" {
 		t.Fatalf("sessions by path=%#v", byPath)
 	}
 	if len(CodexFiles()) != 2 {
@@ -531,7 +531,7 @@ func TestCodexForkKeepsItsOwnThreadID(t *testing.T) {
 	if ss[0].ID != "child" {
 		t.Errorf("id = %q, want the rollout's own thread", ss[0].ID)
 	}
-	if ss[0].Project != "child" {
+	if ss[0].Project != "w/child" {
 		t.Errorf("project = %q, want the child's own cwd", ss[0].Project)
 	}
 }

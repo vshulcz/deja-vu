@@ -319,13 +319,13 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 			return nil, err
 		}
 		defer func() { _ = os.Remove(plain) }()
-		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), projectName(filepath.Dir(path)))
+		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), filepath.Base(filepath.Dir(path)))
 		for i := range ss {
 			ss[i].Path = path
 		}
 		return ss, err
 	}
-	return parseCodexRolloutPath(path, offset, codexSessionID(path), projectName(filepath.Dir(path)))
+	return parseCodexRolloutPath(path, offset, codexSessionID(path), filepath.Base(filepath.Dir(path)))
 }
 
 func parseCodexRolloutPath(path string, offset int64, id, project string) ([]model.Session, error) {

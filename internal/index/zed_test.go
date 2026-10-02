@@ -117,8 +117,8 @@ func TestZedStoreIsDiscoveredAndTagged(t *testing.T) {
 	if hits[0].Harness != "zed" {
 		t.Fatalf("harness = %q, want zed", hits[0].Harness)
 	}
-	if hits[0].Project != "app" {
-		t.Fatalf("project = %q, want the folder_paths basename", hits[0].Project)
+	if hits[0].Project != "w/app" {
+		t.Fatalf("project = %q, want the folder_paths project", hits[0].Project)
 	}
 	// Filtering by harness must reach it, and must not reach it under another
 	// name — a tag that matches everything is not a tag.

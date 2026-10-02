@@ -388,13 +388,13 @@ func claudeProjectName(dir string) string {
 // path no longer exists (deleted projects, dirs imported from other machines).
 func decodeProjectBase(base string) string {
 	if resolved := resolveEncodedPath(base); resolved != "" {
-		segs := strings.Split(strings.Trim(resolved, string(filepath.Separator)), string(filepath.Separator))
-		if len(segs) >= 2 {
-			return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
+		if name := cwdProjectName(resolved); name != "" {
+			return name
 		}
-		if len(segs) == 1 {
-			return segs[0]
-		}
+	}
+	// A drive is not a parent, as cwdProjectName has it: C--proj is "proj".
+	if _, rest, ok := splitEncodedWindowsDrive(base); ok {
+		base = rest
 	}
 	parts := strings.Split(base, "-")
 	var clean []string

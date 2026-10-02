@@ -42,7 +42,7 @@ func TestParseGrokFile(t *testing.T) {
 	if len(ss) != 1 || ss[0].ID != "019f-grok-session" || ss[0].Harness != "grok" {
 		t.Fatalf("bad session: %#v", ss)
 	}
-	if ss[0].Project != "cool-app" || ss[0].Title != "Fix the parser" {
+	if ss[0].Project != "work/cool-app" || ss[0].Title != "Fix the parser" {
 		t.Fatalf("bad metadata: %#v", ss[0])
 	}
 	// Speech and the tool call between the two spoken chunks: the run is what

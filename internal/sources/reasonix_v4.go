@@ -414,7 +414,7 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 	}
 	s := model.Session{Harness: "reasonix", ID: id, Path: path, Title: firstLineTrim(tr.title)}
 	if ws := reasonixV4Workspace(path, tr.workspace); ws != "" {
-		s.Project = claudeProjectName(pathToProjectKey(ws))
+		s.Project = projectName(ws)
 	} else if slug := reasonixV4Slug(path); slug != "" {
 		s.Project = claudeProjectName(slug)
 	}

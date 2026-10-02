@@ -19,7 +19,8 @@ Nothing in the file carries a timestamp. `sessions.json` records `dateCreated`
 and `workspaceDirectory` per session, so that date is the session's start (the
 file's mtime when the list has no entry); turns are laid out one second apart
 from the start, which is enough to order them within the session. The project name comes from
-`workspaceDirectory`, falling back to the list entry when the document omits it.
+`workspaceDirectory`, falling back to the list entry when the document omits it;
+a `file://` URI there is decoded first (#4461).
 
 Shape verified against Continue's own types (`core/index.d.ts`: `Session`,
 `ChatHistoryItem`, `ChatMessage`) and `core/util/paths.ts`; a live-store

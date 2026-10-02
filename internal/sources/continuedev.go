@@ -176,7 +176,7 @@ func ParseContinueFile(path string) ([]model.Session, error) {
 		workspace = entry.WorkspaceDirectory
 	}
 	if workspace != "" {
-		s.Project = claudeProjectName(pathToProjectKey(workspace))
+		s.Project = projectName(workspace)
 	} else {
 		s.Project = "continue"
 	}
