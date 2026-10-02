@@ -51,7 +51,9 @@
 </ul>
 <p>Senpi (OmO Native) descends from pi and kept its transcript envelope — a</p>
 <p><code>session</code> header line, then one <code>message</code> line per turn — so the parsing is</p>
-<p>pi&#39;s. The encoded directory names the project, the way pi&#39;s does.</p>
+<p>pi&#39;s. The header&#39;s <code>cwd</code> names the project; the encoded directory is the</p>
+<p>fallback for a header without one, because Senpi folds every <code>/</code> into <code>-</code> and</p>
+<p><code>/tmp/my-app</code> and <code>/tmp/my/app</code> share a folder name (#4427).</p>
 <p>It kept the rest of pi too, which is what closes the harness: on a live install</p>
 <p>of <code>@code-yeongyu/senpi</code> every surface answered on senpi&#39;s own screen.</p>
 <ul>
@@ -76,9 +78,20 @@
 <ul>
 <li><code>--session &lt;path|id&gt;</code>, <code>--resume</code> and <code>--fork</code> are in its own help, so</li>
 </ul>
-<p><code>deja resume</code> prints <code>senpi --session &lt;id&gt;</code>.</p>
+<p><code>deja resume</code> prints <code>senpi --session &lt;id&gt;</code>, after a <code>cd</code> into the</p>
+<p>directory the header records: from anywhere else Senpi offers to fork the</p>
+<p>session into the current directory instead of reopening it (#4426).</p>
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>Commands run inside <code>eval</code> cells.</strong> With codemode loaded, Senpi&#39;s</li>
+</ul>
+<p>default, <code>bash</code>, <code>grep</code> and <code>powershell</code> leave the model&#39;s tool list and run</p>
+<p>only as <code>tool.bash(...)</code> in a cell. The transcript&#39;s call is then <code>eval</code></p>
+<p>with JS, and what ran is on the result, under</p>
+<p><code>details.toolCalls[].args</code>; deja reads the commands, files and edits from</p>
+<p>there. The cell&#39;s text is a JSON string, <code>{&#34;text&#34;:&#34;…&#34;}</code>, and is read as the</p>
+<p>text it wraps (#4425).</p>
 <ul>
 <li><strong>Senpi&#39;s first run moves <code>~/.pi/agent</code> to <code>~/.senpi/agent</code></strong> — the whole</li>
 </ul>

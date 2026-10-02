@@ -31,11 +31,11 @@ func TestAntigravityProjectFallsBackToTheCLICache(t *testing.T) {
 	}
 	t.Setenv("DEJA_ANTIGRAVITY_ROOT", root)
 
-	if got := antigravityProject("cli-conv-42"); got != "api-gateway" {
+	if got := antigravityProject("cli-conv-42"); got != "coding/api-gateway" {
 		t.Errorf("project = %q, want the workspace the CLI recorded", got)
 	}
 	// The IDE's own mapping keeps working.
-	if got := antigravityProject("ide-conv"); got != "other" {
+	if got := antigravityProject("ide-conv"); got != "coding/other" {
 		t.Errorf("IDE conversation = %q, want its own workspace", got)
 	}
 	if got := antigravityProject("neither"); got != "-" {
@@ -55,17 +55,17 @@ func TestAntigravityProjectFromTheFilesASessionOpened(t *testing.T) {
 		{
 			name:  "one checkout",
 			paths: []string{"/Users/me/coding/api-gateway/cmd/main.go", "/Users/me/coding/api-gateway/internal/db/pool.go"},
-			want:  "api-gateway",
+			want:  "coding/api-gateway",
 		},
 		{
 			name:  "a single file still names its directory",
 			paths: []string{"/Users/me/coding/api-gateway/main.go"},
-			want:  "api-gateway",
+			want:  "coding/api-gateway",
 		},
 		{
 			name:  "two checkouts share only the parent, which is no project",
 			paths: []string{"/Users/me/coding/api-gateway/main.go", "/Users/me/coding/billing/main.go"},
-			want:  "coding",
+			want:  "me/coding",
 		},
 		{
 			name:  "a session in the home directory names nothing",
@@ -85,7 +85,7 @@ func TestAntigravityProjectFromTheFilesASessionOpened(t *testing.T) {
 		{
 			name:  "windows paths",
 			paths: []string{`C:\Users\me\coding\api-gateway\cmd\main.go`, `C:\Users\me\coding\api-gateway\internal\db\pool.go`},
-			want:  "api-gateway",
+			want:  "coding/api-gateway",
 		},
 		{
 			name:  "a windows home directory names nothing",
@@ -119,7 +119,7 @@ func TestAntigravityProjectClimbsToTheCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	messages := []model.Message{{Role: RoleFiles, Text: filepath.Join(deep, "pool.go")}}
-	if got := antigravityProjectFromFiles(messages); got != "api-gateway" {
+	if got, want := antigravityProjectFromFiles(messages), filepath.Base(filepath.Dir(checkout))+"/api-gateway"; got != want {
 		t.Fatalf("project = %q, want the checkout rather than the package", got)
 	}
 }
@@ -164,7 +164,7 @@ func TestParseAntigravityCLISessionGetsAProject(t *testing.T) {
 	if len(sessions) != 1 {
 		t.Fatalf("parsed %d sessions", len(sessions))
 	}
-	if got := sessions[0].Project; got != "api-gateway" {
+	if got := sessions[0].Project; got != filepath.Base(filepath.Dir(checkout))+"/api-gateway" {
 		t.Fatalf("project = %q; a CLI session with no cache entry is invisible "+
 			"to recall without one", got)
 	}

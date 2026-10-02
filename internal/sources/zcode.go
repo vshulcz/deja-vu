@@ -22,12 +22,12 @@ import (
 // data)` with `json_extract(data,'$.role')`, and `part(data)` with
 // `json_extract(data,'$.type')`. That is OpenCode's schema, which deja already
 // parses for OpenCode itself and for Kilo's CLI, so this is one more root
-// rather than a new reader. Not yet checked against a running ZCode, which the
-// registry entry says (#3675).
+// rather than a new reader (#3675). A store the 3.14.4 runtime wrote confirms
+// the schema, with Claude Code's tool names in the parts (#4428).
 
 // ZCodeConfigDir is ZCode's user directory: the project store, and under
-// `cli/config.json` everything it is configured with — the server map and the
-// hooks both live in that one file.
+// `cli/setting.json` everything the runtime is configured with — the server
+// map and the hooks both live in that one file (#4429).
 func ZCodeConfigDir() string { return filepath.Join(Home(), ".zcode") }
 
 // ZCodeRoot is the project store root. DEJA_ZCODE_ROOT replaces it.
@@ -54,13 +54,15 @@ func ParseZCodeDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return ParseZCodeDB(db)
 	}
-	return parseOpencodeSchemaDB("zcode", db, opencodeSinceWhere(t), 0)
+	// This read returns touched sessions whole, which is why the store is in
+	// rereadsWholeSessions in internal/index: appended, they doubled (#4396).
+	return parseOpencodeSchemaDBSince("zcode", db, t)
 }
 
-// ZCodeSessionFiles lists the transcripts, and the database when it holds
-// anything — the same pair Kilo has.
+// ZCodeSessionFiles lists the transcripts, the legacy snapshots (#4432), and
+// the database when it holds anything — the same pair Kilo has, and one more.
 func ZCodeSessionFiles() []string {
-	out := ZCodeTranscriptFiles()
+	out := append(ZCodeTranscriptFiles(), ZCodeLegacyFiles()...)
 	if fi, err := os.Stat(ZCodeDB()); err == nil && fi.Size() > 0 {
 		out = append(out, ZCodeDB())
 	}
@@ -72,10 +74,12 @@ func ZCodeUnderRoot(p string) bool {
 	return strings.HasPrefix(p, ZCodeRoot()) && strings.HasSuffix(p, ".jsonl")
 }
 
-// LoadZCode reads both stores: the transcripts with the flat-role reader, the
-// CLI database with OpenCode's, the way LoadKilo does for Kilo's two.
+// LoadZCode reads the stores: the transcripts with the flat-role reader, the
+// CLI database with OpenCode's, the way LoadKilo does for Kilo's two, and the
+// snapshots an older ZCode left.
 func LoadZCode() []model.Session {
 	ss := parseFiles(ZCodeTranscriptFiles(), ParseZCodeFile)
+	ss = append(ss, parseFiles(ZCodeLegacyFiles(), ParseZCodeLegacyFile)...)
 	dbSS, _ := ParseZCodeDB(ZCodeDB())
 	return append(ss, dbSS...)
 }

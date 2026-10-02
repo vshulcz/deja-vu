@@ -57,7 +57,7 @@ func TestCopilotAgentTranscriptIsReadAndSearchable(t *testing.T) {
 	if s.ID != "s-agent" {
 		t.Errorf("id = %q", s.ID)
 	}
-	if s.Project != "projA" {
+	if s.Project != "work/projA" {
 		t.Errorf("project = %q, want the workspace.json folder", s.Project)
 	}
 	if s.Started.IsZero() {

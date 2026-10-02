@@ -98,7 +98,7 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// The payload, and nothing written back into the environment: deja used to
 	// export the workspace here, which carried this call's project into the
 	// next one in the same process and decided nothing else (#2185).
-	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace)
+	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace, "")
 	if digest == "" {
 		fmt.Fprintln(stdout, "{}")
 		return nil

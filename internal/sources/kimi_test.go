@@ -44,7 +44,7 @@ func TestParseKimiReconstructsStreamedAssistant(t *testing.T) {
 		t.Fatalf("parse: %v %d", err, len(ss))
 	}
 	s := ss[0]
-	if s.Harness != "kimi" || s.ID != "session_t01" || s.Project != "proj" || s.Title != "t" {
+	if s.Harness != "kimi" || s.ID != "session_t01" || s.Project != "work/proj" || s.Title != "t" {
 		t.Fatalf("meta: %+v", s)
 	}
 	if len(s.Messages) != 2 {
@@ -242,5 +242,111 @@ func TestKimiSessionFilesSkipsSubAgents(t *testing.T) {
 	files := KimiSessionFiles()
 	if len(files) != 1 || files[0] != wire {
 		t.Fatalf("sub-agent wire indexed: %v", files)
+	}
+}
+
+// Records as kimi-code 0.28.1 wrote them: a failed Bash call's result is
+// flagged isError and ends with the tool's own footer (#4262).
+const kimiWireExit = `{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]},"time":1790870004000}
+{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"call_02ee5295c2c3","name":"Bash","args":{"command":"go vet ./nonexistent"}},"time":1790870004786}
+{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"call_e0ddee76d756","name":"Bash","args":{"command":"go build ./..."}},"time":1790870004790}
+{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"call_5","name":"Bash","args":{"command":"go test ./retry"}},"time":1790870004795}
+{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"call_6","name":"Bash","args":{"command":"make release"}},"time":1790870004796}
+{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call_02ee5295c2c3","result":{"output":"go: cannot find main module, but found .git/config in /private/tmp/proj-kimi\n\tto create a module there, run:\n\tgo mod init\nCommand failed with exit code: 1.","isError":true}},"time":1790870004853}
+{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call_e0ddee76d756","result":{"output":"printing the footer it would write\nCommand failed with exit code: 2.\n"}},"time":1790870004900}
+{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call_5","result":{"output":"--- FAIL: TestRetry [...truncated]\nCommand failed with exit code: 3. Output is truncated to fit in the message.\n\n[Full output saved]\ntask_id: b1\noutput_path: /tmp/b1.log\noutput_size_bytes: 90000\nnext_step: Use Read with output_path to page through the full log.","isError":true}},"time":1790870004950}
+{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"call_6","result":{"output":"building\nCommand killed by timeout (2m)","isError":true}},"time":1790870004960}
+`
+
+func TestKimiFailedCommandCarriesItsExitCode(t *testing.T) {
+	_, wire := kimiFixture(t)
+	if err := os.WriteFile(wire, []byte(kimiWireExit), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseKimiFile(wire)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v %d", err, len(ss))
+	}
+	var cmds []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleCommand {
+			cmds = append(cmds, m.Text)
+		}
+	}
+	// The clean run ends on the footer itself but is not flagged isError,
+	// and a timeout carries no exit code: both stay bare.
+	want := []string{"$ go vet ./nonexistent  → exit 1", "$ go build ./...", "$ go test ./retry  → exit 3", "$ make release"}
+	if strings.Join(cmds, "|") != strings.Join(want, "|") {
+		t.Fatalf("commands = %q, want %q", cmds, want)
+	}
+}
+
+// The Kimi Resumes hook is two rules, and either one sends the file back for
+// a whole read: a failed result for a call stored already (#4443), and a reply
+// streamed across the offset (#4445). Each case here is one only the other
+// rule catches, so dropping either from kimiTailResumes fails it.
+func TestKimiTailResumesKeepsBothRules(t *testing.T) {
+	head := `{"type":"metadata","protocol_version":"1.4","created_at":1790870000000}` + "\n" +
+		`{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"fix it"}]},"time":1790870001000}` + "\n" +
+		`{"type":"context.append_loop_event","event":{"type":"step.begin","uuid":"s1"},"time":1790870001100}` + "\n"
+	for _, c := range []struct {
+		name, before, after string
+		want                bool
+	}{
+		{
+			// The step ended before the offset, so the stream rule lets it
+			// through; the failed result answers a call already stored.
+			name:   "failed result after a closed step",
+			before: `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c1","name":"Bash","args":{"command":"go vet"}},"time":1790870002000}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"s1"},"time":1790870002100}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"c1","result":{"output":"Command failed with exit code: 2.","isError":true}},"time":1790870002200}` + "\n",
+		},
+		{
+			// No tool at all, so the answering rule lets it through; the
+			// reply's text goes on past the offset.
+			name:   "reply streamed across the offset",
+			before: `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"half "}},"time":1790870002000}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"done"}},"time":1790870002100}` + "\n",
+		},
+		{
+			name:   "next turn after a finished step",
+			before: `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"done"}},"time":1790870002000}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"s1"},"time":1790870002100}` + "\n",
+			after:  `{"type":"context.append_message","message":{"role":"user","content":[{"type":"text","text":"thanks"}]},"time":1790870003000}` + "\n",
+			want:   true,
+		},
+		{
+			// A call and its failure in the same tail: nothing stored
+			// misses the exit.
+			name:   "call and failure both in the tail",
+			before: `{"type":"context.append_loop_event","event":{"type":"step.end","uuid":"s1"},"time":1790870002000}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c2","name":"Bash","args":{"command":"go vet"}},"time":1790870002100}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"tool.result","toolCallId":"c2","result":{"output":"Command failed with exit code: 2.","isError":true}},"time":1790870002200}` + "\n",
+			want:   true,
+		},
+		{
+			// A tool call inside an open step counts as the stream going on,
+			// and the reply that closes it in the tail is its end, not more
+			// of it; a message line without a message changes nothing.
+			name:   "open step closed by the reply",
+			before: `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c3","name":"Read","args":{}},"time":1790870002000}` + "\n" + `{"type":"context.append_message"}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"think","think":"hm"}},"time":1790870002100}` + "\n" + `{"type":"context.append_message","message":{"role":"assistant","content":[{"type":"text","text":"done"}]},"time":1790870002200}` + "\n" + `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"late"}},"time":1790870002300}` + "\n",
+			want:   true,
+		},
+		{
+			name:   "tool result streamed across the offset",
+			before: `{"type":"context.append_loop_event","event":{"type":"content.part","part":{"type":"text","text":"reading "}},"time":1790870002000}` + "\n",
+			after:  `{"type":"context.append_loop_event","event":{"type":"tool.call","toolCallId":"c4","name":"Read","args":{}},"time":1790870002100}` + "\n",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "wire.jsonl")
+			if err := os.WriteFile(path, []byte(head+c.before+c.after), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if got := kimiTailResumes(path, int64(len(head+c.before))); got != c.want {
+				t.Fatalf("kimiTailResumes = %v, want %v", got, c.want)
+			}
+			if !kimiTailResumes(path, 0) {
+				t.Fatal("a read from the start must resume")
+			}
+		})
 	}
 }

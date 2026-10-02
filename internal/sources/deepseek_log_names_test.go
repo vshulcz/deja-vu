@@ -85,10 +85,10 @@ func TestParseDeepSeekFileReadsAV3Log(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(ss) != 1 || len(ss[0].Messages) != 4 {
+		if len(ss) != 1 || len(ss[0].Messages) != 5 {
 			t.Fatalf("%s read as %+v", filepath.Base(path), ss)
 		}
-		if ss[0].ID != "eaf5c9ac-0e47-4d2f-b982-8bae306062d1" || ss[0].Project != "pgbouncer-lab" {
+		if ss[0].ID != "eaf5c9ac-0e47-4d2f-b982-8bae306062d1" || ss[0].Project != "work/pgbouncer-lab" {
 			t.Errorf("%s: id %q, project %q", filepath.Base(path), ss[0].ID, ss[0].Project)
 		}
 	}

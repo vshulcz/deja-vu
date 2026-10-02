@@ -256,17 +256,21 @@ func zedRows(db, cols, where string) ([]zedRow, error) {
 // zedSession turns one row into a session, or reports false when the row
 // carries nothing worth indexing. A body that will not decode is skipped
 // rather than failing the store: one unreadable thread should not cost a user
-// every other thread they have.
+// every other thread they have. It is counted, though, with the reason: the
+// day Zed changes its encoding every new thread lands here, and doctor has to
+// be able to say so (#4341).
 func zedSession(db string, r zedRow) (model.Session, bool) {
 	if r.ID == "" {
 		return model.Session{}, false
 	}
 	doc, err := zedBody(r.DataType, r.Data)
 	if err != nil {
+		diagUnusableRecord(db, r.ID, fmt.Sprintf("thread %s: %v", r.ID, err))
 		return model.Session{}, false
 	}
 	var th zedThread
 	if err := json.Unmarshal(doc, &th); err != nil {
+		diagUnusableRecord(db, r.ID, fmt.Sprintf("thread %s: zed: thread body is not JSON: %v", r.ID, err))
 		return model.Session{}, false
 	}
 	updated := zedTime(r.UpdatedAt)
@@ -502,7 +506,9 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 		sort.Strings(ids)
 		for _, id := range ids {
 			r := msg.ToolResults[id]
-			if r.ToolName != "edit_file" {
+			// write_file (Zed 1.22) creates or overwrites a whole file and
+			// returns the same output as edit_file (#4339).
+			if r.ToolName != "edit_file" && r.ToolName != "write_file" {
 				continue
 			}
 			var res struct {
@@ -569,6 +575,7 @@ func zedCommand(name string, input json.RawMessage) string {
 // looked around in, not a file the work touched.
 var zedPathTools = map[string][]string{
 	"edit_file":              {"path"},
+	"write_file":             {"path"},
 	"read_file":              {"path"},
 	"create_directory":       {"path"},
 	"delete_path":            {"path"},

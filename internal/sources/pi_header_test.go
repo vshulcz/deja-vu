@@ -135,3 +135,66 @@ func TestOmpKeepsHeaderProjectWhenResumedPastTheHeader(t *testing.T) {
 		}
 	}
 }
+
+// omp writes a fixed-size title slot before the session header, so line 1 is
+// not the header. A resumed read took line 1, found no session record, and the
+// appended turns landed in a second session keyed by the file name (#4406).
+func TestOmpKeepsItsIdentityWhenTheTitleSlotComesFirst(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("HOME", filepath.Join(root, "home"))
+	t.Setenv("USERPROFILE", os.Getenv("HOME"))
+	t.Setenv("DEJA_OMP_ROOT", filepath.Join(root, "omp-sessions"))
+	project := filepath.Join(root, "omp-sessions", "--tmp-proj--")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	title := `{"type":"title","v":1,"title":"","updatedAt":"2026-10-01T09:00:00.000Z","pad":"    "}` + "\n"
+	head := `{"type":"session","version":3,"id":"0199aaaa-0000-7000-8000-000000000001","timestamp":"2026-10-01T09:00:00.000Z","cwd":"/tmp/proj"}` + "\n"
+	first := `{"type":"message","id":"u1","timestamp":"2026-10-01T09:00:10Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}` + "\n"
+	tail := `{"type":"message","id":"u2","timestamp":"2026-10-01T09:01:00Z","message":{"role":"user","content":[{"type":"text","text":"check the backoff too"}]}}` + "\n"
+	path := filepath.Join(project, "2026-10-01T09-00-00-000Z_0199aaaa-0000-7000-8000-000000000001.jsonl")
+	if err := os.WriteFile(path, []byte(title+head+first+tail), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	resumed, err := ParseOmpFileFromOffset(path, int64(len(title)+len(head)+len(first)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resumed) != 1 {
+		t.Fatalf("want one session from the resumed read, got %d", len(resumed))
+	}
+	if resumed[0].ID != "0199aaaa-0000-7000-8000-000000000001" {
+		t.Errorf("resumed read id = %q, want the header's 0199aaaa-…", resumed[0].ID)
+	}
+	if want := claudeProjectName(pathToProjectKey("/tmp/proj")); resumed[0].Project != want {
+		t.Errorf("resumed project = %q, want the header cwd's %q", resumed[0].Project, want)
+	}
+	if len(resumed[0].Messages) != 1 || resumed[0].Messages[0].Text != "check the backoff too" {
+		t.Errorf("resumed messages = %#v, want only the appended turn", resumed[0].Messages)
+	}
+}
+
+// A format with its header on line 1 still calls the three-argument form, and
+// gets line 1 and nothing past it: the lookahead is for a reader that names
+// its header, so a stray metadata line further down is not re-read as one.
+func TestHeaderScanWithoutAPredicateTakesLineOne(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.jsonl")
+	body := `{"type":"turn","text":"first"}` + "\n" + `{"type":"session","id":"later"}` + "\n" + `{"type":"turn","text":"appended"}` + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	offset := int64(strings.LastIndex(body, `{"type":"turn","text":"appended"}`))
+	var got []string
+	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
+		typ, _ := m["type"].(string)
+		text, _ := m["text"].(string)
+		got = append(got, typ+":"+text)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(got, ",") != "turn:first,turn:appended" {
+		t.Errorf("records = %v, want line 1 then the appended line", got)
+	}
+}

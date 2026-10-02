@@ -124,7 +124,14 @@ export default function (pi: any) {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       if (!injected) {
-        const { context: digest, receipt } = contextText(run(["hook-context"], ""));
+        // The session goes with it: hook-context marks the one starting as
+        // live, which keeps it out of its own MCP recall on this first turn
+        // (#4394, as #4246 and #4273 did for Hermes and opencode).
+        const key = sessionKey(event, ctx);
+        if (key) session = key;
+        const { context: digest, receipt } = contextText(
+          run(["hook-context"], JSON.stringify({ session_id: key, cwd: process.cwd() })),
+        );
         if (digest) {
           injected = true;
           ctx.ui.setStatus("deja", "");

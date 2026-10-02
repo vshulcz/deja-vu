@@ -54,6 +54,19 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	// Cline treats a directory as a plugin package, reading its skills/ and
+	// its name, only when a package.json there lists the entry under
+	// cline.plugins. Without it the skill below was never loaded and the
+	// plugin was listed as "index" (#4316).
+	pkgPath := filepath.Join(dir, "package.json")
+	oldPkg, err := readConfig(pkgPath)
+	if err != nil {
+		return installResult{}, err
+	}
+	pkgAction, err := writeIfChanged(pkgPath, oldPkg, []byte(clinePluginPackage))
+	if err != nil {
+		return installResult{}, err
+	}
 	// Cline discovers skills bundled in the plugin package, which is the only
 	// channel it has for one: it has no user-level instructions file, so until
 	// now it got the recall rule and no manual at all. Written after index.js
@@ -74,8 +87,29 @@ func installClineAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	// The plugin directory rides along, so the skill inside it is covered by
 	// the line naming the directory rather than going unmentioned (#3254).
+	// So is the package.json: an install that only adds it still changed the
+	// directory.
+	if skillAction == "unchanged" {
+		skillAction = pkgAction
+	}
 	return wroteAll(installResult{Path: path, Action: a},
 		installResult{Path: dir, Action: skillAction}), nil
+}
+
+// clinePluginPackage is the manifest that makes ~/.cline/plugins/deja a plugin
+// package to Cline, so it loads skills/ and lists the plugin as "deja".
+const clinePluginPackage = `{
+  "name": "deja",
+  "private": true,
+  "cline": {
+    "plugins": ["./index.js"]
+  }
+}
+`
+
+// clineSkillPath is the deja-history skill inside the plugin package.
+func clineSkillPath() string {
+	return filepath.Join(sources.ClinePluginsDir(), "deja", "skills", "deja-history", "SKILL.md")
 }
 
 func clinePluginJS(exe string) string {

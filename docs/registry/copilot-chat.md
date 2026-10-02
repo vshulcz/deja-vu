@@ -9,7 +9,7 @@ On VS Code Server 1.137 there is no `chatSessions` directory at all: the machine
 
 `globalStorage/github.copilot-chat/session-store.db` is a third store and is not read: every id in it also exists as a transcript, so it adds the session's `cwd` rather than history, and on the reporter's machine it covered the last two days against the transcripts' eleven weeks.
 
-`workspace.json` beside the storage directory holds `{"folder":"file:///…"}` (or `workspace` for a multi-root `.code-workspace`); the project name is the last path segment. Empty-window sessions take `workingDirectory` the same way, or `-`. `inputState` is not read (it carries the GitHub account label).
+`workspace.json` beside the storage directory holds `{"folder":"file:///…"}` (or `workspace` for a multi-root `.code-workspace`); the project name is the folder's last two path segments, escapes decoded, as Claude Code names a directory (#4457). A folder on a UNC share keeps its host, so resume opens `\\server\share\…` (#4462). Empty-window sessions take `workingDirectory` the same way, or `-`. `inputState` is not read (it carries the GitHub account label).
 
 User turns are `message` as a string or `{text}`. Assistant speech is bare `{value}` markdown chunks (and a plain string in old files); `thinking` and UI chrome (`progressMessage`, `warning`, `info`, `systemNotification`) are skipped. Tool paths come from `toolInvocationSerialized.resultDetails` and `inlineReference`; terminal commands from `toolSpecificData.commandLine`.
 
@@ -26,7 +26,7 @@ Edits are `textEditGroup` parts: a `uri` and a list of lists of `{text, range}`,
   in here: Copilot Chat fires no session-start or per-prompt hook, so nothing
   arrives unasked.
 - **Auto-recall**: none in the hook sense — Copilot Chat has no session-start or per-prompt event. The instructions file is what makes recall arrive without being asked for.
-- **Resume**: Chat: Show Chats… in the editor, not a command.
+- **Resume**: Chat: Show Chats… in the editor, not a command. The list holds only the open workspace’s chats; `deja resume <id>` names the folder to open first.
 - **Handoff**: paste.
 
 **Last verified:** 2026-09-20

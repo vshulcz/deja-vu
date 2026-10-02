@@ -73,13 +73,18 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := setOpenClawPluginEnabled(true); err != nil {
+	// `openclaw plugins disable deja` writes enabled: false on the entry, and
+	// install wrote it back on while reporting "unchanged" (#4472).
+	var note string
+	if openclawEntrySwitchedOff("plugins.entries", openclawPluginID) {
+		note = "left deja's plugin switched off, the way it was — `openclaw plugins enable deja` turns it back on"
+	} else if _, err := setOpenClawPluginEnabled(true); err != nil {
 		return installResult{}, err
 	}
 	// The manifest and package.json beside it are deja's own and went unnamed
 	// on the screen whose job is saying what was touched, so the directory
 	// rides along (#3254).
-	return wroteAll(installResult{Path: entry, Action: a},
+	return wroteAll(installResult{Path: entry, Action: a, Note: note},
 		installResult{Path: dir, Action: a}), nil
 }
 

@@ -72,7 +72,9 @@ func installContinue(exe string, uninstall bool) (installResult, error) {
 			if v := inlineYAMLValue(next, add.key+":"); v != "" {
 				return installResult{}, fmt.Errorf("%s: %s: %s is on one line, and deja edits the block form — move it to a block and run this again", shortHome(path), add.key, v)
 			}
-			next = appendYAMLListItem(next, add.key, add.item)
+			if next, err = appendYAMLListItem(next, add.key, add.item); err != nil {
+				return installResult{}, fmt.Errorf("%s: %w", shortHome(path), err)
+			}
 		}
 	}
 
@@ -89,19 +91,24 @@ func installContinue(exe string, uninstall bool) (installResult, error) {
 }
 
 // appendYAMLListItem puts item at the end of key's block, or writes the key
-// with it when the file has none.
-func appendYAMLListItem(text, key, item string) string {
-	head := "\n" + key + ":\n"
-	at := strings.Index("\n"+text, head)
-	if at < 0 {
-		if text != "" && !strings.HasSuffix(text, "\n") {
-			text += "\n"
-		}
-		return text + key + ":\n" + item
+// with it when the file has none. The key is found the way the other YAML
+// writers find theirs: with a comment on it or trailing blanks, a second key
+// was appended and Continue read deja's alone (#4289).
+func appendYAMLListItem(text, key, item string) (string, error) {
+	// A block ending in a comment with no final newline had the item glued
+	// onto the comment line.
+	if text != "" && !strings.HasSuffix(text, "\n") {
+		text += "\n"
 	}
-	start := at + len(head) - 1
+	start, err := yamlTopKeyEnd(text, key+":")
+	if err != nil {
+		return "", err
+	}
+	if start < 0 {
+		return text + key + ":\n" + item, nil
+	}
 	end := yamlBlockEnd(text, start)
-	return text[:end] + item + text[end:]
+	return text[:end] + item + text[end:], nil
 }
 
 // yamlBlockEnd is where the indented block that starts at from ends: the first
@@ -114,7 +121,8 @@ func yamlBlockEnd(text string, from int) int {
 		if nl >= 0 {
 			line = text[i : i+nl]
 		}
-		if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") {
+		if strings.TrimSpace(line) != "" && !strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t") &&
+			(!strings.HasPrefix(line, "#") || !yamlBlockGoesOn(text[i:])) {
 			return i
 		}
 		if nl < 0 {
@@ -125,16 +133,28 @@ func yamlBlockEnd(text string, from int) int {
 	return len(text)
 }
 
+// yamlBlockGoesOn reports whether, past the column-0 comment that opens rest
+// and any comment or blank line after it, an indented line follows: the
+// comment then sits inside the block rather than closing it (#4289).
+func yamlBlockGoesOn(rest string) bool {
+	for _, line := range strings.Split(rest, "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		return strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")
+	}
+	return false
+}
+
 // removeContinueItem drops the list item under key whose mapping opens with the
 // given name. Ours is found by the name rather than by a marker comment,
 // because that is the field Continue itself keys these lists by.
 func removeContinueItem(text, key, name string) string {
-	head := "\n" + key + ":\n"
-	at := strings.Index("\n"+text, head)
-	if at < 0 {
+	start := yamlKeyLineEnd(text, key+":")
+	if start < 0 {
 		return text
 	}
-	start := at + len(head) - 1
 	end := yamlBlockEnd(text, start)
 	block := text[start:end]
 	lines := strings.Split(block, "\n")

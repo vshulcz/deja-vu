@@ -15,8 +15,10 @@ func ampSettings(t *testing.T, path string) map[string]any {
 	if err != nil {
 		t.Fatalf("settings not written: %v", err)
 	}
+	// Amp reads its settings as JSONC, and a file that came in with comments
+	// keeps them (#4357).
 	var root map[string]any
-	if err := json.Unmarshal(b, &root); err != nil {
+	if err := json.Unmarshal([]byte(jsoncToJSON(string(b))), &root); err != nil {
 		t.Fatalf("settings are not JSON Amp can read: %v\n%s", err, b)
 	}
 	return root

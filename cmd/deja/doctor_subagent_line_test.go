@@ -38,7 +38,7 @@ func TestDoctorSaysHowToIndexSubagentTranscripts(t *testing.T) {
 	}
 	// The default reads them as their task and their answer, so the row says
 	// which half is searchable and how to get the rest (#3009).
-	if !strings.Contains(out, "subagent transcripts read as task and answer") {
+	if !strings.Contains(out, "subagent transcripts read as task, answer and what they changed") {
 		t.Fatalf("the row does not say how these files are read:\n%s", out)
 	}
 	if !strings.Contains(out, "set DEJA_INCLUDE_SUBAGENTS=1 for the whole run") {

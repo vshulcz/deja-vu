@@ -42,7 +42,7 @@
         },
         "resume": {
           "state": "impossible",
-          "why": "aider has no notion of resuming one past session: `--chat-history-file` points at a transcript file it appends to, not a session it reopens, so there is no id to hand back. Restoring one conversation out of that file is not something the CLI offers.",
+          "why": "aider has no notion of resuming one past session: `--chat-history-file` points at a transcript file it appends to, not a session it reopens, so there is no id to hand back. Restoring one conversation out of that file is not something the CLI offers: `--restore-chat-history` loads the whole file, every session in it, so `deja resume` prints that and points at `deja show` for the one session.",
           "source": "aider 0.86.2 --help"
         }
       }
@@ -59,7 +59,7 @@
         "fixtures/registry/amp/thread.json"
       ],
       "parser_source": "internal/sources/amp.go",
-      "last_verified": "2026-09-02",
+      "last_verified": "2026-10-01",
       "display_name": "Amp",
       "capabilities": {
         "mcp": true,
@@ -240,7 +240,7 @@
         },
         "resume": {
           "state": "impossible",
-          "why": "sessions reopen from Chat: Show Chats in the editor, not a command deja can print"
+          "why": "sessions reopen from Chat: Show Chats in the editor, not a command deja can print; deja resume names the workspace to open first, since the list holds only that workspace's chats"
         }
       }
     },
@@ -252,6 +252,7 @@
         "${XDG_CONFIG_HOME}/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "%APPDATA%/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb",
         "${CURSOR_CONFIG_DIR:-~/.cursor}/projects/**/agent-transcripts/**/*.jsonl",
+        "${CURSOR_CONFIG_DIR:-~/.cursor}/chats/*/*/store.db",
         "${DEJA_CURSOR_ROOT}",
         "${DEJA_CURSOR_CLI_ROOT}"
       ],
@@ -260,7 +261,7 @@
         "fixtures/registry/cursor/projects/registry-demo/agent-transcripts/registry-cursor.jsonl"
       ],
       "parser_source": "internal/sources/cursor.go",
-      "last_verified": "2026-09-21",
+      "last_verified": "2026-10-01",
       "display_name": "Cursor",
       "capabilities": {
         "mcp": true,
@@ -269,7 +270,7 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "sqlite3 (IDE chats)"
+        "prereq": "sqlite3 (IDE chats, CLI tool output)"
       },
       "gaps": {}
     },
@@ -652,6 +653,9 @@
         "%APPDATA%/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
         "${XDG_CONFIG_HOME}/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl",
         "<app data>/CherryStudio/.claude/projects/*/*.jsonl",
+        "<app data>/CherryStudio/Data/Agents/.pi/sessions/*.jsonl",
+        "<app data>/CherryStudio/Data/Agents/.dsh/sessions/*/session-*/session*.jsonl*",
+        "<app.user_data_path in ~/.cherrystudio/boot-config.json>/Data/Agents/…",
         "${DEJA_CHERRYSTUDIO_ROOTS}/*/*.jsonl"
       ],
       "format_kind": "jsonl",
@@ -785,22 +789,17 @@
       ],
       "parser_source": "internal/sources/commandcode.go",
       "display_name": "Command Code",
-      "last_verified": "2026-09-16",
+      "last_verified": "2026-10-01",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
         "command": true,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "none"
       },
-      "gaps": {
-        "resume": {
-          "state": "unknown",
-          "why": "No resume flag is described by either integration that documents the rest of Command Code's surfaces, and the CLI is closed, so there is nothing to read one out of. A live install answers it in one `--help` (#3651)."
-        }
-      }
+      "gaps": {}
     },
     {
       "id": "zcode",
@@ -808,7 +807,9 @@
         "~/.zcode/projects/*/*.jsonl",
         "${DEJA_ZCODE_ROOT}/*/*.jsonl",
         "~/.zcode/cli/db/db.sqlite",
-        "${DEJA_ZCODE_DB}"
+        "${DEJA_ZCODE_DB}",
+        "~/.zcode/v2/sessions/*/*.json",
+        "${DEJA_ZCODE_LEGACY_ROOT}/*/*.json"
       ],
       "format_kind": "jsonl+sqlite",
       "fixture_paths": [
@@ -822,24 +823,19 @@
         "auto": true,
         "skill": false,
         "command": false,
-        "resume": false,
+        "resume": true,
         "handoff": "paste",
         "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {
         "skill": {
           "state": "unknown",
-          "why": "Nothing found names a user-level skill directory for ZCode. Its extension surface, as inspected by the memory plugin that got there first, is the hook block and the server map in `~/.zcode/cli/config.json` plus a plugin manifest probe order; guidance therefore reaches the model through the MCP tool descriptions and the injected session block (#3651).",
+          "why": "Nothing found names a user-level skill directory for ZCode. Its extension surface, as inspected by the memory plugin that got there first, is the hook block and the server map in `~/.zcode/cli/setting.json` plus a plugin manifest probe order; guidance therefore reaches the model through the MCP tool descriptions and the injected session block (#3651).",
           "source": "https://github.com/volcengine/OpenViking/blob/main/examples/agent-hook-plugin/DESIGN.md"
         },
         "command": {
           "state": "unknown",
           "why": "Nothing found names a custom-command surface in ZCode. What is documented by a third party is its hook block and a strict HTTP-only server map, so the work here is auto-recall through the hooks rather than a command file (#3651)."
-        },
-        "resume": {
-          "state": "unknown",
-          "why": "The flag is real — `--resume <SESSION_ID>` appears in ZCode's headless contract, and the session id it takes is the one its JSON summary reports — but every documented invocation runs the app bundle's own Electron runtime with a mandatory `--prompt`, which is a turn rather than reopening a session for a person to continue. Whether the `zcode` launcher on PATH accepts the same flag on its own is unverified, and printing a command that needs a prompt would be worse than the paste (#3651).",
-          "source": "https://github.com/Q00/ouroboros/blob/main/docs/runtime-guides/zcode.md"
         }
       }
     },
@@ -849,15 +845,18 @@
         "~/.kiro/sessions/cli/*.jsonl",
         "~/.kiro/sessions/*/sess_*/messages.jsonl",
         "${DEJA_KIRO_ROOT}/cli/*.jsonl",
-        "${DEJA_KIRO_ROOT}/*/sess_*/messages.jsonl"
+        "${DEJA_KIRO_ROOT}/*/sess_*/messages.jsonl",
+        "~/Library/Application Support/kiro-cli/data.sqlite3",
+        "~/.local/share/kiro-cli/data.sqlite3",
+        "${DEJA_KIRO_DB}"
       ],
-      "format_kind": "jsonl",
+      "format_kind": "jsonl+sqlite",
       "fixture_paths": [
         "fixtures/registry/kiro/cli/registry-kiro.jsonl",
         "fixtures/registry/kiro/w-api/sess_00000000-0000-4000-8000-000000000000/messages.jsonl"
       ],
       "parser_source": "internal/sources/kiro.go",
-      "last_verified": "2026-09-17",
+      "last_verified": "2026-10-01",
       "display_name": "Kiro",
       "capabilities": {
         "mcp": true,
@@ -866,7 +865,7 @@
         "command": false,
         "resume": true,
         "handoff": "paste",
-        "prereq": "none"
+        "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {
         "auto": {

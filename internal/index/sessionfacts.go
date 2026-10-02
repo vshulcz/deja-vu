@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -96,6 +97,9 @@ func buildSessionFactsFromIndex(tmp string) {
 		}
 	}
 	if len(out) == 0 {
+		// The last session with a command lost it; a table left from before
+		// would still answer for it (#4441).
+		_ = os.Remove(sessionFactsPath(tmp))
 		return
 	}
 	_ = writeGob(sessionFactsPath(tmp), out)

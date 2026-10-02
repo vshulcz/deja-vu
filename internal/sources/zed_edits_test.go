@@ -111,3 +111,38 @@ func TestZedReadsEditsOnlyFromTheEditTool(t *testing.T) {
 		}
 	}
 }
+
+// Zed 1.22's `write_file` creates or overwrites a whole file. Its input is
+// {path, content} and its result the same EditSessionOutput edit_file returns,
+// so a file the agent created reaches files, edits and blame the same way
+// (#4339). Shape from crates/agent/src/tools/write_file_tool.rs, v1.22.0.
+func TestZedReadsAFileTheAgentWrote(t *testing.T) {
+	const added = "func Retry(n int, f func() error) error { // three tries, then give up"
+	msg := `{"Agent":{"content":[{"ToolUse":{"id":"call_1","name":"write_file","input":{"path":"proj/retry.go","content":"package main\n` + added + `\n"}}}],
+	 "tool_results":{"call_1":{"tool_use_id":"call_1","tool_name":"write_file","is_error":false,"content":{"Text":"ok"},
+	  "output":{"input_path":"proj/retry.go","diff":"@@ -0,0 +1,2 @@\n+package main\n+` + added + `\n","old_text":"","new_text":"package main\n` + added + `\n"}}}}}`
+	at := time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC)
+
+	var files, wrote []string
+	for _, m := range zedWork([]byte(msg), at) {
+		switch m.Role {
+		case RoleFiles:
+			files = append(files, m.Text)
+		case RoleWrote:
+			wrote = append(wrote, m.Text)
+		}
+	}
+	if len(files) != 1 || files[0] != "proj/retry.go" {
+		t.Errorf("files records = %q, want the written file", files)
+	}
+	if len(wrote) != 1 {
+		t.Fatalf("written records = %q, want one for the new file", wrote)
+	}
+	h, ok := HashWrittenLine(added)
+	if !ok {
+		t.Fatal("the added line is not evidence")
+	}
+	if _, has := WroteRecordHas(wrote[0], h); !has {
+		t.Errorf("the written record does not hold the file's line: %q", wrote[0])
+	}
+}

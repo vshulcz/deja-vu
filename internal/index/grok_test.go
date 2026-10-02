@@ -91,7 +91,7 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0].Harness != "grok" || ss[0].Project != "grok-project" {
+	if len(ss) != 1 || ss[0].Harness != "grok" || ss[0].Project != "work/grok-project" {
 		t.Fatalf("bad indexed session: %#v", ss)
 	}
 	recent, err := Recent(indexDir, 1)
@@ -134,7 +134,7 @@ func TestGrokIndexGrowthRenameAndRewind(t *testing.T) {
 		t.Fatal(err)
 	}
 	recent, err = Recent(indexDir, 1)
-	if err != nil || len(recent) != 1 || recent[0].Project != "moved-project" {
+	if err != nil || len(recent) != 1 || recent[0].Project != "work/moved-project" {
 		t.Fatalf("new Grok cwd marker was not indexed: %#v err=%v", recent, err)
 	}
 	if err := os.WriteFile(cwdPath, []byte(secondCWD), 0o644); err != nil {

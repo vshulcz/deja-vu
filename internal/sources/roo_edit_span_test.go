@@ -194,7 +194,7 @@ func TestRooRecordsResolveAgainstTheTaskWorkspace(t *testing.T) {
 	}
 
 	// An absolute path is left alone, whichever machine's convention it is in.
-	for _, p := range []string{"/already/abs.go", `C:\checkout\abs.go`} {
+	for _, p := range []string{"/already/abs.go", `C:\checkout\abs.go`, `\checkout\abs.go`} {
 		if got := rooAbsPath(p, "/checkout/retry"); got != p {
 			t.Errorf("rooAbsPath(%q) = %q, want it untouched", p, got)
 		}

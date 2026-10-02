@@ -823,7 +823,7 @@ func TestInstallClaudeTempHome(t *testing.T) {
 	}
 	b, _ := os.ReadFile(path)
 	wantCommand, _ := mcpCommandArgs("/bin/deja")
-	if !strings.Contains(string(b), `"mcpServers"`) || !strings.Contains(string(b), `"command": "`+wantCommand+`"`) || !strings.Contains(string(b), "/bin/deja") {
+	if !strings.Contains(string(b), `"mcpServers"`) || !strings.Contains(string(b), `"command":"`+wantCommand+`"`) || !strings.Contains(string(b), "/bin/deja") {
 		t.Fatalf("bad claude config: %s", b)
 	}
 	if _, err := os.Stat(path + ".bak"); err != nil {

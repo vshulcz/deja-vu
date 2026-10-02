@@ -47,6 +47,10 @@ type doctorCommandFile struct {
 	// no command file for those — a file beside the skill is one entry too
 	// many, which Gemini said out loud by renaming it (#3665).
 	skill bool
+	// entry reads the command out of a config the reader shares with deja,
+	// for the harnesses whose /deja is an item in a list there rather than a
+	// file: whether one by that name is present, and whether it is ours.
+	entry func(config string) (found, ours bool)
 }
 
 // state separates "deja never wrote one here" from "someone else's file has
@@ -58,6 +62,16 @@ func (c doctorCommandFile) state() string {
 	}
 	if c.skill {
 		return "skill"
+	}
+	if c.entry != nil {
+		found, ours := c.entry(normaliseGooseNewlines(string(b)))
+		switch {
+		case !found:
+			return "missing"
+		case !ours:
+			return "someone else's"
+		}
+		return "written"
 	}
 	if !isOurCommandFile(b) {
 		return "someone else's"
@@ -89,6 +103,24 @@ func doctorCommandFiles() []doctorCommandFile {
 		filepath.Join(vsCodeDefaultUserDir(), "prompts", "deja.prompt.md"))})
 	// Reasonix reads it from deja's plugin package and lists it as /deja:deja.
 	out = append(out, doctorCommandFile{name: "reasonix", path: reasonixCommandPath()})
+	// Continue's /deja is a `prompts:` item and goose's a `slash_commands:`
+	// entry, each in a config.yaml that holds the reader's own settings, so
+	// the file being there says nothing about the command (#4374).
+	out = append(out, doctorCommandFile{name: "continue", path: continueConfigPath(),
+		entry: func(s string) (bool, bool) {
+			if removeContinueItem(s, "prompts", "deja") == s {
+				return false, false
+			}
+			return true, strings.Contains(s, yamlQuote(continuePromptBody))
+		}})
+	out = append(out, doctorCommandFile{name: "goose", path: filepath.Join(gooseConfigDir(), "config.yaml"),
+		entry: func(s string) (bool, bool) {
+			// The remover also drops a key left empty; that is not our entry.
+			if removeGooseSlashCommand(s) == dropEmptyYAMLKey(s, "slash_commands:") {
+				return false, false
+			}
+			return true, strings.Contains(s, "recipe_path: "+yamlQuote(gooseRecipePath()))
+		}})
 	for _, name := range skillIsTheCommandHarnesses() {
 		out = append(out, doctorCommandFile{name: name, path: commandSkillPath(name), skill: true})
 	}

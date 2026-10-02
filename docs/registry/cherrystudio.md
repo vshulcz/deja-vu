@@ -3,8 +3,10 @@
 - **ID**: `cherrystudio`
 - **Store**: `<app data>/CherryStudio/Data/Agents/.claude/<projects>/<workspace>/<session>.jsonl` — `~/Library/Application Support/CherryStudio` on macOS, `%APPDATA%\CherryStudio` on Windows, `$XDG_CONFIG_HOME/CherryStudio` elsewhere
 - **Store (before the upgrade that added `Data/Agents`)**: `<app data>/CherryStudio/.claude/<projects>/…`, read so a store that predates it is not lost
-- **Read override**: `DEJA_CHERRYSTUDIO_ROOTS` replaces the root list
-- **Format**: Claude Code's own transcript JSONL
+- **Stores of the other agent runtimes**: `<app data>/CherryStudio/Data/Agents/.pi/sessions/<ts>_<id>.jsonl` (pi) and `<app data>/CherryStudio/Data/Agents/.dsh/sessions/<workspace>/session-<id>/` (dsh, `DSH_HOME` set to `Data/Agents/.dsh`), read by the stock pi and dsh parsers and filed under `cherrystudio` (#4342)
+- **Moved data dir**: every directory in `app.user_data_path` of `~/.cherrystudio/boot-config.json`, where the app records a move made in its settings, is read the same way as the default (#4347)
+- **Read override**: `DEJA_CHERRYSTUDIO_ROOTS` replaces the root list, the pi and dsh stores included
+- **Format**: Claude Code's own transcript JSONL; pi and dsh logs for those runtimes
 - **Needs**: nothing
 
 Cherry Studio runs Claude Code sessions from a desktop app and writes ordinary

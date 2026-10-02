@@ -51,11 +51,7 @@ func indentLines(s, pad string) string {
 // gooseSlashCommandsBlock returns the text after the slash_commands key, for
 // reading the indent its entries are written at.
 func gooseSlashCommandsBlock(s string) string {
-	i := strings.Index("\n"+s, "\nslash_commands:\n")
-	if i < 0 {
-		return ""
-	}
-	return s[i+len("\nslash_commands:\n")-1:]
+	return yamlKeyBlock(s, "slash_commands:")
 }
 
 // gooseListIndent is the indent the entries of a list are written at, and
@@ -118,13 +114,26 @@ func dropEmptyYAMLKey(s, key string) string {
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
 	for i := 0; i < len(lines); i++ {
+		// Only the bare key, the way deja writes it: one carrying the
+		// reader's comment is theirs to keep, empty or not.
 		if strings.TrimRight(lines[i], " ") != key {
 			out = append(out, lines[i])
 			continue
 		}
+		// A comment, even at column 0, is not the end of the block: the
+		// entries under it still belong to the key (#4289). Only blank lines
+		// go with a key that is dropped — a comment is the reader's.
 		j := i + 1
 		for j < len(lines) && strings.TrimSpace(lines[j]) == "" {
 			j++
+		}
+		k := j
+		for k < len(lines) && (strings.TrimSpace(lines[k]) == "" || strings.HasPrefix(strings.TrimSpace(lines[k]), "#")) {
+			k++
+		}
+		if k > j && k < len(lines) && yamlLineBelongsTo(lines[k], lines[i]) {
+			out = append(out, lines[i])
+			continue
 		}
 		// Nested is "indented further than the key", not "starts with two
 		// spaces": one space is valid YAML and is not two, so a config written
@@ -191,13 +200,23 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 		if strings.Contains(normaliseGooseNewlines(string(old)), entry) {
 			return installResult{Path: path, Action: "unchanged"}, nil
 		}
-		if i := strings.Index("\n"+next, "\nslash_commands:\n"); i >= 0 {
-			at := i + len("\nslash_commands:\n") - 1
+		if next != "" && !strings.HasSuffix(next, "\n") {
+			next += "\n"
+		}
+		// goose refuses a config that names a key twice and then loads none
+		// of it, so an inline value — even `[]` — cannot be shadowed by a
+		// block written after it, the way Hermes' loader allows. The
+		// extensions writer refuses the same shape.
+		if v := inlineYAMLValue(next, "slash_commands:"); v != "" {
+			return installResult{}, fmt.Errorf("%s: slash_commands: %s is on one line, and deja edits the block form — move it to a block and run this again", path, v)
+		}
+		at, err := yamlTopKeyEnd(next, "slash_commands:")
+		if err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if at >= 0 {
 			next = next[:at] + entry + next[at:]
 		} else {
-			if next != "" && !strings.HasSuffix(next, "\n") {
-				next += "\n"
-			}
 			next += "slash_commands:\n" + entry
 		}
 	}

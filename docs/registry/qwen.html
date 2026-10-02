@@ -49,14 +49,18 @@
 <ul>
 <li><strong>MCP</strong>: <code>deja install qwen</code> adds <code>mcpServers.deja</code> to <code>~/.qwen/settings.json</code>.</li>
 <li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. Qwen lists skills under <code>/skills</code>, so the skill is also the command.</li>
-<li><strong>Auto-recall</strong>: <code>deja install qwen-auto</code> adds hooks to the same <code>settings.json</code>: <code>SessionStart</code> (digest), <code>UserPromptSubmit</code> (per-prompt recall), <code>PostToolUseFailure</code> on <code>run_shell_command</code> (the earlier fix for a failed command) and <code>PreCompact</code>.</li>
+<li><strong>Auto-recall</strong>: <code>deja install qwen-auto</code> adds hooks to the same <code>settings.json</code>: <code>SessionStart</code> (digest), <code>UserPromptSubmit</code> (per-prompt recall), <code>PostToolUseFailure</code> on <code>run_shell_command</code> (the earlier fix for a failed command), <code>PreCompact</code> and <code>SessionEnd</code> (the session you quit is back in the next one&#39;s MCP recall).</li>
 </ul>
 <h2 id="resume">Resume</h2>
 <p><code>qwen -r &lt;id&gt;</code> reopens a session by id, and the id is the chat file&#39;s name —</p>
 <p>the same one deja indexes. The command has to run in the project directory:</p>
 <p><code>qwen sessions list</code> shows only the current project&#39;s sessions, so from</p>
-<p>anywhere else the id resolves to nothing. deja recovers that directory from the</p>
-<p>encoded path and prints <code>cd &lt;project&gt; &amp;&amp; qwen -r &lt;id&gt;</code>.</p>
+<p>anywhere else the id resolves to nothing. deja takes that directory from the</p>
+<p><code>cwd</code> the transcript records, or from the encoded folder name for a transcript</p>
+<p>that records none, and prints <code>cd &lt;project&gt; &amp;&amp; qwen -r &lt;id&gt;</code>. When the recorded</p>
+<p>directory is gone, or deja cannot tell which directory the session ran in,</p>
+<p>resume refuses and points at <code>deja show &lt;id&gt;</code>: the bare command would only get</p>
+<p>&#34;No saved session found&#34;.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>JSONL can end in a partial line while Qwen is writing. Malformed lines are skipped.</li>

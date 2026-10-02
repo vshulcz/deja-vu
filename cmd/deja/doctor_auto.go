@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -95,16 +97,100 @@ func autoWirings() []autoWiring {
 	}
 }
 
-// nothingWired reports whether no harness on this machine has an auto-recall
-// file. It is a stat per harness and no index read, which is what the brief can
-// afford — that screen has to feel instant.
+// autoInClientConfig names the rows whose file is the client's own config
+// rather than one deja writes whole. Those exist whether deja ever wrote to
+// them or not, so the file being there says nothing about deja (#4275).
+var autoInClientConfig = map[string]bool{
+	"cursor": true, "qwen": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true,
+}
+
+// autoUnwired reports whether a row's file holds no deja wiring at all: it is
+// not there, or it is the client's own config with no entry of deja's in it.
+// Either is a machine that was never wired, not one whose wiring went stale.
+func autoUnwired(a autoWiring, b []byte, err error) bool {
+	if err != nil {
+		return true
+	}
+	return autoInClientConfig[a.name] && !strings.Contains(string(b), a.marker) && !dejaHookIn(string(b))
+}
+
+// dejaHookIn reports whether a config carries an entry of deja's: Kimi's
+// marked block, or any string that runs one of deja's hook subcommands — the
+// MCP server entry runs `mcp` and is not one. A file that is not JSON is read
+// line by line, its escapes undone: TOML spells a quoted Windows path
+// `"\"C:/Program Files/deja/deja.exe\" hook-prompt"`.
+func dejaHookIn(text string) bool {
+	if strings.Contains(text, kimiHookMarker) {
+		return true
+	}
+	runsDeja := func(s string) bool {
+		for name := range hookNames {
+			if isDejaHookCommand(s, "deja "+name) {
+				return true
+			}
+		}
+		return false
+	}
+	var root any
+	if json.Unmarshal([]byte(jsoncToJSON(strings.TrimPrefix(text, string(utf8BOM)))), &root) != nil {
+		for _, l := range strings.Split(text, "\n") {
+			if runsDeja(quotedPathUnescape.Replace(l)) {
+				return true
+			}
+		}
+		return false
+	}
+	var walk func(v any) bool
+	walk = func(v any) bool {
+		switch v := v.(type) {
+		case string:
+			return runsDeja(v)
+		case []any:
+			for _, e := range v {
+				if walk(e) {
+					return true
+				}
+			}
+		case map[string]any:
+			for _, e := range v {
+				if walk(e) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(root)
+}
+
+// nothingWired reports whether no harness on this machine has auto-recall
+// wired. It reads one small file per harness and no index, which is what the
+// brief can afford — that screen has to feel instant.
 //
 // Auto-recall alone is the question worth asking here. An MCP server is a tool
 // the agent may call; these files are what make memory arrive without anyone
-// asking, which is the thing someone thinks they installed.
+// asking, which is the thing someone thinks they installed. So it reads the
+// rows doctor prints: Claude Code's and codex's hooks, which live outside the
+// table, and a harness plugin that recalls with nothing in the row's file.
 func nothingWired() bool {
+	if claudeHookWiringState().state != "missing" {
+		return false
+	}
+	// Codex counts with one of deja's events in hooks.json or the plugin
+	// enabled, asked here rather than read off the row: hooks.json also holds
+	// the user's own hooks, and the row says plugin only without the file.
+	if codexPluginInstalled() {
+		return false
+	}
+	codex := codexHookWiringState()
+	for _, h := range codexHookWiring {
+		if hookEventWired(codex.hooks, h.Event, h.Sub) {
+			return false
+		}
+	}
 	for _, a := range autoWirings() {
-		if _, err := os.Stat(a.path()); err == nil {
+		b, err := os.ReadFile(a.path())
+		if !autoUnwired(a, b, err) || harnessPluginCarriesRecall(a.name) {
 			return false
 		}
 	}
@@ -156,7 +242,9 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	switch {
 	case harnessPluginCarriesRecall(a.name) && (err != nil || !strings.Contains(string(b), a.marker)):
 		state = "plugin"
-	case err != nil:
+	case a.name == "aider" && aiderWiring(err == nil) != "":
+		state = aiderWiring(err == nil)
+	case autoUnwired(a, b, err):
 		state = "missing"
 	case a.marker != "" && !strings.Contains(string(b), a.marker):
 		state = "stale"
@@ -170,6 +258,8 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	// enabled record of it; the directory alone is inert.
 	case a.name == "reasonix" && !reasonixPackageEnabled():
 		state = "stale"
+	case a.name == "zcode" && !zcodeHooksRun(b):
+		state = "stale"
 	default:
 		state = "wired"
 	}
@@ -182,6 +272,55 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 		binaryMissing = true
 	}
 	return state, binaryMissing
+}
+
+// aiderWiring is the aider row's state when the context file and the read:
+// entry that makes aider load it disagree, and "" when they agree. The file
+// alone said wired while aider loaded nothing, and the entry alone said missing
+// — the word for never installed — while every start printed an error (#4327).
+func aiderWiring(fileThere bool) string {
+	// readConfig, for the byte order mark install writes back.
+	b, _ := readConfig(aiderConfPath())
+	named := aiderConfReadsContext(string(b))
+	switch {
+	case named && !fileThere:
+		return "broken"
+	case !named && fileThere:
+		return "stale"
+	}
+	return ""
+}
+
+// autoWiringSwitchedOff is the line under a wired row whose harness has turned
+// the wiring off, and "" when it has not. The file is still ours and still
+// right, so the row stays wired, the way a switched-off MCP entry does.
+func autoWiringSwitchedOff(name string) string {
+	if name == "antigravity" && antigravityPluginSwitchedOff() {
+		return "the plugin is switched off — antigravity will not run it until `agy plugin enable deja`"
+	}
+	return clientHooksOff(name)
+}
+
+// antigravityPluginSwitchedOff reads the switch `agy plugin disable` writes:
+// plugins.<dir>.enabled in config.json, which wins wherever it has an entry,
+// and otherwise a `"disabled": true` in the plugin's own plugin.json (#4359).
+func antigravityPluginSwitchedOff() bool {
+	var config struct {
+		Plugins map[string]struct {
+			Enabled *bool `json:"enabled"`
+		} `json:"plugins"`
+	}
+	if b, err := readConfig(filepath.Join(antigravityConfigHome(), "config.json")); err == nil &&
+		json.Unmarshal([]byte(jsoncToJSON(string(b))), &config) == nil {
+		if p, ok := config.Plugins[antigravityPluginName]; ok && p.Enabled != nil {
+			return !*p.Enabled
+		}
+	}
+	var manifest struct {
+		Disabled bool `json:"disabled"`
+	}
+	b, err := readConfig(filepath.Join(antigravityConfigHome(), "plugins", antigravityPluginName, "plugin.json"))
+	return err == nil && json.Unmarshal([]byte(jsoncToJSON(string(b))), &manifest) == nil && manifest.Disabled
 }
 
 // doctorAutoRecall prints one line per harness. "stale" is the interesting
@@ -209,8 +348,22 @@ func doctorAutoRecall(w io.Writer) {
 			continue
 		}
 		switch {
+		case a.name == "aider" && aiderWiring(err == nil) == "broken":
+			fmt.Fprintf(w, "  %-12s %-11s %s  (%s reads it and it is not there — aider prints an error on every start; `deja install aider` writes it)\n", a.name, "broken", reportPath(path), reportPath(aiderConfPath()))
+		case a.name == "aider" && aiderWiring(err == nil) == "stale":
+			fmt.Fprintf(w, "  %-12s %-11s %s  (no read: entry for it in %s, so aider never loads it — `deja install aider`)\n", a.name, "stale", reportPath(path), reportPath(aiderConfPath()))
 		case err != nil:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "missing", reportPath(path), note)
+			// Missing here is not "never installed" when the layer still names
+			// the file: dsh then fails the whole profile load (#4292).
+			if a.name == "deepseek" && dshLayerNamesMissing(path) {
+				fmt.Fprintf(w, "  %-12s %s\n", "", reportPath(dshPatchPath())+" still names it — dsh will not start; `deja install deepseek-auto` writes it again, or `deja uninstall deepseek` takes deja out of the layer")
+			}
+		case autoUnwired(a, b, err):
+			// The client's config is there and deja never wrote its hook into
+			// it: the MCP install writes this same file, and only the -auto
+			// target writes the hook (#3313, #4275).
+			fmt.Fprintf(w, "  %-12s %-11s %s  (no deja hook — `deja install %s-auto`)\n", a.name, "missing", reportPath(path), a.name)
 		case a.marker != "" && !strings.Contains(string(b), a.marker):
 			// "reinstall" was the advice, and for the common way to get here
 			// it cannot work: the MCP install writes this same file, and only
@@ -218,8 +371,13 @@ func doctorAutoRecall(w io.Writer) {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — `deja install %s-auto`)\n", a.name, "stale", reportPath(path), a.marker, a.name)
 		case a.name == "reasonix" && !reasonixPackageEnabled():
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no enabled record in %s — `deja install reasonix-auto`)\n", a.name, "stale", reportPath(path), reportPath(reasonixStatePath()))
+		case a.name == "zcode" && !zcodeHooksRun(b):
+			fmt.Fprintf(w, "  %-12s %-11s %s  (deja's hook is not under hooks.events with hooks.enabled on — `deja install zcode-auto`)\n", a.name, "stale", reportPath(path))
 		default:
 			fmt.Fprintf(w, "  %-12s %-11s %s%s\n", a.name, "wired", reportPath(path), note)
+			if off := autoWiringSwitchedOff(a.name); off != "" {
+				fmt.Fprintf(w, "  %-12s %s\n", "", off)
+			}
 		}
 		// Under the row whatever the row said. A machine that upgraded is most
 		// often stale rather than wired — the entries were written by the
@@ -270,6 +428,85 @@ func doctorContinueWired(path string) bool {
 	return removeContinueItem(string(b), "mcpServers", "deja") != string(b)
 }
 
+// yamlKeyLine reports whether line is the mapping key `key` (with its colon)
+// and nothing else — a trailing comment or blanks allowed, as YAML allows
+// them. An exact match missed `mcp_servers:  # mine` (#4289).
+func yamlKeyLine(line, key string) bool {
+	line = strings.TrimRight(line, "\r\n")
+	if i := strings.Index(line, "#"); i > 0 && (line[i-1] == ' ' || line[i-1] == '\t') {
+		line = line[:i]
+	}
+	return strings.TrimSpace(line) == key
+}
+
+// yamlTopKeyEnd is where the first child of the top-level `key` (colon
+// included) goes, just past the key's line, or -1 when the document has none.
+// doc must end in a newline. A second top-level key, or the key under another
+// spelling (`"key":`, `key :`, an inline value), is refused: the client reads
+// the last one, so joining the first left deja unloaded while doctor said
+// wired, and appending another hid the reader's own entries (#4289).
+func yamlTopKeyEnd(doc, key string) (int, error) {
+	name := strings.TrimSuffix(key, ":")
+	at, found := 0, -1
+	for _, line := range strings.SplitAfter(doc, "\n") {
+		start := at
+		at += len(line)
+		if yamlIndentWidth(line) != 0 || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			continue
+		}
+		if yamlKeyLine(line, key) {
+			if found >= 0 {
+				return -1, fmt.Errorf("%s is written twice at the top level, and only the last one is read — keep one and run this again", key)
+			}
+			found = start + len(line)
+			continue
+		}
+		head, rest, ok := strings.Cut(line, ":")
+		if !ok || strings.Trim(strings.TrimSpace(head), `"'`) != name {
+			continue
+		}
+		v := strings.TrimSpace(rest)
+		if i := strings.Index(v, " #"); i >= 0 {
+			v = strings.TrimSpace(v[:i])
+		}
+		switch strings.ToLower(v) {
+		case "{}", "[]", "~", "null", "''", `""`:
+			// Nothing of the reader's under it: a block written after it
+			// shadows nothing, and uninstall takes that block back.
+			continue
+		}
+		return -1, fmt.Errorf("%s is written as %q, and deja edits only the block form `%s` on a line of its own — rewrite it that way and run this again", key, strings.TrimSpace(line), key)
+	}
+	if found < 0 {
+		return -1, nil
+	}
+	// Past any comment or blank line under the key: a comment there heads the
+	// reader's entries, and an entry written above it would carry it away
+	// when uninstall takes that entry out (#4289).
+	// A blank line is skipped only when what follows it still belongs to the
+	// key; the one that separates an empty key from the next one is the
+	// file's, and an entry written below it moved on every install.
+	for at := found; at < len(doc); {
+		end := strings.IndexByte(doc[at:], '\n')
+		if end < 0 {
+			break
+		}
+		line := doc[at : at+end]
+		t := strings.TrimSpace(line)
+		if t != "" && !strings.HasPrefix(t, "#") {
+			if yamlIndentWidth(line) > 0 {
+				found = at
+			}
+			break
+		}
+		at += end + 1
+		if t != "" {
+			found = at
+		}
+	}
+	return found, nil
+}
+
 // yamlHasChildKey reports whether a key sits directly under a top-level parent.
 //
 // The indent is whatever the reader wrote the block at, and asking for exactly
@@ -282,15 +519,15 @@ func yamlHasChildKey(path, parent, key string) bool {
 	if err != nil {
 		return false
 	}
-	lines := strings.Split(string(b), "\n")
+	lines := strings.Split(string(bytes.TrimPrefix(b, utf8BOM)), "\n")
 	inBlock := false
 	child := -1
 	for _, raw := range lines {
 		line := strings.TrimRight(raw, " \t\r")
-		if strings.TrimSpace(line) == "" {
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
 			continue
 		}
-		if strings.TrimSpace(line) == parent && yamlIndentWidth(line) == 0 {
+		if yamlKeyLine(line, parent) && yamlIndentWidth(line) == 0 {
 			inBlock, child = true, -1
 			continue
 		}
@@ -311,48 +548,27 @@ func yamlHasChildKey(path, parent, key string) bool {
 	return false
 }
 
-// codexHasSeenItsHook reports whether codex has recorded any opinion about the
-// session-start hook. Until it has, codex runs nothing — and in `codex exec`
-// there is no interface in which to approve it, which is how scripted runs end
-// up with no memory while every file on disk looks correctly installed.
+// codexHasSeenItsHook reports whether codex has recorded any opinion about
+// deja's session-start hook. Until it has, codex runs nothing — and in `codex
+// exec` there is no interface in which to approve it, which is how scripted
+// runs end up with no memory while every file on disk looks correctly
+// installed.
 func codexHasSeenItsHook() bool {
 	cfg, err := os.ReadFile(filepath.Join(sources.CodexHome(), "config.toml"))
 	if err != nil {
 		return true // nothing to read: do not raise an alarm we cannot support
 	}
-	return codexHookTrustSection(string(cfg)) != ""
-}
-
-// codexHookTrustSection returns the block of codex's config that records what
-// it thinks of our session-start hook, or "" when there is none.
-//
-// Codex keys its trust store per hook rather than per file —
-// `[hooks.state."<path>/hooks.json:session_start:0:0"]` — and the block ends at
-// the next table header. Reading to the end of the file instead, which is what
-// this did, lets an `enabled = false` belonging to some unrelated table decide
-// what deja reports about ours.
-//
-// It deliberately does not check the recorded hash. deja cannot reproduce it:
-// on codex 0.142.4 the pin for a hook whose command is one line long is not the
-// sha256 of the hook file, of the command, of the handler object in any
-// serialisation, or of any combination of the two with the matcher, the event
-// or the key — checked. Comparing the file's own sha256 against it, which is
-// what this did, therefore called every working install untrusted. Presence of
-// a pin is what deja can honestly read: it means codex has been shown this hook
-// and kept an opinion about it.
-func codexHookTrustSection(cfg string) string {
-	i := strings.Index(cfg, "hooks.json:session_start")
-	if i < 0 {
-		return ""
+	path := filepath.Join(sources.CodexHome(), "hooks.json")
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return true
 	}
-	rest := cfg[i:]
-	// Past the key's own line, so the header we stop at is the next one.
-	if nl := strings.IndexByte(rest, '\n'); nl >= 0 {
-		if end := strings.Index(rest[nl:], "\n["); end >= 0 {
-			return rest[:nl+end]
-		}
+	var root map[string]any
+	if json.Unmarshal(b, &root) != nil {
+		return true
 	}
-	return rest
+	hooks, _ := root["hooks"].(map[string]any)
+	return codexPrimaryPin(codexDejaPins(string(cfg), path, hooks)) != ""
 }
 
 // opencodePluginShapeStale reports whether the installed plugin is written for

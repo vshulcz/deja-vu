@@ -31,7 +31,7 @@ Tool calls follow the Anthropic `tool_use` shape with Cursor's own names: `path`
 
 Only `user` and `assistant` roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as `turn_ended` are ignored. Records carry no timestamp field; a user turn's text starts with a `<timestamp>Sunday, Jul 26, 2026, 1:06 PM (UTC+3)</timestamp>` block, which deja reads and carries forward to the assistant turns that answer it. A transcript with no readable block falls back to the file's modification time.
 
-## The second CLI store, and why it is unread
+## The second CLI store
 
 Cursor CLI also writes one SQLite store per chat:
 
@@ -42,7 +42,7 @@ Cursor CLI also writes one SQLite store per chat:
 
 `store.db` holds `blobs(id TEXT, data BLOB)` and `meta(key, value)`. The blobs are content-addressed and the tree needs no schema to walk: `meta`'s single value is hex-encoded JSON naming `latestRootBlobId`, that blob is protobuf whose repeated field 1 is a list of 32-byte child digests in message order, and each child is plain JSON in the Vercel AI SDK shape — `{"role","content"}` with `text`, `reasoning`, `tool-call` and `tool-result` parts, the calls named as above but keyed `toolName`/`args`.
 
-deja does not read it, because on the machine where it was decoded reading it added nothing: all 19 stores walked, and of the 67 turns they held, 51 were already in the JSONL transcript and the remaining 16 were the `<user_info>` environment preamble the transcript omits. Every chat with a `store.db` had a transcript beside it. What `deja doctor` reports instead is the count of chats with no transcript beside them, which is silent today and is the only signal if a release stops writing `agent-transcripts`.
+Each chat also has a `meta.json` beside its `store.db` holding the `cwd` it ran in, and the `<workspace-hash>` above it is md5 of that path; deja reads it for the project name and the resume directory (#4193). The transcript holds every turn the store does except the `<user_info>` environment preamble, but none of the tool results, so deja reads the store for those alone: each transcript call is paired with the store's call of the same tool name and arguments, in order, and takes its result. A Shell result gives the exit status on the command and the printed output without Cursor's `Exit code` / `Command output` framing; the results of `GetMcpTools` and `GetDynamicTools`, which are the MCP servers' own descriptions, are skipped. Every chat with a `store.db` had a transcript beside it, and `deja doctor` reports the count of chats with none — silent today, and the only signal if a release stops writing `agent-transcripts`.
 
 ## Wiring
 
@@ -52,9 +52,14 @@ deja does not read it, because on the machine where it was decoded reading it ad
 
 CLI chats only. A transcript is named after the chat id `cursor-agent --resume`
 takes, and the command runs in the project directory because Cursor lists chats
-per workspace — deja prints `cd <project> && cursor-agent --resume <id>`, the
-directory recovered from the encoded path (Cursor writes it without the leading
-separator, `Users-x-app`). Live-verified: the resumed chat answered from its own
+per workspace — it looks a chat up under `chats/<md5 of the cwd>/<id>` — so deja
+prints `cd <project> && cursor-agent --resume <id>`, the directory read from the
+chat's `meta.json`, whose folder is that md5. The encoded transcript folder is
+only the fallback: it blanks a dot, a space or a non-ASCII character and cuts a
+long path with a hash, so it cannot be read back for those. A chat whose
+directory is gone, is not recorded, or is no longer in cursor-agent's store is
+refused with `deja show` instead — `cursor-agent --resume` with no id lists
+chats from every directory. Live-verified: the resumed chat answered from its own
 history. IDE chats carry a composer id from `state.vscdb` that the CLI does not
 take, so those still reopen only in the editor.
 
@@ -66,4 +71,4 @@ take, so those still reopen only in the editor.
 - A parsed message is capped at 1 MiB. CLI subagent transcripts are opt-in.
 - Both CLI layouts are written by `cursor-agent 2026.09.02-c22c1a3`, minutes apart in the same session.
 
-**Last verified:** 2026-09-21
+**Last verified:** 2026-10-01

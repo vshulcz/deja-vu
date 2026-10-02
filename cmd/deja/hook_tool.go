@@ -277,7 +277,7 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 	// fired on every action it took and had nothing to say about any of them.
 	if isCommandTool(input.ToolName) {
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
-			return commandHookLineSkipping(dir, cwd, cmd, used)
+			return commandHookLineSkipping(dir, cwd, cmd, input.SessionID, used)
 		}
 		return ""
 	}
@@ -287,6 +287,9 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		"search_replace", "write",
 		// Crush names its editors in lowercase.
 		"edit", "multiedit",
+		// Command Code sends its internal names; EDIT and WRITE are only what
+		// its matcher sees (#4371).
+		"edit_file", "write_file",
 		// pi and omp have no pre-tool seam: the only handler whose return the
 		// model reads is the one holding a finished tool result. An edit there
 		// is already made, so the file's history goes out on their lowercase
@@ -295,7 +298,7 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		// so it has the edit itself to speak at.
 		"read":
 		if path := strings.TrimSpace(input.ToolInput.FilePath); path != "" {
-			return fileHookLine(dir, cwd, path)
+			return fileHookLineOutside(dir, cwd, path, input.SessionID)
 		}
 	case "apply_patch":
 		// Codex and other OpenAI-style agents make every file edit through a
@@ -304,7 +307,7 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		// file-history line fires here too — without this the hook is blind to
 		// every edit those agents make.
 		for _, path := range applyPatchFiles(input.ToolInput.Command) {
-			if line := fileHookLine(dir, cwd, path); line != "" {
+			if line := fileHookLineOutside(dir, cwd, path, input.SessionID); line != "" {
 				return line
 			}
 		}
@@ -396,7 +399,7 @@ func hookProjectIs(cwd, project string) bool {
 
 // commandHookLine is the line for a command when nothing has been said yet.
 func commandHookLine(dir, cwd, cmd string) string {
-	return commandHookLineSkipping(dir, cwd, cmd, func(string) bool { return false })
+	return commandHookLineSkipping(dir, cwd, cmd, "", func(string) bool { return false })
 }
 
 // commandHookLineSkipping is the same walk, told which lines the agent has
@@ -412,7 +415,11 @@ func commandHookLine(dir, cwd, cmd string) string {
 // says an agent runs: the missing-program sentence was the answer 51 times, 34
 // of those had a decision waiting behind it, and across one agent session the
 // hook said three lines in ninety-one actions (#3603).
-func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) string {
+//
+// self is the session the hook fires in. Once it has run the command and been
+// indexed it is the newest run, and its own conclusion was quoted back to it as
+// what happened last time (#4380).
+func commandHookLineSkipping(dir, cwd, cmd, self string, used func(string) bool) string {
 	// "You have run this before" is worthless for an inspection command the
 	// agent runs constantly — git status, git diff, ls, cat. On a real store
 	// these are the top of the table (git status --short in 116 sessions), and
@@ -452,7 +459,7 @@ func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) strin
 		}
 		skipped = true
 	}
-	use, ok := index.CommandHistory(dir, cmd)
+	use, ok := index.CommandHistoryOutside(dir, cmd, self)
 	if !ok {
 		return ""
 	}
@@ -528,7 +535,7 @@ func commandHookLineSkipping(dir, cwd, cmd string, used func(string) bool) strin
 			return line
 		}
 	}
-	if d := commandDecisionLine(dir, cwd, cmd, skipped); d != "" {
+	if d := commandDecisionLine(dir, cwd, cmd, self, skipped); d != "" {
 		if line := head + " — last time: " + d; !used(line) {
 			return line
 		}
@@ -653,7 +660,7 @@ func promotedCommandDecision(dir, cwd, cmd string) string {
 // the files a session touched but not the commands it ran, so there is no
 // cheaper lookup, and this hook fires on a build or a deploy rather than on
 // every message — the prompt hook already pays a search per keystroke.
-func commandDecisionLine(dir, cwd, cmd string, lookupOnly bool) string {
+func commandDecisionLine(dir, cwd, cmd, self string, lookupOnly bool) string {
 	// The command table names the newest session in each project that ran this
 	// command, and that session's row carries what it settled. Two map lookups,
 	// where the search below ranks candidates and then loads whole sessions to
@@ -663,7 +670,7 @@ func commandDecisionLine(dir, cwd, cmd string, lookupOnly bool) string {
 	// fact this table held; the ranking existed to guess it.
 	pol := policy.Load()
 	allow := func(project string) bool { return pol.Allows(policy.ActivationAuto, project) }
-	if d := index.CommandSettled(dir, cmd, digest.ProjectNameCandidates(cwd), allow); d != "" {
+	if d := index.CommandSettledOutside(dir, cmd, digest.ProjectNameCandidates(cwd), allow, self); d != "" {
 		return trimTrailingFragment(search.SafeText(strings.TrimSpace(d)))
 	}
 	// And the search, for a table written before it carried the session key:
@@ -693,7 +700,7 @@ func commandDecisionLine(dir, cwd, cmd string, lookupOnly bool) string {
 		// fact rather than a ranking: did the session run it. The words still
 		// choose the candidates; running the command earns the line. A session
 		// that merely says "apply" is not the history of `terraform apply`.
-		if !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
+		if (self != "" && s.ID == self) || !pol.Allows(policy.ActivationAuto, s.Project) || !decisionUsable(s, states) {
 			continue
 		}
 		// The ranked sessions are served without their command records, so the
@@ -728,6 +735,13 @@ func normalizedCommandText(cmd string) string {
 }
 
 func fileHookLine(dir, cwd, path string) string {
+	return fileHookLineOutside(dir, cwd, path, "")
+}
+
+// fileHookLineOutside leaves out self, the session the hook fires in. It is
+// in the index once it has touched the file, and as the newest it was counted
+// and its own last reply quoted back as the file's history (#4380).
+func fileHookLineOutside(dir, cwd, path, self string) string {
 	// FileSessions matches on the file's basename, so without scoping "main.go"
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a
@@ -741,6 +755,9 @@ func fileHookLine(dir, cwd, path string) string {
 	var last time.Time
 	var inScope []index.SessionMeta
 	for _, meta := range index.FileSessions(dir, path) {
+		if self != "" && meta.ID == self {
+			continue
+		}
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
 			continue
 		}
