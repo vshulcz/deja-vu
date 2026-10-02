@@ -794,7 +794,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// transcript root and declines some of its own files by a rule.
 	// Files named in beside are the store's own bookkeeping, as for
 	// printFilesBeside below.
-	printFilesSkippingIn := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool, beside ...string) {
+	//
+	// switchable says whether DEJA_INCLUDE_SUBAGENTS brings the skipped ones
+	// in. Kimi's and Qwen's sub-agent logs are left out by design, and naming
+	// the variable for them would send the user after a switch that does
+	// nothing (#4473, #4475).
+	printFilesSkippingWith := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool, switchable bool, beside ...string) {
 		detail := doctorCount(len(seen), "file")
 		placed := append(append([]string{}, seen...), beside...)
 		unread := 0
@@ -804,7 +809,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 			unread += u
 			byRule += b
 		}
-		if byRule > 0 {
+		if byRule > 0 && !switchable {
+			detail += fmt.Sprintf(", %d subagent transcripts skipped", byRule)
+		} else if byRule > 0 {
 			// The variable named the way it was read as the cause of the
 			// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
 			// wanted those transcripts indexed set the thing the line said
@@ -819,6 +826,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
 		printRow(name, loc, present, detail)
+	}
+	printFilesSkippingIn := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool, beside ...string) {
+		printFilesSkippingWith(name, loc, roots, present, seen, skipped, true, beside...)
 	}
 	// printFilesSkipping is its one-root form.
 	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool, beside ...string) {
@@ -862,7 +872,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		claudePresent = claudePresent || doctorExists(root)
 	}
 	printFilesSkippingIn("claude", claudeLocation, claudeRoots, claudePresent, sources.ClaudeFiles(),
-		func(p string) bool { return !sources.ClaudeFileWanted(p) })
+		func(p string) bool { return !sources.ClaudeFileWanted(p) }, sources.ClaudeSidecarFiles()...)
 
 	codexRoots := sources.CodexRoots()
 	codexLocation := strings.Join(codexRoots, string(os.PathListSeparator))
@@ -907,11 +917,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
 	// Beside, not unread: `<id>.runtime.json`, `meta.json` and
 	// `extract-cursor.json` are qwen's own bookkeeping (#3676).
-	printFilesBeside("qwen", qwenRoot, doctorExists(qwenRoot),
-		sources.QwenSessionFiles(), sources.QwenSidecarFiles()...)
+	printFilesSkippingWith("qwen", qwenRoot, []string{qwenRoot}, doctorExists(qwenRoot),
+		sources.QwenSessionFiles(), sources.QwenSubagentFile, false, sources.QwenSidecarFiles()...)
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
-	printFilesBeside("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles(), sources.KimiSidecarFiles()...)
+	printFilesSkippingWith("kimi", kimiRoot, []string{kimiRoot}, doctorExists(kimiRoot),
+		sources.KimiSessionFiles(), sources.KimiSubagentFile, false, sources.KimiSidecarFiles()...)
 
 	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
 	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))

@@ -482,6 +482,9 @@ import (
 // project by the recorded cwd's last two segments, as claude does, and decode
 // a file:// workspace first; claude and pi name a drive-root directory
 // C:\proj "proj" rather than "C:/proj" (#4457, #4458, #4461, #4462).
+//
+// 60 also: an OpenClaw <id>.trajectory.jsonl is no longer read as a session
+// (#4477).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

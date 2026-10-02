@@ -35,9 +35,34 @@ func QwenSidecarFiles() []string {
 			return true
 		case base == "meta.json" || base == "extract-cursor.json":
 			return true
+		// Qwen 0.20's session groups and workflow runs, and the metadata
+		// beside a sub-agent's log (#4475).
+		case base == "session-organization.v1.json":
+			return true
+		case qwenUnder(p, "workflows"):
+			return true
+		case qwenUnder(p, "subagents") && strings.HasSuffix(base, ".meta.json"):
+			return true
 		}
 		return false
 	})
+}
+
+// QwenSubagentFile reports whether p is a sub-agent's log,
+// projects/<project>/subagents/<session>/agent-<id>.jsonl. The reader takes
+// only chats/, so doctor counts these as skipped, not unread (#4475).
+func QwenSubagentFile(p string) bool {
+	return strings.HasSuffix(p, ".jsonl") && qwenUnder(p, "subagents")
+}
+
+// qwenUnder reports whether p sits in the named directory of its project.
+func qwenUnder(p, dir string) bool {
+	rel, err := filepath.Rel(filepath.Join(QwenRoot(), "projects"), p)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	return len(parts) > 2 && parts[1] == dir
 }
 
 func LoadQwen() []model.Session { return parseFiles(QwenSessionFiles(), ParseQwenFile) }

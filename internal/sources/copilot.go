@@ -33,7 +33,9 @@ func CopilotSidecarFiles() []string {
 		// Copilot CLI 1.0.79 also keeps rewind snapshots per session
 		// (rewind-file-snapshots/index.json, tracking.json): the client's own
 		// state, not transcripts deja failed to read (#4233).
+		// autopilot-objective.json is the goal of an autopilot run (#4476).
 		return filepath.Base(p) == "vscode.metadata.json" ||
+			filepath.Base(p) == "autopilot-objective.json" ||
 			filepath.Base(filepath.Dir(p)) == "rewind-file-snapshots"
 	})
 }

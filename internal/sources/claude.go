@@ -128,6 +128,20 @@ func ClaudeFiles() []string {
 	return out
 }
 
+// ClaudeSidecarFiles lists the agent-<id>.meta.json Claude Code writes next to
+// each sub-agent transcript: the agent type and the task, not a transcript.
+// doctor counted each as a skipped sub-agent, and one was enough to tell the
+// user to set a variable for transcripts deja already reads (#4478).
+func ClaudeSidecarFiles() []string {
+	var out []string
+	for _, root := range ClaudeRoots() {
+		out = append(out, walkFiles(root, func(p string) bool {
+			return IsSubagentPath(p) && strings.HasSuffix(p, ".meta.json")
+		})...)
+	}
+	return out
+}
+
 // UnderClaudeRoot reports whether a path is inside any of the roots above. The
 // registry matches a transcript to its harness by prefix, and with more than
 // one root that question is no longer "does it start with ClaudeRoot()".

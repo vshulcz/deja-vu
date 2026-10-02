@@ -40,11 +40,24 @@ func KimiSessionFiles() []string {
 
 // KimiSidecarFiles lists the per-session state.json the reader opens itself
 // for the title and the working directory. doctor counted one per session as a
-// transcript it could not read (#3309).
+// transcript it could not read (#3309). The goal queue, upcoming-goals.json,
+// sits beside it and is Kimi's own too (#4473), as is a background task's
+// record, tasks/<task-id>.json in an agent's directory or the session's.
 func KimiSidecarFiles() []string {
 	return walkFiles(filepath.Join(KimiRoot(), "sessions"), func(p string) bool {
-		return filepath.Base(p) == "state.json"
+		base := filepath.Base(p)
+		return base == "state.json" || base == "upcoming-goals.json" ||
+			filepath.Base(filepath.Dir(p)) == "tasks" && strings.HasSuffix(base, ".json")
 	})
+}
+
+// KimiSubagentFile reports whether p is a sub-agent's log, which Kimi writes at
+// agents/<agent-id>/wire.jsonl beside agents/main. The reader leaves those out
+// by design (#248); doctor counts them as skipped rather than unread (#4473).
+func KimiSubagentFile(p string) bool {
+	dir := filepath.Dir(p)
+	return filepath.Base(p) == "wire.jsonl" && filepath.Base(dir) != "main" &&
+		filepath.Base(filepath.Dir(dir)) == "agents"
 }
 
 func LoadKimi() []model.Session { return parseFiles(KimiSessionFiles(), ParseKimiFile) }

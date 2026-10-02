@@ -39,9 +39,22 @@ func GeminiRoot() string {
 // chats: the per-project log the CLI writes for itself. Everything outside
 // `tmp` is out of the walk entirely, because Antigravity's store lives in a
 // sibling directory of the same root and has its own row (#3397).
+//
+// Gemini 0.60 also keeps, per project, `/chat save` checkpoints
+// (checkpoint-<tag>.json), restore points (checkpoints/*.json) and task lists
+// (<session>/tasks/*.json). None is a chat log the reader takes (#4474).
 func GeminiSidecarFiles() []string {
 	return walkFiles(filepath.Join(GeminiRoot(), "tmp"), func(p string) bool {
-		return filepath.Base(p) == "logs.json"
+		base, dir := filepath.Base(p), filepath.Base(filepath.Dir(p))
+		switch {
+		case base == "logs.json":
+			return true
+		case strings.HasPrefix(base, "checkpoint-") && strings.HasSuffix(base, ".json"):
+			return true
+		case dir == "checkpoints" || dir == "tasks":
+			return true
+		}
+		return false
 	})
 }
 
