@@ -53,7 +53,9 @@
 <p>output whether it is a string or the CLI&#39;s list of</p>
 <p><code>{query, result, error, success}</code> entries that <code>run_commands</code> and</p>
 <p><code>read_files</code> write; an error the result does not already carry is kept with</p>
-<p>it (#4315). The legacy extension&#39;s store takes</p>
+<p>it (#4315). A command carries <code>→ exit N</code> from its result: the entry&#39;s</p>
+<p><code>success</code> or its &#34;Command exited with code N&#34; error, or the extension&#39;s</p>
+<p>&#34;Command failed with exit code N.&#34; (#4502). The legacy extension&#39;s store takes</p>
 <p>the Roo path for those, since its tools are Roo&#39;s — see</p>
 <p><a href="roo.html">Roo Code</a> for the SEARCH/REPLACE shape and the workspace-relative</p>
 <p>paths. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user envelope is unwrapped so the tags are</p>

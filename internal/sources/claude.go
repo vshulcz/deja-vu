@@ -324,22 +324,13 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 					}
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 				}
-				// The same stamp the typed parser writes, from the same two
-				// fields: a transcript records no exit code, so only the clean
-				// case is stated.
+				// The same stamp the typed parser writes, from the same
+				// fields.
 				for _, res := range toolOutcomesFromContent(msg["content"]) {
-					at, ok := commandAt[res.ID]
-					if !ok || res.Error {
+					if _, ok := commandAt[res.ID]; !ok || !res.Known {
 						continue
 					}
-					for _, i := range at {
-						if i >= len(s.Messages) {
-							continue
-						}
-						if !strings.Contains(s.Messages[i].Text, "  → exit ") {
-							s.Messages[i].Text += "  → exit 0"
-						}
-					}
+					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
 					delete(commandAt, res.ID)
 				}
 			}

@@ -152,7 +152,8 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 			Content map[string]struct {
 				Prompt  string `json:"prompt"`
 				Results []struct {
-					Content any `json:"content"`
+					ID      string `json:"tool_use_id"`
+					Content any    `json:"content"`
 				} `json:"tool_use_results"`
 			} `json:"content"`
 			Timestamp string `json:"timestamp"`
@@ -160,6 +161,7 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 		Assistant map[string]struct {
 			Content  string `json:"content"`
 			ToolUses []struct {
+				ID   string         `json:"id"`
 				Name string         `json:"name"`
 				Args map[string]any `json:"args"`
 			} `json:"tool_uses"`
@@ -169,6 +171,9 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 		return
 	}
 	var t time.Time
+	// A call is in one turn's reply and its result in the next turn's user
+	// content; exits joins the two (#4505).
+	exits := commandExits{}
 	for _, turn := range history {
 		if at := parseTimeAny(turn.User.Timestamp); !at.IsZero() {
 			t = at
@@ -183,6 +188,9 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 			for _, r := range c.Results {
 				if out := kiroResultText(r.Content); out != "" {
 					results = append(results, out)
+				}
+				if code, ok := kiroExitStatus(r.Content); ok {
+					exits.stamp(s.Messages, r.ID, "", code)
 				}
 			}
 		}
@@ -199,13 +207,17 @@ func kiroDBHistory(s *model.Session, raw json.RawMessage) {
 			var calls []any
 			for _, u := range a.ToolUses {
 				if u.Name != "" && u.Args != nil {
-					calls = append(calls, kiroToolCall(u.Name, u.Args))
+					call := kiroToolCall(u.Name, u.Args)
+					call["id"] = u.ID
+					calls = append(calls, call)
 				}
 			}
+			from := len(s.Messages)
 			if work := kiroWorkRecords(calls, nil, t); len(work) > 0 {
 				s.Touch(t)
 				s.Messages = append(s.Messages, work...)
 			}
+			exits.note(s.Messages, from, commandCallsIn(calls, kiroDialect))
 		}
 	}
 }

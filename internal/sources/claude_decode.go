@@ -184,23 +184,15 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 					}
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 				}
-				// The result arrives in a later record and names the call. A
-				// transcript carries no exit code, so only the clean case is
-				// stated, in the marker every other harness writes — nothing is
-				// invented for a failure whose code nobody recorded.
+				// The result arrives in a later record and names the call, in
+				// the marker every other harness writes. A failure is stamped
+				// only with the code its result names; nothing is invented for
+				// one that names none.
 				for _, res := range claudeToolOutcomes(v.Message.Content) {
-					at, ok := commandAt[res.ID]
-					if !ok || res.Error {
+					if _, ok := commandAt[res.ID]; !ok || !res.Known {
 						continue
 					}
-					for _, i := range at {
-						if i >= len(s.Messages) {
-							continue
-						}
-						if !strings.Contains(s.Messages[i].Text, "  → exit ") {
-							s.Messages[i].Text += "  → exit 0"
-						}
-					}
+					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
 					delete(commandAt, res.ID)
 				}
 			}
@@ -762,14 +754,17 @@ func claudeCommands(raw json.RawMessage) []claudeCommand {
 	return out
 }
 
-// claudeToolOutcome is one tool_result and whether the harness marked it a
-// failure. A Claude transcript records no exit code — `is_error` is all there
-// is — so a result that is not an error is the only outcome that can be stated,
-// and it is the one worth stating: it turns "this session ran X" into evidence
-// that X worked here.
+// claudeToolOutcome is one tool_result and the exit code it states. A clean
+// result is exit 0: it turns "this session ran X" into evidence that X worked
+// here. A failed Bash run opens its content with "Exit code N" — Claude Code
+// builds the error as [`Exit code ${code}`, stderr, stdout] — and before #4487
+// that line was not read, so a failure was stored like a run whose result
+// never came. An error that names no code (a denied or interrupted call) is
+// left unknown.
 type claudeToolOutcome struct {
 	ID    string
-	Error bool
+	Code  int
+	Known bool
 }
 
 func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
@@ -788,16 +783,30 @@ func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
 			continue
 		}
 		var part struct {
-			Type      string `json:"type"`
-			ToolUseID string `json:"tool_use_id"`
-			IsError   bool   `json:"is_error"`
+			Type      string          `json:"type"`
+			ToolUseID string          `json:"tool_use_id"`
+			IsError   bool            `json:"is_error"`
+			Content   json.RawMessage `json:"content"`
 		}
 		if json.Unmarshal(item, &part) != nil || part.Type != "tool_result" || part.ToolUseID == "" {
 			continue
 		}
-		out = append(out, claudeToolOutcome{ID: part.ToolUseID, Error: part.IsError})
+		var content any
+		if part.IsError {
+			_ = json.Unmarshal(part.Content, &content)
+		}
+		out = append(out, claudeOutcome(part.ToolUseID, part.IsError, content))
 	}
 	return out
+}
+
+// claudeOutcome reads the exit code off one tool_result, for both parsers.
+func claudeOutcome(id string, failed bool, content any) claudeToolOutcome {
+	if !failed {
+		return claudeToolOutcome{ID: id, Known: true}
+	}
+	code, ok := statusCode(firstLine(contentText(content)), "Exit code ", "")
+	return claudeToolOutcome{ID: id, Code: code, Known: ok && code != 0}
 }
 
 // claudeCallIdentity is which API call a record reports on: the requestId when

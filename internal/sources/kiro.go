@@ -130,6 +130,7 @@ func ParseKiroCLIFileFromOffset(path string, offset int64) ([]model.Session, err
 	// read that Prompt is behind the offset, and what was appended after a
 	// pass landed at 0001-01-01 (#4444).
 	at := kiroCLITimeBefore(path, offset)
+	exits := commandExits{}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		kind, _ := m["kind"].(string)
 		data, _ := m["data"].(map[string]any)
@@ -161,9 +162,20 @@ func ParseKiroCLIFileFromOffset(path string, offset int64) ([]model.Session, err
 		// The work rides beside the talk: toolUse parts in an AssistantMessage,
 		// toolResult parts in a ToolResults record. Read as text only, a Kiro
 		// CLI session had no command, no file and no tool output (#4299).
+		from := len(s.Messages)
 		if work := kiroWorkRecords(calls, results, t); len(work) > 0 {
 			s.Touch(t)
 			s.Messages = append(s.Messages, work...)
+		}
+		exits.note(s.Messages, from, commandCallsIn(calls, kiroDialect))
+		parts, _ := data["content"].([]any)
+		for _, part := range parts {
+			if p, _ := part.(map[string]any); p["kind"] == "toolResult" {
+				d, _ := p["data"].(map[string]any)
+				if code, ok := kiroExitStatus(d["content"]); ok {
+					exits.stamp(s.Messages, str(d["toolUseId"]), "", code)
+				}
+			}
 		}
 	})
 	if len(s.Messages) == 0 {
@@ -191,9 +203,11 @@ func kiroCLITimeBefore(path string, offset int64) time.Time {
 // KiroCLIResumes reports whether a CLI transcript's tail can be appended to
 // what is stored. A reply streams in as AssistantMessage records under one
 // message_id, joined as they are read; when the tail continues the reply the
-// stored part ended on, it is read whole (#4445).
+// stored part ended on, it is read whole (#4445). So is a tail holding the
+// failed exit of a command called before it, which only a read holding both
+// can stamp (#4505).
 func KiroCLIResumes(path string, offset int64) bool {
-	return resumesUnlessJoined(path, offset, func(line []byte) (string, bool) {
+	return kiroExitResumes(path, offset) && resumesUnlessJoined(path, offset, func(line []byte) (string, bool) {
 		m := decodeJSONLine(line)
 		data, _ := m["data"].(map[string]any)
 		if data == nil {
@@ -212,6 +226,28 @@ func KiroCLIResumes(path string, offset int64) bool {
 		return "", false
 	})
 }
+
+// kiroExitResumes is the #4443 rule for kiro-cli: a clean result left in the
+// next pass is let go, as it is for pi, and a failed one is not.
+var kiroExitResumes = resumesUnlessAnswering(`"toolUseId"`, func(m map[string]any) ([]string, string) {
+	data, _ := m["data"].(map[string]any)
+	parts, _ := data["content"].([]any)
+	var calls []string
+	for _, part := range parts {
+		p, _ := part.(map[string]any)
+		d, _ := p["data"].(map[string]any)
+		id := str(d["toolUseId"])
+		switch p["kind"] {
+		case "toolUse":
+			calls = append(calls, id)
+		case "toolResult":
+			if code, ok := kiroExitStatus(d["content"]); ok && code != 0 {
+				return calls, id
+			}
+		}
+	}
+	return calls, ""
+})
 
 // applyKiroCLIHeader reads identity out of the header file beside the
 // transcript: the session's own id and the directory it ran in.
@@ -315,7 +351,9 @@ func kiroContent(v any) (string, []any, []string) {
 			d, _ := p["data"].(map[string]any)
 			name, _ := d["name"].(string)
 			if in, ok := d["input"].(map[string]any); ok && name != "" {
-				calls = append(calls, kiroToolCall(name, in))
+				call := kiroToolCall(name, in)
+				call["id"] = d["toolUseId"]
+				calls = append(calls, call)
 			}
 		case "toolResult":
 			d, _ := p["data"].(map[string]any)
@@ -409,6 +447,25 @@ func kiroResultText(v any) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
+// kiroExitStatus is how a shell command ended, from its result's JSON part:
+// "exit status: 1" in the TUI transcript, "1" in the database. kiroResultText
+// keeps only the output, and a failed command was stored without its status
+// (#4505).
+func kiroExitStatus(v any) (int, bool) {
+	parts, _ := v.([]any)
+	for _, part := range parts {
+		p, _ := part.(map[string]any)
+		data, ok := p["data"].(map[string]any)
+		if !ok {
+			data, _ = p["Json"].(map[string]any)
+		}
+		if st, ok := data["exit_status"].(string); ok {
+			return statusCode(strings.TrimPrefix(st, "exit status: "), "", "")
+		}
+	}
+	return 0, false
 }
 
 // kiroWorkRecords turns one record's tool calls and results into work records,

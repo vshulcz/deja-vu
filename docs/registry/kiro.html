@@ -105,7 +105,8 @@
 <p><code>write</code> and <code>read</code> (<code>content</code>, <code>oldStr</code>, <code>newStr</code>, <code>operations[].path</code>); the</p>
 <p>headless path keeps <code>execute_bash</code>, <code>fs_write</code> and <code>fs_read</code> (<code>file_text</code>,</p>
 <p><code>old_str</code>, <code>new_str</code>). Both are read into commands, files, edits and tool</p>
-<p>output (#4299). Only the <code>Prompt</code> record carries a timestamp, so the reply</p>
+<p>output (#4299). A command carries <code>→ exit N</code> from its result&#39;s</p>
+<p><code>exit_status</code> (#4505). Only the <code>Prompt</code> record carries a timestamp, so the reply</p>
 <p>and its calls take the prompt&#39;s.</p>
 <ul>
 <li><strong>Not read yet.</strong> The IDE mirrors chats into its globalStorage</li>

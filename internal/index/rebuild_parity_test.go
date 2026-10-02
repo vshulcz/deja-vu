@@ -261,6 +261,30 @@ func TestToolResultInTheNextPassSettlesItsCall(t *testing.T) {
 			res:  `{"type":"message","id":"r1","timestamp":"2026-09-01T09:02:01Z","message":{"role":"toolResult","toolCallId":"c-vet","toolName":"bash","content":[{"type":"text","text":"vet: unreachable"}],"details":{"exitCode":2},"isError":true}}` + "\n",
 		},
 		{
+			// Claude, goose and kiro-cli stamp a failure's exit only since
+			// #4487, #4496 and #4505, so the split now matters for them too.
+			name: "claude", env: "DEJA_CLAUDE_ROOT",
+			file: "-tmp-proj/c1.jsonl",
+			head: `{"type":"user","sessionId":"c1","timestamp":"2026-10-01T10:00:00Z","cwd":"/tmp/proj","message":{"role":"user","content":"fix the retry loop"}}` + "\n",
+			call: `{"type":"assistant","sessionId":"c1","timestamp":"2026-10-01T10:00:01Z","cwd":"/tmp/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go vet ./retry"}}]}}` + "\n",
+			res:  `{"type":"user","sessionId":"c1","timestamp":"2026-10-01T10:00:02Z","cwd":"/tmp/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":"Exit code 2\nvet: unreachable"}]}}` + "\n",
+		},
+		{
+			name: "goose", env: "DEJA_GOOSE_ROOT",
+			file: "sessions/20261001_1.jsonl",
+			head: `{"working_dir":"/tmp/proj","description":"fix the retry loop","message_count":0}` + "\n" +
+				`{"role":"user","created":1790848800,"content":[{"type":"text","text":"fix the retry loop"}]}` + "\n",
+			call: `{"role":"assistant","created":1790848801,"content":[{"type":"toolRequest","id":"c1","toolCall":{"status":"success","value":{"name":"developer__shell","arguments":{"command":"go vet ./retry"}}}}]}` + "\n",
+			res:  `{"role":"user","created":1790848802,"content":[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"vet: unreachable\n\nCommand exited with code 2"}],"isError":true}}}]}` + "\n",
+		},
+		{
+			name: "kiro-cli", env: "DEJA_KIRO_ROOT",
+			file: "cli/11111111-2222-4333-8444-555555555555.jsonl",
+			head: `{"version":"v1","kind":"Prompt","data":{"message_id":"m0","content":[{"kind":"text","data":"fix the retry loop"}],"meta":{"timestamp":1790848800}}}` + "\n",
+			call: `{"version":"v1","kind":"AssistantMessage","data":{"message_id":"m1","content":[{"kind":"toolUse","data":{"toolUseId":"t1","name":"shell","input":{"command":"go vet ./retry"}}}],"meta":{"timestamp":1790848801}}}` + "\n",
+			res:  `{"version":"v1","kind":"ToolResults","data":{"message_id":"m2","content":[{"kind":"toolResult","data":{"toolUseId":"t1","content":[{"kind":"json","data":{"exit_status":"exit status: 2","stdout":"","stderr":"vet: unreachable"}}],"status":"success"}}],"meta":{"timestamp":1790848802}}}` + "\n",
+		},
+		{
 			name: "pi refused edit", env: "DEJA_PI_ROOT",
 			file: "--tmp-proj--/s-retry.jsonl",
 			head: `{"type":"session","version":3,"id":"s-retry","timestamp":"2026-09-01T09:00:00Z","cwd":"/tmp/proj"}` + "\n" +

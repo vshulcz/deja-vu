@@ -183,6 +183,7 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Path:    path,
 	}
+	exits := commandExits{}
 	err := scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isGooseHeader, func(m map[string]any) {
 		role, hasRole := m["role"].(string)
 		if !hasRole {
@@ -201,7 +202,7 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 			return
 		}
 		s.Touch(t)
-		appendGooseParts(&s, role, t, parts)
+		appendGooseParts(&s, role, t, parts, exits)
 	})
 	if s.Project == "" {
 		s.Project = "goose"
@@ -255,6 +256,10 @@ type goosePartsOf struct {
 	// edits and wrote are the replaced and the written side of the file
 	// changes the row asked for (#4265).
 	edits, wrote []string
+	// callIDs is the request each command came from, one per command, and
+	// exits the code each response in the row reported, by request.
+	callIDs []string
+	exits   map[string]int
 }
 
 func (p goosePartsOf) empty() bool {
@@ -267,7 +272,10 @@ func (p goosePartsOf) empty() bool {
 // role that marks it as a printout, and the command, the paths and the edits as
 // their own records so `how`, `blame`, `restore` and the fix pairs can find
 // them.
-func appendGooseParts(s *model.Session, role string, t time.Time, p goosePartsOf) {
+//
+// exits joins a command to its response, which arrives on a later row: the
+// shell tool reports how the command ended there and nowhere else (#4496).
+func appendGooseParts(s *model.Session, role string, t time.Time, p goosePartsOf, exits commandExits) {
 	if p.speech != "" {
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: capParsedMessage(p.speech), Time: t})
 	}
@@ -287,8 +295,14 @@ func appendGooseParts(s *model.Session, role string, t time.Time, p goosePartsOf
 			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
 		}
 	}
-	for _, cmd := range p.commands {
+	for i, cmd := range p.commands {
+		if exits != nil && p.callIDs[i] != "" {
+			exits[p.callIDs[i]] = append(exits[p.callIDs[i]], len(s.Messages))
+		}
 		s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
+	}
+	for id, code := range p.exits {
+		exits.stamp(s.Messages, id, "", code)
 	}
 }
 
@@ -381,6 +395,7 @@ func gooseParts(v any) goosePartsOf {
 			name, args := gooseToolCall(m)
 			if cmd := strings.TrimSpace(str(args["command"])); cmd != "" && worthIndexing(cmd) {
 				p.commands = append(p.commands, "$ "+cmd)
+				p.callIDs = append(p.callIDs, str(m["id"]))
 			}
 			// The editor tools name the file they are about to change, which is
 			// what blame reads. `path` is what goose's own editor takes; a tool
@@ -403,6 +418,12 @@ func gooseParts(v any) goosePartsOf {
 		case "toolResponse":
 			if t := gooseToolResult(m); t != "" {
 				out = append(out, t)
+			}
+			if code, ok := gooseExitCode(m); ok && str(m["id"]) != "" {
+				if p.exits == nil {
+					p.exits = map[string]int{}
+				}
+				p.exits[str(m["id"])] = code
 			}
 		}
 	}
@@ -477,6 +498,24 @@ func gooseToolResult(m map[string]any) string {
 		return t
 	}
 	return ""
+}
+
+// gooseExitCode is how a shell command ended, from its response. goose's
+// shell tool (1.46) puts the code in structuredContent.exit_code, and on a
+// failure also ends the text with "Command exited with code N"; a response
+// that says neither is left unknown.
+func gooseExitCode(m map[string]any) (int, bool) {
+	res, _ := m["toolResult"].(map[string]any)
+	value, _ := res["value"].(map[string]any)
+	if sc, ok := value["structuredContent"].(map[string]any); ok {
+		if n, ok := piExitCode(sc["exit_code"]); ok {
+			return n, true
+		}
+	}
+	if failed, _ := value["isError"].(bool); failed {
+		return statusCode(lastLine(textFromContent(value["content"])), "Command exited with code ", "")
+	}
+	return 0, false
 }
 
 // gooseTypeFilter keeps out of recall what goose wrote for itself: Goose
@@ -564,6 +603,7 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		return nil, err
 	}
 	by := map[string]*model.Session{}
+	exits := map[string]commandExits{}
 	rows := 0
 	for dec.More() {
 		var r map[string]any
@@ -604,7 +644,10 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 			continue
 		}
 		s.Touch(t)
-		appendGooseParts(s, role, t, parts)
+		if exits[id] == nil {
+			exits[id] = commandExits{}
+		}
+		appendGooseParts(s, role, t, parts, exits[id])
 	}
 	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()

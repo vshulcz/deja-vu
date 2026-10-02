@@ -133,6 +133,6 @@ func TestAGooseRowWithNothingToIndexIsSkipped(t *testing.T) {
 func gooseSessionFrom(t *testing.T, role, raw string) model.Session {
 	t.Helper()
 	var s model.Session
-	appendGooseParts(&s, role, time.Unix(0, 0), gooseParts(raw))
+	appendGooseParts(&s, role, time.Unix(0, 0), gooseParts(raw), nil)
 	return s
 }

@@ -245,9 +245,15 @@ func (r *piReader) toolResult(msg map[string]any, t time.Time) {
 		mark := ""
 		if code, ok := piExitCode(details["exitCode"]); ok {
 			mark = "  → exit " + strconv.Itoa(code)
+		} else if code, ok := statusCode(lastLine(contentText(msg["content"])), "Command exited with code ", ""); failed && ok {
+			// pi's bash throws on a non-zero exit and the error result keeps
+			// only the message, the output with "Command exited with code N"
+			// as its last line; details is empty (#4501).
+			mark = "  → exit " + strconv.Itoa(code)
 		} else if !failed {
-			// pi records no exit code, so only the clean case is stated,
-			// as the Claude decoder does; nothing is made up for a failure.
+			// A clean run records no code, so it is stated here, as the
+			// Claude decoder does; nothing is made up for a failure that
+			// names none.
 			mark = "  → exit 0"
 		}
 		for _, i := range at {
@@ -329,6 +335,8 @@ func piCommandFailed(msg map[string]any) bool {
 	return ok && code != 0
 }
 
+// piExitCode reads a numeric exit code as either decoder hands it back; the
+// Copilot Chat reader, which decodes with UseNumber, uses it too.
 func piExitCode(v any) (int, bool) {
 	switch n := v.(type) {
 	case float64:

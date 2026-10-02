@@ -59,7 +59,8 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   `write` and `read` (`content`, `oldStr`, `newStr`, `operations[].path`); the
   headless path keeps `execute_bash`, `fs_write` and `fs_read` (`file_text`,
   `old_str`, `new_str`). Both are read into commands, files, edits and tool
-  output (#4299). Only the `Prompt` record carries a timestamp, so the reply
+  output (#4299). A command carries `→ exit N` from its result's
+  `exit_status` (#4505). Only the `Prompt` record carries a timestamp, so the reply
   and its calls take the prompt's.
 - **Not read yet.** The IDE mirrors chats into its globalStorage
   (`kiro.kiroagent/<workspace>/*.chat` beside extensionless execution records).

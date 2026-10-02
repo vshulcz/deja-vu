@@ -491,6 +491,9 @@ import (
 // a renamed Cline CLI session takes its new title (#4319), and a thin harness
 // title is not retaken from an appended turn (#4452); rows already held
 // change only on a rebuild.
+// 60 also: a failed command carries its `→ exit N` in claude, the pi family,
+// goose, cline, kiro-cli, zed and copilot-chat, and a copilot-chat terminal
+// call its output (#4487, #4501, #4496, #4502, #4505, #4507, #4493).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

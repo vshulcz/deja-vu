@@ -15,7 +15,9 @@ replaced span and the hashed written lines. A tool result is indexed as tool
 output whether it is a string or the CLI's list of
 `{query, result, error, success}` entries that `run_commands` and
 `read_files` write; an error the result does not already carry is kept with
-it (#4315). The legacy extension's store takes
+it (#4315). A command carries `→ exit N` from its result: the entry's
+`success` or its "Command exited with code N" error, or the extension's
+"Command failed with exit code N." (#4502). The legacy extension's store takes
 the Roo path for those, since its tools are Roo's — see
 [Roo Code](roo.md) for the SEARCH/REPLACE shape and the workspace-relative
 paths. The legacy `<task>...</task>` user envelope is unwrapped so the tags are

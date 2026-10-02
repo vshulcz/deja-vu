@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -770,15 +771,31 @@ func copilotChatTool(m map[string]any, t time.Time, extras *[]model.Message) {
 			*extras = append(*extras, model.Message{Role: RoleFiles, Text: strings.Join(paths, "\n"), Time: t})
 		}
 	}
-	if !IndexCommands() {
-		return
-	}
 	data, _ := m["toolSpecificData"].(map[string]any)
 	if data == nil {
 		return
 	}
-	if cmd := copilotChatTerminalCommand(data); cmd != "" && worthIndexing(cmd) {
-		*extras = append(*extras, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+	cmd := copilotChatTerminalCommand(data)
+	if cmd == "" || !worthIndexing(cmd) {
+		return
+	}
+	// A terminal call keeps how the command ended and what it printed beside
+	// the command line, terminalCommandState.exitCode and
+	// terminalCommandOutput.text; only the line was read (#4493).
+	if IndexCommands() {
+		line := "$ " + cmd
+		if st, ok := data["terminalCommandState"].(map[string]any); ok {
+			if code, ok := piExitCode(st["exitCode"]); ok {
+				line += fmt.Sprintf("  → exit %d", code)
+			}
+		}
+		*extras = append(*extras, model.Message{Role: RoleCommand, Text: line, Time: t})
+	}
+	if IndexToolOutput() {
+		out, _ := data["terminalCommandOutput"].(map[string]any)
+		if text, _ := out["text"].(string); strings.TrimSpace(text) != "" {
+			*extras = append(*extras, model.Message{Role: RoleToolOutput, Text: capParsedMessage(strings.TrimSpace(text)), Time: t})
+		}
 	}
 }
 

@@ -847,30 +847,7 @@ func commandsFromContent(v any) []string { return commandsIn(v, claudeDialect) }
 // will be answered under, so the reference parser can stamp an outcome the same
 // way the typed one does. The two must agree or the differential test in #502
 // stops meaning anything.
-func commandCallsFromContent(v any) []claudeCommand {
-	items, ok := v.([]any)
-	if !ok {
-		return nil
-	}
-	var out []claudeCommand
-	for _, it := range items {
-		name, in, ok := toolPart(it, claudeDialect)
-		if !ok || !claudeDialect.isShellTool(name) {
-			continue
-		}
-		id := ""
-		if m, ok := it.(map[string]any); ok {
-			id, _ = m["id"].(string)
-		}
-		for _, cmd := range commandStrings(in, claudeDialect) {
-			if !worthIndexing(cmd) {
-				continue
-			}
-			out = append(out, claudeCommand{ID: id, Text: "$ " + cmd})
-		}
-	}
-	return out
-}
+func commandCallsFromContent(v any) []claudeCommand { return commandCallsIn(v, claudeDialect) }
 
 // toolOutcomesFromContent is claudeToolOutcomes for the reference parser.
 func toolOutcomesFromContent(v any) []claudeToolOutcome {
@@ -892,7 +869,7 @@ func toolOutcomesFromContent(v any) []claudeToolOutcome {
 			continue
 		}
 		bad, _ := m["is_error"].(bool)
-		out = append(out, claudeToolOutcome{ID: id, Error: bad})
+		out = append(out, claudeOutcome(id, bad, m["content"]))
 	}
 	return out
 }

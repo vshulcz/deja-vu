@@ -455,6 +455,7 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 	var msg struct {
 		Content []struct {
 			ToolUse *struct {
+				ID    string          `json:"id"`
 				Name  string          `json:"name"`
 				Input json.RawMessage `json:"input"`
 			} `json:"ToolUse"`
@@ -476,6 +477,26 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 	}
 	var out []model.Message
 	var paths []string
+	// The command goes first, ahead of what it printed, stamped with how its
+	// result says it ended (#4507).
+	for _, block := range msg.Content {
+		if block.ToolUse == nil {
+			continue
+		}
+		if cmd := zedCommand(block.ToolUse.Name, block.ToolUse.Input); cmd != "" {
+			if IndexCommands() && worthIndexing(cmd) {
+				line := "$ " + cmd
+				if r, ok := msg.ToolResults[block.ToolUse.ID]; ok {
+					if code, ok := zedExitCode(r.Content.Text); ok {
+						line += fmt.Sprintf("  → exit %d", code)
+					}
+				}
+				out = append(out, model.Message{Role: RoleCommand, Text: line, Time: t})
+			}
+			continue
+		}
+		paths = append(paths, zedToolPaths(block.ToolUse.Name, block.ToolUse.Input)...)
+	}
 	if IndexToolOutput() && len(msg.ToolResults) > 0 {
 		// A map, so the order is fixed by the call id rather than by the
 		// decoder: the same thread indexes the same way twice.
@@ -534,22 +555,30 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 			}
 		}
 	}
-	for _, block := range msg.Content {
-		if block.ToolUse == nil {
-			continue
-		}
-		if cmd := zedCommand(block.ToolUse.Name, block.ToolUse.Input); cmd != "" {
-			if IndexCommands() && worthIndexing(cmd) {
-				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
-			}
-			continue
-		}
-		paths = append(paths, zedToolPaths(block.ToolUse.Name, block.ToolUse.Input)...)
-	}
 	if len(paths) > 0 && IndexToolPaths() {
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: t})
 	}
 	return out
+}
+
+// zedExitCode reads the status Zed's terminal tool opens its result with:
+// `Command "<cmd>" failed with exit code N.` on a failure, and "Command
+// executed successfully." for a clean run that printed nothing. A clean run
+// that printed something is its output alone, and stays unknown. The status
+// is the first paragraph, which spans lines when the command does.
+func zedExitCode(text string) (int, bool) {
+	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n\n")
+	if line == "Command executed successfully." {
+		return 0, true
+	}
+	if !strings.HasPrefix(line, `Command "`) {
+		return 0, false
+	}
+	i := strings.LastIndex(line, `" failed with exit code `)
+	if i < 0 {
+		return 0, false
+	}
+	return statusCode(line[i+2:], "failed with exit code ", ".")
 }
 
 // zedCommand is the shell line a terminal call ran, or "" when the call is not

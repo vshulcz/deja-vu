@@ -160,6 +160,7 @@ func allHarnesses() []Harness {
 				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
 				Parse:     fullParse(ParseClaudeFile),
 				ParseFrom: offsetParse(ParseClaudeFileFromOffset),
+				Resumes:   claudeExitResumes,
 			}},
 		},
 		{
@@ -340,6 +341,7 @@ func allHarnesses() []Harness {
 				},
 				Parse:     fullParse(ParseGooseFile),
 				ParseFrom: offsetParse(ParseGooseFileFromOffset),
+				Resumes:   gooseExitResumes,
 			}, {
 				Name: "goose-db",
 				Match: func(p string) bool {
