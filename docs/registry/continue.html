@@ -55,7 +55,7 @@
 <p>sides — <code>old_string</code>/<code>new_string</code>, <code>edits[]</code>, <code>content</code>/<code>contents</code>, and the</p>
 <p><code>changes</code> of <code>edit_existing_file</code>, without the <code>// ... existing code ...</code></p>
 <p>lines that stand for what was left alone (#4529). A call whose status is</p>
-<p><code>errored</code> or <code>canceled</code> keeps its path and output but no edit or written lines. A command carries</p>
+<p>anything but <code>done</code> (errored, canceled, or still waiting on approval) keeps its path and output but no edit or written lines. A command carries</p>
 <p><code>→ exit N</code> where Continue wrote the code: the CLI&#39;s errored <code>Bash</code> output</p>
 <p>&#34;Error executing tool Bash: Error (exit code N): …&#34;, and the IDE&#39;s output</p>
 <p><code>status</code> &#34;Command failed with exit code N&#34;. A clean run gets no code: the CLI</p>

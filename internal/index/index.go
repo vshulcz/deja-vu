@@ -551,6 +551,7 @@ import (
 //
 // 60 also: a prime ipython cell's details.diffs leave files, edit and wrote
 // records (#4526).
+//
 // 60 also: an Amp shell_command call is a command and an apply_patch call
 // leaves files, edit and wrote records (#4527).
 //

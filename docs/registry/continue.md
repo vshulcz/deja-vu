@@ -17,7 +17,7 @@ and `run_terminal_command` give a command, the file tools their `filepath`
 sides — `old_string`/`new_string`, `edits[]`, `content`/`contents`, and the
 `changes` of `edit_existing_file`, without the `// ... existing code ...`
 lines that stand for what was left alone (#4529). A call whose status is
-`errored` or `canceled` keeps its path and output but no edit or written lines. A command carries
+anything but `done` (errored, canceled, or still waiting on approval) keeps its path and output but no edit or written lines. A command carries
 `→ exit N` where Continue wrote the code: the CLI's errored `Bash` output
 "Error executing tool Bash: Error (exit code N): …", and the IDE's output
 `status` "Command failed with exit code N". A clean run gets no code: the CLI
