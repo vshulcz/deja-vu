@@ -65,7 +65,8 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 	q := `select json_object('id',cast(s.id as text),'cwd',cast(s.cwd_last as text),'title',cast(s.title as text),` +
 		`'role',cast(m.role as text),'body',cast(m.message_json as text),'at',cast(m.created_at as text)) ` +
 		`from sessions s join messages m on m.session_id=s.id` +
-		` where m.role in ('user','assistant')` + where +
+		// tool rows hold the results of the assistant's calls (#4498).
+		` where m.role in ('user','assistant','tool')` + where +
 		` order by s.id,m.seq`
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
@@ -93,11 +94,15 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		if r.ID == "" {
 			continue
 		}
-		text := grokMessageText(r.Body)
-		if strings.TrimSpace(text) == "" {
-			continue
+		text := ""
+		if r.Role != "tool" {
+			text = grokMessageText(r.Body)
 		}
 		at := grokDBTime(r.At)
+		work := grokDBWork(r.Body, r.CWD, at)
+		if strings.TrimSpace(text) == "" && len(work) == 0 {
+			continue
+		}
 		s := by[r.ID]
 		if s == nil {
 			s = &model.Session{
@@ -117,7 +122,10 @@ func ParseGrokDBSince(db string, t time.Time) ([]model.Session, error) {
 		if at.After(s.Updated) {
 			s.Updated = at
 		}
-		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: text, Time: at})
+		if strings.TrimSpace(text) != "" {
+			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: text, Time: at})
+		}
+		s.Messages = append(s.Messages, work...)
 	}
 	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
@@ -173,6 +181,103 @@ func grokMessageText(body string) string {
 		b.WriteString(blk.Text)
 	}
 	return b.String()
+}
+
+// grokDevDialect is grok-dev's tool vocabulary (dist/grok/tools.js in 1.1.7):
+// bash {command}, read_file, write_file and edit_file under `path`.
+var grokDevDialect = toolDialect{
+	pathKey:   "path",
+	pathTools: map[string]bool{"read_file": true, "write_file": true, "edit_file": true},
+	shellTool: "bash",
+	editTools: map[string]bool{"write_file": true, "edit_file": true},
+}
+
+// grokDBWork reads the work in one stored message. grok-dev keeps each turn as
+// an AI SDK message: the assistant's calls are tool-call parts and each
+// result a tool-result part on a row of its own. The reader kept text parts
+// only, so a grok-dev session was its prompts and prose and nothing it did
+// (#4498). Paths are relative to the session's cwd or absolute.
+func grokDBWork(body, cwd string, at time.Time) []model.Message {
+	var doc struct {
+		Content json.RawMessage `json:"content"`
+	}
+	if json.Unmarshal([]byte(body), &doc) != nil {
+		return nil
+	}
+	var blocks []struct {
+		Type     string `json:"type"`
+		ToolName string `json:"toolName"`
+		// An object, or the raw string when the model's arguments were not
+		// JSON — which must not cost the other parts of the message.
+		Input  json.RawMessage `json:"input"`
+		Output any             `json:"output"`
+	}
+	if json.Unmarshal(doc.Content, &blocks) != nil {
+		return nil
+	}
+	var calls []any
+	var outs []string
+	for _, b := range blocks {
+		switch b.Type {
+		case "tool-call":
+			var in map[string]any
+			if b.ToolName == "" || json.Unmarshal(b.Input, &in) != nil || in == nil {
+				continue
+			}
+			if p, _ := in["path"].(string); p != "" {
+				in["path"] = resolveToolPath(p, cwd)
+			}
+			calls = append(calls, map[string]any{"type": "tool_use", "name": b.ToolName, "input": in})
+		case "tool-result":
+			if out := strings.TrimSpace(grokDBResultText(b.Output)); out != "" {
+				outs = append(outs, out)
+			}
+		}
+	}
+	var out []model.Message
+	if IndexToolPaths() {
+		if p := toolPathsIn(calls, grokDevDialect); p != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: at})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(calls, grokDevDialect) {
+			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: at})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(calls, grokDevDialect) {
+			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: at})
+		}
+	}
+	if IndexCommands() {
+		for _, cmd := range commandsIn(calls, grokDevDialect) {
+			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: at})
+		}
+	}
+	if IndexToolOutput() {
+		for _, o := range outs {
+			out = append(out, model.Message{Role: RoleToolOutput, Text: capParsedMessage(o), Time: at})
+		}
+	}
+	return out
+}
+
+// grokDBResultText is what a tool printed: an AI SDK output is {type, value},
+// where a json value is grok-dev's {success, output | error}.
+func grokDBResultText(v any) string {
+	o, _ := v.(map[string]any)
+	switch val := o["value"].(type) {
+	case string:
+		return val
+	case map[string]any:
+		for _, k := range []string{"error", "output", "content"} {
+			if s, _ := val[k].(string); strings.TrimSpace(s) != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func grokDBTime(s string) time.Time {

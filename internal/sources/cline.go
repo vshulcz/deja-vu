@@ -227,9 +227,10 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 	id := filepath.Base(sessionDir)
 	s := model.Session{Harness: "cline", ID: id, Path: path, Project: "cline"}
 	var man clineManifest
+	cwd := ""
 	if mb, err := os.ReadFile(filepath.Join(sessionDir, id+".json")); err == nil {
 		if json.Unmarshal(mb, &man) == nil {
-			cwd := man.CWD
+			cwd = man.CWD
 			if cwd == "" {
 				cwd = man.WorkspaceRoot
 			}
@@ -271,7 +272,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 		// drops because they are not type:"text" — so the file an assistant
 		// edited and the command it ran were reachable from nothing.
 		from := len(s.Messages)
-		if recs := clineWorkRecords(m.Content, ts); len(recs) > 0 {
+		if recs := clineWorkRecords(m.Content, cwd, ts); len(recs) > 0 {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, recs...)
 		}
@@ -379,7 +380,9 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 // declares. Three of them differ from every other harness: `run_commands`
 // takes a list under `commands` rather than one string, `read_files` takes a
 // list of read requests under `files`, and the editor names the replaced text
-// `old_text`.
+// `old_text` and the written text `new_text` — the only record of a file the
+// editor created, which was read under new_string and lost (#4503).
+// apply_patch takes its patch under `input`; clineWorkRecords reads it.
 var clineDialect = toolDialect{
 	pathKey:     "path",
 	pathListKey: "files",
@@ -388,6 +391,7 @@ var clineDialect = toolDialect{
 	commandKey:  "commands",
 	editTools:   map[string]bool{"editor": true},
 	oldKey:      "old_text",
+	newKey:      "new_text",
 }
 
 // rooDialect is what the Roo Code and the legacy Cline extension call their
@@ -451,7 +455,8 @@ func rooWorkRecords(raw json.RawMessage, ts time.Time, workspace string, xmlEra 
 }
 
 // clineWorkRecords turns the tool blocks of one message into work records.
-func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
+// cwd is where the session ran: a patch names its files relative to it.
+func clineWorkRecords(raw json.RawMessage, cwd string, ts time.Time) []model.Message {
 	var blocks []any
 	if json.Unmarshal(raw, &blocks) != nil {
 		return nil
@@ -471,6 +476,9 @@ func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 		for _, span := range editSpansIn(blocks, clineDialect) {
 			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
 		}
+	}
+	for _, patch := range applyPatchInputs(blocks, clineDialect) {
+		out = append(out, applyPatchRecords(patch, func(p string) string { return resolveToolPath(p, cwd) }, ts)...)
 	}
 	if IndexCommands() {
 		for _, cmd := range commandsIn(blocks, clineDialect) {

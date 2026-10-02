@@ -493,15 +493,27 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 // joined by call_id. Both were read off rollouts the Codex CLI had just
 // written; an earlier note in #595 that Codex carries no exit code came from a
 // sample that happened to be all MCP calls.
+//
+// shell_command is the other shell, taking `command` where exec_command takes
+// `cmd`. Codex falls back to it whenever unified exec is off, and on those
+// setups a session read for exec_command alone had no commands (#4490).
 func codexCall(s *model.Session, payload map[string]any, calls map[string]int, t time.Time) {
-	if name, _ := payload["name"].(string); name != "exec_command" {
+	name, _ := payload["name"].(string)
+	if name != "exec_command" && name != "shell_command" {
 		return
 	}
 	args, _ := payload["arguments"].(string)
 	var in struct {
-		Cmd string `json:"cmd"`
+		Cmd     string `json:"cmd"`
+		Command string `json:"command"`
 	}
-	if json.Unmarshal([]byte(args), &in) != nil || in.Cmd == "" {
+	if json.Unmarshal([]byte(args), &in) != nil {
+		return
+	}
+	if name == "shell_command" {
+		in.Cmd = in.Command
+	}
+	if in.Cmd == "" {
 		return
 	}
 	if !IndexCommands() || !worthIndexing(in.Cmd) {

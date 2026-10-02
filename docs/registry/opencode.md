@@ -37,7 +37,7 @@ What changed inside a turn, measured on the same store:
 - a tool names itself under `$.name`; `bash` is now `shell` and `apply_patch` is now `patch`
 - what a tool printed is the block list `$.state.content`, where 1.x wrote the string `$.state.output`
 - the file a `read`, `edit` or `write` names is `$.state.input.path`, where 1.x wrote `filePath`; it can be relative to the session directory
-- `edit` is the editing tool, and it carries both sides: `oldString` and `newString`
+- `edit` is the editing tool, and it carries both sides: `oldString` and `newString`; `write` carries the whole file under `content`
 - times are epoch milliseconds
 
 The message types on a 2.0 store are `user`, `assistant`, `synthetic`, `system`, `idle`, `shell`, `skill`, `compaction`, `model-switched`, `agent-switched` and `location-switched`. deja reads the first two and a compaction's summary; the rest are opencode talking to itself.
@@ -63,7 +63,7 @@ part(id, message_id, data)
 {"type":"text","text":"The query now uses the index.","time":{"start":"2026-07-17T09:00:01Z"}}
 ```
 
-Parts with `type: "text"` are messages; the role comes from `message.data.role`. Parts marked `synthetic` or `ignored` are opencode's own text and are dropped, and a message with `summary` set is a compaction digest, indexed under the summary role. Four tool parts are read as well: `read` gives a file record from `state.input.filePath`, `bash` a command record from `state.input.command` with a non-zero `state.metadata.exit` and its `state.output` as tool output, and `apply_patch` edit records from `state.input.patchText`. Message time prefers `part.data.time.start`, then `message.data.time.created`, then the `message.time_created` column; session times come from the `session` row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. `session.directory` supplies the project, `session.title` the title, and `session.parent_id` marks a subagent run.
+Parts with `type: "text"` are messages; the role comes from `message.data.role`. Parts marked `synthetic` or `ignored` are opencode's own text and are dropped, and a message with `summary` set is a compaction digest, indexed under the summary role. Five tool parts are read as well: `read` gives a file record from `state.input.filePath`, `bash` a command record from `state.input.command` with a non-zero `state.metadata.exit` and its `state.output` as tool output, `apply_patch` edit records from `state.input.patchText`, `edit` the replaced `oldString` and the written `newString`, and `write` the written `content`. An `edit` or `write` in the `error` state changed nothing and is not recorded. Message time prefers `part.data.time.start`, then `message.data.time.created`, then the `message.time_created` column; session times come from the `session` row. Strings in RFC 3339 form and numeric Unix seconds or milliseconds are accepted. `session.directory` supplies the project, `session.title` the title, and `session.parent_id` marks a subagent run.
 
 ## Wiring
 

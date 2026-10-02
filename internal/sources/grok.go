@@ -198,7 +198,8 @@ type grokUpdateEvent struct {
 }
 
 // grokWorkRecords reads what a tool_call was asked to do off its rawInput:
-// the command for run_terminal_command, the file for the tools that take one.
+// the command for run_terminal_command, the file for the tools that take one,
+// and both sides of an edit.
 // The reader indexed the title and the output and dropped the input, so no
 // Grok session ever yielded a command or a file record (#3285).
 func grokWorkRecords(event grokUpdateEvent, t time.Time) []model.Message {
@@ -219,12 +220,34 @@ func grokWorkRecords(event grokUpdateEvent, t time.Time) []model.Message {
 			out = append(out, model.Message{Role: RoleCommand, Text: "$ " + strings.TrimSpace(cmd), Time: t})
 		}
 	}
+	call := []any{map[string]any{"type": "tool_use", "name": name, "input": in}}
 	if IndexToolPaths() {
-		if p, _ := in["target_file"].(string); strings.TrimSpace(p) != "" {
-			out = append(out, model.Message{Role: RoleFiles, Text: strings.TrimSpace(p), Time: t})
+		if p := toolPathsIn(call, grokDialect); p != "" {
+			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range editSpansIn(call, grokDialect) {
+			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wroteRecordsIn(call, grokDialect) {
+			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: t})
 		}
 	}
 	return out
+}
+
+// grokDialect is Grok Build 1.0.41's default file toolset: read_file takes
+// `target_file`, search_replace {file_path, old_string, new_string} and write
+// {file_path, content}. Reading only target_file left every change a Grok
+// session made as a bare title (#4497).
+var grokDialect = toolDialect{
+	pathKey:    "file_path",
+	pathKeyAlt: "target_file",
+	pathTools:  map[string]bool{"read_file": true, "search_replace": true, "write": true},
+	editTools:  map[string]bool{"search_replace": true, "write": true},
 }
 
 // GrokResumes reports whether the tail of updates.jsonl can be appended to

@@ -71,6 +71,9 @@ type toolHookInput struct {
 	ToolInput     struct {
 		Command  string `json:"command"`
 		FilePath string `json:"file_path"`
+		// Claude's NotebookEdit names its file here and not under file_path
+		// (#4489).
+		NotebookPath string `json:"notebook_path"`
 	} `json:"tool_input"`
 	SessionID      string `json:"session_id"`
 	ConversationID string `json:"conversation_id"`
@@ -93,6 +96,9 @@ func (i *toolHookInput) adopt() {
 	i.ToolName = adoptGrok(i.ToolName, i.grokEnvelope.ToolName)
 	i.ToolInput.Command = adoptGrok(i.ToolInput.Command, i.grokEnvelope.ToolInput.Command)
 	i.ToolInput.FilePath = adoptGrok(i.ToolInput.FilePath, i.grokEnvelope.ToolInput.FilePath)
+	if i.ToolInput.FilePath == "" {
+		i.ToolInput.FilePath = i.ToolInput.NotebookPath
+	}
 }
 
 // hookToolShape is how the answer is framed on the way out. Claude Code's hook

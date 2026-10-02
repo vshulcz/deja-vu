@@ -87,8 +87,8 @@ func TestClaudeAutoWiresTheFailureEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	fail := claudeHookCommands(t, "PostToolUseFailure")
-	if len(fail) != 1 || !strings.HasPrefix(fail[0], "Bash ") || !strings.HasSuffix(fail[0], " hook-tool-after") {
-		t.Fatalf("PostToolUseFailure = %q, want one Bash entry running hook-tool-after", fail)
+	if len(fail) != 1 || !strings.HasPrefix(fail[0], "Bash|PowerShell ") || !strings.HasSuffix(fail[0], " hook-tool-after") {
+		t.Fatalf("PostToolUseFailure = %q, want one Bash|PowerShell entry running hook-tool-after", fail)
 	}
 	if post := claudeHookCommands(t, "PostToolUse"); len(post) != 1 {
 		t.Fatalf("PostToolUse = %q, want it kept", post)
@@ -184,7 +184,7 @@ func TestPluginManifestHooksOnlyEventsOldClaudeKnows(t *testing.T) {
 		}
 	}
 	extra := hookMatchers(t, repoFile(t, "claude-plugin/hooks/hooks.json"), "deja.sh")
-	if extra["PostToolUseFailure"] != "Bash" {
-		t.Errorf("hooks/hooks.json = %v, want PostToolUseFailure on Bash", extra)
+	if extra["PostToolUseFailure"] != "Bash|PowerShell" {
+		t.Errorf("hooks/hooks.json = %v, want PostToolUseFailure on Bash|PowerShell", extra)
 	}
 }

@@ -210,7 +210,7 @@ func TestRooRecordsResolveAgainstTheTaskWorkspace(t *testing.T) {
 // own first line is dashes. The rule counts as a header only under a line
 // number, so this span keeps it.
 func TestRooDiffKeepsDashesThatAreNotABlockHeader(t *testing.T) {
-	replaced, written := rooDiffSides("<<<<<<< SEARCH\n-------\nold heading\n=======\n-------\nnew heading\n>>>>>>> REPLACE")
+	replaced, written := rooDiffSides("<<<<<<< SEARCH\n-------\nold heading\n=======\n-------\nnew heading\n>>>>>>> REPLACE", rooMarkers)
 	if len(replaced) != 1 || replaced[0] != "-------\nold heading" {
 		t.Errorf("replaced = %q, want the dashes kept", replaced)
 	}

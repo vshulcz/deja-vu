@@ -37,6 +37,7 @@ func TestGrokAutoWritesEveryHookEvent(t *testing.T) {
 		"UserPromptSubmit": "hook-prompt",
 		"PreCompact":       "hook-precompact",
 		"PreToolUse":       "hook-tool",
+		"PostToolUse":      "hook-tool-after",
 	}
 	for event, sub := range want {
 		groups, ok := root.Hooks[event]

@@ -87,6 +87,7 @@
 <tr><td><code>read</code></td><td><code>path</code></td><td>the file</td></tr>
 <tr><td><code>edit</code></td><td><code>path</code>, <code>edits[].oldText</code> / <code>newText</code> (older pi: one <code>oldText</code> / <code>newText</code> pair)</td><td>the file, the replaced span, the written lines</td></tr>
 <tr><td><code>write</code></td><td><code>path</code>, <code>content</code></td><td>the file and the written lines</td></tr>
+<tr><td><code>apply_patch</code> (OpenClaw)</td><td><code>input</code>, a <code>*** Begin Patch</code> body</td><td>each file the patch names, its removed lines, its added lines</td></tr>
 <tr><td><code>bash</code> (OpenClaw: <code>exec</code>)</td><td><code>command</code></td><td>the command, and <code>→ exit N</code> from the matching <code>toolResult</code> (<code>details.exitCode</code> when there is one, else the &#34;Command exited with code N&#34; line that ends a failed result, <code>exit 0</code> for a result that is not an error)</td></tr>
 </table></div>
 <p>A relative <code>path</code> resolves against the header&#39;s <code>cwd</code>. gjc&#39;s <code>edit</code> takes one <code>input</code> string in its hashline form instead; see the gjc entry.</p>

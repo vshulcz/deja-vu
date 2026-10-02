@@ -1846,16 +1846,16 @@ var claudeHookWiring = []struct{ Event, Sub, Matcher string }{
 	// subagent. That agent gets no session start and sends no user prompt, so
 	// its instructions are the only place memory can reach it, and hook-tool
 	// answers this one by rewriting them rather than by speaking to the parent.
-	{"PreToolUse", "hook-tool", "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent"},
+	{"PreToolUse", "hook-tool", "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|Task|Agent"},
 	// The other half of the point of action: the pre-tool line speaks before a
 	// command runs, this one speaks when it failed and the store knows what
-	// followed that error before. Bash only — a failed edit does not carry a
-	// shell error signature.
-	{"PostToolUse", "hook-tool-after", "Bash"},
+	// followed that error before. The shells only — a failed edit does not
+	// carry a shell error signature. PowerShell is the shell on Windows (#4489).
+	{"PostToolUse", "hook-tool-after", "Bash|PowerShell"},
 	// A command that exited non-zero fires this instead, never PostToolUse —
 	// measured on Claude Code 2.1.287, output under `error` (#4488).
 	// PostToolUse stays for the failure that exits 0: `go test ./... | tail`.
-	{"PostToolUseFailure", "hook-tool-after", "Bash"},
+	{"PostToolUseFailure", "hook-tool-after", "Bash|PowerShell"},
 	// The session is over, so its live stamp goes and the next session's MCP
 	// recall can answer with it (#4210).
 	{"SessionEnd", "hook-session-end", ""},

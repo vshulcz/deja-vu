@@ -109,6 +109,10 @@ func (r *piReader) call(id, name string, args map[string]any, applied bool, t ti
 	if name == "" || args == nil {
 		return
 	}
+	if patch, _ := args["input"].(string); name == "apply_patch" && patch != "" {
+		r.patch(id, patch, applied, t)
+		return
+	}
 	if in, _ := args["input"].(string); name == "edit" && in != "" && args["path"] == nil {
 		r.hashline(id, in, t)
 		return
@@ -143,6 +147,29 @@ func (r *piReader) call(id, name string, args map[string]any, applied bool, t ti
 				r.commandAt[id] = append(r.commandAt[id], len(r.s.Messages))
 			}
 			r.add(RoleCommand, cmd, t)
+		}
+	}
+}
+
+// patch records OpenClaw's apply_patch, on beside pi's edit and write for
+// every model: one `input` holding a patch in codex's format, so the files and
+// both sides come out of its headers and lines (#4500).
+func (r *piReader) patch(id, body string, applied bool, t time.Time) {
+	files, spans, wrote := applyPatch(body, r.abs)
+	if IndexToolPaths() && len(files) > 0 {
+		r.add(RoleFiles, strings.Join(files, "\n"), t)
+	}
+	if !applied {
+		return
+	}
+	if IndexEdits() {
+		for _, span := range spans {
+			r.change(id, RoleEdit, span, t)
+		}
+	}
+	if IndexWrites() {
+		for _, w := range wrote {
+			r.change(id, RoleWrote, w, t)
 		}
 	}
 }

@@ -38,7 +38,7 @@
 <article>
 <h1>Grok Build session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent. <code>grok-dev</code>, another CLI sharing <code>~/.grok</code>, writes no session files: its history is in <code>${GROK_HOME:-~/.grok}/grok.db</code>, a SQLite store read through <code>sqlite3</code>, and <code>DEJA_GROK_DB</code> points deja at another copy.</p>
+<p>Grok Build stores sessions below <code>${GROK_HOME:-~/.grok}/sessions/&lt;encoded-cwd&gt;/&lt;session-id&gt;/</code>. <code>DEJA_GROK_ROOT</code> overrides where deja reads sessions; <code>GROK_HOME</code> relocates the whole Grok tree, including <code>config.toml</code>. <code>updates.jsonl</code> is the conversation stream and sibling <code>summary.json</code> carries metadata. A <code>.cwd</code> file beside session directories can recover the working directory when summary metadata is absent. <code>grok-dev</code>, another CLI sharing <code>~/.grok</code>, writes no session files: its history is in <code>${GROK_HOME:-~/.grok}/grok.db</code>, a SQLite store read through <code>sqlite3</code>, and <code>DEJA_GROK_DB</code> points deja at another copy. Each row of <code>messages</code> is an AI SDK message: text parts are the turn, <code>tool-call</code> parts become commands (<code>bash</code>), files, edits and written lines (<code>read_file</code>, <code>write_file</code>, <code>edit_file</code> under <code>path</code>), and the <code>tool-result</code> parts on <code>tool</code> rows tool output.</p>
 <p>The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers <code>summary.json</code> and <code>.cwd</code> over decoding the directory name.</p>
 <h2 id="three-products-share-this-directory">Three products share this directory</h2>
 <p>Grok Build reads <code>config.toml</code>. <code>grok-dev</code> keeps its history in <code>grok.db</code> and</p>
@@ -98,6 +98,13 @@
 <p><code>updatedInput</code>, which is how memory reaches a spawned agent&#39;s prompt; the</p>
 <p>rest of the wiring is there for its side effects, warming the index and</p>
 <p>forgetting what a compaction threw away.</p>
+<ul>
+<li><code>PostToolUse</code> on <code>Bash</code> (grok maps it to <code>run_terminal_command</code>) runs</li>
+</ul>
+<p><code>deja hook-tool-after</code>. Grok 1.0.41&#39;s own hook docs say it fires for a</p>
+<p>command that exited non-zero and hands <code>additionalContext</code> to the model with</p>
+<p>the result. The output is read from <code>toolResult.output_for_prompt</code>; <code>output</code></p>
+<p>there is the raw bytes as a number array (#4499).</p>
 <p><strong>Last verified:</strong> 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)</p>
 
 <hr>

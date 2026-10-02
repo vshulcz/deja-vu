@@ -363,6 +363,15 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 	// A shell call's command record, by call id, so the exit status its
 	// result reports can ride on it.
 	shellAt := map[string]int{}
+	// The directory the session ran in, read once and only when a call
+	// names a relative path.
+	dir, dirRead := "", false
+	projectDir := func() string {
+		if !dirRead {
+			dir, dirRead = GeminiProjectDir(s.Path), true
+		}
+		return dir
+	}
 	for _, m := range msgs {
 		role := ""
 		switch m.Type {
@@ -383,7 +392,7 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		// a Gemini store yielded no command, no tool output and no fix pair
 		// (#3293). Qwen's dialect follows Gemini's tool names, so the same
 		// reader serves both.
-		if work := geminiWorkRecords(m, t); len(work) > 0 {
+		if work := geminiWorkRecords(m, projectDir, t); len(work) > 0 {
 			s.Touch(t)
 			start := len(s.Messages)
 			s.Messages = append(s.Messages, work...)
@@ -584,9 +593,31 @@ func geminiNoteExits(s *model.Session, m geminiMessage, shellAt map[string]int) 
 	}
 }
 
+// geminiReadManyPaths puts read_many_files' include in the form the other
+// tools' paths take: a directory ("docs/") is not a file the session read,
+// and a path is relative to the project (#4494).
+func geminiReadManyPaths(args map[string]any, projectDir func() string) {
+	items, ok := args["include"].([]any)
+	if !ok {
+		return
+	}
+	var out []any
+	for _, it := range items {
+		p, _ := it.(string)
+		if p == "" || strings.HasSuffix(p, "/") || strings.HasSuffix(p, `\`) {
+			continue
+		}
+		if !isAbsolutePath(p) && !strings.ContainsAny(p, "*?[{") {
+			p = resolveToolPath(p, projectDir())
+		}
+		out = append(out, p)
+	}
+	args["include"] = out
+}
+
 // geminiWorkRecords turns a record's toolCalls (the calls, without their
 // results) and its functionResponse parts (the results) into work records.
-func geminiWorkRecords(m geminiMessage, t time.Time) []model.Message {
+func geminiWorkRecords(m geminiMessage, projectDir func() string, t time.Time) []model.Message {
 	var parts []any
 	if len(m.ToolCalls) > 0 {
 		var calls []struct {
@@ -595,6 +626,9 @@ func geminiWorkRecords(m geminiMessage, t time.Time) []model.Message {
 		}
 		if json.Unmarshal(m.ToolCalls, &calls) == nil {
 			for _, c := range calls {
+				if c.Name == "read_many_files" {
+					geminiReadManyPaths(c.Args, projectDir)
+				}
 				if c.Name != "" && c.Args != nil {
 					parts = append(parts, map[string]any{"functionCall": map[string]any{"name": c.Name, "args": c.Args}})
 				}

@@ -1,8 +1,10 @@
 package sources
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -71,8 +73,10 @@ func ParseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 // is `path`, and the replaced span is `old_str` rather than `old_string` —
 // reading the wrong one loses the only record of what stopped existing.
 var copilotDialect = toolDialect{
-	pathKey:   "path",
-	pathTools: map[string]bool{"edit": true, "read": true, "write": true, "create": true},
+	pathKey: "path",
+	// view is how Copilot CLI 1.0.79 reads a file, under either model
+	// family (#4491).
+	pathTools: map[string]bool{"edit": true, "read": true, "write": true, "create": true, "view": true},
 	shellTool: "bash",
 	// The whole-file writes belong here too, or nothing a created file holds
 	// is evidence it was ever in a session — and a commit that only adds
@@ -92,6 +96,12 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	// Which message holds each shell command, by the call id the completion
 	// event repeats: Copilot files the command and its outcome as two records.
 	commandAt := map[string][]int{}
+	// Where the session runs, which a patch's relative paths are under. An
+	// incremental read starts past session.start, so it comes off the head.
+	cwd := ""
+	if offset > 0 {
+		cwd = copilotHeadCWD(path)
+	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		data, _ := m["data"].(map[string]any)
@@ -106,7 +116,8 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 			}
 			s.Touch(parseTimeAny(data["startTime"]))
 			if ctx, ok := data["context"].(map[string]any); ok {
-				if cwd, _ := ctx["cwd"].(string); cwd != "" {
+				if c, _ := ctx["cwd"].(string); c != "" {
+					cwd = c
 					s.Project = copilotProjectName(cwd)
 				}
 			}
@@ -135,6 +146,19 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 				return
 			}
 			name, _ := data["toolName"].(string)
+			// With a GPT model the only edit tool is apply_patch, a freeform
+			// tool whose arguments are the patch string itself rather than an
+			// object, so every file such a session changed was dropped (#4491).
+			// Its paths may be relative; Copilot resolves them against the
+			// session's directory.
+			if body, ok := data["arguments"].(string); ok && name == "apply_patch" {
+				resolve := func(p string) string { return resolveToolPath(p, cwd) }
+				if records := applyPatchRecords(body, resolve, t); len(records) > 0 {
+					s.Touch(t)
+					s.Messages = append(s.Messages, records...)
+				}
+				return
+			}
 			args, _ := data["arguments"].(map[string]any)
 			if name == "" || args == nil {
 				return
@@ -285,6 +309,32 @@ func copilotExitCode(data map[string]any, out string) int {
 		}
 	}
 	return 0
+}
+
+// copilotHeadCWD is the cwd session.start records, read off the first lines
+// only.
+func copilotHeadCWD(path string) string {
+	f, err := os.Open(path)
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for i := 0; i < 8 && sc.Scan(); i++ {
+		var rec struct {
+			Type string `json:"type"`
+			Data struct {
+				Context struct {
+					CWD string `json:"cwd"`
+				} `json:"context"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(sc.Bytes(), &rec) == nil && rec.Type == "session.start" {
+			return rec.Data.Context.CWD
+		}
+	}
+	return ""
 }
 
 // copilotProjectName is the recorded working directory's project, the last two

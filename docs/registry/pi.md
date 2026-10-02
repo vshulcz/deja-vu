@@ -68,6 +68,7 @@ A `toolCall` block carries `name` and `arguments`. deja reads them for pi and ev
 | `read` | `path` | the file |
 | `edit` | `path`, `edits[].oldText` / `newText` (older pi: one `oldText` / `newText` pair) | the file, the replaced span, the written lines |
 | `write` | `path`, `content` | the file and the written lines |
+| `apply_patch` (OpenClaw) | `input`, a `*** Begin Patch` body | each file the patch names, its removed lines, its added lines |
 | `bash` (OpenClaw: `exec`) | `command` | the command, and `→ exit N` from the matching `toolResult` (`details.exitCode` when there is one, else the "Command exited with code N" line that ends a failed result, `exit 0` for a result that is not an error) |
 
 A relative `path` resolves against the header's `cwd`. gjc's `edit` takes one `input` string in its hashline form instead; see the gjc entry.

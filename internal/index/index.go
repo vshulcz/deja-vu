@@ -494,6 +494,41 @@ import (
 // 60 also: a failed command carries its `→ exit N` in claude, the pi family,
 // goose, cline, kiro-cli, zed and copilot-chat, and a copilot-chat terminal
 // call its output (#4487, #4501, #4496, #4502, #4505, #4507, #4493).
+// 60 also: a Claude Code PowerShell call is a command and a NotebookEdit call
+// leaves files and wrote records (#4489).
+//
+// 60 also: a codex shell_command call is a command with its exit (#4490).
+//
+// 60 also: a Copilot CLI view call leaves a files record and an apply_patch
+// call, whose arguments are the patch string, leaves files, edit and wrote
+// records (#4491).
+//
+// 60 also: a Copilot Chat copilot_readFile call leaves a files record from
+// its message uris (#4492).
+//
+// 60 also: a Gemini CLI read_many_files call leaves a files record for the
+// literal paths in include (#4494).
+//
+// 60 also: an opencode or Kilo CLI 1.x edit or write call, and a 2.x write
+// call, leaves edit and wrote records (#4495).
+//
+// 60 also: a Grok Build search_replace or write call leaves files, edit and
+// wrote records (#4497).
+//
+// 60 also: a grok-dev session in grok.db keeps its tool calls and results as
+// commands, files, edits, wrote and tool output (#4498).
+//
+// 60 also: an OpenClaw apply_patch call leaves files, edit and wrote records
+// (#4500).
+//
+// 60 also: a Cline CLI editor call leaves a wrote record of new_text, and an
+// apply_patch call files, edit and wrote records (#4503).
+//
+// 60 also: a Cline extension replace_in_file with Cline's own markers, or an
+// apply_patch under input, leaves edit and wrote records (#4504).
+//
+// 60 also: a kiro-cli --v3 or Kiro IDE tool_call record becomes commands,
+// files, edit and wrote records (#4506).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

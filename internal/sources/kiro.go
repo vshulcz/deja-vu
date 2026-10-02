@@ -369,11 +369,17 @@ func kiroContent(v any) (string, []any, []string) {
 // write and read; `--no-interactive` keeps the older execute_bash, fs_write
 // and fs_read. The two write tools name their arguments differently and
 // kiroToolCall folds them onto the keys here.
+//
+// kiro-cli --v3 and the Kiro IDE run another engine (@kiro/agent 0.66) whose
+// tools are execute_bash/execute_pwsh, fs_write and fs_append {path, text},
+// str_replace {path, oldStr, newStr}, read_file {path} and delete_file
+// {targetFile} (#4506).
 var kiroDialect = toolDialect{
-	pathKey:     "path",
-	pathTools:   map[string]bool{"write": true, "read": true, "fs_write": true, "fs_read": true},
-	shellTools:  map[string]bool{"shell": true, "execute_bash": true, "execute_cmd": true},
-	editTools:   map[string]bool{"write": true, "fs_write": true},
+	pathKey: "path",
+	pathTools: map[string]bool{"write": true, "read": true, "fs_write": true, "fs_read": true,
+		"fs_append": true, "str_replace": true, "read_file": true, "delete_file": true},
+	shellTools:  map[string]bool{"shell": true, "execute_bash": true, "execute_cmd": true, "execute_pwsh": true},
+	editTools:   map[string]bool{"write": true, "fs_write": true, "fs_append": true, "str_replace": true},
 	oldKey:      "old_str",
 	newKey:      "new_str",
 	pathListKey: "operations",
@@ -388,7 +394,9 @@ func kiroToolCall(name string, args map[string]any) map[string]any {
 	for k, v := range args {
 		in[k] = v
 	}
-	for from, to := range map[string]string{"oldStr": "old_str", "newStr": "new_str", "file_text": "content"} {
+	for from, to := range map[string]string{"oldStr": "old_str", "newStr": "new_str", "file_text": "content",
+		// The v3 engine's write text and delete target (#4506).
+		"text": "content", "targetFile": "path"} {
 		if v, ok := in[from]; ok {
 			if _, set := in[to]; !set {
 				in[to] = v
@@ -528,6 +536,22 @@ func ParseKiroIDEFileFromOffset(path string, offset int64) ([]model.Session, err
 
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		t := parseTimeAny(m["timestamp"])
+		// A tool_call record has no content, only the call: read as text it
+		// was skipped, and the session kept no command, file or edit (#4506).
+		if call, isCall, failed := kiroIDECall(m); isCall {
+			if call == nil {
+				return
+			}
+			work := kiroWorkRecords([]any{call}, nil, t)
+			if failed {
+				work = kiroDropChanges(work)
+			}
+			if len(work) > 0 {
+				s.Touch(t)
+				s.Messages = append(s.Messages, work...)
+			}
+			return
+		}
 		role, text := kiroIDELine(m)
 		if text == "" {
 			return
@@ -539,6 +563,45 @@ func ParseKiroIDEFileFromOffset(path string, offset int64) ([]model.Session, err
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// kiroIDECall is the call a v3 tool_call record carries, in the tool_use
+// shape. isCall reports a tool_call record at all; call is nil for one that
+// is not the call run. The engine persists a line each time an action changes
+// state (acp-server.js persistAction, every line naming its actionType):
+// awaiting_approval, executing, then completed, failed or denied, all with
+// the same args. Only the line saying how it ended is the call, once, and a
+// denied one never ran (#4506). failed is a call that ran and changed nothing.
+func kiroIDECall(m map[string]any) (call map[string]any, isCall, failed bool) {
+	payload, _ := m["payload"].(map[string]any)
+	if kind, _ := payload["type"].(string); kind != "tool_call" {
+		return nil, false, false
+	}
+	status, _ := payload["status"].(string)
+	if _, persisted := payload["actionType"]; persisted && status != "completed" && status != "failed" {
+		return nil, true, false
+	}
+	if status == "denied" {
+		return nil, true, false
+	}
+	name, _ := payload["toolName"].(string)
+	args, _ := payload["args"].(map[string]any)
+	if name == "" || args == nil {
+		return nil, true, false
+	}
+	return kiroToolCall(name, args), true, status == "failed"
+}
+
+// kiroDropChanges keeps what a failed call names and ran, not the edit it
+// did not make.
+func kiroDropChanges(work []model.Message) []model.Message {
+	out := work[:0]
+	for _, m := range work {
+		if m.Role != RoleEdit && m.Role != RoleWrote {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // kiroIDELine reads one IDE record, in either of the two shapes that file has

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ZCode's older sessions, the snapshots under `~/.zcode/v2/sessions` that the current runtime leaves until you restore them, are indexed, and `deja doctor` counts them. Deleted ones are skipped, and one already restored into the CLI database is read from there (#4432).
 - pi, omp, OpenClaw, gjc, prime-agent, senpi and Kimchi sessions carry their tool calls: the files read and written, the commands run with how they ended, and the replaced text of each edit, so `deja files`, `deja how`, `deja restore` and `deja blame` answer for them. gjc's hashline edits are read too. The index rebuilds once (#4113).
+- `deja install grok-auto` wires `PostToolUse`, so a Grok Build command that fails gets the earlier fix for the same error, as Claude Code and Codex do; `deja hook-tool-after` reads grok's camelCase payload and its `output_for_prompt` (#4499).
 
 ### Fixed
 
@@ -162,6 +163,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installing and uninstalling no longer re-sorts the keys of a hook entry you wrote on one line in `~/.claude/settings.json` (or any JSON config deja edits): entries inside a block deja adds to keep their text, so an install followed by an uninstall gives the file back byte for byte (#4167).
 - A Claude Code session run in a directory named with characters outside A–Z and 0–9 (Cyrillic, CJK, accents, spaces) is filed under that directory rather than its parent, so recall in that directory finds it, and `deja resume` cds into it instead of `parent///////`. The index rebuilds once (#4175).
 - A rebuild no longer re-reads all of Cursor's `chats/` for every CLI transcript whose chat is gone from it; 500 such transcripts took 3.6 s and take 6 ms. A chat started later is still found, within two seconds when it shares a folder with an older one (#4226).
+- A Claude Code or Cherry Studio session keeps its PowerShell commands and the notebooks NotebookEdit changed, as commands, files and written lines, and the pre-tool hook speaks before both. The index rebuilds once (#4489).
+- A Codex session run with unified exec off keeps its commands: `shell_command` calls are read as well as `exec_command` ones, with their exit codes (#4490).
+- A Copilot CLI session keeps the files it read with `view`, and with a GPT model every `apply_patch` edit as files, replaced text and written lines, so `deja files`, `restore` and `blame` answer for it (#4491).
+- A file Copilot Chat read with `copilot_readFile` is recorded. VS Code keeps that path only in the tool's message, where deja did not look (#4492).
+- A Gemini CLI `read_many_files` call records the files it names under `include`, relative ones under the project; globs and directories are left out (#4494).
+- An opencode session whose changes went through `edit` or `write` keeps them: the replaced text and the written lines, on 1.x stores (and Kilo CLI's) and for `write` on 2.x, so `deja restore` and `blame` answer for those files. Which tool opencode hands a model decided whether a session had any (#4495).
+- A Grok Build session keeps what `search_replace` and `write` changed: the file, the replaced text and the written lines. Only `read_file` and the shell were read, so every edit was a bare title (#4497).
+- A grok-dev session keeps what it did: the commands it ran with their output, the files it read and the edits and writes it made. Only the text parts of `grok.db` were read, so a session was its prompts and prose alone (#4498).
+- An OpenClaw edit made with `apply_patch` is recorded as the files it touched, the lines it removed and the lines it added, in both the JSONL and SQLite stores (#4500).
+- A Cline CLI session records what its editor wrote, including a file it created, and the files, replaced text and written lines of an `apply_patch` edit, so `deja blame` can attribute them (#4503).
+- A Cline VS Code task keeps both sides of a `replace_in_file` edit written with Cline's `------- SEARCH` / `+++++++ REPLACE` markers, and the files and both sides of an `apply_patch` edit, whose patch Cline passes as `input` (#4504).
+- A `kiro-cli --v3` or Kiro IDE session keeps its tool calls: the commands it ran, the files it read, wrote, appended to or deleted, and the replaced text and written lines of each edit. Only the results' text was kept (#4506).
 
 ## [0.21.4] - 2026-09-29
 

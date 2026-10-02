@@ -172,6 +172,13 @@
     <summary>Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Codex CLI stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/codex.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/codex.html"></link>
+    <updated>2026-10-02T00:00:00Z</updated>
+    <summary>Where Codex CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Command Code stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/commandcode.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/commandcode.html"></link>
@@ -191,6 +198,13 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot-chat.html"></link>
     <updated>2026-10-02T00:00:00Z</updated>
     <summary>Where VS Code Copilot Chat writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Copilot CLI stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/copilot.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot.html"></link>
+    <updated>2026-10-02T00:00:00Z</updated>
+    <summary>Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Crush stores its history — session format</title>
@@ -270,31 +284,10 @@
     <summary>Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
-    <title>Where pi stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/pi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/pi.html"></link>
+    <title>Where opencode stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/opencode.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/opencode.html"></link>
     <updated>2026-10-02T00:00:00Z</updated>
-    <summary>Where pi writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where prime-agent (PrimeIntellect) stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/prime.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/prime.html"></link>
-    <updated>2026-10-02T00:00:00Z</updated>
-    <summary>Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Qwen Code stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/qwen.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/qwen.html"></link>
-    <updated>2026-10-02T00:00:00Z</updated>
-    <summary>Where Qwen Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Reasonix stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/reasonix.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/reasonix.html"></link>
-    <updated>2026-10-02T00:00:00Z</updated>
-    <summary>Where Reasonix writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+    <summary>Where opencode writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
 </feed>

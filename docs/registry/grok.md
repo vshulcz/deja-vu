@@ -2,7 +2,7 @@
 
 ## Store and files
 
-Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent. `grok-dev`, another CLI sharing `~/.grok`, writes no session files: its history is in `${GROK_HOME:-~/.grok}/grok.db`, a SQLite store read through `sqlite3`, and `DEJA_GROK_DB` points deja at another copy.
+Grok Build stores sessions below `${GROK_HOME:-~/.grok}/sessions/<encoded-cwd>/<session-id>/`. `DEJA_GROK_ROOT` overrides where deja reads sessions; `GROK_HOME` relocates the whole Grok tree, including `config.toml`. `updates.jsonl` is the conversation stream and sibling `summary.json` carries metadata. A `.cwd` file beside session directories can recover the working directory when summary metadata is absent. `grok-dev`, another CLI sharing `~/.grok`, writes no session files: its history is in `${GROK_HOME:-~/.grok}/grok.db`, a SQLite store read through `sqlite3`, and `DEJA_GROK_DB` points deja at another copy. Each row of `messages` is an AI SDK message: text parts are the turn, `tool-call` parts become commands (`bash`), files, edits and written lines (`read_file`, `write_file`, `edit_file` under `path`), and the `tool-result` parts on `tool` rows tool output.
 
 The working-directory group is URL-encoded, although observed names are not always encoded consistently. deja prefers `summary.json` and `.cwd` over decoding the directory name.
 
@@ -69,5 +69,10 @@ session asked for it is not written down, and deja does not guess.
   `updatedInput`, which is how memory reaches a spawned agent's prompt; the
   rest of the wiring is there for its side effects, warming the index and
   forgetting what a compaction threw away.
+- `PostToolUse` on `Bash` (grok maps it to `run_terminal_command`) runs
+  `deja hook-tool-after`. Grok 1.0.41's own hook docs say it fires for a
+  command that exited non-zero and hands `additionalContext` to the model with
+  the result. The output is read from `toolResult.output_for_prompt`; `output`
+  there is the raw bytes as a number array (#4499).
 
 **Last verified:** 2026-08-24 against Grok Build 1.0.5 (macos-aarch64)

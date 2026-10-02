@@ -186,7 +186,10 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		// the edits came through this tool had nothing for `deja restore`,
 		// `deja files` or blame.
 		`'old',json_extract(p.data,'$.state.input.oldString'),` +
-		`'new',json_extract(p.data,'$.state.input.newString'),` +
+		// write hands over the whole file under `content` (#4495).
+		`'new',coalesce(json_extract(p.data,'$.state.input.newString'),` +
+		`case when json_extract(p.data,'$.name')='write' then json_extract(p.data,'$.state.input.content') end),` +
+		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,` +
 		// What a command printed moved from `$.state.output`, a string, to
 		// `$.state.content`, the list of blocks the tool returned. Only the text
 		// ones, and only for bash, for the reason the 1.x reader gives: a file
@@ -207,7 +210,7 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		// 2.0 renamed two of the three: `bash` is `shell` and `apply_patch` is
 		// `patch`. Both spellings are read, because a store written before the
 		// rename keeps the old ones.
-		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit')))` +
+		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit','write')))` +
 		where + ` order by s.id,p.mc,p.ord` + lim
 }
 

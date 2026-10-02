@@ -333,7 +333,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`'path',` + opencodeV1Path(harness) + `,` +
 		`'cmd',json_extract(p.data,'$.state.input.command'),` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
-		zcodeV1Fields(harness) +
+		opencodeV1EditFields(harness) +
 		// The output of a bash call and its exit status. Only bash: `read`
 		// output is 119 MB of file contents on this store against 49 MB of
 		// command output, and #547 measured file bodies as the weakest slice
@@ -372,49 +372,61 @@ func opencodeV1Query(harness, where string, limit int) string {
 		` or (instr(substr(p.data,1,200),'"tool":"bash"')>0 ` +
 		`and json_extract(p.data,'$.tool')='bash')` +
 		` or (instr(substr(p.data,1,200),'"tool":"apply_patch"')>0 ` +
-		`and json_extract(p.data,'$.tool')='apply_patch')` + zcodeV1Tools(harness) + `)` +
+		`and json_extract(p.data,'$.tool')='apply_patch')` + opencodeV1Tools(harness) + `)` +
 		where + ` order by s.id,m.time_created,p.id` + lim
 	return q
 }
 
-// zcodeV1Fields and zcodeV1Tools read ZCode's tool parts, which sit in
-// OpenCode's schema under Claude Code's names and arguments: Bash {command},
-// Read {file_path}, Edit {file_path, old_string, new_string} and Write
-// {file_path, content}. Matched only for ZCode, so opencode's own query gains
-// no clause; read as opencode's were, ZCode sessions were text alone (#4428).
-func zcodeV1Fields(harness string) string {
-	if harness != "zcode" {
-		return ""
+// opencodeV1EditFields read the two sides of an edit. opencode's own edit
+// takes {filePath, oldString, newString} and its write {filePath, content};
+// the 1.x reader took neither, so a session whose changes went through them
+// had nothing for restore or blame (#4495). ZCode's tool parts sit in the same
+// schema under Claude Code's names and arguments, Edit {file_path, old_string,
+// new_string} and Write {file_path, content} (#4428).
+func opencodeV1EditFields(harness string) string {
+	path := `when json_extract(p.data,'$.tool') in ('edit','write') then json_extract(p.data,'$.state.input.filePath') `
+	old := `json_extract(p.data,'$.state.input.oldString')`
+	nw := `json_extract(p.data,'$.state.input.newString'),` +
+		`case when json_extract(p.data,'$.tool')='write' then json_extract(p.data,'$.state.input.content') end`
+	if harness == "zcode" {
+		path += `when json_extract(p.data,'$.tool') in ('Edit','Write') then json_extract(p.data,'$.state.input.file_path') `
+		old = `coalesce(` + old + `,json_extract(p.data,'$.state.input.old_string'))`
+		nw += `,json_extract(p.data,'$.state.input.new_string'),` +
+			`case when json_extract(p.data,'$.tool')='Write' then json_extract(p.data,'$.state.input.content') end`
 	}
-	return `'editpath',case when json_extract(p.data,'$.tool') in ('Edit','Write') ` +
-		`then json_extract(p.data,'$.state.input.file_path') end,` +
-		`'old',json_extract(p.data,'$.state.input.old_string'),` +
-		`'new',coalesce(json_extract(p.data,'$.state.input.new_string'),` +
-		`case when json_extract(p.data,'$.tool')='Write' then json_extract(p.data,'$.state.input.content') end),` +
-		// An Edit ZCode refused — "File has not been read yet" — changed
-		// nothing, and is not recorded as if it had.
+	return `'editpath',case ` + path + `end,` +
+		`'old',` + old + `,` +
+		`'new',coalesce(` + nw + `),` +
+		// An edit the tool refused — ZCode's "File has not been read yet",
+		// opencode's error state — changed nothing, and is not recorded as if
+		// it had.
 		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,`
+}
+
+// opencodeV1Tools admits the edit and write parts beside read, bash and
+// apply_patch, with the same cheap gate in front of the exact test; and for
+// ZCode its Claude-named tools, so opencode's own query gains no clause for
+// them; read as opencode's were, ZCode sessions were text alone (#4428).
+func opencodeV1Tools(harness string) string {
+	names := []string{"edit", "write"}
+	if harness == "zcode" {
+		names = append(names, "Bash", "Read", "Edit", "Write")
+	}
+	var b strings.Builder
+	for _, name := range names {
+		fmt.Fprintf(&b, ` or (instr(substr(p.data,1,200),'"tool":"%s"')>0 and json_extract(p.data,'$.tool')='%s')`, name, name)
+	}
+	return b.String()
 }
 
 // opencodeV1Path is the file a read opened: `filePath` in opencode's read,
 // `file_path` in ZCode's Read.
 func opencodeV1Path(harness string) string {
 	if harness != "zcode" {
-		return `json_extract(p.data,'$.state.input.filePath')`
+		return `case when json_extract(p.data,'$.tool')='read' then json_extract(p.data,'$.state.input.filePath') end`
 	}
 	return `coalesce(json_extract(p.data,'$.state.input.filePath'),case when json_extract(p.data,'$.tool')='Read' ` +
 		`then json_extract(p.data,'$.state.input.file_path') end)`
-}
-
-func zcodeV1Tools(harness string) string {
-	if harness != "zcode" {
-		return ""
-	}
-	var b strings.Builder
-	for _, name := range []string{"Bash", "Read", "Edit", "Write"} {
-		fmt.Fprintf(&b, ` or (instr(substr(p.data,1,200),'"tool":"%s"')>0 and json_extract(p.data,'$.tool')='%s')`, name, name)
-	}
-	return b.String()
 }
 
 // readOpencodeRows runs one projection and folds its rows into by, keyed by

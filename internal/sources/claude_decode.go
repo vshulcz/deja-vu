@@ -440,6 +440,20 @@ func IndexToolPaths() bool { return os.Getenv("DEJA_INDEX_PATHS") != "0" }
 // prose-mention approach unusable.
 var pathTools = map[string]bool{"Read": true, "Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true}
 
+// claudeShellTools are the calls that run a command. PowerShell is Claude
+// Code's shell on Windows and takes `command` the way Bash does; reading Bash
+// alone left a Windows session with no command at all (#4489).
+var claudeShellTools = map[string]bool{"Bash": true, "PowerShell": true}
+
+// claudeCallPath is the file a call names: `file_path`, or `notebook_path`
+// on NotebookEdit, which names nothing under the first (#4489).
+func claudeCallPath(filePath, notebookPath string) string {
+	if filePath != "" {
+		return filePath
+	}
+	return notebookPath
+}
+
 // claudeToolPaths returns the distinct file paths a message's tool calls name,
 // one per line, or "" when it names none.
 func claudeToolPaths(raw json.RawMessage) string {
@@ -462,22 +476,24 @@ func claudeToolPaths(raw json.RawMessage) string {
 			Type  string `json:"type"`
 			Name  string `json:"name"`
 			Input struct {
-				FilePath string `json:"file_path"`
+				FilePath     string `json:"file_path"`
+				NotebookPath string `json:"notebook_path"`
 			} `json:"input"`
 		}
 		if json.Unmarshal(item, &part) != nil {
 			continue
 		}
-		if part.Type != "tool_use" || !pathTools[part.Name] || part.Input.FilePath == "" {
+		path := claudeCallPath(part.Input.FilePath, part.Input.NotebookPath)
+		if part.Type != "tool_use" || !pathTools[part.Name] || path == "" {
 			continue
 		}
 		// One path per line, split back apart by the index: a path carrying a
 		// newline arrives as two files the session never touched (#2042).
-		if seen[part.Input.FilePath] || strings.ContainsAny(part.Input.FilePath, "\n\r") {
+		if seen[path] || strings.ContainsAny(path, "\n\r") {
 			continue
 		}
-		seen[part.Input.FilePath] = true
-		out = append(out, part.Input.FilePath)
+		seen[path] = true
+		out = append(out, path)
 	}
 	return strings.Join(out, "\n")
 }
@@ -575,8 +591,13 @@ func claudeWroteRecords(raw json.RawMessage) []string {
 		var part struct {
 			Type  string `json:"type"`
 			Input struct {
-				FilePath  string `json:"file_path"`
-				NewString string `json:"new_string"`
+				FilePath     string `json:"file_path"`
+				NotebookPath string `json:"notebook_path"`
+				NewString    string `json:"new_string"`
+				// NotebookEdit's written side: the cell's new source, which
+				// a delete carries too and Claude Code discards (#4489).
+				NewSource string `json:"new_source"`
+				EditMode  string `json:"edit_mode"`
 				// A Write hands over the whole file, which is how a new file
 				// enters a repository — and a commit that adds a file is the
 				// case the replaced side can say nothing at all about.
@@ -589,11 +610,14 @@ func claudeWroteRecords(raw json.RawMessage) []string {
 		if json.Unmarshal(item, &part) != nil || part.Type != "tool_use" {
 			continue
 		}
-		path := part.Input.FilePath
+		path := claudeCallPath(part.Input.FilePath, part.Input.NotebookPath)
 		if path == "" {
 			continue
 		}
 		written := []string{part.Input.NewString, part.Input.Content}
+		if part.Input.EditMode != "delete" {
+			written = append(written, part.Input.NewSource)
+		}
 		for _, e := range part.Input.Edits {
 			written = append(written, e.NewString)
 		}
@@ -743,7 +767,7 @@ func claudeCommands(raw json.RawMessage) []claudeCommand {
 		if json.Unmarshal(item, &part) != nil {
 			continue
 		}
-		if part.Type != "tool_use" || part.Name != "Bash" || part.Input.Command == "" {
+		if part.Type != "tool_use" || !claudeShellTools[part.Name] || part.Input.Command == "" {
 			continue
 		}
 		if !worthIndexing(part.Input.Command) {

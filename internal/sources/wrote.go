@@ -5,6 +5,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // RoleWrote is the record kind holding what a session wrote, as hashes: one
@@ -160,5 +163,77 @@ func addedLinesOfPatch(patch string) []string {
 		}
 	}
 	flush()
+	return out
+}
+
+// applyPatch is what one apply_patch body says about the files it touched:
+// each file its headers name, the spans it removed ("path\nspan", as an
+// edit's replaced side) and the lines it added (WroteRecord). One reading of
+// the format for every harness that carries it, so a patch from Copilot CLI,
+// OpenClaw or Cline means what one from codex or opencode does (#4491).
+// resolve puts a header's path in the form the surfaces compare; nil keeps it
+// as written.
+func applyPatch(patch string, resolve func(string) string) (files, spans, wrote []string) {
+	if resolve == nil {
+		resolve = func(p string) string { return p }
+	}
+	head := func(rec string) string {
+		path, rest, _ := strings.Cut(rec, "\n")
+		return resolve(path) + "\n" + rest
+	}
+	seen := map[string]bool{}
+	for _, m := range codexPatchFile.FindAllStringSubmatch(patch, -1) {
+		if p := resolve(strings.TrimSpace(m[1])); p != "" && !seen[p] {
+			seen[p] = true
+			files = append(files, p)
+		}
+	}
+	for _, span := range patchSpans(patch) {
+		spans = append(spans, head(span))
+	}
+	for _, rec := range addedLinesOfPatch(patch) {
+		wrote = append(wrote, head(rec))
+	}
+	return files, spans, wrote
+}
+
+// applyPatchRecords is applyPatch as the records a reader appends, under the
+// switches every reader honours.
+func applyPatchRecords(patch string, resolve func(string) string, t time.Time) []model.Message {
+	files, spans, wrote := applyPatch(patch, resolve)
+	var out []model.Message
+	if IndexToolPaths() && len(files) > 0 {
+		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(files, "\n"), Time: t})
+	}
+	if IndexWrites() {
+		for _, w := range wrote {
+			out = append(out, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range spans {
+			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	return out
+}
+
+// applyPatchInputs is the patch body of every apply_patch call among blocks.
+// Roo names the argument `patch`; Cline's CLI and extension name it `input`
+// (#4503, #4504).
+func applyPatchInputs(blocks []any, d toolDialect) []string {
+	var out []string
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, d)
+		if !ok || name != "apply_patch" {
+			continue
+		}
+		for _, k := range []string{"patch", "input"} {
+			if p, _ := in[k].(string); p != "" {
+				out = append(out, p)
+				break
+			}
+		}
+	}
 	return out
 }
