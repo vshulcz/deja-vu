@@ -425,7 +425,7 @@ import (
 // 60 also: a Senpi eval cell's commands, reads and edits are indexed, and its
 // result text is unwrapped (#4425).
 //
-// 60 also: a pi, Senpi, omp, OpenClaw, gjc, prime or Kimchi session takes its
+// 60 also: a pi, Senpi, omp, OpenClaw, gjc, prime, Kimchi or Command Code session takes its
 // project from the header's cwd as it is, not decoded from the folder (#4427).
 //
 // 60 also: a ZCode CLI session keeps its Bash, Read, Edit and Write calls

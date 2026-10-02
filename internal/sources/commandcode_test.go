@@ -43,7 +43,7 @@ func TestCommandCodeReadsTheV3Transcript(t *testing.T) {
 	if s.ID != "1583a430-5538-475d-9190-0d726c7a374f" {
 		t.Errorf("id = %q", s.ID)
 	}
-	if want := claudeProjectName(pathToProjectKey("/private/tmp/proj-cc")); s.Project != want {
+	if want := "tmp/proj-cc"; s.Project != want {
 		t.Errorf("project = %q, want %q from the header's cwd", s.Project, want)
 	}
 	byRole := map[string][]string{}

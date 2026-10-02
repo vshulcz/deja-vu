@@ -152,7 +152,12 @@ func commandCodeMessage(s *model.Session, m map[string]any) {
 	}
 }
 
+// commandCodeProject names the project from the header's cwd when it has one;
+// the folder name is a lossy slug of it (my-app and my/app share one).
 func commandCodeProject(path string) string {
+	if cwd := CommandCodeSessionDir(path); cwd != "" {
+		return cwdProjectName(cwd)
+	}
 	dir := projectDir(CommandCodeRoot(), path)
 	if dir == "" || dir == CommandCodeRoot() {
 		return ""
