@@ -11,8 +11,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// Gemini loads hooks from extensions, not from settings.json, and only when
-// hooksConfig.enabled is set. A `hooks` block in settings.json — where deja
+// Gemini loads hooks from extensions, not from settings.json, and none at all
+// with hooksConfig.enabled false (the key defaults to true on 0.60). A `hooks` block in settings.json — where deja
 // used to write one — is read by nothing (checked on 0.52.0, headless and in
 // the TUI).
 //
