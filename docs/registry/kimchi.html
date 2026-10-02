@@ -49,9 +49,9 @@
 <p>that path in <code>getDefaultSessionDirPath</code>: <code>&lt;agent&gt;/sessions/--&lt;encoded cwd&gt;--</code>,</p>
 <p>where the encoding is the working directory with the separators replaced by</p>
 <p>dashes and a <code>--</code> on each end. A session file directly under the root is read</p>
-<p>too. Either way the header&#39;s <code>cwd</code> is what names the project, read as it is</p>
-<p>rather than encoded and decoded back, which could not tell <code>my-app</code> from</p>
-<p><code>my/app</code> (#4427).</p>
+<p>too. Either way the header&#39;s <code>cwd</code> is what names the project, by its last two</p>
+<p>segments, rather than encoded and decoded back, which could not tell <code>my-app</code></p>
+<p>from <code>my/app</code> (#4427, #4457).</p>
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>

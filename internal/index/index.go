@@ -485,6 +485,12 @@ import (
 //
 // 60 also: an OpenClaw <id>.trajectory.jsonl is no longer read as a session
 // (#4477).
+//
+// 60 also: a dsh log with a torn zstd frame keeps the frames around it
+// (#4294), a Cherry Studio dsh log is filed under cherrystudio alone (#4342),
+// a renamed Cline CLI session takes its new title (#4319), and a thin harness
+// title is not retaken from an appended turn (#4452); rows already held
+// change only on a rebuild.
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
