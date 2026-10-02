@@ -36,7 +36,8 @@ func TestParseAmpKeepsToolCallsAndMessageTimes(t *testing.T) {
 	for _, m := range s.Messages {
 		byRole[m.Role] = append(byRole[m.Role], m.Text)
 	}
-	if got := byRole[RoleCommand]; len(got) != 1 || got[0] != "$ go test ./..." {
+	// The run's exitCode rides on the command (#4530).
+	if got := byRole[RoleCommand]; len(got) != 1 || got[0] != "$ go test ./...  → exit 1" {
 		t.Errorf("commands = %q", got)
 	}
 	if got := byRole[RoleToolOutput]; len(got) != 1 || got[0] != "--- FAIL: TestRetry (0.00s)" {

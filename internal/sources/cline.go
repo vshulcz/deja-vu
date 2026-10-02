@@ -538,8 +538,40 @@ func clineJoinExits(msgs []model.Message, from int, raw json.RawMessage, d toolD
 			exits.stamp(msgs, id, "", code)
 		} else if code, ok := statusCode(line, "Command executed successfully (exit code ", ")."); ok {
 			exits.stamp(msgs, id, "", code)
+		} else if code, ok := rooExitCode(contentText(m["content"])); ok {
+			exits.stamp(msgs, id, "", code)
 		}
+		// A result answers its call once; an id handed out again belongs to
+		// a later call.
+		delete(exits, id)
 	}
+}
+
+// rooExitCode reads the status Roo's and Kilo Code's execute_command open
+// their result with: "Command executed in terminal within working directory
+// '<dir>'. Exit code: N", or for a failure that sentence ending "Command
+// execution was not successful, …" and "Exit code: N" on the next line. A run
+// whose output went to an artifact opens "Command executed in '<dir>'." the
+// same way (#4530).
+func rooExitCode(text string) (int, bool) {
+	head, rest, _ := strings.Cut(text, "\n")
+	// Kilo Code and older Roo builds put two spaces after "terminal".
+	if tail, ok := strings.CutPrefix(head, "Command executed in terminal "); ok {
+		if !strings.HasPrefix(strings.TrimLeft(tail, " "), "within working directory '") {
+			return 0, false
+		}
+	} else if !strings.HasPrefix(head, "Command executed in '") {
+		return 0, false
+	}
+	at := strings.LastIndex(head, "'. ")
+	if at < 0 {
+		return 0, false
+	}
+	status := head[at+3:]
+	if status == "Command execution was not successful, inspect the cause and adjust as needed." {
+		status, _, _ = strings.Cut(rest, "\n")
+	}
+	return statusCode(status, "Exit code: ", "")
 }
 
 // clineTurnToolOutput is what a turn's tool_result blocks printed, for the

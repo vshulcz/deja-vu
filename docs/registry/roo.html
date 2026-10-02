@@ -61,6 +61,11 @@
 <p><code>search_replace</code>, <code>edit_file</code> and <code>edit</code>, which take <code>old_string</code> and</p>
 <p><code>new_string</code> under <code>file_path</code>, and <code>apply_patch</code>, whose paths and <code>-</code>/<code>+</code> lines</p>
 <p>are read out of the patch body.</p>
+<p>An <code>execute_command</code> result opens with its status, &#34;Command executed in</p>
+<p>terminal within working directory &#39;…&#39;. Exit code: N&#34; (a failure puts &#34;Command</p>
+<p>execution was not successful, …&#34; there and the code on the next line), and the</p>
+<p>command record carries <code>→ exit N</code> from it. A command killed by a signal, or one</p>
+<p>whose code the terminal never reported, keeps no code (#4530).</p>
 <p>Tasks from before native tool calling (Roo 3.20, and the legacy Cline</p>
 <p>extension) keep each call as XML inside the assistant&#39;s text block —</p>
 <p><code>&lt;execute_command&gt;&lt;command&gt;…&lt;/command&gt;&lt;/execute_command&gt;</code> — and its result as</p>

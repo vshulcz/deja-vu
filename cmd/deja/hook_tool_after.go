@@ -187,8 +187,9 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 func isCommandTool(name string) bool {
 	switch name {
 	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal",
-		// Claude Code's shell on Windows (#4489).
-		"PowerShell",
+		// Claude Code's shell on Windows (#4489), and the pi-coding-agent's
+		// under Senpi and Kimchi (#4523).
+		"PowerShell", "powershell",
 		"run_shell_command", "run_terminal_command", "run_commands",
 		// Command Code's payload carries the internal name, not the SHELL its
 		// matcher sees (#4371).

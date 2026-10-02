@@ -60,7 +60,9 @@
 <p>new turns use <code>read</code>, <code>write</code>, <code>edit</code> and <code>bash</code>, where <code>edit</code> takes</p>
 <p><code>edits[{oldText,newText}]</code> (also sent as a JSON string, or as one top-level</p>
 <p><code>oldText</code>/<code>newText</code> pair, both read the same way); the older <code>read_file</code>, <code>write_file</code> and <code>edit_file</code></p>
-<p>names are still read for sessions saved before.</p>
+<p>names are still read for sessions saved before. A failed <code>bash</code> result has</p>
+<p><code>is_error</code> and ends &#34;Command exited with code N&#34;; the command it answers, by</p>
+<p><code>tool_use_id</code>, carries that as <code>→ exit N</code> (#4537).</p>
 <p><code>thinking</code> blocks are dropped. So are the <code>system</code> and <code>developer</code> roles:</p>
 <p>CodeWhale&#39;s own documentation names them as where it puts compaction summaries,</p>
 <p>branch summaries and sub-agent framing, which is the harness talking to itself</p>

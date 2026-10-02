@@ -79,6 +79,9 @@ ZCode 3.14.4 runtime wrote names them as Claude Code does, with its arguments â€
 new_string}`, `Write {file_path, content}`. deja reads those for ZCode as
 commands with their output, files, edit spans and written lines; an `Edit`
 ZCode refused (`state.status: "error"`) is not recorded as a change (#4428).
+A Bash part has no `metadata.exit`; a failed run's output opens with "Exit code
+N", as Claude Code's does, and that line goes on the command as `â†’ exit N`
+rather than into the output (#4536).
 
 Said plainly: that is a third party's attestation, not a running ZCode checked
 here. `task_type` also separates `subagent_child` and `fork` from `interactive`,

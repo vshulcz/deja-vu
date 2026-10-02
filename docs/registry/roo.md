@@ -25,6 +25,12 @@ nothing rather than guessing where it ended. Current Roo also offers
 `new_string` under `file_path`, and `apply_patch`, whose paths and `-`/`+` lines
 are read out of the patch body.
 
+An `execute_command` result opens with its status, "Command executed in
+terminal within working directory '…'. Exit code: N" (a failure puts "Command
+execution was not successful, …" there and the code on the next line), and the
+command record carries `→ exit N` from it. A command killed by a signal, or one
+whose code the terminal never reported, keeps no code (#4530).
+
 Tasks from before native tool calling (Roo 3.20, and the legacy Cline
 extension) keep each call as XML inside the assistant's text block —
 `<execute_command><command>…</command></execute_command>` — and its result as

@@ -69,9 +69,9 @@ A `toolCall` block carries `name` and `arguments`. deja reads them for pi and ev
 | `edit` | `path`, `edits[].oldText` / `newText` (older pi: one `oldText` / `newText` pair) | the file, the replaced span, the written lines |
 | `write` | `path`, `content` | the file and the written lines |
 | `apply_patch` (OpenClaw) | `input`, a `*** Begin Patch` body | each file the patch names, its removed lines, its added lines |
-| `bash` (OpenClaw: `exec`) | `command` | the command, and `→ exit N` from the matching `toolResult` (`details.exitCode` when there is one, else the "Command exited with code N" line that ends a failed result, `exit 0` for a result that is not an error) |
+| `bash` (OpenClaw: `exec`; the pi-coding-agent under Senpi and Kimchi also `powershell`) | `command` | the command, and `→ exit N` from the matching `toolResult` (`details.exitCode` when there is one, else the "Command exited with code N" line that ends a failed result, `exit 0` for a result that is not an error) |
 
-A relative `path` resolves against the header's `cwd`. gjc's `edit` takes one `input` string in its hashline form instead; see the gjc entry.
+A relative `path` resolves against the header's `cwd`. gjc's `edit` takes one `input` string in its hashline form instead; see the gjc entry. omp and gjc also edit in a replace mode, omp's `{path, old_string, new_string}` (or `edits` of those) and gjc's `{path, edits:[{old_text, new_text}]}`, and a patch mode, `{path, edits:[{op, diff}]}`: those give the same records, a patch's `-` lines per hunk the replaced span and its `+` lines, or a created file's whole `diff`, the written lines (#4524).
 
 ### Timestamps
 
@@ -93,7 +93,7 @@ pi does not include built-in MCP but supports it via the `pi-mcp-adapter` packag
 
 The skill is the shared `~/.agents/skills/deja-history/SKILL.md`; pi scans that directory, and a second copy in `~/.pi/agent/skills` makes it report a collision, so install removes one an older deja left there.
 
-`deja install pi-auto` writes the MCP entry and `~/.pi/agent/extensions/deja.ts`. The extension returns the session digest on the first turn and per-prompt recall after that at `before_agent_start`, adds to a `tool_result` a file's history after a `read` or the earlier fix after a failed `bash` command, runs `deja hook-precompact` at `session_compact`, and registers `/deja <query>`, which runs `deja search`.
+`deja install pi-auto` writes the MCP entry and `~/.pi/agent/extensions/deja.ts`. The extension returns the session digest on the first turn and per-prompt recall after that at `before_agent_start`, adds to a `tool_result` a file's history after a `read` or the earlier fix after a failed `bash` or `powershell` command, runs `deja hook-precompact` at `session_compact`, and registers `/deja <query>`, which runs `deja search`.
 
 `deja resume` prints `pi --session <id>`, run in the `cwd` the session header records; the folder name folds `/` into `-`, so `my-app` and `my/app` share it. With that directory gone the `cd` is left out and deja notes that pi, run from another project, offers to fork the session (#4456).
 

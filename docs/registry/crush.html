@@ -57,7 +57,11 @@
 <p><code>tool_result</code> carries what the tool printed with a <code>&lt;cwd&gt;…&lt;/cwd&gt;</code> tag appended,</p>
 <p>which is the same directory on every line in the store and is stripped rather</p>
 <p>than indexed — left in, a search for the project name would match every tool</p>
-<p>output there is. <code>finish</code> is bookkeeping.</p>
+<p>output there is. <code>finish</code> is bookkeeping. A result names its call by</p>
+<p><code>tool_call_id</code> (the call&#39;s <code>id</code>), on a later row: a bash result whose last line</p>
+<p>is crush&#39;s &#34;Exit code N&#34; puts <code>→ exit N</code> on the command, and an <code>edit</code>,</p>
+<p><code>multiedit</code> or <code>write</code> whose result has <code>is_error</code> changed nothing, so it keeps</p>
+<p>its file record and no edit or written lines (#4532).</p>
 <p>Both stamp columns are commented &#34;Unix timestamp in milliseconds&#34; in Crush&#39;s own</p>
 <p>schema and hold whole seconds in what v0.92.0 writes — its update trigger sets</p>
 <p><code>strftime(&#39;%s&#39;,&#39;now&#39;)</code>. Both units are read. The project is the directory the</p>

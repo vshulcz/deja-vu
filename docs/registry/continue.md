@@ -11,9 +11,13 @@ write the same file. The session document holds `history[]`, each item a
 `{type, text}` parts; an assistant item that called tools carries them in
 `toolCallStates[]`. `system` and `tool` roles are skipped — the first is
 configuration, and a tool's result arrives under the assistant item that asked
-for it. The tool calls themselves are not indexed as work records: they are
-model tools (`read_file`, `edit_file`) rather than commands anyone ran, and the
-command index is for the latter.
+for it. The calls in `toolCallStates[]` become work records: a `Bash` or
+`run_terminal_command` call a command, the file tools their file, edit span and
+written lines. A command carries `→ exit N` where Continue wrote the code: the
+CLI's errored `Bash` output "Error executing tool Bash: Error (exit code N): …",
+and the IDE's output `status` "Command failed with exit code N". A clean run
+gets no code: the CLI resolves a non-zero exit with empty stderr as done, and
+the IDE says "Command completed" for a process a signal ended (#4530).
 
 Nothing in the file carries a timestamp. `sessions.json` records `dateCreated`
 and `workspaceDirectory` per session, so that date is the session's start (the

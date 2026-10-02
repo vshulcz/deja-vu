@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -158,6 +159,7 @@ func ParseAmpFile(path string) ([]model.Session, error) {
 		Updated: created,
 	}
 	ts := created
+	exits := commandExits{}
 	for _, item := range thread.Messages {
 		if item.Role != "user" && item.Role != "assistant" {
 			continue
@@ -186,10 +188,12 @@ func ParseAmpFile(path string) ([]model.Session, error) {
 				Time: ts,
 			})
 		}
+		from := len(session.Messages)
 		for _, rec := range ampWorkRecords(item.Content, ts) {
 			session.Touch(ts)
 			session.Messages = append(session.Messages, rec)
 		}
+		ampJoinExits(session.Messages, from, item.Content, exits)
 	}
 	if len(session.Messages) == 0 {
 		return nil, nil
@@ -268,6 +272,32 @@ func ampToolResults(blocks []any) []string {
 		}
 	}
 	return out
+}
+
+// ampJoinExits notes the commands a message's tool calls appended from index
+// from on, and stamps those its tool results report on. A finished run's
+// result is {output, exitCode}, in the user message after the call; Amp
+// writes -1 when the process gave it no code, which says nothing (#4530).
+func ampJoinExits(msgs []model.Message, from int, raw json.RawMessage, exits commandExits) {
+	if !IndexCommands() || !bytes.Contains(raw, []byte(`"tool_`)) {
+		return
+	}
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return
+	}
+	exits.note(msgs, from, commandCallsIn(blocks, ampDialect))
+	for _, it := range blocks {
+		m, _ := it.(map[string]any)
+		run, _ := m["run"].(map[string]any)
+		if m["type"] != "tool_result" || run["status"] != "done" {
+			continue
+		}
+		res, _ := run["result"].(map[string]any)
+		if code, ok := piExitCode(res["exitCode"]); ok && code >= 0 {
+			exits.stamp(msgs, str(m["toolUseID"]), "", code)
+		}
+	}
 }
 
 func ampProject(uri, fallback string) string {

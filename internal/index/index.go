@@ -529,6 +529,28 @@ import (
 //
 // 60 also: a kiro-cli --v3 or Kiro IDE tool_call record becomes commands,
 // files, edit and wrote records (#4506).
+//
+// 60 also: a Roo, Kilo Code, Continue, Amp or Antigravity command carries the
+// `→ exit N` its result reports (#4530).
+//
+// 60 also: a Crush command carries its `→ exit N`, and an edit Crush refused
+// leaves no edit or wrote records (#4532).
+//
+// 60 also: a failed ZCode Bash run carries its `→ exit N` (#4536).
+//
+// 60 also: a failed CodeWhale bash command carries its `→ exit N` (#4537).
+//
+// 60 also: a failed Command Code command carries its `→ exit N` (#4539).
+//
+// 60 also: a pi-family powershell call leaves a command record (#4523).
+//
+// 60 also: an omp or gjc edit in replace or patch mode leaves edit and wrote
+// records (#4524).
+//
+// 60 also: an omp hashline edit leaves files, edit and wrote records (#4525).
+//
+// 60 also: a prime ipython cell's details.diffs leave files, edit and wrote
+// records (#4526).
 const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

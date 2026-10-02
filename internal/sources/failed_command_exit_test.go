@@ -244,6 +244,14 @@ func TestAFailedResultForAStoredCallIsReadWithItsCall(t *testing.T) {
 		{"goose-jsonl", gooseCall, gooseOut(false), true},
 		{"goose-jsonl", gooseCall, `{"role":"user","created":1790874402,"content":[{"type":"toolResponse","id":"c1","toolResult":{"status":"success","value":{"content":[{"type":"text","text":"FAIL"}],"structuredContent":{"exit_code":2}}}}]}` + "\n", false},
 		{"goose-jsonl", "", gooseCall + gooseOut(true), true},
+		// Command Code's failure is the "Exit code: N" line, with no is_error
+		// (#4539).
+		{"commandcode", commandCodeCall, commandCodeResult("Exit code: 1\nFAIL"), false},
+		{"commandcode", commandCodeCall, commandCodeResult("ok"), true},
+		{"commandcode", "", commandCodeCall + commandCodeResult("Exit code: 1\nFAIL"), true},
+		// A PowerShell run is the shell since #4523.
+		{"kimchi", piCall("c1", "powershell", `{"command":"go vet ./retry"}`) + "\n", piResult("c1", "powershell", "vet: unreachable\n\nCommand exited with code 1", `{}`, true) + "\n", false},
+		{"kimchi", piCall("c1", "powershell", `{"command":"go vet ./retry"}`) + "\n", piResult("c1", "powershell", "ok", `{}`, false) + "\n", true},
 	} {
 		p := filepath.Join(t.TempDir(), "s.jsonl")
 		body := `{"type":"user","sessionId":"c1","timestamp":"2026-10-01T10:00:00Z","message":{"role":"user","content":"fix the retry loop"}}` + "\n" + c.head

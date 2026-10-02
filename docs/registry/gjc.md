@@ -36,6 +36,11 @@ project directory names the project, and the header's cwd wins when it is there.
   each followed by the lines it writes. deja records the file and the written
   lines from the call, and the replaced lines from the result's
   `details.diff` (`-1|old line`), since the call holds only anchors (#4113).
+  `edit.mode` picks the shape: hashline is one of four. `replace`, the auto
+  choice for Claude, DeepSeek and Qwen models, takes `{path,
+  edits:[{old_text, new_text, all}]}`, `patch` takes `{path, edits:[{op,
+  diff}]}` and `apply_patch` an `input` patch; all are read for the file, the
+  replaced span and the written lines (#4524).
 - `service_tier_change` lines are not turns and are dropped rather than read as
   empty messages.
 - Wiring: `deja install gjc` writes the server into `~/.gjc/agent/mcp.json`,

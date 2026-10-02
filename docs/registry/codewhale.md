@@ -23,7 +23,9 @@ record, a `tool_result` becomes tool output, error runs included. Since 0.9.6
 new turns use `read`, `write`, `edit` and `bash`, where `edit` takes
 `edits[{oldText,newText}]` (also sent as a JSON string, or as one top-level
 `oldText`/`newText` pair, both read the same way); the older `read_file`, `write_file` and `edit_file`
-names are still read for sessions saved before.
+names are still read for sessions saved before. A failed `bash` result has
+`is_error` and ends "Command exited with code N"; the command it answers, by
+`tool_use_id`, carries that as `→ exit N` (#4537).
 
 `thinking` blocks are dropped. So are the `system` and `developer` roles:
 CodeWhale's own documentation names them as where it puts compaction summaries,

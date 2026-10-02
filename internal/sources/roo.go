@@ -329,6 +329,7 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 		contents[i] = m.Content
 	}
 	xmlEra := rooXMLEra(contents)
+	exits := commandExits{}
 	for ti, m := range turns {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
@@ -350,10 +351,14 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, tool...)
 			}
+			clineJoinExits(s.Messages, len(s.Messages), m.Content, rooDialect, exits)
 			text = unwrapClineTask(words)
 		} else if work := rooWorkRecords(m.Content, ts, item.Workspace, xmlEra); len(work) > 0 {
 			s.Touch(ts)
+			from := len(s.Messages)
 			s.Messages = append(s.Messages, work...)
+			// The result of an execute_command says how it ended (#4530).
+			clineJoinExits(s.Messages, from, m.Content, rooDialect, exits)
 		}
 		if text == "" {
 			continue

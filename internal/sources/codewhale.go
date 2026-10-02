@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -204,6 +205,7 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 	if start.IsZero() {
 		start = doc.Metadata.UpdatedAt
 	}
+	exits := commandExits{}
 	for i, m := range doc.Messages {
 		// One millisecond per record off the session's own start: the file
 		// stores no per-message time, and a single stamp for the whole session
@@ -225,9 +227,14 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: ts})
 		}
+		from := len(s.Messages)
 		for _, rec := range codeWhaleWorkRecords(m.Content, ts) {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, rec)
+		}
+		var blocks []any
+		if bytes.Contains(m.Content, []byte(`"tool_`)) && json.Unmarshal(m.Content, &blocks) == nil {
+			joinResultExits(s.Messages, from, blocks, codeWhaleDialect, exits, codeWhaleExitCode)
 		}
 	}
 	if !doc.Metadata.UpdatedAt.IsZero() {
@@ -237,6 +244,17 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// codeWhaleExitCode reads a failed bash result: CodeWhale marks it is_error
+// and ends it "Command exited with code N" (tools/shell.rs
+// contract_bash_error_status), wrapped as "Error: …" (#4537). A timeout or a
+// kill ends otherwise and gives no code.
+func codeWhaleExitCode(result map[string]any) (int, bool) {
+	if failed, _ := result["is_error"].(bool); !failed {
+		return 0, false
+	}
+	return statusCode(lastLine(contentText(result["content"])), "Command exited with code ", "")
 }
 
 // codeWhaleWorkRecords turns one message's tool blocks into work records, the

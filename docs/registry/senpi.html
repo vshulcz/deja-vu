@@ -90,7 +90,8 @@
 <p>only as <code>tool.bash(...)</code> in a cell. The transcript&#39;s call is then <code>eval</code></p>
 <p>with JS, and what ran is on the result, under</p>
 <p><code>details.toolCalls[].args</code>; deja reads the commands, files and edits from</p>
-<p>there. The cell&#39;s text is a JSON string, <code>{&#34;text&#34;:&#34;…&#34;}</code>, and is read as the</p>
+<p>there, a <code>tool.powershell(...)</code> run as a command the way <code>tool.bash(...)</code></p>
+<p>is (#4523). The cell&#39;s text is a JSON string, <code>{&#34;text&#34;:&#34;…&#34;}</code>, and is read as the</p>
 <p>text it wraps (#4425).</p>
 <ul>
 <li><strong>Senpi&#39;s first run moves <code>~/.pi/agent</code> to <code>~/.senpi/agent</code></strong> — the whole</li>

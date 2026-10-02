@@ -481,6 +481,7 @@ func allHarnesses() []Harness {
 				Match:     CommandCodeUnderRoot,
 				Parse:     fullParse(ParseCommandCodeFile),
 				ParseFrom: offsetParse(ParseCommandCodeFileFromOffset),
+				Resumes:   commandCodeExitResumes,
 			}},
 		},
 		{

@@ -285,6 +285,25 @@ func TestToolResultInTheNextPassSettlesItsCall(t *testing.T) {
 			res:  `{"version":"v1","kind":"ToolResults","data":{"message_id":"m2","content":[{"kind":"toolResult","data":{"toolUseId":"t1","content":[{"kind":"json","data":{"exit_status":"exit status: 2","stdout":"","stderr":"vet: unreachable"}}],"status":"success"}}],"meta":{"timestamp":1790848802}}}` + "\n",
 		},
 		{
+			// Command Code stamps a failure since #4539.
+			name: "commandcode", env: "DEJA_COMMANDCODE_ROOT",
+			file: "-tmp-proj/s1.jsonl",
+			head: `{"type":"session","version":3,"id":"s1","timestamp":"2026-10-01T20:09:14.839Z","cwd":"/tmp/proj"}` + "\n" +
+				`{"type":"message","id":"u1","timestamp":"2026-10-01T20:09:15.000Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}` + "\n",
+			call: `{"type":"message","id":"a1","timestamp":"2026-10-01T20:09:16.000Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"call_1","name":"shell_command","input":{"command":"go vet ./retry"}}]}}` + "\n",
+			res:  `{"type":"message","id":"r1","timestamp":"2026-10-01T20:09:17.000Z","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":[{"type":"text","text":"Exit code: 2\nvet: unreachable"}]}]}}` + "\n",
+		},
+		{
+			// omp's hashline edit takes its replaced lines from the result
+			// since #4525.
+			name: "omp hashline", env: "DEJA_OMP_ROOT",
+			file: "--tmp-proj--/2026-10-01T10-00-00-000Z_o1.jsonl",
+			head: `{"type":"session","version":3,"id":"omp-edits","timestamp":"2026-10-01T10:00:00.000Z","cwd":"/tmp/proj"}` + "\n" +
+				`{"type":"message","id":"u1","timestamp":"2026-10-01T10:00:00.000Z","message":{"role":"user","content":[{"type":"text","text":"fix the retry loop"}]}}` + "\n",
+			call: `{"type":"message","id":"a0","timestamp":"2026-10-01T10:00:01.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"c0","name":"edit","arguments":{"input":"*** Begin Patch\n[retry.go#1a2b]\nPUT 3.=3:\n+\tfor attempt := 0; attempt < maxAttempts; attempt++ {\n*** End Patch"}}]}}` + "\n",
+			res:  `{"type":"message","id":"r0","timestamp":"2026-10-01T10:00:02.000Z","message":{"role":"toolResult","toolCallId":"c0","toolName":"edit","content":[{"type":"text","text":"Updated retry.go"}],"details":{"path":"retry.go","diff":"-3|\tfor {\n+3|\tfor attempt := 0; attempt < maxAttempts; attempt++ {"},"isError":false}}` + "\n",
+		},
+		{
 			name: "pi refused edit", env: "DEJA_PI_ROOT",
 			file: "--tmp-proj--/s-retry.jsonl",
 			head: `{"type":"session","version":3,"id":"s-retry","timestamp":"2026-09-01T09:00:00Z","cwd":"/tmp/proj"}` + "\n" +

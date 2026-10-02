@@ -150,3 +150,19 @@ func TestPiCommandOutlivesTheHookTimeout(t *testing.T) {
 		t.Fatalf("the hook budget is no longer the default:\n%s", src)
 	}
 }
+
+// Senpi and the pi-coding-agent Kimchi ships have a powershell tool beside
+// bash, with the same {command}; a failed PowerShell run got no fix pair, and
+// hook-tool-after did not take the lowercase name for a command (#4523).
+func TestPiRepairsAFailedPowerShellRun(t *testing.T) {
+	src := piExtensionTS("/bin/deja")
+	if !strings.Contains(src, `event.toolName !== "powershell"`) {
+		t.Fatalf("the failure hook still stops at bash:\n%s", src)
+	}
+	if !strings.Contains(src, "tool_name: event.toolName") {
+		t.Fatalf("the failure hook does not say which shell ran:\n%s", src)
+	}
+	if !isCommandTool("powershell") {
+		t.Error("hook-tool-after does not read powershell as a command tool")
+	}
+}

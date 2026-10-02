@@ -81,6 +81,7 @@ func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session,
 		Project: commandCodeProject(path),
 		Path:    path,
 	}
+	exits := commandExits{}
 	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
 		switch typ, _ := m["type"].(string); typ {
 		case "session":
@@ -88,7 +89,7 @@ func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session,
 			// whole.
 			applyPiHeader(&s, m, true)
 		case "message":
-			commandCodeMessage(&s, m)
+			commandCodeMessage(&s, m, exits)
 		default:
 			flatRoleLine(&s, m)
 		}
@@ -110,8 +111,9 @@ var commandCodeDialect = toolDialect{
 }
 
 // commandCodeMessage reads one v3 envelope. A user-role message made of
-// tool_result blocks is tool output, as in a Claude transcript.
-func commandCodeMessage(s *model.Session, m map[string]any) {
+// tool_result blocks is tool output, as in a Claude transcript; such a result
+// says how the command of the call it answers ended.
+func commandCodeMessage(s *model.Session, m map[string]any, exits commandExits) {
 	msg, ok := m["message"].(map[string]any)
 	if !ok {
 		return
@@ -146,11 +148,47 @@ func commandCodeMessage(s *model.Session, m map[string]any) {
 		}
 	}
 	if IndexCommands() {
+		from := len(s.Messages)
 		for _, c := range commandsIn(content, commandCodeDialect) {
 			s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: c, Time: t})
 		}
+		joinResultExits(s.Messages, from, content, commandCodeDialect, exits, commandCodeExitCode)
 	}
 }
+
+// commandCodeExitCode reads the status Command Code opens a failed command's
+// result with: "Exit code: N", or "Exit code: N (<meaning>)" for a code it
+// knows, such as grep's 1 (formatShellCommandResult). A clean run has no such
+// line, and no result carries is_error (#4539).
+func commandCodeExitCode(result map[string]any) (int, bool) {
+	line := firstLine(contentText(result["content"]))
+	if at := strings.Index(line, " ("); at > 0 && strings.HasSuffix(line, ")") {
+		line = line[:at]
+	}
+	code, ok := statusCode(line, "Exit code: ", "")
+	return code, ok && code != 0
+}
+
+// commandCodeExitResumes is the #4443 rule for Command Code's v3 envelopes: a
+// tail holding the failed result of a call stored already is read whole, or
+// the call never gets its exit; a clean one is let go.
+var commandCodeExitResumes = resumesUnlessAnswering(`"tool_`, func(m map[string]any) ([]string, string) {
+	msg, _ := m["message"].(map[string]any)
+	items, _ := msg["content"].([]any)
+	var calls []string
+	for _, it := range items {
+		p, _ := it.(map[string]any)
+		switch p["type"] {
+		case "tool_use":
+			calls = append(calls, str(p["id"]))
+		case "tool_result":
+			if _, failed := commandCodeExitCode(p); failed && str(p["tool_use_id"]) != "" {
+				return calls, str(p["tool_use_id"])
+			}
+		}
+	}
+	return calls, ""
+})
 
 // commandCodeProject names the project from the header's cwd when it has one;
 // the folder name is a lossy slug of it (my-app and my/app share one).

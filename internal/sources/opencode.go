@@ -483,6 +483,17 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 		}
 		if cmd := str(r["cmd"]); cmd != "" {
 			t := partTime(r)
+			out := str(r["out"])
+			if r["exit"] == nil && harness == "zcode" {
+				// ZCode records no exit field and writes a failed run's code
+				// Claude's way, "Exit code N" as the output's first line, and
+				// only for a non-zero N (#4536).
+				head, rest, _ := strings.Cut(out, "\n")
+				if code, ok := statusCode(head, "Exit code ", ""); ok && code != 0 {
+					r["exit"] = float64(code)
+					out = rest
+				}
+			}
 			if IndexCommands() && worthIndexing(cmd) {
 				// A non-zero exit rides with the command. opencode records it on
 				// 99% of runs, which is the one thing Claude's transcripts
@@ -499,7 +510,7 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 			}
 			// The output is a separate record under the same role Claude's tool
 			// results use, so `--role tool-output` means the same thing on both.
-			if out := str(r["out"]); out != "" && IndexToolOutput() {
+			if out != "" && IndexToolOutput() {
 				s.Touch(t)
 				s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: out, Time: t})
 			}

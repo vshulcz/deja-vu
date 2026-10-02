@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -153,4 +154,45 @@ func primeProject(path string) string {
 		return ""
 	}
 	return claudeProjectName(dir)
+}
+
+// cellDiffs records the files a prime ipython cell changed. prime's one tool
+// runs Python, and its edit skill, `await edit(path, old_str, new_str)`, is how
+// the agent changes a file; each change it made is on the cell's result as
+// details.diffs[{path, oldStr, newStr}], which prime reads back itself to list
+// a session's edited files (#4526). A diff is there only for a change that
+// was written, so a cell that fails afterwards keeps it.
+func (r *piReader) cellDiffs(v any, t time.Time) {
+	diffs, _ := v.([]any)
+	var calls []any
+	for _, d := range diffs {
+		m, _ := d.(map[string]any)
+		p := r.abs(str(m["path"]))
+		if p == "" {
+			continue
+		}
+		calls = append(calls, map[string]any{"type": "tool_use", "name": "edit",
+			"input": map[string]any{"path": p, "oldText": str(m["oldStr"]), "newText": str(m["newStr"])}})
+	}
+	if len(calls) == 0 {
+		return
+	}
+	if IndexToolPaths() {
+		if p := toolPathsIn(calls, piDialect); p != "" {
+			r.add(RoleFiles, p, t)
+		}
+	}
+	for _, c := range calls {
+		one := []any{c}
+		if IndexEdits() {
+			for _, span := range editSpansIn(one, piDialect) {
+				r.add(RoleEdit, span, t)
+			}
+		}
+		if IndexWrites() {
+			for _, w := range wroteRecordsIn(one, piDialect) {
+				r.add(RoleWrote, w, t)
+			}
+		}
+	}
 }

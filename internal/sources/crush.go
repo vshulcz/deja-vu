@@ -139,6 +139,7 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 	}
 	project := crushProjectName(db)
 	byID := map[string]*model.Session{}
+	joins := map[string]*crushJoin{}
 	var order []string
 	for _, r := range rows {
 		s := byID[r.SessionID]
@@ -154,17 +155,17 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 				s.Parent = r.Parent
 			}
 			byID[r.SessionID] = s
+			joins[r.SessionID] = &crushJoin{exits: commandExits{}, changes: map[string][]int{}, dropped: map[int]bool{}}
 			order = append(order, r.SessionID)
 		}
 		at := unixGuess(r.CreatedAt)
-		for _, m := range crushMessages(r.Role, r.Parts, at) {
-			s.Touch(m.Time)
-			s.Messages = append(s.Messages, m)
-		}
+		recs, results := crushMessages(r.Role, r.Parts, at)
+		joins[r.SessionID].add(s, recs, results)
 	}
 	out := make([]model.Session, 0, len(order))
 	for _, id := range order {
 		s := byID[id]
+		joins[id].drop(s)
 		if len(s.Messages) == 0 {
 			continue
 		}
@@ -209,24 +210,93 @@ type crushPart struct {
 		Name       string `json:"name"`
 		Input      string `json:"input"`
 		Content    string `json:"content"`
+		ID         string `json:"id"`
 		ToolCallID string `json:"tool_call_id"`
 		IsError    bool   `json:"is_error"`
 	} `json:"data"`
 }
 
+// crushRecord is one record a part gave, with the call it came from.
+type crushRecord struct {
+	model.Message
+	call string
+}
+
+// crushResult is what a tool_result part says about its call.
+type crushResult struct {
+	call, content string
+	failed        bool
+}
+
+// crushJoin pairs a session's calls with their results, which crush keeps as
+// separate parts on separate rows (#4532). A bash result ends "Exit code N"
+// when the command failed (internal/agent/tools/bash.go formatOutput), and an
+// edit or write whose result is an error changed nothing.
+type crushJoin struct {
+	exits   commandExits
+	changes map[string][]int
+	dropped map[int]bool
+}
+
+func (j *crushJoin) add(s *model.Session, recs []crushRecord, results []crushResult) {
+	for _, r := range recs {
+		s.Touch(r.Time)
+		if r.call != "" {
+			switch r.Role {
+			case RoleCommand:
+				j.exits[r.call] = append(j.exits[r.call], len(s.Messages))
+			case RoleEdit, RoleWrote:
+				j.changes[r.call] = append(j.changes[r.call], len(s.Messages))
+			}
+		}
+		s.Messages = append(s.Messages, r.Message)
+	}
+	for _, r := range results {
+		if r.failed {
+			for _, i := range j.changes[r.call] {
+				j.dropped[i] = true
+			}
+		}
+		if code, ok := statusCode(lastLine(crushStripCWD(r.content)), "Exit code ", ""); ok {
+			j.exits.stamp(s.Messages, r.call, "", code)
+		}
+		// A result answers the call before it, once: a provider that numbers
+		// calls per turn reuses the id, and a later failure under it is not
+		// the earlier call's.
+		delete(j.exits, r.call)
+		delete(j.changes, r.call)
+	}
+}
+
+// drop takes out the changes whose result refused them.
+func (j *crushJoin) drop(s *model.Session) {
+	if len(j.dropped) == 0 {
+		return
+	}
+	kept := s.Messages[:0]
+	for i, m := range s.Messages {
+		if !j.dropped[i] {
+			kept = append(kept, m)
+		}
+	}
+	s.Messages = kept
+}
+
 // crushMessages turns one row's parts into what deja indexes: speech, the
-// commands a run actually executed, and what a tool printed.
-func crushMessages(role, parts string, at time.Time) []model.Message {
+// commands a run actually executed, and what a tool printed, and what each
+// result said about its call.
+func crushMessages(role, parts string, at time.Time) ([]crushRecord, []crushResult) {
 	var list []crushPart
 	if json.Unmarshal([]byte(parts), &list) != nil {
-		return nil
+		return nil, nil
 	}
-	var out []model.Message
+	var out []crushRecord
+	var results []crushResult
 	for _, p := range list {
 		switch p.Type {
 		case "text":
 			if text := strings.TrimSpace(p.Data.Text); text != "" {
-				out = append(out, model.Message{Role: role, Text: crushPlainText(capParsedMessage(text)), Time: at})
+				out = append(out, crushRecord{Message: model.Message{Role: role, Text: crushPlainText(capParsedMessage(text)), Time: at}})
 			}
 		case "tool_call":
 			// The arguments are a JSON string of the tool's own schema, so the
@@ -246,7 +316,7 @@ func crushMessages(role, parts string, at time.Time) []model.Message {
 				continue
 			}
 			if IndexToolPaths() && args.FilePath != "" {
-				out = append(out, model.Message{Role: RoleFiles, Text: crushPlainText(args.FilePath), Time: at})
+				out = append(out, crushRecord{Message: model.Message{Role: RoleFiles, Text: crushPlainText(args.FilePath), Time: at}})
 			}
 			// edit, multiedit and write carry both sides of the change, which is
 			// what restore and blame read (#4377). Only those three: a view
@@ -268,13 +338,13 @@ func crushMessages(role, parts string, at time.Time) []model.Message {
 						if len(span) > editSpanMax {
 							span = span[:editSpanMax]
 						}
-						out = append(out, model.Message{Role: RoleEdit, Text: path + "\n" + crushPlainText(span), Time: at})
+						out = append(out, crushRecord{model.Message{Role: RoleEdit, Text: path + "\n" + crushPlainText(span), Time: at}, p.Data.ID})
 					}
 				}
 				if IndexWrites() {
 					for _, w := range written {
 						if rec := WroteRecord(path, w); rec != "" {
-							out = append(out, model.Message{Role: RoleWrote, Text: rec, Time: at})
+							out = append(out, crushRecord{model.Message{Role: RoleWrote, Text: rec, Time: at}, p.Data.ID})
 						}
 					}
 				}
@@ -284,33 +354,37 @@ func crushMessages(role, parts string, at time.Time) []model.Message {
 			}
 			cmd := strings.TrimSpace(args.Command)
 			if cmd != "" && worthIndexing(cmd) {
-				out = append(out, model.Message{Role: RoleCommand, Text: crushPlainText(cmd), Time: at})
+				out = append(out, crushRecord{model.Message{Role: RoleCommand, Text: crushPlainText(cmd), Time: at}, p.Data.ID})
 			}
 		case "tool_result":
+			if p.Data.ToolCallID != "" {
+				results = append(results, crushResult{p.Data.ToolCallID, p.Data.Content, p.Data.IsError})
+			}
 			text := strings.TrimSpace(crushStripCWD(p.Data.Content))
 			if text == "" {
 				continue
 			}
-			out = append(out, model.Message{Role: RoleToolOutput, Text: crushPlainText(capParsedMessage(text)), Time: at})
+			out = append(out, crushRecord{Message: model.Message{Role: RoleToolOutput, Text: crushPlainText(capParsedMessage(text)), Time: at}})
 		}
 	}
-	return out
+	return out, results
 }
 
 // crushStripCWD drops the <cwd>…</cwd> tag Crush appends to a tool result. It
 // is the same directory on every line of every session, and left in it is a
 // path that matches a search for the project name in every tool output there
-// is.
+// is. Only the tag at the end is crush's: one earlier is what the command
+// printed, and cutting there lost the exit line below it.
 func crushStripCWD(s string) string {
-	at := strings.Index(s, "<cwd>")
+	t := strings.TrimRight(s, " \t\r\n")
+	if !strings.HasSuffix(t, "</cwd>") {
+		return s
+	}
+	at := strings.LastIndex(t, "<cwd>")
 	if at < 0 {
 		return s
 	}
-	end := strings.Index(s[at:], "</cwd>")
-	if end < 0 {
-		return s[:at]
-	}
-	return s[:at] + s[at+end+len("</cwd>"):]
+	return t[:at]
 }
 
 func crushRows(db, q string) ([]crushRow, error) {

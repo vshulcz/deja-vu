@@ -66,7 +66,9 @@
 <p><code>create_file</code> (<code>path</code>) the files touched, <code>edit_file</code>&#39;s <code>old_str</code>/<code>new_str</code> an</p>
 <p>edit span and the written side, <code>create_file</code>&#39;s <code>content</code> the written side. A</p>
 <p><code>tool_result</code> block holds a <code>run</code>; its <code>result.output</code> (or a string result, or</p>
-<p>the run&#39;s error) is kept as tool output.</p>
+<p>the run&#39;s error) is kept as tool output, and a finished <code>Bash</code> run&#39;s</p>
+<p><code>result.exitCode</code> goes on the command as <code>→ exit N</code> (Amp&#39;s <code>-1</code>, no code from</p>
+<p>the process, is left off) (#4530).</p>
 <p>A user message is stamped with <code>meta.sentAt</code> (Unix milliseconds) and an</p>
 <p>assistant message with <code>usage.timestamp</code> (ISO 8601). A message with neither,</p>
 <p>such as a user turn holding only tool results, takes the previous message&#39;s</p>

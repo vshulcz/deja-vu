@@ -43,3 +43,21 @@ func piEventsIn(src string) []string {
 	}
 	return out
 }
+
+// The npm package is what pi users install, and the pi-coding-agent Kimchi and
+// Senpi ship has powershell beside bash; the installer's extension took a
+// failed PowerShell run and the package still stopped at bash (#4523).
+func TestThePiPackageRepairsAFailedPowerShellRunLikeTheInstaller(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "extensions", "pi", "index.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`event.toolName !== "powershell"`, "tool_name: event.toolName"} {
+		if !strings.Contains(piExtensionTS("/bin/deja"), want) {
+			t.Fatalf("the installer's extension lost %q", want)
+		}
+		if !strings.Contains(string(b), want) {
+			t.Errorf("the package's failure hook lacks %q, which the installer's has", want)
+		}
+	}
+}

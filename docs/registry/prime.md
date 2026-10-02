@@ -48,6 +48,13 @@ That is the envelope pi writes, which is why deja reads it with the same parser
 pi and omp share: prime-agent descends from the same codebase
 (`@earendil-works/pi-coding-agent`) and kept the format.
 
+The model has one tool, `ipython`, so a change to a file is Python in a cell:
+the bundled edit skill's `await edit(path, old_str, new_str)`. Each change it
+writes lands on the cell's `toolResult` as `details.diffs[{path, oldStr,
+newStr, startLine}]`, and deja records the files, the replaced spans and the
+written lines from there (#4526). A command run with `bash()` inside a cell is
+only in the cell's code and is not recorded as a command.
+
 ## What deja does with it
 
 Sessions are indexed and searchable like any other harness.

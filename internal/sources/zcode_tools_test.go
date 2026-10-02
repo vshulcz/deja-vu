@@ -67,3 +67,25 @@ insert into part values ('p6', 'm2', '{"type":"tool","callID":"call_w","declarat
 		t.Errorf("wrote = %q, want the Edit's new text", wrote)
 	}
 }
+
+// ZCode heads its output with "Exit code N" only for a failed run with a
+// non-zero code (isBashProviderErrorStatus); a clean run's output that opens
+// "Exit code 0" is the command's own and stays whole.
+func TestZCodeExitZeroLineIsOutput(t *testing.T) {
+	db := vocabSQL(t, `create table session(id text primary key, directory text, time_created integer, time_updated integer);
+create table message(id text, session_id text, time_created integer, data text);
+create table part(id text, message_id text, data text);
+insert into part values ('p1','m1','{"type":"tool","tool":"Bash","callID":"p1","state":{"status":"completed","input":{"command":"make check"},"output":"Exit code 0\nall checks passed","time":{"start":1790000002000}}}');
+insert into message values ('m1','s1',1790000001000,'{"role":"assistant","time":{"created":1790000001000}}');
+insert into session values ('s1','/tmp/proj',1790000000000,1790000100000);
+`)
+	ss := parseKindForTest(t, "zcode-db", db)
+	if len(ss) != 1 {
+		t.Fatalf("%d sessions", len(ss))
+	}
+	got := [2]string{strings.Join(rolesOf(ss[0], RoleCommand), "|"), strings.Join(rolesOf(ss[0], RoleToolOutput), "|")}
+	want := [2]string{"$ make check", "Exit code 0\nall checks passed"}
+	if got != want {
+		t.Errorf("command, output = %q, want %q", got, want)
+	}
+}

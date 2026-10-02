@@ -20,7 +20,11 @@ lines that `deja restore` and `deja blame` read (#4377).
 `tool_result` carries what the tool printed with a `<cwd>…</cwd>` tag appended,
 which is the same directory on every line in the store and is stripped rather
 than indexed — left in, a search for the project name would match every tool
-output there is. `finish` is bookkeeping.
+output there is. `finish` is bookkeeping. A result names its call by
+`tool_call_id` (the call's `id`), on a later row: a bash result whose last line
+is crush's "Exit code N" puts `→ exit N` on the command, and an `edit`,
+`multiedit` or `write` whose result has `is_error` changed nothing, so it keeps
+its file record and no edit or written lines (#4532).
 
 Both stamp columns are commented "Unix timestamp in milliseconds" in Crush's own
 schema and hold whole seconds in what v0.92.0 writes — its update trigger sets

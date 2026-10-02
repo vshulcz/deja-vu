@@ -88,7 +88,13 @@ Messages use a wrapper envelope:
 where `"type": "text"`. Blocks with `"type": "thinking"` or `"type": "image"`
 are skipped. `toolCall` blocks are read the way pi's are (see the pi entry):
 the file a `read`, `edit` or `write` names, the replaced and written text, and
-the `bash` command (#4113).
+the `bash` command (#4113). omp's `replace` edit mode, `{path, old_string,
+new_string}`, and its `patch` mode, `{path, edits:[{op, diff}]}`, give the same
+records (#4524). Its default mode, hashline, sends one `input`: `[path#TAG]`
+sections (inside `*** Begin Patch` … `*** End Patch` or bare) holding ops such
+as `PUT 3.=5:` whose `+` body rows are the written lines. deja records each
+section's file and those lines from the call, and for a one-file edit the
+replaced lines from the result's `details.diff` (`-3|old line`) (#4525).
 
 ### Timestamps
 

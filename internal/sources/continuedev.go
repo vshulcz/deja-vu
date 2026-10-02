@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -144,6 +145,7 @@ type continueToolCallSt struct {
 	} `json:"toolCall"`
 	Output []struct {
 		Content string `json:"content"`
+		Status  string `json:"status"`
 	} `json:"output"`
 }
 
@@ -262,7 +264,11 @@ func continueToolWork(states []continueToolCallSt, at time.Time) []model.Message
 		switch name {
 		case "Bash", "run_terminal_command":
 			if cmd := strings.TrimSpace(str(args["command"])); IndexCommands() && cmd != "" && worthIndexing(cmd) {
-				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: at})
+				line := "$ " + cmd
+				if code, ok := continueExitCode(name, st); ok {
+					line += fmt.Sprintf("  → exit %d", code)
+				}
+				out = append(out, model.Message{Role: RoleCommand, Text: line, Time: at})
 			}
 			path = ""
 		case "Edit", "MultiEdit", "Write", "single_find_and_replace", "multi_edit", "create_new_file":
@@ -308,6 +314,37 @@ func continueToolWork(states []continueToolCallSt, at time.Time) []model.Message
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: at})
 	}
 	return append(out, outputs...)
+}
+
+// continueExitCode is how a command ended, where Continue wrote it (#4530).
+// The CLI's Bash rejects a non-zero exit that printed to stderr as "Error
+// (exit code N): <stderr>", stored errored under "Error executing tool Bash: ";
+// one that printed nothing there resolves like a clean run, so a done Bash
+// says nothing. The IDE's run_terminal_command puts "Command failed with exit
+// code N" on its output's status, and "Command completed" also when the
+// process died of a signal, so only the failure is taken.
+func continueExitCode(name string, st continueToolCallSt) (int, bool) {
+	for _, o := range st.Output {
+		switch {
+		case name == "Bash" && st.Status == "errored":
+			rest, ok := strings.CutPrefix(o.Content, "Error executing tool Bash: Error (exit code ")
+			if !ok {
+				continue
+			}
+			n, _, ok := strings.Cut(rest, "): ")
+			if code, ok2 := statusCode(n, "", ""); ok && ok2 {
+				return code, true
+			}
+		case name == "run_terminal_command":
+			if code, ok := statusCode(o.Status, "Command failed with exit code ", ""); ok {
+				return code, true
+			}
+			if code, ok := statusCode(o.Status, "Command failed with: Command failed with exit code ", ""); ok {
+				return code, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // continuePlaceholderTitle reports whether a title is Continue's placeholder —

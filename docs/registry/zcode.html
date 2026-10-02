@@ -118,6 +118,9 @@ SELECT json_extract(data, &#39;$.type&#39;) FROM part GROUP BY type</code></pre>
 <p>new_string}<code>, </code>Write {file_path, content}`. deja reads those for ZCode as</p>
 <p>commands with their output, files, edit spans and written lines; an <code>Edit</code></p>
 <p>ZCode refused (<code>state.status: &#34;error&#34;</code>) is not recorded as a change (#4428).</p>
+<p>A Bash part has no <code>metadata.exit</code>; a failed run&#39;s output opens with &#34;Exit code</p>
+<p>N&#34;, as Claude Code&#39;s does, and that line goes on the command as <code>→ exit N</code></p>
+<p>rather than into the output (#4536).</p>
 <p>Said plainly: that is a third party&#39;s attestation, not a running ZCode checked</p>
 <p>here. <code>task_type</code> also separates <code>subagent_child</code> and <code>fork</code> from <code>interactive</code>,</p>
 <p>which is the distinction <code>DEJA_INCLUDE_SUBAGENTS</code> draws elsewhere — left alone</p>

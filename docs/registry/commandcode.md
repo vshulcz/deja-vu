@@ -18,7 +18,11 @@ Tool calls use Command Code's own names with Claude's input keys:
 `shell_command` (`command`), `read_file`, `edit_file` (`file_path`,
 `old_string`, `new_string`), `write_file` (`file_path`, `content`) and
 `read_multiple_files` (`paths`). All of them are indexed as commands, files,
-replaced spans and written lines (#4370).
+replaced spans and written lines (#4370). A failed command's `tool_result`
+opens with "Exit code: N" (or "Exit code: N (No matches found)" and the like)
+and has no `is_error`; that code goes on the command the result answers as
+`→ exit N`. A clean run writes no such line and gets no code. A result that
+lands in a later index pass than its call is read with the call (#4539).
 
 The older shape, one flat `role`/`content`/`timestamp`/`sessionId` line per
 message, is still read. The client migrates such a file to v3 in place the

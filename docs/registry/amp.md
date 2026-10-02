@@ -29,7 +29,9 @@ become work records: `Bash` (`cmd`) a command, `Read`, `edit_file` and
 `create_file` (`path`) the files touched, `edit_file`'s `old_str`/`new_str` an
 edit span and the written side, `create_file`'s `content` the written side. A
 `tool_result` block holds a `run`; its `result.output` (or a string result, or
-the run's error) is kept as tool output.
+the run's error) is kept as tool output, and a finished `Bash` run's
+`result.exitCode` goes on the command as `→ exit N` (Amp's `-1`, no code from
+the process, is left off) (#4530).
 
 A user message is stamped with `meta.sentAt` (Unix milliseconds) and an
 assistant message with `usage.timestamp` (ISO 8601). A message with neither,

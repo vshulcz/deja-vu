@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,11 +16,12 @@ import (
 // `edits[].oldText/newText` (an older pi put one pair at the top level), and
 // the shell is `bash`, or `exec` in OpenClaw, with the line under `command`.
 // The reader kept the text and skipped these calls, so files, commands and
-// edits were empty for all six (#4113).
+// edits were empty for all six (#4113). The pi-coding-agent under Kimchi and
+// Senpi also has `powershell`, with bash's {command, timeout} (#4523).
 var piDialect = toolDialect{
 	pathKey:    "path",
 	pathTools:  map[string]bool{"read": true, "edit": true, "write": true},
-	shellTools: map[string]bool{"bash": true, "exec": true},
+	shellTools: map[string]bool{"bash": true, "exec": true, "powershell": true},
 	editTools:  map[string]bool{"edit": true, "write": true},
 	oldKey:     "oldText",
 	newKey:     "newText",
@@ -117,6 +119,9 @@ func (r *piReader) call(id, name string, args map[string]any, applied bool, t ti
 		r.hashline(id, in, t)
 		return
 	}
+	if name == "edit" {
+		args = piEditModes(args)
+	}
 	in := args
 	if p, _ := args["path"].(string); p != "" && r.abs(p) != p {
 		in = make(map[string]any, len(args))
@@ -206,23 +211,67 @@ func evalText(txt string) string {
 	return *v.Text
 }
 
+// ompHashlineTag is the four-hex snapshot tag that ends an omp section
+// header's path.
+var ompHashlineTag = regexp.MustCompile(`#[0-9a-fA-F]{4}$`)
+
+// ompHashlinePath reads an omp hashline section header, `[path#TAG]`, the
+// way omp does: the path is all between the brackets less the tag, and may
+// itself hold a "#" or be quoted.
+func ompHashlinePath(l string) (string, bool) {
+	l = strings.TrimRight(l, " \t")
+	if len(l) < 2 || l[0] != '[' || l[len(l)-1] != ']' {
+		return "", false
+	}
+	p := strings.TrimSpace(l[1 : len(l)-1])
+	if at := ompHashlineTag.FindStringIndex(p); at != nil {
+		p = p[:at[0]]
+	}
+	if len(p) >= 2 && (p[0] == '"' || p[0] == '\'') && p[len(p)-1] == p[0] {
+		p = p[1 : len(p)-1]
+	}
+	return p, strings.TrimSpace(p) != ""
+}
+
 // hashline reads gjc's edit, which takes one string rather than a path and a
 // span: `§path` starts a file, `≔A..B` replaces the anchored lines, `«A` and
 // `»A` insert before and after, and the lines under an op are what it writes.
 // The replaced text is not in the call; the result's diff carries it.
+//
+// omp's hashline, its default edit mode, is the same idea in other words: a
+// `[path#TAG]` header starts a file, an op ending in ":" (`PUT 3.=5:`,
+// `PUT >3:`) takes body rows, each "+" and the line it writes, and `CUT`,
+// `REM` and `MV` take none (#4525).
 func (r *piReader) hashline(id, input string, t time.Time) {
 	var files []string
 	written := map[string][]string{}
+	// One dialect per call: a gjc body line such as a TOML `[server]` is
+	// written text, not an omp header.
+	omp := !strings.HasPrefix(input, "§") && !strings.Contains(input, "\n§")
 	cur, inOp := "", false
 	for _, l := range strings.Split(input, "\n") {
 		l = strings.TrimRight(l, "\r")
+		if p, ok := ompHashlinePath(l); omp && ok {
+			if cur, inOp = r.abs(p), false; cur != "" {
+				files = append(files, cur)
+			}
+			continue
+		}
 		switch {
-		case strings.HasPrefix(l, "§"):
+		case !omp && strings.HasPrefix(l, "§"):
 			cur, inOp = r.abs(strings.TrimSpace(strings.TrimPrefix(l, "§"))), false
 			if cur != "" && !strings.ContainsAny(cur, "\n\r") {
 				files = append(files, cur)
 			}
 		case cur == "":
+		case omp:
+			if inOp && strings.HasPrefix(l, "+") {
+				if row := l[1:]; strings.TrimSpace(row) != "" {
+					written[cur] = append(written[cur], row)
+				}
+			} else {
+				inOp = strings.HasSuffix(strings.TrimSpace(l), ":")
+			}
 		case strings.HasPrefix(l, "≔"), strings.HasPrefix(l, "«"), strings.HasPrefix(l, "»"):
 			inOp = true
 		case inOp && strings.TrimSpace(l) != "":
@@ -261,6 +310,7 @@ func (r *piReader) toolResult(msg map[string]any, t time.Time) {
 	if name, _ := msg["toolName"].(string); name == "eval" {
 		r.evalCalls(details, t)
 	}
+	r.cellDiffs(details["diffs"], t)
 	if recs, ok := r.pending[id]; ok {
 		delete(r.pending, id)
 		if !failed {

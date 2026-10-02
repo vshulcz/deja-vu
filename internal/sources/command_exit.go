@@ -55,6 +55,35 @@ func (c commandExits) stamp(msgs []model.Message, id, cmd string, code int) {
 	}
 }
 
+// joinResultExits is the join for a transcript in Claude's blocks: a tool_use
+// with an id in one message, and a tool_result naming it under tool_use_id in
+// a later one. It notes the commands blocks' calls appended to msgs from index
+// from on, and stamps those a result among blocks reports on, with the code
+// read off that result.
+func joinResultExits(msgs []model.Message, from int, blocks any, d toolDialect, exits commandExits, code func(result map[string]any) (int, bool)) {
+	if !IndexCommands() {
+		return
+	}
+	exits.note(msgs, from, commandCallsIn(blocks, d))
+	items, _ := blocks.([]any)
+	for _, it := range items {
+		m, ok := it.(map[string]any)
+		if !ok || m["type"] != "tool_result" {
+			continue
+		}
+		id, _ := m["tool_use_id"].(string)
+		if _, ok := exits[id]; !ok {
+			continue
+		}
+		if n, ok := code(m); ok {
+			exits.stamp(msgs, id, "", n)
+		}
+		// A result answers its call once: a client that hands an id out
+		// again, as call_1, means a later call by it.
+		delete(exits, id)
+	}
+}
+
 // commandCallsIn is commandsIn with the id of the call each command came from,
 // so a reader can stamp the outcome when the result arrives.
 func commandCallsIn(v any, d toolDialect) []claudeCommand {

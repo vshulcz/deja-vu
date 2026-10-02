@@ -43,7 +43,8 @@ of `@code-yeongyu/senpi` every surface answered on senpi's own screen.
   only as `tool.bash(...)` in a cell. The transcript's call is then `eval`
   with JS, and what ran is on the result, under
   `details.toolCalls[].args`; deja reads the commands, files and edits from
-  there. The cell's text is a JSON string, `{"text":"…"}`, and is read as the
+  there, a `tool.powershell(...)` run as a command the way `tool.bash(...)`
+  is (#4523). The cell's text is a JSON string, `{"text":"…"}`, and is read as the
   text it wraps (#4425).
 - **Senpi's first run moves `~/.pi/agent` to `~/.senpi/agent`** — the whole
   directory, sessions and config and extensions, and it prints one line about
