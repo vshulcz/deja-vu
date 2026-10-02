@@ -43,24 +43,29 @@ func TestParseOmpFile(t *testing.T) {
 	}
 	// The header cwd is promoted to the project key, not the lossy directory
 	// name (-Code-pleasure-course would decode to pleasure/course).
-	if s.Project != claudeProjectName(pathToProjectKey("/Users/halo/Code/pleasure-course")) {
-		t.Fatalf("project = %q, want %q", s.Project, claudeProjectName(pathToProjectKey("/Users/halo/Code/pleasure-course")))
+	// Encoding the cwd and decoding it back was that guess again (#4427).
+	if s.Project != "Code/pleasure-course" {
+		t.Fatalf("project = %q, want Code/pleasure-course", s.Project)
 	}
-	// user + assistant(text only, thinking/toolCall skipped) + tool output + assistant
-	if len(s.Messages) != 4 {
-		t.Fatalf("want 4 messages, got %d: %#v", len(s.Messages), s.Messages)
+	// user + assistant(text only, thinking skipped) + the read's file row +
+	// tool output + assistant. The toolCall was skipped too until #4113.
+	if len(s.Messages) != 5 {
+		t.Fatalf("want 5 messages, got %d: %#v", len(s.Messages), s.Messages)
 	}
 	if s.Messages[0].Role != "user" || s.Messages[0].Text != "download the videos" {
 		t.Fatalf("message[0] = %#v", s.Messages[0])
 	}
 	if s.Messages[1].Role != "assistant" || s.Messages[1].Text != "reading the list" {
-		t.Fatalf("message[1] = %#v (thinking/toolCall must be skipped)", s.Messages[1])
+		t.Fatalf("message[1] = %#v (thinking must be skipped)", s.Messages[1])
 	}
-	if s.Messages[2].Role != RoleToolOutput || s.Messages[2].Text != "some file output" {
-		t.Fatalf("message[2] = %#v, want tool output", s.Messages[2])
+	if want := "/Users/halo/Code/pleasure-course/anastasia.md"; s.Messages[2].Role != RoleFiles || s.Messages[2].Text != want {
+		t.Fatalf("message[2] = %#v, want the file the read named, resolved against the cwd", s.Messages[2])
 	}
-	if s.Messages[3].Role != "assistant" || s.Messages[3].Text != "done" {
-		t.Fatalf("message[3] = %#v", s.Messages[3])
+	if s.Messages[3].Role != RoleToolOutput || s.Messages[3].Text != "some file output" {
+		t.Fatalf("message[3] = %#v, want tool output", s.Messages[3])
+	}
+	if s.Messages[4].Role != "assistant" || s.Messages[4].Text != "done" {
+		t.Fatalf("message[4] = %#v", s.Messages[4])
 	}
 }
 

@@ -6,7 +6,7 @@
 - **Read overrides**: `DEJA_CODEWHALE_ROOT` replaces the current session directory (the legacy one is still read while it exists); `CODEWHALE_HOME` moves the whole store and turns the legacy root off
 - **Format**: JSON — `{schema_version, metadata, messages}`, pretty-printed
 - **Needs**: nothing
-- **Resume**: `codewhale --resume <id>`, run in the workspace the session was worked in — `--session-id` is its alias and `codewhale exec` takes both (checked against 0.9.13)
+- **Resume**: `cd <metadata.workspace> && codewhale --resume <id>`, the absolute workspace from the session file, with no `cd` and a note when it is gone (#4362, #4460) — `--session-id` is its alias and `codewhale exec` takes both (checked against 0.9.13)
 
 CodeWhale is a terminal agent written in Rust. It shipped as `deepseek-tui`
 until v0.8.41 and under its own name since; the provider integration did not
@@ -19,7 +19,20 @@ a different program with a different store, which is why both entries exist.
 `{role, content}`, where content is the block list Anthropic's API uses —
 `text`, `thinking`, `tool_use`, `tool_result` — so the decoding the Cline and
 Claude readers already do applies here: a call becomes a command or a file
-record, a `tool_result` becomes tool output, error runs included.
+record, a `tool_result` becomes tool output, error runs included. Since 0.9.6
+new turns use `read`, `write`, `edit` and `bash`, where `edit` takes
+`edits[{oldText,newText}]` (also sent as a JSON string, or as one top-level
+`oldText`/`newText` pair, both read the same way); the older `read_file`, `write_file` and `edit_file`
+names are still read for sessions saved before. Commands also run through
+`terminal/run` (a PTY session) and `task_shell_start` (a background task), both
+under `command`, and are read as commands (#4538). `apply_patch` takes a
+unified diff (`--- a/x` / `+++ b/x`, not codex's `*** Begin Patch`) under
+`patch`, retargeted to `path` when that is set, or whole files under `replace`
+(deprecated alias `changes`) as `{path, content}`; the files, each hunk's
+removed lines and the added lines or contents are read, paths under the
+workspace. A call whose `tool_result` has `is_error` is not recorded (#4538). A failed `bash` result has
+`is_error` and ends "Command exited with code N"; the command it answers, by
+`tool_use_id`, carries that as `→ exit N` (#4537).
 
 `thinking` blocks are dropped. So are the `system` and `developer` roles:
 CodeWhale's own documentation names them as where it puts compaction summaries,
@@ -39,7 +52,7 @@ either.
   one millisecond per record, so two identical turns stay two records rather
   than collapsing into one the way they did for Zed (#3333).
 - **Bookkeeping sits beside the transcripts.** `offline_queue.json`,
-  `owners.json` and the `checkpoints/` slot share the sessions directory; they
+  `session_boot_owners.json` and the `checkpoints/` slot share the sessions directory; they
   are named rather than counted, so drift in the store still shows up as an
   unread file.
 - **The shapes come from the source, not from a running install.** The store

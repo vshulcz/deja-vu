@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -161,6 +162,26 @@ func ParseClineFile(path string) ([]model.Session, error) {
 
 // --- modern CLI/SDK store ---
 
+// ClineSessionDir is the directory a Cline CLI session ran in, from the
+// <id>.json manifest beside its transcript: cwd, else workspace_root. "" when
+// neither names an absolute path; a relative one would be read against
+// wherever deja runs (#4318).
+func ClineSessionDir(path string) string {
+	sessionDir := filepath.Dir(path)
+	b, err := os.ReadFile(filepath.Join(sessionDir, filepath.Base(sessionDir)+".json"))
+	if err != nil {
+		return ""
+	}
+	var man clineManifest
+	if json.Unmarshal(b, &man) != nil {
+		return ""
+	}
+	if d := firstNonEmpty(man.CWD, man.WorkspaceRoot); filepath.IsAbs(d) {
+		return d
+	}
+	return ""
+}
+
 type clineManifest struct {
 	SessionID     string `json:"session_id"`
 	CreatedAt     string `json:"created_at"`
@@ -206,14 +227,15 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 	id := filepath.Base(sessionDir)
 	s := model.Session{Harness: "cline", ID: id, Path: path, Project: "cline"}
 	var man clineManifest
+	cwd := ""
 	if mb, err := os.ReadFile(filepath.Join(sessionDir, id+".json")); err == nil {
 		if json.Unmarshal(mb, &man) == nil {
-			cwd := man.CWD
+			cwd = man.CWD
 			if cwd == "" {
 				cwd = man.WorkspaceRoot
 			}
 			if cwd != "" {
-				s.Project = claudeProjectName(pathToProjectKey(cwd))
+				s.Project = projectName(cwd)
 			}
 			s.Title = strings.TrimSpace(man.Metadata.Title)
 			if s.Title == "" {
@@ -229,6 +251,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 			}
 		}
 	}
+	exits := commandExits{}
 	for _, m := range msgs.Messages {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
@@ -248,10 +271,12 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 		// The work rides in the same content list, in blocks clineContentText
 		// drops because they are not type:"text" — so the file an assistant
 		// edited and the command it ran were reachable from nothing.
-		if recs := clineWorkRecords(m.Content, ts); len(recs) > 0 {
+		from := len(s.Messages)
+		if recs := clineWorkRecords(m.Content, cwd, ts); len(recs) > 0 {
 			s.Touch(ts)
 			s.Messages = append(s.Messages, recs...)
 		}
+		clineJoinExits(s.Messages, from, m.Content, clineDialect, exits)
 	}
 	if len(s.Messages) == 0 {
 		return nil, nil
@@ -295,7 +320,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 					s.Title = firstLineTrim(m.Task)
 					if m.CWD != "" {
 						workspace = m.CWD
-						s.Project = claudeProjectName(pathToProjectKey(m.CWD))
+						s.Project = projectName(m.CWD)
 					}
 					if m.TS > 0 {
 						base = time.UnixMilli(m.TS)
@@ -310,23 +335,34 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 			base = fi.ModTime()
 		}
 	}
+	contents := make([]json.RawMessage, len(turns))
+	for i, m := range turns {
+		contents[i] = m.Content
+	}
+	xmlEra := rooXMLEra(contents)
+	exits := commandExits{}
 	for ti, m := range turns {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
 		ts := base.Add(time.Duration(ti) * time.Second)
+		text := clineContentText(m.Content)
 		if m.Role == "user" {
-			if tool := clineTurnToolOutput(m.Content, ts); len(tool) > 0 {
+			// A result of the XML era is a text block, not a tool_result
+			// (#4424), so the person's words are what is left beside it.
+			results, words := rooUserTurn(m.Content, xmlEra)
+			tool := append(clineTurnToolOutput(m.Content, ts), rooLegacyToolOutput(results, ts)...)
+			if len(tool) > 0 {
 				s.Touch(ts)
 				s.Messages = append(s.Messages, tool...)
 			}
-		} else if work := rooWorkRecords(m.Content, ts, workspace); len(work) > 0 {
+			clineJoinExits(s.Messages, len(s.Messages), m.Content, rooDialect, exits)
+			text = unwrapClineTask(words)
+		} else if work := rooWorkRecords(m.Content, ts, workspace, xmlEra); len(work) > 0 {
 			s.Touch(ts)
+			from := len(s.Messages)
 			s.Messages = append(s.Messages, work...)
-		}
-		text := clineContentText(m.Content)
-		if m.Role == "user" {
-			text = unwrapClineTask(text)
+			clineJoinExits(s.Messages, from, m.Content, rooDialect, exits)
 		}
 		if text == "" {
 			continue
@@ -344,7 +380,9 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 // declares. Three of them differ from every other harness: `run_commands`
 // takes a list under `commands` rather than one string, `read_files` takes a
 // list of read requests under `files`, and the editor names the replaced text
-// `old_text`.
+// `old_text` and the written text `new_text` — the only record of a file the
+// editor created, which was read under new_string and lost (#4503).
+// apply_patch takes its patch under `input`; clineWorkRecords reads it.
 var clineDialect = toolDialect{
 	pathKey:     "path",
 	pathListKey: "files",
@@ -353,6 +391,7 @@ var clineDialect = toolDialect{
 	commandKey:  "commands",
 	editTools:   map[string]bool{"editor": true},
 	oldKey:      "old_text",
+	newKey:      "new_text",
 }
 
 // rooDialect is what the Roo Code and the legacy Cline extension call their
@@ -361,25 +400,41 @@ var clineDialect = toolDialect{
 // replace_in_file. Neither reader emitted a call as a work record before
 // #3295. The two sides of an edit come out of rooEditRecords rather than the
 // shared helper: apply_diff carries a SEARCH/REPLACE block, not an
-// old_string.
+// old_string. Current Roo adds search_replace, edit_file and edit, which name
+// the file `file_path`, and apply_patch, whose paths are in the patch body
+// (#4419). read_file still takes the legacy files[{path, lineRanges}] form
+// (#4531). Kilo Code adds write_file, fast_edit_file under target_file,
+// delete_file and generate_image (#4535).
 var rooDialect = toolDialect{
-	pathKey: "path",
+	pathKey:     "path",
+	pathKeyAlt:  "file_path",
+	pathListKey: "files",
 	pathTools: map[string]bool{"read_file": true, "write_to_file": true, "apply_diff": true,
-		"insert_content": true, "search_and_replace": true, "replace_in_file": true},
+		"insert_content": true, "search_and_replace": true, "replace_in_file": true,
+		"search_replace": true, "edit_file": true, "edit": true,
+		"write_file": true, "fast_edit_file": true, "delete_file": true, "generate_image": true},
 	shellTool: "execute_command",
 	editTools: map[string]bool{},
 }
 
 // rooWorkRecords is clineWorkRecords for the task files: the command a call
 // ran and the files it named, under the same switches.
-func rooWorkRecords(raw json.RawMessage, ts time.Time, workspace string) []model.Message {
+func rooWorkRecords(raw json.RawMessage, ts time.Time, workspace string, xmlEra bool) []model.Message {
 	var blocks []any
 	if json.Unmarshal(raw, &blocks) != nil {
-		return nil
+		var s string
+		if json.Unmarshal(raw, &s) != nil {
+			return nil
+		}
+		blocks = []any{map[string]any{"type": "text", "text": s}}
 	}
+	if xmlEra {
+		blocks = rooWithXMLCalls(blocks)
+	}
+	rooFoldTargetFile(blocks)
 	var out []model.Message
 	if IndexToolPaths() {
-		if p := rooResolvePaths(toolPathsIn(blocks, rooDialect), workspace); p != "" {
+		if p := rooResolvePaths(rooPatchPaths(blocks, toolPathsIn(blocks, rooDialect)), workspace); p != "" {
 			out = append(out, model.Message{Role: RoleFiles, Text: p, Time: ts})
 		}
 	}
@@ -405,7 +460,8 @@ func rooWorkRecords(raw json.RawMessage, ts time.Time, workspace string) []model
 }
 
 // clineWorkRecords turns the tool blocks of one message into work records.
-func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
+// cwd is where the session ran: a patch names its files relative to it.
+func clineWorkRecords(raw json.RawMessage, cwd string, ts time.Time) []model.Message {
 	var blocks []any
 	if json.Unmarshal(raw, &blocks) != nil {
 		return nil
@@ -426,6 +482,9 @@ func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 			out = append(out, model.Message{Role: RoleEdit, Text: span, Time: ts})
 		}
 	}
+	for _, patch := range applyPatchInputs(blocks, clineDialect) {
+		out = append(out, applyPatchRecords(patch, func(p string) string { return resolveToolPath(p, cwd) }, ts)...)
+	}
 	if IndexCommands() {
 		for _, cmd := range commandsIn(blocks, clineDialect) {
 			out = append(out, model.Message{Role: RoleCommand, Text: cmd, Time: ts})
@@ -437,6 +496,87 @@ func clineWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 		}
 	}
 	return out
+}
+
+// clineJoinExits notes the commands a message's tool calls appended from
+// index from on, and stamps those its tool results report on (#4502). A
+// command is emitted from its tool_use and its status sits in the tool_result
+// of a later message, and nothing joined the two.
+func clineJoinExits(msgs []model.Message, from int, raw json.RawMessage, d toolDialect, exits commandExits) {
+	if !IndexCommands() || !bytes.Contains(raw, []byte(`"tool_`)) {
+		return
+	}
+	var blocks []any
+	if json.Unmarshal(raw, &blocks) != nil {
+		return
+	}
+	exits.note(msgs, from, commandCallsIn(blocks, d))
+	for _, it := range blocks {
+		m, ok := it.(map[string]any)
+		if !ok || m["type"] != "tool_result" {
+			continue
+		}
+		id, _ := m["tool_use_id"].(string)
+		if _, ok := exits[id]; !ok {
+			continue
+		}
+		// Cline CLI: one {query, error, success} entry per command of a
+		// run_commands batch; success is a clean exit, and a non-zero one is
+		// the error "Command exited with code N".
+		if list, ok := m["content"].([]any); ok {
+			for _, e := range list {
+				entry, _ := e.(map[string]any)
+				query, _ := entry["query"].(string)
+				if ok, _ := entry["success"].(bool); ok {
+					exits.stamp(msgs, id, query, 0)
+				} else if er, _ := entry["error"].(string); er != "" {
+					if code, ok := statusCode(er, "Command exited with code ", ""); ok {
+						exits.stamp(msgs, id, query, code)
+					}
+				}
+			}
+		}
+		// The VS Code extension's execute_command opens its result with the
+		// status (CommandOrchestrator.ts).
+		line := firstLine(contentText(m["content"]))
+		if code, ok := statusCode(line, "Command failed with exit code ", "."); ok {
+			exits.stamp(msgs, id, "", code)
+		} else if code, ok := statusCode(line, "Command executed successfully (exit code ", ")."); ok {
+			exits.stamp(msgs, id, "", code)
+		} else if code, ok := rooExitCode(contentText(m["content"])); ok {
+			exits.stamp(msgs, id, "", code)
+		}
+		// A result answers its call once; an id handed out again belongs to
+		// a later call.
+		delete(exits, id)
+	}
+}
+
+// rooExitCode reads the status Roo's and Kilo Code's execute_command open
+// their result with: "Command executed in terminal within working directory
+// '<dir>'. Exit code: N", or for a failure that sentence ending "Command
+// execution was not successful, …" and "Exit code: N" on the next line. A run
+// whose output went to an artifact opens "Command executed in '<dir>'." the
+// same way (#4530).
+func rooExitCode(text string) (int, bool) {
+	head, rest, _ := strings.Cut(text, "\n")
+	// Kilo Code and older Roo builds put two spaces after "terminal".
+	if tail, ok := strings.CutPrefix(head, "Command executed in terminal "); ok {
+		if !strings.HasPrefix(strings.TrimLeft(tail, " "), "within working directory '") {
+			return 0, false
+		}
+	} else if !strings.HasPrefix(head, "Command executed in '") {
+		return 0, false
+	}
+	at := strings.LastIndex(head, "'. ")
+	if at < 0 {
+		return 0, false
+	}
+	status := head[at+3:]
+	if status == "Command execution was not successful, inspect the cause and adjust as needed." {
+		status, _, _ = strings.Cut(rest, "\n")
+	}
+	return statusCode(status, "Exit code: ", "")
 }
 
 // clineTurnToolOutput is what a turn's tool_result blocks printed, for the
@@ -459,9 +599,10 @@ func clineTurnToolOutput(raw json.RawMessage, ts time.Time) []model.Message {
 	return out
 }
 
-// clineToolResults reads what a call printed. The content is a string on the
-// shapes observed, and results are kept whether or not the call succeeded —
-// the error a command hit is what a later search reaches for.
+// clineToolResults reads what a call printed. The content is a string, text
+// blocks, or Cline CLI's list of per-command entries, and results are kept
+// whether or not the call succeeded — the error a command hit is what a later
+// search reaches for.
 func clineToolResults(blocks []any) []string {
 	var out []string
 	for _, it := range blocks {
@@ -474,15 +615,39 @@ func clineToolResults(blocks []any) []string {
 		}
 		body := strings.TrimSpace(contentText(m["content"]))
 		if body == "" {
-			if s, _ := m["content"].(string); s != "" {
-				body = strings.TrimSpace(s)
-			}
+			body = clineResultEntries(m["content"])
 		}
 		if body != "" {
 			out = append(out, body)
 		}
 	}
 	return out
+}
+
+// clineResultEntries reads the list Cline CLI writes for run_commands and
+// read_files: one {query, result, error, success} entry per command or file.
+// The result carries the stderr; the error is added when the result does not
+// already say it, and stands alone when the command never started (#4315).
+func clineResultEntries(v any) string {
+	list, _ := v.([]any)
+	var parts []string
+	for _, it := range list {
+		e, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
+		r, _ := e["result"].(string)
+		r = strings.TrimSpace(r)
+		// The error is usually already in the result ("[Command exited with
+		// code 1]"); one that says something else, like a timeout, is kept too.
+		if er, _ := e["error"].(string); strings.TrimSpace(er) != "" && !strings.Contains(r, strings.TrimSpace(er)) {
+			r = strings.TrimSpace(r + "\n" + strings.TrimSpace(er))
+		}
+		if r != "" {
+			parts = append(parts, r)
+		}
+	}
+	return strings.Join(parts, "\n")
 }
 
 // clineContentText extracts plain text from either a string content or a
@@ -512,7 +677,7 @@ func clineContentText(raw json.RawMessage) string {
 // user-input equivalent) so the tags themselves are not indexed, and the
 // host's <environment_details> block, which is not the person's words.
 func unwrapClineTask(text string) string {
-	t := stripClineHostBlocks(text)
+	t := stripNoToolsPrompt(stripClineHostBlocks(text))
 	for _, tag := range []string{"task", "user_message", "user_input"} {
 		open := "<" + tag
 		if !strings.HasPrefix(t, open) {
@@ -533,6 +698,39 @@ func unwrapClineTask(text string) string {
 	return t
 }
 
+// The retry prompt Roo and Cline send as a user turn when the model answered
+// without a tool call (formatResponse.noToolsUsed). The client shows it as an
+// error row, not as something the person typed, and on one live Roo task it
+// was 36 of 37 user turns (#4421).
+const (
+	noToolsPromptHead = "[ERROR] You did not use a tool in your previous response!"
+	noToolsPromptTail = "(This is an automated message, so do not respond to it conversationally.)"
+)
+
+// stripNoToolsPrompt drops that prompt from a turn's text. It starts a line
+// when the client writes it, so a person quoting it in a sentence keeps it; a
+// prompt whose closing line is missing runs to the end of the text.
+func stripNoToolsPrompt(text string) string {
+	for {
+		i := strings.Index(text, noToolsPromptHead)
+		for i > 0 && text[i-1] != '\n' {
+			j := strings.Index(text[i+1:], noToolsPromptHead)
+			if j < 0 {
+				return text
+			}
+			i += 1 + j
+		}
+		if i < 0 {
+			return text
+		}
+		end := len(text)
+		if k := strings.Index(text[i:], noToolsPromptTail); k >= 0 {
+			end = i + k + len(noToolsPromptTail)
+		}
+		text = strings.TrimSpace(text[:i] + text[end:])
+	}
+}
+
 func firstNonEmpty(a, b string) string {
 	if a != "" {
 		return a
@@ -541,8 +739,9 @@ func firstNonEmpty(a, b string) string {
 }
 
 // pathToProjectKey converts an absolute workspace path to the dash-encoded
-// key claudeProjectName expects, so cline/roo sessions land in the same
-// project namespace as every other harness.
+// key claudeProjectName expects. A reader that has the path itself labels it
+// with projectName instead: decoding the key back guesses between my-app and
+// my/app (#4458).
 func pathToProjectKey(p string) string {
 	// A Windows path folds the same way: backslashes are separators too, and
 	// the drive letter's colon is not a character a key carries (#3217).

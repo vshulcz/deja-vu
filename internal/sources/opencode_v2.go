@@ -46,6 +46,10 @@ type opencodeSchema struct {
 	// legacy is a 2.0 store that still holds 1.x sessions in session,
 	// message and part, read beside the 2.0 ones.
 	legacy bool
+	// rowsStamped says message and part carry time_updated and part names its
+	// session, turnsStamped that session_message carries time_updated: the
+	// since clause asks those where they are there (#4207).
+	rowsStamped, turnsStamped bool
 }
 
 // opencodeSchemaCache keeps one answer per store file, because the schema is
@@ -71,8 +75,14 @@ func opencodeSchemaOf(db string) opencodeSchema {
 
 func readOpencodeSchema(db string) opencodeSchema {
 	out := opencodeSchema{sessionTable: "session"}
-	b, err := sqliteOutput(db, `select group_concat(name) from sqlite_master where type='table' `+
-		`and name in ('session','session_v2','session_message','message','part')`)
+	// The tables, and which of the turn tables carry time_updated, in one
+	// process. pragma_table_info on a missing table is empty, not an error.
+	b, err := sqliteOutput(db, `select group_concat(n) from (`+
+		`select name n from sqlite_master where type='table' `+
+		`and name in ('session','session_v2','session_message','message','part')`+
+		` union all select 'message.time_updated' from pragma_table_info('message') where name='time_updated'`+
+		` union all select 'part.'||name from pragma_table_info('part') where name in ('time_updated','session_id')`+
+		` union all select 'session_message.time_updated' from pragma_table_info('session_message') where name='time_updated')`)
 	if err != nil {
 		return out
 	}
@@ -80,6 +90,8 @@ func readOpencodeSchema(db string) opencodeSchema {
 	for _, name := range strings.Split(strings.TrimSpace(string(b)), ",") {
 		have[name] = true
 	}
+	out.rowsStamped = have["message.time_updated"] && have["part.time_updated"] && have["part.session_id"]
+	out.turnsStamped = have["session_message.time_updated"]
 	if have["session_v2"] && !have["session"] {
 		out.sessionTable = "session_v2"
 	}
@@ -174,7 +186,10 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		// the edits came through this tool had nothing for `deja restore`,
 		// `deja files` or blame.
 		`'old',json_extract(p.data,'$.state.input.oldString'),` +
-		`'new',json_extract(p.data,'$.state.input.newString'),` +
+		// write hands over the whole file under `content` (#4495).
+		`'new',coalesce(json_extract(p.data,'$.state.input.newString'),` +
+		`case when json_extract(p.data,'$.name')='write' then json_extract(p.data,'$.state.input.content') end),` +
+		`'refused',case when json_extract(p.data,'$.state.status')='error' then 1 end,` +
 		// What a command printed moved from `$.state.output`, a string, to
 		// `$.state.content`, the list of blocks the tool returned. Only the text
 		// ones, and only for bash, for the reason the 1.x reader gives: a file
@@ -195,18 +210,25 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 		// 2.0 renamed two of the three: `bash` is `shell` and `apply_patch` is
 		// `patch`. Both spellings are read, because a store written before the
 		// rename keeps the old ones.
-		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit')))` +
+		`and json_extract(p.data,'$.name') in ('read','bash','shell','apply_patch','patch','edit','write')))` +
 		where + ` order by s.id,p.mc,p.ord` + lim
 }
 
-// opencodeV2SinceWhere bounds a 2.x read to what changed after the watermark.
-// The message's own column is `p.mc` here, and a part's stamp is written under
-// `$.time.start` by a tool and `$.time.created` by a turn.
-func opencodeV2SinceWhere(t time.Time) string {
-	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
-	return fmt.Sprintf(" and (%s or p.mc > '%s' or %s or coalesce(json_extract(p.data,'$.time.start'),json_extract(p.data,'$.time.created')) > '%s')",
-		newerThanEpoch("p.mc", t), rfc,
-		newerThanEpoch("coalesce(json_extract(p.data,'$.time.start'),json_extract(p.data,'$.time.created'))", t), rfc)
+// opencodeV2SinceWhere picks the 2.x sessions touched after the watermark, read
+// whole, for the reason opencodeSinceWhere gives. A turn's row is rewritten as
+// its content streams in, so time_updated is what moves; a store without the
+// column is asked for the turn's own stamps, under `$.time.start` for a tool
+// and `$.time.created` for a turn.
+func opencodeV2SinceWhere(db string, t time.Time) string {
+	touched := fmt.Sprintf("select session_id from session_message where %s or %s",
+		newerThanEpoch("time_created", t), newerThanEpoch("time_updated", t))
+	if !opencodeSchemaOf(db).turnsStamped {
+		rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
+		at := "coalesce(json_extract(x.data,'$.time.start'),json_extract(x.data,'$.time.created'))"
+		touched = fmt.Sprintf("select x.sid from parts x where %s or x.mc > '%s' or %s or %s > '%s'",
+			newerThanEpoch("x.mc", t), rfc, newerThanEpoch(at, t), at, rfc)
+	}
+	return opencodeSessionTouched(opencodeSessionTable(db), t, touched)
 }
 
 // opencodeSessionTable is the table sessions live in, for the reads beside the

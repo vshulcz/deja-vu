@@ -34,6 +34,10 @@ import (
 // agent's prompt (hook_spawn.go). So in grok the hooks below are wired for
 // their side effects — warming the index, forgetting what a compaction threw
 // away — and for the spawn, which is the one place deja still speaks.
+//
+// PostToolUse has changed since 1.0.5: grok 1.0.41's hook docs say its
+// context goes to the model with the tool's result, so a failed command gets
+// the fix pair there too (#4499).
 func grokHooksPath() string {
 	return filepath.Join(sources.GrokHome(), "hooks", "deja.json")
 }
@@ -71,6 +75,7 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 		for _, ev := range [][2]string{
 			{"SessionStart", "hook-context"}, {"PreCompact", "hook-precompact"},
 			{"UserPromptSubmit", "hook-prompt"}, {"PreToolUse", "hook-tool"},
+			{"PostToolUse", "hook-tool-after"},
 		} {
 			root = updateClaudeHook(root, ev[0], hookRun(exe, ev[1]), "", true)
 		}
@@ -109,6 +114,10 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	// run_terminal_command, `Write` reaches write and `Agent` reaches
 	// spawn_subagent — the one of them whose reply grok acts on.
 	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
+	// Grok fires PostToolUse for a run_terminal_command that exited non-zero
+	// and hands the hook's context to the model with the result, so a failure
+	// gets the earlier fix the way claude's does (#4499).
+	root = updateClaudeHook(root, "PostToolUse", hookRun(exe, "hook-tool-after"), "Bash", false)
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
 		return installResult{}, err

@@ -15,10 +15,10 @@ func TestCopilotChatDecodesAWorkspaceURI(t *testing.T) {
 	for _, tc := range []struct {
 		name, uri, want string
 	}{
-		{name: "a space", uri: "file:///tmp/my%20app", want: "my app"},
-		{name: "parentheses and a dot", uri: "file:///tmp/my%20app%20(v2.1)", want: "my app (v2.1)"},
-		{name: "non-ASCII", uri: "file:///tmp/%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82", want: "проект"},
-		{name: "nothing to decode", uri: "file:///tmp/plain", want: "plain"},
+		{name: "a space", uri: "file:///tmp/my%20app", want: "tmp/my app"},
+		{name: "parentheses and a dot", uri: "file:///tmp/my%20app%20(v2.1)", want: "tmp/my app (v2.1)"},
+		{name: "non-ASCII", uri: "file:///tmp/%D0%BF%D1%80%D0%BE%D0%B5%D0%BA%D1%82", want: "tmp/проект"},
+		{name: "nothing to decode", uri: "file:///tmp/plain", want: "tmp/plain"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := copilotChatProjectFromURI(tc.uri); got != tc.want {
@@ -51,7 +51,7 @@ func TestACopilotChatSessionUnderAnEncodedFolderKeepsItsProject(t *testing.T) {
 	if err != nil || len(ss) != 1 {
 		t.Fatalf("len=%d err=%v", len(ss), err)
 	}
-	if ss[0].Project != "my app (v2.1)" {
+	if ss[0].Project != "tmp/my app (v2.1)" {
 		t.Fatalf("project = %q — the folder URI was not decoded", ss[0].Project)
 	}
 }

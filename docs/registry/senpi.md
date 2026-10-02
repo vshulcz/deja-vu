@@ -11,7 +11,9 @@
 
 Senpi (OmO Native) descends from pi and kept its transcript envelope — a
 `session` header line, then one `message` line per turn — so the parsing is
-pi's. The encoded directory names the project, the way pi's does.
+pi's. The header's `cwd` names the project; the encoded directory is the
+fallback for a header without one, because Senpi folds every `/` into `-` and
+`/tmp/my-app` and `/tmp/my/app` share a folder name (#4427).
 
 It kept the rest of pi too, which is what closes the harness: on a live install
 of `@code-yeongyu/senpi` every surface answered on senpi's own screen.
@@ -28,12 +30,22 @@ of `@code-yeongyu/senpi` every surface answered on senpi's own screen.
   returned as `{"type":"custom_message","customType":"deja-recall"}` — which is
   auto-recall arriving, in senpi's own transcript.
 - `--session <path|id>`, `--resume` and `--fork` are in its own help, so
-  `deja resume` prints `senpi --session <id>`.
+  `deja resume` prints `senpi --session <id>`, after a `cd` into the
+  directory the header records: from anywhere else Senpi offers to fork the
+  session into the current directory instead of reopening it (#4426).
 
 **Last verified:** 2026-09-17
 
 ## Known quirks and drift
 
+- **Commands run inside `eval` cells.** With codemode loaded, Senpi's
+  default, `bash`, `grep` and `powershell` leave the model's tool list and run
+  only as `tool.bash(...)` in a cell. The transcript's call is then `eval`
+  with JS, and what ran is on the result, under
+  `details.toolCalls[].args`; deja reads the commands, files and edits from
+  there, a `tool.powershell(...)` run as a command the way `tool.bash(...)`
+  is (#4523). The cell's text is a JSON string, `{"text":"…"}`, and is read as the
+  text it wraps (#4425).
 - **Senpi's first run moves `~/.pi/agent` to `~/.senpi/agent`** — the whole
   directory, sessions and config and extensions, and it prints one line about
   it. So installing senpi on a machine that has pi leaves pi's own directory

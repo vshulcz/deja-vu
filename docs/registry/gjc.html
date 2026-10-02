@@ -39,8 +39,8 @@
 <h1>gajae-code</h1>
 <ul>
 <li><strong>ID</strong>: <code>gjc</code></li>
-<li><strong>Store</strong>: <code>${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/&lt;project-slug&gt;/&lt;session&gt;.jsonl</code></li>
-<li><strong>Sub-agent passes</strong>: <code>…/&lt;project-slug&gt;/&lt;session&gt;/N-*.jsonl</code></li>
+<li><strong>Store</strong>: <code>${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/&lt;project&gt;/&lt;session&gt;.jsonl</code></li>
+<li><strong>Sub-agent passes</strong>: <code>…/&lt;project&gt;/&lt;session&gt;/N-*.jsonl</code></li>
 <li><strong>Read override</strong>: <code>DEJA_GJC_ROOT</code> replaces the session root</li>
 <li><strong>Format</strong>: pi&#39;s session JSONL</li>
 <li><strong>Needs</strong>: nothing</li>
@@ -51,11 +51,11 @@
 <p><strong>Last verified:</strong> 2026-09-21</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
-<li>Resume: <code>gjc --resume &lt;id&gt;</code>. From its session-operations document:</li>
+<li>Resume: <code>gjc --resume &lt;id&gt;</code>, in the directory the header&#39;s <code>cwd</code> names.</li>
 </ul>
-<p><code>--resume &lt;id|path&gt;</code> at startup opens an existing session, and a session</p>
-<p>belonging to another project forks into the current one — so deja prints</p>
-<p>the command without a working directory rather than guessing at one.</p>
+<p>From any other project 0.18 refuses the session (&#34;is in another project …</p>
+<p>Re-run from that directory&#34;) or forks it into the current one, so deja</p>
+<p>prints the <code>cd</code> (#4395).</p>
 <ul>
 <li><strong>Sub-agent passes sit one directory deeper</strong>, under a directory named for the</li>
 </ul>
@@ -64,6 +64,26 @@
 <p>session of its own it competes with the parent for the same recall slot.</p>
 <p><code>DEJA_INCLUDE_SUBAGENTS=1</code> takes them, the switch Claude Code&#39;s and Cursor&#39;s</p>
 <p>sub-agents already use.</p>
+<ul>
+<li><strong>Project directories</strong>: from 0.18, <code>&lt;project&gt;</code> is <code>v2-&lt;identity digest&gt;</code></li>
+</ul>
+<p>rather than a slug of the path, with <code>.gjc-managed-session-scope.v2.json</code></p>
+<p>beside the sessions naming the directory. The header&#39;s cwd gives the</p>
+<p>project either way. <code>deja doctor</code> leaves the scope file and the skipped</p>
+<p>passes out of its &#34;not recognised here&#34; count (#4393).</p>
+<ul>
+<li><strong>Edits are hashline, not pi&#39;s.</strong> gjc 0.18&#39;s <code>edit</code> rejects pi&#39;s</li>
+</ul>
+<p><code>{path, edits}</code> (&#34;input: expected string&#34;) and takes one <code>input</code> string:</p>
+<p><code>§path</code>, then ops (<code>≔A..B</code> replace, <code>«A</code> insert before, <code>»A</code> insert after),</p>
+<p>each followed by the lines it writes. deja records the file and the written</p>
+<p>lines from the call, and the replaced lines from the result&#39;s</p>
+<p><code>details.diff</code> (<code>-1|old line</code>), since the call holds only anchors (#4113).</p>
+<p><code>edit.mode</code> picks the shape: hashline is one of four. <code>replace</code>, the auto</p>
+<p>choice for Claude, DeepSeek and Qwen models, takes `{path,</p>
+<p>edits:[{old_text, new_text, all}]}<code>, </code>patch<code> takes </code>{path, edits:[{op,</p>
+<p>diff}]}<code> and </code>apply_patch<code> an </code>input` patch; all are read for the file, the</p>
+<p>replaced span and the written lines (#4524).</p>
 <ul>
 <li><code>service_tier_change</code> lines are not turns and are dropped rather than read as</li>
 </ul>

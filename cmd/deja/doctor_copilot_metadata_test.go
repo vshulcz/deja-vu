@@ -23,6 +23,15 @@ func TestDoctorDoesNotCallCopilotsMetadataUnrecognised(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "vscode.metadata.json"), []byte(`{"workspaceFolder":"/w/api"}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// Copilot CLI 1.0.79's rewind snapshots are its own state too (#4233).
+	if err := os.MkdirAll(filepath.Join(dir, "rewind-file-snapshots"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"index.json", "tracking.json"} {
+		if err := os.WriteFile(filepath.Join(dir, "rewind-file-snapshots", f), []byte(`{}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	t.Setenv("DEJA_COPILOT_ROOT", filepath.Join(tmp, "copilot", "session-state"))
 	var buf bytes.Buffer
 	doctorHarnesses(&buf, t.TempDir())

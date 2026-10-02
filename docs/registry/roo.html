@@ -41,7 +41,7 @@
 <li><strong>ID</strong>: <code>roo</code></li>
 <li><strong>Store</strong>: VS Code-host globalStorage <code>rooveterinaryinc.roo-cline/tasks/&lt;taskId&gt;/api_conversation_history.json</code>; per-task metadata in <code>history_item.json</code> (id, ts, task, workspace). Code, Code Insiders, VSCodium, Cursor and Windsurf host roots are probed, and a <code>roo-cline.customStoragePath</code> set in a host&#39;s <code>User/settings.json</code> is followed. The Roo CLI writes the same tree under <code>~/.vscode-mock/global-storage</code>.</li>
 <li><strong>Read override</strong>: <code>DEJA_ROO_ROOTS</code> (path list); <code>DEJA_ROO_CLI_ROOT</code> for the CLI&#39;s storage base</li>
-<li><strong>Format</strong>: whole-file JSON rewritten on change; full re-parse per pass</li>
+<li><strong>Format</strong>: whole-file JSON rewritten on change; full re-parse per pass. A change to <code>history_item.json</code> alone re-reads the task too (#4446)</li>
 </ul>
 <p>The transcript shape matches Cline&#39;s legacy store (Roo is a Cline fork), so</p>
 <p>the same text-block extraction and <code>&lt;task&gt;</code> envelope unwrapping apply.</p>
@@ -57,7 +57,31 @@
 <p>REPLACE body becomes the hashed written lines line-level blame matches. A</p>
 <p><code>search_and_replace</code> with <code>use_regex</code> records neither side, because a pattern is</p>
 <p>not text the file held, and a block whose closing marker never arrives records</p>
-<p>nothing rather than guessing where it ended.</p>
+<p>nothing rather than guessing where it ended. Current Roo also offers</p>
+<p><code>search_replace</code>, <code>edit_file</code> and <code>edit</code>, which take <code>old_string</code> and</p>
+<p><code>new_string</code> under <code>file_path</code>, and <code>apply_patch</code>, whose paths and <code>-</code>/<code>+</code> lines</p>
+<p>are read out of the patch body. <code>search_and_replace</code> is kept as an alias of</p>
+<p><code>edit</code> and written under the alias with <code>edit</code>&#39;s arguments, which are read as</p>
+<p><code>edit</code>&#39;s (#4531). <code>read_file</code> still takes the legacy</p>
+<p><code>files: [{path, lineRanges}]</code> form, stored with <code>_legacyFormat: true</code>; each</p>
+<p><code>path</code> is a file record (#4531).</p>
+<p>An <code>execute_command</code> result opens with its status, &#34;Command executed in</p>
+<p>terminal within working directory &#39;…&#39;. Exit code: N&#34; (a failure puts &#34;Command</p>
+<p>execution was not successful, …&#34; there and the code on the next line), and the</p>
+<p>command record carries <code>→ exit N</code> from it. A command killed by a signal, or one</p>
+<p>whose code the terminal never reported, keeps no code (#4530).</p>
+<p>Tasks from before native tool calling (Roo 3.20, and the legacy Cline</p>
+<p>extension) keep each call as XML inside the assistant&#39;s text block —</p>
+<p><code>&lt;execute_command&gt;&lt;command&gt;…&lt;/command&gt;&lt;/execute_command&gt;</code> — and its result as</p>
+<p>user text blocks headed <code>[execute_command for &#39;…&#39;] Result:</code>. Those calls give</p>
+<p>the same records a <code>tool_use</code> block does, and the result is indexed as tool</p>
+<p>output, not as the person&#39;s words. Only the first call of a message counts,</p>
+<p>since the client ran no other, and only in a task with no <code>tool_use</code> block at</p>
+<p>all: in a native-era task XML in the text is something the model showed. The</p>
+<p>answer to <code>ask_followup_question</code>, the feedback on <code>attempt_completion</code> and any</p>
+<p><code>&lt;feedback&gt;</code> typed beside a result stay the person&#39;s. The retry prompt the</p>
+<p>client sends when the model used no tool (&#34;[ERROR] You did not use a tool…&#34;) is</p>
+<p>not indexed as a user turn.</p>
 <p>A call names its file relative to the workspace, so the path is resolved against</p>
 <p>the <code>workspace</code> in <code>history_item.json</code> before it is recorded — a one-segment</p>
 <p>path like <code>loop.go</code> matches no file on any machine otherwise. A task without</p>
@@ -72,9 +96,12 @@
 <li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>.</li>
 <li><strong>Command</strong>: <code>~/.roo/commands/deja.md</code>, invoked as <code>/deja</code>.</li>
 <li><strong>Auto-recall</strong>: none; Roo has no released lifecycle hooks.</li>
-<li><strong>Resume</strong>: <code>roo --session-id &lt;uuid&gt;</code>, run in the task&#39;s workspace, for tasks</li>
+<li><strong>Resume</strong>: <code>roo -w &lt;workspace&gt; --session-id &lt;uuid&gt;</code>, run in the task&#39;s</li>
 </ul>
-<p>the CLI created. Editor tasks reopen from the extension&#39;s history UI.</p>
+<p>workspace, for tasks the CLI created. The <code>-w</code> matters: without it the CLI</p>
+<p>looks under the real path of its cwd, and a task created with <code>-w /tmp/...</code></p>
+<p>on macOS recorded the symlinked path. A workspace that is gone is refused</p>
+<p>with <code>deja show</code> (#4459). Editor tasks reopen from the extension&#39;s history UI.</p>
 <ul>
 <li><strong>Handoff</strong>: paste.</li>
 </ul>

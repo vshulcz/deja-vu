@@ -19,16 +19,18 @@ Whole-session JSON has `sessionId`, `startTime`, `lastUpdated`, and a `messages`
 
 ## Wiring
 
-`deja install gemini` adds the server under `mcpServers` in `~/.gemini/settings.json` and writes the shared skill `~/.agents/skills/deja-history/SKILL.md`. There is no command file: Gemini's command namespace is flat, the MCP server's own prompt is already `/deja`, and each skill is listed as a command too. `deja install gemini-auto` adds the same plus an extension at `~/.gemini/extensions/deja/`, because Gemini loads hooks from extensions and not from `settings.json`, and only with `hooksConfig.enabled` set, which install turns on. The extension wires `SessionStart` (`deja hook-context`), `BeforeAgent` (`hook-prompt`) and `AfterTool` on `run_shell_command` (`hook-tool-after`); timeouts are in milliseconds.
+`deja install gemini` adds the server under `mcpServers` in `~/.gemini/settings.json` and writes the shared skill `~/.agents/skills/deja-history/SKILL.md`. There is no command file: Gemini's command namespace is flat, the MCP server's own prompt is already `/deja`, and each skill is listed as a command too. `deja install gemini-auto` adds the same plus an extension at `~/.gemini/extensions/deja/`, because Gemini loads hooks from extensions and not from `settings.json`, and not at all with `hooksConfig.enabled: false`. Install sets it to `true`. Uninstall takes the switch back out when install added it and no other extension has hooks; otherwise it stays on and uninstall says so. A `false` you set is said aloud when install turns it on, and uninstall sets it back to `false`. The extension wires `SessionStart` (`deja hook-context`), `BeforeAgent` (`hook-prompt`), `AfterTool` on `run_shell_command` (`hook-tool-after`) and `SessionEnd` (`hook-session-end`, which tells MCP recall the session is over and may be answered with); timeouts are in milliseconds.
 
 ## Resume
 
 `gemini --resume <uuid>` takes the session id deja indexes — the `--help` text
 mentions only `latest` and an index, but the CLI's own error names
-`--resume {uuid}` and 0.55.1 accepts one. No `cd`: gemini scopes the lookup by
-a hash of the working directory and stores only the hash, so there is nothing
-to invert into a path. From the wrong directory it says "No previous sessions
-found for this project" rather than opening someone else's.
+`--resume {uuid}` and 0.55.1 accepts one. gemini finds a session only from
+the directory it ran in — anywhere else it says "No previous sessions found
+for this project" — so the command runs there. 0.60 records that directory
+in `~/.gemini/projects.json` and in the project folder's `.project_root`; a
+store that keys the folder by a hash of the path alone gets no `cd`, and a
+recorded directory that is gone is refused with a pointer to `deja show`.
 
 ## Known quirks and drift
 

@@ -60,7 +60,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent",
+        "matcher": "Bash|PowerShell|Edit|Write|MultiEdit|NotebookEdit|Task|Agent",
         "hooks": [
           {
             "type": "command",
@@ -73,13 +73,24 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-tool-after",
             "timeout": 10,
             "statusMessage": "Checking what fixed this before…"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-session-end",
+            "statusMessage": "Marking this session as ended…"
           }
         ]
       }

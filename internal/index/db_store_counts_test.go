@@ -30,7 +30,11 @@ insert into part values ('p-%[1]s','m-%[1]s',json_object('type','text','text','%
 // A database-backed store reads only what is new — the since cursor the index
 // stamps as LastUpdated — but it changes like any other file, so the merge
 // branch treated it as re-read whole and started its ingest counts over. The
-// database growing by one session threw away what the rest of it holds (#2025).
+// database growing by one message threw away what the rest of it holds (#2025).
+//
+// grok, because its reader selects messages. opencode was the case here until
+// it began handing back touched sessions whole (#4207); a store that does that
+// starts its counts over, the goose trade below.
 func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {
 		t.Skip("sqlite3 CLI not available")
@@ -39,15 +43,18 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 	setHome(t, tmp)
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
+	t.Setenv("DEJA_GOOSE_DB", filepath.Join(tmp, "none-goose.db"))
+	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "none-opencode.db"))
 	t.Setenv("DEJA_NOTES_FILE", filepath.Join(tmp, "notes.jsonl"))
-	db := filepath.Join(tmp, "opencode.db")
-	t.Setenv("DEJA_OPENCODE_DB", db)
+	db := filepath.Join(tmp, "grok.db")
+	t.Setenv("DEJA_GROK_DB", db)
+	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 
 	long := strings.Repeat("pgbouncer pool timed out and the retry took a second ", 1600)
 	if len(long) < maxIndexedText {
 		t.Fatalf("the fixture message is %d bytes, under the %d that gets it clipped", len(long), maxIndexedText)
 	}
-	seedOpencodeSession(t, db, "s1", long, 1767322800000)
+	seedGrokDB(t, db, [][2]string{{long, "2026-01-01T10:00:00.000Z"}})
 
 	dir := filepath.Join(tmp, "index.db")
 	if err := Ensure(dir, "", true, nil); err != nil {
@@ -59,15 +66,15 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return m.IngestHealth["opencode"].ClippedMessages
+		return m.IngestHealth["grok"].ClippedMessages
 	}
 	if got := clipped(); got != 1 {
 		t.Fatalf("the build clipped %d messages, so this measures nothing", got)
 	}
 
-	// The store grows by a session that has nothing wrong with it. The pass
-	// reads only that session, so it cannot speak for the rest of the store.
-	seedOpencodeSession(t, db, "s2", "a short second session", 1767326400000)
+	// The store grows by a message that has nothing wrong with it. The pass
+	// reads only that message, so it cannot speak for the rest of the store.
+	seedGrokDB(t, db, [][2]string{{"a short second message", "2026-01-01T11:00:00.000Z"}})
 	var out strings.Builder
 	if err := Ensure(dir, "", false, &out); err != nil {
 		t.Fatal(err)
@@ -75,12 +82,8 @@ func TestADatabaseThatGrowsKeepsItsIngestCounts(t *testing.T) {
 	if said := out.String(); !strings.Contains(said, replacementPassMarker) {
 		t.Fatalf("this was not the merge path, so it does not measure what it is about: %q", said)
 	}
-	m, err := readManifest(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(m.Sessions) != 2 {
-		t.Fatalf("the pass ended with %d sessions, so the store did not grow the way this expects", len(m.Sessions))
+	if hits, err := Search(dir, search.Options{Query: "short second message", All: true}); err != nil || len(hits) == 0 {
+		t.Fatalf("the new message was not read (%d hits, %v), so the store did not grow the way this expects", len(hits), err)
 	}
 	if got := clipped(); got != 1 {
 		t.Errorf("the clipped message is still in the database and the count is %d", got)

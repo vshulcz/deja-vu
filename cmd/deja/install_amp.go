@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
@@ -22,6 +23,12 @@ func installAmpMCPAt(path, exe string, uninstall bool) (installResult, error) {
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err
+	}
+	// A JSONC file goes through the text writer, so the reader's comments and
+	// key order stay through an install and an uninstall, as for prime (#4357).
+	// The dot is escaped: one literal key, not an "amp" object.
+	if len(bytes.TrimSpace(old)) > 0 && configIsJSONC(old) {
+		return writeJSONCEntry(path, old, strings.ReplaceAll(ampServersKey, ".", `\.`), ampServerEntry(exe), uninstall)
 	}
 	var root map[string]any
 	if len(bytes.TrimSpace(old)) == 0 {

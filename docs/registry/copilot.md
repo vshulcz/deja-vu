@@ -15,7 +15,10 @@ The work is filed outside the message stream. `tool.execution_start` carries
 and `old_str`/`new_str` for an edit, which is the one place the replaced text
 survives. `create` hands over the whole file as `file_text`, and that is the
 only record a created file's lines were ever in a session — a commit that adds
-them deletes nothing for the replaced side to match. `tool.execution_complete` carries `data.result.content`,
+them deletes nothing for the replaced side to match. `view` is the file read.
+With a GPT model there is no `edit` or `create`: every edit is `apply_patch`,
+whose `arguments` is the patch string itself, read into files, the removed
+lines and the added ones as codex's patches are. `tool.execution_complete` carries `data.result.content`,
 indexed as tool output whether or not the call failed, because the error a
 command hit is what a later search reaches for. Its `success` flag is true on
 failed runs too, so a non-zero exit code is read from the telemetry or the
@@ -36,7 +39,7 @@ already name every file.
 
 - `assistant.message` records whose content is empty and whose work is entirely
   in tool calls used to be dropped; the tool events now carry them.
-- Tool names are lowercase (`edit`, `read`, `write`, `bash`) where Claude Code
+- Tool names are lowercase (`edit`, `view`, `create`, `bash`) where Claude Code
   capitalises, and the edit argument is `old_str` rather than `old_string`.
 - A session directory can outlive its `events.jsonl`; the discovery walk only
   picks up files that exist.

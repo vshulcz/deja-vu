@@ -43,16 +43,28 @@
 <li>modern CLI/SDK: <code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/&lt;sessionId&gt;/&lt;sessionId&gt;.messages.json</code> with a <code>&lt;sessionId&gt;.json</code> manifest beside it</li>
 <li>legacy VS Code extension (<code>saoudrizwan.claude-dev</code>): <code>&lt;host globalStorage&gt;/tasks/&lt;taskId&gt;/api_conversation_history.json</code> with <code>state/taskHistory.json</code> supplying title, cwd and timestamp; Code, Code Insiders, VSCodium, Cursor and Windsurf host roots are probed</li>
 <li><strong>Read overrides</strong>: <code>DEJA_CLINE_ROOT</code> (modern sessions dir), <code>DEJA_CLINE_ROOTS</code> (path list of legacy extension roots)</li>
-<li><strong>Format</strong>: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets</li>
+<li><strong>Format</strong>: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets. A change to the manifest alone, as <code>cline history update --title</code> makes, re-reads the session too (#4319), and so does a change to the task&#39;s own entry in <code>state/taskHistory.json</code> (#4446)</li>
 </ul>
 <p><code>user</code>/<code>assistant</code> turns are indexed for their text, from string content or</p>
 <p><code>type:&#34;text&#34;</code> blocks; thinking, images, compaction artifacts and non-lead agents</p>
 <p>are skipped by design. Tool calls are read as well: <code>run_commands</code> becomes a</p>
-<p>command record, the file tools a files record, and the editor&#39;s two sides the</p>
-<p>replaced span and the hashed written lines. The legacy extension&#39;s store takes</p>
+<p>command record, the file tools a files record, and the editor&#39;s two sides</p>
+<p>(<code>old_text</code>, <code>new_text</code>) the replaced span and the hashed written lines; an</p>
+<p><code>editor</code> call with only <code>new_text</code> creates or inserts, and gives the written</p>
+<p>side alone. <code>apply_patch</code> takes its patch under <code>input</code> and gives the files,</p>
+<p>removed lines and added lines its headers name. A tool result is indexed as tool</p>
+<p>output whether it is a string or the CLI&#39;s list of</p>
+<p><code>{query, result, error, success}</code> entries that <code>run_commands</code> and</p>
+<p><code>read_files</code> write; an error the result does not already carry is kept with</p>
+<p>it (#4315). A command carries <code>→ exit N</code> from its result: the entry&#39;s</p>
+<p><code>success</code> or its &#34;Command exited with code N&#34; error, or the extension&#39;s</p>
+<p>&#34;Command failed with exit code N.&#34; (#4502). The legacy extension&#39;s store takes</p>
 <p>the Roo path for those, since its tools are Roo&#39;s — see</p>
 <p><a href="roo.html">Roo Code</a> for the SEARCH/REPLACE shape and the workspace-relative</p>
-<p>paths. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user envelope is unwrapped so the tags are</p>
+<p>paths. Two spellings are Cline&#39;s own: <code>replace_in_file</code> blocks are marked</p>
+<p><code>------- SEARCH</code> / <code>=======</code> / <code>+++++++ REPLACE</code> (each a whole line, a run of</p>
+<p>three or more, Roo&#39;s <code>&lt;</code> and <code>&gt;</code> too), and <code>apply_patch</code> names its</p>
+<p>patch <code>input</code> where Roo&#39;s names it <code>patch</code>. The legacy <code>&lt;task&gt;...&lt;/task&gt;</code> user envelope is unwrapped so the tags are</p>
 <p>not indexed.</p>
 <ul>
 <li><strong>MCP</strong>: <code>deja install cline</code> writes <code>mcpServers.deja</code> into</li>
@@ -66,12 +78,16 @@
 <p><code>${CLINE_DIR:-~/.cline}/plugins/deja/</code>. It registers a rule whose content is</p>
 <p>session-start recall, a message builder that adds recall for each prompt and</p>
 <p>a repair after a failed command, the <code>/deja</code> command, and the</p>
-<p><code>deja-history</code> skill bundled in the plugin. Cline&#39;s own hooks cannot carry</p>
-<p>context back, so the plugin is the channel.</p>
+<p><code>deja-history</code> skill bundled in the plugin. A <code>package.json</code> listing</p>
+<p><code>index.js</code> under <code>cline.plugins</code> makes the directory a plugin package, which</p>
+<p>is the only way Cline loads its <code>skills/</code> (#4316). Cline&#39;s own hooks cannot</p>
+<p>carry context back, so the plugin is the channel.</p>
 <ul>
-<li><strong>Resume</strong>: <code>cline --id &lt;sessionId&gt;</code> for modern sessions only; legacy VS</li>
+<li><strong>Resume</strong>: <code>cd &lt;cwd&gt; &amp;&amp; cline --id &lt;sessionId&gt;</code> for modern sessions only;</li>
 </ul>
-<p>Code tasks reopen from the extension UI.</p>
+<p><code>cline --id</code> reopens the transcript from anywhere but runs its tools in the</p>
+<p>current directory, so the command runs in the manifest&#39;s <code>cwd</code> (#4318).</p>
+<p>Legacy VS Code tasks reopen from the extension UI.</p>
 <ul>
 <li><strong>Handoff</strong>: <code>cline &lt;prompt&gt;</code> runs directly.</li>
 </ul>

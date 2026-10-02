@@ -13,11 +13,21 @@ deleted is ordinary and is skipped rather than reported.
 
 A message's `parts` column is a JSON array of `{type, data}`. `text` carries
 `data.text`; `tool_call` carries the tool's name and a JSON *string* of its
-arguments, so the shell command and the edited path are one decode further in;
+arguments, so the shell command and the edited path are one decode further in.
+`edit` and `multiedit` (an `edits` array) carry `old_string` and `new_string`,
+and `write` carries `content`; those become the replaced span and the written
+lines that `deja restore` and `deja blame` read (#4377). `lsp_replace_symbol`
+writes its `replacement` in place of a symbol, before it or after it, and is
+read as written lines unless its `action` is `delete`; the replaced symbol is
+only in the result's metadata (#4533).
 `tool_result` carries what the tool printed with a `<cwd>…</cwd>` tag appended,
 which is the same directory on every line in the store and is stripped rather
 than indexed — left in, a search for the project name would match every tool
-output there is. `finish` is bookkeeping.
+output there is. `finish` is bookkeeping. A result names its call by
+`tool_call_id` (the call's `id`), on a later row: a bash result whose last line
+is crush's "Exit code N" puts `→ exit N` on the command, and an `edit`,
+`multiedit` or `write` whose result has `is_error` changed nothing, so it keeps
+its file record and no edit or written lines (#4532).
 
 Both stamp columns are commented "Unix timestamp in milliseconds" in Crush's own
 schema and hold whole seconds in what v0.92.0 writes — its update trigger sets
@@ -56,7 +66,8 @@ endpoint: the store landed beside the project, the registry gained its path and
   model appended to the tool result, in the request Crush sent next.
 - **Resume**: `crush --session <uuid>`, run in the project directory — Crush
   looks for the session in the store under the current directory and nowhere
-  else, so the same id resolves to nothing from elsewhere.
+  else, so the same id resolves to nothing from elsewhere. That store sits in
+  the project, so a project that is gone is refused with `deja show` (#4459).
 - **Handoff**: exec, `crush run`.
 
 Costs on that version, measured from the recorded requests: deja's tool schema

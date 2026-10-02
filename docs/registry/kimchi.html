@@ -49,7 +49,9 @@
 <p>that path in <code>getDefaultSessionDirPath</code>: <code>&lt;agent&gt;/sessions/--&lt;encoded cwd&gt;--</code>,</p>
 <p>where the encoding is the working directory with the separators replaced by</p>
 <p>dashes and a <code>--</code> on each end. A session file directly under the root is read</p>
-<p>too, and then the header&#39;s <code>cwd</code> is what names the project.</p>
+<p>too. Either way the header&#39;s <code>cwd</code> is what names the project, by its last two</p>
+<p>segments, rather than encoded and decoded back, which could not tell <code>my-app</code></p>
+<p>from <code>my/app</code> (#4427, #4457).</p>
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
@@ -57,7 +59,16 @@
 </ul>
 <p><code>--resume &lt;selector&gt;</code> to <code>--session &lt;id&gt;</code> (<code>src/cli-args.ts</code>), so the id</p>
 <p>deja indexes is the selector Kimchi takes — <code>deja resume</code> prints that</p>
-<p>command rather than handing over a paste.</p>
+<p>command rather than handing over a paste. It runs in the directory the</p>
+<p>header&#39;s <code>cwd</code> names: Kimchi 1.5 finds a session from anywhere, but outside</p>
+<p>its project asks to fork it instead of reopening it (#4400).</p>
+<ul>
+<li><strong>Sub-agent runs</strong> of the <code>Agent</code> tool are transcripts of their own beside</li>
+</ul>
+<p>the parent, marked by <code>parentSession</code> on the header and a</p>
+<p><code>kimchi:subagent-session</code> entry after it. They are skipped, as Claude Code&#39;s,</p>
+<p>Cursor&#39;s and gjc&#39;s sub-agents are; <code>DEJA_INCLUDE_SUBAGENTS=1</code> takes them. A</p>
+<p>fork carries <code>parentSession</code> alone and stays a session (#4401).</p>
 <ul>
 <li>A session file directly under the root has no encoded project directory to</li>
 </ul>

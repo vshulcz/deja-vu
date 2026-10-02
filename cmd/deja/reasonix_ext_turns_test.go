@@ -159,8 +159,29 @@ func TestReasonixExtMapsFileToolsToTheirPaths(t *testing.T) {
 	if tool != "Edit" || in["file_path"] != filepath.Join("/work", "internal/a.go") {
 		t.Errorf("edit_file = %s %v, want Edit with the path resolved against the workspace", tool, in)
 	}
-	if tool, _ := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "" {
-		t.Errorf("read_file mapped to %q; the pre-tool line is for changes, not reads", tool)
+	// tool.after holds an edit that is already made, and Reasonix refuses an
+	// edit on a file the session has not read, so read_file is the step where
+	// the file's history can still change what gets written (#4410). It maps
+	// to the lowercase `read` pi and omp send for the same reason.
+	if tool, in := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "read" || in["file_path"] != filepath.Join("/work", "a.go") {
+		t.Errorf("read_file = %s %v, want read with the path resolved against the workspace", tool, in)
+	}
+}
+
+// Reasonix 1.39.6's other file-changing tools reach the file line too:
+// notebook_edit, delete_range and delete_symbol under path, move_file under
+// the file it moved from (#4541).
+func TestReasonixExtMapsTheOtherFileTools(t *testing.T) {
+	for _, c := range []struct{ name, args, tool, path string }{
+		{"notebook_edit", `{"path":"retry.ipynb","new_source":"x","edit_mode":"replace"}`, "NotebookEdit", "retry.ipynb"},
+		{"delete_range", `{"path":"retry.go","start_anchor":"a","end_anchor":"b"}`, "Edit", "retry.go"},
+		{"delete_symbol", `{"path":"retry.go","name":"legacyRetry","kind":"func"}`, "Edit", "retry.go"},
+		{"move_file", `{"source_path":"jitter.go","destination_path":"backoff/jitter.go"}`, "Edit", "jitter.go"},
+	} {
+		tool, in := rxHookToolInput(c.name, c.args, "/work")
+		if tool != c.tool || in["file_path"] != filepath.Join("/work", c.path) {
+			t.Errorf("%s = %s %v, want %s on %s", c.name, tool, in, c.tool, filepath.Join("/work", c.path))
+		}
 	}
 }
 

@@ -50,11 +50,21 @@
 <p>deleted is ordinary and is skipped rather than reported.</p>
 <p>A message&#39;s <code>parts</code> column is a JSON array of <code>{type, data}</code>. <code>text</code> carries</p>
 <p><code>data.text</code>; <code>tool_call</code> carries the tool&#39;s name and a JSON *string* of its</p>
-<p>arguments, so the shell command and the edited path are one decode further in;</p>
+<p>arguments, so the shell command and the edited path are one decode further in.</p>
+<p><code>edit</code> and <code>multiedit</code> (an <code>edits</code> array) carry <code>old_string</code> and <code>new_string</code>,</p>
+<p>and <code>write</code> carries <code>content</code>; those become the replaced span and the written</p>
+<p>lines that <code>deja restore</code> and <code>deja blame</code> read (#4377). <code>lsp_replace_symbol</code></p>
+<p>writes its <code>replacement</code> in place of a symbol, before it or after it, and is</p>
+<p>read as written lines unless its <code>action</code> is <code>delete</code>; the replaced symbol is</p>
+<p>only in the result&#39;s metadata (#4533).</p>
 <p><code>tool_result</code> carries what the tool printed with a <code>&lt;cwd&gt;…&lt;/cwd&gt;</code> tag appended,</p>
 <p>which is the same directory on every line in the store and is stripped rather</p>
 <p>than indexed — left in, a search for the project name would match every tool</p>
-<p>output there is. <code>finish</code> is bookkeeping.</p>
+<p>output there is. <code>finish</code> is bookkeeping. A result names its call by</p>
+<p><code>tool_call_id</code> (the call&#39;s <code>id</code>), on a later row: a bash result whose last line</p>
+<p>is crush&#39;s &#34;Exit code N&#34; puts <code>→ exit N</code> on the command, and an <code>edit</code>,</p>
+<p><code>multiedit</code> or <code>write</code> whose result has <code>is_error</code> changed nothing, so it keeps</p>
+<p>its file record and no edit or written lines (#4532).</p>
 <p>Both stamp columns are commented &#34;Unix timestamp in milliseconds&#34; in Crush&#39;s own</p>
 <p>schema and hold whole seconds in what v0.92.0 writes — its update trigger sets</p>
 <p><code>strftime(&#39;%s&#39;,&#39;now&#39;)</code>. Both units are read. The project is the directory the</p>
@@ -100,7 +110,8 @@
 <li><strong>Resume</strong>: <code>crush --session &lt;uuid&gt;</code>, run in the project directory — Crush</li>
 </ul>
 <p>looks for the session in the store under the current directory and nowhere</p>
-<p>else, so the same id resolves to nothing from elsewhere.</p>
+<p>else, so the same id resolves to nothing from elsewhere. That store sits in</p>
+<p>the project, so a project that is gone is refused with <code>deja show</code> (#4459).</p>
 <ul>
 <li><strong>Handoff</strong>: exec, <code>crush run</code>.</li>
 </ul>

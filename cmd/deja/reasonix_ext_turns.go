@@ -303,11 +303,13 @@ func (x *rxExt) onInput(ctx context.Context, fields map[string]json.RawMessage) 
 // rxHookToolInput turns a Reasonix tool call into the Claude-shaped fields
 // deja's tool hooks read: the shell tool's command — bash, or pwsh and
 // powershell on Windows (tool.IsShellToolName) — and a file tool's path as
-// file_path, resolved against the workspace the way Reasonix resolves it.
+// file_path, resolved against the workspace the way Reasonix resolves it;
+// move_file's is the file it moved from.
 func rxHookToolInput(name, arguments, workspace string) (string, map[string]string) {
 	var args struct {
-		Command string `json:"command"`
-		Path    string `json:"path"`
+		Command    string `json:"command"`
+		Path       string `json:"path"`
+		SourcePath string `json:"source_path"`
 	}
 	_ = json.Unmarshal([]byte(arguments), &args)
 	switch {
@@ -316,15 +318,27 @@ func rxHookToolInput(name, arguments, workspace string) (string, map[string]stri
 			return "", nil
 		}
 		return "Bash", map[string]string{"command": args.Command}
-	case name == "write_file", name == "edit_file", name == "multi_edit":
+	case name == "read_file", name == "write_file", name == "edit_file", name == "multi_edit",
+		// The file tools beside them: a notebook cell, a range or symbol
+		// cut out, and a move, under the file it moved from (#4541).
+		name == "notebook_edit", name == "delete_range", name == "delete_symbol", name == "move_file":
 		p := strings.TrimSpace(args.Path)
+		if name == "move_file" {
+			p = strings.TrimSpace(args.SourcePath)
+		}
 		if p == "" {
 			return "", nil
 		}
 		if !filepath.IsAbs(p) && workspace != "" {
 			p = filepath.Join(workspace, p)
 		}
-		tool := map[string]string{"write_file": "Write", "edit_file": "Edit", "multi_edit": "MultiEdit"}[name]
+		// read_file goes out as the lowercase `read` pi and omp send: this
+		// hook holds a finished result, so on an edit the line arrives after
+		// the write, and Reasonix refuses an edit on a file the session has
+		// not read. The read is the last step where the line can still change
+		// what gets written (#4410).
+		tool := map[string]string{"read_file": "read", "write_file": "Write", "edit_file": "Edit", "multi_edit": "MultiEdit",
+			"notebook_edit": "NotebookEdit", "delete_range": "Edit", "delete_symbol": "Edit", "move_file": "Edit"}[name]
 		return tool, map[string]string{"file_path": p}
 	}
 	return "", nil

@@ -1,6 +1,9 @@
 package sources
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 // Roo and the legacy Cline extension do not send an edit as old_string and
 // new_string the way the shared dialect expects. apply_diff and
@@ -10,10 +13,27 @@ import "strings"
 // `content`. Reading none of them left both readers with the paths a session
 // touched and not a line of what it changed, so blame, restore and the
 // moved-since annotation were silent on every Roo session (#595).
-const (
-	rooSearchMarker  = "<<<<<<< SEARCH"
-	rooMiddleMarker  = "======="
-	rooReplaceMarker = ">>>>>>> REPLACE"
+//
+// Cline's replace_in_file spells the markers `------- SEARCH` and
+// `+++++++ REPLACE`, and accepts Roo's too; read with Roo's alone, Cline's
+// main edit tool recorded the path and neither side (#4504). Both match a
+// marker as the whole line, so an indented `=======` inside the replaced code
+// is code. Roo's apply_diff takes exactly seven; Cline takes a run of three
+// or more (src/core/assistant-message/diff.ts), which in Roo's would cut a
+// block at a `===` heading rule.
+type diffMarkers struct{ search, middle, replace *regexp.Regexp }
+
+var (
+	rooMarkers = diffMarkers{
+		search:  regexp.MustCompile(`^<{7} SEARCH>?$`),
+		middle:  regexp.MustCompile(`^={7}$`),
+		replace: regexp.MustCompile(`^>{7} REPLACE$`),
+	}
+	clineMarkers = diffMarkers{
+		search:  regexp.MustCompile(`^(?:-{3,}|<{3,}) SEARCH>?$`),
+		middle:  regexp.MustCompile(`^={3,}$`),
+		replace: regexp.MustCompile(`^(?:\+{3,}|>{3,}) REPLACE>?$`),
+	}
 )
 
 // rooEditTools are the calls that change a file, under both extensions' names.
@@ -23,25 +43,37 @@ var rooEditTools = map[string]bool{
 	"search_and_replace": true,
 	"write_to_file":      true,
 	"insert_content":     true,
+	// Current Roo's tools: the last three take old_string and new_string under
+	// `file_path`, apply_patch takes one patch for any number of files
+	// (#4419).
+	"search_replace": true,
+	"edit_file":      true,
+	"edit":           true,
+	"apply_patch":    true,
+	// Kilo Code's own: fast_edit_file sends the new code with the rest
+	// elided, and write_file is the alias of write_to_file it keeps in
+	// history (#4535).
+	"fast_edit_file": true,
+	"write_file":     true,
 }
 
 // rooDiffSides splits one diff payload into the replaced and the written side
 // of each of its blocks. A payload can hold several blocks for the same file;
 // an unterminated one ends the walk, because guessing where it was meant to
 // close would record text the file never held.
-func rooDiffSides(diff string) (replaced, written []string) {
+func rooDiffSides(diff string, m diffMarkers) (replaced, written []string) {
 	lines := strings.Split(diff, "\n")
 	for i := 0; i < len(lines); i++ {
-		if !strings.HasPrefix(strings.TrimSpace(lines[i]), rooSearchMarker) {
+		if !rooMarker(lines[i], m.search) {
 			continue
 		}
 		i++
 		i = rooSkipBlockHeader(lines, i)
-		before, next, ok := rooCollect(lines, i, rooMiddleMarker)
+		before, next, ok := rooCollect(lines, i, m.middle)
 		if !ok {
 			return replaced, written
 		}
-		after, next, ok := rooCollect(lines, next+1, rooReplaceMarker)
+		after, next, ok := rooCollect(lines, next+1, m.replace)
 		if !ok {
 			return replaced, written
 		}
@@ -73,10 +105,16 @@ func rooSkipBlockHeader(lines []string, i int) int {
 	return i
 }
 
-// rooCollect reads lines until the marker, and reports whether it found one.
-func rooCollect(lines []string, i int, marker string) (body []string, at int, ok bool) {
+// rooMarker reports whether a line is a marker, trailing whitespace and a
+// CRLF's \r aside.
+func rooMarker(line string, marker *regexp.Regexp) bool {
+	return marker.MatchString(strings.TrimRight(line, " \t\r"))
+}
+
+// rooCollect reads lines until a marker, and reports whether it found one.
+func rooCollect(lines []string, i int, markers *regexp.Regexp) (body []string, at int, ok bool) {
 	for ; i < len(lines); i++ {
-		if strings.HasPrefix(strings.TrimSpace(lines[i]), marker) {
+		if rooMarker(lines[i], markers) {
 			return body, i, true
 		}
 		body = append(body, lines[i])
@@ -112,6 +150,30 @@ func rooResolvePaths(record, workspace string) string {
 	return strings.Join(lines, "\n")
 }
 
+// rooPatchPaths adds the files an apply_patch call names to a files record.
+// The patch carries them in its own headers, not under an argument (#4419),
+// and the call names it `patch` in Roo, `input` in Cline (#4504).
+func rooPatchPaths(blocks []any, record string) string {
+	seen := map[string]bool{}
+	var out []string
+	if record != "" {
+		out = strings.Split(record, "\n")
+		for _, p := range out {
+			seen[p] = true
+		}
+	}
+	for _, patch := range applyPatchInputs(blocks, rooDialect) {
+		files, _, _ := applyPatch(patch, nil)
+		for _, p := range files {
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
 // rooEditRecords turns the edit calls in one message into the replaced side
 // ("path\nspan") and the written side (WroteRecord), in the order the calls
 // were made.
@@ -121,7 +183,18 @@ func rooEditRecords(blocks []any, workspace string) (spans, wrote []string) {
 		if !ok || !rooEditTools[name] {
 			continue
 		}
+		if name == "apply_patch" {
+			for _, patch := range applyPatchInputs([]any{it}, rooDialect) {
+				_, sp, wr := applyPatch(patch, func(p string) string { return rooAbsPath(p, workspace) })
+				spans = append(spans, sp...)
+				wrote = append(wrote, wr...)
+			}
+			continue
+		}
 		path, _ := in["path"].(string)
+		if path == "" {
+			path, _ = in["file_path"].(string)
+		}
 		// "path\nspan" cannot hold a path with a newline in it, the same
 		// reason the shared helper drops those edits (#2042).
 		if path == "" || strings.ContainsAny(path, "\n\r") {
@@ -149,10 +222,18 @@ func rooEditRecords(blocks []any, workspace string) (spans, wrote []string) {
 
 func rooCallSides(name string, in map[string]any) (replaced, written []string) {
 	switch name {
-	case "apply_diff", "replace_in_file":
+	case "apply_diff":
 		diff, _ := in["diff"].(string)
-		return rooDiffSides(diff)
+		return rooDiffSides(diff, rooMarkers)
+	case "replace_in_file":
+		diff, _ := in["diff"].(string)
+		return rooDiffSides(diff, clineMarkers)
 	case "search_and_replace":
+		// Current Roo keeps search_and_replace as an alias of edit and writes
+		// the alias with edit's arguments (#4531).
+		if _, ok := in["old_string"]; ok {
+			return rooCallSides("edit", in)
+		}
 		// A regular expression is not the text that stopped existing, so only
 		// a literal search is recorded as the replaced side. The written side
 		// of a regex replacement carries $1 and friends, which is not a line
@@ -160,14 +241,49 @@ func rooCallSides(name string, in map[string]any) (replaced, written []string) {
 		if rooTruthy(in["use_regex"]) {
 			return nil, nil
 		}
+		// Kilo Code's takes a list of literal pairs under operations
+		// (#4535).
+		if ops, ok := in["operations"].([]any); ok {
+			for _, op := range ops {
+				m, _ := op.(map[string]any)
+				search, _ := m["search"].(string)
+				replace, _ := m["replace"].(string)
+				replaced = append(replaced, search)
+				written = append(written, replace)
+			}
+			return replaced, written
+		}
 		search, _ := in["search"].(string)
 		replace, _ := in["replace"].(string)
 		return []string{search}, []string{replace}
-	case "write_to_file", "insert_content":
+	case "search_replace", "edit_file", "edit":
+		old, _ := in["old_string"].(string)
+		neu, _ := in["new_string"].(string)
+		return []string{old}, []string{neu}
+	case "write_to_file", "insert_content", "write_file":
 		content, _ := in["content"].(string)
 		return nil, []string{content}
+	case "fast_edit_file":
+		edit, _ := in["code_edit"].(string)
+		return nil, []string{withoutElisions(edit)}
 	}
 	return nil, nil
+}
+
+// rooFoldTargetFile puts Kilo Code's fast_edit_file target_file under path,
+// the key the shared readers take the file from (#4535).
+func rooFoldTargetFile(blocks []any) {
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, rooDialect)
+		if !ok || name != "fast_edit_file" {
+			continue
+		}
+		if _, has := in["path"]; !has {
+			if p, _ := in["target_file"].(string); p != "" {
+				in["path"] = p
+			}
+		}
+	}
 }
 
 // rooTruthy reads a flag that arrives as a bool from the JSON history and as a

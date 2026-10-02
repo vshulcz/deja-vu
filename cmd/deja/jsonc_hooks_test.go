@@ -69,7 +69,7 @@ func TestTheGeminiHookSwitchReadsWhatIsThere(t *testing.T) {
 			if err := os.WriteFile(path, []byte(c.before), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if err := enableGeminiHooks(); err != nil {
+			if _, err := enableGeminiHooks(); err != nil {
 				t.Fatal(err)
 			}
 			b, err := os.ReadFile(path)
@@ -177,7 +177,7 @@ func TestTheGeminiSwitchRefusesABlockItCannotEdit(t *testing.T) {
 		if err := os.WriteFile(path, []byte(before), 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := enableGeminiHooks(); err == nil {
+		if _, err := enableGeminiHooks(); err == nil {
 			b, _ := os.ReadFile(path)
 			t.Errorf("a block deja cannot edit was accepted:\n%s", b)
 		}

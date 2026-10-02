@@ -158,5 +158,6 @@ func kiroFixtureRoot(t *testing.T) string {
 		t.Fatal(err)
 	}
 	t.Setenv("DEJA_KIRO_ROOT", root)
+	t.Setenv("DEJA_KIRO_DB", filepath.Join(t.TempDir(), "data.sqlite3"))
 	return root
 }

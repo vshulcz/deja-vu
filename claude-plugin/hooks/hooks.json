@@ -1,0 +1,18 @@
+{
+  "description": "Events Claude Code before 2.0.56 does not know. Kept out of plugin.json: an older Claude rejects the whole manifest over one, and skips only this file.",
+  "hooks": {
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh\" hook-tool-after",
+            "timeout": 10,
+            "statusMessage": "Checking what fixed this before…"
+          }
+        ]
+      }
+    ]
+  }
+}

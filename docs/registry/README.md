@@ -33,7 +33,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [Senpi](senpi.md) | pi's session JSONL under its own agent directory |
 | [gajae-code](gjc.md) | pi's session JSONL, sub-agent passes one level down |
 | [Kimchi Coding](kimchi.md) | pi's session JSONL, flat root |
-| [Command Code](commandcode.md) | flat role/content JSONL per session |
+| [Command Code](commandcode.md) | session header + message envelopes, JSONL per session |
 | [ZCode](zcode.md) | flat role/content JSONL per session, plus the CLI's OpenCode-schema SQLite |
 | [CodeWhale](codewhale.md) | one JSON document per session, Anthropic-shaped content blocks |
 | [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory |

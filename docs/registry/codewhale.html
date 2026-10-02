@@ -44,7 +44,7 @@
 <li><strong>Read overrides</strong>: <code>DEJA_CODEWHALE_ROOT</code> replaces the current session directory (the legacy one is still read while it exists); <code>CODEWHALE_HOME</code> moves the whole store and turns the legacy root off</li>
 <li><strong>Format</strong>: JSON — <code>{schema_version, metadata, messages}</code>, pretty-printed</li>
 <li><strong>Needs</strong>: nothing</li>
-<li><strong>Resume</strong>: <code>codewhale --resume &lt;id&gt;</code>, run in the workspace the session was worked in — <code>--session-id</code> is its alias and <code>codewhale exec</code> takes both (checked against 0.9.13)</li>
+<li><strong>Resume</strong>: <code>cd &lt;metadata.workspace&gt; &amp;&amp; codewhale --resume &lt;id&gt;</code>, the absolute workspace from the session file, with no <code>cd</code> and a note when it is gone (#4362, #4460) — <code>--session-id</code> is its alias and <code>codewhale exec</code> takes both (checked against 0.9.13)</li>
 </ul>
 <p>CodeWhale is a terminal agent written in Rust. It shipped as <code>deepseek-tui</code></p>
 <p>until v0.8.41 and under its own name since; the provider integration did not</p>
@@ -56,7 +56,20 @@
 <p><code>{role, content}</code>, where content is the block list Anthropic&#39;s API uses —</p>
 <p><code>text</code>, <code>thinking</code>, <code>tool_use</code>, <code>tool_result</code> — so the decoding the Cline and</p>
 <p>Claude readers already do applies here: a call becomes a command or a file</p>
-<p>record, a <code>tool_result</code> becomes tool output, error runs included.</p>
+<p>record, a <code>tool_result</code> becomes tool output, error runs included. Since 0.9.6</p>
+<p>new turns use <code>read</code>, <code>write</code>, <code>edit</code> and <code>bash</code>, where <code>edit</code> takes</p>
+<p><code>edits[{oldText,newText}]</code> (also sent as a JSON string, or as one top-level</p>
+<p><code>oldText</code>/<code>newText</code> pair, both read the same way); the older <code>read_file</code>, <code>write_file</code> and <code>edit_file</code></p>
+<p>names are still read for sessions saved before. Commands also run through</p>
+<p><code>terminal/run</code> (a PTY session) and <code>task_shell_start</code> (a background task), both</p>
+<p>under <code>command</code>, and are read as commands (#4538). <code>apply_patch</code> takes a</p>
+<p>unified diff (<code>--- a/x</code> / <code>+++ b/x</code>, not codex&#39;s <code>*** Begin Patch</code>) under</p>
+<p><code>patch</code>, retargeted to <code>path</code> when that is set, or whole files under <code>replace</code></p>
+<p>(deprecated alias <code>changes</code>) as <code>{path, content}</code>; the files, each hunk&#39;s</p>
+<p>removed lines and the added lines or contents are read, paths under the</p>
+<p>workspace. A call whose <code>tool_result</code> has <code>is_error</code> is not recorded (#4538). A failed <code>bash</code> result has</p>
+<p><code>is_error</code> and ends &#34;Command exited with code N&#34;; the command it answers, by</p>
+<p><code>tool_use_id</code>, carries that as <code>→ exit N</code> (#4537).</p>
 <p><code>thinking</code> blocks are dropped. So are the <code>system</code> and <code>developer</code> roles:</p>
 <p>CodeWhale&#39;s own documentation names them as where it puts compaction summaries,</p>
 <p>branch summaries and sub-agent framing, which is the harness talking to itself</p>
@@ -75,7 +88,7 @@
 <ul>
 <li><strong>Bookkeeping sits beside the transcripts.</strong> <code>offline_queue.json</code>,</li>
 </ul>
-<p><code>owners.json</code> and the <code>checkpoints/</code> slot share the sessions directory; they</p>
+<p><code>session_boot_owners.json</code> and the <code>checkpoints/</code> slot share the sessions directory; they</p>
 <p>are named rather than counted, so drift in the store still shows up as an</p>
 <p>unread file.</p>
 <ul>

@@ -46,7 +46,7 @@
 <li><strong>Read overrides</strong>: <code>DEJA_REASONIX_ROOT</code> replaces the state root; pointed at a <code>sessions</code> directory it reads that directory alone</li>
 <li><strong>Format</strong>: 1.x — an event log of zstd frames; JSONL — one message per line, no envelope</li>
 <li><strong>Needs</strong>: the <code>zstd</code> CLI for 1.x sessions; nothing for JSONL</li>
-<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace is resumed by its file path. 1.x sessions in the global or desktop store have no resume command</li>
+<li><strong>Resume</strong>: <code>reasonix --resume &lt;id&gt;</code>, run in the workspace the session was worked in; a JSONL session saved with no workspace, or whose workspace is gone, is resumed by its file path from anywhere, and a 1.x session whose workspace is gone is refused with <code>deja show</code> (#4459). 1.x sessions in the global or desktop store have no resume command</li>
 </ul>
 <p>Reasonix is a Go coding agent built around DeepSeek&#39;s prefix cache. The</p>
 <p>layout above comes from its own resolver, <code>internal/contract/config</code></p>
@@ -58,13 +58,19 @@
 <p>v0.x builds wrote OpenAI&#39;s nested <code>{id, type, function: {name, arguments}}</code></p>
 <p>instead, and both are read. <code>bash</code> becomes a command record, <code>read_file</code>,</p>
 <p><code>write_file</code>, <code>edit_file</code> and <code>multi_edit</code> become file records, and the edits</p>
-<p>keep the replaced span. A <code>tool</code> line is tool output. <code>system</code> lines and user</p>
+<p>keep the replaced span. <code>notebook_edit</code>, <code>delete_range</code> and <code>delete_symbol</code></p>
+<p>name their file under <code>path</code> and <code>move_file</code> two, under <code>source_path</code> and</p>
+<p><code>destination_path</code>; <code>notebook_edit</code>&#39;s <code>new_source</code> is the written side unless</p>
+<p>its <code>edit_mode</code> is <code>delete</code>, and <code>delete_range</code>, which names only anchors, has</p>
+<p>its removed lines read from the unified diff its result returns — a call that</p>
+<p>failed returns an error and gives none (#4541). A <code>tool</code> line is tool output. <code>system</code> lines and user</p>
 <p>lines marked <code>host_authored</code> are dropped: the host wrote them, not the person.</p>
 <p>Where <code>raw_content</code> is set on a user or tool line it is the text before the</p>
 <p>host added context or cut a result for the model, and that is what is indexed.</p>
 <p>Beside each transcript sits <code>&lt;id&gt;.jsonl.meta</code>, which carries <code>created_at</code>,</p>
 <p><code>updated_at</code>, <code>workspace_root</code> and the titles (<code>custom_title</code>, <code>topic_title</code>,</p>
-<p><code>name</code>). The session&#39;s clock and project come from there.</p>
+<p><code>name</code>). The session&#39;s clock and project come from there, and a rename that</p>
+<p>rewrites only this file re-reads the session (#4446).</p>
 <h2 id="1-x-session-directories">1.x session directories</h2>
 <p>Reasonix 1.x (npm <code>reasonix</code> 1.x, branch <code>main-v2</code>) keeps each session as a</p>
 <p>directory: <code>manifest.json</code> (<code>sessionId</code>, <code>createdAt</code>, <code>codec</code></p>
@@ -123,7 +129,9 @@
 <p>approval) get nothing. Reasonix stores the typed text as <code>raw_content</code>, and</p>
 <p>that is what deja indexes. At <code>tool.after</code> it adds the pre-tool line for a</p>
 <p>shell command (<code>bash</code>, or <code>pwsh</code> and <code>powershell</code> on Windows) or a file</p>
-<p>write, and when a command failed, what fixed the same failure before. Both</p>
+<p>write — <code>write_file</code>, <code>edit_file</code>, <code>multi_edit</code>, <code>notebook_edit</code>,</p>
+<p><code>delete_range</code>, <code>delete_symbol</code>, and <code>move_file</code> under the file it moved</p>
+<p>from (#4541) — and when a command failed, what fixed the same failure before. Both</p>
 <p>go after the output; for output Reasonix will cut to a CI summary (first</p>
 <p>and last eight lines) they go in front, on one line. At</p>
 <p><code>compaction.prepare</code> it adds deja&#39;s record of the folded turns, read from</p>

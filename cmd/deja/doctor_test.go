@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -591,7 +592,7 @@ func TestDoctorCodexHookStates(t *testing.T) {
 		[]byte(`{"hooks":{`+strings.Join(entries, ",")+`}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\nenabled = false\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte("[hooks.state."+strconv.Quote(filepath.Join(codexHome, "hooks.json")+":session_start:0:0")+"]\ntrusted_hash = \"sha256:aa\"\nenabled = false\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()
@@ -618,7 +619,7 @@ func TestDoctorCodexHookStates(t *testing.T) {
 	// pin — its value is not the hook file's sha256 — and comparing the two
 	// reported every working install as untrusted.
 	if err := os.WriteFile(filepath.Join(codexHome, "config.toml"),
-		[]byte("[hooks.state.\"/x/hooks.json:session_start:0:0\"]\ntrusted_hash = \"sha256:aa\"\n"), 0o644); err != nil {
+		[]byte("[hooks.state."+strconv.Quote(filepath.Join(codexHome, "hooks.json")+":session_start:0:0")+"]\ntrusted_hash = \"sha256:aa\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	out.Reset()

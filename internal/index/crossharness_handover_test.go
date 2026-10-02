@@ -41,19 +41,25 @@ func TestASessionStartReachesTheOtherAgentsWorkInThisCheckout(t *testing.T) {
 	}
 	touched := filepath.Join(repo, "pool.go")
 
-	// Claude's project directory is the encoded working directory, which
-	// decodes to parent/base — where codex keeps the bare name. That is the
-	// "one contains the other" shape, 84 of the 144 disagreements.
+	// Claude was started in a subdirectory of the checkout, so its project is
+	// named after that directory, pool/internal, where codex's is src/pool:
+	// the "one contains the other" shape, 84 of the 144 disagreements. Both
+	// name a directory the same way now (#4457), so a different starting
+	// directory is what still gives one checkout two names.
 	// A drive letter's colon cannot be part of a directory name on Windows,
 	// and the encoder drops it there too.
-	encoded := strings.ReplaceAll(strings.ReplaceAll(filepath.ToSlash(repo), ":", ""), "/", "-")
+	sub := filepath.Join(repo, "internal")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	encoded := strings.ReplaceAll(strings.ReplaceAll(filepath.ToSlash(sub), ":", ""), "/", "-")
 	writeLines(t, filepath.Join(claude, encoded, "c1.jsonl"),
-		claudeLineAt("c1", "2026-03-01T09:00:00Z", "the pool leaked connections under load", repo),
-		claudeEditAt("c1", "2026-03-01T09:05:00Z", touched, repo))
+		claudeLineAt("c1", "2026-03-01T09:00:00Z", "the pool leaked connections under load", sub),
+		claudeEditAt("c1", "2026-03-01T09:05:00Z", touched, sub))
 
-	// Codex records the working directory, so the same checkout arrives under
-	// a different project string. This is the disagreement the measurement
-	// found in 85% of cross-harness pairs.
+	// Codex records the checkout itself, so the same work arrives under a
+	// different project string. This is the disagreement the measurement found
+	// in 85% of cross-harness pairs.
 	write(t, filepath.Join(codex, "sessions", "2026", "03", "01", "rollout-2026-03-01T10-00-00-x1.jsonl"),
 		`{"type":"session_meta","timestamp":"2026-03-01T10:00:00Z","payload":{"session_id":"x1","cwd":`+jsonStr(repo)+`}}`+"\n"+
 			`{"timestamp":"2026-03-01T10:00:01Z","payload":{"role":"user","content":"the pool still leaks, fixed by closing the rows"}}`+"\n"+
@@ -86,7 +92,7 @@ func TestASessionStartReachesTheOtherAgentsWorkInThisCheckout(t *testing.T) {
 	}
 
 	// A session starting in the checkout sees both, whatever each was called.
-	got, err := RecentProjectsUnder(dir, []string{"pool"}, repo, 12)
+	got, err := RecentProjectsUnder(dir, []string{"src/pool"}, repo, 12)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +106,7 @@ func TestASessionStartReachesTheOtherAgentsWorkInThisCheckout(t *testing.T) {
 
 	// And the name alone does not: without the rescue, the agent whose project
 	// string differs is invisible, which is what the 144 pairs would have been.
-	byName, err := RecentProjects(dir, []string{"pool"}, 12)
+	byName, err := RecentProjects(dir, []string{"src/pool"}, 12)
 	if err != nil {
 		t.Fatal(err)
 	}

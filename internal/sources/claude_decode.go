@@ -101,7 +101,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
-		Project: claudeProjectName(claudeProjectDir(path)),
+		Project: claudeProjectNameFor(path),
 		Path:    path,
 	}
 	err := scan(func(line []byte) {
@@ -184,23 +184,15 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 					}
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 				}
-				// The result arrives in a later record and names the call. A
-				// transcript carries no exit code, so only the clean case is
-				// stated, in the marker every other harness writes — nothing is
-				// invented for a failure whose code nobody recorded.
+				// The result arrives in a later record and names the call, in
+				// the marker every other harness writes. A failure is stamped
+				// only with the code its result names; nothing is invented for
+				// one that names none.
 				for _, res := range claudeToolOutcomes(v.Message.Content) {
-					at, ok := commandAt[res.ID]
-					if !ok || res.Error {
+					if _, ok := commandAt[res.ID]; !ok || !res.Known {
 						continue
 					}
-					for _, i := range at {
-						if i >= len(s.Messages) {
-							continue
-						}
-						if !strings.Contains(s.Messages[i].Text, "  → exit ") {
-							s.Messages[i].Text += "  → exit 0"
-						}
-					}
+					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
 					delete(commandAt, res.ID)
 				}
 			}
@@ -209,8 +201,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	// A child run comes in as the task it was handed and the answer it came
-	// back with, unless the reader asked for the whole thing (#3009).
+	// A child run comes in as the task it was handed, the answer it came back
+	// with and what it changed, unless the reader asked for the whole thing
+	// (#3009, #4163).
 	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
@@ -409,7 +402,7 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 	// Reset before returning it as well as after taking it: a pooled reader
 	// must not keep the last file open through its reference.
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
-	r.Reset(f)
+	r.Reset(boundedFrom(path, f, offset))
 	for {
 		line, err := r.ReadBytes('\n')
 		if trimmed := trimJSONSpace(line); len(trimmed) > 0 {
@@ -447,6 +440,20 @@ func IndexToolPaths() bool { return os.Getenv("DEJA_INDEX_PATHS") != "0" }
 // prose-mention approach unusable.
 var pathTools = map[string]bool{"Read": true, "Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true}
 
+// claudeShellTools are the calls that run a command. PowerShell is Claude
+// Code's shell on Windows and takes `command` the way Bash does; reading Bash
+// alone left a Windows session with no command at all (#4489).
+var claudeShellTools = map[string]bool{"Bash": true, "PowerShell": true}
+
+// claudeCallPath is the file a call names: `file_path`, or `notebook_path`
+// on NotebookEdit, which names nothing under the first (#4489).
+func claudeCallPath(filePath, notebookPath string) string {
+	if filePath != "" {
+		return filePath
+	}
+	return notebookPath
+}
+
 // claudeToolPaths returns the distinct file paths a message's tool calls name,
 // one per line, or "" when it names none.
 func claudeToolPaths(raw json.RawMessage) string {
@@ -469,22 +476,24 @@ func claudeToolPaths(raw json.RawMessage) string {
 			Type  string `json:"type"`
 			Name  string `json:"name"`
 			Input struct {
-				FilePath string `json:"file_path"`
+				FilePath     string `json:"file_path"`
+				NotebookPath string `json:"notebook_path"`
 			} `json:"input"`
 		}
 		if json.Unmarshal(item, &part) != nil {
 			continue
 		}
-		if part.Type != "tool_use" || !pathTools[part.Name] || part.Input.FilePath == "" {
+		path := claudeCallPath(part.Input.FilePath, part.Input.NotebookPath)
+		if part.Type != "tool_use" || !pathTools[part.Name] || path == "" {
 			continue
 		}
 		// One path per line, split back apart by the index: a path carrying a
 		// newline arrives as two files the session never touched (#2042).
-		if seen[part.Input.FilePath] || strings.ContainsAny(part.Input.FilePath, "\n\r") {
+		if seen[path] || strings.ContainsAny(path, "\n\r") {
 			continue
 		}
-		seen[part.Input.FilePath] = true
-		out = append(out, part.Input.FilePath)
+		seen[path] = true
+		out = append(out, path)
 	}
 	return strings.Join(out, "\n")
 }
@@ -582,8 +591,13 @@ func claudeWroteRecords(raw json.RawMessage) []string {
 		var part struct {
 			Type  string `json:"type"`
 			Input struct {
-				FilePath  string `json:"file_path"`
-				NewString string `json:"new_string"`
+				FilePath     string `json:"file_path"`
+				NotebookPath string `json:"notebook_path"`
+				NewString    string `json:"new_string"`
+				// NotebookEdit's written side: the cell's new source, which
+				// a delete carries too and Claude Code discards (#4489).
+				NewSource string `json:"new_source"`
+				EditMode  string `json:"edit_mode"`
 				// A Write hands over the whole file, which is how a new file
 				// enters a repository — and a commit that adds a file is the
 				// case the replaced side can say nothing at all about.
@@ -596,11 +610,14 @@ func claudeWroteRecords(raw json.RawMessage) []string {
 		if json.Unmarshal(item, &part) != nil || part.Type != "tool_use" {
 			continue
 		}
-		path := part.Input.FilePath
+		path := claudeCallPath(part.Input.FilePath, part.Input.NotebookPath)
 		if path == "" {
 			continue
 		}
 		written := []string{part.Input.NewString, part.Input.Content}
+		if part.Input.EditMode != "delete" {
+			written = append(written, part.Input.NewSource)
+		}
 		for _, e := range part.Input.Edits {
 			written = append(written, e.NewString)
 		}
@@ -750,7 +767,7 @@ func claudeCommands(raw json.RawMessage) []claudeCommand {
 		if json.Unmarshal(item, &part) != nil {
 			continue
 		}
-		if part.Type != "tool_use" || part.Name != "Bash" || part.Input.Command == "" {
+		if part.Type != "tool_use" || !claudeShellTools[part.Name] || part.Input.Command == "" {
 			continue
 		}
 		if !worthIndexing(part.Input.Command) {
@@ -761,14 +778,17 @@ func claudeCommands(raw json.RawMessage) []claudeCommand {
 	return out
 }
 
-// claudeToolOutcome is one tool_result and whether the harness marked it a
-// failure. A Claude transcript records no exit code — `is_error` is all there
-// is — so a result that is not an error is the only outcome that can be stated,
-// and it is the one worth stating: it turns "this session ran X" into evidence
-// that X worked here.
+// claudeToolOutcome is one tool_result and the exit code it states. A clean
+// result is exit 0: it turns "this session ran X" into evidence that X worked
+// here. A failed Bash run opens its content with "Exit code N" — Claude Code
+// builds the error as [`Exit code ${code}`, stderr, stdout] — and before #4487
+// that line was not read, so a failure was stored like a run whose result
+// never came. An error that names no code (a denied or interrupted call) is
+// left unknown.
 type claudeToolOutcome struct {
 	ID    string
-	Error bool
+	Code  int
+	Known bool
 }
 
 func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
@@ -787,16 +807,30 @@ func claudeToolOutcomes(raw json.RawMessage) []claudeToolOutcome {
 			continue
 		}
 		var part struct {
-			Type      string `json:"type"`
-			ToolUseID string `json:"tool_use_id"`
-			IsError   bool   `json:"is_error"`
+			Type      string          `json:"type"`
+			ToolUseID string          `json:"tool_use_id"`
+			IsError   bool            `json:"is_error"`
+			Content   json.RawMessage `json:"content"`
 		}
 		if json.Unmarshal(item, &part) != nil || part.Type != "tool_result" || part.ToolUseID == "" {
 			continue
 		}
-		out = append(out, claudeToolOutcome{ID: part.ToolUseID, Error: part.IsError})
+		var content any
+		if part.IsError {
+			_ = json.Unmarshal(part.Content, &content)
+		}
+		out = append(out, claudeOutcome(part.ToolUseID, part.IsError, content))
 	}
 	return out
+}
+
+// claudeOutcome reads the exit code off one tool_result, for both parsers.
+func claudeOutcome(id string, failed bool, content any) claudeToolOutcome {
+	if !failed {
+		return claudeToolOutcome{ID: id, Known: true}
+	}
+	code, ok := statusCode(firstLine(contentText(content)), "Exit code ", "")
+	return claudeToolOutcome{ID: id, Code: code, Known: ok && code != 0}
 }
 
 // claudeCallIdentity is which API call a record reports on: the requestId when

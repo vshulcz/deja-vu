@@ -35,8 +35,8 @@ func TestParseAmpThread(t *testing.T) {
 	if s.Harness != "amp" || s.ID != "thread-abc" || s.Title != "Fix the parser" {
 		t.Fatalf("identity = %#v", s)
 	}
-	if s.Project != "amp-project" {
-		t.Fatalf("project = %q, want amp-project", s.Project)
+	if s.Project != "tmp/amp-project" {
+		t.Fatalf("project = %q, want tmp/amp-project", s.Project)
 	}
 	if s.Path != path {
 		t.Fatalf("path = %q, want %q", s.Path, path)

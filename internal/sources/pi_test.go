@@ -47,7 +47,9 @@ func TestParsePiFile(t *testing.T) {
 	if s.ID != "abc-123" {
 		t.Fatalf("id = %q, want abc-123", s.ID)
 	}
-	if want := "vu/" + unique; s.Project != want {
+	// The header's cwd names it; the folder is the fallback for a header
+	// without one (#4427).
+	if want := "tmp/deja-vu-fixture"; s.Project != want {
 		t.Fatalf("project = %q, want %q", s.Project, want)
 	}
 	if len(s.Messages) != 4 {

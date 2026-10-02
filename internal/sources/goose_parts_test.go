@@ -26,7 +26,8 @@ const (
 // answer from, and friction and the fix pairs never saw the error a build
 // printed.
 func TestGooseKeepsTheCommandAndWhatItPrinted(t *testing.T) {
-	speech, toolOut, commands, _ := gooseParts(gooseToolRequestJSON)
+	p := gooseParts(gooseToolRequestJSON)
+	speech, toolOut, commands := p.speech, p.toolOut, p.commands
 	if speech != "Running the build now." {
 		t.Errorf("speech = %q", speech)
 	}
@@ -37,7 +38,8 @@ func TestGooseKeepsTheCommandAndWhatItPrinted(t *testing.T) {
 		t.Errorf("a request is not output: %q", toolOut)
 	}
 
-	speech, toolOut, commands, _ = gooseParts(gooseToolResponseJSON)
+	p = gooseParts(gooseToolResponseJSON)
+	speech, toolOut, commands = p.speech, p.toolOut, p.commands
 	if !strings.Contains(toolOut, "undefined: snorblefunc") || !strings.Contains(toolOut, "exit status 2") {
 		t.Errorf("tool output = %q", toolOut)
 	}
@@ -77,7 +79,7 @@ func TestAGooseEditorCallNamesItsFile(t *testing.T) {
 	for _, key := range []string{"path", "file_path"} {
 		raw := `[{"type":"toolRequest","id":"t2","toolCall":{"status":"success","value":` +
 			`{"name":"developer__text_editor","arguments":{"` + key + `":"/w/app/queue.go","command":"str_replace"}}}}]`
-		_, _, _, paths := gooseParts(raw)
+		paths := gooseParts(raw).paths
 		if len(paths) != 1 || paths[0] != "/w/app/queue.go" {
 			t.Errorf("%s: paths = %q", key, paths)
 		}
@@ -89,7 +91,7 @@ func TestAGooseEditorCallNamesItsFile(t *testing.T) {
 func TestAFailedGooseToolStillCarriesWhatWentWrong(t *testing.T) {
 	raw := `[{"type":"toolResponse","id":"t3","toolResult":{"status":"error",` +
 		`"error":{"code":-32603,"message":"command not found: shellcheck"}}}]`
-	_, toolOut, _, _ := gooseParts(raw)
+	toolOut := gooseParts(raw).toolOut
 	if !strings.Contains(toolOut, "command not found: shellcheck") {
 		t.Errorf("tool output = %q", toolOut)
 	}
@@ -100,7 +102,7 @@ func TestAFailedGooseToolStillCarriesWhatWentWrong(t *testing.T) {
 // and deja indexed it as something the person said.
 func TestTheGooseTurnEnvelopeIsNotIndexedAsSpeech(t *testing.T) {
 	raw := `[{"type":"text","text":"<turn-context>\n<current-time>2026-09-02 01:07:00 +03:00</current-time>\n<working-directory>/private/tmp</working-directory>\n</turn-context>"}]`
-	speech, _, _, _ := gooseParts(raw)
+	speech := gooseParts(raw).speech
 	if speech != "" {
 		t.Errorf("the envelope was kept as speech: %q", speech)
 	}
@@ -108,7 +110,7 @@ func TestTheGooseTurnEnvelopeIsNotIndexedAsSpeech(t *testing.T) {
 	// Stripped, not dropped whole: a turn that carries the envelope and real
 	// words has to keep the words.
 	both := `[{"type":"text","text":"<turn-context>\n<current-time>x</current-time>\n</turn-context>\nraise the pool to 40"}]`
-	speech, _, _, _ = gooseParts(both)
+	speech = gooseParts(both).speech
 	if speech != "raise the pool to 40" {
 		t.Errorf("speech = %q, want the words without the envelope", speech)
 	}
@@ -121,9 +123,8 @@ func TestAGooseRowWithNothingToIndexIsSkipped(t *testing.T) {
 		`[]`,
 		`[{"type":"text","text":"   "}]`,
 	} {
-		speech, toolOut, commands, paths := gooseParts(raw)
-		if speech != "" || toolOut != "" || len(commands) != 0 || len(paths) != 0 {
-			t.Errorf("%s produced %q %q %q %q", raw, speech, toolOut, commands, paths)
+		if p := gooseParts(raw); !p.empty() {
+			t.Errorf("%s produced %+v", raw, p)
 		}
 	}
 }
@@ -132,7 +133,6 @@ func TestAGooseRowWithNothingToIndexIsSkipped(t *testing.T) {
 func gooseSessionFrom(t *testing.T, role, raw string) model.Session {
 	t.Helper()
 	var s model.Session
-	speech, toolOut, commands, paths := gooseParts(raw)
-	appendGooseParts(&s, role, time.Unix(0, 0), speech, toolOut, commands, paths)
+	appendGooseParts(&s, role, time.Unix(0, 0), gooseParts(raw), nil)
 	return s
 }

@@ -295,6 +295,9 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 	var turns []struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
+		// Roo stamps every turn in epoch milliseconds. A float, so a value
+		// written with a fraction does not fail the whole task.
+		TS float64 `json:"ts"`
 	}
 	if err := json.Unmarshal(b, &turns); err != nil {
 		// One document per task, as in cline: a file that will not parse is a
@@ -310,7 +313,7 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 	if hb, err := os.ReadFile(filepath.Join(taskDir, "history_item.json")); err == nil && json.Unmarshal(hb, &item) == nil {
 		s.Title = firstLineTrim(item.Task)
 		if item.Workspace != "" {
-			s.Project = claudeProjectName(pathToProjectKey(item.Workspace))
+			s.Project = projectName(item.Workspace)
 		}
 		if item.TS > 0 {
 			base = time.UnixMilli(item.TS)
@@ -321,23 +324,41 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 			base = fi.ModTime()
 		}
 	}
+	contents := make([]json.RawMessage, len(turns))
+	for i, m := range turns {
+		contents[i] = m.Content
+	}
+	xmlEra := rooXMLEra(contents)
+	exits := commandExits{}
 	for ti, m := range turns {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
+		// A turn's own ts first: history_item's is when the task was last
+		// touched, so counting seconds from it put a long task at its end and
+		// past the clock (#4420). A turn without one keeps that scheme.
 		ts := base.Add(time.Duration(ti) * time.Second)
-		if m.Role == "user" {
-			if tool := clineTurnToolOutput(m.Content, ts); len(tool) > 0 {
-				s.Touch(ts)
-				s.Messages = append(s.Messages, tool...)
-			}
-		} else if work := rooWorkRecords(m.Content, ts, item.Workspace); len(work) > 0 {
-			s.Touch(ts)
-			s.Messages = append(s.Messages, work...)
+		if m.TS > 0 {
+			ts = time.UnixMilli(int64(m.TS))
 		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
-			text = unwrapClineTask(text)
+			// A result of the XML era is a text block, not a tool_result
+			// (#4424), so the person's words are what is left beside it.
+			results, words := rooUserTurn(m.Content, xmlEra)
+			tool := append(clineTurnToolOutput(m.Content, ts), rooLegacyToolOutput(results, ts)...)
+			if len(tool) > 0 {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, tool...)
+			}
+			clineJoinExits(s.Messages, len(s.Messages), m.Content, rooDialect, exits)
+			text = unwrapClineTask(words)
+		} else if work := rooWorkRecords(m.Content, ts, item.Workspace, xmlEra); len(work) > 0 {
+			s.Touch(ts)
+			from := len(s.Messages)
+			s.Messages = append(s.Messages, work...)
+			// The result of an execute_command says how it ended (#4530).
+			clineJoinExits(s.Messages, from, m.Content, rooDialect, exits)
 		}
 		if text == "" {
 			continue

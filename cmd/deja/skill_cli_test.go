@@ -136,10 +136,47 @@ func TestRemoveCLISkillLeavesOneTheUserRewrote(t *testing.T) {
 
 // The copy in the repo is what a reader sees on GitHub and what someone on a
 // machine deja cannot write to copies by hand. It has to be the file the binary
-// would have written.
+// would have written, plus the registry block only ClawHub reads (#4378).
 func TestBundledCLISkillMatchesTheInstaller(t *testing.T) {
 	got := string(repoFile(t, filepath.Join("skills", "deja-search", "SKILL.md")))
-	if got != cliSkillFile() {
-		t.Errorf("skills/deja-search/SKILL.md has drifted from cliSkillFile:\n--- file ---\n%s\n--- installer ---\n%s", got, cliSkillFile())
+	if got != cliSkillRegistryFile() {
+		t.Errorf("skills/deja-search/SKILL.md has drifted from cliSkillRegistryFile:\n--- file ---\n%s\n--- installer ---\n%s", got, cliSkillRegistryFile())
+	}
+	if strings.Replace(got, "\n"+cliSkillMeta, "", 1) != cliSkillFile() {
+		t.Error("the registry copy differs from the installed skill by more than its metadata")
+	}
+}
+
+// The Agent Skills spec types `metadata` as string keys to string values, and a
+// reader that decodes it that way drops the whole skill when a value is a
+// nested map: Crush 0.97.1 rejected deja-search on every start with "cannot
+// unmarshal !!map into string" (#4378). Every skill deja writes into a shared
+// skills directory has to be one such a reader accepts.
+func TestInstalledSkillsKeepMetadataFlat(t *testing.T) {
+	for name, file := range map[string]string{
+		"deja-search":  cliSkillFile(),
+		"deja-history": skillFile(""),
+	} {
+		parts := strings.SplitN(file, "---\n", 3)
+		if len(parts) != 3 || parts[0] != "" {
+			t.Fatalf("%s: no frontmatter:\n%s", name, file)
+		}
+		inMeta := false
+		for _, line := range strings.Split(strings.TrimSuffix(parts[1], "\n"), "\n") {
+			switch {
+			case line == "metadata:":
+				inMeta = true
+			case !strings.HasPrefix(line, " "):
+				inMeta = false
+				if strings.HasPrefix(line, "metadata:") {
+					t.Errorf("%s: metadata is not a block of string values: %q", name, line)
+				}
+			case inMeta:
+				k, v, ok := strings.Cut(strings.TrimPrefix(line, "  "), ": ")
+				if !ok || strings.HasPrefix(line, "   ") || strings.Contains(k, " ") || v == "" || strings.ContainsAny(v[:1], "{[|>") {
+					t.Errorf("%s: metadata value is not a string: %q", name, line)
+				}
+			}
+		}
 	}
 }

@@ -64,7 +64,26 @@ type wiringState struct {
 	// a second one beside it (#3421). The record is what makes the answer
 	// certain rather than a guess about names.
 	Exes []string `json:"exes,omitempty"`
+	// Written is the path the configs name when it is not Exe itself: a link
+	// that resolves to it, which survives the upgrade that replaces Exe
+	// (#4189). Remove the link and the configs are dead while Exe is still
+	// there, so the repair checks this too.
+	Written string `json:"written,omitempty"`
 }
+
+// writtenStillResolves reports whether the path the configs name still leads
+// to exe.
+func (st wiringState) writtenStillResolves(exe string) bool {
+	if st.Written == "" {
+		return true
+	}
+	r, err := filepath.EvalSymlinks(st.Written)
+	return err == nil && r == exe
+}
+
+// wiringWrittenExe is the path this run wrote into configs, when the repair
+// chose a link; recordWiring keeps it as Written.
+var wiringWrittenExe string
 
 // wiringExeHistory bounds the remembered paths. Ten covers a machine that
 // reinstalls often; beyond that the oldest is dropped.
@@ -198,10 +217,20 @@ func recordWiring(targets []string, uninstall bool) {
 		}
 	}
 	sort.Strings(kept)
-	exe, _ := os.Executable()
-	exe, _ = filepath.Abs(exe)
+	invoked, _ := runningExe()
+	invoked, _ = filepath.Abs(invoked)
+	exe := invoked
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
+	}
+	// What the configs were given: install writes the binary as it was
+	// started, the repair whatever stableExe chose.
+	written := invoked
+	if wiringWrittenExe != "" {
+		written = wiringWrittenExe
+	}
+	if written == exe {
+		written = ""
 	}
 	// Uninstalling everything on a machine that was never wired would otherwise
 	// create the record on the way out — a file left behind by the command that
@@ -263,8 +292,9 @@ func recordWiring(targets []string, uninstall bool) {
 	sort.Strings(blocks)
 	exes := append([]string(nil), st.Exes...)
 	next := wiringState{Version: version, Targets: kept, Created: created, Dirs: dirs, Snapshots: snapshots,
-		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir()}
+		Blocks: blocks, Exe: exe, Exes: exes, Home: homeDir(), Written: written}
 	rememberWrittenExe(&next, exe)
+	rememberWrittenExe(&next, written)
 	st = next
 	b, err := json.MarshalIndent(st, "", "  ")
 	if err != nil {
@@ -329,6 +359,32 @@ func underTempDir(p string) bool {
 	return false
 }
 
+// runningExe is os.Executable, a variable so a test can run the repair as a
+// binary reached through a link.
+var runningExe = os.Executable
+
+// stableExe is the path to write for the running binary: a link that resolves
+// to it where there is one, the binary itself otherwise. A package manager
+// keeps each release in a versioned directory and moves a link to the new one
+// — Homebrew's Cellar and bin/deja — so an entry naming the resolved binary
+// breaks on the next upgrade and one naming the link does not (#4189). The
+// link the binary was started through comes first; Linux reports the resolved
+// binary as the executable, so the places the installers leave one are tried
+// after it.
+func stableExe(invoked, exe string) string {
+	for _, c := range append([]string{invoked}, launcherCandidates("")...) {
+		// A link in a temp directory goes when the directory does, which is
+		// what the resolved path was guarded against.
+		if c == "" || c == exe || exeIsTemporary(c) {
+			continue
+		}
+		if r, err := filepath.EvalSymlinks(c); err == nil && r == exe {
+			return c
+		}
+	}
+	return exe
+}
+
 // refreshWiringAfterUpgrade rewrites the recorded targets when the binary that
 // wrote them is not the one running now. It returns the targets it changed, so
 // a caller with somewhere to print can say so; the hook paths call it and stay
@@ -342,17 +398,18 @@ func refreshWiringAfterUpgrade() []string {
 	if len(st.Targets) == 0 || version == "" {
 		return nil
 	}
-	exe, err := os.Executable()
+	invoked, err := runningExe()
 	if err != nil {
 		return nil
 	}
-	exe, _ = filepath.Abs(exe)
+	invoked, _ = filepath.Abs(invoked)
+	exe := invoked
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
 	// Either the version or the path: a binary that moved writes the same
 	// version into configs that now name a file which is not there (#773).
-	if st.Version == version && (st.Exe == "" || st.Exe == exe) {
+	if st.Version == version && (st.Exe == "" || st.Exe == exe) && st.writtenStillResolves(exe) {
 		return nil
 	}
 	// But not a binary that will be gone tomorrow. The repair exists because
@@ -394,8 +451,12 @@ func refreshWiringAfterUpgrade() []string {
 	}
 	var changed []string
 	failed := false
+	// Compared resolved, written through the link.
+	write := stableExe(invoked, exe)
+	wiringWrittenExe = write
+	defer func() { wiringWrittenExe = "" }()
 	for _, target := range st.Targets {
-		res, err := installTarget(target, exe, false)
+		res, err := installTarget(target, write, false)
 		if err != nil {
 			// A harness the user has since removed is not an error worth
 			// surfacing: the next install run will drop it from the record.
@@ -407,7 +468,7 @@ func refreshWiringAfterUpgrade() []string {
 			stuckWiring = append(stuckWiring, target)
 			continue
 		}
-		cr, cerr := refreshCommandFile(target, exe)
+		cr, cerr := refreshCommandFile(target, write)
 		if cerr != nil {
 			failed = true
 			stuckWiring = append(stuckWiring, target)
@@ -578,7 +639,10 @@ func blockKey(path, name string) string { return path + "#" + name }
 
 // noteBlockAdded records that deja, not the reader, put this container there.
 func noteBlockAdded(path, name string) {
-	blocksAddedThisRun = append(blocksAddedThisRun, blockKey(path, name))
+	key := blockKey(path, name)
+	// The later of a take-back and an add in one process is the one that holds.
+	delete(blocksForgottenThisRun, key)
+	blocksAddedThisRun = append(blocksAddedThisRun, key)
 }
 
 // blockWasAdded reports whether deja added it, in this run or an earlier one.
@@ -590,4 +654,20 @@ func blockWasAdded(path, name string) bool {
 	return slices.Contains(readWiringState().Blocks, key)
 }
 
-func forgetBlockAdded(path, name string) { blocksForgottenThisRun[blockKey(path, name)] = true }
+// blocksAddedWithPrefix lists the names deja recorded for this file that
+// start with prefix — for a record that carries a value after its name.
+func blocksAddedWithPrefix(path, prefix string) []string {
+	var names []string
+	for _, key := range append(append([]string(nil), blocksAddedThisRun...), readWiringState().Blocks...) {
+		if name, ok := strings.CutPrefix(key, blockKey(path, prefix)); ok && !blocksForgottenThisRun[key] {
+			names = append(names, prefix+name)
+		}
+	}
+	return names
+}
+
+func forgetBlockAdded(path, name string) {
+	key := blockKey(path, name)
+	blocksForgottenThisRun[key] = true
+	blocksAddedThisRun = slices.DeleteFunc(blocksAddedThisRun, func(b string) bool { return b == key })
+}

@@ -414,7 +414,7 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 	}
 	s := model.Session{Harness: "reasonix", ID: id, Path: path, Title: firstLineTrim(tr.title)}
 	if ws := reasonixV4Workspace(path, tr.workspace); ws != "" {
-		s.Project = claudeProjectName(pathToProjectKey(ws))
+		s.Project = projectName(ws)
 	} else if slug := reasonixV4Slug(path); slug != "" {
 		s.Project = claudeProjectName(slug)
 	}
@@ -425,6 +425,7 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 	}
 	clock := start.Add(-time.Millisecond)
 	commandAt := map[string][]int{}
+	ranges := reasonixRangeCalls{}
 	for _, msg := range tr.msgs {
 		// The host wrote these, not the person: the session-context snapshot
 		// (origin "host", provider/message_origin.go) and the local-only
@@ -450,6 +451,7 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 			if msg.Role != "assistant" {
 				continue
 			}
+			ranges.note(msg.ToolCalls)
 			calls, _ := msg.ToolCalls.([]any)
 			for _, c := range calls {
 				callID, _ := mapGet(c, "id").(string)
@@ -462,6 +464,10 @@ func ParseReasonixV4(path string) ([]model.Session, error) {
 				}
 			}
 		case "tool":
+			for _, rec := range ranges.spans(msg.ToolCallID, text, ts) {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, rec)
+			}
 			// A non-zero exit rides on the command, the way opencode's does.
 			if ex := msg.ToolExecution; ex != nil && ex.ExitCode != nil && *ex.ExitCode > 0 {
 				for _, i := range commandAt[msg.ToolCallID] {

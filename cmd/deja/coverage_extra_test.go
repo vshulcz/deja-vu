@@ -311,7 +311,7 @@ func TestResumeRemainingHarnessBranches(t *testing.T) {
 		{model.Session{Harness: "antigravity", ID: "ag"}, "", "agy --conversation ag", ""},
 		{model.Session{Harness: "aider", ID: "aid", Path: filepath.Join(tmp, "aider", ".aider.chat.history.md")}, "", "", "aider has no session resume"},
 		{model.Session{Harness: "gemini", ID: "g"}, "", "gemini --resume g", ""},
-		{model.Session{Harness: "cursor", ID: "c", Path: filepath.Join(tmp, "chat.jsonl")}, "", "cursor-agent --resume c", ""},
+		{model.Session{Harness: "cursor", ID: "c", Path: filepath.Join(tmp, "chat.jsonl")}, "", "", "not recorded"},
 		{model.Session{Harness: "cursor", ID: "c", Path: filepath.Join(tmp, "workspace")}, "", "", "Cursor UI"},
 		{model.Session{Harness: "claude", ID: "digest.Short", Path: ""}, "", "claude --resume digest.Short", ""},
 	}

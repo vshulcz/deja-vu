@@ -305,7 +305,292 @@ import (
 // transcripts: `credential` 171→49, openai-key 137→189, github-token 87→123.
 // The same values were masked before and after; a store built before this
 // keeps the old labels until it re-reads its sources (#536).
-const version = 53
+// 54 keeps what a Claude subagent changed. Its run was cut to the task and the
+// answer, and the edit, written and file records went with the prose, so blame
+// never named the subagent that changed a file: 1,668 edits on one machine,
+// none indexed (#4163). Paths inside a Claude Code worktree were also dropped
+// as the agent's own files (#4164). A finished subagent transcript is never
+// re-read, so only a rebuild brings either in.
+//
+// 55: an interactive Codex session was owned by its history.jsonl line and
+// filed under the project "history" (#4180); the row is decided when a session
+// is written, so a rebuild.
+//
+// 56: a Claude Code session run in a directory with characters outside
+// [A-Za-z0-9] took its project from the folder name, where those characters
+// are blanked, and landed under the parent; it now reads the recorded cwd
+// (#4175). Projects are set when a transcript is read, so a rebuild.
+//
+// 57: a Cursor CLI session gains its tool results from the chat store — the
+// exit status on a command and the output it printed (#4187). A finished
+// transcript is never re-read, so a rebuild.
+//
+// 58: a Cursor CLI session takes its project from the chat's meta.json cwd;
+// the folder name blanks a dot, a space or a non-ASCII character, so those
+// were filed under a split or empty name (#4193). A rebuild.
+//
+// 59: a failed Gemini CLI command carries its exit status (#4208); a
+// finished chat file is not re-read, so a rebuild.
+//
+// 60: a resumed Gemini CLI session keeps the prompts deja's recall was
+// prepended to; Gemini's own resume history leaves them out (#4214). The
+// chat file is re-read whole only when it changes, so a rebuild.
+//
+// 60 also: Qwen Code — an `edit` or `write_file` call leaves files, wrote and
+// edit records (#4254), a failed command carries its exit status (#4255), and
+// a session in a non-ASCII directory takes its project from the recorded cwd
+// (#4258). Gemini CLI reads through the same dialect, so its `write_file`
+// leaves a wrote record too.
+//
+// 60 also: a Qwen Code or Gemini CLI shell result is indexed without the
+// report around it, so `Error: (none)` no longer reads as a failure and a fix
+// pair is stored under the error itself, not `Output: <error>` (#4256).
+//
+// 60 also: a Hermes session keeps its tool calls and results — commands,
+// files, edits and tool output (#4242).
+//
+// 60 also: a goose edit or write call leaves an edit and a wrote record, not
+// only the path (#4265).
+//
+// 60 also: a failed Kimi Code command carries its exit status (#4262).
+//
+// 60 also: an encoded project folder whose path has a "_", "." or space
+// resolves back to its directory, so sessions named from the folder (Qwen
+// Code and Claude Code without a cwd, Cursor CLI, pi, omp and the rest) get
+// the real project: `my_org/app`, not `org/app` (#4402).
+//
+// 60 also: an index that let Gemini's resume stub take a session's row lost
+// that session's records, and only a re-read brings them back (#4213); an
+// opencode reply written during a pass is read only when its session is
+// touched again (#4207). Hermes compaction copies count once (#4296).
+//
+// 60 also: a Kiro CLI session keeps its tool calls and results, which were
+// dropped as not text (#4299).
+//
+// 60 also: a Cline CLI run_commands or read_files result, written as a list of
+// per-command entries, is indexed as tool output (#4315).
+//
+// 60 also: a dsh session gains its command, files, edit and wrote records from
+// its tool/call events (#4291).
+//
+// 60 also: an Amp thread keeps its tool calls and each turn's own time
+// (#4356).
+//
+// 60 also: Antigravity commands and files come from the planner's tool_calls
+// (#4358).
+//
+// 60 also: CodeWhale's 0.9.6 read, write and edit tools leave files and edits
+// (#4360).
+//
+// 60 also: Command Code's v3 transcripts are read, turns and tool calls both
+// (#4370).
+//
+// 60 also: a Continue session gains its tool calls — commands, files, edit
+// spans, written lines and tool output from toolCallStates (#4373) — and a
+// turn is never dated after its file's mtime (#4376).
+//
+// 60 also: a Crush edit, multiedit or write carries the replaced span and the
+// written lines (#4377).
+//
+// 60 also: an aider session carries the files aider added and edited and the
+// commands it ran, and an /ask question is kept once (#4324, #4325).
+//
+// 60 also: an aider session's id is its history path and start time rather
+// than its ordinal in the file, so a new history at the path of a deleted one
+// no longer takes the kept sessions' ids (#4332).
+//
+// 60 also: a Zed thread gains the files its agent created with write_file
+// (#4339).
+//
+// 60 also: a Cherry Studio reply indexed mid-stream is read whole once it
+// finishes (#4346).
+//
+// 60 also: an omp session indexed mid-way keeps its header id instead of
+// splitting off the appended turns under the file name (#4406).
+//
+// 60 also: a CodeWhale edit_file call written with search/replace, its own
+// argument names, leaves an edit and a wrote record (#4404).
+//
+// 60 also: a Kilo CLI or ZCode session doubled in the index on each pass after
+// a write to its database (#4396); the copies already held go only on a
+// rebuild.
+//
+// 60 also: a Kimchi sub-agent run is skipped rather than indexed as a session
+// of its own (#4401); runs already held go only on a rebuild.
+//
+// 60 also: pi, omp, OpenClaw, gjc, prime, senpi and Kimchi sessions carry
+// their tool calls as files, commands and edits (#4113); a finished
+// transcript is not re-read, so a rebuild.
+//
+// 60 also: a Senpi eval cell's commands, reads and edits are indexed, and its
+// result text is unwrapped (#4425).
+//
+// 60 also: a pi, Senpi, omp, OpenClaw, gjc, prime, Kimchi or Command Code session takes its
+// project from the header's cwd as it is, not decoded from the folder (#4427).
+//
+// 60 also: a ZCode CLI session keeps its Bash, Read, Edit and Write calls
+// (#4428).
+//
+// 60 also: ZCode's legacy snapshots under ~/.zcode/v2/sessions are read, and
+// one rewritten is held once (#4432).
+//
+// 60 also: Roo and Kilo extension tasks read apply_patch, search_replace,
+// edit_file and edit calls into files, edit and wrote records (#4419).
+//
+// 60 also: a Roo or Kilo extension turn is stamped at its own ts, not at the
+// task's last activity plus N seconds (#4420).
+//
+// 60 also: the Roo and Cline "You did not use a tool" retry prompt is not
+// indexed as a user turn (#4421).
+//
+// 60 also: Roo, Kilo and legacy Cline tasks from the XML tool era read their
+// calls into command, files and edit records and their results as tool
+// output (#4424).
+//
+// 60 also: a rooted DeepSeek TUI, Codex or pi-family tool path from the other
+// OS's convention is no longer joined onto the session's cwd, a relative one
+// under a slash-rooted cwd keeps slashes on Windows, and a Roo path with one
+// leading `\` stays as written (#4438).
+//
+// 60 also: a line written while a pass ran is held once, where the pass read
+// it and the next read it again (#4442); copies already held go on a rebuild.
+//
+// 60 also: a Codex, Copilot CLI, Kimi or pi-shaped command whose result came
+// a pass after its call carries its exit, and a refused edit is dropped (#4443).
+//
+// 60 also: a Codex session known only from history.jsonl is one session per
+// id, not per line, so a full build derives it from every prompt (#4449).
+//
+// 60 also: a grok, kiro-cli or Kimi reply streamed across an index pass is
+// one message, not two (#4445).
+//
+// 60 also: a kiro-cli reply or tool call appended after a pass takes the
+// prompt's time, not 0001-01-01 (#4444).
+//
+// 60 also: a Roo, Kilo, Cline VS Code, Reasonix or Kimi session whose title or
+// workspace file changed alone is read again (#4446).
+//
+// 60 also: a ZCode snapshot restored into the CLI database leaves its turns
+// to the database's on the next pass (#4448).
+//
+// 60 also: a Cursor chat continued or renamed after a pass is read whole, so
+// its title, words, asked and touched match a rebuild (#4450, #4451).
+//
+// 60 also: codex, opencode, Kilo CLI, ZCode CLI, goose, crush, cursor, gemini,
+// kimi, grok, antigravity, amp, aider, Copilot, Copilot Chat, zed, dsh, Cline,
+// Roo, Kilo extension, Continue, CodeWhale, Kiro, Reasonix and Hermes name a
+// project by the recorded cwd's last two segments, as claude does, and decode
+// a file:// workspace first; claude and pi name a drive-root directory
+// C:\proj "proj" rather than "C:/proj" (#4457, #4458, #4461, #4462).
+//
+// 60 also: an OpenClaw <id>.trajectory.jsonl is no longer read as a session
+// (#4477).
+//
+// 60 also: a dsh log with a torn zstd frame keeps the frames around it
+// (#4294), a Cherry Studio dsh log is filed under cherrystudio alone (#4342),
+// a renamed Cline CLI session takes its new title (#4319), and a thin harness
+// title is not retaken from an appended turn (#4452); rows already held
+// change only on a rebuild.
+// 60 also: a failed command carries its `→ exit N` in claude, the pi family,
+// goose, cline, kiro-cli, zed and copilot-chat, and a copilot-chat terminal
+// call its output (#4487, #4501, #4496, #4502, #4505, #4507, #4493).
+// 60 also: a Claude Code PowerShell call is a command and a NotebookEdit call
+// leaves files and wrote records (#4489).
+//
+// 60 also: a codex shell_command call is a command with its exit (#4490).
+//
+// 60 also: a Copilot CLI view call leaves a files record and an apply_patch
+// call, whose arguments are the patch string, leaves files, edit and wrote
+// records (#4491).
+//
+// 60 also: a Copilot Chat copilot_readFile call leaves a files record from
+// its message uris (#4492).
+//
+// 60 also: a Gemini CLI read_many_files call leaves a files record for the
+// literal paths in include (#4494).
+//
+// 60 also: an opencode or Kilo CLI 1.x edit or write call, and a 2.x write
+// call, leaves edit and wrote records (#4495).
+//
+// 60 also: a Grok Build search_replace or write call leaves files, edit and
+// wrote records (#4497).
+//
+// 60 also: a grok-dev session in grok.db keeps its tool calls and results as
+// commands, files, edits, wrote and tool output (#4498).
+//
+// 60 also: an OpenClaw apply_patch call leaves files, edit and wrote records
+// (#4500).
+//
+// 60 also: a Cline CLI editor call leaves a wrote record of new_text, and an
+// apply_patch call files, edit and wrote records (#4503).
+//
+// 60 also: a Cline extension replace_in_file with Cline's own markers, or an
+// apply_patch under input, leaves edit and wrote records (#4504).
+//
+// 60 also: a kiro-cli --v3 or Kiro IDE tool_call record becomes commands,
+// files, edit and wrote records (#4506).
+//
+// 60 also: a Roo, Kilo Code, Continue, Amp or Antigravity command carries the
+// `→ exit N` its result reports (#4530).
+//
+// 60 also: a Crush command carries its `→ exit N`, and an edit Crush refused
+// leaves no edit or wrote records (#4532).
+//
+// 60 also: a failed ZCode Bash run carries its `→ exit N` (#4536).
+//
+// 60 also: a failed CodeWhale bash command carries its `→ exit N` (#4537).
+//
+// 60 also: a failed Command Code command carries its `→ exit N` (#4539).
+//
+// 60 also: a pi-family powershell call leaves a command record (#4523).
+//
+// 60 also: an omp or gjc edit in replace or patch mode leaves edit and wrote
+// records (#4524).
+//
+// 60 also: an omp hashline edit leaves files, edit and wrote records (#4525).
+//
+// 60 also: a prime ipython cell's details.diffs leave files, edit and wrote
+// records (#4526).
+//
+// 60 also: an Amp shell_command call is a command and an apply_patch call
+// leaves files, edit and wrote records (#4527).
+//
+// 60 also: an Antigravity write_to_file call leaves a wrote record of its
+// CodeContent once its step finishes (#4528).
+//
+// 60 also: a Continue edit_existing_file call leaves a wrote record of its
+// changes, and a canceled edit leaves none (#4529).
+//
+// 60 also: a Roo or Kilo search_and_replace call with old_string and
+// new_string leaves edit and wrote records (#4531).
+//
+// 60 also: a Roo or Kilo read_file call in the legacy files[] form leaves a
+// files record (#4531).
+//
+// 60 also: a Crush lsp_replace_symbol call leaves a wrote record of its
+// replacement (#4533).
+//
+// 60 also: a Kilo CLI background_process start or monitor is a command, and
+// notebook_read and notebook_edit leave files and wrote records (#4534).
+//
+// 60 also: a Kilo Code task's search_and_replace operations[], fast_edit_file
+// and write_file leave files, edit and wrote records, and delete_file and
+// generate_image files records (#4535).
+//
+// 60 also: a CodeWhale terminal/run or task_shell_start call is a command
+// (#4538).
+//
+// 60 also: a CodeWhale apply_patch call leaves files, edit and wrote records
+// from its unified diff or replace[] entries (#4538).
+//
+// 60 also: a Command Code shell_command with args[], powershell or
+// monitor_command call is a command, and a read_file glob is not a file
+// (#4540).
+//
+// 60 also: a Reasonix notebook_edit, delete_range, delete_symbol or move_file
+// call leaves files records, notebook_edit a wrote record and delete_range an
+// edit record from its result's diff (#4541).
+const version = 60
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -497,6 +782,12 @@ type SessionMeta struct {
 	// before it existed decodes with it zero and ranking falls back to what it
 	// can see.
 	Words int `json:",omitempty"`
+	// NoText marks a row whose transcript had nothing left to index once
+	// plumbing was stripped, so a transcript holding the conversation under
+	// the same id takes the row instead of being reported as a clash (#4213).
+	// Words cannot say it: a row of emoji has text and no words. Additive: an
+	// older manifest decodes with it false, the answer it always gave.
+	NoText bool `json:",omitempty"`
 	// Counted is how many of this session's messages the derived fields above
 	// already include, and LastMsg fingerprints the newest of them.
 	//
@@ -649,6 +940,17 @@ type FileIngest struct {
 	// the same reason as the other two: a pass that reads one transcript must
 	// not speak for what another one holds (#2022).
 	Clipped int `json:"clipped,omitempty"`
+	// ClippedSessions splits Clipped by session id. Zed keeps every thread in
+	// one threads.db, so the file's count alone put the note on every thread
+	// in it (#4340). Kept out of the JSON: the contract is the per-file count.
+	ClippedSessions map[string]int `json:"-"`
+	// Reason says why the last unusable record was skipped, for a store whose
+	// records are rows rather than lines a reader can go and look at (#4341).
+	Reason string `json:"reason,omitempty"`
+	// Unusable is those records by id. A store read from its watermark hands
+	// back only what changed, so a pass carries the rows it did not re-read
+	// instead of reporting them gone. Out of the JSON: the count is the contract.
+	Unusable map[string]string `json:"-"`
 }
 
 type manifestCore struct {

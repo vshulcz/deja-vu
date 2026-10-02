@@ -128,6 +128,20 @@ func ClaudeFiles() []string {
 	return out
 }
 
+// ClaudeSidecarFiles lists the agent-<id>.meta.json Claude Code writes next to
+// each sub-agent transcript: the agent type and the task, not a transcript.
+// doctor counted each as a skipped sub-agent, and one was enough to tell the
+// user to set a variable for transcripts deja already reads (#4478).
+func ClaudeSidecarFiles() []string {
+	var out []string
+	for _, root := range ClaudeRoots() {
+		out = append(out, walkFiles(root, func(p string) bool {
+			return IsSubagentPath(p) && strings.HasSuffix(p, ".meta.json")
+		})...)
+	}
+	return out
+}
+
 // UnderClaudeRoot reports whether a path is inside any of the roots above. The
 // registry matches a transcript to its harness by prefix, and with more than
 // one root that question is no longer "does it start with ClaudeRoot()".
@@ -182,13 +196,47 @@ const SubagentTailKept = 4
 // are what it concluded. The middle is the reading and the searching — verbose,
 // often duplicated in the parent's summary, and the reason these files were
 // skipped whole.
+//
+// What the child changed stays: its edit, wrote and files records are what
+// blame, attribution and restore read, they are small, and nothing else holds
+// them. Cut with the prose, blame never named the subagent that changed a file
+// (#4163).
 func KeepSubagentTail(ms []model.Message) []model.Message {
 	if len(ms) <= SubagentTailKept+1 {
 		return ms
 	}
+	tail := len(ms) - SubagentTailKept
+	// A files record names everything a turn opened, reads included, so only
+	// the paths the child changed are kept from it — the ones an edit or a
+	// write in the middle names on its first line. The read-only exploring a
+	// subagent does stays out with the prose.
+	changed := map[string]bool{}
+	for _, m := range ms[1:tail] {
+		if m.Role == RoleEdit || m.Role == RoleWrote {
+			path, _, _ := strings.Cut(m.Text, "\n")
+			changed[path] = true
+		}
+	}
 	kept := make([]model.Message, 0, SubagentTailKept+1)
 	kept = append(kept, ms[0])
-	return append(kept, ms[len(ms)-SubagentTailKept:]...)
+	for _, m := range ms[1:tail] {
+		switch m.Role {
+		case RoleEdit, RoleWrote:
+			kept = append(kept, m)
+		case RoleFiles:
+			var paths []string
+			for _, p := range strings.Split(m.Text, "\n") {
+				if changed[p] {
+					paths = append(paths, p)
+				}
+			}
+			if len(paths) > 0 {
+				m.Text = strings.Join(paths, "\n")
+				kept = append(kept, m)
+			}
+		}
+	}
+	return append(kept, ms[tail:]...)
 }
 
 func ParseClaudeFile(path string) ([]model.Session, error) {
@@ -207,7 +255,7 @@ func parseClaudeFileFromOffset(path string, offset int64) ([]model.Session, erro
 // reference the typed parser is proved against — including on a real store,
 // where the shapes nobody thought of live.
 func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, error) {
-	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectName(claudeProjectDir(path)), Path: path}
+	s := model.Session{Harness: "claude", ID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), Project: claudeProjectNameFor(path), Path: path}
 	// Where each Bash call's record landed, so the result that arrives in a
 	// later record can stamp its outcome onto it.
 	commandAt := map[string][]int{}
@@ -276,22 +324,13 @@ func parseClaudeGenericFromOffset(path string, offset int64) ([]model.Session, e
 					}
 					s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd.Text, Time: t})
 				}
-				// The same stamp the typed parser writes, from the same two
-				// fields: a transcript records no exit code, so only the clean
-				// case is stated.
+				// The same stamp the typed parser writes, from the same
+				// fields.
 				for _, res := range toolOutcomesFromContent(msg["content"]) {
-					at, ok := commandAt[res.ID]
-					if !ok || res.Error {
+					if _, ok := commandAt[res.ID]; !ok || !res.Known {
 						continue
 					}
-					for _, i := range at {
-						if i >= len(s.Messages) {
-							continue
-						}
-						if !strings.Contains(s.Messages[i].Text, "  → exit ") {
-							s.Messages[i].Text += "  → exit 0"
-						}
-					}
+					commandExits(commandAt).stamp(s.Messages, res.ID, "", res.Code)
 					delete(commandAt, res.ID)
 				}
 			}
@@ -354,13 +393,13 @@ func claudeProjectName(dir string) string {
 // path no longer exists (deleted projects, dirs imported from other machines).
 func decodeProjectBase(base string) string {
 	if resolved := resolveEncodedPath(base); resolved != "" {
-		segs := strings.Split(strings.Trim(resolved, string(filepath.Separator)), string(filepath.Separator))
-		if len(segs) >= 2 {
-			return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
+		if name := cwdProjectName(resolved); name != "" {
+			return name
 		}
-		if len(segs) == 1 {
-			return segs[0]
-		}
+	}
+	// A drive is not a parent, as cwdProjectName has it: C--proj is "proj".
+	if _, rest, ok := splitEncodedWindowsDrive(base); ok {
+		base = rest
 	}
 	parts := strings.Split(base, "-")
 	var clean []string
@@ -401,19 +440,24 @@ func resolveEncodedPath(base string) string {
 	if len(parts) == 0 || len(parts) > 24 {
 		return ""
 	}
+	listed := map[string][]os.DirEntry{}
 	var try func(done, seg string, i int) string
 	try = func(done, seg string, i int) string {
-		if i == len(parts) {
-			p := done + string(filepath.Separator) + seg
-			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
-				return p
+		// An empty segment is a character the encoding blanked, not a
+		// directory: closing it as one handed back the parent with slashes
+		// on, "007///////" (#4175).
+		if seg == "" {
+			if i == len(parts) {
+				return ""
 			}
-			return ""
+			return try(done, seg+"-"+parts[i], i+1)
+		}
+		if i == len(parts) {
+			return encodedChild(done, seg, listed)
 		}
 		// close the current segment with "/" first (most path characters are
 		// separators), pruning when the prefix does not exist
-		p := done + string(filepath.Separator) + seg
-		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		if p := encodedChild(done, seg, listed); p != "" {
 			if r := try(p, parts[i], i+1); r != "" {
 				return r
 			}
@@ -425,6 +469,40 @@ func resolveEncodedPath(base string) string {
 		return ""
 	}
 	return try(root, parts[0], 1)
+}
+
+// encodedChild is the directory under dir that the encoded segment seg names,
+// or "". The encoding blanks every character that is not a letter or digit to
+// "-", so a segment with a "-" in it may stand for "_", "." or a space as well
+// as a hyphen: on a miss the directory is listed and its entries are compared
+// encoded (#4402). listed keeps each listing for the rest of one resolve.
+func encodedChild(dir, seg string, listed map[string][]os.DirEntry) string {
+	p := dir + string(filepath.Separator) + seg
+	if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+		return p
+	}
+	if !strings.Contains(seg, "-") {
+		return ""
+	}
+	list := dir
+	if list == "" {
+		list = string(filepath.Separator)
+	}
+	entries, ok := listed[list]
+	if !ok {
+		entries, _ = os.ReadDir(list)
+		listed[list] = entries
+	}
+	for _, e := range entries {
+		if claudeEncodePath(e.Name()) != seg {
+			continue
+		}
+		p := dir + string(filepath.Separator) + e.Name()
+		if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+			return p
+		}
+	}
+	return ""
 }
 
 // splitEncodedWindowsDrive recognises the "C--Users-x-app" form Claude Code

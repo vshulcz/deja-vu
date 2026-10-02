@@ -155,7 +155,7 @@
 <p>For one IDE session, remove its directory:</p>
 <pre>rm -r ~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;</pre>
 <p>Every session is its own file or directory, so removing one leaves the rest alone. To clear a whole tree, remove <code>~/.kiro/sessions/cli</code> for the CLI, or the workspace directories beside it for the IDE. The two trees are independent: clearing one does not clear the other.</p>
-<p>What <code>~/.kiro/sessions</code> does not cover: the IDE also mirrors its chats into its <code>globalStorage</code> (<code>kiro.kiroagent/&lt;workspace&gt;/*.chat</code>), and the CLI's TUI keeps conversations in a <code>kiro-cli/data.sqlite3</code> database, in the <code>conversations_v2</code> table. If the goal is that nothing is left, check those too. deja does not read either one yet, because no sample of them was available to verify against, so this page does not describe their contents.</p>
+<p>What <code>~/.kiro/sessions</code> does not cover: the IDE also mirrors its chats into its <code>globalStorage</code> (<code>kiro.kiroagent/&lt;workspace&gt;/*.chat</code>), and <code>kiro-cli chat --no-interactive</code> keeps its conversations in a <code>kiro-cli/data.sqlite3</code> database, one row each in the <code>conversations_v2</code> table. If the goal is that nothing is left, check those too. deja reads the database but not the globalStorage mirror, which no sample was available to verify against, so this page does not describe its contents.</p>
 
 <h2>What you lose</h2>
 <p>The sessions are the record of what was tried and what worked. A CLI session you remove can no longer be reopened with <code>kiro-cli chat --resume-id</code>. There is no archive: a removed session is gone, not moved.</p>

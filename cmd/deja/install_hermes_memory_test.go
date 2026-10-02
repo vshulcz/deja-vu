@@ -4,6 +4,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -74,6 +76,52 @@ func TestInstallHermesWritesAMemoryProviderBesideTheHookPlugin(t *testing.T) {
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Fatalf("uninstall left the provider directory: %v", err)
+	}
+}
+
+// A MEMORY.md entry is often a bullet ("- user prefers X"). Passed bare, deja
+// read it as a flag and the note was lost without a word.
+func TestHermesMemoryWritePassesDashTextAfterSeparator(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stub deja is a shebang script")
+	}
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	dir := t.TempDir()
+	argvFile := filepath.Join(dir, "argv.json")
+	stub := filepath.Join(dir, "deja")
+	stubSrc := "#!" + py + "\nimport json, sys\njson.dump(sys.argv[1:], open(" + strconv.Quote(argvFile) + ", 'w'))\n"
+	if err := os.WriteFile(stub, []byte(stubSrc), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Just enough of Hermes for the provider to import.
+	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := "import provider\nprovider.DejaMemoryProvider().on_memory_write('add', 'user', '- prefers tabs')\n"
+	cmd := exec.Command(py, "-c", run)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("provider: %v\n%s", err, out)
+	}
+	got, err := os.ReadFile(argvFile)
+	if err != nil {
+		t.Fatalf("stub deja was not called: %v", err)
+	}
+	want := `["remember", "--tag", "hermes-user", "--", "- prefers tabs"]`
+	if string(got) != want {
+		t.Fatalf("argv = %s, want %s", got, want)
 	}
 }
 

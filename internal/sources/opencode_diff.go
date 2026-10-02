@@ -176,3 +176,83 @@ func unifiedDiffSpans(file, patch string) []string {
 	flush()
 	return out
 }
+
+// withOpencodeDiffsFor is withOpencodeDiffs for sessions a pass read on their
+// own: each looks up its own diff file rather than the pass listing them all.
+// The index replaces a session it reads again from the database, so the
+// session has to come back with what its diff gave it (#4207).
+func withOpencodeDiffsFor(ss []model.Session) []model.Session {
+	dir := OpencodeDiffDir()
+	for i := range ss {
+		if !strings.HasPrefix(ss[i].ID, "ses_") {
+			continue
+		}
+		p := filepath.Join(dir, ss[i].ID+".json")
+		if _, err := os.Stat(p); err != nil {
+			continue
+		}
+		parsed, err := ParseOpencodeDiff(p)
+		if err != nil {
+			diagFileError(p, err)
+			continue
+		}
+		for _, d := range parsed {
+			ss[i].Messages = append(ss[i].Messages, d.Messages...)
+		}
+	}
+	return ss
+}
+
+// ParseOpencodeDiffSession reads a changed diff file as its session: the
+// database's copy of it, whole, with the diff folded in — what a full build
+// holds for that id. Handed back on its own, the diff's records were added to
+// the ones a full build had folded in, and a diff whose session the database
+// no longer holds became a session with no conversation in it, which a full
+// build does not keep (#4207).
+func ParseOpencodeDiffSession(path string) ([]model.Session, error) {
+	return ParseOpencodeDiffSessions([]string{path})
+}
+
+// opencodeDiffBatch bounds the ids one query names, well under SQLite's limit
+// on the length of a statement.
+const opencodeDiffBatch = 500
+
+// ParseOpencodeDiffSessions is ParseOpencodeDiffSession for many files at once.
+// Each read of the database also reads every session's parent and title, which
+// is most of its cost: ~430 ms on a 3.8 GB store, paid once a file when a pass
+// read them one by one.
+func ParseOpencodeDiffSessions(paths []string) ([]model.Session, error) {
+	var ids []string
+	seen := map[string]bool{}
+	for _, p := range paths {
+		id := strings.TrimSuffix(filepath.Base(p), ".json")
+		if !strings.HasPrefix(id, "ses_") || seen[id] {
+			continue
+		}
+		seen[id] = true
+		ids = append(ids, "'"+sqlEscape(id)+"'")
+	}
+	var out []model.Session
+	for len(ids) > 0 {
+		n := min(len(ids), opencodeDiffBatch)
+		ss, err := ParseOpencodeDBWhere(OpencodeDB(), " and s.id in ("+strings.Join(ids[:n], ",")+")", 0)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ss...)
+		ids = ids[n:]
+	}
+	return withOpencodeDiffsFor(out), nil
+}
+
+// parseOpencodeStore and parseOpencodeStoreSince are the database kind's
+// reads: the sessions they hand back carry their diffs, as Load's do.
+func parseOpencodeStore(db string) ([]model.Session, error) {
+	ss, err := ParseOpencodeDB(db)
+	return withOpencodeDiffsFor(ss), err
+}
+
+func parseOpencodeStoreSince(db string, t time.Time) ([]model.Session, error) {
+	ss, err := ParseOpencodeDBSince(db, t)
+	return withOpencodeDiffsFor(ss), err
+}

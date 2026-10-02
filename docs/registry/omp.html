@@ -104,8 +104,16 @@
 </table></div>
 <h3 id="content">Content</h3>
 <p><code>message.content</code> is an array of typed blocks. deja extracts <code>text</code> from blocks</p>
-<p>where <code>&#34;type&#34;: &#34;text&#34;</code>. Blocks with <code>&#34;type&#34;: &#34;thinking&#34;</code>, <code>&#34;type&#34;: &#34;toolCall&#34;</code>,</p>
-<p>or <code>&#34;type&#34;: &#34;image&#34;</code> are skipped.</p>
+<p>where <code>&#34;type&#34;: &#34;text&#34;</code>. Blocks with <code>&#34;type&#34;: &#34;thinking&#34;</code> or <code>&#34;type&#34;: &#34;image&#34;</code></p>
+<p>are skipped. <code>toolCall</code> blocks are read the way pi&#39;s are (see the pi entry):</p>
+<p>the file a <code>read</code>, <code>edit</code> or <code>write</code> names, the replaced and written text, and</p>
+<p>the <code>bash</code> command (#4113). omp&#39;s <code>replace</code> edit mode, `{path, old_string,</p>
+<p>new_string}<code>, and its </code>patch<code> mode, </code>{path, edits:[{op, diff}]}`, give the same</p>
+<p>records (#4524). Its default mode, hashline, sends one <code>input</code>: <code>[path#TAG]</code></p>
+<p>sections (inside <code>*<strong> Begin Patch</code> … <code></strong>* End Patch</code> or bare) holding ops such</p>
+<p>as <code>PUT 3.=5:</code> whose <code>+</code> body rows are the written lines. deja records each</p>
+<p>section&#39;s file and those lines from the call, and for a one-file edit the</p>
+<p>replaced lines from the result&#39;s <code>details.diff</code> (<code>-3|old line</code>) (#4525).</p>
 <h3 id="timestamps">Timestamps</h3>
 <p>Both ISO-8601 strings (<code>&#34;timestamp&#34;</code> in the envelope) and Unix milliseconds</p>
 <p>(<code>&#34;timestamp&#34;</code> inside <code>message</code>) are observed. The parser uses the envelope</p>

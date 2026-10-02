@@ -1,8 +1,8 @@
 # gajae-code
 
 - **ID**: `gjc`
-- **Store**: `${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/<project-slug>/<session>.jsonl`
-- **Sub-agent passes**: `…/<project-slug>/<session>/N-*.jsonl`
+- **Store**: `${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/<project>/<session>.jsonl`
+- **Sub-agent passes**: `…/<project>/<session>/N-*.jsonl`
 - **Read override**: `DEJA_GJC_ROOT` replaces the session root
 - **Format**: pi's session JSONL
 - **Needs**: nothing
@@ -15,16 +15,32 @@ project directory names the project, and the header's cwd wins when it is there.
 
 ## Known quirks and drift
 
-- Resume: `gjc --resume <id>`. From its session-operations document:
-  `--resume <id|path>` at startup opens an existing session, and a session
-  belonging to another project forks into the current one — so deja prints
-  the command without a working directory rather than guessing at one.
+- Resume: `gjc --resume <id>`, in the directory the header's `cwd` names.
+  From any other project 0.18 refuses the session ("is in another project …
+  Re-run from that directory") or forks it into the current one, so deja
+  prints the `cd` (#4395).
 - **Sub-agent passes sit one directory deeper**, under a directory named for the
   session they belong to, one file per pass. They are skipped: a sub-agent's
   transcript repeats the parent's work in its own words, and indexed as a
   session of its own it competes with the parent for the same recall slot.
   `DEJA_INCLUDE_SUBAGENTS=1` takes them, the switch Claude Code's and Cursor's
   sub-agents already use.
+- **Project directories**: from 0.18, `<project>` is `v2-<identity digest>`
+  rather than a slug of the path, with `.gjc-managed-session-scope.v2.json`
+  beside the sessions naming the directory. The header's cwd gives the
+  project either way. `deja doctor` leaves the scope file and the skipped
+  passes out of its "not recognised here" count (#4393).
+- **Edits are hashline, not pi's.** gjc 0.18's `edit` rejects pi's
+  `{path, edits}` ("input: expected string") and takes one `input` string:
+  `§path`, then ops (`≔A..B` replace, `«A` insert before, `»A` insert after),
+  each followed by the lines it writes. deja records the file and the written
+  lines from the call, and the replaced lines from the result's
+  `details.diff` (`-1|old line`), since the call holds only anchors (#4113).
+  `edit.mode` picks the shape: hashline is one of four. `replace`, the auto
+  choice for Claude, DeepSeek and Qwen models, takes `{path,
+  edits:[{old_text, new_text, all}]}`, `patch` takes `{path, edits:[{op,
+  diff}]}` and `apply_patch` an `input` patch; all are read for the file, the
+  replaced span and the written lines (#4524).
 - `service_tier_change` lines are not turns and are dropped rather than read as
   empty messages.
 - Wiring: `deja install gjc` writes the server into `~/.gjc/agent/mcp.json`,

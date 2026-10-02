@@ -41,7 +41,8 @@
 <li><strong>ID</strong>: <code>zcode</code></li>
 <li><strong>Store</strong>: <code>~/.zcode/projects/&lt;encoded-cwd&gt;/&lt;session&gt;.jsonl</code></li>
 <li><strong>Store (CLI database)</strong>: <code>~/.zcode/cli/db/db.sqlite</code> — OpenCode&#39;s schema</li>
-<li><strong>Read overrides</strong>: <code>DEJA_ZCODE_ROOT</code> replaces the project root; <code>DEJA_ZCODE_DB</code> names the database</li>
+<li><strong>Store (legacy snapshots)</strong>: <code>~/.zcode/v2/sessions/&lt;workspaceHash&gt;/&lt;taskId&gt;.json</code></li>
+<li><strong>Read overrides</strong>: <code>DEJA_ZCODE_ROOT</code> replaces the project root; <code>DEJA_ZCODE_DB</code> names the database; <code>DEJA_ZCODE_LEGACY_ROOT</code> replaces the snapshot root</li>
 <li><strong>Format</strong>: flat JSONL — one message per line</li>
 <li><strong>Needs</strong>: <code>sqlite3</code> for the CLI database; the transcripts need nothing</li>
 </ul>
@@ -52,20 +53,33 @@
 <p><strong>Last verified:</strong> 2026-09-17</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
-<li><strong>The CLI database is read on a third party&#39;s word.</strong> It goes through</li>
+<li><strong>The CLI database is OpenCode&#39;s schema with Claude Code&#39;s tool names.</strong></li>
 </ul>
-<p>OpenCode&#39;s schema reader (see below); that shape has not been checked</p>
-<p>against a running ZCode.</p>
+<p>It goes through OpenCode&#39;s schema reader (see below), checked against a</p>
+<p>store the ZCode 3.14.4 runtime wrote, whose tool parts needed their own</p>
+<p>names read (#4428).</p>
 <ul>
 <li>Wiring: <code>deja install zcode</code> writes the server into <code>mcp.servers</code> in</li>
 </ul>
-<p><code>~/.zcode/cli/config.json</code> — one level deeper than the <code>mcpServers</code> every</p>
+<p><code>~/.zcode/cli/setting.json</code> — one level deeper than the <code>mcpServers</code> every</p>
 <p>other client here uses — and <code>deja install zcode-auto</code> adds the hooks to the</p>
-<p>same file, on <code>SessionStart</code> and <code>UserPromptSubmit</code>.</p>
+<p>same file, under <code>hooks.events.SessionStart</code> and</p>
+<p><code>hooks.events.UserPromptSubmit</code>. The runtime (3.14.4) writes that file on</p>
+<p>its first launch and reads it from then on. deja used to write</p>
+<p><code>config.json</code>, which the runtime reads once, as the source of that</p>
+<p>first-launch migration, so nothing reached the agent on a machine where</p>
+<p>ZCode had run; an uninstall clears deja&#39;s entries from both. Before that</p>
+<p>first launch, install starts <code>setting.json</code> from <code>config.json</code> the way the</p>
+<p>runtime would, since the runtime skips its migration once the file exists,</p>
+<p>and <code>deja doctor</code> reads hooks outside <code>hooks.events</code> or with</p>
+<p><code>hooks.enabled</code> off as stale (#4429).</p>
 <ul>
 <li>**Three things decide whether that works, and all three are silent when</li>
 </ul>
-<p>wrong.** Config-file hooks do nothing without <code>hooks.enabled: true</code>. A</p>
+<p>wrong.** Config-file hooks do nothing without <code>hooks.enabled: true</code>, and</p>
+<p>the runtime&#39;s own <code>setting.json</code> starts with it off: install turns it on and</p>
+<p>says so, and uninstall puts back what was there, so hooks the reader had</p>
+<p>switched off do not stay on (#4431). A</p>
 <p>config hook gets no template expansion, so the command carries an absolute</p>
 <p>path. And the output schema is strict: one key ZCode does not recognise and</p>
 <p>the whole response is discarded — which is why the installed line ends in</p>
@@ -76,8 +90,16 @@
 <p>describe them. They come from volcengine/OpenViking&#39;s memory plugin, whose</p>
 <p><code>examples/agent-hook-plugin/DESIGN.md</code> records the surface it established by</p>
 <p>inspecting a live install — seven hook events, the manifest probe order, the</p>
-<p>strict schema — and ships an installer against it. Nothing here is verified</p>
-<p>on the machine deja was written on.</p>
+<p>strict schema — and ships an installer against it. The file and the</p>
+<p>nesting have moved since; the three rules above held on the 3.14.4 runtime,</p>
+<p>where the hooks fired and the digest reached the request (#4429).</p>
+<ul>
+<li><code>deja resume</code> on a session from the CLI database prints</li>
+</ul>
+<p><code>cd &#39;&lt;dir&gt;&#39; &amp;&amp; zcode --resume &lt;sess_id&gt;</code>, the directory from the session</p>
+<p>row. The terminal client reopens the session from any directory; the <code>cd</code></p>
+<p>keeps the agent in the project. A JSONL transcript has no such command</p>
+<p>(#4430).</p>
 <h2 id="the-cli-database">The CLI database</h2>
 <p>It was left unread while nothing said what shape it was in. deja reads it</p>
 <p>now, on the shape attested by <code>zcode-stats</code> 0.8.0 — a read-only dashboard over the live database,</p>
@@ -90,13 +112,35 @@ SELECT json_extract(data, &#39;$.role&#39;) FROM message GROUP BY role
 SELECT json_extract(data, &#39;$.type&#39;) FROM part GROUP BY type</code></pre>
 <p><code>session</code> / <code>message(data)</code> / <code>part(data)</code> is OpenCode&#39;s schema, which deja</p>
 <p>already parses for OpenCode and for Kilo Code&#39;s CLI, so this is one more root</p>
-<p>rather than a new reader: text parts, <code>read</code>, <code>bash</code> and <code>apply_patch</code> calls,</p>
-<p>as the opencode page describes.</p>
+<p>rather than a new reader. The tool parts are not opencode&#39;s, though: a store the</p>
+<p>ZCode 3.14.4 runtime wrote names them as Claude Code does, with its arguments —</p>
+<p><code>Bash {command}</code>, <code>Read {file_path}</code>, `Edit {file_path, old_string,</p>
+<p>new_string}<code>, </code>Write {file_path, content}`. deja reads those for ZCode as</p>
+<p>commands with their output, files, edit spans and written lines; an <code>Edit</code></p>
+<p>ZCode refused (<code>state.status: &#34;error&#34;</code>) is not recorded as a change (#4428).</p>
+<p>A Bash part has no <code>metadata.exit</code>; a failed run&#39;s output opens with &#34;Exit code</p>
+<p>N&#34;, as Claude Code&#39;s does, and that line goes on the command as <code>→ exit N</code></p>
+<p>rather than into the output (#4536).</p>
 <p>Said plainly: that is a third party&#39;s attestation, not a running ZCode checked</p>
 <p>here. <code>task_type</code> also separates <code>subagent_child</code> and <code>fork</code> from <code>interactive</code>,</p>
 <p>which is the distinction <code>DEJA_INCLUDE_SUBAGENTS</code> draws elsewhere — left alone</p>
 <p>until there is a real store to measure it against, rather than guessed at</p>
 <p>(#3675).</p>
+<h2 id="legacy-snapshots">Legacy snapshots</h2>
+<p>Before the current runtime ZCode kept each conversation as one JSON file,</p>
+<p><code>~/.zcode/v2/sessions/&lt;workspaceHash&gt;/&lt;taskId&gt;.json</code>:</p>
+<pre><code class="language-json">{&#34;meta&#34;: {&#34;taskId&#34;: &#34;…&#34;, &#34;acpSessionId&#34;: &#34;…&#34;, &#34;workspacePath&#34;: &#34;/path/to/proj&#34;,
+          &#34;title&#34;: &#34;…&#34;, &#34;createdAt&#34;: 1790000000000, &#34;updatedAt&#34;: 1790000060000},
+ &#34;messages&#34;: [{&#34;role&#34;: &#34;user&#34;, &#34;content&#34;: &#34;…&#34;, &#34;timestamp&#34;: 1790000000000}]}</code></pre>
+<p>That is the shape the 3.14.4 runtime&#39;s own restore-legacy-sessions skill scans</p>
+<p>(<code>scan-legacy-sessions.mjs</code>). The files stay until the user restores them by</p>
+<p>hand, so deja reads them: <code>acpSessionId</code>, else <code>taskId</code>, is the id, the one a</p>
+<p>restore gives the session, <code>workspacePath</code> names the project, and the user and</p>
+<p>assistant text is indexed. Files ending <code>.deleted.json</code> are skipped, as ZCode</p>
+<p>skips them, and a snapshot whose id is already in the CLI database is read</p>
+<p>from there instead, from the first pass after the restore on (#4448). <code>deja resume</code> on a snapshot names ZCode&#39;s</p>
+<p><code>/restore-legacy-sessions</code> command rather than a <code>zcode --resume</code> that would</p>
+<p>not find it (#4432).</p>
 
 <hr>
 <p>deja reads this format and thirty-four others, and turns what it finds into memory your

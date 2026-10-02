@@ -153,7 +153,8 @@
       "name": "prime",
       "state": "missing",
       "paths": [
-        "<tmp>/home/.prime/agent/sessions"
+        "<tmp>/home/.prime/agent/sessions",
+        "<tmp>/home/.prime/agent/session-artifacts"
       ],
       "files": 0,
       "indexed_sessions": 0
@@ -211,7 +212,9 @@
     {
       "name": "kilocode",
       "state": "missing",
-      "paths": null,
+      "paths": [
+        "<tmp>/home/.local/share/kilo/kilo.db"
+      ],
       "files": 0,
       "indexed_sessions": 0
     },
@@ -262,7 +265,9 @@
       "name": "zcode",
       "state": "missing",
       "paths": [
-        "<tmp>/home/.zcode/projects"
+        "<tmp>/home/.zcode/projects",
+        "<tmp>/home/.zcode/cli/db/db.sqlite",
+        "<tmp>/home/.zcode/v2/sessions"
       ],
       "files": 0,
       "indexed_sessions": 0
@@ -407,7 +412,7 @@
     {
       "name": "copilot",
       "state": "config-missing",
-      "path": "<tmp>/home/.copilot/skills/deja-history/SKILL.md"
+      "path": "<tmp>/home/.copilot/mcp-config.json"
     },
     {
       "name": "vscode",
@@ -477,7 +482,7 @@
     {
       "name": "zcode",
       "state": "config-missing",
-      "path": "<tmp>/home/.zcode/cli/config.json"
+      "path": "<tmp>/home/.zcode/cli/setting.json"
     },
     {
       "name": "commandcode",
@@ -604,7 +609,7 @@
     {
       "name": "zcode",
       "state": "missing",
-      "path": "<tmp>/home/.zcode/cli/config.json"
+      "path": "<tmp>/home/.zcode/cli/setting.json"
     },
     {
       "name": "commandcode",
@@ -682,6 +687,16 @@
       "name": "reasonix",
       "state": "missing",
       "path": "<tmp>/home/.reasonix/plugins/deja/commands/deja.md"
+    },
+    {
+      "name": "continue",
+      "state": "missing",
+      "path": "<tmp>/home/.continue/config.yaml"
+    },
+    {
+      "name": "goose",
+      "state": "missing",
+      "path": "<tmp>/home/.config/goose/config.yaml"
     },
     {
       "name": "antigravity",

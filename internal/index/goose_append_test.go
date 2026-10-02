@@ -96,7 +96,7 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 		}
 		return n
 	}
-	if p := found("zonkomatic"); len(p) != 1 || p[0] != "app" {
+	if p := found("zonkomatic"); len(p) != 1 || p[0] != "work/app" {
 		t.Fatalf("the fixture did not index under its working_dir: %v", p)
 	}
 
@@ -104,7 +104,7 @@ func TestAGrowingGooseSessionKeepsItsProject(t *testing.T) {
 	if err := Ensure(dir, "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	if p := found("zonkomatic"); len(p) != 1 || p[0] != "app" {
+	if p := found("zonkomatic"); len(p) != 1 || p[0] != "work/app" {
 		t.Errorf("appending a turn moved the session's project: %v", p)
 	}
 	if n := hits("appended vantorquell"); n != 1 {

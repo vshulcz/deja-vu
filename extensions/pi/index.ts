@@ -124,7 +124,14 @@ export default function (pi: any) {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       if (!injected) {
-        const { context: digest, receipt } = contextText(run(["hook-context"], ""));
+        // The session goes with it: hook-context marks the one starting as
+        // live, which keeps it out of its own MCP recall on this first turn
+        // (#4394, as #4246 and #4273 did for Hermes and opencode).
+        const key = sessionKey(event, ctx);
+        if (key) session = key;
+        const { context: digest, receipt } = contextText(
+          run(["hook-context"], JSON.stringify({ session_id: key, cwd: process.cwd() })),
+        );
         if (digest) {
           injected = true;
           ctx.ui.setStatus("deja", "");
@@ -195,7 +202,8 @@ export default function (pi: any) {
         return { content: parts.concat([{ type: "text", text: note }]) };
       }
       if (!event.isError) return;
-      if (event.toolName !== "bash") return;
+      // The pi-coding-agent has a powershell tool beside bash (#4523).
+      if (event.toolName !== "bash" && event.toolName !== "powershell") return;
       const parts = Array.isArray(event.content) ? event.content : [];
       const output = parts
         .filter((p: any) => p && p.type === "text" && typeof p.text === "string")
@@ -205,7 +213,7 @@ export default function (pi: any) {
       const id = String(event.toolCallId || "");
       if (!(id in repaired)) {
         repaired[id] = run(["hook-tool-after", "--plain"], JSON.stringify({
-          tool_name: "bash",
+          tool_name: event.toolName,
           tool_response: output,
           session_id: session,
           cwd: process.cwd(),

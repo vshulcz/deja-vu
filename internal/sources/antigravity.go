@@ -2,6 +2,7 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path"
@@ -113,6 +114,18 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		return nil, nil
 	}
 	s := model.Session{Harness: "antigravity", ID: id, Project: antigravityProject(id), Path: path}
+	// Records already taken from a planner's tool_calls, so the step that
+	// runs the call and names it again in its header is not a second run.
+	fromCalls := map[model.Message]int{}
+	// What a write_to_file call is about to write, by file, until the step
+	// that ran it says it did (#4528).
+	pendingWrites := map[string]string{}
+	cwd := ""
+	// The commands the latest planner row asked for, where they sit, waiting
+	// for the step that says how each ended. A step carries no call id, so
+	// it answers the call it follows (#4530).
+	var running []int
+	asked := 0
 	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
 		role := ""
 		source, _ := m["source"].(string)
@@ -124,28 +137,77 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 		default:
 			return
 		}
-		text, _ := m["content"].(string)
-		if strings.TrimSpace(text) == "" {
-			return
-		}
-		if role == "user" {
-			text = cleanAntigravityUserContent(text)
-		}
-		if strings.TrimSpace(text) == "" {
-			return
-		}
-		text = capParsedMessage(text)
 		t, _ := time.Parse(time.RFC3339Nano, str(m["created_at"]))
 		if t.IsZero() {
 			t = s.Started
 		}
+		var calls []model.Message
+		if role == "assistant" {
+			var c string
+			calls, c = antigravityToolCalls(m["tool_calls"], t)
+			if cwd == "" {
+				cwd = c
+			}
+			if calls, _ := m["tool_calls"].([]any); len(calls) > 0 {
+				// A planner row's steps follow it before the next row: a
+				// write still waiting here is one whose step failed.
+				clear(pendingWrites)
+				antigravityNoteWrites(m["tool_calls"], pendingWrites)
+			}
+		}
+		text, _ := m["content"].(string)
+		if role == "user" {
+			text = cleanAntigravityUserContent(text)
+		}
+		if strings.TrimSpace(text) == "" && len(calls) == 0 {
+			return
+		}
 		s.Touch(t)
+		if str(m["type"]) == "PLANNER_RESPONSE" {
+			running = nil
+			asked = antigravityRunCalls(m["tool_calls"])
+			for i, c := range calls {
+				if c.Role == RoleCommand {
+					running = append(running, len(s.Messages)+i)
+				}
+			}
+			// The speech, when there is any, goes in ahead of the calls.
+			if strings.TrimSpace(text) != "" {
+				for i := range running {
+					running[i]++
+				}
+			}
+		}
+		if strings.TrimSpace(text) == "" {
+			s.Messages = append(s.Messages, antigravityTakeCalls(calls, fromCalls)...)
+			return
+		}
+		text = capParsedMessage(text)
 		// A step's kind decides what it is, not its source. Antigravity puts
 		// prose and tool transcripts in the same MODEL stream, and reading
 		// only the source made shell dumps into assistant speech: 333 of 369
 		// MODEL rows on this machine, 90%, ranked as things the agent said.
 		if role == "assistant" {
-			s.Messages = append(s.Messages, antigravityStep(str(m["type"]), text, t)...)
+			step := antigravityStep(str(m["type"]), text, t)
+			own := -1
+			for _, rec := range step {
+				key := model.Message{Role: rec.Role, Text: rec.Text}
+				if (rec.Role == RoleCommand || rec.Role == RoleFiles) && fromCalls[key] > 0 {
+					fromCalls[key]--
+					continue
+				}
+				if rec.Role == RoleCommand {
+					own = len(s.Messages)
+				}
+				s.Messages = append(s.Messages, rec)
+			}
+			if code, ok := antigravityExitCode(str(m["type"]), text); ok {
+				running = antigravityStampExit(s.Messages, running, asked, own, antigravityField(text, "Task Description:"), code)
+			}
+			if str(m["type"]) == "CODE_ACTION" && str(m["status"]) == "DONE" {
+				s.Messages = append(s.Messages, antigravityTakeWrite(text, step, pendingWrites, t)...)
+			}
+			s.Messages = append(s.Messages, antigravityTakeCalls(calls, fromCalls)...)
 			return
 		}
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
@@ -156,6 +218,8 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 	if s.Project == "-" || s.Project == "" {
 		if p := antigravityProjectFromFiles(s.Messages); p != "" {
 			s.Project = p
+		} else if cwd != "" {
+			s.Project = projectName(cwd)
 		}
 	}
 	return []model.Session{s}, err
@@ -225,6 +289,173 @@ func antigravityStep(kind, text string, t time.Time) []model.Message {
 		}
 	}
 	return out
+}
+
+// antigravityToolCalls reads the structured calls a planner row carries —
+// the args the client hands its own PreToolUse hooks. The RUN_COMMAND step
+// after a call does not always name the command, and without this the command
+// was lost whenever it did not (#4358). The edit tools' diff stays with their
+// CODE_ACTION step; the call gives only the file. Returns the first Cwd too.
+func antigravityToolCalls(v any, t time.Time) ([]model.Message, string) {
+	calls, _ := v.([]any)
+	var out []model.Message
+	cwd := ""
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		if args == nil {
+			continue
+		}
+		switch str(call["name"]) {
+		case "run_command":
+			cmd := strings.TrimSpace(antigravityArg(args, "CommandLine"))
+			if cwd == "" {
+				cwd = antigravityArg(args, "Cwd")
+			}
+			if cmd != "" && IndexCommands() && worthIndexing(cmd) {
+				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
+			}
+		case "view_file", "replace_file_content", "multi_replace_file_content", "write_to_file":
+			p := antigravityArg(args, "AbsolutePath")
+			if p == "" {
+				p = antigravityArg(args, "TargetFile")
+			}
+			p = decodeURIPath(strings.TrimPrefix(p, "file://"))
+			if p != "" && IndexToolPaths() {
+				out = append(out, model.Message{Role: RoleFiles, Text: p, Time: t})
+			}
+		}
+	}
+	return out, cwd
+}
+
+// antigravityExitCode reads how a command ended off the step that ran it: a
+// header line "The command exited with code N.", above the step's Output:.
+func antigravityExitCode(kind, text string) (int, bool) {
+	if kind != "GENERIC" && kind != "RUN_COMMAND" {
+		return 0, false
+	}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		// The header ends where the output starts, "Output:" or the
+		// Stdout:/Stderr: pair; a line in the output is not the status.
+		if line == "Output:" || strings.HasPrefix(line, "Stdout:") || strings.HasPrefix(line, "Stderr:") {
+			break
+		}
+		if code, ok := statusCode(line, "The command exited with code ", "."); ok {
+			return code, true
+		}
+	}
+	return 0, false
+}
+
+// antigravityStampExit marks the command a step's exit belongs to: the one
+// the step itself recorded, else the planner's call it names, else the
+// planner's only call. With two calls and no name the code is left off
+// rather than guessed, counting a call too trivial to record: its step would
+// otherwise stamp the one that was. Returns the calls still waiting.
+func antigravityStampExit(msgs []model.Message, running []int, asked, own int, named string, code int) []int {
+	at := -1
+	switch {
+	case own >= 0:
+		at = own
+	case named != "":
+		for k, i := range running {
+			if msgs[i].Text == "$ "+named {
+				at = i
+				running = append(running[:k:k], running[k+1:]...)
+				break
+			}
+		}
+	case len(running) == 1 && asked == 1:
+		at, running = running[0], nil
+	}
+	if at >= 0 && at < len(msgs) && !strings.Contains(msgs[at].Text, "  → exit ") {
+		msgs[at].Text += fmt.Sprintf("  → exit %d", code)
+	}
+	return running
+}
+
+// antigravityRunCalls counts a planner row's run_command calls, recorded or
+// not.
+func antigravityRunCalls(v any) int {
+	calls, _ := v.([]any)
+	n := 0
+	for _, c := range calls {
+		if call, _ := c.(map[string]any); str(call["name"]) == "run_command" {
+			n++
+		}
+	}
+	return n
+}
+
+// antigravityNoteWrites keeps the content of the latest write_to_file call
+// for each file it names. The CODE_ACTION step that runs the call says
+// "Created file" and carries no diff block — 1 of 50 did on the store this was read off — so
+// CodeContent is the only record of what the file was given (#4528).
+func antigravityNoteWrites(v any, pending map[string]string) {
+	calls, _ := v.([]any)
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		if args == nil || str(call["name"]) != "write_to_file" {
+			continue
+		}
+		p := decodeURIPath(strings.TrimPrefix(antigravityArg(args, "TargetFile"), "file://"))
+		if p != "" {
+			pending[p] = antigravityArg(args, "CodeContent")
+		}
+	}
+}
+
+// antigravityTakeWrite is the wrote record of a write_to_file call, once a
+// finished CODE_ACTION step names its file. A step that failed names none, so
+// a write that never happened is not recorded; one whose step had a diff
+// block already gave its written side. The step answers the latest call for
+// its file: an earlier one still waiting is a call whose step failed, and
+// its content never reached the file.
+func antigravityTakeWrite(text string, step []model.Message, pending map[string]string, t time.Time) []model.Message {
+	// Only the step that created the file: a replace step on the same path
+	// with no diff block did not run the write.
+	if antigravityField(text, "Created file") == "" {
+		return nil
+	}
+	p := antigravityPath(text)
+	content, ok := pending[p]
+	if !ok {
+		return nil
+	}
+	delete(pending, p)
+	for _, rec := range step {
+		if rec.Role == RoleWrote {
+			return nil
+		}
+	}
+	if rec := WroteRecord(p, content); rec != "" && IndexWrites() {
+		return []model.Message{{Role: RoleWrote, Text: rec, Time: t}}
+	}
+	return nil
+}
+
+// antigravityArg reads one call argument. On disk each value is JSON in its
+// own right — CommandLine is `"go test ./..."` with the quotes — so a value
+// that decodes as a JSON string is that string; a bare one is taken as it is.
+func antigravityArg(args map[string]any, key string) string {
+	v := str(args[key])
+	var decoded string
+	if strings.HasPrefix(v, `"`) && json.Unmarshal([]byte(v), &decoded) == nil {
+		return decoded
+	}
+	return v
+}
+
+// antigravityTakeCalls keeps the records from a row's calls and notes each,
+// so the step that later names the same call adds nothing.
+func antigravityTakeCalls(calls []model.Message, seen map[model.Message]int) []model.Message {
+	for _, c := range calls {
+		seen[model.Message{Role: c.Role, Text: c.Text}]++
+	}
+	return calls
 }
 
 // antigravityField reads a labelled line out of a step's header.
@@ -377,7 +608,7 @@ func antigravityProject(id string) string {
 				continue
 			}
 			for _, uri := range c.Summary.WorkspaceURIs {
-				if w, ok := strings.CutPrefix(uri, "file://"); ok && w != "" {
+				if w, ok := fileURIPath(uri); ok {
 					return projectName(w)
 				}
 			}
@@ -409,13 +640,29 @@ func antigravityProject(id string) string {
 }
 
 // isAbsolutePath accepts both conventions, not the host's. A synced store
-// holds whatever the machine that wrote it used.
+// holds whatever the machine that wrote it used. A leading `\` is rooted too:
+// Windows reads \tmp\x against the current drive, never against a cwd.
 func isAbsolutePath(p string) bool {
-	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\\`) {
+	if strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) {
 		return true
 	}
 	// C:\src or C:/src
 	return len(p) > 2 && p[1] == ':' && (p[2] == '\\' || p[2] == '/')
+}
+
+// resolveToolPath puts a tool call's path relative to the session's cwd onto
+// that cwd, and leaves a rooted one as written. filepath.IsAbs is the host's
+// rule, and on Windows it is false for /tmp/proj/retry.go, which then became
+// \tmp\proj\tmp\proj\retry.go (#4438). A slash-rooted cwd is joined with
+// slashes so the record reads the same whichever host indexed it.
+func resolveToolPath(p, cwd string) string {
+	if p == "" || cwd == "" || isAbsolutePath(p) {
+		return p
+	}
+	if strings.HasPrefix(cwd, "/") {
+		return path.Join(cwd, p)
+	}
+	return filepath.Join(cwd, p)
 }
 
 // slashed puts a path in one convention so the segment arithmetic below reads

@@ -308,8 +308,9 @@ class DejaMemoryProvider(MemoryProvider):
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         # A MEMORY.md / USER.md entry is a decision worth outranking the noisy
         # sessions around it; deja keeps it as a note in the same index.
+        # "--" because an entry may start with a dash ("- user prefers X").
         if action == "add" and content and content.strip():
-            _deja(["remember", content.strip(), "--tag", "hermes-%%s" %% (target or "memory")])
+            _deja(["remember", "--tag", "hermes-%%s" %% (target or "memory"), "--", content.strip()])
 
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
         return [RECALL_SCHEMA, FIX_SCHEMA, BLAME_SCHEMA]

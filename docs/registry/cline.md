@@ -5,16 +5,28 @@
   - modern CLI/SDK: `${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/<sessionId>/<sessionId>.messages.json` with a `<sessionId>.json` manifest beside it
   - legacy VS Code extension (`saoudrizwan.claude-dev`): `<host globalStorage>/tasks/<taskId>/api_conversation_history.json` with `state/taskHistory.json` supplying title, cwd and timestamp; Code, Code Insiders, VSCodium, Cursor and Windsurf host roots are probed
 - **Read overrides**: `DEJA_CLINE_ROOT` (modern sessions dir), `DEJA_CLINE_ROOTS` (path list of legacy extension roots)
-- **Format**: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets
+- **Format**: whole-file JSON rewritten on change (not append-only) — full re-parse after atomic replacement, no incremental offsets. A change to the manifest alone, as `cline history update --title` makes, re-reads the session too (#4319), and so does a change to the task's own entry in `state/taskHistory.json` (#4446)
 
 `user`/`assistant` turns are indexed for their text, from string content or
 `type:"text"` blocks; thinking, images, compaction artifacts and non-lead agents
 are skipped by design. Tool calls are read as well: `run_commands` becomes a
-command record, the file tools a files record, and the editor's two sides the
-replaced span and the hashed written lines. The legacy extension's store takes
+command record, the file tools a files record, and the editor's two sides
+(`old_text`, `new_text`) the replaced span and the hashed written lines; an
+`editor` call with only `new_text` creates or inserts, and gives the written
+side alone. `apply_patch` takes its patch under `input` and gives the files,
+removed lines and added lines its headers name. A tool result is indexed as tool
+output whether it is a string or the CLI's list of
+`{query, result, error, success}` entries that `run_commands` and
+`read_files` write; an error the result does not already carry is kept with
+it (#4315). A command carries `→ exit N` from its result: the entry's
+`success` or its "Command exited with code N" error, or the extension's
+"Command failed with exit code N." (#4502). The legacy extension's store takes
 the Roo path for those, since its tools are Roo's — see
 [Roo Code](roo.md) for the SEARCH/REPLACE shape and the workspace-relative
-paths. The legacy `<task>...</task>` user envelope is unwrapped so the tags are
+paths. Two spellings are Cline's own: `replace_in_file` blocks are marked
+`------- SEARCH` / `=======` / `+++++++ REPLACE` (each a whole line, a run of
+three or more, Roo's `<` and `>` too), and `apply_patch` names its
+patch `input` where Roo's names it `patch`. The legacy `<task>...</task>` user envelope is unwrapped so the tags are
 not indexed.
 
 - **MCP**: `deja install cline` writes `mcpServers.deja` into
@@ -25,10 +37,14 @@ not indexed.
   `${CLINE_DIR:-~/.cline}/plugins/deja/`. It registers a rule whose content is
   session-start recall, a message builder that adds recall for each prompt and
   a repair after a failed command, the `/deja` command, and the
-  `deja-history` skill bundled in the plugin. Cline's own hooks cannot carry
-  context back, so the plugin is the channel.
-- **Resume**: `cline --id <sessionId>` for modern sessions only; legacy VS
-  Code tasks reopen from the extension UI.
+  `deja-history` skill bundled in the plugin. A `package.json` listing
+  `index.js` under `cline.plugins` makes the directory a plugin package, which
+  is the only way Cline loads its `skills/` (#4316). Cline's own hooks cannot
+  carry context back, so the plugin is the channel.
+- **Resume**: `cd <cwd> && cline --id <sessionId>` for modern sessions only;
+  `cline --id` reopens the transcript from anywhere but runs its tools in the
+  current directory, so the command runs in the manifest's `cwd` (#4318).
+  Legacy VS Code tasks reopen from the extension UI.
 - **Handoff**: `cline <prompt>` runs directly.
 
 Specified by the community in

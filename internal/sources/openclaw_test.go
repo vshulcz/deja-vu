@@ -44,7 +44,7 @@ func TestParseOpenClawFile(t *testing.T) {
 		t.Fatalf("roles = %q,%q", s.Messages[0].Role, s.Messages[1].Role)
 	}
 	// Header cwd promotes to the project key.
-	if s.Project != claudeProjectName(pathToProjectKey("/workspace/registry-demo")) {
+	if s.Project != "workspace/registry-demo" {
 		t.Fatalf("project = %q", s.Project)
 	}
 }

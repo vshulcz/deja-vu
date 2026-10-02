@@ -256,17 +256,21 @@ func zedRows(db, cols, where string) ([]zedRow, error) {
 // zedSession turns one row into a session, or reports false when the row
 // carries nothing worth indexing. A body that will not decode is skipped
 // rather than failing the store: one unreadable thread should not cost a user
-// every other thread they have.
+// every other thread they have. It is counted, though, with the reason: the
+// day Zed changes its encoding every new thread lands here, and doctor has to
+// be able to say so (#4341).
 func zedSession(db string, r zedRow) (model.Session, bool) {
 	if r.ID == "" {
 		return model.Session{}, false
 	}
 	doc, err := zedBody(r.DataType, r.Data)
 	if err != nil {
+		diagUnusableRecord(db, r.ID, fmt.Sprintf("thread %s: %v", r.ID, err))
 		return model.Session{}, false
 	}
 	var th zedThread
 	if err := json.Unmarshal(doc, &th); err != nil {
+		diagUnusableRecord(db, r.ID, fmt.Sprintf("thread %s: zed: thread body is not JSON: %v", r.ID, err))
 		return model.Session{}, false
 	}
 	updated := zedTime(r.UpdatedAt)
@@ -451,6 +455,7 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 	var msg struct {
 		Content []struct {
 			ToolUse *struct {
+				ID    string          `json:"id"`
 				Name  string          `json:"name"`
 				Input json.RawMessage `json:"input"`
 			} `json:"ToolUse"`
@@ -472,6 +477,26 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 	}
 	var out []model.Message
 	var paths []string
+	// The command goes first, ahead of what it printed, stamped with how its
+	// result says it ended (#4507).
+	for _, block := range msg.Content {
+		if block.ToolUse == nil {
+			continue
+		}
+		if cmd := zedCommand(block.ToolUse.Name, block.ToolUse.Input); cmd != "" {
+			if IndexCommands() && worthIndexing(cmd) {
+				line := "$ " + cmd
+				if r, ok := msg.ToolResults[block.ToolUse.ID]; ok {
+					if code, ok := zedExitCode(r.Content.Text); ok {
+						line += fmt.Sprintf("  → exit %d", code)
+					}
+				}
+				out = append(out, model.Message{Role: RoleCommand, Text: line, Time: t})
+			}
+			continue
+		}
+		paths = append(paths, zedToolPaths(block.ToolUse.Name, block.ToolUse.Input)...)
+	}
 	if IndexToolOutput() && len(msg.ToolResults) > 0 {
 		// A map, so the order is fixed by the call id rather than by the
 		// decoder: the same thread indexes the same way twice.
@@ -502,7 +527,9 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 		sort.Strings(ids)
 		for _, id := range ids {
 			r := msg.ToolResults[id]
-			if r.ToolName != "edit_file" {
+			// write_file (Zed 1.22) creates or overwrites a whole file and
+			// returns the same output as edit_file (#4339).
+			if r.ToolName != "edit_file" && r.ToolName != "write_file" {
 				continue
 			}
 			var res struct {
@@ -528,22 +555,30 @@ func zedWork(raw json.RawMessage, t time.Time) []model.Message {
 			}
 		}
 	}
-	for _, block := range msg.Content {
-		if block.ToolUse == nil {
-			continue
-		}
-		if cmd := zedCommand(block.ToolUse.Name, block.ToolUse.Input); cmd != "" {
-			if IndexCommands() && worthIndexing(cmd) {
-				out = append(out, model.Message{Role: RoleCommand, Text: "$ " + cmd, Time: t})
-			}
-			continue
-		}
-		paths = append(paths, zedToolPaths(block.ToolUse.Name, block.ToolUse.Input)...)
-	}
 	if len(paths) > 0 && IndexToolPaths() {
 		out = append(out, model.Message{Role: RoleFiles, Text: strings.Join(dedupeStrings(paths), "\n"), Time: t})
 	}
 	return out
+}
+
+// zedExitCode reads the status Zed's terminal tool opens its result with:
+// `Command "<cmd>" failed with exit code N.` on a failure, and "Command
+// executed successfully." for a clean run that printed nothing. A clean run
+// that printed something is its output alone, and stays unknown. The status
+// is the first paragraph, which spans lines when the command does.
+func zedExitCode(text string) (int, bool) {
+	line, _, _ := strings.Cut(strings.TrimSpace(text), "\n\n")
+	if line == "Command executed successfully." {
+		return 0, true
+	}
+	if !strings.HasPrefix(line, `Command "`) {
+		return 0, false
+	}
+	i := strings.LastIndex(line, `" failed with exit code `)
+	if i < 0 {
+		return 0, false
+	}
+	return statusCode(line[i+2:], "failed with exit code ", ".")
 }
 
 // zedCommand is the shell line a terminal call ran, or "" when the call is not
@@ -569,6 +604,7 @@ func zedCommand(name string, input json.RawMessage) string {
 // looked around in, not a file the work touched.
 var zedPathTools = map[string][]string{
 	"edit_file":              {"path"},
+	"write_file":             {"path"},
 	"read_file":              {"path"},
 	"create_directory":       {"path"},
 	"delete_path":            {"path"},

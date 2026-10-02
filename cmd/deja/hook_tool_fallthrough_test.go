@@ -99,7 +99,7 @@ func TestTheToolHookFallsThroughToTheLineBehindARepeatedFact(t *testing.T) {
 	// going quiet for the rest of the session.
 	said := map[string]bool{dedupeFact(first): true}
 	saidAlready := func(line string) bool { return said[dedupeFact(line)] }
-	second := commandHookLineSkipping(dir, "/work/app", cmd, saidAlready)
+	second := commandHookLineSkipping(dir, "/work/app", cmd, "", saidAlready)
 	if second == "" {
 		t.Fatal("the hook went silent once the missing-program sentence had been said")
 	}
@@ -113,7 +113,7 @@ func TestTheToolHookFallsThroughToTheLineBehindARepeatedFact(t *testing.T) {
 	// filed — and since #3605 the decision is a table lookup, so the only
 	// thing the bound still bought was silence.
 	said[dedupeFact(second)] = true
-	third := commandHookLineSkipping(dir, "/work/app", cmd, saidAlready)
+	third := commandHookLineSkipping(dir, "/work/app", cmd, "", saidAlready)
 	if third == "" {
 		t.Fatal("the hook went silent with a decision still unsaid behind two repeated facts")
 	}
@@ -128,7 +128,7 @@ func TestTheToolHookFallsThroughToTheLineBehindARepeatedFact(t *testing.T) {
 
 	// And when everything it can say has been said, silence is the answer.
 	all := func(string) bool { return true }
-	if line := commandHookLineSkipping(dir, "/work/app", cmd, all); line != "" {
+	if line := commandHookLineSkipping(dir, "/work/app", cmd, "", all); line != "" {
 		t.Errorf("a walk with nothing new to say still said something:\n  %s", line)
 	}
 }

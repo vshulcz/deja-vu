@@ -52,7 +52,10 @@
 <p>and <code>old_str</code>/<code>new_str</code> for an edit, which is the one place the replaced text</p>
 <p>survives. <code>create</code> hands over the whole file as <code>file_text</code>, and that is the</p>
 <p>only record a created file&#39;s lines were ever in a session — a commit that adds</p>
-<p>them deletes nothing for the replaced side to match. <code>tool.execution_complete</code> carries <code>data.result.content</code>,</p>
+<p>them deletes nothing for the replaced side to match. <code>view</code> is the file read.</p>
+<p>With a GPT model there is no <code>edit</code> or <code>create</code>: every edit is <code>apply_patch</code>,</p>
+<p>whose <code>arguments</code> is the patch string itself, read into files, the removed</p>
+<p>lines and the added ones as codex&#39;s patches are. <code>tool.execution_complete</code> carries <code>data.result.content</code>,</p>
 <p>indexed as tool output whether or not the call failed, because the error a</p>
 <p>command hit is what a later search reaches for. Its <code>success</code> flag is true on</p>
 <p>failed runs too, so a non-zero exit code is read from the telemetry or the</p>
@@ -81,7 +84,7 @@
 </ul>
 <p>in tool calls used to be dropped; the tool events now carry them.</p>
 <ul>
-<li>Tool names are lowercase (<code>edit</code>, <code>read</code>, <code>write</code>, <code>bash</code>) where Claude Code</li>
+<li>Tool names are lowercase (<code>edit</code>, <code>view</code>, <code>create</code>, <code>bash</code>) where Claude Code</li>
 </ul>
 <p>capitalises, and the edit argument is <code>old_str</code> rather than <code>old_string</code>.</p>
 <ul>

@@ -141,7 +141,10 @@ export default function (pi: any) {
     try {
       remember(ctx);
       if (!injected) {
-        const raw = run(["hook-context"], "");
+        // The session goes with it: hook-context marks the one starting as
+        // live, which keeps it out of its own MCP recall on this first turn
+        // (#4394, as #4246 and #4273 did for Hermes and opencode).
+        const raw = run(["hook-context"], JSON.stringify({ session_id: sessionID(), cwd: process.cwd() }));
         let digest = "";
         let receipt = "";
         try {
@@ -216,7 +219,8 @@ export default function (pi: any) {
         return { content: parts.concat([{ type: "text", text: note }]) };
       }
       if (!event.isError) return;
-      if (event.toolName !== "bash") return;
+      // Senpi and Kimchi's pi have a powershell tool beside bash (#4523).
+      if (event.toolName !== "bash" && event.toolName !== "powershell") return;
       const parts = Array.isArray(event.content) ? event.content : [];
       const output = parts
         .filter((p: any) => p && p.type === "text" && typeof p.text === "string")
@@ -226,7 +230,7 @@ export default function (pi: any) {
       const id = String(event.toolCallId || "");
       if (!(id in repaired)) {
         repaired[id] = run(["hook-tool-after", "--plain"], JSON.stringify({
-          tool_name: "bash",
+          tool_name: event.toolName,
           tool_response: output,
           session_id: sessionID(),
           cwd: process.cwd(),
