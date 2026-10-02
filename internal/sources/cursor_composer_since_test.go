@@ -86,7 +86,10 @@ insert into cursorDiskKV values ('bubbleId:renamed:b1', json('{"type":1,"text":"
 insert into cursorDiskKV values ('composerData:still', json('{"composerId":"still","name":"untouched","createdAt":1752600000000,"lastUpdatedAt":1752600100000}'));
 insert into cursorDiskKV values ('bubbleId:still:b1', json('{"type":1,"text":"nothing new","timestamp":1752600001000}'));
 commit;`)
-	if out, err := exec.Command("sqlite3", db, b.String()).CombinedOutput(); err != nil {
+	// On stdin: the script is past the 32 KiB a Windows command line holds.
+	seed := exec.Command("sqlite3", db)
+	seed.Stdin = strings.NewReader(b.String())
+	if out, err := seed.CombinedOutput(); err != nil {
 		t.Fatalf("seed: %v: %s", err, out)
 	}
 	ss, err := parseCursorDB(db, time.UnixMilli(1752600200000).UTC())
