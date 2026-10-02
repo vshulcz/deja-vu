@@ -39,6 +39,11 @@ func TestPluginManifestHooksWhatTheInstallerHooks(t *testing.T) {
 
 	manifest := hookMatchers(t, repoFile(t, "claude-plugin/.claude-plugin/plugin.json"),
 		"deja.sh")
+	// Claude Code loads hooks/hooks.json beside the manifest's own; the events
+	// an older Claude rejects live there (#4488).
+	for event, matcher := range hookMatchers(t, repoFile(t, "claude-plugin/hooks/hooks.json"), "deja.sh") {
+		manifest[event] = matcher
+	}
 
 	for _, event := range sortedKeys(wired) {
 		got, ok := manifest[event]

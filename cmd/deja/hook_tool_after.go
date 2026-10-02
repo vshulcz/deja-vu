@@ -156,7 +156,13 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		return nil
 	}
 	var resp sessionStartHookResponse
+	// The event it was sent. Claude Code fires PostToolUseFailure for a command
+	// that exited non-zero and drops a reply naming any other event (#4488);
+	// qwen takes either. Everything else gets the name it always had.
 	resp.HookSpecificOutput.HookEventName = "PostToolUse"
+	if input.HookEventName == "PostToolUseFailure" {
+		resp.HookSpecificOutput.HookEventName = input.HookEventName
+	}
 	resp.HookSpecificOutput.AdditionalContext = payload
 	b, err := json.Marshal(resp)
 	if err != nil {

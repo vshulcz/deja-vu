@@ -61,6 +61,7 @@
 <li>Tool and control records use other <code>type</code> values and do not become messages.</li>
 <li>Project path encoding is ambiguous because <code>-</code> represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.</li>
 <li>Subagent logs are read as task, answer and the files they changed by default; the full child transcript is opt-in.</li>
+<li>A Bash call that exits non-zero fires <code>PostToolUseFailure</code>, not <code>PostToolUse</code>, with the output under <code>error</code>; a hook reply has to name the event it was sent or Claude Code drops it (&#34;Hook returned incorrect event name&#34;). <code>claude-auto</code> wires <code>hook-tool-after</code> to both (2.1.287, #4488). Before 2.0.56 the event does not exist and the settings schema rejects the whole file over it, so install leaves it out when <code>claude --version</code> is older; the plugin carries it in <code>hooks/hooks.json</code>, which an older Claude skips on its own.</li>
 </ul>
 <p><strong>Last verified:</strong> 2026-09-10</p>
 

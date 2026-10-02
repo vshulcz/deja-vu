@@ -18,6 +18,7 @@ type hookWiringState struct {
 	path    string
 	state   string
 	missing []string       // events this release wires that the file lacks
+	want    int            // events this release wires for this client's version
 	dead    bool           // the entries name a deja that is not there
 	runNote string         // or name one the host's shell cannot reach as spelled (#4125)
 	hooks   map[string]any // for the repeat check, which reads the entries
@@ -45,13 +46,15 @@ func claudeHookWiringState() hookWiringState {
 		return st
 	}
 	st.hooks, _ = root["hooks"].(map[string]any)
-	for _, h := range claudeHookWiring {
+	wiring := claudeWiring()
+	st.want = len(wiring)
+	for _, h := range wiring {
 		if !hookEventWired(st.hooks, h.Event, h.Sub) {
 			st.missing = append(st.missing, h.Event)
 		}
 	}
 	switch {
-	case len(st.missing) == len(claudeHookWiring):
+	case len(st.missing) == st.want:
 		st.state = "missing"
 	case len(st.missing) > 0:
 		st.state = "out of date"
@@ -60,7 +63,7 @@ func claudeHookWiringState() hookWiringState {
 	}
 	// Only when something here is actually wired: both notes are about the
 	// binary the entries name, and a file with no deja in it names none.
-	if len(st.missing) < len(claudeHookWiring) {
+	if len(st.missing) < st.want {
 		st.dead = hookExeNote(st.path, "claude-auto") != ""
 	}
 	if doctorLauncherNote(st.path, "claude-auto") != "" {
@@ -68,7 +71,7 @@ func claudeHookWiringState() hookWiringState {
 	}
 	// A binary that is there can still be one the shell cannot reach as the
 	// file spells it (#4125); asked only when nothing above already said dead.
-	if !st.dead && len(st.missing) < len(claudeHookWiring) {
+	if !st.dead && len(st.missing) < st.want {
 		st.runNote = claudeHookRunNote(st.hooks)
 		st.dead = st.runNote != ""
 	}

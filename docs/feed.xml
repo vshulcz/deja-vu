@@ -151,6 +151,13 @@
     <summary>Where Cherry Studio writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Claude Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/claude-code.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/claude-code.html"></link>
+    <updated>2026-10-02T00:00:00Z</updated>
+    <summary>Where Claude Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Cline stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/cline.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/cline.html"></link>

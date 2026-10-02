@@ -235,19 +235,19 @@ func doctorHooks(w io.Writer) {
 	if off := clientHooksOff("claude-code"); off != "" && st.state == "wired" {
 		fmt.Fprintf(w, "  %-12s %s\n", "", off)
 	}
-	if len(st.missing) > 0 && len(st.missing) < len(claudeHookWiring) {
+	if len(st.missing) > 0 && len(st.missing) < st.want {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
 		// lacks everything added since.
 		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
-			len(claudeHookWiring)-len(st.missing), len(claudeHookWiring), strings.Join(st.missing, ", "))
+			st.want-len(st.missing), st.want, strings.Join(st.missing, ", "))
 	}
 	if note := doctorHookRepeats(st.hooks, claudeHookWiring, "claude-auto"); note != "" {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
 	// Only when something here is actually wired: the note is about the binary
 	// those entries name, and a file with no deja in it names none.
-	if note := hookExeNote(st.path, "claude-auto"); note != "" && len(st.missing) < len(claudeHookWiring) {
+	if note := hookExeNote(st.path, "claude-auto"); note != "" && len(st.missing) < st.want {
 		fmt.Fprintf(w, "  %-12s %s\n", "", note)
 	}
 	// The entries name the launcher now, and the launcher is always there —
