@@ -67,6 +67,10 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	} else if err := json.Unmarshal(old, &root); err != nil {
 		return installResult{}, configParseError(path, err)
 	}
+	// What the file held before, for the trust pins below: a second parse
+	// rather than a copy, since the update edits the maps in place.
+	var before map[string]any
+	_ = json.Unmarshal(old, &before)
 	for _, h := range codexHookWiring {
 		updateCodexHook(root, h.Event, hookRun(exe, h.Sub), h.Matcher, uninstall)
 	}
@@ -79,6 +83,13 @@ func installCodexHooks(exe string, uninstall bool) (installResult, error) {
 	}
 	next = append(next, '\n')
 	a, err := writeIfChanged(path, old, next)
+	if err == nil && a != "unchanged" {
+		// Codex's approval of each hook is pinned by position in its
+		// config.toml; see codex_hook_trust.go. Install moves hooks too: a
+		// second copy of deja's entry it drops shifts the reader's hooks
+		// after it up a place (#4227).
+		err = moveCodexHookTrust(path, before, root)
+	}
 	return installResult{Path: path, Action: a}, err
 }
 
@@ -295,7 +306,10 @@ export default {
       try {
         const key = event.sessionID || "default"
         if (!cache.has(key)) {
-          const raw = await runHook("hook-context", undefined, cwd)
+          // The session id rides along so the digest leaves this session
+          // out: the context hook runs after the first message is stored,
+          // and the index can already hold it (#4199).
+          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", cwd }), cwd)
           let digest = ""
           try {
             digest = JSON.parse(raw)?.hookSpecificOutput?.additionalContext || ""
@@ -532,7 +546,10 @@ export const DejaRecall = async ({ $, client, directory }) => {
       try {
         const key = input.sessionID || "default"
         if (!cache.has(key)) {
-          const raw = await $%scd ${cwd} && %q %s%s.text()
+          // The session id rides along so the digest leaves this session
+          // out: the transform runs after the first message is stored, and
+          // the index can already hold it (#4199).
+          const raw = await $%scd ${cwd} && echo ${JSON.stringify({ session_id: input.sessionID || "", cwd })} | %q %s%s.text()
           let ctx = "", receipt = ""
           try {
             const parsed = JSON.parse(raw)
@@ -745,6 +762,11 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	// that stops them repeating outlives them, so without this the memory qwen
 	// just lost is the memory recall refuses to send again.
 	{"PreCompact", "hook-precompact", ""},
+	// The session is over, so its live stamp goes and the next session's MCP
+	// recall can answer with it (#4257). qwen-code 0.20.0 fires it on an
+	// interactive exit and from ACP; a one-shot `qwen -p` does not, so those
+	// still wait out the window.
+	{"SessionEnd", "hook-session-end", ""},
 }
 
 // qwenRetiredEvents are events deja used to write for qwen and no longer does.
@@ -1008,7 +1030,7 @@ func dejaHookEntry(entry map[string]any) bool {
 		// Both tool subcommands are spelled out: the match wants the whole
 		// token, so "hook-tool" does not find "hook-tool-after".
 		for _, sub := range []string{"hook-context", "hook-prompt", "hook-precompact", "hook-goose", "hook-antigravity",
-			"hook-tool", "hook-tool-after", "hook-spawn"} {
+			"hook-tool", "hook-tool-after", "hook-spawn", "hook-session-end"} {
 			if isDejaHookCommand(cmd, "deja "+sub) {
 				return true
 			}

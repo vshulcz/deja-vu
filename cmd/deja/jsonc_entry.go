@@ -98,9 +98,9 @@ func stripJSONComments(text string) string {
 func jsoncSetEntry(text, blockKey, id, entry string, uninstall bool, dropFrom int) (string, error) {
 	open := zedTopLevelOpen(text)
 	if open < 0 {
-		return "", fmt.Errorf("does not look like a settings object; add %q by hand", blockKey)
+		return "", fmt.Errorf("does not look like a settings object; add %q by hand", strings.Join(splitBlockKey(blockKey), "."))
 	}
-	keys := strings.Split(blockKey, ".")
+	keys := splitBlockKey(blockKey)
 	block, have := walkJSONCKeys(text, open, keys)
 	if block == nil {
 		if uninstall {
@@ -297,7 +297,7 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 	// mcpBlock reads null as "no block", which is right where the writer can
 	// replace the value; here the write is a text insert, so it would leave a
 	// second key of the same name with the reader's value winning (#2740).
-	keys := strings.Split(blockKey, ".")
+	keys := splitBlockKey(blockKey)
 	holder := root
 	have := 0
 	for _, key := range keys[:len(keys)-1] {
@@ -322,7 +322,7 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 				if uninstall {
 					return installResult{Path: path, Action: "unchanged"}, nil
 				}
-				return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, blockKey)
+				return installResult{}, fmt.Errorf("%s: %q is not an object deja can edit — left as it was", path, strings.Join(keys, "."))
 			}
 		}
 	}
@@ -348,7 +348,7 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 		// it created `mcp` as well as `servers` can leave the file as it found
 		// it (#2783).
 		for i := have; i < len(keys); i++ {
-			noteBlockAdded(path, strings.Join(keys[:i+1], "."))
+			noteBlockAdded(path, joinBlockKey(keys[:i+1]))
 		}
 	}
 	key := dejaEntryKey(m)
@@ -356,17 +356,17 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 	var next string
 	if uninstall {
 		delete(m, key)
-		removeAdoptedDejaEntries(path, blockKey, m)
+		removeAdoptedDejaEntries(path, joinBlockKey(keys), m)
 		note = leftDejaEntriesNote(m)
 		dropFrom := len(keys)
-		if len(m) == 0 && blockWasAdded(path, blockKey) {
+		if len(m) == 0 && blockWasAdded(path, joinBlockKey(keys)) {
 			dropFrom = len(keys) - 1
-			forgetBlockAdded(path, blockKey)
+			forgetBlockAdded(path, joinBlockKey(keys))
 			// And up, while each level holds nothing but the one below it and
 			// deja is what put it there.
 			holders := chainHolders(root, keys)
 			for i := len(keys) - 2; i >= 0; i-- {
-				prefix := strings.Join(keys[:i+1], ".")
+				prefix := joinBlockKey(keys[:i+1])
 				if len(holders[i+1]) != 1 || !blockWasAdded(path, prefix) {
 					break
 				}
@@ -391,6 +391,27 @@ func writeJSONCEntry(path string, old []byte, blockKey string, want map[string]a
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
 	return installResult{Path: path, Action: a, Note: note}, werr
+}
+
+// splitBlockKey reads a dotted block key as a path, except where a dot is
+// escaped: Amp's servers live under one literal key, "amp.mcpServers", which
+// the writers spell `amp\.mcpServers` (#4357).
+func splitBlockKey(blockKey string) []string {
+	parts := strings.Split(strings.ReplaceAll(blockKey, `\.`, "\x00"), ".")
+	for i, part := range parts {
+		parts[i] = strings.ReplaceAll(part, "\x00", ".")
+	}
+	return parts
+}
+
+// joinBlockKey is splitBlockKey backwards, for the names the wiring state
+// keeps: a block deja added has to be found again under the same name.
+func joinBlockKey(keys []string) string {
+	escaped := make([]string, len(keys))
+	for i, key := range keys {
+		escaped[i] = strings.ReplaceAll(key, ".", `\.`)
+	}
+	return strings.Join(escaped, ".")
 }
 
 // chainHolders is the object each key of a dotted block key lives in, so an
@@ -425,7 +446,7 @@ func jsoncSetFlag(text, blockKey, key string, value bool) (string, error) {
 	}
 	// A dotted block key, for a switch that lives deeper than the top level:
 	// openclaw's is `hooks.internal.enabled` (#2811).
-	keys := strings.Split(blockKey, ".")
+	keys := splitBlockKey(blockKey)
 	block, have := walkJSONCKeys(text, open, keys)
 	if block == nil {
 		at, comma, indent := open, rootComma(text, open), "  "
@@ -463,7 +484,7 @@ func jsoncRemoveKey(text, blockKey, key string, dropFrom int) (string, error) {
 	if open < 0 {
 		return text, nil
 	}
-	keys := strings.Split(blockKey, ".")
+	keys := splitBlockKey(blockKey)
 	if dropFrom < len(keys) {
 		chain, have := walkJSONCKeys(text, open, keys[:dropFrom+1])
 		if chain == nil || have <= dropFrom {

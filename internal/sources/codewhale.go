@@ -63,14 +63,15 @@ func CodeWhaleRoots() []string {
 }
 
 // codeWhaleSidecars are the files the harness keeps beside its transcripts:
-// the offline queue, the legacy checkpoint slot, and the ownership ledger.
+// the offline queue, the legacy checkpoint slot, and the ledger of which boot
+// owns which session (session_boot_owners.json, #4361).
 // None of them is a session, and the row that counts unread files should not
 // report them as transcripts deja failed on.
 var codeWhaleSidecars = map[string]bool{
-	"offline_queue.json": true,
-	"latest.json":        true,
-	"owners.json":        true,
-	"constitution.json":  true,
+	"offline_queue.json":       true,
+	"latest.json":              true,
+	"session_boot_owners.json": true,
+	"constitution.json":        true,
 }
 
 // CodeWhaleSessionFiles lists the transcripts. A session file sits directly in
@@ -112,17 +113,26 @@ func CodeWhaleSidecarFiles() []string {
 // codeWhaleDialect is what CodeWhale calls its tools. The shell tool answers to
 // three names on the wire — the canonical exec_shell and the bash aliases every
 // model already knows — and the file tools take `path`. apply_patch carries a
-// patch rather than a replaced span, so it names a file and no edit.
+// patch rather than a replaced span, so it names a file and no edit. Since
+// 0.9.6 new turns use read, write and edit instead, and edit takes
+// edits[{oldText,newText}]; the older names stay for sessions saved before
+// (#4360).
 var codeWhaleDialect = toolDialect{
 	pathKey: "path",
 	pathTools: map[string]bool{
+		"read": true, "write": true, "edit": true,
 		"read_file": true, "write_file": true, "edit_file": true,
 		"fim_edit": true, "apply_patch": true, "str_replace": true,
 	},
 	shellTool:  "exec_shell",
 	shellTools: map[string]bool{"exec_shell": true, "bash": true, "Bash": true},
-	editTools:  map[string]bool{"edit_file": true, "fim_edit": true, "str_replace": true},
-	oldKey:     "old_string",
+	editTools: map[string]bool{
+		"edit": true, "write": true,
+		"edit_file": true, "fim_edit": true, "str_replace": true,
+	},
+	oldKey:      "old_string",
+	editsOldKey: "oldText",
+	editsNewKey: "newText",
 }
 
 type codeWhaleSession struct {
@@ -138,6 +148,24 @@ type codeWhaleSession struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
 	} `json:"messages"`
+}
+
+// CodeWhaleWorkspace is the workspace a saved session was worked in, from its
+// metadata. "" when the file names none (#4362).
+func CodeWhaleWorkspace(path string) string {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	var doc struct {
+		Metadata struct {
+			Workspace string `json:"workspace"`
+		} `json:"metadata"`
+	}
+	if json.Unmarshal(b, &doc) != nil {
+		return ""
+	}
+	return doc.Metadata.Workspace
 }
 
 func LoadCodeWhale() []model.Session {
@@ -163,7 +191,7 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		Title: firstLineTrim(doc.Metadata.Title),
 	}
 	if doc.Metadata.Workspace != "" {
-		s.Project = claudeProjectName(pathToProjectKey(doc.Metadata.Workspace))
+		s.Project = projectName(doc.Metadata.Workspace)
 	}
 	if doc.Metadata.Parent != "" {
 		// `codewhale fork` writes the source id here, and this file is the only
@@ -219,6 +247,8 @@ func codeWhaleWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 	if json.Unmarshal(raw, &blocks) != nil {
 		return nil
 	}
+	codeWhaleFoldEdits(blocks)
+	codeWhaleFoldEditKeys(blocks)
 	var out []model.Message
 	if IndexToolPaths() {
 		if p := toolPathsIn(blocks, codeWhaleDialect); p != "" {
@@ -246,6 +276,65 @@ func codeWhaleWorkRecords(raw json.RawMessage, ts time.Time) []model.Message {
 		}
 	}
 	return out
+}
+
+// codeWhaleFoldEdits puts an edit call into the one shape the dialect reads,
+// the way CodeWhale's prepare_contract_edit_input does before it runs one: an
+// edits array sent as a JSON string is decoded, and a top-level
+// oldText/newText pair joins edits. The transcript keeps what the model sent,
+// so either shape left the edit with no span and nothing written (#4360).
+func codeWhaleFoldEdits(blocks []any) {
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, codeWhaleDialect)
+		if !ok || name != "edit" {
+			continue
+		}
+		if encoded, ok := in["edits"].(string); ok {
+			var decoded []any
+			if json.Unmarshal([]byte(encoded), &decoded) == nil {
+				in["edits"] = decoded
+			}
+		}
+		oldText, okOld := in["oldText"].(string)
+		newText, okNew := in["newText"].(string)
+		if okOld && okNew {
+			edits, _ := in["edits"].([]any)
+			in["edits"] = append(edits, map[string]any{"oldText": oldText, "newText": newText})
+			delete(in, "oldText")
+			delete(in, "newText")
+		}
+	}
+}
+
+// codeWhaleEditKeys are the spellings CodeWhale's edit_file folds onto its own
+// search and replace before it runs (tools/file.rs EDIT_ALIASES), mapped here
+// onto the dialect's old_string and new_string. search/replace is the
+// canonical pair, so a call written that way had no edit and no wrote record
+// (#4404).
+var codeWhaleEditKeys = [][2]string{
+	{"search", "old_string"}, {"replace", "new_string"},
+	{"old_str", "old_string"}, {"new_str", "new_string"},
+	{"oldText", "old_string"}, {"newText", "new_string"},
+	{"old_text", "old_string"}, {"new_text", "new_string"},
+	{"replacement", "new_string"},
+}
+
+// codeWhaleFoldEditKeys rewrites an edit_file call's arguments onto the keys
+// the dialect reads. The transcript keeps what the model sent.
+func codeWhaleFoldEditKeys(blocks []any) {
+	for _, it := range blocks {
+		name, in, ok := toolPart(it, codeWhaleDialect)
+		if !ok || name != "edit_file" {
+			continue
+		}
+		for _, k := range codeWhaleEditKeys {
+			if v, ok := in[k[0]]; ok {
+				if _, set := in[k[1]]; !set {
+					in[k[1]] = v
+				}
+			}
+		}
+	}
 }
 
 // isCodeWhaleSession reports whether a path is one of CodeWhale's transcripts:

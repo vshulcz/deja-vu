@@ -36,7 +36,7 @@ func TestEverySurfaceCarriesTheQuietTriggers(t *testing.T) {
 // so it kept the old trigger list while `deja install` wrote the new one.
 func TestBundledCLISkillMatchesInstaller(t *testing.T) {
 	got := string(repoFile(t, "skills/deja-search/SKILL.md"))
-	if want := cliSkillFile(); got != want {
-		t.Fatalf("skills/deja-search/SKILL.md has drifted from cliSkillFile:\n--- file ---\n%s\n--- installer ---\n%s", got, want)
+	if want := cliSkillRegistryFile(); got != want {
+		t.Fatalf("skills/deja-search/SKILL.md has drifted from cliSkillRegistryFile:\n--- file ---\n%s\n--- installer ---\n%s", got, want)
 	}
 }

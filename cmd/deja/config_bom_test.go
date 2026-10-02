@@ -28,12 +28,12 @@ func TestAConfigWithAByteOrderMarkIsStillInstallable(t *testing.T) {
 		return p
 	}
 	files := map[string]string{
-		".claude.json":           `{"editorMode":"vim"}`,
-		".claude/settings.json":  `{"model":"opus"}`,
-		".cursor/mcp.json":       `{"mcpServers":{}}`,
-		".gemini/settings.json":  `{"theme":"dark"}`,
-		".qwen/settings.json":    `{"theme":"dark"}`,
-		".zcode/cli/config.json": `{}`,
+		".claude.json":            `{"editorMode":"vim"}`,
+		".claude/settings.json":   `{"model":"opus"}`,
+		".cursor/mcp.json":        `{"mcpServers":{}}`,
+		".gemini/settings.json":   `{"theme":"dark"}`,
+		".qwen/settings.json":     `{"theme":"dark"}`,
+		".zcode/cli/setting.json": `{}`,
 	}
 	paths := map[string]string{}
 	for rel, body := range files {

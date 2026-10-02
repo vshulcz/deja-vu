@@ -150,7 +150,7 @@
 <p>One detail matters for text rather than for tokens. Several <code>AssistantMessage</code> records can share one <code>data.message_id</code>: the CLI appends the answer as it streams, and each record carries the next piece rather than the whole answer so far. Read one message per record and a recall quotes a third of a sentence — so deja joins a run under one id and the answer comes back whole. Reading Kiro's store with anything that does not is where half-sentences come from.</p>
 
 <h2>What is not read yet, and why that is written down</h2>
-<p>The IDE also mirrors chats into its globalStorage, and the TUI keeps sessions in a SQLite store (<code>kiro-cli/data.sqlite3</code>, table <code>conversations_v2</code>). No sample of either schema is in hand, so deja does not read them: a reader built against a guessed shape is one that drops history without saying so. The <a href="../registry/kiro.html">format registry entry</a> records both as gaps rather than leaving the question open.</p>
+<p><code>kiro-cli chat --no-interactive</code> writes neither tree: each headless conversation is a row of <code>kiro-cli/data.sqlite3</code>, table <code>conversations_v2</code>, and deja reads it through the <code>sqlite3</code> CLI. The IDE also mirrors chats into its globalStorage. No sample of that is in hand, so deja does not read it: a reader built against a guessed shape is one that drops history without saying so. The <a href="../registry/kiro.html">format registry entry</a> records it as a gap rather than leaving the question open.</p>
 
 <h2>Getting recall into Kiro itself</h2>
 <pre>deja install kiro</pre>

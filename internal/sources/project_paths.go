@@ -61,11 +61,7 @@ func projectFromPaths(ms []model.Message) string {
 	if float64(n) < 0.6*float64(total) {
 		return ""
 	}
-	segs := strings.Split(strings.Trim(best, string(filepath.Separator)), string(filepath.Separator))
-	if len(segs) >= 2 {
-		return projectSegments(segs[len(segs)-2], segs[len(segs)-1])
-	}
-	return filepath.Base(best)
+	return cwdProjectName(best)
 }
 
 // agentScratch drops the agent's own working area. A scratch clone under

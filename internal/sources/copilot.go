@@ -30,7 +30,13 @@ func CopilotSessionFiles() []string {
 // read, once per session (#3303).
 func CopilotSidecarFiles() []string {
 	return walkFiles(CopilotRoot(), func(p string) bool {
-		return filepath.Base(p) == "vscode.metadata.json"
+		// Copilot CLI 1.0.79 also keeps rewind snapshots per session
+		// (rewind-file-snapshots/index.json, tracking.json): the client's own
+		// state, not transcripts deja failed to read (#4233).
+		// autopilot-objective.json is the goal of an autopilot run (#4476).
+		return filepath.Base(p) == "vscode.metadata.json" ||
+			filepath.Base(p) == "autopilot-objective.json" ||
+			filepath.Base(filepath.Dir(p)) == "rewind-file-snapshots"
 	})
 }
 
@@ -240,6 +246,24 @@ func jsonInt(v any) (int, bool) {
 // whole shape rather than the phrase.
 var copilotShellExitRe = regexp.MustCompile(`<shellId:[^>]*completed with exit code (\d+)>`)
 
+// copilotResumes sends an event log back for a whole read when its tail holds
+// the failed exit of a command started before it (#4443).
+var copilotResumes = resumesUnlessAnswering(`"tool.execution_`, func(m map[string]any) ([]string, string) {
+	data, _ := m["data"].(map[string]any)
+	id, _ := data["toolCallId"].(string)
+	switch typ, _ := m["type"].(string); typ {
+	case "tool.execution_start":
+		return []string{id}, ""
+	case "tool.execution_complete":
+		result, _ := data["result"].(map[string]any)
+		out, _ := result["content"].(string)
+		if copilotExitCode(data, out) > 0 {
+			return nil, id
+		}
+	}
+	return nil, ""
+})
+
 // copilotExitCode reads what a shell call actually did. The telemetry carries
 // the number when Copilot recorded one; the trailer under the output is the
 // fallback, and both are absent for a call that is not a shell run.
@@ -263,17 +287,6 @@ func copilotExitCode(data map[string]any, out string) int {
 	return 0
 }
 
-// copilotProjectName mirrors the codex convention: the last two path segments
-// of the recorded working directory, or the final one at filesystem roots.
-func copilotProjectName(cwd string) string {
-	cwd = strings.TrimRight(cwd, "/\\")
-	base := filepath.Base(cwd)
-	if base == "" || base == "." || base == string(filepath.Separator) {
-		return ""
-	}
-	parent := filepath.Base(filepath.Dir(cwd))
-	if parent != "" && parent != "." && parent != string(filepath.Separator) && !strings.Contains(parent, ":") {
-		return parent + "/" + base
-	}
-	return base
-}
+// copilotProjectName is the recorded working directory's project, the last two
+// segments; a Windows path from a synced store reads the same on any host.
+func copilotProjectName(cwd string) string { return cwdProjectName(cwd) }

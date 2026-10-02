@@ -101,7 +101,7 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
-		Project: claudeProjectName(claudeProjectDir(path)),
+		Project: claudeProjectNameFor(path),
 		Path:    path,
 	}
 	err := scan(func(line []byte) {
@@ -209,8 +209,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
-	// A child run comes in as the task it was handed and the answer it came
-	// back with, unless the reader asked for the whole thing (#3009).
+	// A child run comes in as the task it was handed, the answer it came back
+	// with and what it changed, unless the reader asked for the whole thing
+	// (#3009, #4163).
 	if IsSubagentPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 		s.Messages = KeepSubagentTail(s.Messages)
 	}
@@ -409,7 +410,7 @@ func scanJSONLBytes(path string, offset int64, fn func([]byte)) error {
 	// Reset before returning it as well as after taking it: a pooled reader
 	// must not keep the last file open through its reference.
 	defer func() { r.Reset(nil); jsonlReaders.Put(r) }()
-	r.Reset(f)
+	r.Reset(boundedFrom(path, f, offset))
 	for {
 		line, err := r.ReadBytes('\n')
 		if trimmed := trimJSONSpace(line); len(trimmed) > 0 {

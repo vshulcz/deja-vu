@@ -59,6 +59,61 @@ func yamlBlockIsSequence(block string) bool {
 	return false
 }
 
+// yamlEntrySwitchedOff reports whether the entry `name` under the top-level
+// key has been switched off: `enabled: false`, the spelling goose and hermes
+// both read, or `disabled: true`. The writers below rebuild deja's entry
+// whole, and they dropped the switch until they read it first (#4467).
+func yamlEntrySwitchedOff(doc, topKey, name string) bool {
+	lines := strings.Split(strings.ReplaceAll(doc, "\r\n", "\n"), "\n")
+	in, child, entry, field := false, -1, -1, -1
+	for _, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		w := yamlIndentWidth(line)
+		if w == 0 {
+			in, child, entry, field = yamlKeyLine(line, topKey), -1, -1, -1
+			continue
+		}
+		if !in {
+			continue
+		}
+		if child < 0 {
+			child = w
+		}
+		key, rest, ok := hermesKeyLine(line)
+		if w <= child {
+			entry, field = -1, -1
+			if w == child && ok && hermesKeyName(key) == name && strings.TrimSpace(stripYAMLComment(rest)) == "" {
+				entry = w
+			}
+			continue
+		}
+		if entry < 0 || !ok {
+			continue
+		}
+		if field < 0 {
+			field = w
+		}
+		if w != field {
+			continue
+		}
+		v := strings.ToLower(hermesYAMLScalar(rest))
+		switch hermesKeyName(key) {
+		case "enabled":
+			if v == "false" {
+				return true
+			}
+		case "disabled":
+			if v == "true" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func installGoose(exe string, uninstall bool) (installResult, error) {
 	path := filepath.Join(gooseConfigDir(), "config.yaml")
 	old, err := readConfig(path)
@@ -78,7 +133,12 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 	// empty key first makes the two paths meet: either the key has other
 	// extensions and ours joins them, or it is gone and one is written.
 	next = dropEmptyYAMLKey(next, "extensions:")
+	var note string
 	if !uninstall {
+		on := "true"
+		if yamlEntrySwitchedOff(body, "extensions:", "deja") {
+			on, note = "false", switchedOffNote
+		}
 		cmd, args := mcpCommandArgs(exe)
 		pad := yamlBlockIndent(gooseExtensionsBlock(next))
 		if pad == "" {
@@ -86,7 +146,7 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		}
 		key, val := pad, pad+"  "
 		var b strings.Builder
-		fmt.Fprintf(&b, "%sdeja:\n%senabled: true\n%stype: stdio\n%sname: deja\n", key, val, val, val)
+		fmt.Fprintf(&b, "%sdeja:\n%senabled: %s\n%stype: stdio\n%sname: deja\n", key, val, on, val, val)
 		// Quote both: on Unix cmd is the exe path, on Windows the exe lands in
 		// args — either way a YAML metacharacter in the path (a ": ", a " #")
 		// would break the config Goose has to read back.
@@ -105,7 +165,7 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		// to update. A config.yaml in a dotfiles repository showed a diff after
 		// each upgrade's repair (#3689).
 		if strings.Contains(body, entry) {
-			return installResult{Path: path, Action: "unchanged"}, nil
+			return installResult{Path: path, Action: "unchanged", Note: note}, nil
 		}
 		// An inline value — `extensions: [a, b]` or `extensions: {…}` — is not
 		// followed by a block, so the insert below missed it and appended a
@@ -114,8 +174,14 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		if v := inlineYAMLValue(next, "extensions:"); v != "" {
 			return installResult{}, fmt.Errorf("%s: extensions: %s is on one line, and deja edits the block form — move it to a block and run this again", path, v)
 		}
-		if i := strings.Index("\n"+next, "\nextensions:\n"); i >= 0 {
-			at := i + len("\nextensions:\n") - 1
+		if next != "" && !strings.HasSuffix(next, "\n") {
+			next += "\n"
+		}
+		at, err := yamlTopKeyEnd(next, "extensions:")
+		if err != nil {
+			return installResult{}, fmt.Errorf("%s: %w", path, err)
+		}
+		if at >= 0 {
 			// goose keys extensions by name. Writing our mapping entry under a
 			// key whose value is a sequence leaves a mapping and a sequence
 			// under one key, which no parser accepts — a config that was
@@ -127,9 +193,6 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 			}
 			next = next[:at] + entry + next[at:]
 		} else {
-			if next != "" && !strings.HasSuffix(next, "\n") {
-				next += "\n"
-			}
 			next += "extensions:\n" + entry
 		}
 	}
@@ -142,7 +205,7 @@ func installGoose(exe string, uninstall bool) (installResult, error) {
 		next = strings.ReplaceAll(next, "\n", "\r\n")
 	}
 	a, werr := writeIfChanged(path, old, []byte(next))
-	return installResult{Path: path, Action: a}, werr
+	return installResult{Path: path, Action: a, Note: note}, werr
 }
 
 // normaliseNewlines returns the text with LF endings and whether it had CRLF,
@@ -179,17 +242,47 @@ func removeGooseExtension(s string) string {
 	s = strings.Join(out, "\n")
 	// An extensions key with nothing under it parses as null and Goose then
 	// refuses the config.
-	return strings.Replace(s, "extensions:\n\n", "\n", 1)
+	// Anchored at a line start: a bare Replace also matched the tail of
+	// `my_extensions:` and broke the file.
+	if strings.HasPrefix(s, "extensions:\n\n") {
+		return s[len("extensions:\n"):]
+	}
+	return strings.Replace(s, "\nextensions:\n\n", "\n\n", 1)
 }
 
 // gooseExtensionsBlock returns the text after the extensions key, or "" when
 // there is no block form of it to read an indent from.
 func gooseExtensionsBlock(s string) string {
-	i := strings.Index("\n"+s, "\nextensions:\n")
-	if i < 0 {
-		return ""
+	return yamlKeyBlock(s, "extensions:")
+}
+
+// yamlKeyBlock returns the text after the top-level key's line, or "" when
+// the file has no block form of it. The key line is matched as the writers
+// match it, comment and trailing blanks included: reading only the bare
+// spelling wrote deja's entry at two spaces over a block at four, and the
+// reader's entries ended up nested in deja's — and went with it on uninstall
+// (#4289).
+func yamlKeyBlock(s, key string) string {
+	if at := yamlKeyLineEnd(s, key); at >= 0 {
+		return s[at:]
 	}
-	return s[i+len("\nextensions:\n")-1:]
+	return ""
+}
+
+// yamlKeyLineEnd is the offset just past the first top-level line that is
+// key, or -1 when there is none or it is the file's last line with no newline.
+func yamlKeyLineEnd(s, key string) int {
+	at := 0
+	for _, line := range strings.SplitAfter(s, "\n") {
+		at += len(line)
+		if yamlIndentWidth(line) == 0 && yamlKeyLine(line, key) {
+			if !strings.HasSuffix(line, "\n") {
+				return -1
+			}
+			return at
+		}
+	}
+	return -1
 }
 
 // yamlBlockIndent returns the indent the entries under a key are written at.
@@ -525,7 +618,7 @@ func refreshGooseHintsFor(cwd string) error {
 	if recallIsOff() {
 		return clearGooseRecall()
 	}
-	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd)
+	digest, sessions, _, _, _, _, _ := cachedHookDigestFor(index.DefaultDir(), cwd, "")
 	body := digest
 	if sessions > 0 {
 		body = frameRecall(startLead(gooseLead) + digest)

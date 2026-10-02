@@ -53,20 +53,25 @@
 <pre><code class="language-json">{&#34;role&#34;:&#34;assistant&#34;,&#34;message&#34;:{&#34;content&#34;:[{&#34;type&#34;:&#34;text&#34;,&#34;text&#34;:&#34;The cache key omitted the locale.&#34;}]}}</code></pre>
 <p>Tool calls follow the Anthropic <code>tool_use</code> shape with Cursor&#39;s own names: <code>path</code> rather than <code>file_path</code>, <code>Shell</code> rather than <code>Bash</code>, <code>old_string</code>/<code>new_string</code> on <code>StrReplace</code>, and the whole file as <code>contents</code> on <code>Write</code> — the last of these is the only record a created file&#39;s lines were ever in a session.</p>
 <p>Only <code>user</code> and <code>assistant</code> roles are retained. Content follows the Anthropic string-or-parts shape. Control records such as <code>turn_ended</code> are ignored. Records carry no timestamp field; a user turn&#39;s text starts with a <code>&lt;timestamp&gt;Sunday, Jul 26, 2026, 1:06 PM (UTC+3)&lt;/timestamp&gt;</code> block, which deja reads and carries forward to the assistant turns that answer it. A transcript with no readable block falls back to the file&#39;s modification time.</p>
-<h2 id="the-second-cli-store-and-why-it-is-unread">The second CLI store, and why it is unread</h2>
+<h2 id="the-second-cli-store">The second CLI store</h2>
 <p>Cursor CLI also writes one SQLite store per chat:</p>
 <pre><code>~/.cursor/chats/&lt;workspace-hash&gt;/&lt;chat-uuid&gt;/meta.json
 ~/.cursor/chats/&lt;workspace-hash&gt;/&lt;chat-uuid&gt;/store.db</code></pre>
 <p><code>store.db</code> holds <code>blobs(id TEXT, data BLOB)</code> and <code>meta(key, value)</code>. The blobs are content-addressed and the tree needs no schema to walk: <code>meta</code>&#39;s single value is hex-encoded JSON naming <code>latestRootBlobId</code>, that blob is protobuf whose repeated field 1 is a list of 32-byte child digests in message order, and each child is plain JSON in the Vercel AI SDK shape — <code>{&#34;role&#34;,&#34;content&#34;}</code> with <code>text</code>, <code>reasoning</code>, <code>tool-call</code> and <code>tool-result</code> parts, the calls named as above but keyed <code>toolName</code>/<code>args</code>.</p>
-<p>deja does not read it, because on the machine where it was decoded reading it added nothing: all 19 stores walked, and of the 67 turns they held, 51 were already in the JSONL transcript and the remaining 16 were the <code>&lt;user_info&gt;</code> environment preamble the transcript omits. Every chat with a <code>store.db</code> had a transcript beside it. What <code>deja doctor</code> reports instead is the count of chats with no transcript beside them, which is silent today and is the only signal if a release stops writing <code>agent-transcripts</code>.</p>
+<p>Each chat also has a <code>meta.json</code> beside its <code>store.db</code> holding the <code>cwd</code> it ran in, and the <code>&lt;workspace-hash&gt;</code> above it is md5 of that path; deja reads it for the project name and the resume directory (#4193). The transcript holds every turn the store does except the <code>&lt;user_info&gt;</code> environment preamble, but none of the tool results, so deja reads the store for those alone: each transcript call is paired with the store&#39;s call of the same tool name and arguments, in order, and takes its result. A Shell result gives the exit status on the command and the printed output without Cursor&#39;s <code>Exit code</code> / <code>Command output</code> framing; the results of <code>GetMcpTools</code> and <code>GetDynamicTools</code>, which are the MCP servers&#39; own descriptions, are skipped. Every chat with a <code>store.db</code> had a transcript beside it, and <code>deja doctor</code> reports the count of chats with none — silent today, and the only signal if a release stops writing <code>agent-transcripts</code>.</p>
 <h2 id="wiring">Wiring</h2>
 <p><code>deja install cursor</code> adds the server to <code>${CURSOR_CONFIG_DIR:-~/.cursor}/mcp.json</code>, writes the shared skill <code>~/.agents/skills/deja-history/SKILL.md</code> and the <code>/deja</code> command in <code>commands/deja.md</code> beside it. <code>deja install cursor-auto</code> adds the same plus <code>hooks.json</code> entries: <code>sessionStart</code> (<code>deja hook-context</code>), <code>beforeSubmitPrompt</code> (<code>hook-prompt</code>, interactive TUI only — headless <code>-p</code> skips it), <code>preToolUse</code>, <code>postToolUse</code> and <code>preCompact</code>. Cursor also runs the hooks in <code>~/.claude/settings.json</code> and dedupes them against its own by exact command string, so a machine with both wired gets one injection.</p>
 <h2 id="resume">Resume</h2>
 <p>CLI chats only. A transcript is named after the chat id <code>cursor-agent --resume</code></p>
 <p>takes, and the command runs in the project directory because Cursor lists chats</p>
-<p>per workspace — deja prints <code>cd &lt;project&gt; &amp;&amp; cursor-agent --resume &lt;id&gt;</code>, the</p>
-<p>directory recovered from the encoded path (Cursor writes it without the leading</p>
-<p>separator, <code>Users-x-app</code>). Live-verified: the resumed chat answered from its own</p>
+<p>per workspace — it looks a chat up under <code>chats/&lt;md5 of the cwd&gt;/&lt;id&gt;</code> — so deja</p>
+<p>prints <code>cd &lt;project&gt; &amp;&amp; cursor-agent --resume &lt;id&gt;</code>, the directory read from the</p>
+<p>chat&#39;s <code>meta.json</code>, whose folder is that md5. The encoded transcript folder is</p>
+<p>only the fallback: it blanks a dot, a space or a non-ASCII character and cuts a</p>
+<p>long path with a hash, so it cannot be read back for those. A chat whose</p>
+<p>directory is gone, is not recorded, or is no longer in cursor-agent&#39;s store is</p>
+<p>refused with <code>deja show</code> instead — <code>cursor-agent --resume</code> with no id lists</p>
+<p>chats from every directory. Live-verified: the resumed chat answered from its own</p>
 <p>history. IDE chats carry a composer id from <code>state.vscdb</code> that the CLI does not</p>
 <p>take, so those still reopen only in the editor.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
@@ -77,7 +82,7 @@
 <li>A parsed message is capped at 1 MiB. CLI subagent transcripts are opt-in.</li>
 <li>Both CLI layouts are written by <code>cursor-agent 2026.09.02-c22c1a3</code>, minutes apart in the same session.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-21</p>
+<p><strong>Last verified:</strong> 2026-10-01</p>
 
 <hr>
 <p>deja reads this format and thirty-four others, and turns what it finds into memory your

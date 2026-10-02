@@ -8,15 +8,10 @@ import (
 	"testing"
 )
 
-// goose resolves its own directories through etcetera's choose_app_strategy
-// with author "Block" — the Apple strategy on macOS — so its sessions live
-// under `~/Library/Application Support/Block/goose`, which goose's own comment
-// names. deja read `~/.local/share/goose` on every platform, so a mac user who
-// had used goose was told `goose missing` (#3642).
-//
-// The older locations are still read, because an install that predates the
-// change has its sessions there: this machine is one of them, which is why the
-// single-root reader looked correct from inside it.
+// goose resolves its own directories through etcetera's choose_app_strategy,
+// which is XDG on macOS as well as Linux (#4267). The Apple layouts, which
+// #3642 took for goose's own, and the older Block segment under XDG stay
+// candidates, so a store under any of them is still read.
 func TestGooseDataDirsCoverThePlatformAndTheOlderOnes(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -41,16 +36,15 @@ func TestGooseDataDirsCoverThePlatformAndTheOlderOnes(t *testing.T) {
 		t.Errorf("the legacy Block/goose location is not a candidate: %v", dirs)
 	}
 	if runtime.GOOS == "darwin" {
-		apple := filepath.Join(home, "Library", "Application Support", "Block", "goose")
-		if dirs[0] != apple {
-			t.Errorf("first candidate = %q, want goose's own macOS location %q", dirs[0], apple)
+		if !strings.Contains(joined, filepath.Join(home, "Library", "Application Support", "Block", "goose")) {
+			t.Errorf("the Apple Block/goose location is not a candidate: %v", dirs)
 		}
 		if !strings.Contains(joined, filepath.Join(home, "Library", "Application Support", "goose")) {
 			t.Errorf("the location without the Block segment is not a candidate: %v", dirs)
 		}
 	}
-	if runtime.GOOS == "linux" && dirs[0] != xdg {
-		t.Errorf("first candidate = %q, want %q on linux", dirs[0], xdg)
+	if runtime.GOOS != "windows" && dirs[0] != xdg {
+		t.Errorf("first candidate = %q, want %q", dirs[0], xdg)
 	}
 
 	// GOOSE_PATH_ROOT is the whole answer when it is set: goose puts config,
@@ -107,5 +101,47 @@ func TestGooseReadsEveryRootThatExists(t *testing.T) {
 	}
 	if kind != "goose-jsonl" {
 		t.Errorf("registry kind for %s = %q, want goose-jsonl", files[0], kind)
+	}
+}
+
+// goose 1.46 on a mac keeps its sessions in ~/.local/share/goose: etcetera's
+// choose_app_strategy is XDG on macOS too, the Apple layout being
+// choose_native_strategy. GooseRoot is what install --auto and doctor key on,
+// so it has to name the XDG root on a fresh mac, and the root that exists when
+// only an older layout does (#4267).
+func TestGooseRootIsTheOneGooseWritesOrTheOneThatExists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", "")
+	t.Setenv("GOOSE_PATH_ROOT", "")
+	t.Setenv("XDG_DATA_HOME", "")
+	t.Setenv("DEJA_GOOSE_ROOT", "")
+	t.Setenv("DEJA_GOOSE_DB", "")
+
+	if runtime.GOOS != "windows" {
+		xdg := filepath.Join(home, ".local", "share", "goose")
+		if got := GooseRoot(); got != xdg {
+			t.Errorf("GooseRoot() with nothing on disk = %q, want %q", got, xdg)
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		apple := filepath.Join(home, "Library", "Application Support", "Block", "goose")
+		if err := os.MkdirAll(apple, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if got := GooseRoot(); got != apple {
+			t.Errorf("GooseRoot() with only the Apple layout on disk = %q, want %q", got, apple)
+		}
+	}
+	dirs := GooseDataDirs()
+	last := dirs[len(dirs)-1]
+	if err := os.MkdirAll(last, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "darwin" {
+		if got := GooseRoot(); got != last {
+			t.Errorf("GooseRoot() with only %q on disk = %q", last, got)
+		}
 	}
 }

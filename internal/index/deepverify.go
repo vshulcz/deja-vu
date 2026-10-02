@@ -86,12 +86,13 @@ func DeepVerify(dir string) (DeepReport, error) {
 		if _, ok := current[p]; ok {
 			continue
 		}
-		// A file that is gone while its directory is still there is the
-		// client's cleanup or a deletion by hand, and the index keeps those
+		// A file that is gone from a store that is still there is the
+		// client's cleanup or a deletion by hand, including one that took the
+		// session's own directory with it (#4195), and the index keeps those
 		// on purpose (#2970) — so it is not drift, and the fix the finding
 		// prescribes, a rebuild, is exactly what would lose them. A tree that
 		// is gone whole is still reported.
-		if _, err := os.Stat(filepath.Dir(p)); err == nil {
+		if deletedFromLiveStore(p) {
 			report.Kept = append(report.Kept, p)
 			continue
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -43,7 +44,21 @@ func writeFilesFixture(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(proj, "s.jsonl"), []byte(b.String()), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	filesAskFromNowhere(t, tmp)
 	return repo
+}
+
+// filesAskFromNowhere runs `files` from a directory that is no project, so the
+// answer does not depend on the checkout the tests run in. The package
+// directory is a repository, and its worktrees' names — whatever the
+// developer called them — become the scope `files` answers in (#4383).
+func filesAskFromNowhere(t *testing.T, tmp string) {
+	t.Helper()
+	nowhere := filepath.Join(tmp, "nowhere")
+	if err := os.MkdirAll(nowhere, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(nowhere)
 }
 
 func TestFilesCommandRanksNearbyTouches(t *testing.T) {
@@ -145,6 +160,41 @@ func TestFilesDistinguishesFilteredFromAbsent(t *testing.T) {
 // peer's content must hold here too — it read imported file paths aloud while
 // search, blame and restore all refused (#1026).
 func TestFilesCommandHonoursTrustPolicy(t *testing.T) {
+	filesTrustPolicyCase(t)
+}
+
+// `files` scopes its answer to the project of the working directory, and every
+// worktree of that repository adds its names. A test running in this checkout
+// read the developer's worktrees: one called `t` put "imported:svc" in scope
+// and left the local session out, so the case above failed only while that
+// worktree existed (#4383).
+func TestFilesTrustPolicyIgnoresTheRunnersWorktrees(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+	base := t.TempDir()
+	main := filepath.Join(base, "checkout")
+	if err := os.MkdirAll(main, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	git := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", main}, args...)...)
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@example.com", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@example.com")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	git("init", "-q")
+	git("commit", "-q", "--allow-empty", "-m", "seed")
+	git("worktree", "add", "-q", "--detach", filepath.Join(base, "t"))
+	t.Chdir(main)
+	filesTrustPolicyCase(t)
+}
+
+func filesTrustPolicyCase(t *testing.T) {
+	t.Helper()
 	repo := writeFilesFixture(t) // a local session touching retry.go under repo
 	cfg := filepath.Join(filepath.Dir(filepath.Dir(repo)), "config")
 	t.Setenv("XDG_CONFIG_HOME", cfg)
@@ -197,6 +247,7 @@ func TestFilesCommandHonoursTrustPolicy(t *testing.T) {
 // truth is the rule hid it. search and last already name the rule (#686, #680).
 func TestFilesCommandNamesTheTrustPolicyOnAnEmptyResult(t *testing.T) {
 	tmp := hermeticEnv(t)
+	filesAskFromNowhere(t, tmp)
 	cfg := filepath.Join(tmp, "config")
 	t.Setenv("XDG_CONFIG_HOME", cfg)
 	repo := filepath.Join(tmp, "repo")

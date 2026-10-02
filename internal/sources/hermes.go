@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -115,13 +116,38 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
 	}
-	// content is null for tool-call rows; those carry no prose worth indexing.
+	cols := hermesColumns(db)
+	// Rewind takes turns back with active=0; compaction archives the turns it
+	// summarised with active=0 and compacted=1, and Hermes' own search still
+	// reads those. A store with active alone has only the first.
+	live, archived := "", ""
+	switch {
+	case cols["active"] && cols["compacted"]:
+		live = " and (active = 1 or compacted = 1)"
+		archived = `,'compacted',compacted`
+	case cols["active"]:
+		live = " and active = 1"
+	}
 	// json_object rather than the shell's -json mode, which is quadratic in
-	// what it escapes — see sqliteRows.
+	// what it escapes — see sqliteRows. In insertion order, as Hermes reads
+	// its own sessions (get_messages): a row's timestamp can be the
+	// platform's event time, and the rows compaction writes as one batch have
+	// to stay together (#4296).
 	q := `select json_object('session_id',cast(session_id as text),'role',cast(role as text),` +
-		`'content',cast(content as text),'timestamp',timestamp) from messages ` +
-		`where role in ('user','assistant') and content is not null and content <> ''` + where +
-		` order by session_id,timestamp,id`
+		`'content',cast(content as text),'timestamp',timestamp` + archived + `) from messages ` +
+		`where role in ('user','assistant') and content is not null and content <> ''` + live + where +
+		` order by session_id,id`
+	if cols["tool_calls"] && cols["tool_call_id"] && cols["tool_name"] {
+		// A tool-call row has no content, only tool_calls, and the result lands
+		// on a `tool` row; both carry the session's work (#4242).
+		q = `select json_object('session_id',cast(session_id as text),'role',cast(role as text),` +
+			`'content',cast(content as text),'timestamp',timestamp,` +
+			`'tool_calls',cast(tool_calls as text),'tool_call_id',cast(tool_call_id as text),` +
+			`'tool_name',cast(tool_name as text)` + archived + `) from messages ` +
+			`where role in ('user','assistant','tool') and ((content is not null and content <> '')` +
+			` or (tool_calls is not null and tool_calls <> ''))` + live + where +
+			` order by session_id,id`
+	}
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	dec, err := sqliteRows(cmd)
@@ -147,20 +173,37 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 	cwds := hermesSessionCwds(db)
 	for i := range out {
 		if cwd := cwds[out[i].ID]; cwd != "" {
-			out[i].Project = claudeProjectName(pathToProjectKey(cwd))
+			out[i].Project = projectName(cwd)
 		}
 	}
 	return out, nil
 }
 
 // decodeHermesArray reads {session_id,role,content,timestamp} rows into
-// sessions, either as a json array — Postgres json_agg, with dec positioned
+// sessions — with tool_calls, tool_call_id and tool_name when the query asked
+// for them — either as a json array — Postgres json_agg, with dec positioned
 // just past the opening '[' and left just past the closing ']' — or as the
 // bare stream of objects the sqlite3 reader produces. project and path stamp
 // every session.
+//
+// Both queries order by session, so a session is finished when the next one
+// starts and its bookkeeping goes with it.
 func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session, error) {
-	by := map[string]*model.Session{}
-	var order []string
+	var out []model.Session
+	var cur *hermesSession
+	finish := func() {
+		if cur == nil {
+			return
+		}
+		// No title here: the index derives one (the person's first line,
+		// a greeting giving way to the next turn, the agent's line when
+		// nobody typed). Titling in the parser skipped the greeting rule, so
+		// a session opened with "hi" listed as "hi" (#3241, #3251).
+		if s := cur.done(); len(s.Messages) > 0 {
+			out = append(out, s)
+		}
+		cur = nil
+	}
 	for dec.More() {
 		var r map[string]any
 		if err := dec.Decode(&r); err != nil {
@@ -170,37 +213,82 @@ func decodeHermesArray(dec *json.Decoder, project, path string) ([]model.Session
 		if id == "" {
 			continue
 		}
-		s := by[id]
-		if s == nil {
-			s = &model.Session{Harness: "hermes", ID: id, Project: project, Path: path}
-			by[id] = s
-			order = append(order, id)
+		if cur == nil || cur.s.ID != id {
+			finish()
+			cur = newHermesSession(model.Session{Harness: "hermes", ID: id, Project: project, Path: path})
 		}
-		txt := strings.TrimSpace(str(r["content"]))
-		if txt == "" {
-			continue
-		}
-		txt = capParsedMessage(txt)
-		t := hermesTime(r["timestamp"])
-		s.Touch(t)
-		s.Messages = append(s.Messages, model.Message{Role: str(r["role"]), Text: txt, Time: t})
+		cur.row(r)
 	}
+	finish()
 	if _, err := dec.Token(); err != nil && err != io.EOF {
 		return nil, err
 	}
-	out := make([]model.Session, 0, len(order))
-	for _, id := range order {
-		s := by[id]
-		if len(s.Messages) == 0 {
-			continue
-		}
-		// No title here: the index derives one (the person's first line,
-		// a greeting giving way to the next turn, the agent's line when
-		// nobody typed). Titling in the parser skipped the greeting rule, so
-		// a session opened with "hi" listed as "hi" (#3241, #3251).
-		out = append(out, *s)
-	}
 	return out, nil
+}
+
+// hermesColumns names the columns of the messages table. Every Hermes schema
+// seen has the tool columns, but naming a missing one fails the whole query,
+// and a store without them still has its prose to give.
+func hermesColumns(db string) map[string]bool {
+	out, err := sqliteOutput(db, "pragma table_info(messages)")
+	if err != nil {
+		return nil
+	}
+	cols := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		// cid|name|type|notnull|dflt_value|pk
+		if f := strings.SplitN(line, "|", 3); len(f) == 3 {
+			cols[f[1]] = true
+		}
+	}
+	return cols
+}
+
+// hermesContentJSON is the prefix Hermes stores structured content under —
+// a multimodal message's list of parts (hermes_state.py _encode_content).
+const hermesContentJSON = "\x00json:"
+
+// hermesText is a row's content as text: the text parts of a multimodal
+// message, never the base64 of its images.
+func hermesText(content string) string {
+	if !strings.HasPrefix(content, hermesContentJSON) {
+		return strings.TrimSpace(content)
+	}
+	var v any
+	if json.Unmarshal([]byte(content[len(hermesContentJSON):]), &v) != nil {
+		return ""
+	}
+	parts, _ := v.([]any)
+	if m, ok := v.(map[string]any); ok {
+		parts = []any{m}
+	}
+	var out []string
+	for _, p := range parts {
+		switch e := p.(type) {
+		case string:
+			out = append(out, e)
+		case map[string]any:
+			if e["type"] != nil && e["type"] != "text" {
+				continue
+			}
+			if hermesMediaPlaceholder[str(e["text"])] {
+				// What compaction leaves where it took an image out
+				// (agent/context_compressor.py); it says nothing.
+				continue
+			}
+			if s, _ := e["text"].(string); s != "" {
+				out = append(out, s)
+			} else if s, _ := e["text_summary"].(string); s != "" {
+				out = append(out, s)
+			}
+		}
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
+var hermesMediaPlaceholder = map[string]bool{
+	"[Attached image — stripped after compression]": true,
+	"[screenshot removed to save context]":          true,
 }
 
 // hermesTime reads Hermes' REAL epoch seconds. The shared parser handles
@@ -273,4 +361,124 @@ func hermesProfile(db string) string {
 		return "hermes"
 	}
 	return name
+}
+
+// HermesResumeProfile is the profile `hermes -p` has to name for a session
+// read from this store to be found, or "" when the plain command finds it.
+// `hermes --resume` looks only in the active profile's store, so a session
+// recorded under `hermes -p work` came back "Session not found" (#4248). A
+// profile's session is always named, so the command does not depend on which
+// one is active; a sticky `hermes profile use work` makes the root store need
+// naming too, as `default`. dir says the name is a directory under profiles/,
+// for the caller to check it is one Hermes takes.
+//
+// The root is worked out the way Hermes' get_default_hermes_root does: a
+// HERMES_HOME under `profiles/` is a profile, which `hermes -p work` exports
+// to everything it runs, deja included, and the root is two levels up. In that
+// mode the root's store is always named. Like Hermes, the profile and its name
+// are read off the path as written, absolute and cleaned, so a profile that is
+// a symlink to another disk is still that profile; symlinks are resolved only
+// to tell whether two directories are the same one, so a symlinked or relative
+// home still matches. A store that is neither the root's nor a profile's, or a
+// Postgres one, keeps the plain command.
+func HermesResumeProfile(db string) (name string, dir bool) {
+	if IsHermesPGStore(db) {
+		return "", false
+	}
+	root, inProfile := hermesAbs(HermesHome()), false
+	if filepath.Base(filepath.Dir(root)) == "profiles" {
+		root, inProfile = filepath.Dir(filepath.Dir(root)), true
+	}
+	profiles := filepath.Join(root, "profiles")
+	if p := os.Getenv("DEJA_HERMES_PROFILES_ROOT"); p != "" {
+		profiles = hermesAbs(p)
+	}
+	store := hermesAbs(filepath.Dir(db))
+	if sameDir(filepath.Dir(store), profiles) {
+		return filepath.Base(store), true
+	}
+	if !sameDir(store, root) {
+		return "", false
+	}
+	if inProfile {
+		return "default", false
+	}
+	b, err := os.ReadFile(filepath.Join(root, "active_profile"))
+	if err != nil {
+		return "", false
+	}
+	if active := strings.TrimSpace(strings.TrimPrefix(string(b), "\ufeff")); active != "" && active != "default" {
+		return "default", false
+	}
+	return "", false
+}
+
+// hermesAbs is p absolute and cleaned, symlinks left as written.
+func hermesAbs(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return filepath.Clean(p)
+}
+
+// sameDir reports whether two directories are the same one: as written, or
+// once their symlinks are followed.
+func sameDir(a, b string) bool {
+	return samePath(a, b) || samePath(hermesResolved(a), hermesResolved(b))
+}
+
+// hermesResolved is p absolute, cleaned and with its symlinks followed: those
+// of the deepest part that exists, with the rest joined back on, so a store
+// whose directory is gone resolves the same way as the home it sat in.
+func hermesResolved(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	rest := ""
+	for dir := p; ; dir = filepath.Dir(dir) {
+		if real, err := filepath.EvalSymlinks(dir); err == nil {
+			return filepath.Join(real, rest)
+		}
+		if filepath.Dir(dir) == dir {
+			return p
+		}
+		rest = filepath.Join(filepath.Base(dir), rest)
+	}
+}
+
+// samePath compares two cleaned paths the way the filesystem does: Windows
+// ignores case.
+func samePath(a, b string) bool {
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(a, b)
+	}
+	return a == b
+}
+
+// HermesStoreLacks reports whether the Hermes store a session was read from no
+// longer has it — taken out with `hermes sessions delete`, which leaves
+// `hermes --resume` answering "Session not found" (#4250). False whenever that
+// cannot be told: a Postgres store, no file, or a read that fails. The sessions
+// table is what resume looks the id up in; a store from before it is asked
+// through its messages.
+func HermesStoreLacks(db, id string) bool {
+	if IsHermesPGStore(db) || !nonEmptyFile(db) {
+		return false
+	}
+	query := func(q string) (string, bool) {
+		cmd, stop := sqliteReadCmd(db, q)
+		defer stop()
+		b, err := cmd.Output()
+		return strings.TrimSpace(string(b)), err == nil
+	}
+	names, ok := query(`select name from sqlite_master where type='table' and name in ('sessions','messages')`)
+	if !ok || names == "" {
+		return false
+	}
+	q := fmt.Sprintf(`select count(*) from messages where session_id='%s'`, sqlEscape(id))
+	if strings.Contains(" "+strings.Join(strings.Fields(names), " ")+" ", " sessions ") {
+		q = fmt.Sprintf(`select count(*) from sessions where id='%s'`, sqlEscape(id))
+	}
+	n, ok := query(q)
+	return ok && n == "0"
 }

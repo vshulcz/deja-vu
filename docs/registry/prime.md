@@ -20,6 +20,14 @@ prime-agent relocates the root with two variables of its own,
 reads both — a machine that has moved its sessions has moved them for deja too.
 `DEJA_PRIME_ROOT` overrides all of it.
 
+`rlm.spawn` writes each child session as its own transcript beside the root,
+under `~/.prime/agent/session-artifacts/<parent-id>/sub-<n>/<child-id>.jsonl`,
+with `parentSession` and an `rlmDepth` above 0 in its header. deja reads those
+too and files each as a subagent of the parent, read as a Claude Code subagent
+is: the task, what it changed and its last turns. `DEJA_INCLUDE_SUBAGENTS=1`
+takes the whole run, `=0` leaves children out. The `semantic-edges.jsonl` next
+to it is prime's event log, not a transcript.
+
 Older installs kept sessions under `~/.pi/agent/*.jsonl` and in a `--cwd--`
 directory beneath this root. prime-agent migrates both into the flat root when
 it starts, so the flat layout is what a live install has.
@@ -56,7 +64,8 @@ Sessions are indexed and searchable like any other harness.
   `session_compact` runs `deja hook-precompact`. It registers `/deja
   <query>`, which runs `deja search`. `tool_result` does not fire in
   `--print` on 0.9.1, so the repair line after a failed command is not wired.
-- **Resume**: `prime-agent --resume <id>`.
+- **Resume**: `cd <cwd> && prime-agent --resume <id>`, with the `cwd` from the
+  header; prime-agent resumes a session only from the project it ran in.
 - **Handoff**: exec.
 
 Reported and specified from source by @iMaxTomas in #2529.

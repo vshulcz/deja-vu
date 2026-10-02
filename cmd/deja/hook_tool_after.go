@@ -10,6 +10,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -122,17 +123,11 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		// `pytest -v` whose log runs past a megabyte (#1716). What arrived is
 		// still worth reading: pull the output back out of the cut JSON rather
 		// than throwing away a megabyte that begins with the error.
-		out = salvageFromPayload(string(raw))
+		out = sources.UnwrapShellReport(salvageFromPayload(string(raw)))
 	}
 	if out == "" {
 		return nil
 	}
-	// The same labelled report gemini and qwen wrap a command's output in,
-	// arriving as a plain string rather than under llmContent: qwen's failure
-	// payload carries it in `error`. With the frame in place the error reads as
-	// `Output: ./main.go:9:2: …` and hashes to a signature no session recorded.
-	// Output without the frame comes back untouched.
-	out = unwrapGeminiShellOutput(out)
 	// Out of the raw bytes for a cut payload, the way the tool name is: the
 	// line keeps to the project it names, and the harness sends cwd ahead of
 	// the output.
@@ -177,7 +172,10 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 func isCommandTool(name string) bool {
 	switch name {
 	case "Bash", "bash", "shell", "Shell", "run_command", "execute_command", "terminal",
-		"run_shell_command", "run_terminal_command", "run_commands":
+		"run_shell_command", "run_terminal_command", "run_commands",
+		// Command Code's payload carries the internal name, not the SHELL its
+		// matcher sees (#4371).
+		"shell_command":
 		return true
 	}
 	return false
@@ -186,6 +184,13 @@ func isCommandTool(name string) bool {
 // toolResponseText pulls whatever the harness called the output. Claude Code
 // sends an object with stdout and stderr, codex a string, and others a mix; a
 // bare string response is the whole output.
+//
+// What comes back is unwrapped of the labelled report gemini and qwen put
+// around a command's output — gemini under llmContent, qwen's failure payload
+// as a plain string in `error`. With the frame in place the error reads as
+// `Output: ./main.go:9:2: …` and hashes to a signature no session recorded.
+// Once, as the index does: a second pass took a leading "Output: " off the
+// command's own output too.
 func toolResponseText(raw json.RawMessage) string {
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return ""
@@ -200,7 +205,7 @@ func toolResponseText(raw json.RawMessage) string {
 				return text
 			}
 		}
-		return clampOutput(s)
+		return clampOutput(sources.UnwrapShellReport(s))
 	}
 	var obj map[string]any
 	if json.Unmarshal(raw, &obj) != nil {
@@ -216,62 +221,12 @@ func toolResponseText(raw json.RawMessage) string {
 		if !ok || strings.TrimSpace(v) == "" {
 			continue
 		}
-		if key == "llmContent" {
-			v = unwrapGeminiShellOutput(v)
-		}
-		if strings.TrimSpace(v) == "" {
-			continue
-		}
 		if b.Len() > 0 {
 			b.WriteByte('\n')
 		}
 		b.WriteString(v)
 	}
-	return clampOutput(b.String())
-}
-
-// unwrapGeminiShellOutput strips the frame gemini and qwen put around a
-// command's output before handing it to the model. Gemini fences it in
-// <untrusted_context> with an "Output:" marker; qwen writes a labelled report —
-// Command, Directory, Output, Error, Exit Code, Signal, PGID. The marker is
-// what matters: with it in front, the first line of a build failure stops
-// looking like an error, and the fix pair went silent on a failure it answers
-// the moment the marker is gone (gemini-cli 0.55.1, qwen-code 0.20.0).
-func unwrapGeminiShellOutput(s string) string {
-	if !strings.Contains(s, "Output:") {
-		return s
-	}
-	var kept []string
-	for _, line := range strings.Split(s, "\n") {
-		t := strings.TrimSpace(line)
-		if t == "<untrusted_context>" || t == "</untrusted_context>" || framingLabel(t) {
-			continue
-		}
-		// The label introduces the payload on its first line only; what follows
-		// is the command's own output, untouched.
-		for _, label := range []string{"Output: ", "Error: "} {
-			if strings.HasPrefix(line, label) {
-				line = line[len(label):]
-				break
-			}
-		}
-		if strings.TrimSpace(line) == "(none)" {
-			continue
-		}
-		kept = append(kept, line)
-	}
-	return strings.Join(kept, "\n")
-}
-
-// framingLabel reports whether a line is part of the shell report rather than
-// the command's output.
-func framingLabel(t string) bool {
-	for _, label := range []string{"Command: ", "Directory: ", "Exit Code: ", "Signal: ", "Process Group PGID:"} {
-		if strings.HasPrefix(t, label) {
-			return true
-		}
-	}
-	return false
+	return clampOutput(sources.UnwrapShellReport(b.String()))
 }
 
 // after returns what follows key where it is used as one, or "" when the key is

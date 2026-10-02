@@ -39,13 +39,23 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	if uninstall {
-		if len(old) == 0 {
-			return installResult{Path: path, Action: "unchanged"}, nil
+		res := installResult{Path: path, Action: "unchanged"}
+		if len(old) > 0 {
+			if err := os.Remove(path); err != nil {
+				return installResult{}, err
+			}
+			res.Action = "removed"
 		}
-		if err := os.Remove(path); err != nil {
+		// The skill install wrote goes too, unless another harness that reads
+		// the shared file is still installed (#4345).
+		if sharedSkillStillWanted("cherrystudio") {
+			return res, nil
+		}
+		skill, err := installSkillFile(sharedSkillPath(), true)
+		if err != nil {
 			return installResult{}, err
 		}
-		return installResult{Path: path, Action: "removed"}, nil
+		return cherryStudioResult(res, skill), nil
 	}
 	body, err := json.MarshalIndent(map[string]any{
 		"mcpServers": map[string]any{"deja": mcpServerEntry(exe)},
@@ -77,16 +87,61 @@ func installCherryStudio(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	out := wroteAll(res, skill)
-	out.Note = joinNotes(res.Note, "the skill is listed under Settings -> Skills once discovered; enable it for the agent")
+	out := cherryStudioResult(res, skill)
+	out.Note = joinNotes(out.Note, "the skill is listed under Settings -> Skills once discovered; enable it for the agent")
 	return out, nil
+}
+
+// cherryStudioResult leads with the import file whatever the skill did.
+// wroteAll falls back to the last result when nothing changed, so a second
+// install named SKILL.md as the thing to import (#4343).
+func cherryStudioResult(res, skill installResult) installResult {
+	res.also = append(res.also, skill.Path)
+	if skill.Action != "unchanged" {
+		res.Note = joinNotes(res.Note, "also "+skill.Action+" "+shortHome(skill.Path))
+	}
+	return res
+}
+
+// cherryStudioAppWiring reads the app's own MCP servers for doctor. known is
+// false when they cannot be read — no database, no sqlite3 — and then the
+// import file is all doctor has to go on. path is the database when the app
+// has deja, and missing the binary its entry names when that is gone (#4344).
+// off is a deja server the app has but does not start: its switch is off.
+func cherryStudioAppWiring() (known, wired, off bool, path, missing string) {
+	db, servers, ok := sources.CherryStudioMCPServers()
+	if !ok {
+		return false, false, false, "", ""
+	}
+	for _, s := range servers {
+		args := make([]any, len(s.Args))
+		for i, a := range s.Args {
+			args[i] = a
+		}
+		entry := map[string]any{"command": s.Command, "args": args}
+		if !entryRunsDeja(entry) {
+			continue
+		}
+		if !s.Active {
+			off = true
+			continue
+		}
+		cmd := mcpEntryDejaCommand(entry)
+		if filepath.IsAbs(cmd) {
+			if _, err := os.Stat(cmd); err != nil {
+				return true, true, false, db, cmd
+			}
+		}
+		return true, true, false, db, ""
+	}
+	return true, false, off, db, ""
 }
 
 // cherryStudioFirstRoot is what says the app is on this machine: a transcript
 // root it has written, rather than the app directory, which an uninstalled
 // Electron app can leave behind.
 func cherryStudioFirstRoot() string {
-	for _, root := range sources.CherryStudioRoots() {
+	for _, root := range sources.CherryStudioAllRoots() {
 		if _, err := os.Stat(root); err == nil {
 			return root
 		}

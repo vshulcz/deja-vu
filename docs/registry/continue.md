@@ -19,7 +19,8 @@ Nothing in the file carries a timestamp. `sessions.json` records `dateCreated`
 and `workspaceDirectory` per session, so that date is the session's start (the
 file's mtime when the list has no entry); turns are laid out one second apart
 from the start, which is enough to order them within the session. The project name comes from
-`workspaceDirectory`, falling back to the list entry when the document omits it.
+`workspaceDirectory`, falling back to the list entry when the document omits it;
+a `file://` URI there is decoded first (#4461).
 
 Shape verified against Continue's own types (`core/index.d.ts`: `Session`,
 `ChatHistoryItem`, `ChatMessage`) and `core/util/paths.ts`; a live-store
@@ -50,7 +51,10 @@ validation is still welcome.
   here, that nothing accepts an arbitrary id, was wrong. What it does differ
   in is the ending: the flag forks, so the history comes back under a new
   session id rather than continuing the old one, and deja says so on stderr
-  beside the command. `cn --resume` remains the last-session shortcut, and
+  beside the command. The fork runs its tools in the current directory, so
+  the command goes with a `cd` into the session's `workspaceDirectory` (#4375),
+  or, with that gone, a note that the fork runs where you are (#4460).
+  `cn --resume` remains the last-session shortcut, and
   the editor reopens one from its history view.
 - **Handoff**: paste.
 

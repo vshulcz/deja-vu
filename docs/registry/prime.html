@@ -54,6 +54,13 @@
 <p><code>PRIME_AGENT_SESSION_DIR</code> and <code>PRIME_AGENT_CODING_AGENT_SESSION_DIR</code>, and deja</p>
 <p>reads both — a machine that has moved its sessions has moved them for deja too.</p>
 <p><code>DEJA_PRIME_ROOT</code> overrides all of it.</p>
+<p><code>rlm.spawn</code> writes each child session as its own transcript beside the root,</p>
+<p>under <code>~/.prime/agent/session-artifacts/&lt;parent-id&gt;/sub-&lt;n&gt;/&lt;child-id&gt;.jsonl</code>,</p>
+<p>with <code>parentSession</code> and an <code>rlmDepth</code> above 0 in its header. deja reads those</p>
+<p>too and files each as a subagent of the parent, read as a Claude Code subagent</p>
+<p>is: the task, what it changed and its last turns. <code>DEJA_INCLUDE_SUBAGENTS=1</code></p>
+<p>takes the whole run, <code>=0</code> leaves children out. The <code>semantic-edges.jsonl</code> next</p>
+<p>to it is prime&#39;s event log, not a transcript.</p>
 <p>Older installs kept sessions under <code>~/.pi/agent/*.jsonl</code> and in a <code>--cwd--</code></p>
 <p>directory beneath this root. prime-agent migrates both into the flat root when</p>
 <p>it starts, so the flat layout is what a live install has.</p>
@@ -87,7 +94,10 @@
 <p>&lt;query&gt;<code>, which runs </code>deja search<code>. </code>tool_result` does not fire in</p>
 <p><code>--print</code> on 0.9.1, so the repair line after a failed command is not wired.</p>
 <ul>
-<li><strong>Resume</strong>: <code>prime-agent --resume &lt;id&gt;</code>.</li>
+<li><strong>Resume</strong>: <code>cd &lt;cwd&gt; &amp;&amp; prime-agent --resume &lt;id&gt;</code>, with the <code>cwd</code> from the</li>
+</ul>
+<p>header; prime-agent resumes a session only from the project it ran in.</p>
+<ul>
 <li><strong>Handoff</strong>: exec.</li>
 </ul>
 <p>Reported and specified from source by @iMaxTomas in #2529.</p>

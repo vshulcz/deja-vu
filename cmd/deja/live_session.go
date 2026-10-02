@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -61,6 +63,33 @@ func markSessionLive(dir, id string) {
 	rows := readLiveSessions(dir)
 	rows[id] = time.Now().UTC()
 	writeLiveSessions(dir, rows)
+}
+
+// endSessionLive drops a session's stamp. The window is a guess at whether the
+// agent is still there; a harness that says the session ended knows, and
+// leaving the stamp in place hid a session finished a minute ago from the next
+// one's recall for the rest of the window (#4210).
+func endSessionLive(dir, id string) {
+	id = strings.TrimSpace(id)
+	if dir == "" || id == "" {
+		return
+	}
+	rows := readLiveSessions(dir)
+	if _, ok := rows[id]; !ok {
+		return
+	}
+	delete(rows, id)
+	writeLiveSessions(dir, rows)
+}
+
+// runHookSessionEnd is the SessionEnd hook of Claude Code, Gemini CLI and Qwen
+// Code. It says nothing back — none of them reads a reply to it — and it runs even
+// with recall off: clearing a stamp never hands anyone anything.
+func runHookSessionEnd(dir string, stdin io.Reader) {
+	var input precompactHookInput
+	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &input)
+	input.adopt()
+	endSessionLive(dir, input.SessionID)
 }
 
 // readLiveSessions is every stamp in the file, whatever its age.

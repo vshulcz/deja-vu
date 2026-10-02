@@ -299,6 +299,11 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		// under this harness come from the grok-dev database and cannot resume.
 		s.Path = filepath.Join(t.TempDir(), "sessions", "workspace%2Fp", "abc123", "updates.jsonl")
 	}
+	if harness == "zcode" {
+		// The CLI database's sessions resume, and carry the directory they
+		// ran in as their path; a JSONL transcript does not (#4430).
+		s.Path = t.TempDir()
+	}
 	if harness == "roo" {
 		// Only the CLI's own store resumes, and the command carries the
 		// workspace out of history_item.json — a bare path would fail the
@@ -309,12 +314,45 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}
-		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":"/work/app"}`
+		ws, _ := json.Marshal(t.TempDir())
+		item := `{"id":"` + id + `","ts":1,"task":"t","workspace":` + string(ws) + `}`
 		if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		t.Setenv("DEJA_ROO_CLI_ROOT", root)
 		s.Path = filepath.Join(dir, "api_conversation_history.json")
+	}
+	if harness == "cursor" {
+		// cursor-agent opens a chat from chats/<md5 of its directory>/<id>,
+		// so the directory and the chat both have to be there (#4193).
+		cli := t.TempDir()
+		cwd := filepath.Join(cli, "app")
+		chat := filepath.Join(cli, "chats", sources.CursorChatBucket(cwd), s.ID)
+		if err := os.MkdirAll(chat, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(cwd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for name, body := range map[string]string{"meta.json": `{"cwd":` + jsonString(cwd) + `}`, "store.db": ""} {
+			if err := os.WriteFile(filepath.Join(chat, name), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv("DEJA_CURSOR_CLI_ROOT", cli)
+		t.Setenv("CURSOR_CONFIG_DIR", cli)
+		s.Path = filepath.Join(cli, "projects", "app", "agent-transcripts", s.ID, s.ID+".jsonl")
+	}
+	if harness == "qwen" {
+		// qwen finds a session only from the directory it ran in, so that
+		// directory has to be there (#4259).
+		tmp := t.TempDir()
+		cwd := filepath.Join(tmp, "app")
+		if err := os.MkdirAll(cwd, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+		s.Path = qwenTranscriptIn(t, filepath.Join(tmp, "qwen"), cwd, s.ID, true)
 	}
 	if harness == "kilocode" {
 		// Only the CLI half of Kilo's store resumes, and the reader tells the
@@ -327,6 +365,9 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		// project the store sits under, so both have to be real here.
 		s.ID = "942cbc1e-78c7-41cb-aa8a-78c3baab018c"
 		s.Path = filepath.Join(t.TempDir(), "app", ".crush", "crush.db")
+		if err := os.MkdirAll(filepath.Dir(s.Path), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if harness == "openclaw" {
 		dir := filepath.Join(t.TempDir(), "agents", "main", "sessions")

@@ -52,8 +52,11 @@ func TestParseAiderFile(t *testing.T) {
 	if s1.Harness != "aider" || s1.Started.Hour() != 10 {
 		t.Fatalf("bad session meta: %#v", s1)
 	}
-	if len(s1.Messages) != 2 {
-		t.Fatalf("s1 messages = %d, want user+assistant: %#v", len(s1.Messages), s1.Messages)
+	if len(s1.Messages) != 3 {
+		t.Fatalf("s1 messages = %d, want user+assistant+files: %#v", len(s1.Messages), s1.Messages)
+	}
+	if f := s1.Messages[2]; f.Role != RoleFiles || f.Text != filepath.Join(dir, "pager.go") {
+		t.Fatalf("applied edit not recorded as a file: %#v", f)
 	}
 	if s1.Messages[0].Role != "user" || s1.Messages[0].Text != "fix the off-by-one in pager.go\nkeep the tests green" {
 		t.Fatalf("user message wrong: %#v", s1.Messages[0])

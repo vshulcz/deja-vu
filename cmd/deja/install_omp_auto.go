@@ -154,7 +154,10 @@ export default function extension(pi) {
       remember(ctx);
       if (injected) return;
       injected = true;
-      const raw = run(["hook-context"], "");
+      // The session goes with it: hook-context marks the one starting as
+      // live, which keeps it out of its own MCP recall on this first turn
+      // (#4394, as #4246 and #4273 did for Hermes and opencode).
+      const raw = run(["hook-context"], JSON.stringify({ session_id: sessionID(), cwd: process.cwd() }));
       if (!raw) return;
       let digest = raw;
       let receipt = "";

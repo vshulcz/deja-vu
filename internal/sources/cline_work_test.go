@@ -103,3 +103,54 @@ func TestParseClineWorkRecordsSwitchOff(t *testing.T) {
 		t.Fatalf("want the two spoken turns back, got %d", len(ss[0].Messages))
 	}
 }
+
+// Cline CLI 3.0.67 writes a run_commands or read_files result as a list of
+// {query, result, error, success} entries, one per command or file. Read for
+// text keys only, a failing command's stderr reached neither search nor the
+// fix pairs (#4315).
+func TestParseClineReadsListToolResults(t *testing.T) {
+	const sess = `{"version":1,"sessionId":"s_list","messages":[
+{"role":"user","content":[{"type":"text","text":"run the tests"}],"ts":1767225600000},
+{"role":"assistant","content":[{"type":"tool_use","id":"c1","name":"run_commands","input":{"commands":["git status --short","python3 -m pytest -q"]}}],"ts":1767225601000},
+{"role":"user","content":[{"type":"tool_result","tool_use_id":"c1","name":"run_commands","content":[
+  {"query":"git status --short","result":"?? retry.py\n","success":true},
+  {"query":"python3 -m pytest -q","result":"[Command exited with code 1]\n\n[stderr]\nNameError: name 'attempt' is not defined\n","error":"Command exited with code 1","success":false}]}],"ts":1767225602000},
+{"role":"user","content":[{"type":"tool_result","tool_use_id":"c2","name":"read_files","content":[
+  {"query":"/w/retry.py","result":"1 | def retry(n):","success":true}]}],"ts":1767225603000},
+{"role":"user","content":[{"type":"tool_result","tool_use_id":"c3","name":"run_commands","content":[
+  {"query":"make","error":"spawn make ENOENT","success":false}]}],"ts":1767225604000},
+{"role":"user","content":[{"type":"tool_result","tool_use_id":"c4","name":"run_commands","content":[
+  {"query":"npm test","result":"PASS a.test.js\n","error":"Command timed out after 30s","success":false},
+  {"query":"true","result":"","success":false}]}],"ts":1767225605000}
+]}`
+	dir := filepath.Join(t.TempDir(), "s_list")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(dir, "s_list.messages.json")
+	if err := os.WriteFile(p, []byte(sess), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseClineFile(p)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v %d", err, len(ss))
+	}
+	var out []string
+	for _, m := range ss[0].Messages {
+		if m.Role == RoleToolOutput {
+			out = append(out, m.Text)
+		}
+	}
+	all := strings.Join(out, "\n")
+	for _, want := range []string{"?? retry.py", "NameError: name 'attempt' is not defined", "def retry(n)", "spawn make ENOENT", "PASS a.test.js", "Command timed out after 30s"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("tool output %q is missing %q", out, want)
+		}
+	}
+	if strings.Count(all, "Command exited with code 1") != 1 {
+		t.Errorf("an error already in the result is repeated: %q", out)
+	}
+	if len(out) != 4 {
+		t.Errorf("got %d tool outputs, want one per tool_result: %q", len(out), out)
+	}
+}

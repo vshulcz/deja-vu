@@ -35,7 +35,7 @@ insert or replace into sessions values ('s1','w1','pool timeouts','/work/api','2
 //
 // The store is only safe to stamp because its parser selects messages rather
 // than sessions and normalises both sides of the comparison with a millisecond
-// backoff (#2150): the same shape as opencode and cursor. hermes and zed do
+// backoff (#2150): the same shape as cursor. hermes and zed do
 // neither, which is why they are not stamped here.
 func TestTheGrokStoreIsAskedOnlyForWhatIsNew(t *testing.T) {
 	if _, err := exec.LookPath("sqlite3"); err != nil {

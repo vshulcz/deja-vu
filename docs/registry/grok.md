@@ -52,6 +52,8 @@ session asked for it is not written down, and deja does not guess.
 - Path encoding is ambiguous when upstream leaves separators or percent escapes in different forms.
 - `deja resume` prints `grok --resume <id>` and runs it in the recovered
   working directory, since Grok Build scopes its session list by directory.
+  It reopens a session from any directory, so a deleted one gets no `cd` and
+  a note instead (#4459).
   Rows that came out of `grok.db` belong to the other product and get an error
   instead.
 

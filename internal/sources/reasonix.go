@@ -277,7 +277,7 @@ func ParseReasonixFile(path string) ([]model.Session, error) {
 	}
 	switch {
 	case ws != "":
-		s.Project = claudeProjectName(pathToProjectKey(ws))
+		s.Project = projectName(ws)
 	case filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(path)))) == "projects":
 		s.Project = claudeProjectName(filepath.Dir(filepath.Dir(path)))
 	}

@@ -94,8 +94,8 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	if ss[0].Harness != "senpi" {
 		t.Errorf("harness = %q, want senpi", ss[0].Harness)
 	}
-	if ss[0].Project != "senpi/demo" {
-		t.Errorf("project = %q, want it from the encoded directory", ss[0].Project)
+	if ss[0].Project != "workspace/senpi-demo" {
+		t.Errorf("project = %q, want it from the header's cwd", ss[0].Project)
 	}
 	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[1].Text, "acknowledged") {
 		t.Errorf("senpi messages = %+v", ss[0].Messages)
@@ -130,7 +130,7 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	// The header's cwd is what names the project — authoritative, and on a real
 	// machine the encoded directory is built from the same value, so the layout
 	// must not change the attribution. The flat case below asserts that pair.
-	if ks[0].Project != "kimchi/demo" {
+	if ks[0].Project != "workspace/kimchi-demo" {
 		t.Errorf("project = %q, want it from the header's cwd", ks[0].Project)
 	}
 	if ks[0].ID != "reg-kimchi-001" {

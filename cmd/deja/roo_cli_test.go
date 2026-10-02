@@ -23,8 +23,13 @@ func rooCLITask(t *testing.T, root, id, workspace string) string {
 	if err := os.WriteFile(path, []byte(`[{"role":"user","content":"hi"}]`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	item := `{"id":"` + id + `","ts":1788785794339,"task":"fix the queue","workspace":"` + workspace + `"}`
-	if err := os.WriteFile(filepath.Join(dir, "history_item.json"), []byte(item), 0o644); err != nil {
+	// Encoded, not spliced: a Windows workspace's backslashes are escapes in
+	// JSON, and a spliced C:\Users\RUNNER~1 failed to parse (#4455).
+	item, err := json.Marshal(map[string]any{"id": id, "ts": 1788785794339, "task": "fix the queue", "workspace": workspace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "history_item.json"), item, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return path
@@ -39,6 +44,9 @@ func TestResumeRooSplitsTheCLIFromTheEditor(t *testing.T) {
 	cli := filepath.Join(tmp, "vscode-mock", "global-storage")
 	t.Setenv("DEJA_ROO_CLI_ROOT", cli)
 	work := filepath.Join(tmp, "app")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	id := "01a07bf9-8882-7703-a3fa-245deb8ea752"
 	path := rooCLITask(t, cli, id, work)
 
@@ -46,13 +54,43 @@ func TestResumeRooSplitsTheCLIFromTheEditor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("roo CLI resume: %v", err)
 	}
-	if cmd != "roo --session-id "+id {
+	// The CLI looks a task up by the workspace it is given, and with no -w
+	// that is the real path of its cwd: a task created with -w through a
+	// symlink (/tmp on macOS) is "not found" from a plain cd (#4422).
+	if cmd != "roo -w "+resumeWordFor(t, work)+" --session-id "+id {
 		t.Fatalf("cmd = %q", cmd)
 	}
-	// The CLI lists only tasks whose workspace it is standing in, so the
-	// command has to carry the directory the task was in.
 	if runtime.GOOS != "windows" && dir != work {
 		t.Fatalf("dir = %q, want the workspace %q", dir, work)
+	}
+	// A workspace with a space or a ~ in it, as a Windows profile under its
+	// 8.3 name has, is quoted rather than left off: without -w the CLI looks
+	// under the cwd's real path and misses the task (#4455).
+	spaced := filepath.Join(tmp, "JOHNSM~1", "My Projects", "app")
+	if err := os.MkdirAll(spaced, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	sid := "01a07bf9-8882-7703-a3fa-245deb8ea753"
+	want := "roo -w '" + spaced + "' --session-id " + sid
+	if _, cmd, err := resumeCommand(model.Session{Harness: "roo", ID: "roo-task-" + sid, Path: rooCLITask(t, cli, sid, spaced)}); err != nil || cmd != want {
+		t.Fatalf("spaced workspace: cmd = %q, err = %v, want %q", cmd, err, want)
+	}
+	// --exec reads the quoted word back as one argument, a Windows one with
+	// its backslashes included.
+	win := `C:\Users\JOHNSM~1\My Projects\app`
+	line := "roo -w '" + win + "' --session-id " + sid
+	if got, err := resumeArgv(line); err != nil || strings.Join(got, "|") != "roo|-w|"+win+"|--session-id|"+sid {
+		t.Fatalf("--exec splits %q into %q, err = %v", line, got, err)
+	}
+	// A quote has no form bash, zsh and PowerShell all read alike, so that
+	// workspace keeps the cd alone.
+	quoted := filepath.Join(tmp, "bob's app")
+	if err := os.MkdirAll(quoted, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	qid := "01a07bf9-8882-7703-a3fa-245deb8ea754"
+	if _, cmd, err := resumeCommand(model.Session{Harness: "roo", ID: "roo-task-" + qid, Path: rooCLITask(t, cli, qid, quoted)}); err != nil || cmd != "roo --session-id "+qid {
+		t.Fatalf("quoted workspace: cmd = %q, err = %v", cmd, err)
 	}
 
 	// An editor task lives under the host's globalStorage, and the CLI never
@@ -149,4 +187,15 @@ func rooAllowList(t *testing.T, path string) []string {
 		t.Fatalf("settings are not JSON Roo can read: %v\n%s", err, b)
 	}
 	return cfg.Servers["deja"].AlwaysAllow
+}
+
+// resumeWordFor is the word a temp-dir workspace goes on the command as: bare
+// on a Unix temp dir, quoted for a Windows one with its backslashes.
+func resumeWordFor(t *testing.T, s string) string {
+	t.Helper()
+	w, ok := resumeWord(s)
+	if !ok {
+		t.Fatalf("workspace %q cannot go on a command", s)
+	}
+	return w
 }

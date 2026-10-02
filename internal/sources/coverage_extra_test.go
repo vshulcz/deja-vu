@@ -121,7 +121,7 @@ func TestGeminiBranchesAndLoadGemini(t *testing.T) {
 		t.Fatalf("jsonl without metadata got=%#v err=%v", got, err)
 	}
 	ss := LoadGemini()
-	if len(ss) != 1 || ss[0].Project != "gem-proj" || ss[0].Messages[0].Text != "a\nb" {
+	if len(ss) != 1 || ss[0].Project != "workspace/gem-proj" || ss[0].Messages[0].Text != "a\nb" {
 		t.Fatalf("LoadGemini=%#v", ss)
 	}
 	if got := geminiContentText(json.RawMessage(`123`)); got != "" {

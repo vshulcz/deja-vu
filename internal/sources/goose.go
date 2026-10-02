@@ -14,23 +14,31 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// GooseDataDir is where goose keeps its data on this platform — the first of
-// GooseDataDirs, which is the one goose itself would write to.
-func GooseDataDir() string { return GooseDataDirs()[0] }
+// GooseDataDir is where goose keeps its data on this platform: the first of
+// GooseDataDirs that exists, or the one goose itself would write to when none
+// does. install --auto and doctor key on it, so naming a candidate that is not
+// on disk skipped goose on a mac that had used it (#4267).
+func GooseDataDir() string {
+	dirs := GooseDataDirs()
+	for _, dir := range dirs {
+		if dirExists(dir) {
+			return dir
+		}
+	}
+	return dirs[0]
+}
 
 // GooseDataDirs are the data roots a goose install can have, the current one
 // first. goose resolves its own directories through etcetera's
 // choose_app_strategy with author and top-level domain "Block"
-// (crates/goose/src/config/paths.rs): the Apple strategy on macOS, XDG on
-// Linux, the Windows strategy on Windows. So on a mac the sessions are under
-// `~/Library/Application Support/Block/goose`, which goose's own comment
-// names, and reading only `~/.local/share/goose` there reported `goose
-// missing` to every mac user who had used it (#3642).
+// (crates/goose/src/config/paths.rs). That is the Windows strategy on Windows
+// and XDG everywhere else, macOS included: the Apple layout is
+// choose_native_strategy, which goose does not call. goose 1.46 on a mac keeps
+// its sessions in `~/.local/share/goose` (#4267); #3642 read it the other way.
 //
-// The older locations stay as candidates rather than as the answer: an install
-// that predates the change still has its sessions there — this machine is one
-// of them, which is why a single-root reader looked correct from inside it.
-// Every directory that exists is read.
+// The other locations stay as candidates rather than as the answer: an install
+// with a store under one of them keeps being read. Every directory that exists
+// is read.
 func GooseDataDirs() []string {
 	// GOOSE_PATH_ROOT relocates config, data and state together; a user who
 	// sets it has every session under it and none where we would look.
@@ -60,6 +68,7 @@ func GooseDataDirs() []string {
 			}
 		}
 	}
+	xdgRoots := []string{filepath.Join(xdg, "goose"), filepath.Join(xdg, "Block", "goose")}
 	switch runtime.GOOS {
 	case "windows":
 		appdata := os.Getenv("APPDATA")
@@ -67,13 +76,14 @@ func GooseDataDirs() []string {
 			appdata = filepath.Join(Home(), "AppData", "Roaming")
 		}
 		add(filepath.Join(appdata, "Block", "goose", "data"))
+		// An older goose wrote XDG whatever the platform.
+		add(xdgRoots...)
 	case "darwin":
 		support := filepath.Join(Home(), "Library", "Application Support")
-		add(filepath.Join(support, "Block", "goose"), filepath.Join(support, "goose"))
+		add(xdgRoots[0], filepath.Join(support, "Block", "goose"), filepath.Join(support, "goose"), xdgRoots[1])
+	default:
+		add(xdgRoots...)
 	}
-	// XDG is the current answer on Linux and a real fallback everywhere else:
-	// an older goose wrote here whatever the platform.
-	add(filepath.Join(xdg, "goose"), filepath.Join(xdg, "Block", "goose"))
 	return out
 }
 
@@ -173,7 +183,7 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
 		Path:    path,
 	}
-	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
+	err := scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isGooseHeader, func(m map[string]any) {
 		role, hasRole := m["role"].(string)
 		if !hasRole {
 			applyGooseHeader(&s, m)
@@ -186,12 +196,12 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		if t.IsZero() {
 			t = parseTimeAny(m["timestamp"])
 		}
-		speech, toolOut, commands, paths := gooseParts(m["content"])
-		if speech == "" && toolOut == "" && len(commands) == 0 && len(paths) == 0 {
+		parts := gooseParts(m["content"])
+		if parts.empty() {
 			return
 		}
 		s.Touch(t)
-		appendGooseParts(&s, role, t, speech, toolOut, commands, paths)
+		appendGooseParts(&s, role, t, parts)
 	})
 	if s.Project == "" {
 		s.Project = "goose"
@@ -200,6 +210,13 @@ func parseGooseFileFromOffset(path string, offset int64) ([]model.Session, error
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// isGooseHeader tells the session's metadata line from its messages, which
+// all carry a role.
+func isGooseHeader(m map[string]any) bool {
+	_, hasRole := m["role"]
+	return !hasRole
 }
 
 // applyGooseHeader reads the session's own line: the header goose writes first,
@@ -231,26 +248,98 @@ func gooseText(v any) string {
 	}
 }
 
+// goosePartsOf is what deja indexes out of one row's content array.
+type goosePartsOf struct {
+	speech, toolOut string
+	commands, paths []string
+	// edits and wrote are the replaced and the written side of the file
+	// changes the row asked for (#4265).
+	edits, wrote []string
+}
+
+func (p goosePartsOf) empty() bool {
+	return p.speech == "" && p.toolOut == "" && len(p.commands) == 0 && len(p.paths) == 0 &&
+		len(p.edits) == 0 && len(p.wrote) == 0
+}
+
 // appendGooseParts files one row's content under the roles deja indexes, the
 // way the Claude reader does: speech under the speaker, tool output under the
-// role that marks it as a printout, and the command and the paths as their own
-// records so `how`, `blame` and the fix pairs can find them.
-func appendGooseParts(s *model.Session, role string, t time.Time, speech, toolOut string, commands, paths []string) {
-	if speech != "" {
-		s.Messages = append(s.Messages, model.Message{Role: role, Text: capParsedMessage(speech), Time: t})
+// role that marks it as a printout, and the command, the paths and the edits as
+// their own records so `how`, `blame`, `restore` and the fix pairs can find
+// them.
+func appendGooseParts(s *model.Session, role string, t time.Time, p goosePartsOf) {
+	if p.speech != "" {
+		s.Messages = append(s.Messages, model.Message{Role: role, Text: capParsedMessage(p.speech), Time: t})
 	}
-	if toolOut != "" {
-		s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(toolOut), Time: t})
+	if p.toolOut != "" {
+		s.Messages = append(s.Messages, model.Message{Role: RoleToolOutput, Text: capParsedMessage(p.toolOut), Time: t})
 	}
-	if IndexToolPaths() && len(paths) > 0 {
-		s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(paths, "\n"), Time: t})
+	if IndexToolPaths() && len(p.paths) > 0 {
+		s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: strings.Join(p.paths, "\n"), Time: t})
 	}
-	for _, cmd := range commands {
+	if IndexWrites() {
+		for _, w := range p.wrote {
+			s.Messages = append(s.Messages, model.Message{Role: RoleWrote, Text: w, Time: t})
+		}
+	}
+	if IndexEdits() {
+		for _, span := range p.edits {
+			s.Messages = append(s.Messages, model.Message{Role: RoleEdit, Text: span, Time: t})
+		}
+	}
+	for _, cmd := range p.commands {
 		s.Messages = append(s.Messages, model.Message{Role: RoleCommand, Text: cmd, Time: t})
 	}
 }
 
-// gooseParts splits a goose content array into the four things deja indexes
+// gooseDialect is the developer extension's editor since goose folded it into
+// the core (goose 1.27): `edit` takes path, before and after, `write` takes
+// path and content (crates/goose/src/agents/platform_extensions/developer/
+// edit.rs). The call is stored under the bare name, with the extension in
+// `_meta`.
+var gooseDialect = toolDialect{
+	pathKey:   "path",
+	editTools: map[string]bool{"edit": true, "write": true},
+	oldKey:    "before",
+	newKey:    "after",
+}
+
+// gooseTextEditorDialect is the text_editor tool the goose-mcp developer
+// extension had before that, stored as `developer__text_editor`: str_replace
+// takes old_str and new_str, write takes file_text, insert takes new_str.
+var gooseTextEditorDialect = toolDialect{
+	pathKey:    "path",
+	editTools:  map[string]bool{"text_editor": true},
+	oldKey:     "old_str",
+	newKey:     "new_str",
+	contentKey: "file_text",
+}
+
+// gooseTextEditorArgs keeps the text arguments the call's command reads:
+// old_str and new_str for str_replace, new_str for insert, file_text for
+// write. A view or an undo_edit carrying stray ones changed nothing, and
+// text_editor has no `edits` list for the shared dialect reader to find.
+func gooseTextEditorArgs(args map[string]any) map[string]any {
+	keep := map[string][]string{
+		"str_replace": {"old_str", "new_str"},
+		"insert":      {"new_str"},
+		"write":       {"file_text"},
+	}[str(args["command"])]
+	out := make(map[string]any, len(args))
+	for k, v := range args {
+		if k != "old_str" && k != "new_str" && k != "file_text" && k != "edits" {
+			out[k] = v
+		}
+	}
+	for _, k := range keep {
+		if v, ok := args[k]; ok {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// gooseParts splits a goose content array into the things deja indexes
 // separately. goose stores far more than speech in the same column — measured
 // against goose 1.48.0 by importing a transcript and reading the row back:
 //
@@ -268,12 +357,16 @@ func appendGooseParts(s *model.Session, role string, t time.Time, speech, toolOu
 // The response arrives on a `user` row — goose files a tool result as the
 // user's turn, the same way Claude Code does — so a row that holds only
 // responses is tool output rather than something a person said.
-func gooseParts(v any) (speech, toolOut string, commands, paths []string) {
+func gooseParts(v any) goosePartsOf {
 	items, ok := gooseContentArray(v)
 	if !ok {
-		return gooseText(v), "", nil, nil
+		return goosePartsOf{speech: gooseText(v)}
 	}
+	var p goosePartsOf
 	var say, out []string
+	// The editor calls in the shape the dialect readers take, so the edit and
+	// wrote records come out the way they do for every other harness.
+	var calls []any
 	for _, it := range items {
 		m, ok := it.(map[string]any)
 		if !ok {
@@ -287,25 +380,38 @@ func gooseParts(v any) (speech, toolOut string, commands, paths []string) {
 		case "toolRequest":
 			name, args := gooseToolCall(m)
 			if cmd := strings.TrimSpace(str(args["command"])); cmd != "" && worthIndexing(cmd) {
-				commands = append(commands, "$ "+cmd)
+				p.commands = append(p.commands, "$ "+cmd)
 			}
 			// The editor tools name the file they are about to change, which is
 			// what blame reads. `path` is what goose's own editor takes; a tool
 			// from an extension may spell it either way.
 			for _, key := range []string{"path", "file_path"} {
 				if pth := strings.TrimSpace(str(args[key])); pth != "" {
-					paths = append(paths, pth)
+					p.paths = append(p.paths, pth)
 					break
 				}
 			}
-			_ = name
+			if args != nil {
+				tool := strings.TrimPrefix(name, "developer__")
+				if tool == "text_editor" {
+					args = gooseTextEditorArgs(args)
+				}
+				calls = append(calls, map[string]any{
+					"type": "tool_use", "name": tool, "input": args,
+				})
+			}
 		case "toolResponse":
 			if t := gooseToolResult(m); t != "" {
 				out = append(out, t)
 			}
 		}
 	}
-	return strings.Join(say, "\n"), strings.Join(out, "\n"), commands, paths
+	for _, d := range []toolDialect{gooseDialect, gooseTextEditorDialect} {
+		p.edits = append(p.edits, editSpansIn(calls, d)...)
+		p.wrote = append(p.wrote, wroteRecordsIn(calls, d)...)
+	}
+	p.speech, p.toolOut = strings.Join(say, "\n"), strings.Join(out, "\n")
+	return p
 }
 
 // withoutGooseTurnContext removes the block goose injects ahead of a turn —
@@ -427,8 +533,8 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	//
 	// A matching session comes back whole, which is work repeated on every pass
 	// over an active store (#2030) — but it is also what keeps the session
-	// whole in the index: a partial return replaces what goose already had
-	// there, where the same partial return from opencode merges (#2033).
+	// whole in the index: a partial return would replace what goose already
+	// had there (#2033).
 	where := fmt.Sprintf(" and (m.created_timestamp > %d or datetime(s.updated_at) > datetime('%s'))", sec, rfc)
 	return parseGooseDBWhere(db, where, 0)
 }
@@ -493,12 +599,12 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		if t.IsZero() {
 			t = s.Updated
 		}
-		speech, toolOut, commands, paths := gooseParts(r["content_json"])
-		if speech == "" && toolOut == "" && len(commands) == 0 && len(paths) == 0 {
+		parts := gooseParts(r["content_json"])
+		if parts.empty() {
 			continue
 		}
 		s.Touch(t)
-		appendGooseParts(s, role, t, speech, toolOut, commands, paths)
+		appendGooseParts(s, role, t, parts)
 	}
 	if _, err := dec.Token(); err != nil && err != io.EOF {
 		_ = cmd.Wait()
@@ -523,4 +629,25 @@ func parseGooseDBWhere(db, where string, limit int) ([]model.Session, error) {
 		out = append(out, *s)
 	}
 	return out, nil
+}
+
+// GooseStoreLacks reports whether the goose store a session was read from no
+// longer has it — deleted in goose, which leaves `goose session --resume`
+// answering "no such session exists" (#4271). False whenever that cannot be
+// told: no file, no sessions table, or a read that fails.
+func GooseStoreLacks(db, id string) bool {
+	if !nonEmptyFile(db) {
+		return false
+	}
+	query := func(q string) (string, bool) {
+		cmd, stop := sqliteReadCmd(db, q)
+		defer stop()
+		b, err := cmd.Output()
+		return strings.TrimSpace(string(b)), err == nil
+	}
+	if names, ok := query(`select name from sqlite_master where type='table' and name='sessions'`); !ok || names == "" {
+		return false
+	}
+	n, ok := query(fmt.Sprintf(`select count(*) from sessions where id='%s'`, sqlEscape(id)))
+	return ok && n == "0"
 }

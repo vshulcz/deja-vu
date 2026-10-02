@@ -25,29 +25,33 @@ func parseFlatRoleJSONL(path string, offset int64, harness, project string) ([]m
 		Project: project,
 		Path:    path,
 	}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
-		role, _ := m["role"].(string)
-		if role == "" {
-			return
-		}
-		text := textFromContent(m["content"])
-		if text == "" {
-			return
-		}
-		if id, _ := m["sessionId"].(string); id != "" {
-			s.ID = id
-		}
-		t := parseTimeAny(m["timestamp"])
-		s.Touch(t)
-		switch role {
-		case "user", "assistant":
-		default:
-			role = RoleToolOutput
-		}
-		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
-	})
+	err := scanJSONLFromOffset(path, offset, func(m map[string]any) { flatRoleLine(&s, m) })
 	if len(s.Messages) == 0 {
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// flatRoleLine folds one flat line into s. Command Code's reader calls it for
+// the lines it still finds in the older shape.
+func flatRoleLine(s *model.Session, m map[string]any) {
+	role, _ := m["role"].(string)
+	if role == "" {
+		return
+	}
+	text := textFromContent(m["content"])
+	if text == "" {
+		return
+	}
+	if id, _ := m["sessionId"].(string); id != "" {
+		s.ID = id
+	}
+	t := parseTimeAny(m["timestamp"])
+	s.Touch(t)
+	switch role {
+	case "user", "assistant":
+	default:
+		role = RoleToolOutput
+	}
+	s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 }

@@ -1,6 +1,9 @@
 package sources
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,9 +18,9 @@ import (
 //	Senpi:  ${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/<encoded-cwd>/*.jsonl
 //	Kimchi: ${KIMCHI_CODING_AGENT_DIR:-~/.config/kimchi/harness}/sessions/--<encoded-cwd>--/*.jsonl
 //
-// Both keep the encoded project directory pi has, so that names the project; a
-// Kimchi file directly under the root has none, and the header line's cwd names
-// it there — the choice omp and prime-agent already make for the same reason.
+// Both keep the encoded project directory pi has, but the header line's cwd
+// names the project: the folder name is lossy, and a Kimchi file directly under
+// the root has none — the choice omp and prime-agent already make.
 
 // SenpiConfigDir is the agent directory. SENPI_CODING_AGENT_DIR moves it, and
 // moves it for deja: a machine that has said where its sessions are should not
@@ -51,10 +54,14 @@ func ParseSenpiFile(path string) ([]model.Session, error) {
 
 // ParseSenpiFileFromOffset is the incremental read.
 func ParseSenpiFileFromOffset(path string, offset int64) ([]model.Session, error) {
-	return parsePiShaped(path, offset, "senpi", senpiProject(path), false)
+	// The header's cwd names the project, the folder only when it has none:
+	// Senpi folds every / into a -, so /tmp/my-app and /tmp/my/app share a
+	// folder name (#4427).
+	return parsePiShaped(path, offset, "senpi", senpiProject(path), true)
 }
 
-// senpiProject reads the name out of the encoded directory, the way pi's does.
+// senpiProject reads the name out of the encoded directory, for a header that
+// records no cwd.
 func senpiProject(path string) string {
 	dir := projectDir(SenpiRoot(), path)
 	if dir == "" || dir == SenpiRoot() {
@@ -82,11 +89,52 @@ func KimchiRoot() string {
 	return EnvPath("DEJA_KIMCHI_ROOT", filepath.Join(KimchiConfigDir(), "sessions"))
 }
 
-// KimchiSessionFiles lists the transcripts.
+// KimchiSessionFiles lists the transcripts, sub-agent runs excluded unless
+// they are asked for.
 func KimchiSessionFiles() []string {
-	return walkFiles(KimchiRoot(), func(p string) bool {
-		return strings.HasSuffix(p, ".jsonl")
-	})
+	return walkFiles(KimchiRoot(), kimchiWanted)
+}
+
+// KimchiUnderRoot lets the registry claim a path for incremental ingest.
+func KimchiUnderRoot(p string) bool {
+	return underRoot(p, KimchiRoot(), ".jsonl") && kimchiWanted(p)
+}
+
+func kimchiWanted(p string) bool {
+	if !strings.HasSuffix(p, ".jsonl") {
+		return false
+	}
+	return os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "1" || !KimchiSubagentFile(p)
+}
+
+// KimchiSubagentFile reports whether a transcript is a run of Kimchi's `Agent`
+// tool. Kimchi writes those beside the parent in the same project directory,
+// so the path cannot tell; the run carries `parentSession` on its header and a
+// `kimchi:subagent-session` entry right after it. A fork has the first and not
+// the second, and is a session of its own. Skipped the way Claude Code's, Cursor's
+// and gjc's sub-agents are: a sub-agent's restatement of the task competes
+// with the parent for recall (#4401).
+func KimchiSubagentFile(p string) bool {
+	f, err := os.Open(p)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	r := bufio.NewReaderSize(f, 4096)
+	head, _ := r.ReadBytes('\n')
+	// Only a header naming a parent is worth a second line.
+	if !bytes.Contains(head, []byte(`"parentSession"`)) {
+		return false
+	}
+	next, _ := r.ReadBytes('\n')
+	var m struct {
+		Type       string `json:"type"`
+		CustomType string `json:"customType"`
+	}
+	if json.Unmarshal(next, &m) != nil {
+		return false
+	}
+	return m.Type == "custom" && m.CustomType == "kimchi:subagent-session"
 }
 
 func LoadKimchi() []model.Session { return parseFiles(KimchiSessionFiles(), ParseKimchiFile) }

@@ -100,3 +100,65 @@ func TestDoctorPrintsTheCommandsSection(t *testing.T) {
 		t.Errorf("the skill state is never explained:\n%s", text)
 	}
 }
+
+// Continue's and goose's commands are items in a config.yaml rather than files
+// of their own, and doctor had no row for either: a removed or renamed /deja
+// looked the same as a working one (#4374). The state comes from the item.
+func TestDoctorReadsConfigYAMLCommands(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DEJA_CONTINUE_ROOT", "")
+	t.Setenv("CONTINUE_GLOBAL_DIR", "")
+	t.Setenv("GOOSE_PATH_ROOT", "")
+	row := func(name string) doctorCommandFile {
+		t.Helper()
+		for _, c := range doctorCommandFiles() {
+			if c.name == name {
+				return c
+			}
+		}
+		t.Fatalf("no %s row", name)
+		return doctorCommandFile{}
+	}
+	write := func(path, text string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cases := []struct {
+		name, path string
+		install    func() error
+		other      string
+	}{
+		{"continue", continueConfigPath(),
+			func() error { _, err := installContinue("/bin/deja", false); return err },
+			"prompts:\n  - name: deja\n    description: my own\n    prompt: grep my notes\n"},
+		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"),
+			func() error { _, err := installGooseCommand("/bin/deja", false); return err },
+			"slash_commands:\n  - command: \"deja\"\n    recipe_path: /home/me/notes-recipe.yaml\n"},
+	}
+	for _, c := range cases {
+		// A config with no item of that name: missing, though the file is there.
+		write(c.path, "models: []\n")
+		if got := row(c.name).state(); got != "missing" {
+			t.Errorf("%s with no item: %q, want missing", c.name, got)
+		}
+		if row(c.name).path != c.path {
+			t.Errorf("%s: row names %s, install writes %s", c.name, row(c.name).path, c.path)
+		}
+		write(c.path, c.other)
+		if got := row(c.name).state(); got != "someone else's" {
+			t.Errorf("%s with the reader's own /deja: %q, want someone else's", c.name, got)
+		}
+		write(c.path, "models: []\n")
+		if err := c.install(); err != nil {
+			t.Fatal(err)
+		}
+		if got := row(c.name).state(); got != "written" {
+			t.Errorf("%s after install: %q, want written", c.name, got)
+		}
+	}
+}
