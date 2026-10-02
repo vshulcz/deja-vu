@@ -30,6 +30,14 @@ func reasonixPackageEnabled() bool {
 // record they disabled, or a plain install when there is none. reasonix-auto
 // here handed an MCP-only install auto-recall it never asked for.
 func doctorMCPSwitchedOff(name string) string {
+	// And every other client's own switch, on the entry or beside it (#4466,
+	// #4468).
+	if note := clientMCPEntryOff(name); note != "" {
+		return note
+	}
+	if note := clientMCPDenied(name); note != "" {
+		return note
+	}
 	if name != "reasonix" || reasonixPackageEnabled() {
 		return ""
 	}

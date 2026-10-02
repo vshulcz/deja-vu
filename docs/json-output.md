@@ -535,7 +535,11 @@ is not, which makes aider print an error on every start.
 `binary_missing` marks a row whose entries name a deja binary that is no longer
 there — what an upgrade leaves behind, with every hook exiting 127.
 `switched_off` marks a `wired` row the harness has turned off, so it will not
-run the hook: Antigravity's plugin after `agy plugin disable deja`.
+run the hook: Antigravity's plugin after `agy plugin disable deja`, the
+client's switch for every hook (`disableAllHooks` in claude-code and qwen,
+gemini's `hooksConfig.enabled`, codex's `[features] hooks`, openclaw's
+`hooks.internal.enabled`), or deja's extension or plugin disabled through the
+client (gemini, goose, pi, senpi, omp, gjc, cline, hermes, openclaw, dsh).
 
 The first two rows are `claude-code` and `codex-hook`, whose hooks are wired
 event by event, so they have two states of their own: `out of date` (some of the
@@ -550,8 +554,16 @@ reads `missing`, since both files also carry the user's own hooks; for
 `mcp` rows are `wired`, `not-wired` (the config file is there without a deja
 server in it) or `config-missing`. A `wired` row carries `binary_missing` when
 its entry names a deja binary that is no longer there, so the harness cannot
-start the server, and `switched_off` when the entry is turned off
-(`"disabled": true`, or opencode's `"enabled": false`), so the harness will not. For Reasonix, `switched_off` means deja's plugin package has no enabled
+start the server, and `switched_off` when the client will not start it: the
+entry is turned off (`"disabled": true`, opencode's `"enabled": false`, or
+`enabled: false` in goose, hermes, codex and grok, `disabled: true` on dsh's
+row), or a list or switch beside it says so — gemini and qwen `mcp.excluded`
+or an `mcp.allowed` without deja (gemini ignores an empty one), `gemini mcp
+disable`, copilot's `disabledMcpServers`, grok's `disabled_mcp_servers`, omp and gjc
+`disabledServers`, VS Code's `chat.mcp.access`, zcode's `features.mcp`,
+openclaw's `tools.deny`, opencode's `tools`, amp's `amp.tools.disable`, and the
+per-project lists claude-code and cursor-agent keep for the repository (or
+directory) doctor runs in. For Reasonix, `switched_off` means deja's plugin package has no enabled
 record in `plugin-packages.json`, which is what `reasonix plugin disable deja`
 leaves. The `deepseek` row carries `plugin_missing` when
 `cordis.patch.yml` names a deja plugin file dsh cannot find, which keeps dsh

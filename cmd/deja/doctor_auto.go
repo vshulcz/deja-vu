@@ -298,7 +298,7 @@ func autoWiringSwitchedOff(name string) string {
 	if name == "antigravity" && antigravityPluginSwitchedOff() {
 		return "the plugin is switched off — antigravity will not run it until `agy plugin enable deja`"
 	}
-	return ""
+	return clientHooksOff(name)
 }
 
 // antigravityPluginSwitchedOff reads the switch `agy plugin disable` writes:

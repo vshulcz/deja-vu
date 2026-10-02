@@ -232,6 +232,9 @@ func doctorHooks(w io.Writer) {
 		return
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", st.state, reportPath(st.path))
+	if off := clientHooksOff("claude-code"); off != "" && st.state == "wired" {
+		fmt.Fprintf(w, "  %-12s %s\n", "", off)
+	}
 	if len(st.missing) > 0 && len(st.missing) < len(claudeHookWiring) {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
@@ -322,6 +325,9 @@ func doctorCodexHook(w io.Writer) {
 	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
+	}
+	if off := clientHooksOff("codex-hook"); off != "" && status == "wired" {
+		line += fmt.Sprintf("\n  %-12s %s", "", off)
 	}
 	if note := doctorHookRepeats(hooks, codexHookWiring, "codex-auto"); note != "" {
 		line += fmt.Sprintf("\n  %-12s %s", "", note)

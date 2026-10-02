@@ -960,7 +960,8 @@ func collectDoctorAutoRecall() []doctorAutoStatus {
 	// people run, missing from the machine-readable half of the one report that
 	// says whether a hook still works (#3502, #3510).
 	for _, st := range []hookWiringState{claudeHookWiringState(), codexHookWiringState()} {
-		out = append(out, doctorAutoStatus{Name: st.name, State: st.state, Path: st.path, BinaryMissing: st.dead})
+		out = append(out, doctorAutoStatus{Name: st.name, State: st.state, Path: st.path, BinaryMissing: st.dead,
+			SwitchedOff: st.state == "wired" && clientHooksOff(st.name) != ""})
 	}
 	for _, a := range wirings {
 		state, dead := autoWiringState(a)
