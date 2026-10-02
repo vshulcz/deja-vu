@@ -63,6 +63,7 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 		servers = map[string]any{}
 		root["mcpServers"] = servers
 	}
+	var note string
 	if uninstall {
 		delete(servers, "deja")
 		if len(servers) == 0 {
@@ -72,7 +73,9 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 		command, args := mcpCommandArgs(exe)
 		// type: "stdio" explicitly: prime-agent's settings carry both stdio and
 		// http servers under the same key, and its docs write the type out.
-		servers["deja"] = map[string]any{"type": "stdio", "command": command, "args": args}
+		entry := map[string]any{"type": "stdio", "command": command, "args": args}
+		note = keepSwitch(servers["deja"], entry)
+		servers["deja"] = entry
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -84,7 +87,7 @@ func installPrimeMCPAt(path, exe string, uninstall bool) (installResult, error) 
 		return installResult{}, err
 	}
 	a, err := writeIfChanged(path, old, next)
-	return installResult{Path: path, Action: a}, err
+	return installResult{Path: path, Action: a, Note: note}, err
 }
 
 // installPrimeAuto writes the extension and the MCP server both, for the same

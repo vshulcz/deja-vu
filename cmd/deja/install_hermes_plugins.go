@@ -61,6 +61,55 @@ func setHermesPluginEnabled(on bool) error {
 	return err
 }
 
+// hermesPluginDisabled reports whether config.yaml lists deja under
+// plugins.disabled, in a block list or a flow one.
+func hermesPluginDisabled() bool {
+	b, err := readConfig(filepath.Join(sources.HermesHome(), "config.yaml"))
+	if err != nil {
+		return false
+	}
+	in, list, child := false, false, -1
+	for _, line := range strings.Split(lfText(b), "\n") {
+		t := strings.TrimSpace(line)
+		if t == "" || strings.HasPrefix(t, "#") {
+			continue
+		}
+		w := yamlIndentWidth(line)
+		if w == 0 {
+			in, list, child = yamlKeyLine(line, "plugins:"), false, -1
+			continue
+		}
+		if !in {
+			continue
+		}
+		if child < 0 {
+			child = w
+		}
+		if list && (w > child || w == child && strings.HasPrefix(t, "-")) {
+			if strings.HasPrefix(t, "-") && hermesYAMLScalar(t[1:]) == "deja" {
+				return true
+			}
+			continue
+		}
+		list = false
+		key, rest, ok := hermesKeyLine(line)
+		if !ok || w != child || hermesKeyName(key) != "disabled" {
+			continue
+		}
+		v := strings.TrimSpace(stripYAMLComment(rest))
+		if strings.HasPrefix(v, "[") && strings.HasSuffix(v, "]") {
+			for _, item := range strings.Split(v[1:len(v)-1], ",") {
+				if hermesYAMLScalar(item) == "deja" {
+					return true
+				}
+			}
+			continue
+		}
+		list = v == ""
+	}
+	return false
+}
+
 // hermesNullBlock records the null an `enabled: ~` held before deja listed
 // itself under the key, with the space before it, so uninstall puts back the
 // very bytes.

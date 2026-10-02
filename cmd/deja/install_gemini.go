@@ -46,6 +46,9 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		if err := disableGeminiHooksIfOurs(); err != nil {
 			return installResult{}, err
 		}
+		if err := restoreGeminiHooksSwitch(); err != nil {
+			return installResult{}, err
+		}
 		note := ""
 		if geminiHooksEnabled() {
 			note = "left hooksConfig.enabled on in gemini's settings.json — other extensions may be running on it"
@@ -136,10 +139,39 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if err := enableGeminiHooks(); err != nil {
+	note, err := enableGeminiHooks()
+	if err != nil {
 		return installResult{}, err
 	}
-	return installResult{Path: dir, Action: a}, nil
+	return installResult{Path: dir, Action: a, Note: note}, nil
+}
+
+// geminiSwitchRecord is the record that hooksConfig.enabled was false before
+// deja turned it on, so uninstall can put it back (#4471).
+const geminiSwitchRecord = "hooksConfig.enabled=false"
+
+// restoreGeminiHooksSwitch turns hooksConfig.enabled back off when deja is
+// the one that turned it on over the reader's false. Their other hooks did
+// not run before deja came, and they do not run after it goes.
+func restoreGeminiHooksSwitch() error {
+	path := filepath.Join(sources.GeminiHome(), "settings.json")
+	if !blockWasAdded(path, geminiSwitchRecord) {
+		return nil
+	}
+	forgetBlockAdded(path, geminiSwitchRecord)
+	old, err := readConfig(path)
+	if err != nil {
+		return err
+	}
+	if cfg, _ := geminiHooksConfig(old); cfg["enabled"] != true {
+		return nil
+	}
+	next, err := jsoncSetFlag(string(old), "hooksConfig", "enabled", false)
+	if err != nil {
+		return fmt.Errorf("gemini settings: %w", err)
+	}
+	_, err = writeIfChanged(path, old, []byte(next))
+	return err
 }
 
 // geminiHooksEnabled reports whether the master switch is on right now, which
@@ -244,13 +276,26 @@ func geminiOtherHooks() bool {
 }
 
 // enableGeminiHooks flips the master switch. Without it the extension is
-// loaded and its hooks are never run.
-func enableGeminiHooks() error {
+// loaded and its hooks are never run. A false the reader set is every hook
+// switched off, theirs included — the key defaults to true — so turning it on
+// is said aloud and written down for uninstall to undo (#4471, the rule
+// zcode's hooks.enabled follows — #4431).
+func enableGeminiHooks() (string, error) {
 	path := filepath.Join(sources.GeminiHome(), "settings.json")
 	old, err := readConfig(path)
 	if err != nil {
-		return err
+		return "", err
 	}
+	note := ""
+	if cfg, _ := geminiHooksConfig(old); cfg["enabled"] == false {
+		noteBlockAdded(path, geminiSwitchRecord)
+		note = "turned hooksConfig.enabled on in " + shortHome(path) + ", which was off, so its other hooks run too; uninstall turns it back off"
+	}
+	err = setGeminiHooksOn(path, old)
+	return note, err
+}
+
+func setGeminiHooksOn(path string, old []byte) error {
 	if cfg, present := geminiHooksConfig(old); present && (len(cfg) != 1 || cfg["enabled"] != true) {
 		// The reader's own object — a switch they set to false, a key
 		// beside it: not deja's to take back later.

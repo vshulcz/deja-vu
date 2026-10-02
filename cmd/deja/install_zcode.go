@@ -110,6 +110,7 @@ func zcodeServerAt(path, exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	var note string
 	mcp, _ := root["mcp"].(map[string]any)
 	if mcp == nil {
 		if uninstall {
@@ -147,7 +148,9 @@ func zcodeServerAt(path, exe string, uninstall bool) (installResult, error) {
 			forgetBlockAdded(path, "mcp")
 		}
 	} else {
-		servers["deja"] = mcpServerEntry(exe)
+		entry := mcpServerEntry(exe)
+		note = keepSwitch(servers["deja"], entry)
+		servers["deja"] = entry
 		mcp["servers"] = servers
 		root["mcp"] = mcp
 	}
@@ -166,7 +169,7 @@ func zcodeServerAt(path, exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return installResult{Path: path, Action: action}, nil
+	return installResult{Path: path, Action: action, Note: note}, nil
 }
 
 // zcodeHookEntry is one wired event, in the shape the config takes.
@@ -194,12 +197,15 @@ func installZCodeAuto(exe string, uninstall bool) (installResult, error) {
 	}
 	out := wroteAll(server, hooksRes)
 	// Both halves write the same file, so wroteAll keeps one result and the
-	// hooks' note about the switch would go with the other.
-	if hooksRes.Note != "" && !strings.Contains(out.Note, hooksRes.Note) {
-		if out.Note != "" {
-			out.Note += "; "
+	// other's note — the hooks switch, or the server's own off switch (#4467)
+	// — would go with it.
+	for _, n := range []string{server.Note, hooksRes.Note} {
+		if n != "" && !strings.Contains(out.Note, n) {
+			if out.Note != "" {
+				out.Note += "; "
+			}
+			out.Note += n
 		}
-		out.Note += hooksRes.Note
 	}
 	return out, nil
 }

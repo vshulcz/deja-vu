@@ -59,6 +59,13 @@ func installHermesPlugin(exe string, uninstall bool) (installResult, error) {
 	// A discovered plugin is listed as "not enabled" and never loaded until
 	// its name is in plugins.enabled, so the installer puts it there rather
 	// than leaving the user a second step nothing tells them about.
+	//
+	// Unless the reader took it out: `hermes plugins disable deja` moves the
+	// name to plugins.disabled, and listing it under enabled again turned it
+	// back on and left it in both lists (#4472).
+	if hermesPluginDisabled() {
+		return installResult{Path: dir, Action: a, Note: "left deja's plugin switched off, the way it was — `hermes plugins enable deja` turns it back on"}, nil
+	}
 	if err := setHermesPluginEnabled(true); err != nil {
 		return installResult{}, err
 	}
@@ -213,13 +220,18 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 		return installResult{}, err
 	}
 	next := removeHermesMCPBlock(lfText(old))
+	var note string
 	if !uninstall {
 		pad, ok := hermesBlockIndent(next)
 		if !ok {
 			pad = "  "
 		}
+		on := "true"
+		if yamlEntrySwitchedOff(lfText(old), "mcp_servers:", "deja") {
+			on, note = "false", switchedOffNote
+		}
 		entry := pad + "deja:\n" + pad + pad + "command: " + yamlQuote(exe) + "\n" +
-			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: true\n"
+			pad + pad + "args:\n" + pad + pad + pad + "- mcp\n" + pad + pad + "enabled: " + on + "\n"
 		if next != "" && !strings.HasSuffix(next, "\n") {
 			next += "\n"
 		}
@@ -254,7 +266,7 @@ func installHermesMCP(exe string, uninstall bool) (installResult, error) {
 	// was the only writer that did not, so a config whose deja block ended it
 	// came back without one (#2606, #2730).
 	a, werr := writeIfChanged(path, old, []byte(keepTrailingNewline(lfText(old), next)))
-	return installResult{Path: path, Action: a}, werr
+	return installResult{Path: path, Action: a, Note: note}, werr
 }
 
 // removeHermesMCPBlock drops our entry and nothing else: the block ends at the

@@ -2531,6 +2531,12 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 		if s != "" {
 			s += "\n\n"
 		}
+		// The block is written fresh, so the reader's `enabled = false` on the
+		// one it replaces went with it and the next start ran deja (#4467).
+		if tomlDejaSwitchedOff(text) {
+			block = strings.TrimRight(block, "\n") + "\nenabled = false\n"
+			note = switchedOffNote
+		}
 		s += block
 	} else {
 		note = leftNamedDejaEntriesNote(foreignTOMLDejaKeys(s))
@@ -2540,6 +2546,23 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 	}
 	a, err := writeIfChanged(path, old, []byte(s))
 	return installResult{Path: path, Action: a, Note: note}, err
+}
+
+// tomlDejaSwitchedOff reports whether `[mcp_servers.deja]` carries
+// `enabled = false`, the switch codex and grok both read.
+func tomlDejaSwitchedOff(s string) bool {
+	lines := strings.Split(s, "\n")
+	for _, b := range tomlMCPBlocks(s) {
+		if b.key != "deja" {
+			continue
+		}
+		for i := b.start + 1; i < b.end; i++ {
+			if key, value, ok := tomlLineKeyValue(lines[i]); ok && key == "enabled" && value == "false" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func tomlMCPBlocks(s string) []tomlMCPBlock {
@@ -3112,7 +3135,7 @@ func mergeDejaEntry(prev any, entry map[string]any) (map[string]any, string) {
 		if note != "" {
 			note += "; "
 		}
-		note += "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+		note += switchedOffNote
 	}
 	return out, note
 }
@@ -3140,6 +3163,26 @@ func installClientOffNotes(target string) []string {
 		notes = append(notes, n)
 	}
 	return notes
+}
+
+// switchedOffNote is what install says over an entry the reader turned off.
+const switchedOffNote = "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+
+// keepSwitch carries the reader's off switch from the entry deja is replacing
+// onto the fresh one, for the writers that rebuild the entry rather than merge
+// into it. They dropped it, so the next client start ran deja again for
+// somebody who had switched it off (#4467). The note is "" when it was on.
+func keepSwitch(prev any, next map[string]any) string {
+	old, ok := prev.(map[string]any)
+	if !ok || !entrySwitchedOff(old) {
+		return ""
+	}
+	for _, k := range []string{"disabled", "enabled"} {
+		if v, ok := old[k]; ok {
+			next[k] = v
+		}
+	}
+	return switchedOffNote
 }
 
 // entrySwitchedOff reports whether the reader has turned this entry off.
@@ -4122,7 +4165,7 @@ func mergedJSONCEntryLine(dropped []string, key, exe string) (string, string) {
 		// is true whether or not this run changed anything.
 		off := ""
 		if entrySwitchedOff(merged) {
-			off = "left the entry switched off, the way it was — deja will not answer until you turn it back on"
+			off = switchedOffNote
 		}
 		return strings.TrimSuffix(strings.TrimRight(strings.Join(dropped, "\n"), " \t"), ","), off
 	}

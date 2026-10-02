@@ -75,10 +75,57 @@ func installOpenClawHooks(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if _, err := setOpenClawHookEnabled(true); err != nil {
-		return installResult{}, err
+	// `openclaw hooks disable deja-recall` is the reader's say, and so is the
+	// switch above it while deja's own entry is off: neither is turned back on
+	// (#4472). The switch alone being off is the one deja needs on, and it
+	// says so, the way zcode's does (#4431).
+	var note string
+	if openclawEntrySwitchedOff(openclawHookEntries, openclawHookName) {
+		note = "left deja's hook switched off, the way it was — `openclaw hooks enable " + openclawHookName + "` turns it back on"
+	} else {
+		if openclawHooksSwitchOff() {
+			note = "turned hooks.internal.enabled on in " + shortHome(openclawConfigPath()) + ", which was off, so its other hooks run too; uninstall turns it back off"
+		}
+		if _, err := setOpenClawHookEnabled(true); err != nil {
+			return installResult{}, err
+		}
 	}
-	return installResult{Path: dir, Action: a}, nil
+	return installResult{Path: dir, Action: a, Note: note}, nil
+}
+
+func openclawConfigPath() string {
+	return filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+}
+
+// openclawConfigAt is the value at a dotted path in openclaw.json, comments
+// and all, or nil.
+func openclawConfigAt(keys ...string) any {
+	b, err := os.ReadFile(openclawConfigPath())
+	if err != nil {
+		return nil
+	}
+	var v any
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &v) != nil {
+		return nil
+	}
+	for _, k := range keys {
+		m, _ := v.(map[string]any)
+		v = m[k]
+	}
+	return v
+}
+
+// openclawEntrySwitchedOff reports whether deja's entry under the block is
+// there with enabled: false — what openclaw's own disable commands write.
+func openclawEntrySwitchedOff(block, id string) bool {
+	entry, _ := openclawConfigAt(append(strings.Split(block, "."), id)...).(map[string]any)
+	return entry != nil && entry["enabled"] == false
+}
+
+// openclawHooksSwitchOff reports whether the reader has internal hooks off.
+func openclawHooksSwitchOff() bool {
+	keys := strings.Split(openclawHookEntries, ".")
+	return openclawConfigAt(append(keys[:len(keys)-1:len(keys)-1], openclawHookSwitch)...) == false
 }
 
 // setOpenClawHookEnabled flips hooks.internal.enabled and our entry. Without
@@ -178,6 +225,14 @@ func hookSwitchKeys() (deja, on, off string) {
 // noteHookSwitch records what was under the switch before deja wrote to it.
 func noteHookSwitch(path string, was any) {
 	deja, on, off := hookSwitchKeys()
+	// A false is the reader's whenever it is read: deja only writes true. One
+	// set after the first install replaces what that install recorded, or the
+	// uninstall turned their hooks back on (#4472).
+	if v, ok := was.(bool); ok && !v {
+		forgetHookSwitch(path)
+		noteBlockAdded(path, off)
+		return
+	}
 	// Once. A second install reads the switch deja itself set on the first, so
 	// recording again would say the reader had it on and hand it back that way
 	// — which is #2830 again, by way of an upgrade.
