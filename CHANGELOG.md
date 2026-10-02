@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A VS Code Copilot Chat session on a UNC share workspace preserves the host name in both resume guidance (`code \\server\share\proj`) and project URI extraction instead of stripping it to a bare path (#4462).
 - A project folder whose path has a `_`, `.` or space in it resolves back to its directory, so a Qwen Code session that recorded no cwd resumes there and the project keeps its real name. The same goes for every agent whose sessions are filed under such a folder name (Claude Code without a cwd, Cursor CLI, pi, omp and others): `my_org/app` is no longer indexed as `org/app`. The index rebuilds once (#4402).
 - Resuming a recent session reads the session-start digest from the cache instead of rebuilding it, and keeps doing so after the cache refreshes; a resume took 24-41 ms against 0.1-0.2 ms for a new session (#4224).
 - `deja install codex-auto` that drops a second copy of deja's hook moves the Codex trust pins of your hooks after it along with them, so your hook keeps its approval instead of picking up the dropped copy's pin (#4227).

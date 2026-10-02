@@ -595,10 +595,13 @@ func CopilotChatWorkspaceDir(sessionPath string) string {
 	for _, k := range []string{"folder", "workspace"} {
 		s, _ := m[k].(string)
 		u, err := url.Parse(s)
-		if err != nil || u.Scheme != "file" || u.Path == "" {
+		if err != nil || u.Scheme != "file" || (u.Path == "" && u.Host == "") {
 			continue
 		}
 		p := u.Path
+		if u.Scheme == "file" && u.Host != "" {
+			p = "//" + u.Host + u.Path
+		}
 		if runtime.GOOS == "windows" && len(p) >= 3 && p[0] == '/' && p[2] == ':' {
 			p = p[1:]
 		}
@@ -617,6 +620,9 @@ func copilotChatProjectFromURI(uri string) string {
 	}
 	p := u.Path
 	if u.Scheme == "file" {
+		if u.Host != "" {
+			p = "//" + u.Host + u.Path
+		}
 		if runtime.GOOS == "windows" && len(p) >= 3 && p[0] == '/' && p[2] == ':' {
 			p = p[1:]
 		}

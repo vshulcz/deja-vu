@@ -48,3 +48,24 @@ func TestResumeCopilotChatNamesTheFolderToOpen(t *testing.T) {
 		t.Fatalf("an empty-window chat got %v", err)
 	}
 }
+
+func TestResumeCopilotChatUNCWorkspace(t *testing.T) {
+	root := t.TempDir()
+	ws := filepath.Join(root, "workspaceStorage", "unc-hash")
+	if err := os.MkdirAll(filepath.Join(ws, "chatSessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "workspace.json"), []byte(`{"folder":"file://server/share/proj"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := model.Session{
+		Harness: "copilot-chat",
+		ID:      "11111111-2222-3333-4444-555555555555",
+		Path:    filepath.Join(ws, "chatSessions", "11111111-2222-3333-4444-555555555555.json"),
+	}
+	_, _, err := resumeCommand(s)
+	wantDir := filepath.FromSlash("//server/share/proj")
+	if err == nil || !strings.Contains(err.Error(), shellQuoteIfNeeded(wantDir)) {
+		t.Fatalf("resume does not name UNC folder %s: %v", wantDir, err)
+	}
+}

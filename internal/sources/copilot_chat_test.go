@@ -507,3 +507,25 @@ func TestCopilotChatPushPastTheEndPadsLikeVSCode(t *testing.T) {
 		t.Fatalf("pushed request not at index 2: %#v", reqs[2])
 	}
 }
+
+func TestCopilotChatWorkspaceDirUNC(t *testing.T) {
+	root := t.TempDir()
+	ws := filepath.Join(root, "workspaceStorage", "unc-ws")
+	if err := os.MkdirAll(filepath.Join(ws, "chatSessions"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(ws, "workspace.json"), []byte(`{"folder":"file://server/share/proj"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sessPath := filepath.Join(ws, "chatSessions", "s1.json")
+	got := CopilotChatWorkspaceDir(sessPath)
+	want := filepath.FromSlash("//server/share/proj")
+	if got != want {
+		t.Fatalf("CopilotChatWorkspaceDir = %q, want %q", got, want)
+	}
+
+	gotProject := copilotChatProjectFromURI("file://server/share/proj")
+	if gotProject != "proj" {
+		t.Fatalf("copilotChatProjectFromURI = %q, want %q", gotProject, "proj")
+	}
+}
