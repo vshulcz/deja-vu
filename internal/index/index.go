@@ -447,9 +447,10 @@ import (
 // calls into command, files and edit records and their results as tool
 // output (#4424).
 //
-// 60 also: a rooted DeepSeek TUI or Codex tool path from the other OS's
-// convention is no longer joined onto the session's cwd, and a Roo path with
-// one leading `\` stays as written (#4438).
+// 60 also: a rooted DeepSeek TUI, Codex or pi-family tool path from the other
+// OS's convention is no longer joined onto the session's cwd, a relative one
+// under a slash-rooted cwd keeps slashes on Windows, and a Roo path with one
+// leading `\` stays as written (#4438).
 //
 // 60 also: a line written while a pass ran is held once, where the pass read
 // it and the next read it again (#4442); copies already held go on a rebuild.

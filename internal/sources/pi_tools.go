@@ -2,7 +2,6 @@ package sources
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -80,12 +79,9 @@ func (r *piReader) finish() {
 // abs resolves a path the agent gave relative to the session's directory, the
 // way the files of every other harness are recorded.
 func (r *piReader) abs(p string) string {
-	// A leading slash is absolute however the machine reading it spells
-	// paths: the session may have been written on another one.
-	if p == "" || r.cwd == "" || filepath.IsAbs(p) || strings.HasPrefix(p, "/") {
-		return p
-	}
-	return filepath.Join(r.cwd, p)
+	// The session may have been written on another machine, so both the path
+	// and the cwd are read in either convention, not the host's (#4438).
+	return resolveToolPath(p, r.cwd)
 }
 
 // toolCalls records the calls in one assistant message through the shared

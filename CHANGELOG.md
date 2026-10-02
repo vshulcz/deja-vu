@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- On Windows, a DeepSeek TUI or Codex tool path such as `/tmp/proj/retry.go` is kept as written instead of being joined onto the session's directory as `\tmp\proj\tmp\proj\retry.go`, and `deja doctor` keeps the drive of a `file://C:/…` dsh plugin it reports missing (#4438).
+- On Windows, a DeepSeek TUI or Codex tool path such as `/tmp/proj/retry.go` is kept as written instead of being joined onto the session's directory as `\tmp\proj\tmp\proj\retry.go`, a pi, Senpi or omp file relative to `/tmp/proj` is recorded as `/tmp/proj/retry.go` rather than `\tmp\proj\retry.go`, and `deja doctor` keeps the drive of a `file://C:/…` dsh plugin it reports missing (#4438).
 - `deja resume` on a Roo CLI task whose workspace has a space or a Windows 8.3 `~` in its path quotes the workspace after `-w` instead of leaving `-w` off, which sent the CLI to the wrong store; `--exec` passes the quoted path as one argument (#4455).
 - `deja search` stops offering `deja how` for a command that no indexed session runs twice any more. An update that left the recurring-command table empty kept the old one until a rebuild (#4441).
 - A transcript line written while `deja index` ran is indexed once. The pass read on to the end of the file, past the size it recorded, and the next pass read the same lines again (#4442).

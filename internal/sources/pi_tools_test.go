@@ -191,3 +191,23 @@ func TestPiResumesPastACleanCommandResult(t *testing.T) {
 		})
 	}
 }
+
+// A pi-family session read on the other OS keeps its paths in the convention
+// it was written in. filepath.Join put a relative path under /work/app as
+// \work\app\retry.cfg on Windows, and joined a drive-letter path onto the cwd
+// everywhere else (#4438).
+func TestPiPathsResolveTheSameOnEveryHost(t *testing.T) {
+	for _, c := range []struct{ p, cwd, want string }{
+		{"retry.cfg", "/work/app", "/work/app/retry.cfg"},
+		{"./sub/retry.cfg", "/work/app", "/work/app/sub/retry.cfg"},
+		{"/work/app/retry.cfg", "/work/app", "/work/app/retry.cfg"},
+		{`C:\app\retry.cfg`, "/work/app", `C:\app\retry.cfg`},
+		{`\app\retry.cfg`, "/work/app", `\app\retry.cfg`},
+		{"retry.cfg", "", "retry.cfg"},
+	} {
+		r := &piReader{cwd: c.cwd}
+		if got := r.abs(c.p); got != c.want {
+			t.Errorf("abs(%q) under %q = %q, want %q", c.p, c.cwd, got, c.want)
+		}
+	}
+}
