@@ -11,8 +11,13 @@ import (
 // gajae-code (`gjc`) is another pi descendant: a `session` header carrying the
 // id and the cwd, then one `message` line per turn, so parsePiShaped reads it.
 //
-//	~/.gjc/agent/sessions/<project-slug>/<session>.jsonl          the session
-//	~/.gjc/agent/sessions/<project-slug>/<session>/N-*.jsonl      its sub-agents
+//	~/.gjc/agent/sessions/<project>/<session>.jsonl          the session
+//	~/.gjc/agent/sessions/<project>/<session>/N-*.jsonl      its sub-agents
+//
+// <project> is `v2-<identity digest>` from gjc 0.18 on, with a
+// `.gjc-managed-session-scope.v2.json` beside the sessions naming the
+// directory; earlier builds used a slug of the path. The reader takes the
+// project from the header's cwd, so either layout files the same.
 //
 // The second layout is a pass run by a sub-agent, one file per pass. Those are
 // skipped the way Claude Code's and Cursor's are: a sub-agent's transcript
@@ -59,6 +64,21 @@ func gjcSubagentPath(p string) bool {
 		return false
 	}
 	return len(strings.Split(filepath.ToSlash(rel), "/")) > 2
+}
+
+// GjcSubagentPath is gjcSubagentPath for doctor, which names the passes as a
+// skip rather than as files it could not read (#4393).
+func GjcSubagentPath(p string) bool {
+	return strings.HasSuffix(p, ".jsonl") && gjcSubagentPath(p)
+}
+
+// GjcScopeFiles lists the scope file gjc 0.18 keeps in each project directory.
+// It is gjc's bookkeeping, not a conversation, and is listed so doctor can
+// leave it out of the files it reports as unread (#4393).
+func GjcScopeFiles() []string {
+	return walkFiles(GjcRoot(), func(p string) bool {
+		return strings.HasPrefix(filepath.Base(p), ".gjc-managed-session-scope")
+	})
 }
 
 // GjcUnderRoot lets the registry claim a path for incremental ingest.

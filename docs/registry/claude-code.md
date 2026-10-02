@@ -8,8 +8,8 @@ A subagent's transcript is not a copy of its parent. The parent keeps the launch
 the `agentId` and a summary of what came back; the child's own turns and tool
 stream exist only in the sidechain file, where every line carries
 `isSidechain: true`, the parent's `sessionId`, its own `agentId` and an
-`attributionAgent` naming which agent ran. Reading only the task and the answer
-by default is about index size — the reasoning and tool stream in between are
+`attributionAgent` naming which agent ran. Reading only the task, the answer and
+the files it changed by default is about index size — the reasoning and tool stream in between are
 where the volume is (#3009) — not about the work being there twice. deja indexes
 each sidechain as its own session keyed by `agentId`, with the parent recorded as its
 `parent` (#1384). Keying on `sessionId`, which the child repeats, folded the two
@@ -34,6 +34,6 @@ Message records have `type`, `sessionId`, `timestamp`, and a `message` object. `
 - JSONL can end in a partial line while Claude is writing. Malformed lines are skipped; a later indexing pass reads the completed tail.
 - Tool and control records use other `type` values and do not become messages.
 - Project path encoding is ambiguous because `-` represents both a separator and a hyphen. deja checks the local filesystem before using a two-segment fallback.
-- Subagent logs are read as task and answer by default; the full child transcript is opt-in.
+- Subagent logs are read as task, answer and the files they changed by default; the full child transcript is opt-in.
 
 **Last verified:** 2026-09-10

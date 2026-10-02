@@ -41,21 +41,35 @@
 <li><strong>ID</strong>: <code>commandcode</code></li>
 <li><strong>Store</strong>: <code>~/.commandcode/projects/&lt;encoded-cwd&gt;/&lt;session&gt;.jsonl</code></li>
 <li><strong>Read override</strong>: <code>DEJA_COMMANDCODE_ROOT</code> replaces the project root</li>
-<li><strong>Format</strong>: flat JSONL — one message per line</li>
+<li><strong>Format</strong>: JSONL — a <code>session</code> header, then one <code>message</code> envelope per line</li>
 <li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: <code>cmd --resume &lt;id&gt;</code> (<code>cmdc</code> on Windows), run in the header&#39;s <code>cwd</code>, since it finds a session only under the current directory&#39;s project (#4372). With that directory gone, or none recorded, <code>cmd --session &lt;id&gt;</code>, which searches every project and continues the same transcript where you run it (checked against 1.73.4, #4460)</li>
 </ul>
-<p>Command Code writes a Claude-Code-style project directory with a plain</p>
-<p>transcript in it: each line is one message, carrying <code>role</code>, <code>content</code>,</p>
-<p><code>timestamp</code> and <code>sessionId</code>, with no envelope around it. <code>content</code> is either a</p>
-<p>string or the block array Claude&#39;s format uses, and both are read.</p>
-<p><strong>Last verified:</strong> 2026-09-16</p>
+<p>Command Code writes a Claude-Code-style project directory with one transcript</p>
+<p>per session. Since 1.73 (format version 3) the first line is a header,</p>
+<p><code>{&#34;type&#34;:&#34;session&#34;,&#34;version&#34;:3,&#34;id&#34;,&#34;timestamp&#34;,&#34;cwd&#34;}</code>, and every line after</p>
+<p>it is <code>{&#34;type&#34;:&#34;message&#34;,&#34;timestamp&#34;,…,&#34;message&#34;:{&#34;role&#34;,&#34;content&#34;}}</code>, the</p>
+<p>content in Claude&#39;s blocks (<code>text</code>, <code>tool_use</code>, <code>tool_result</code>). The project is</p>
+<p>the header&#39;s <code>cwd</code>; the directory name is a lossy slug of it.</p>
+<p>Tool calls use Command Code&#39;s own names with Claude&#39;s input keys:</p>
+<p><code>shell_command</code> (<code>command</code>), <code>read_file</code>, <code>edit_file</code> (<code>file_path</code>,</p>
+<p><code>old_string</code>, <code>new_string</code>), <code>write_file</code> (<code>file_path</code>, <code>content</code>) and</p>
+<p><code>read_multiple_files</code> (<code>paths</code>). All of them are indexed as commands, files,</p>
+<p>replaced spans and written lines (#4370).</p>
+<p>The older shape, one flat <code>role</code>/<code>content</code>/<code>timestamp</code>/<code>sessionId</code> line per</p>
+<p>message, is still read. The client migrates such a file to v3 in place the</p>
+<p>next time it opens the session and keeps the old copy as <code>&lt;session&gt;.v2.bak</code>.</p>
+<p><strong>Last verified:</strong> 2026-10-01 (command-code 1.73.4)</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>A sibling with the same extension.</strong> <code>&lt;session&gt;.checkpoints.jsonl</code> sits</li>
 </ul>
 <p>beside the transcript and is a snapshot stream, not a conversation — read as</p>
 <p>one it adds a session with no words in it that then competes for a recall</p>
-<p>slot. It is skipped by name, and a test pins that.</p>
+<p>slot. It is skipped by name, and a test pins that. So are</p>
+<p><code>&lt;session&gt;.prompts.jsonl</code> and <code>&lt;session&gt;.v2.bak</code>, which is the client&#39;s own</p>
+<p>transcript filter, and <code>doctor</code> counts them and the <code>&lt;session&gt;.meta.json</code></p>
+<p>sidecar as files beside the transcripts rather than as unread.</p>
 <ul>
 <li>A line whose role is neither <code>user</code> nor <code>assistant</code> is tool output, which is</li>
 </ul>
@@ -83,13 +97,11 @@
 <p><code>PreToolUse</code>, <code>PostToolUse</code> and <code>Stop</code>, so the digest rides SessionStart and</p>
 <p>the rest is the tool-time pair.</p>
 <ul>
-<li><strong>None of this is verified on the machine deja was written on.</strong> The CLI is</li>
+<li>The transcript format above was read off files command-code 1.73.4 wrote</li>
 </ul>
-<p>closed, and every path above comes from two independent integrations that</p>
-<p>both cite the vendor&#39;s docs: rulesync&#39;s <code>commandcode-paths.ts</code> and</p>
-<p><code>types/hooks.ts</code>, and akitaonrails/ai-memory&#39;s support matrix, which reports</p>
-<p>the same MCP file and says its SessionStart injects. If a live install</p>
-<p>disagrees, this entry is where to correct it.</p>
+<p>and its bundle (<code>toStoredEntry</code>, <code>parseV3Lines</code>, <code>migrateToV3</code>). The wiring</p>
+<p>paths come from rulesync&#39;s <code>commandcode-paths.ts</code> and <code>types/hooks.ts</code>, and</p>
+<p>akitaonrails/ai-memory&#39;s support matrix.</p>
 
 <hr>
 <p>deja reads this format and thirty-four others, and turns what it finds into memory your

@@ -112,20 +112,23 @@ func TestCompletionListsEveryInstallTarget(t *testing.T) {
 // install untrusted — on the machine this was written on, doctor said untrusted
 // while codex was demonstrably delivering deja's recall to the model.
 func TestCodexHookTrustSectionStopsAtTheNextTable(t *testing.T) {
+	hooks := map[string]any{"SessionStart": []any{map[string]any{"hooks": []any{
+		map[string]any{"type": "command", "command": "/usr/local/bin/deja hook-context"},
+	}}}}
 	cfg := `[hooks.state."/h/hooks.json:session_start:0:0"]
 trusted_hash = "sha256:abc"
 
 [projects."/some/other"]
 enabled = false
 `
-	got := codexHookTrustSection(cfg)
+	got := codexDejaPins(cfg, "/h/hooks.json", hooks)["SessionStart"]
 	if !strings.Contains(got, "trusted_hash") {
 		t.Fatalf("the hook's own pin is missing from its section: %q", got)
 	}
 	if strings.Contains(got, "enabled = false") {
 		t.Errorf("the section ran on into an unrelated table, whose enabled flag would decide our status: %q", got)
 	}
-	if codexHookTrustSection("[projects.\"/x\"]\nenabled = true\n") != "" {
+	if codexDejaPins("[projects.\"/x\"]\nenabled = true\n", "/h/hooks.json", hooks)["SessionStart"] != "" {
 		t.Error("a config that never mentions the hook reported a section for it")
 	}
 }

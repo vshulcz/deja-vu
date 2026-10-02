@@ -188,9 +188,12 @@ func (st reasonixState) ours() (index int, current bool) {
 		_ = json.Unmarshal(raw, &got)
 		// The paths as Reasonix may spell them: root with forward slashes
 		// (pluginpkg.RelativeRoot), source however the command line gave it.
+		// Enabled is the reader's: `reasonix plugin disable deja` turns it
+		// off, and an install that counted that as stale wrote it back on
+		// (#4472).
 		same := got.Name == want.Name && rxSamePath(got.Source, want.Source) &&
 			filepath.ToSlash(got.Root) == want.Root && got.Version == want.Version &&
-			got.Description == want.Description && got.ManifestKind == want.ManifestKind && got.Enabled
+			got.Description == want.Description && got.ManifestKind == want.ManifestKind
 		return i, same
 	}
 	return -1, false
@@ -333,15 +336,23 @@ func installReasonix(exe string, uninstall, auto bool) (installResult, error) {
 	if i, _ := st.ours(); i >= 0 && !reasonixRecordIsOurs(st.Plugins[i], isRealDir(reasonixInstalledRoot())) {
 		return installResult{}, fmt.Errorf("%s records a Reasonix plugin named %q that deja did not install — left as it was", statePath, reasonixPluginName)
 	}
+	off := st.off()
 	if _, current := st.ours(); current && reasonixInstalledMatches(files) {
-		return reasonixResult("unchanged", auto), nil
+		return reasonixKeptOff(reasonixResult("unchanged", auto), off), nil
 	}
 	had := fileExists(manifest)
 	if cli := reasonixCLI(); cli != "" {
 		if err := installReasonixViaCLI(cli, src); err != nil {
 			return installResult{}, err
 		}
-	} else if err := installReasonixByHand(files, st); err != nil {
+		// Reasonix's own installer records the plugin enabled; the switch
+		// the reader had goes back on top of it.
+		if off {
+			if err := reasonixSwitchOff(); err != nil {
+				return installResult{}, err
+			}
+		}
+	} else if err := installReasonixByHand(files, st, off); err != nil {
 		return installResult{}, err
 	}
 	if !reasonixInstalledMatches(files) {
@@ -351,7 +362,52 @@ func installReasonix(exe string, uninstall, auto bool) (installResult, error) {
 	if had {
 		action = "updated"
 	}
-	return reasonixResult(action, auto), nil
+	return reasonixKeptOff(reasonixResult(action, auto), off), nil
+}
+
+// off reports whether deja's record is there and switched off.
+func (st reasonixState) off() bool {
+	i, _ := st.ours()
+	if i < 0 {
+		return false
+	}
+	var got reasonixEntry
+	return json.Unmarshal(st.Plugins[i], &got) == nil && !got.Enabled
+}
+
+// reasonixKeptOff says so when install left the plugin the way the reader
+// switched it.
+func reasonixKeptOff(r installResult, off bool) installResult {
+	if off {
+		r.Note = "left deja's plugin switched off, the way it was — `reasonix plugin enable deja` turns it back on; " + r.Note
+	}
+	return r
+}
+
+// reasonixSwitchOff writes deja's record back as disabled.
+func reasonixSwitchOff() error {
+	path := reasonixStatePath()
+	st, old, err := readReasonixState(path)
+	if err != nil {
+		return err
+	}
+	i, _ := st.ours()
+	if i < 0 {
+		return nil
+	}
+	// Through the struct, which marshals in Reasonix's own field order.
+	var rec reasonixEntry
+	if err := json.Unmarshal(st.Plugins[i], &rec); err != nil {
+		return err
+	}
+	rec.Enabled = false
+	b, err := json.Marshal(rec)
+	if err != nil {
+		return err
+	}
+	st.Plugins[i] = b
+	_, err = writeIfChanged(path, old, st.marshal())
+	return err
 }
 
 // reasonixResult names the package directory whole, the state file that
@@ -429,11 +485,13 @@ func installReasonixViaCLI(cli, src string) error {
 
 // installReasonixByHand writes what `reasonix plugin install` writes: the
 // package copied under plugins/deja and deja's record in the state file.
-func installReasonixByHand(files map[string][]byte, st reasonixState) error {
+func installReasonixByHand(files map[string][]byte, st reasonixState, off bool) error {
 	if err := writePackageTree(reasonixInstalledRoot(), files); err != nil {
 		return err
 	}
-	entry, _ := json.Marshal(wantReasonixEntry())
+	want := wantReasonixEntry()
+	want.Enabled = !off
+	entry, _ := json.Marshal(want)
 	if i, _ := st.ours(); i >= 0 {
 		st.Plugins[i] = entry
 	} else {

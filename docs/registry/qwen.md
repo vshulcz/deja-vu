@@ -22,15 +22,19 @@ The work sits in the same `parts` list as `functionCall` and `functionResponse`.
 
 - **MCP**: `deja install qwen` adds `mcpServers.deja` to `~/.qwen/settings.json`.
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. Qwen lists skills under `/skills`, so the skill is also the command.
-- **Auto-recall**: `deja install qwen-auto` adds hooks to the same `settings.json`: `SessionStart` (digest), `UserPromptSubmit` (per-prompt recall), `PostToolUseFailure` on `run_shell_command` (the earlier fix for a failed command) and `PreCompact`.
+- **Auto-recall**: `deja install qwen-auto` adds hooks to the same `settings.json`: `SessionStart` (digest), `UserPromptSubmit` (per-prompt recall), `PostToolUseFailure` on `run_shell_command` (the earlier fix for a failed command), `PreCompact` and `SessionEnd` (the session you quit is back in the next one's MCP recall).
 
 ## Resume
 
 `qwen -r <id>` reopens a session by id, and the id is the chat file's name —
 the same one deja indexes. The command has to run in the project directory:
 `qwen sessions list` shows only the current project's sessions, so from
-anywhere else the id resolves to nothing. deja recovers that directory from the
-encoded path and prints `cd <project> && qwen -r <id>`.
+anywhere else the id resolves to nothing. deja takes that directory from the
+`cwd` the transcript records, or from the encoded folder name for a transcript
+that records none, and prints `cd <project> && qwen -r <id>`. When the recorded
+directory is gone, or deja cannot tell which directory the session ran in,
+resume refuses and points at `deja show <id>`: the bare command would only get
+"No saved session found".
 
 ## Known quirks and drift
 

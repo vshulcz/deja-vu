@@ -41,8 +41,10 @@
 <li><strong>ID</strong>: <code>cherrystudio</code></li>
 <li><strong>Store</strong>: <code>&lt;app data&gt;/CherryStudio/Data/Agents/.claude/&lt;projects&gt;/&lt;workspace&gt;/&lt;session&gt;.jsonl</code> — <code>~/Library/Application Support/CherryStudio</code> on macOS, <code>%APPDATA%\CherryStudio</code> on Windows, <code>$XDG_CONFIG_HOME/CherryStudio</code> elsewhere</li>
 <li><strong>Store (before the upgrade that added <code>Data/Agents</code>)</strong>: <code>&lt;app data&gt;/CherryStudio/.claude/&lt;projects&gt;/…</code>, read so a store that predates it is not lost</li>
-<li><strong>Read override</strong>: <code>DEJA_CHERRYSTUDIO_ROOTS</code> replaces the root list</li>
-<li><strong>Format</strong>: Claude Code&#39;s own transcript JSONL</li>
+<li><strong>Stores of the other agent runtimes</strong>: <code>&lt;app data&gt;/CherryStudio/Data/Agents/.pi/sessions/&lt;ts&gt;_&lt;id&gt;.jsonl</code> (pi) and <code>&lt;app data&gt;/CherryStudio/Data/Agents/.dsh/sessions/&lt;workspace&gt;/session-&lt;id&gt;/</code> (dsh, <code>DSH_HOME</code> set to <code>Data/Agents/.dsh</code>), read by the stock pi and dsh parsers and filed under <code>cherrystudio</code> (#4342)</li>
+<li><strong>Moved data dir</strong>: every directory in <code>app.user_data_path</code> of <code>~/.cherrystudio/boot-config.json</code>, where the app records a move made in its settings, is read the same way as the default (#4347)</li>
+<li><strong>Read override</strong>: <code>DEJA_CHERRYSTUDIO_ROOTS</code> replaces the root list, the pi and dsh stores included</li>
+<li><strong>Format</strong>: Claude Code&#39;s own transcript JSONL; pi and dsh logs for those runtimes</li>
 <li><strong>Needs</strong>: nothing</li>
 </ul>
 <p>Cherry Studio runs Claude Code sessions from a desktop app and writes ordinary</p>

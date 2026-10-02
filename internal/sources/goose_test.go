@@ -39,7 +39,7 @@ func TestParseGooseFile(t *testing.T) {
 		t.Fatalf("sessions = %d, want 1", len(ss))
 	}
 	s := ss[0]
-	if s.Harness != "goose" || s.ID != "20250724_1" || s.Project != "demo" || s.Title != "demo session" {
+	if s.Harness != "goose" || s.ID != "20250724_1" || s.Project != "workspace/demo" || s.Title != "demo session" {
 		t.Fatalf("session = %#v", s)
 	}
 	if len(s.Messages) != 2 || s.Messages[0].Role != "user" || s.Messages[1].Text != "Hello from Goose!" {

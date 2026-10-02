@@ -159,8 +159,12 @@ func TestReasonixExtMapsFileToolsToTheirPaths(t *testing.T) {
 	if tool != "Edit" || in["file_path"] != filepath.Join("/work", "internal/a.go") {
 		t.Errorf("edit_file = %s %v, want Edit with the path resolved against the workspace", tool, in)
 	}
-	if tool, _ := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "" {
-		t.Errorf("read_file mapped to %q; the pre-tool line is for changes, not reads", tool)
+	// tool.after holds an edit that is already made, and Reasonix refuses an
+	// edit on a file the session has not read, so read_file is the step where
+	// the file's history can still change what gets written (#4410). It maps
+	// to the lowercase `read` pi and omp send for the same reason.
+	if tool, in := rxHookToolInput("read_file", `{"path":"a.go"}`, "/work"); tool != "read" || in["file_path"] != filepath.Join("/work", "a.go") {
+		t.Errorf("read_file = %s %v, want read with the path resolved against the workspace", tool, in)
 	}
 }
 

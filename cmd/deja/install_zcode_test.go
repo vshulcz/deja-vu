@@ -17,7 +17,7 @@ func TestInstallZCodeWritesTheServerAndTheHooks(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	path := filepath.Join(home, ".zcode", "cli", "config.json")
+	path := filepath.Join(home, ".zcode", "cli", "setting.json")
 
 	// Something of the user's is already in the file: it has to survive both
 	// halves of the install.
@@ -164,9 +164,9 @@ type zcodeConfig struct {
 	} `json:"hooks"`
 }
 
-// readZCodeConfig reads the file back the way ZCode does, with the events
-// wherever they are: deja writes them at the top of `hooks` on a fresh file and
-// under `hooks.events` when something already put them there.
+// readZCodeConfig reads the file back with the events wherever they are. The
+// runtime reads `hooks.events` only, and deja writes there (#4429); an install
+// from before that put them at the top of `hooks`.
 func readZCodeConfig(t *testing.T, path string) zcodeConfig {
 	t.Helper()
 	b, err := os.ReadFile(path)

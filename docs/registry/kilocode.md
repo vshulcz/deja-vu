@@ -47,7 +47,9 @@ The extension id is `kilocode.kilo-code`, confirmed from
 Task JSON: one document per task, an array of `{role, content}` turns in Cline's
 shape, with the user's first turn wrapped in `<task>…</task>`. `history_item.json`
 supplies the id, the millisecond timestamp and the workspace, which is what names
-the project; without it the task's directory mtime is the base time.
+the project; without it the task's directory mtime is the base time. A
+`history_item.json` written or changed after the transcript re-reads the task
+(#4446).
 
 SQLite: `session` joined to `message` and `part`, exactly as OpenCode writes it —
 see [OpenCode](opencode.md) for the field-by-field description.

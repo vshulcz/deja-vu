@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"math"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -58,11 +60,48 @@ func PrimeRoot() string {
 	return filepath.Join(PrimeConfigDir(), "sessions")
 }
 
-// PrimeSessionFiles lists transcript files under the prime-agent session root.
+// PrimeArtifactsRoot is where prime-agent keeps a session's artifacts, beside
+// the session root. rlm.spawn writes each child's transcript there, as
+// session-artifacts/<parent-id>/sub-<n>/<child-id>.jsonl (#4407).
+func PrimeArtifactsRoot() string {
+	return filepath.Join(filepath.Dir(PrimeRoot()), "session-artifacts")
+}
+
+// PrimeRoots are the directories prime-agent transcripts live under.
+func PrimeRoots() []string { return []string{PrimeRoot(), PrimeArtifactsRoot()} }
+
+// PrimeSessionFiles lists transcript files under the prime-agent session root
+// and the spawned children's transcripts under the artifacts root, unless
+// DEJA_INCLUDE_SUBAGENTS=0 leaves children out.
 func PrimeSessionFiles() []string {
-	return walkFiles(PrimeRoot(), func(p string) bool {
+	files := walkFiles(PrimeRoot(), func(p string) bool {
 		return strings.HasSuffix(p, ".jsonl")
 	})
+	if os.Getenv("DEJA_INCLUDE_SUBAGENTS") == "0" {
+		return files
+	}
+	return append(files, walkFiles(PrimeArtifactsRoot(), isPrimeChildTranscript)...)
+}
+
+// isPrimeChildTranscript is a child's transcript under the artifacts root: a
+// .jsonl in a sub-<n> directory. semantic-edges.jsonl sits beside it and is
+// prime's own event log.
+func isPrimeChildTranscript(p string) bool {
+	return strings.HasSuffix(p, ".jsonl") && filepath.Base(p) != "semantic-edges.jsonl" &&
+		strings.HasPrefix(filepath.Base(filepath.Dir(p)), "sub-")
+}
+
+// IsPrimeChildPath reports whether p is an rlm.spawn child's transcript.
+func IsPrimeChildPath(p string) bool {
+	return strings.HasPrefix(p, PrimeArtifactsRoot()+string(filepath.Separator)) && isPrimeChildTranscript(p)
+}
+
+// isPrimeFile reports whether p is a transcript PrimeSessionFiles would list.
+func isPrimeFile(p string) bool {
+	if strings.HasPrefix(p, PrimeArtifactsRoot()+string(filepath.Separator)) {
+		return isPrimeChildTranscript(p) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "0"
+	}
+	return strings.HasSuffix(p, ".jsonl") && strings.HasPrefix(p, PrimeRoot())
 }
 
 // LoadPrime loads all prime-agent sessions.
@@ -79,7 +118,29 @@ func ParsePrimeFileFromOffset(path string, offset int64) ([]model.Session, error
 }
 
 func parsePrimeFileFromOffset(path string, offset int64) ([]model.Session, error) {
-	return parsePiShaped(path, offset, "prime", primeProject(path), true)
+	ss, err := parsePiShaped(path, offset, "prime", primeProject(path), true)
+	// A spawned child comes in the way a Claude Code subagent does: the task,
+	// what it changed and how it ended, unless the reader asked for the whole
+	// run. Whole, its reading competed with the parent for recall (#3009,
+	// #4407).
+	if IsPrimeChildPath(path) && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
+		for i := range ss {
+			ss[i].Messages = KeepSubagentTail(ss[i].Messages)
+		}
+	}
+	return ss, err
+}
+
+// PrimeSessionDir is the cwd a prime-agent session's header records, for the
+// cd in front of `prime-agent --resume`: prime resumes a session only from the
+// project it ran in (#4408).
+func PrimeSessionDir(path string) string {
+	if path == "" {
+		return ""
+	}
+	header := leadingJSONLHeader(path, math.MaxInt64, headerLookahead, isPiHeader)
+	cwd, _ := header["cwd"].(string)
+	return cwd
 }
 
 // primeProject is the fallback name when the header carries no cwd: the

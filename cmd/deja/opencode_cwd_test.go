@@ -23,9 +23,9 @@ func TestOpencodePluginRunsInTheProjectDirectory(t *testing.T) {
 	if !strings.Contains(compact, "constcwd=ctx.location?.directory||process.cwd()") {
 		t.Error("no fallback for a host that hands over no directory")
 	}
-	// The two calls that carry a payload say where they are inside it; the
-	// bare one is run from there.
-	if !strings.Contains(compact, `runHook("hook-context",undefined,cwd)`) {
+	// Every call says where it is inside its payload, and hook-context is
+	// also run from there.
+	if !strings.Contains(compact, `runHook("hook-context",JSON.stringify({session_id:event.sessionID||"",cwd}),cwd)`) {
 		t.Error("hook-context does not run in the project")
 	}
 	if !strings.Contains(compact, `session_id:event.sessionID||"",cwd}`) {

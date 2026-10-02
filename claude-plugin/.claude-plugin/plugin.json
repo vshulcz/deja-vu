@@ -83,6 +83,17 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/deja.sh hook-session-end",
+            "statusMessage": "Marking this session as ended…"
+          }
+        ]
+      }
     ]
   },
   "mcpServers": {

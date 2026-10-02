@@ -57,7 +57,7 @@ func TestReadCompactionTranscriptClaudeRecognizesFileHistoryPreamble(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Harness != "claude" || got.Workspace != "/work/widget" || got.Session.Project != "widget" {
+	if got.Harness != "claude" || got.Workspace != "/work/widget" || got.Session.Project != "work/widget" {
 		t.Fatalf("preamble attribution=%#v", got)
 	}
 	if len(got.ToolCalls) != 1 || got.ToolCalls[0].ID != "same-call" {

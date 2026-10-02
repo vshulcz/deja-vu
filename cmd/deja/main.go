@@ -243,6 +243,10 @@ var commands = map[string]command{
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
 	},
+	"hook-session-end": func(dir string, _ []string) error {
+		runHookSessionEnd(dir, os.Stdin)
+		return nil
+	},
 	"hook-plan": func(dir string, _ []string) error {
 		if sayIfTypedByHand("hook-plan") {
 			return nil
@@ -616,8 +620,21 @@ func cmdIndex(dir string, rest []string) error {
 	// the step whose whole job is filling memory returned to the prompt after
 	// a bare "indexing ..." line, and the state (no history anywhere, or a
 	// store behind a permission wall) only surfaced on the next command.
-	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 && (noAgentHistoryFound() || deniedStoreCount() > 0) {
-		fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+	// Only when the index is empty too: a pass that found no transcript left
+	// on disk still holds the sessions it keeps searchable, and the line
+	// above has just said so (#4221).
+	//
+	// A store behind a permission wall is still named when the index holds
+	// other sessions, without the "nothing to index" half: that line is the
+	// only pointer to the store this pass could not read.
+	if b := index.LastBuild; b.Sessions == 0 && b.Messages == 0 {
+		denied := deniedStoreCount()
+		switch {
+		case indexIsEmpty(dir) && (denied > 0 || noAgentHistoryFound()):
+			fmt.Fprintln(os.Stderr, emptyIndexReason(b, index.ReportEvictedFiles()))
+		case denied > 0:
+			fmt.Fprintln(os.Stderr, deniedStoresLine(denied, index.ReportEvictedFiles()))
+		}
 	}
 	if !quiet {
 		maybeFirstIndexGreeting(dir)
@@ -762,9 +779,10 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 }
 
 // clippedMessageNote says that a message in this session was stored short of
-// what the transcript holds. The count is the store's, not this session's —
-// deja records it per file at ingest — so the line names the session's own
-// file and leaves the arithmetic to `deja doctor`.
+// what the transcript holds. deja records the count per file at ingest, and a
+// store like Zed's threads.db keeps every session in one file, so the file's
+// count put the note on every session in it (#4340). The file says a clip
+// happened; the per-session split says which of its sessions holds it.
 func clippedMessageNote(dir string, s model.Session) string {
 	if s.Path == "" {
 		return ""
@@ -774,8 +792,16 @@ func clippedMessageNote(dir string, s model.Session) string {
 	if !ok || e.Clipped == 0 {
 		return ""
 	}
+	n := e.ClippedSessions[s.ID]
+	if e.ClippedSessions == nil {
+		// A store built before the split: the file's count is all there is.
+		n = e.Clipped
+	}
+	if n == 0 {
+		return ""
+	}
 	return fmt.Sprintf("deja: %s stored short of what the transcript holds — the rest of %s is in the file itself",
-		pluralMessages(e.Clipped), pluralThem(e.Clipped))
+		pluralMessages(n), pluralThem(n))
 }
 
 func pluralMessages(n int) string {
@@ -3291,7 +3317,7 @@ func printSources(dir string) {
 		{"cline", sources.ClineSessionsDir(), append([]string{sources.ClineSessionsDir()}, sources.ClineLegacyRoots()...), sources.ClineSessionFiles, sources.LoadCline},
 		{"roo", strings.Join(sources.RooRoots(), string(os.PathListSeparator)), sources.RooRoots(), sources.RooTaskFiles, sources.LoadRoo},
 		{"kilocode", strings.Join(sources.KiloRoots(), string(os.PathListSeparator)), sources.KiloRoots(), sources.KiloSessionFiles, sources.LoadKilo},
-		{"cherrystudio", strings.Join(sources.CherryStudioRoots(), string(os.PathListSeparator)), sources.CherryStudioRoots(), sources.CherryStudioSessionFiles, sources.LoadCherryStudio},
+		{"cherrystudio", strings.Join(sources.CherryStudioAllRoots(), string(os.PathListSeparator)), sources.CherryStudioAllRoots(), sources.CherryStudioSessionFiles, sources.LoadCherryStudio},
 		{"kiro", sources.KiroRoot(), []string{sources.KiroRoot()}, sources.KiroSessionFiles, sources.LoadKiro},
 		{"senpi", sources.SenpiRoot(), []string{sources.SenpiRoot()}, sources.SenpiSessionFiles, sources.LoadSenpi},
 		{"kimchi", sources.KimchiRoot(), []string{sources.KimchiRoot()}, sources.KimchiSessionFiles, sources.LoadKimchi},
@@ -3301,7 +3327,7 @@ func printSources(dir string) {
 		{"continue", filepath.Join(sources.ContinueRoot(), "sessions"), []string{filepath.Join(sources.ContinueRoot(), "sessions")}, sources.ContinueSessionFiles, sources.LoadContinue},
 		{"pi", sources.PiRoot(), []string{sources.PiRoot()}, sources.PiSessionFiles, sources.LoadPi},
 		{"omp", sources.OmpRoot(), []string{sources.OmpRoot()}, sources.OmpSessionFiles, sources.LoadOmp},
-		{"prime", sources.PrimeRoot(), []string{sources.PrimeRoot()}, sources.PrimeSessionFiles, sources.LoadPrime},
+		{"prime", sources.PrimeRoot(), sources.PrimeRoots(), sources.PrimeSessionFiles, sources.LoadPrime},
 		{"amp", sources.AmpRoot(), []string{sources.AmpRoot()}, sources.AmpThreadFiles, sources.LoadAmp},
 		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawStoreFiles, sources.LoadOpenClaw},
 		{"codewhale", sources.CodeWhaleRoot(), sources.CodeWhaleRoots(), sources.CodeWhaleSessionFiles, sources.LoadCodeWhale},
@@ -3418,6 +3444,9 @@ func printSources(dir string) {
 		note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 	}
 	note += unreadNote("aider")
+	if len(rawAiderSessions) == 0 && !skipAider {
+		note += "\tnote=" + aiderNoHistoryHint
+	}
 	if !skipAider {
 		fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	}
@@ -4056,6 +4085,7 @@ var helpHidden = map[string]bool{
 	"hook-goose-prompt": true,
 	"hook-precompact":   true,
 	"hook-refresh":      true,
+	"hook-session-end":  true,
 	"reasonix-ext":      true,
 	"warmup-status":     true,
 }
@@ -4282,6 +4312,14 @@ func idPrefixNeeded(dir, subject, refusal string) error {
 	return errors.New(refusal)
 }
 
+// indexIsEmpty reports whether the index holds no session at all. An index
+// that cannot be counted counts as empty on purpose, so the caller falls back
+// to the empty-index hint it printed before.
+func indexIsEmpty(dir string) bool {
+	n, err := index.SessionCount(dir)
+	return err != nil || n == 0
+}
+
 // emptyIndexReason opens the empty-index sentence. "Nothing to index yet" is
 // for a machine deja has never seen history from; a run that has just evicted a
 // store says what went away instead, because the line above it has already told
@@ -4292,6 +4330,18 @@ func emptyIndexReason(b index.BuildSummary, evicted int) string {
 			evicted, pluralS(evicted), pluralWhich(evicted)))
 	}
 	return emptyIndexHint("nothing to index yet")
+}
+
+// deniedStoresLine names the stores deja could not read on a pass whose index
+// still holds sessions, with the files the pass evicted when there were any.
+func deniedStoresLine(denied, evicted int) string {
+	line := fmt.Sprintf("%d store%s could not be read (permission denied); `deja doctor` names %s",
+		denied, pluralS(denied), pluralWhich(denied))
+	if evicted > 0 {
+		line = fmt.Sprintf("%d indexed file%s went away with the store that held %s — %s",
+			evicted, pluralS(evicted), pluralWhich(evicted), line)
+	}
+	return "deja: " + line
 }
 
 // emptyIndexHint phrases the nothing-here answer the same way everywhere, and
@@ -4320,15 +4370,20 @@ func emptyIndexHint(what string) string {
 }
 
 // deniedStoreCount reports how many harness stores exist but cannot be opened.
+// Opened, not parsed: the probe stops before doctor's parser (#4272).
 func deniedStoreCount() int {
 	n := 0
-	for _, check := range doctorStoreChecks() {
-		if store, _ := inspectDoctorStore(check); store.State == "denied" {
+	for _, check := range deniedStoreChecks() {
+		if store, _, _ := probeDoctorStore(check); store.State == "denied" {
 			n++
 		}
 	}
 	return n
 }
+
+// deniedStoreChecks is doctorStoreChecks, swappable so a test can count what
+// the probe parses.
+var deniedStoreChecks = doctorStoreChecks
 
 // noAgentHistoryFound reports whether the stores themselves are empty, as
 // opposed to an index that merely has not been built yet.

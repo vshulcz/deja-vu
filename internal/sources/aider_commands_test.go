@@ -72,6 +72,8 @@ func TestAiderSlashCommandKnowsWhatIsACommand(t *testing.T) {
 	for _, cmd := range []string{
 		"/undo", "/clear", "/add internal/retry/retry.go", "/run go test ./...",
 		"/drop", "/model gpt-5", "/tokens", "  /quit  ", "/GIT status",
+		// The sub-coder logs the question again as its own line (#4325).
+		"/ask why the retry cap is four", "/code add a backoff", "/context where is it",
 	} {
 		if !aiderSlashCommand(cmd) {
 			t.Errorf("%q is one of aider's commands", cmd)
@@ -80,8 +82,6 @@ func TestAiderSlashCommandKnowsWhatIsACommand(t *testing.T) {
 	for _, mine := range []string{
 		"/etc/hosts is wrong on the build box",
 		"/usr/local/bin/deja is on PATH now",
-		"/ask why the retry cap is four",
-		"/code add a backoff",
 		"/",
 		"why does /undo not work here",
 		"",

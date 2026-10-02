@@ -45,10 +45,12 @@
 </ul>
 <p>Tool calls are <code>tool.call</code> events with <code>name</code> and <code>args</code>: <code>path</code> for the file tools, <code>old_string</code>/<code>new_string</code> on <code>Edit</code>, and the whole file as <code>content</code> on <code>Write</code>, which is the only record a created file&#39;s lines were ever in a session.</p>
 <p><code>state.json</code> next to each session supplies title, workDir (project) and</p>
-<p>timestamps. User turns arrive as <code>context.append_message</code>; streamed assistant</p>
+<p>timestamps, and a change to it alone re-reads the session (#4446). User turns arrive as <code>context.append_message</code>; streamed assistant</p>
 <p>turns are reconstructed from <code>step.begin</code> → <code>content.part</code> (type <code>text</code> only;</p>
 <p><code>think</code> parts are skipped) → <code>step.end</code>, with an end-of-file flush so a</p>
-<p>response that is mid-stream when indexing runs is not lost. <code>tool.result</code></p>
+<p>response that is mid-stream when indexing runs is not lost; the next pass</p>
+<p>reads the file whole when the stream goes on, so the reply is stored once</p>
+<p>(#4445). <code>tool.result</code></p>
 <p>events keep their <code>output</code> text under the <code>tool-output</code> role, error results</p>
 <p>included. Sub-agent histories under <code>agents/agent-*</code> and media are out of</p>
 <p>scope.</p>
@@ -66,7 +68,12 @@
 <p>whose output reaches the model, and it takes plain stdout, so the session</p>
 <p>digest rides the first prompt rather than a session-start hook.</p>
 <ul>
-<li><strong>Resume</strong>: <code>kimi --session &lt;sessionId&gt;</code> (verified live on 0.28.1).</li>
+<li><strong>Resume</strong>: <code>kimi --session &lt;sessionId&gt;</code>, run in the <code>workDir</code> from the</li>
+</ul>
+<p>session&#39;s <code>state.json</code>: Kimi refuses a session from any other directory</p>
+<p>(verified live on 0.28.1). A <code>workDir</code> that is gone is refused with a</p>
+<p>pointer to <code>deja show</code>.</p>
+<ul>
 <li><strong>Handoff</strong>: exec, <code>kimi -p</code>.</li>
 </ul>
 <p>Requested and specified by <a href="https://github.com/yearth">@yearth</a> in</p>

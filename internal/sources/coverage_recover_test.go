@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,12 @@ func hermeticEnv(t *testing.T) string {
 	tmp := t.TempDir()
 	t.Setenv("HOME", filepath.Join(tmp, "home"))
 	t.Setenv("USERPROFILE", filepath.Join(tmp, "home"))
+	// NotesFile and the config resolvers follow an absolute XDG_* on every
+	// platform, so an exported one sent a test's writes into the developer's
+	// own directories (#4405).
+	t.Setenv("XDG_DATA_HOME", filepath.Join(tmp, "home", ".local", "share"))
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmp, "home", ".config"))
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(tmp, "home", ".cache"))
 	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(tmp, "codex"))
 	t.Setenv("DEJA_OPENCODE_DB", filepath.Join(tmp, "opencode.db"))
@@ -28,6 +35,25 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("DEJA_INCLUDE_SUBAGENTS", "")
 	t.Setenv("DEJA_GROK_ROOT", filepath.Join(tmp, "grok"))
 	return tmp
+}
+
+// A developer who exports XDG_DATA_HOME had a test's notes written into their
+// real data directory: NotesFile prefers an absolute XDG_DATA_HOME on every
+// platform, and hermeticEnv moved only HOME (#4405).
+func TestHermeticEnvKeepsXDGDirsUnderTheTempRoot(t *testing.T) {
+	outside := t.TempDir()
+	for _, v := range []string{"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"} {
+		t.Setenv(v, filepath.Join(outside, v))
+	}
+	tmp := hermeticEnv(t)
+	if !strings.HasPrefix(NotesFile(), tmp+string(filepath.Separator)) {
+		t.Errorf("NotesFile = %s, want it under the temp root %s", NotesFile(), tmp)
+	}
+	for _, v := range []string{"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"} {
+		if got := os.Getenv(v); strings.HasPrefix(got, outside) {
+			t.Errorf("%s = %s, still the exported one", v, got)
+		}
+	}
 }
 
 // --- codex.go: CodexFiles (0%) ---
@@ -132,7 +158,7 @@ func TestParseGrokFileFallbacksAndDefaultKind(t *testing.T) {
 	if s.ID != "load-grok-session" {
 		t.Fatalf("fallback id = %q", s.ID)
 	}
-	if s.Project != "needle-project" {
+	if s.Project != "work/needle-project" {
 		t.Fatalf("fallback cwd/project = %q", s.Project)
 	}
 	// Speech plus the tool call; only the empty-text event is filtered (#1321).

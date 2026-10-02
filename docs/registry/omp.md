@@ -85,8 +85,10 @@ Messages use a wrapper envelope:
 ### Content
 
 `message.content` is an array of typed blocks. deja extracts `text` from blocks
-where `"type": "text"`. Blocks with `"type": "thinking"`, `"type": "toolCall"`,
-or `"type": "image"` are skipped.
+where `"type": "text"`. Blocks with `"type": "thinking"` or `"type": "image"`
+are skipped. `toolCall` blocks are read the way pi's are (see the pi entry):
+the file a `read`, `edit` or `write` names, the replaced and written text, and
+the `bash` command (#4113).
 
 ### Timestamps
 

@@ -282,9 +282,10 @@ func filterTombstonedSet(ss []model.Session, dead map[string]bool) []model.Sessi
 	}
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if !dead[s.Harness+":"+s.ID] {
-			out = append(out, s)
+		if dead[s.Harness+":"+s.ID] || s.FormerID != "" && dead[s.Harness+":"+s.FormerID] {
+			continue
 		}
+		out = append(out, s)
 	}
 	return out
 }

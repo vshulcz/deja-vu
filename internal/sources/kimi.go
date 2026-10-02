@@ -2,8 +2,11 @@ package sources
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -37,11 +40,24 @@ func KimiSessionFiles() []string {
 
 // KimiSidecarFiles lists the per-session state.json the reader opens itself
 // for the title and the working directory. doctor counted one per session as a
-// transcript it could not read (#3309).
+// transcript it could not read (#3309). The goal queue, upcoming-goals.json,
+// sits beside it and is Kimi's own too (#4473), as is a background task's
+// record, tasks/<task-id>.json in an agent's directory or the session's.
 func KimiSidecarFiles() []string {
 	return walkFiles(filepath.Join(KimiRoot(), "sessions"), func(p string) bool {
-		return filepath.Base(p) == "state.json"
+		base := filepath.Base(p)
+		return base == "state.json" || base == "upcoming-goals.json" ||
+			filepath.Base(filepath.Dir(p)) == "tasks" && strings.HasSuffix(base, ".json")
 	})
+}
+
+// KimiSubagentFile reports whether p is a sub-agent's log, which Kimi writes at
+// agents/<agent-id>/wire.jsonl beside agents/main. The reader leaves those out
+// by design (#248); doctor counts them as skipped rather than unread (#4473).
+func KimiSubagentFile(p string) bool {
+	dir := filepath.Dir(p)
+	return filepath.Base(p) == "wire.jsonl" && filepath.Base(dir) != "main" &&
+		filepath.Base(filepath.Dir(dir)) == "agents"
 }
 
 func LoadKimi() []model.Session { return parseFiles(KimiSessionFiles(), ParseKimiFile) }
@@ -92,6 +108,70 @@ func kimiPersonsOrigin(origin any) bool {
 	return kind == "" || kind == "user" || strings.HasPrefix(kind, "user") || trigger == "user-slash"
 }
 
+// kimiSessionState reads the state.json beside a wire.jsonl at
+// .../sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl.
+func kimiSessionState(path string) (st kimiState, ok bool) {
+	sessionDir := filepath.Dir(filepath.Dir(filepath.Dir(path)))
+	b, err := os.ReadFile(filepath.Join(sessionDir, "state.json"))
+	if err != nil || json.Unmarshal(b, &st) != nil {
+		return kimiState{}, false
+	}
+	return st, true
+}
+
+// KimiSessionDir is the directory a Kimi Code session was created in, for the
+// cd in front of `kimi --session`: Kimi refuses a session from any other
+// directory (#4274).
+func KimiSessionDir(path string) string {
+	if path == "" {
+		return ""
+	}
+	st, _ := kimiSessionState(path)
+	return st.WorkDir
+}
+
+// kimiExit is the footer kimi-code's Bash tool writes on a non-zero exit,
+// with the truncation note on the same line when the output was cut. A
+// timeout or an interrupt ends with its own message and carries no code.
+var kimiExit = regexp.MustCompile(`^Command failed with exit code: (\d+)\.`)
+
+// kimiResumes sends a wire.jsonl back for a whole read when its tail holds the
+// failed exit of a command called before it (#4443).
+var kimiResumes = resumesUnlessAnswering(`"tool.`, func(m map[string]any) ([]string, string) {
+	e, _ := m["event"].(map[string]any)
+	id, _ := e["toolCallId"].(string)
+	switch typ, _ := e["type"].(string); typ {
+	case "tool.call":
+		return []string{id}, ""
+	case "tool.result":
+		if r, _ := e["result"].(map[string]any); kimiExitCode(r) > 0 {
+			return nil, id
+		}
+	}
+	return nil, ""
+})
+
+// kimiExitCode reads the status off a Bash result: the footer on its last
+// line, ahead of the saved-output reference a truncated result carries, and
+// only on a result flagged isError, so a clean run whose output quotes the
+// footer is not taken for a failure. 0 when there is none.
+func kimiExitCode(r map[string]any) int {
+	if isErr, _ := r["isError"].(bool); !isErr {
+		return 0
+	}
+	out, _ := r["output"].(string)
+	if i := strings.LastIndex(out, "\n\n[Full output saved]\n"); i >= 0 {
+		out = out[:i]
+	}
+	out = strings.TrimRight(out, "\n")
+	m := kimiExit.FindStringSubmatch(strings.TrimSpace(out[strings.LastIndex(out, "\n")+1:]))
+	if m == nil {
+		return 0
+	}
+	code, _ := strconv.Atoi(m[1])
+	return code
+}
+
 func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	// .../sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl
 	sessionDir := filepath.Dir(filepath.Dir(filepath.Dir(path)))
@@ -100,15 +180,16 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		ID:      filepath.Base(sessionDir),
 		Path:    path,
 	}
-	var st kimiState
-	if b, err := os.ReadFile(filepath.Join(sessionDir, "state.json")); err == nil {
-		if json.Unmarshal(b, &st) == nil {
-			s.Title = strings.TrimSpace(st.Title)
-			s.Project = projectName(st.WorkDir)
-			s.Touch(parseTimeAny(st.CreatedAt))
-			s.Touch(parseTimeAny(st.UpdatedAt))
-		}
+	if st, ok := kimiSessionState(path); ok {
+		s.Title = strings.TrimSpace(st.Title)
+		s.Project = projectName(st.WorkDir)
+		s.Touch(parseTimeAny(st.CreatedAt))
+		s.Touch(parseTimeAny(st.UpdatedAt))
 	}
+	// A Bash call and its result are separate loop events joined by
+	// toolCallId; the command record is kept by id so the exit status the
+	// result reports can ride on it (#4262).
+	shellAt := map[string]int{}
 	// Streamed assistant text accumulates across content.part events and is
 	// flushed on step.end — or at EOF, so a response mid-stream when the
 	// indexer runs is not lost (the remainder lands on the next incremental
@@ -211,26 +292,41 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 						records = append(records, model.Message{Role: RoleEdit, Text: span, Time: t})
 					}
 				}
+				shell := -1
 				if IndexCommands() {
 					for _, cmd := range commandsIn(part, kimiDialect) {
+						shell = len(records)
 						records = append(records, model.Message{Role: RoleCommand, Text: cmd, Time: t})
 					}
 				}
+				id, _ := e["toolCallId"].(string)
+				// An id seen again belongs to this call now, recorded or not.
+				delete(shellAt, id)
 				if len(records) == 0 {
 					return
 				}
 				flush()
 				s.Touch(t)
+				if shell >= 0 && id != "" {
+					shellAt[id] = len(s.Messages) + shell
+				}
 				s.Messages = append(s.Messages, records...)
 			case "tool.result":
 				// Every observed result shape carries its text under
 				// `output` — plain, with a note, truncated, or flagged
 				// isError. The error ones are kept on purpose: the error a
 				// command hit is exactly what a later search reaches for.
+				r, _ := e["result"].(map[string]any)
+				id, _ := e["toolCallId"].(string)
+				if i, ok := shellAt[id]; ok {
+					if code := kimiExitCode(r); code > 0 {
+						s.Messages[i].Text += fmt.Sprintf("  → exit %d", code)
+					}
+					delete(shellAt, id)
+				}
 				if !IndexToolOutput() {
 					return
 				}
-				r, _ := e["result"].(map[string]any)
 				out, _ := r["output"].(string)
 				if out = strings.TrimSpace(out); out == "" {
 					return
@@ -247,6 +343,90 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// kimiTailResumes reads wire.jsonl whole when either rule asks: the tail
+// answers a call made before it (#4443), or it goes on with a reply streamed
+// across the offset (#4445).
+func kimiTailResumes(path string, offset int64) bool {
+	return kimiResumes(path, offset) && KimiResumes(path, offset)
+}
+
+// KimiResumes reports whether the tail of wire.jsonl can be appended to what
+// is stored. A reply's content.part events are joined until the step ends, and
+// a pass mid-step flushes what has arrived; when the tail goes on with that
+// step, the file is read whole (#4445). A tool event can sit inside the
+// stream, so one on either side of the offset counts as the stream going on,
+// and so does a user turn after it, which a whole read places ahead of the
+// reply it interrupted.
+func KimiResumes(path string, offset int64) bool {
+	if offset <= 0 {
+		return true
+	}
+	open := false
+	eachLineBefore(path, offset, func(line []byte) bool {
+		switch kimiStreamEvent(line) {
+		case kimiStreamGoesOn:
+			open = true
+			return false
+		case kimiStreamEnds:
+			return false
+		}
+		return true
+	})
+	if !open {
+		return true
+	}
+	resumes := true
+	eachLineFrom(path, offset, func(line []byte) bool {
+		switch kimiStreamEvent(line) {
+		case kimiStreamGoesOn, kimiUserTurn:
+			resumes = false
+			return false
+		case kimiStreamEnds:
+			return false
+		}
+		return true
+	})
+	return resumes
+}
+
+const (
+	kimiStreamOther = iota
+	kimiStreamGoesOn
+	kimiStreamEnds
+	kimiUserTurn
+)
+
+// kimiStreamEvent says what a wire.jsonl line does to a reply being streamed.
+func kimiStreamEvent(line []byte) int {
+	m := decodeJSONLine(line)
+	switch m["type"] {
+	case "context.append_message":
+		msg, _ := m["message"].(map[string]any)
+		switch {
+		case msg == nil:
+		case msg["role"] == "assistant":
+			return kimiStreamEnds
+		case msg["role"] == "user":
+			return kimiUserTurn
+		}
+	case "context.append_loop_event":
+		e, _ := m["event"].(map[string]any)
+		switch e["type"] {
+		case "step.begin", "step.end":
+			return kimiStreamEnds
+		case "tool.call", "tool.result":
+			return kimiStreamGoesOn
+		case "content.part":
+			if p, _ := e["part"].(map[string]any); p != nil && p["type"] == "text" {
+				if text, _ := p["text"].(string); text != "" {
+					return kimiStreamGoesOn
+				}
+			}
+		}
+	}
+	return kimiStreamOther
 }
 
 // kimiText joins the text parts of an append_message content array.

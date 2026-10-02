@@ -115,7 +115,7 @@ func ParseHermesPG(dsn string, sinceNano int64) ([]model.Session, error) {
 	}
 	sql := `select coalesce(json_agg(m),'[]') from (` +
 		`select session_id,role,content,timestamp from messages where ` + where +
-		` order by session_id,timestamp,id) m`
+		` order by session_id,id) m`
 	out, err := HermesPGRunner(dsn, sql)
 	if err != nil {
 		return nil, err

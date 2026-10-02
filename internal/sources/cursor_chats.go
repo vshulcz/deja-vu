@@ -18,11 +18,11 @@ import (
 // and each child is plain JSON — `{"role","content"}`, the Vercel AI SDK shape,
 // with `text`, `reasoning`, `tool-call` and `tool-result` parts.
 //
-// Nothing here reads it, and on this machine reading it would add nothing:
-// all 19 stores decoded, and of the 67 turns they held, 51 were already in the
-// JSONL transcript and the other 16 were the `<user_info>` environment
-// preamble the transcript leaves out on purpose. Every chat with a store.db
-// also had a transcript (#3772).
+// The transcript holds every turn the store does, bar the `<user_info>`
+// environment preamble it leaves out on purpose (#3772), but none of the tool
+// results; cursor_store.go reads those from here (#4187).
+// meta.json's cwd gives the project and the resume directory
+// (cursor_chat_cwd.go, #4193).
 //
 // What matters is the day that stops being true. If a Cursor release keeps
 // writing chats and stops writing `agent-transcripts`, every CLI session goes

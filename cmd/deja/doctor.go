@@ -6,10 +6,12 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -50,7 +52,7 @@ func defaultDoctorVersionLookup() doctorVersionLookup {
 func countSubagentFiles(seen []string) int {
 	n := 0
 	for _, p := range seen {
-		if sources.IsSubagentPath(p) {
+		if sources.IsSubagentPath(p) || sources.IsPrimeChildPath(p) {
 			n++
 		}
 	}
@@ -230,6 +232,9 @@ func doctorHooks(w io.Writer) {
 		return
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", st.state, reportPath(st.path))
+	if off := clientHooksOff("claude-code"); off != "" && st.state == "wired" {
+		fmt.Fprintf(w, "  %-12s %s\n", "", off)
+	}
 	if len(st.missing) > 0 && len(st.missing) < len(claudeHookWiring) {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
@@ -266,11 +271,18 @@ func doctorWiringExe(w io.Writer) {
 	if st.Exe == "" || len(st.Targets) == 0 {
 		return
 	}
-	if _, err := os.Stat(st.Exe); err == nil {
+	// The configs name the link when the repair wrote one (#4189), and a
+	// link that still resolves is wiring that works, whatever became of the
+	// binary it led to before.
+	named := st.Exe
+	if st.Written != "" {
+		named = st.Written
+	}
+	if _, err := os.Stat(named); err == nil {
 		return
 	}
 	fmt.Fprintf(w, "  %-12s %-11s configs name %s, which is not there — `deja install %s` rewrites them for this binary\n",
-		"wiring", "stale", st.Exe, strings.Join(st.Targets, " "))
+		"wiring", "stale", named, strings.Join(st.Targets, " "))
 }
 
 // doctorCodexHook reports the codex session-start hook state. Codex gates
@@ -279,7 +291,7 @@ func doctorWiringExe(w io.Writer) {
 func doctorCodexHook(w io.Writer) {
 	st := codexHookWiringState()
 	hooksPath, status, missing, hooks := st.path, st.state, st.missing, st.hooks
-	if st.absent {
+	if st.absent || status == "missing" || status == "plugin" {
 		// The plugin ships the same hooks under its own root, and codex trusts
 		// those the same way. Nothing was installed here, and nothing is
 		// missing either.
@@ -313,6 +325,9 @@ func doctorCodexHook(w io.Writer) {
 	}
 	if status == "disabled" {
 		line += "  (codex trusts but disabled it — re-enable in codex settings or hooks.state)"
+	}
+	if off := clientHooksOff("codex-hook"); off != "" && status == "wired" {
+		line += fmt.Sprintf("\n  %-12s %s", "", off)
 	}
 	if note := doctorHookRepeats(hooks, codexHookWiring, "codex-auto"); note != "" {
 		line += fmt.Sprintf("\n  %-12s %s", "", note)
@@ -660,6 +675,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 		partly[check.name] = store.Partial
 	}
 
+	// Crush and OpenClaw print a row per database under one name, and the
+	// counts below are the harness's, not the row's: repeated on every row, an
+	// empty crush.db claimed another project's sessions (#4379). The first row
+	// of a harness carries them.
+	counted := map[string]bool{}
 	printRow := func(name, path string, present bool, detail string) {
 		// A store DEJA_STORES silences has no row at all. The line above says
 		// which stores are being read; a row saying "missing" about one of the
@@ -719,7 +739,9 @@ func doctorHarnesses(w io.Writer, dir string) {
 		// `sync import` has no files at all, and doctor said nothing about the
 		// sessions it does hold — the only surface that names them was stats
 		// (#892).
-		if n, ok := indexed[name]; ok {
+		first := !counted[name]
+		counted[name] = true
+		if n, ok := indexed[name]; ok && first {
 			if detail != "" {
 				detail += ", "
 			}
@@ -754,7 +776,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		// read. Outside the block above on purpose — a store with no indexed
 		// session at all has no entry there, and that is exactly the store
 		// this is about (#3747).
-		if u := neverRead[name]; u > 0 {
+		if u := neverRead[name]; u > 0 && first {
 			if detail != "" {
 				detail += ", "
 			}
@@ -776,16 +798,26 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// — the one thing `doctor` exists to rule out (#701).
 	// printFilesSkippingIn is printFiles for a harness that has more than one
 	// transcript root and declines some of its own files by a rule.
-	printFilesSkippingIn := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool) {
+	// Files named in beside are the store's own bookkeeping, as for
+	// printFilesBeside below.
+	//
+	// switchable says whether DEJA_INCLUDE_SUBAGENTS brings the skipped ones
+	// in. Kimi's and Qwen's sub-agent logs are left out by design, and naming
+	// the variable for them would send the user after a switch that does
+	// nothing (#4473, #4475).
+	printFilesSkippingWith := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool, switchable bool, beside ...string) {
 		detail := doctorCount(len(seen), "file")
+		placed := append(append([]string{}, seen...), beside...)
 		unread := 0
 		byRule := 0
 		for _, root := range roots {
-			u, b := unplacedFiles(root, seen, skipped)
+			u, b := unplacedFiles(root, placed, skipped)
 			unread += u
 			byRule += b
 		}
-		if byRule > 0 {
+		if byRule > 0 && !switchable {
+			detail += fmt.Sprintf(", %d subagent transcripts skipped", byRule)
+		} else if byRule > 0 {
 			// The variable named the way it was read as the cause of the
 			// skip — "skipped (DEJA_INCLUDE_SUBAGENTS=1)" — so somebody who
 			// wanted those transcripts indexed set the thing the line said
@@ -794,16 +826,19 @@ func doctorHarnesses(w io.Writer, dir string) {
 		} else if short := countSubagentFiles(seen); short > 0 && os.Getenv("DEJA_INCLUDE_SUBAGENTS") != "1" {
 			// Read, but not in full: what a reader needs to know is which half
 			// of those files is searchable, and how to get the rest (#3009).
-			detail += fmt.Sprintf(", %d subagent transcripts read as task and answer — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
+			detail += fmt.Sprintf(", %d subagent transcripts read as task, answer and what they changed — set DEJA_INCLUDE_SUBAGENTS=1 for the whole run", short)
 		}
 		if unread > 0 {
 			detail += fmt.Sprintf(", %d not recognised here", unread)
 		}
 		printRow(name, loc, present, detail)
 	}
+	printFilesSkippingIn := func(name, loc string, roots []string, present bool, seen []string, skipped func(string) bool, beside ...string) {
+		printFilesSkippingWith(name, loc, roots, present, seen, skipped, true, beside...)
+	}
 	// printFilesSkipping is its one-root form.
-	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool) {
-		printFilesSkippingIn(name, path, []string{path}, present, seen, skipped)
+	printFilesSkipping := func(name, path string, present bool, seen []string, skipped func(string) bool, beside ...string) {
+		printFilesSkippingIn(name, path, []string{path}, present, seen, skipped, beside...)
 	}
 	printFiles := func(name, path string, present bool, seen []string) {
 		printFilesSkipping(name, path, present, seen, nil)
@@ -843,7 +878,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 		claudePresent = claudePresent || doctorExists(root)
 	}
 	printFilesSkippingIn("claude", claudeLocation, claudeRoots, claudePresent, sources.ClaudeFiles(),
-		func(p string) bool { return !sources.ClaudeFileWanted(p) })
+		func(p string) bool { return !sources.ClaudeFileWanted(p) }, sources.ClaudeSidecarFiles()...)
 
 	codexRoots := sources.CodexRoots()
 	codexLocation := strings.Join(codexRoots, string(os.PathListSeparator))
@@ -856,7 +891,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	ocDB := sources.OpencodeDB()
 	printRow("opencode", ocDB, doctorFilePresent(ocDB), doctorSQLiteDetail(ocDB, sqlite))
 
-	printRow("aider", doctorAiderLocation(), len(sources.AiderFiles()) > 0, doctorCount(len(sources.AiderFiles()), "file"))
+	printRow("aider", doctorAiderLocation(), len(sources.AiderFiles()) > 0, doctorAiderDetail())
 
 	// The row names the store and counts what is under `tmp`, where the chats
 	// are: Antigravity keeps its own store in a sibling directory of the same
@@ -888,11 +923,12 @@ func doctorHarnesses(w io.Writer, dir string) {
 	qwenRoot := filepath.Join(sources.QwenRoot(), "projects")
 	// Beside, not unread: `<id>.runtime.json`, `meta.json` and
 	// `extract-cursor.json` are qwen's own bookkeeping (#3676).
-	printFilesBeside("qwen", qwenRoot, doctorExists(qwenRoot),
-		sources.QwenSessionFiles(), sources.QwenSidecarFiles()...)
+	printFilesSkippingWith("qwen", qwenRoot, []string{qwenRoot}, doctorExists(qwenRoot),
+		sources.QwenSessionFiles(), sources.QwenSubagentFile, false, sources.QwenSidecarFiles()...)
 
 	kimiRoot := filepath.Join(sources.KimiRoot(), "sessions")
-	printFilesBeside("kimi", kimiRoot, doctorExists(kimiRoot), sources.KimiSessionFiles(), sources.KimiSidecarFiles()...)
+	printFilesSkippingWith("kimi", kimiRoot, []string{kimiRoot}, doctorExists(kimiRoot),
+		sources.KimiSessionFiles(), sources.KimiSubagentFile, false, sources.KimiSidecarFiles()...)
 
 	gooseRoot := filepath.Join(sources.GooseRoot(), "sessions")
 	printRow("goose", gooseRoot, doctorExists(gooseRoot) || doctorFilePresent(sources.GooseDB()), doctorGooseDetail(sqlite))
@@ -943,7 +979,8 @@ func doctorHarnesses(w io.Writer, dir string) {
 	senpiRoot := sources.SenpiRoot()
 	printFiles("senpi", senpiRoot, doctorExists(senpiRoot), sources.SenpiSessionFiles())
 	kimchiRoot := sources.KimchiRoot()
-	printFiles("kimchi", kimchiRoot, doctorExists(kimchiRoot), sources.KimchiSessionFiles())
+	// Its sub-agent runs are skipped on purpose and named as such (#4401).
+	printFilesSkipping("kimchi", kimchiRoot, doctorExists(kimchiRoot), sources.KimchiSessionFiles(), sources.KimchiSubagentFile)
 	commandRoot := sources.CommandCodeRoot()
 	// The checkpoint stream beside each transcript is named rather than left to
 	// the unread count: it is not a conversation, and "1 not recognised here"
@@ -964,12 +1001,22 @@ func doctorHarnesses(w io.Writer, dir string) {
 		zcodeLoc = zcodeLoc + string(os.PathListSeparator) + zcodeDB
 	}
 	zcodeDetail := doctorCount(len(zcodeTranscripts), "file")
+	// And the snapshots an older ZCode left, which are read too (#4432).
+	zcodeLegacy := sources.ZCodeLegacyFiles()
+	if len(zcodeLegacy) > 0 {
+		zcodeLoc += string(os.PathListSeparator) + sources.ZCodeLegacyRoot()
+		zcodeDetail += ", " + doctorCount(len(zcodeLegacy), "legacy snapshot")
+	}
 	if zcodeHasDB {
 		zcodeDetail += ", CLI store present" + doctorDBPrereqNote(sqlite)
 	}
-	printRow("zcode", zcodeLoc, doctorExists(zcodeRoot) || zcodeHasDB, zcodeDetail)
+	printRow("zcode", zcodeLoc, doctorExists(zcodeRoot) || zcodeHasDB || len(zcodeLegacy) > 0, zcodeDetail)
+	// gjc's scope file sits in every project directory and its sub-agent
+	// passes are skipped on purpose; counted as unread, the row reported one
+	// file per project that deja had no reason to read (#4393).
 	gjcRoot := sources.GjcRoot()
-	printFiles("gjc", gjcRoot, doctorExists(gjcRoot), sources.GjcSessionFiles())
+	printFilesSkipping("gjc", gjcRoot, doctorExists(gjcRoot), sources.GjcSessionFiles(),
+		sources.GjcSubagentPath, sources.GjcScopeFiles()...)
 
 	// Kiro's two clients write different files under one root, and the row says
 	// which of them answered: a CLI user and an IDE user have nothing in common
@@ -981,13 +1028,21 @@ func doctorHarnesses(w io.Writer, dir string) {
 	if kiroIDE > 0 {
 		kiroDetail += ", " + doctorCount(kiroIDE, "IDE file")
 	}
-	printRow("kiro", kiroRoot, kiroCLI+kiroIDE > 0, kiroDetail)
+	// `kiro-cli chat --no-interactive` writes only to its database (#4300).
+	kiroLoc := kiroRoot
+	kiroDB := sources.KiroDB()
+	kiroHasDB := doctorExists(kiroDB)
+	if kiroHasDB {
+		kiroLoc += string(os.PathListSeparator) + kiroDB
+		kiroDetail += ", CLI store present" + doctorDBPrereqNote(sqlite)
+	}
+	printRow("kiro", kiroLoc, kiroCLI+kiroIDE > 0 || kiroHasDB, kiroDetail)
 
 	// Cherry Studio writes Claude Code transcripts under its own app data, so
 	// the row names the roots it found rather than the app directory (#3644).
 	cherryFiles := len(sources.CherryStudioSessionFiles())
 	cherryLoc := "CherryStudio/Data/Agents/.claude"
-	if roots := sources.CherryStudioRoots(); len(roots) > 0 {
+	if roots := sources.CherryStudioAllRoots(); len(roots) > 0 {
 		cherryLoc = strings.Join(roots, string(os.PathListSeparator))
 	}
 	printRow("cherrystudio", cherryLoc, cherryFiles > 0, doctorCount(cherryFiles, "file"))
@@ -1020,7 +1075,11 @@ func doctorHarnesses(w io.Writer, dir string) {
 	primeRoot := sources.PrimeRoot()
 	printFiles("prime", primeRoot, doctorExists(primeRoot), sources.PrimeSessionFiles())
 	ampRoot := sources.AmpRoot()
-	printFiles("amp", ampRoot, doctorExists(ampRoot), sources.AmpThreadFiles())
+	if sources.AmpThreadsServerSide() {
+		printRow("amp", ampRoot, doctorExists(ampRoot), doctorCount(0, "file")+", "+ampServerSideNote)
+	} else {
+		printFiles("amp", ampRoot, doctorExists(ampRoot), sources.AmpThreadFiles())
+	}
 	// CodeWhale keeps its transcripts beside its own bookkeeping — the offline
 	// queue, the ownership ledger, the checkpoint slot — so those are placed
 	// rather than counted as transcripts deja could not read.
@@ -1158,6 +1217,19 @@ func doctorAiderLocation() string {
 	}
 	return loc
 }
+
+// doctorAiderDetail says where the history is when none was found: aider
+// writes it at the git root of each project, and $HOME holds one only for a
+// launch from $HOME (#4326).
+func doctorAiderDetail() string {
+	n := len(sources.AiderFiles())
+	if n > 0 {
+		return doctorCount(n, "file")
+	}
+	return doctorCount(0, "file") + " — " + aiderNoHistoryHint
+}
+
+const aiderNoHistoryHint = "aider writes .aider.chat.history.md in each project; start it there as `deja aider` or list project dirs in DEJA_AIDER_ROOTS"
 
 func doctorAntigravityLocation() string {
 	if roots := sources.AntigravityRoots(); len(roots) > 0 {
@@ -1333,6 +1405,9 @@ func doctorMCP(w io.Writer) {
 		if status != "wired" && c.name == "codex" && codexPluginInstalled() {
 			status = "plugin"
 		}
+		if c.name == "cherrystudio" && doctorCherryStudioMCP(w, status, c.path) {
+			continue
+		}
 		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", c.name, status, guidanceStatus(guidanceHarness(c.name)), reportPath(c.path))
 		// One "wired" can be two registrations: a hand add under another name
 		// — the project is called deja-vu, after all — plus the `deja` a later
@@ -1350,8 +1425,11 @@ func doctorMCP(w io.Writer) {
 		// healthy while no memory arrived (#2216).
 		if status == "wired" {
 			if missing := dejaCommandMissing(c.path); missing != "" {
-				fmt.Fprintf(w, "  %-12s %s\n", "",
-					"points at "+missing+", which is not there — `deja install "+c.name+"` rewrites it for this binary")
+				fix := "`deja install " + c.name + "` rewrites it for this binary"
+				if c.name == "cherrystudio" {
+					fix += ", then re-import it in Settings → MCP"
+				}
+				fmt.Fprintf(w, "  %-12s %s\n", "", "points at "+missing+", which is not there — "+fix)
 			} else if other := otherBinaryNote(c.path, c.name); other != "" {
 				// The quieter half: the binary is there and is neither this one
 				// nor the deja on PATH. Two harnesses on the machine this was
@@ -1360,13 +1438,27 @@ func doctorMCP(w io.Writer) {
 				fmt.Fprintf(w, "  %-12s %s\n", "", other)
 			}
 		}
+		// Declared and switched off is not wired in any sense a session
+		// feels: the client never starts the server (#4303).
+		if status == "wired" && dejaEntrySwitchedOff(c.path) {
+			fmt.Fprintf(w, "  %-12s %s\n", "",
+				"the entry is switched off — "+c.name+" will not start it until you turn it back on")
+		}
 		// Zed's entry can defer to an extension instead of naming a binary,
 		// and then "wired" is a fact about an id rather than about anything
 		// runnable (#3660).
+		if status == "wired" && c.name == "deepseek" {
+			if missing := dshPluginsMissing(c.path); len(missing) > 0 {
+				fmt.Fprintf(w, "  %-12s %s\n", "", dshPluginsMissingNote(c.path, missing))
+			}
+		}
 		if status == "wired" && c.name == "zed" {
 			if note := zedUnreachableNote(c.path); note != "" {
 				fmt.Fprintf(w, "  %-12s %s\n", "", note)
 			}
+		}
+		if note := doctorMCPSwitchedOff(c.name); note != "" && status == "wired" {
+			fmt.Fprintf(w, "  %-12s %s\n", "", note)
 		}
 		if note := doctorWiringNote(c.name); note != "" && status == "wired" {
 			fmt.Fprintf(w, "  %-12s %s\n", "", note)
@@ -1388,6 +1480,34 @@ func doctorMCPDuplicateNote(keys []string) string {
 		return fmt.Sprintf("two entries in this config run deja (%s) — every session starts the server twice", names)
 	}
 	return fmt.Sprintf("%d entries in this config run deja (%s) — every session starts the server %d times", len(keys), names, len(keys))
+}
+
+// dejaEntrySwitchedOff reports whether every deja entry in a JSON config is
+// switched off — `disabled: true`, or opencode's `enabled: false`, the test
+// install uses. One entry still on is enough for recall to work.
+func dejaEntrySwitchedOff(path string) bool {
+	b, err := readConfig(path)
+	if err != nil {
+		return false
+	}
+	var root map[string]any
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+		return false
+	}
+	off := false
+	for _, m := range mcpServerMaps(root) {
+		for key, v := range m {
+			if key != "deja" && !mcpEntryRunsDeja(v) {
+				continue
+			}
+			entry, ok := v.(map[string]any)
+			if !ok || !entrySwitchedOff(entry) {
+				return false
+			}
+			off = true
+		}
+	}
+	return off
 }
 
 // dejaCommandMissing returns the deja binary a config names when that file is
@@ -1415,12 +1535,15 @@ func dejaCommandMissing(path string) string {
 // thing in TOML, YAML and JSONC, and adding a parser per format to answer one
 // question is not worth the surface.
 func dejaCommandIn(path string) string {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return ""
 	}
 	var root map[string]any
-	if json.Unmarshal(b, &root) == nil {
+	// JSONC first-class: opencode takes comments and trailing commas in its
+	// config, and a strict read sent those to the line scan below, which
+	// does not know opencode's list-shaped command (#4197).
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) == nil {
 		for _, m := range mcpServerMaps(root) {
 			for _, v := range m {
 				if cmd := mcpEntryDejaCommand(v); cmd != "" {
@@ -1500,7 +1623,7 @@ func dejaCommandIn(path string) string {
 func mcpServerMaps(root map[string]any) []map[string]any {
 	var out []map[string]any
 	// context_servers is Zed's spelling of the same map (#3683).
-	for _, key := range []string{"mcpServers", "mcp", "servers", "context_servers"} {
+	for _, key := range []string{"mcpServers", "mcp", "servers", "context_servers", ampServersKey} {
 		m, _ := root[key].(map[string]any)
 		if m == nil {
 			continue
@@ -1520,9 +1643,9 @@ var quotedPathUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`)
 
 // commandValue matches a `command` or `cmd` key and the value after it, in the
 // three shapes these configs come in: JSON and JSONC quote the key, TOML uses
-// `=`, YAML uses `:` and quotes nothing. A JSONC file that will not parse as
-// JSON — zed's settings, which carry comments — reaches this too, so the whole
-// text is scanned rather than a line at a time.
+// `=`, YAML uses `:` and quotes nothing. A file that does not parse even as
+// JSONC — JSON5, YAML, TOML — reaches this too, so the whole text is scanned
+// rather than a line at a time.
 var commandValue = regexp.MustCompile(`"?(?:command|cmd)"?\s*[:=]\s*(?:"([^"\n]*)"|'([^'\n]*)'|([^",\n}]+))`)
 
 // mcpEntryDejaCommand is mcpEntryRunsDeja's answer to "which one": the same
@@ -1665,9 +1788,9 @@ func dejaBlockOpens(trimmed string) (opens, beside bool) {
 		"serverName: deja", `serverName: "deja"`, "serverName: 'deja'":
 		return true, true
 	}
-	// A quoted JSON key, for the files that do not parse as JSON: Zed's
-	// settings carry comments, so the whole text is read a line at a time, and
-	// its server key is `deja-context-server` rather than `deja` (#3683).
+	// A quoted JSON key, for the files that do not parse even as JSONC, which
+	// are read a line at a time; Zed's server key is `deja-context-server`
+	// rather than `deja` (#3683).
 	if key, ok := jsonKeyOpening(trimmed); ok && strings.HasPrefix(strings.ToLower(key), "deja") {
 		return true, false
 	}
@@ -1693,6 +1816,44 @@ func jsonKeyOpening(trimmed string) (string, bool) {
 		return "", false
 	}
 	return key, true
+}
+
+// doctorCherryStudioMCP prints the cherrystudio row from the app's own server
+// table when it can be read, and reports false when it cannot, leaving the
+// import-file row and its caveat to the caller. The import file existing says
+// nothing about the app having the server (#4344).
+func doctorCherryStudioMCP(w io.Writer, fileStatus, importPath string) bool {
+	known, wired, off, db, missing := cherryStudioAppWiring()
+	if !known {
+		return false
+	}
+	guidance := guidanceStatus(guidanceHarness("cherrystudio"))
+	if off {
+		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", "cherrystudio", "disabled", guidance, reportPath(db))
+		fmt.Fprintf(w, "  %-12s %s\n", "", "Cherry Studio has deja's server switched off, so it never starts — turn it on in Settings → MCP")
+		return true
+	}
+	if !wired {
+		status := "not imported"
+		if fileStatus == "config missing" {
+			status = fileStatus
+		}
+		fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", "cherrystudio", status, guidance, reportPath(importPath))
+		fix := "`deja install cherrystudio`, then import " + reportPath(importPath)
+		if status == "not imported" {
+			fix = "import this file"
+		}
+		fmt.Fprintf(w, "  %-12s %s\n", "", "Cherry Studio has no deja server — "+fix+" in Settings → MCP → Import from JSON")
+		return true
+	}
+	fmt.Fprintf(w, "  %-12s %-14s guidance %-11s %s\n", "cherrystudio", "wired", guidance, reportPath(db))
+	if missing != "" {
+		// Rewriting the import file does not reach the app: its copy keeps
+		// the dead path until the server is re-imported or edited.
+		fmt.Fprintf(w, "  %-12s %s\n", "", "points at "+missing+", which is not there — `deja install cherrystudio`, then re-import "+
+			reportPath(importPath)+" in Settings → MCP (or fix the command there)")
+	}
+	return true
 }
 
 // doctorWiringNote adds what "wired" cannot promise for a given harness. Three
@@ -1746,7 +1907,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"amp", sources.AmpSettingsFile(), doctorJSONWired(ampServersKey), doctorJSONDejaKeys(ampServersKey)},
 		{"prime", primeSettingsPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"openclaw", filepath.Join(sources.OpenClawStateDir(), "openclaw.json"), doctorOpenClawWired, nil},
-		{"copilot", guidancePath("copilot"), doctorFileWired, nil},
+		{"copilot", copilotMCPConfigPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"vscode", doctorVSCodeMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
 		{"hermes", filepath.Join(sources.HermesHome(), "config.yaml"), doctorHermesWired, nil},
 		{"goose", filepath.Join(gooseConfigDir(), "config.yaml"), doctorGooseWired, nil},
@@ -1783,17 +1944,183 @@ func dshPatchPath() string {
 // key: dsh has no MCP config of its own, it has an ordered list of patch
 // entries, and deja's is `mcp-deja`.
 func doctorDSHWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
 	return strings.Contains(string(b), "id: mcp-deja")
 }
 
+// dshPluginsMissing lists the plugin files deja's block in the layer names by
+// path and that are not on disk. dsh imports every row when it builds a
+// profile, and one file that is gone fails the whole load: no agent at all, not
+// just no recall, while the server row above still reads wired (#4292).
+func dshPluginsMissing(path string) []string {
+	b, err := readConfig(path)
+	if err != nil {
+		return nil
+	}
+	var missing []string
+	inBlock := false
+	for _, line := range strings.Split(lfText(b), "\n") {
+		t := strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(t, dshBlockStart):
+			inBlock = true
+			continue
+		case t == dshBlockEnd:
+			inBlock = false
+			continue
+		}
+		name, ok := strings.CutPrefix(t, "name:")
+		if !inBlock || !ok {
+			continue
+		}
+		for _, m := range dshNameMissing(yamlScalar(strings.TrimSpace(name))) {
+			if !slices.Contains(missing, m) {
+				missing = append(missing, m)
+			}
+		}
+	}
+	return missing
+}
+
+// dshNameMissing is what one plugin name resolves to that dsh cannot load.
+// The rules are dsh 0.1.1-rc.2's, measured rather than assumed: a name
+// starting with "." is resolved against the directory of the profile being
+// built, not against the layer, so it is checked in every profile there is; a
+// file:// URL is imported as the file; `~/` is never expanded and loads
+// nothing even when the file is there. A package name such as
+// '@deepseek-ai/dsh-mcp-client' resolves inside dsh's own bundle and is not a
+// file deja can check.
+func dshNameMissing(name string) []string {
+	switch {
+	case strings.HasPrefix(name, "~/"):
+		return []string{name}
+	case strings.HasPrefix(name, "file://"):
+		u, err := url.Parse(name)
+		if err != nil {
+			return nil
+		}
+		// dsh's URL parser keeps a drive letter as part of the path, written
+		// file://C:/x or file:///C:/x; Go's reads the first as host "C:" and
+		// the second as /C:/x, and either way doctor named a drive-less path
+		// that is not the one in the layer (#4438).
+		// Any other host but localhost names a share, \\host\path.
+		p := u.Path
+		if len(u.Host) == 2 && u.Host[1] == ':' {
+			p = u.Host + p
+		} else if u.Host != "" && u.Host != "localhost" {
+			p = "//" + u.Host + p
+		} else if len(p) > 2 && p[0] == '/' && p[2] == ':' {
+			p = p[1:]
+		}
+		p = filepath.FromSlash(p)
+		if !doctorExists(p) {
+			return []string{p}
+		}
+	case strings.HasPrefix(name, "."):
+		var out []string
+		for _, dir := range dshProfileDirs() {
+			if p := filepath.Join(dir, filepath.FromSlash(name)); !doctorExists(p) {
+				out = append(out, p)
+			}
+		}
+		return out
+	case filepath.IsAbs(name) && !doctorExists(name):
+		return []string{name}
+	}
+	return nil
+}
+
+// dshProfileDirs are the profiles dsh has generated, one directory each beside
+// the node_modules their plugins load from.
+func dshProfileDirs() []string {
+	root := filepath.Join(sources.DSHHome(), "profiles")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() && e.Name() != "node_modules" && !strings.HasPrefix(e.Name(), ".") {
+			out = append(out, filepath.Join(root, e.Name()))
+		}
+	}
+	return out
+}
+
+// dshLayerNamesMissing reports whether the layer names a plugin file that is gone.
+func dshLayerNamesMissing(file string) bool {
+	for _, m := range dshPluginsMissing(dshPatchPath()) {
+		if m == file {
+			return true
+		}
+	}
+	return false
+}
+
+// dshPluginsMissingNote is the line under the deepseek row when the layer names
+// a plugin file that is gone. The -auto target is named when the layer carries
+// the auto row, since the plain one would take that row out.
+func dshPluginsMissingNote(path string, missing []string) string {
+	b, _ := readConfig(path)
+	target := "deepseek"
+	if strings.Contains(string(b), "id: deja-auto") {
+		target = "deepseek-auto"
+	}
+	names := make([]string, len(missing))
+	for i, m := range missing {
+		names[i] = reportPath(m)
+	}
+	list, it := names[0], "it"
+	if n := len(names); n > 1 {
+		list, it = strings.Join(names[:n-1], ", ")+" and "+names[n-1], "them"
+	}
+	return "names " + list + ", which dsh cannot find — dsh will not start; `deja install " + target + "` writes " + it + " again, or `deja uninstall deepseek` takes deja out of the layer"
+}
+
+// yamlScalar reads one plain, single- or double-quoted YAML scalar, the three
+// ways a hand edit or deja's own yamlQuote can spell a path. A comment after
+// it is not part of it: a plain scalar ends at " #", a quoted one at its
+// closing quote.
+func yamlScalar(v string) string {
+	if len(v) >= 2 && v[0] == '\'' {
+		for i := 1; i < len(v); i++ {
+			if v[i] != '\'' {
+				continue
+			}
+			if i+1 < len(v) && v[i+1] == '\'' {
+				i++
+				continue
+			}
+			return strings.ReplaceAll(v[1:i], "''", "'")
+		}
+	}
+	if len(v) >= 2 && v[0] == '"' {
+		for i := 1; i < len(v); i++ {
+			if v[i] == '\\' {
+				i++
+				continue
+			}
+			if v[i] == '"' {
+				r := strings.NewReplacer(`\\`, `\`, `\"`, `"`)
+				return r.Replace(v[1:i])
+			}
+		}
+	}
+	for i := 1; i < len(v); i++ {
+		if v[i] == '#' && (v[i-1] == ' ' || v[i-1] == '\t') {
+			return strings.TrimSpace(v[:i])
+		}
+	}
+	return v
+}
+
 // doctorZCodeWired reads `mcp.servers`, one level deeper than the `mcpServers`
 // the rest of this table uses.
 func doctorZCodeWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1802,7 +2129,7 @@ func doctorZCodeWired(path string) bool {
 			Servers map[string]any `json:"servers"`
 		} `json:"mcp"`
 	}
-	if json.Unmarshal(b, &root) != nil {
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return false
 	}
 	for _, v := range root.MCP.Servers {
@@ -1874,7 +2201,7 @@ func vsCodeExtensionMCPPath(extension string) string {
 // the two halves were given the same id. A machine that has not reinstalled
 // since is still wired, and should not be told otherwise.
 func doctorZedWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
@@ -1911,12 +2238,12 @@ func doctorOpencodeConfigPath() string {
 
 // doctorOpenClawWired checks openclaw.json's nested mcp.servers map.
 func doctorOpenClawWired(path string) bool {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return false
 	}
 	var root map[string]any
-	if json.Unmarshal(b, &root) != nil {
+	if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
 		return strings.Contains(string(b), `"deja"`)
 	}
 	mcp, _ := root["mcp"].(map[string]any)
@@ -1956,13 +2283,13 @@ func doctorJSONWired(key string) func(string) bool {
 
 func doctorJSONWiredIn(pick func(map[string]any) map[string]any) func(string) bool {
 	return func(path string) bool {
-		b, err := os.ReadFile(path)
+		b, err := readConfig(path)
 		if err != nil {
 			return false
 		}
 		var root map[string]any
-		if json.Unmarshal(b, &root) != nil {
-			// jsonc or otherwise unparseable — fall back to a substring probe.
+		if json.Unmarshal([]byte(jsoncToJSON(string(b))), &root) != nil {
+			// Unparseable even as JSONC — fall back to a substring probe.
 			return strings.Contains(string(b), `"deja"`)
 		}
 		m := pick(root)
@@ -1993,7 +2320,7 @@ func doctorJSONDejaKeys(key string) func(string) []string {
 
 func doctorJSONDejaKeysIn(pick func(map[string]any) map[string]any) func(string) []string {
 	return func(path string) []string {
-		b, err := os.ReadFile(path)
+		b, err := readConfig(path)
 		if err != nil {
 			return nil
 		}
@@ -2058,7 +2385,7 @@ func doctorTOMLWired(path string) bool {
 // say — is not MCP wiring; and args count as well as command, since Windows
 // wiring runs deja behind a `cmd /c` shim.
 func doctorTOMLDejaKeys(path string) []string {
-	b, err := os.ReadFile(path)
+	b, err := readConfig(path)
 	if err != nil {
 		return nil
 	}
@@ -2299,8 +2626,8 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 			clipped = fmt.Sprintf(", %d message%s stored short of the transcript (over 64 KB)",
 				e.ClippedMessages, pluralS(e.ClippedMessages))
 		}
-		fmt.Fprintf(w, "  ingest   %s: %d unusable line%s skipped, %d path%s unreadable%s — see `deja doctor --json`\n",
-			h, e.MalformedLines, pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles), clipped)
+		fmt.Fprintf(w, "  ingest   %s: %d unusable %s%s skipped, %d path%s unreadable%s — see `deja doctor --json`\n",
+			h, e.MalformedLines, sources.SkippedNoun(h), pluralS(e.MalformedLines), e.FailedFiles, pluralS(e.FailedFiles), clipped)
 	}
 	reportFutureDated(w, dir)
 }
