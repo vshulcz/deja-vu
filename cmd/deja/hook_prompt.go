@@ -481,6 +481,19 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// keeps it discoverable — the agent learns there is history here and can
 	// ask for it — for 134 bytes against the 0.5-1.3 KB a real digest measures.
 	var body string
+	// A long session stops paying for full digests once it has had a few. On
+	// this machine's injection log the fifth and later per-prompt blocks of a
+	// session were acted on 0 times in 53, against 1 in 12 for the second to
+	// fourth, and they were 29% of every per-prompt byte. Past the budget the
+	// block is the one-line pointer, which still says history is here. A
+	// question asked before keeps the full block: that claim is the strong one.
+	// A spawned agent is a new reader and starts its own count.
+	if worthDigest && digestBudgetSpent(seen, input.SessionID) {
+		if cite := ss[0]; search.AskedBefore(cite, terms) == "" {
+			worthDigest = false
+		}
+	}
+	fullDigest := worthDigest
 	if worthDigest {
 		// Hand the digest the query's words most-identifying first. It has no
 		// way of its own to tell "mm_status" from "decide", and the session
@@ -546,8 +559,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The same block twice is wallpaper, and the reader stops looking. Judged
 	// on what would be shown, so a session whose other lines answer the next
 	// question still gets to answer it.
-	if seen[blockFingerprint(body)] {
+	fp := blockFingerprint(body)
+	if seen[fp] || seen[digestSeenPrefix+fp] {
 		return emitNudgeOnly(stdout, plain, nudge)
+	}
+	if fullDigest {
+		fp = digestSeenPrefix + fp
 	}
 	// And the same sentence twice under another session's id is the same
 	// wallpaper: the fingerprint above covers the block, whose header carries
@@ -569,7 +586,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// stop a re-spawn of the same agent repeating itself — not to send the
 	// second one in blind. Handing it what the parent saw is the whole point.
 	out := frameRecall(body)
-	rememberInjectedIDs(dir, input.SessionID, blockFingerprint(body))
+	rememberInjectedIDs(dir, input.SessionID, fp)
 	rememberInjectedIDs(dir, input.SessionID, freshQuotes...)
 	// Stamped, because the question is answered again once the window passes,
 	// where a block fingerprint holds for the life of the session.
@@ -1586,6 +1603,29 @@ func blockAlreadySentThisSession(dir, sid string) bool {
 		return false
 	}
 	return len(recentlyInjected(dir, sid, leadWindow)) > 0
+}
+
+// digestsPerSession is how many full per-prompt digests one agent session gets
+// before later matches shrink to the pointer line.
+const digestsPerSession = 4
+
+// digestSeenPrefix marks a full digest's fingerprint in the seen list, so the
+// budget can count them without a row of its own.
+const digestSeenPrefix = "digest:"
+
+// digestBudgetSpent reports whether this session has had its full digests. A
+// spawned agent is a new reader and is never cut.
+func digestBudgetSpent(seen map[string]bool, sid string) bool {
+	if sid == "" || strings.HasPrefix(sid, spawnReaderPrefix) {
+		return false
+	}
+	n := 0
+	for id := range seen {
+		if strings.HasPrefix(id, digestSeenPrefix) {
+			n++
+		}
+	}
+	return n >= digestsPerSession
 }
 
 // leadWindow is how far back the check reads. Longer than the injection
