@@ -320,7 +320,7 @@ for people who install extensions there rather than from a CLI:
 | Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-vu`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Either path works alone, and both together double nothing: each package reads what
 `deja install` already wrote and uses the deja you already have.
