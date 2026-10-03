@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -290,6 +291,9 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 	// maps the Claude names onto its own — and then dropped here, so the hook
 	// fired on every action it took and had nothing to say about any of them.
 	if isCommandTool(input.ToolName) {
+		if !commandHintsOn() {
+			return ""
+		}
 		if cmd := strings.TrimSpace(input.ToolInput.Command); cmd != "" {
 			return commandHookLineSkipping(dir, cwd, cmd, input.SessionID, used)
 		}
@@ -327,6 +331,18 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		}
 	}
 	return ""
+}
+
+// commandHintsOn reports whether the line before a command is wanted. Off
+// unless DEJA_COMMAND_HINTS=on. Over a month of real Claude Code sessions it
+// fired 864 times, 782 of them the failure warning and 94% of those about the
+// project being worked in. A warned command failed 2.7% of the time, against
+// 3.0% for every Bash call, and the warning named the error that followed 6
+// times. The line arrives with the command already chosen, so it cannot stop
+// one either: told that a program is missing, an agent ran it anyway 7 times
+// in 8. The answer after a failure is hook-tool-after's, and it stays on.
+func commandHintsOn() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("DEJA_COMMAND_HINTS")), "on")
 }
 
 // applyPatchFiles pulls the target paths out of an apply_patch body. Each file

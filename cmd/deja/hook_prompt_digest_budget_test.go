@@ -25,7 +25,7 @@ func TestDigestBudgetSpentCountsOnlyFullDigests(t *testing.T) {
 		t.Fatal("budget not spent after the session had its full digests")
 	}
 	if digestBudgetSpent(seen, spawnReaderPrefix+"agent:x") {
-		t.Error("a spawned agent was cut, but it is a new reader")
+		t.Error("a spawned agent counted the parent's digests")
 	}
 	if digestBudgetSpent(seen, "") {
 		t.Error("a payload with no session id was cut")
@@ -113,10 +113,17 @@ func TestHookPromptShrinksToPointerPastTheDigestBudget(t *testing.T) {
 		t.Errorf("a repeated question past the budget lost its full block:\n%q", got)
 	}
 
-	reader := spawnReaderPrefix + "long-1:abc"
-	spend(reader)
-	if got := ask(reader); !strings.Contains(got, "- **") {
-		t.Errorf("a spawned agent was cut to the pointer:\n%q", got)
+	// A spawned agent gets the pointer from its first block, and the full one
+	// only when its instructions repeat a question asked before.
+	spend("none")
+	reader := spawnReaderPrefix + "parent-1:abc"
+	got = ask(reader)
+	if !strings.Contains(got, "deja: this project has history on") || strings.Contains(got, "- **") {
+		t.Errorf("a spawned agent did not get the pointer:\n%q", got)
+	}
+	spend("none")
+	if got := askAbout(spawnReaderPrefix+"parent-1:def", "why does rsync hang in the nightly deploy script"); !strings.Contains(got, "StrictHostKeyChecking") {
+		t.Errorf("a spawned agent repeating a question lost its full block:\n%q", got)
 	}
 
 	spend("compact-1")

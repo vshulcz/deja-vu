@@ -493,8 +493,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// fourth, and they were 29% of every per-prompt byte. Past the budget the
 	// block is the one-line pointer, which still says history is here. A
 	// question asked before keeps the full block: that claim is the strong one.
-	// A spawned agent is a new reader and starts its own count.
-	if worthDigest && digestBudgetSpent(seen, input.SessionID) {
+	//
+	// A spawned agent gets the pointer from the start. Its block is appended to
+	// instructions the parent already wrote with the context it had, and on
+	// this machine's transcripts 582 such blocks in a month were followed by a
+	// recall 0 times and by a file action the instructions did not already name
+	// 5 times: 18% of every token deja injected, at 53k tokens an action.
+	if worthDigest && (isSpawnedReader(input.SessionID) || digestBudgetSpent(seen, input.SessionID)) {
 		if cite := ss[0]; search.AskedBefore(cite, terms) == "" {
 			worthDigest = false
 		}
@@ -1620,7 +1625,8 @@ const digestsPerSession = 4
 const digestSeenPrefix = "digest:"
 
 // digestBudgetSpent reports whether this session has had its full digests. A
-// spawned agent is a new reader and is never cut.
+// spawned agent has no count of its own: it gets the pointer unless the
+// question was asked before, which the caller decides.
 func digestBudgetSpent(seen map[string]bool, sid string) bool {
 	if sid == "" || strings.HasPrefix(sid, spawnReaderPrefix) {
 		return false

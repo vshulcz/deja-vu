@@ -164,6 +164,7 @@ func TestGrokSpawnCarriesMemoryIntoTheSubagent(t *testing.T) {
 // carries have to be read out of `toolName` and `toolInput` for the hook to
 // know what is about to run.
 func TestGrokToolPayloadNamesTheCommand(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	commandRunWithAnOutcome(t, "go test ./... -count=1", "a", "b")

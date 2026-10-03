@@ -18,6 +18,7 @@ import (
 // command did to this machine last time is keyed on its shape, and says
 // something worth acting on (#2924).
 func TestTheHookSaysWhatTheCommandBrokeLastTime(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	hermeticEnv(t)
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
 	for i, id := range []string{"f1", "f2"} {

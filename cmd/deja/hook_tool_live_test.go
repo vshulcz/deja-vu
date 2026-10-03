@@ -51,6 +51,7 @@ func TestToolHookLeavesTheLiveSessionOutOfTheFileLine(t *testing.T) {
 // the one whose conclusion is quoted, and that is the live session once it has
 // run the command and been indexed (#4380).
 func TestToolHookLeavesTheLiveSessionOutOfTheCommandLine(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")

@@ -15,6 +15,7 @@ import (
 // not one that could be paired with what the agent did next. The per-prompt
 // hook has carried the receiving session since #1494; these two now do too.
 func TestThePointOfActionRecordsWhoItWentTo(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)

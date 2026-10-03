@@ -68,6 +68,8 @@ func TestRecallOffReachesEverySurfaceThatInjects(t *testing.T) {
 	after := build("after.db")
 	t.Setenv("CLAUDE_PROJECT_DIR", "/proj")
 	t.Setenv("DEJA_RECALL", "")
+	// The command line is opt-in; the switch has to silence it once it is on.
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 
 	// A fresh agent session per run: the per-prompt hook bans what it already
 	// showed a session, and reusing the id would silence the second run for a

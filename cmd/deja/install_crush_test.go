@@ -13,6 +13,7 @@ import (
 // nothing to it. Wired with the wrong shape the hook still exits 0 and Crush
 // still runs the tool, so nothing fails — the recall is simply never seen.
 func TestHookToolWritesCrushsOwnEnvelope(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")

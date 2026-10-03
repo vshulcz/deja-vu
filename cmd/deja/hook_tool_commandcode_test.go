@@ -13,6 +13,7 @@ import (
 // uppercase display name. The hook fired on every shell and edit and said
 // nothing, because it did not know these names (#4371).
 func TestToolHookKnowsCommandCodeToolNames(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")

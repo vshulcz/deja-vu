@@ -71,12 +71,15 @@ func TestAFleetIsNotSilencedByTheProjectCooldown(t *testing.T) {
 	if !strings.Contains(first, "session.timeout.ms") {
 		t.Fatalf("the first agent of the fleet got no memory: %q", first)
 	}
+	// The others are told the same history is there. A spawned agent gets the
+	// pointer unless its instructions repeat the question, so the quote itself
+	// is not required, only that the cooldown did not send it out with nothing.
 	for i, prompt := range []string{
 		"Look into the kafka consumer rebalance flapping on the orders topic.",
 		"Find out what makes the kafka consumer rebalance flap on the orders topic.",
 	} {
-		if got := spawn(prompt); !strings.Contains(got, "session.timeout.ms") {
-			t.Errorf("agent %d of the fleet was sent out without the answer the first one got: %q", i+2, got)
+		if got := spawn(prompt); !strings.Contains(got, "kafka consumer rebalance keeps flapping") && !strings.Contains(got, "session.timeout.ms") {
+			t.Errorf("agent %d of the fleet was sent out without the history the first one got: %q", i+2, got)
 		}
 	}
 }

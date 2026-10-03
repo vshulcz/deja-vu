@@ -40,6 +40,7 @@ func commandRunWithAnOutcome(t *testing.T, cmd string, ids ...string) {
 // its ceiling is one short line. A command this machine has run before, and
 // knows the outcome of, earns that line; anything else does not.
 func TestToolHookSpeaksOnlyForACommandWithAHistory(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	commandRunWithAnOutcome(t, "go test ./... -count=1", "a", "b")
@@ -401,6 +402,7 @@ func TestToolHookCommandHonoursTrustPolicy(t *testing.T) {
 // An inspection command carries no reusable signal, and a PreToolUse hook must
 // not repeat the same line to the same agent session on every action.
 func TestToolHookSkipsInspectionAndDedupes(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
 	root := os.Getenv("DEJA_CLAUDE_ROOT")
@@ -454,6 +456,7 @@ func TestTruncateToolLineKeepsRunesWhole(t *testing.T) {
 // The hook-tool injection is recorded so it is visible to stats and the
 // receipt, and deduped so it is counted once per fact, not per action.
 func TestToolHookRecordsTheInjection(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	dir := filepath.Join(tmp, "index.db")
 	t.Setenv("DEJA_INDEX_DIR", dir)

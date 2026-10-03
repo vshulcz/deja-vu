@@ -16,6 +16,7 @@ import (
 // compared against what the agent did next — and `deja log --last` had nothing
 // to print for it.
 func TestThePointOfActionKeepsWhatItSaid(t *testing.T) {
+	t.Setenv("DEJA_COMMAND_HINTS", "on")
 	tmp := hermeticEnv(t)
 	dir := tmp + "/index.db"
 	t.Setenv("DEJA_INDEX_DIR", dir)
