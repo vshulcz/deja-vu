@@ -85,12 +85,17 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 	mcpConn.Store(newMCPConn())
 	br := bufio.NewReaderSize(r, 64*1024)
 	enc := json.NewEncoder(w)
+	srv := newMCPServer(dir, enc)
 	for {
+		if werr := srv.writeErr(); werr != nil {
+			srv.wait()
+			return werr
+		}
 		line, overlong, err := readMCPLine(br, mcpMaxFrame)
 		if overlong {
 			// One oversized frame is reported as a parse error and skipped; the
 			// server keeps serving instead of tearing down the whole session.
-			writeRPCError(enc, nil, -32700, "parse error")
+			srv.refuse(nil, -32700, "parse error")
 		} else if trimmed := strings.TrimSpace(string(line)); trimmed != "" {
 			var req rpcRequest
 			if batch, isBatch := parseBatch(trimmed); isBatch {
@@ -102,30 +107,30 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 				// notification does on its own line: the spec forbids answering
 				// one, inside a batch or out of it.
 				if id, answer := batchReply(batch); answer {
-					writeRPCError(enc, id, -32600, "batch requests are not supported — send one request per line")
+					srv.refuse(id, -32600, "batch requests are not supported — send one request per line")
 				}
 			} else if uerr := json.Unmarshal([]byte(trimmed), &req); uerr != nil {
-				writeRPCError(enc, nil, -32700, "parse error")
+				srv.refuse(nil, -32700, "parse error")
 			} else if req.JSONRPC != "" && req.JSONRPC != "2.0" {
 				// The member that says which protocol the frame speaks. An
 				// absent one is still served — clients in the wild omit it and
 				// the request is unambiguous — but "1.0" asks for a protocol
 				// this server does not speak and used to be answered anyway.
-				writeRPCError(enc, req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
+				srv.refuse(req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
 			} else if !isNotification(req.ID) {
-				result, code, msg := handleMCP(dir, req)
-				if code != 0 {
-					writeRPCError(enc, req.ID, code, msg)
-				} else if eerr := enc.Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result}); eerr != nil {
-					return eerr
-				}
+				srv.serve(req)
+			} else if req.Method == "notifications/cancelled" {
+				srv.cancel(req.Params)
 			}
 		}
 		if err != nil {
 			if err != io.EOF && os.Getenv("DEJA_DEBUG") == "1" {
 				fmt.Fprintf(os.Stderr, "deja mcp read error: %v\n", err)
 			}
-			return nil
+			// Input is over, but requests already read are still owed their
+			// answers.
+			srv.wait()
+			return srv.writeErr()
 		}
 	}
 }

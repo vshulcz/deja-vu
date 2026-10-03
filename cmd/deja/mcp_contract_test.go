@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,16 +16,58 @@ import (
 
 // driveMCP feeds line-delimited JSON-RPC requests through serveMCP (the exact
 // code path `deja mcp` runs over stdio) and returns the parsed responses in
-// order. This exercises the real request/response framing a client sees.
+// order. Calls run concurrently and may answer out of order, so a request that
+// carries an id is sent only once the one before it has been answered, the way
+// a client that awaits each call sees them.
 func driveMCP(t *testing.T, requests ...string) []map[string]any {
 	t.Helper()
-	in := strings.Join(requests, "\n") + "\n"
-	var out bytes.Buffer
-	if err := serveMCP(index.DefaultDir(), strings.NewReader(in), &out); err != nil {
+	pr, pw := io.Pipe()
+	outR, outW := io.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		err := serveMCP(index.DefaultDir(), pr, outW)
+		_ = outW.Close()
+		done <- err
+	}()
+	lines := make(chan string, 64)
+	go func() {
+		sc := bufio.NewScanner(outR)
+		sc.Buffer(make([]byte, 64*1024), mcpMaxFrame+1024)
+		for sc.Scan() {
+			lines <- sc.Text()
+		}
+		close(lines)
+	}()
+	var raw []string
+	for _, r := range requests {
+		if _, err := io.WriteString(pw, r+"\n"); err != nil {
+			t.Fatalf("write request: %v", err)
+		}
+		var probe struct {
+			ID any `json:"id"`
+		}
+		if !strings.HasPrefix(strings.TrimSpace(r), "{") || json.Unmarshal([]byte(r), &probe) != nil || probe.ID == nil {
+			continue
+		}
+		for line := range lines {
+			raw = append(raw, line)
+			var reply struct {
+				ID any `json:"id"`
+			}
+			if json.Unmarshal([]byte(line), &reply) == nil && mcpIDKey(reply.ID) == mcpIDKey(probe.ID) {
+				break
+			}
+		}
+	}
+	_ = pw.Close()
+	for line := range lines {
+		raw = append(raw, line)
+	}
+	if err := <-done; err != nil {
 		t.Fatalf("serveMCP: %v", err)
 	}
 	var resp []map[string]any
-	for _, line := range strings.Split(strings.TrimSpace(out.String()), "\n") {
+	for _, line := range raw {
 		if line == "" {
 			continue
 		}
