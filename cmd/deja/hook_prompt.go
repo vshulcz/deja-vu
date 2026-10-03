@@ -64,6 +64,9 @@ type promptHookInput struct {
 	CWD string `json:"cwd"`
 	// Cursor leaves cwd empty and names the project here instead.
 	WorkspaceRoots []string `json:"workspace_roots"`
+	// HookEventName is BeforeAgent from Gemini CLI, whose compactions are
+	// found in the transcript at the next prompt.
+	HookEventName string `json:"hook_event_name"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
@@ -192,6 +195,9 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// arrived and marked it shown to a session that never saw it (#4588).
 	if strings.TrimSpace(string(input.Prompt)) == "" || grokDropsContext() {
 		return nil
+	}
+	if input.HookEventName == "BeforeAgent" {
+		catchUpCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
 	}
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "UserPromptSubmit", shape, stdout); delivered {
 		return err

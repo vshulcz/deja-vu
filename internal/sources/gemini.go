@@ -207,10 +207,19 @@ func parseGeminiJSON(path string) ([]model.Session, error) {
 }
 
 func parseGeminiJSONL(path string) ([]model.Session, error) {
+	return parseGeminiJSONLWith(path, func(fn func(map[string]any)) error {
+		return scanJSONLFromOffset(path, 0, fn)
+	})
+}
+
+// parseGeminiJSONLWith reads Gemini records from scan; path only names the
+// session and finds its project.
+func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	var s model.Session
 	started := false
 	var msgs []geminiMessage
-	msgAt := map[string]int{} // id -> index in msgs, rebuilt when msgs is
+	calls := map[string]json.RawMessage{} // a gemini turn's toolCalls, by id
+	msgAt := map[string]int{}             // id -> index in msgs, rebuilt when msgs is
 	reindex := func() {
 		msgAt = make(map[string]int, len(msgs))
 		for i, m := range msgs {
@@ -219,7 +228,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 			}
 		}
 	}
-	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
+	err := scan(func(m map[string]any) {
 		if !started {
 			id, _ := m["sessionId"].(string)
 			if id == "" {
@@ -257,7 +266,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 						snap = append(snap, gm)
 					}
 				}
-				msgs = mergeGeminiSnapshot(msgs, snap)
+				msgs = mergeGeminiSnapshot(msgs, snap, calls)
 				reindex()
 			}
 			return
@@ -275,6 +284,9 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 		raw, _ := json.Marshal(m)
 		var gm geminiMessage
 		if json.Unmarshal(raw, &gm) == nil && gm.Type != "" {
+			if gm.ID != "" && gm.Type == "gemini" && geminiHasCalls(gm.ToolCalls) {
+				calls[gm.ID] = gm.ToolCalls
+			}
 			// A turn written again under its id — a gemini turn once its
 			// toolCalls arrive — replaces the earlier line, as Gemini's own
 			// loader does.
@@ -304,10 +316,7 @@ func parseGeminiJSONL(path string) ([]model.Session, error) {
 // <session_context>, / or ?), and a prompt deja's recall was prepended to is
 // one of them (#4214). Those turns go back in, before the next turn read
 // earlier that the snapshot kept.
-func mergeGeminiSnapshot(msgs, snap []geminiMessage) []geminiMessage {
-	if len(msgs) == 0 {
-		return snap
-	}
+func mergeGeminiSnapshot(msgs, snap []geminiMessage, calls map[string]json.RawMessage) []geminiMessage {
 	inSnap := map[string]bool{}
 	for _, m := range snap {
 		if m.ID != "" {
@@ -329,12 +338,26 @@ func mergeGeminiSnapshot(msgs, snap []geminiMessage) []geminiMessage {
 		}
 	}
 	tail = pending
+	// A snapshot is history-shaped: a turn that ran a tool holds the
+	// functionCall in its content and no toolCalls, so taken as is it lost the
+	// command and its exit — every one before a resume or a compaction. The
+	// record written earlier under the same id still has them; calls keeps
+	// them by id across snapshots, since a resume first writes one that holds
+	// only the opening context.
 	var out []geminiMessage
 	for _, m := range snap {
+		if c, ok := calls[m.ID]; ok && m.Type == "gemini" && !geminiHasCalls(m.ToolCalls) {
+			m.ToolCalls = c
+		}
 		out = append(out, before[m.ID]...)
 		out = append(out, m)
 	}
 	return append(out, tail...)
+}
+
+func geminiHasCalls(raw json.RawMessage) bool {
+	var calls []any
+	return json.Unmarshal(raw, &calls) == nil && len(calls) > 0
 }
 
 // geminiResumeDrops mirrors Gemini's isIgnoredUserContent: the user turns its

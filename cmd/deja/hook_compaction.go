@@ -42,6 +42,68 @@ func compactionUsageKey(s index.CompactionState) usage.CompactionKey {
 // guesses another session or waits for a history rebuild on the hook path. It
 // returns the state this compaction stored, and false when it stored none.
 func captureCompaction(dir string, input precompactHookInput) (index.CompactionState, bool) {
+	return captureCompactionFrom(dir, input, func(workspace string) (sources.CompactionTranscript, string) {
+		return compactionSource(input, workspace)
+	})
+}
+
+// compactionSource reads what the host named: a transcript file, the turns it
+// handed over in the payload, or a session in a store deja reads by its id.
+// The second string is the failure reason, empty on success.
+func compactionSource(input precompactHookInput, workspace string) (sources.CompactionTranscript, string) {
+	var (
+		transcript sources.CompactionTranscript
+		err        error
+	)
+	switch {
+	case input.TranscriptPath != "":
+		transcript, err = sources.ReadCompactionTranscript(input.TranscriptPath, input.SessionID)
+	case len(input.Messages) > 0:
+		transcript, err = sources.ReadCompactionMessages(input.Harness, input.SessionID, workspace, input.Messages)
+	case input.Harness != "":
+		transcript, err = sources.ReadCompactionStore(input.Harness, input.SessionID)
+	default:
+		return transcript, "missing_transcript"
+	}
+	if err != nil {
+		return transcript, "transcript_unavailable"
+	}
+	return transcript, ""
+}
+
+// catchUpCompaction captures a compaction the host only shows after the fact.
+// Gemini CLI fires PreCompress on every attempt, compacting or not, and has no
+// hook after one; its transcript keeps the old turns and records the rewrite,
+// so the next prompt finds it there. A compaction already stored is left alone,
+// which keeps its packet delivered once.
+func catchUpCompaction(dir string, input precompactHookInput) {
+	if input.SessionID == "" || input.TranscriptPath == "" || recallIsOff() {
+		return
+	}
+	transcript, found, err := sources.ReadGeminiCompaction(input.TranscriptPath, input.SessionID)
+	if err != nil || !found {
+		return
+	}
+	// Seen is kept apart from the session's own ledger, which the capture
+	// below clears: a compaction whose capture failed must not clear it again
+	// on every prompt after.
+	seenKey, seen := onceDigestKey("compaction-seen:"+input.SessionID), "compaction-seen:"+shortHash(transcript.Fingerprint)
+	if loadSeen(dir).injected(seenKey)[seen] {
+		return
+	}
+	workspace := compactionWorkspace(hookProjectPath(input.CWD, input.WorkspaceRoots))
+	if state, ok, err := index.Compaction(dir, input.SessionID, workspace); err == nil && ok && state.SourceDigest == transcript.Fingerprint {
+		return
+	}
+	rememberInjectedIDs(dir, seenKey, seen)
+	// The same bookkeeping a PreCompact does: what this session was shown is
+	// gone from its window, so recall may show it again.
+	forgetInjected(dir, input.SessionID)
+	forgetInjected(dir, compactionFailureKey(input.SessionID))
+	captureCompactionFrom(dir, input, func(string) (sources.CompactionTranscript, string) { return transcript, "" })
+}
+
+func captureCompactionFrom(dir string, input precompactHookInput, read func(workspace string) (sources.CompactionTranscript, string)) (index.CompactionState, bool) {
 	if input.SessionID == "" {
 		return index.CompactionState{}, false
 	}
@@ -63,14 +125,10 @@ func captureCompaction(dir string, input precompactHookInput) (index.CompactionS
 			Key: usage.CompactionKey{Session: shortHash(input.SessionID), Workspace: shortHash(workspace)}, Error: reason,
 		})
 	}
-	if input.TranscriptPath == "" {
-		failure("missing_transcript")
-		return index.CompactionState{}, false
-	}
 	now := time.Now().UTC()
-	transcript, err := sources.ReadCompactionTranscript(input.TranscriptPath, input.SessionID)
-	if err != nil {
-		failure("transcript_unavailable")
+	transcript, reason := read(workspace)
+	if reason != "" {
+		failure(reason)
 		return index.CompactionState{}, false
 	}
 	if transcript.Workspace == "" || compactionWorkspace(transcript.Workspace) != workspace {

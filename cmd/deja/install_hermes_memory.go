@@ -225,6 +225,24 @@ def _deja(args, payload="", timeout=10):
         return ""
 
 
+def _bounded_messages(messages, limit=768 * 1024):
+    # deja reads at most 1 MB of hook payload. The packet is about where the
+    # work stood, so the newest turns are kept and long tool output is cut.
+    out, size = [], 0
+    for m in reversed(list(messages or [])):
+        if not isinstance(m, dict):
+            continue
+        m = dict(m)
+        if isinstance(m.get("content"), str) and len(m["content"]) > 4000:
+            m["content"] = m["content"][:4000]
+        size += len(json.dumps(m, default=str))
+        if size > limit:
+            break
+        out.append(m)
+    out.reverse()
+    return out
+
+
 def _query_args(command, text):
     # "--" when the text names one of deja's own flags: a search for "--json"
     # otherwise dies in flag parsing and comes back as an empty history.
@@ -299,11 +317,29 @@ class DejaMemoryProvider(MemoryProvider):
         # on its next refresh. Nothing to mirror.
         return None
 
+    def on_pre_compress(self, messages) -> str:
+        # Held until the compression commits: Hermes can still abandon it, and
+        # it may move the conversation to a new session id first.
+        self._compressing = messages
+        return ""
+
     def on_session_switch(self, new_session_id: str, *, parent_session_id: str = "", reset: bool = False, rewound: bool = False, **kwargs) -> None:
         # A new conversation, or one whose transcript was cut back, has lost
         # the digest; hand it over again on the next turn.
         if reset or rewound:
             self._first_turn = True
+        # The compression committed. deja builds the recovery packet from the
+        # turns that were summarised, under the id the next turn will ask
+        # with, and hands it back on that turn.
+        compressed, self._compressing = getattr(self, "_compressing", None), None
+        if kwargs.get("reason") == "compression" and compressed and new_session_id:
+            payload = json.dumps({
+                "session_id": new_session_id,
+                "cwd": os.getcwd(),
+                "harness": "hermes",
+                "messages": _bounded_messages(compressed),
+            }, default=str)
+            _deja(["hook-precompact"], payload, timeout=10)
 
     def on_memory_write(self, action: str, target: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         # A MEMORY.md / USER.md entry is a decision worth outranking the noisy

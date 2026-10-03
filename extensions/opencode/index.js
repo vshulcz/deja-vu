@@ -166,6 +166,8 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // again. Counted, so a store that really is empty is still only asked a few
   // times.
   const empties = new Map()
+  // Sessions between their compacting hook and the summary request.
+  const compacting = new Set()
   // Every session the per-prompt hook stamped live. opencode never says a
   // session ended, so without ending them here the stamp sat out its whole
   // window and the next session's MCP recall left a finished one out (#4546).
@@ -281,6 +283,10 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // the same place Claude Code's SessionStart output lands.
   hooks["experimental.chat.system.transform"] = async (input, output) => {
     try {
+      // The summary request is the last one a compaction makes, and the digest
+      // has no business in it: asked here, deja would hand the summariser the
+      // recovery packet meant for the turn after.
+      if (input?.sessionID && compacting.delete(input.sessionID)) return
       const key = input?.sessionID || "default"
       if (!digests.has(key)) {
         // The session id, as the plugin `deja install opencode-auto` writes
@@ -335,6 +341,11 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // by what the user just asked. Silent when nothing matches.
   hooks["experimental.chat.messages.transform"] = async (input, output) => {
     try {
+      // The compaction's own request runs this transform right after the
+      // compacting hook. Recall there would land in the summariser's input and
+      // the recovery packet would count as delivered to a turn that never saw it.
+      const owner = (output?.messages || []).find((m) => m?.info?.sessionID)?.info?.sessionID
+      if (owner && compacting.has(owner)) return
       const { parts, prompt, sessionID } = lastUserText(output?.messages)
       // A turn with no text, an image alone, still goes to hook-prompt: that
       // call is what stamps the session live again after session.idle ended
@@ -356,11 +367,15 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
     }
   }
 
-  // Compaction is about to throw the working transcript away. Index what
-  // exists now, so the session survives in memory after the window collapses.
-  hooks["experimental.session.compacting"] = async () => {
+  // Compaction is about to summarise the session away. The turns are still in
+  // opencode's store, so deja reads them by the session id and keeps a
+  // recovery packet — commands, how they went, what was open — for the next
+  // turn, as Claude Code gets through PreCompact.
+  hooks["experimental.session.compacting"] = async (input) => {
     try {
-      await ask(["hook-precompact"], undefined, 60000)
+      const sessionID = input?.sessionID || ""
+      if (sessionID) compacting.add(sessionID)
+      await ask(["hook-precompact"], JSON.stringify({ session_id: sessionID, cwd, harness: "opencode" }), 60000)
     } catch {
       // memory is optional: never break a compaction over it
     }

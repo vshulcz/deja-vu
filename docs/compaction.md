@@ -1,7 +1,9 @@
 # Automatic compaction recovery
 
-With auto-recall installed, `hook-precompact` reads the current Claude Code or
-Codex JSONL transcript before the host compacts it. It extracts the user's
+With auto-recall installed, `hook-precompact` reads the current session before
+the host compacts it: the Claude Code or Codex JSONL transcript, the opencode or
+Kilo CLI session in their SQLite store, or the turns Hermes hands its memory
+provider. Gemini CLI is read after the fact, see below. It extracts the user's
 objective, assistant conclusions, recorded verification commands, and what a turn
 says is still open or in conflict. An open item is recognised by its shape — the
 line opens with the label, in either language ("Gap: …", "Осталось: …", "Still
@@ -61,8 +63,18 @@ usual background index warmup.
 
 The source must declare the exact native session ID and workspace supplied by
 the hook. Unknown formats, missing transcript paths, mismatched identities, and
-files that change during reading cannot produce a successful capture. Other
-hosts keep the existing warmup and recall behavior until a supported transcript
+files that change during reading cannot produce a successful capture.
+
+| Host | Capture | Packet handed back |
+|---|---|---|
+| Claude Code, Codex | `PreCompact` reads the JSONL transcript | next session-start, prompt or tool hook |
+| opencode, Kilo CLI | the plugin's `experimental.session.compacting` names the session; deja reads it from `opencode.db` / `kilo.db`, which keep the compacted turns | next prompt, appended to the user turn; the summary request itself gets neither recall nor the packet |
+| Hermes | the memory provider keeps the turns from `on_pre_compress` and passes them on `on_session_switch` with `reason="compression"`, under the session id the next turn uses | next turn's prefetch |
+| Gemini CLI | none before: `PreCompress` fires on every compression attempt, compacting or not. The transcript keeps the old turns and records the rewrite that drops them, so the next `BeforeAgent` finds the compaction there and reads the session as it stood before it | that same `BeforeAgent` |
+
+On opencode the packet rides one request, like per-prompt recall there: the
+plugin adds it to the copy of the turn opencode sends, not to the stored turn.
+Other hosts keep the existing warmup and recall behavior until a supported
 reader and the required hook payload are available.
 
 Reasonix is handled differently. Its extension receives the turns being folded,

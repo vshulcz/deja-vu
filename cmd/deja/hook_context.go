@@ -49,6 +49,11 @@ type precompactHookInput struct {
 	WorkspaceRoots []string `json:"workspace_roots"`
 	HookEventName  string   `json:"hook_event_name"`
 	Trigger        string   `json:"trigger"`
+	// Harness names a host whose session has no transcript file: opencode and
+	// Kilo keep it in SQLite, read here by session id; Hermes hands over the
+	// turns it is compacting in Messages.
+	Harness  string          `json:"harness"`
+	Messages json.RawMessage `json:"messages"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 }
