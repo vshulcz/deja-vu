@@ -21,7 +21,7 @@ func TestToolHookKnowsCommandCodeToolNames(t *testing.T) {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/retry.cfg","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on three retries in retry.cfg."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/retry.cfg","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	commandRunWithAnOutcome(t, "go test ./... -count=1", "a", "b")

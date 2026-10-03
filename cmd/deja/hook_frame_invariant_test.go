@@ -52,7 +52,7 @@ func TestEveryHookInjectionSaysItIsUntrusted(t *testing.T) {
 		rows := []string{
 			fmt.Sprintf(`{"type":"user","sessionId":%q,"cwd":"/work/api","timestamp":%q,"message":{"role":"user","content":"work on the ingest watermark"}}`,
 				sid, at.Format(time.RFC3339)),
-			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/api","timestamp":%q,"message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/work/api/internal/index/ingest.go","old_string":"x","new_string":"y"}}]}}`,
+			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/api","timestamp":%q,"message":{"role":"assistant","content":[{"type":"text","text":"We settled on ingest.go reading the batch before the lock."},{"type":"tool_use","name":"Edit","input":{"file_path":"/work/api/internal/index/ingest.go","old_string":"x","new_string":"y"}}]}}`,
 				sid, at.Add(time.Minute).Format(time.RFC3339)),
 			fmt.Sprintf(`{"type":"assistant","sessionId":%q,"cwd":"/work/api","timestamp":%q,"message":{"role":"assistant","content":"the watermark stays grok-only (%d)"}}`,
 				sid, at.Add(2*time.Minute).Format(time.RFC3339), k),

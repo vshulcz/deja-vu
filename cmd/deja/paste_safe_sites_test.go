@@ -79,20 +79,6 @@ func TestTheHintsThatOfferACommandQuoteWhatTheyOffer(t *testing.T) {
 	}
 }
 
-// The command the file hook offers carries a path that came out of a
-// transcript, which is the same kind of value.
-func TestTheFileHookQuotesThePathItOffers(t *testing.T) {
-	for _, name := range []string{"esc" + string(rune(0x1b)) + "[31mX.go", "amp&&id.go"} {
-		line := fileHookBlameOffer("head", name)
-		if carriesControl(line) {
-			t.Errorf("%q: a control byte reached the terminal: %q", name, line)
-		}
-		if strings.Contains(line, "blame "+name) {
-			t.Errorf("%q: the path is unquoted in a command to paste: %q", name, line)
-		}
-	}
-}
-
 // The `deja fix` line offers an error string lifted from a transcript, and a
 // shell expands `$(…)` and backticks inside double quotes as readily as
 // outside them — so Go's own `%q` was not quoting for the reader who pastes.

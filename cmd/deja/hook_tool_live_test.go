@@ -24,9 +24,9 @@ func TestToolHookLeavesTheLiveSessionOutOfTheFileLine(t *testing.T) {
 	}
 	for i := 0; i < 5; i++ {
 		edit("old"+string(rune('0'+i)), "2026-01-0"+string(rune('2'+i))+"T03:04:05Z",
-			"Set retry back to three in retry.cfg; five retries overloaded the upstream.")
+			"We settled on three in retry.cfg; five retries overloaded the upstream.")
 	}
-	edit("live", "2026-02-01T03:04:05Z", "Raised the retry count in retry.cfg to five and stopped there.")
+	edit("live", "2026-02-01T03:04:05Z", "We settled on five in retry.cfg and stopped there.")
 	if _, err := captureRun(t, "index"); err != nil {
 		t.Fatal(err)
 	}

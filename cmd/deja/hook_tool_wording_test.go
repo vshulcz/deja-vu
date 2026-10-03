@@ -41,21 +41,33 @@ func editStore(t *testing.T) string {
 }
 
 // The line was built on a measurement: an agent follows a decision where it
-// ignores a pointer. Calling the last sentence of the last session a "prior
-// decision" spends that credibility on filler — and the same surface already
-// says the honest weaker thing for commands (#2526).
+// ignores a pointer. The last sentence of the last session is not a decision,
+// and offered under a weaker label it was never acted on either: a month of real
+// sessions, 37 of those lines and no recall, no blame, no edit changed. So the
+// line says nothing rather than spend the agent's context on it (#2526).
 func TestAScannedConclusionIsNotCalledADecision(t *testing.T) {
 	dir := editStore(t)
 
-	line := fileHookLine(dir, "/work/app", "/work/app/render.go")
-	if line == "" {
-		t.Fatal("the fixture produced no line at all")
+	if line := fileHookLine(dir, "/work/app", "/work/app/render.go"); line != "" {
+		t.Errorf("a session's closing sentence reached the edit:\n  %s", line)
 	}
-	if strings.Contains(line, "prior decision") {
-		t.Errorf("a session's closing sentence is offered as a decision:\n  %s", line)
+}
+
+// A note the user promoted reaches the file through any session that touched
+// it, and one long session touches everything. Read from a real month: the one
+// accepted note on the machine, a rule about the repository description, went
+// out in front of 56 edits to Go files it says nothing about, and the
+// session-start block already carries it. A note that does not name the file
+// stays off this line.
+func TestAProjectNoteThatIsNotAboutTheFileStaysOff(t *testing.T) {
+	dir := editStore(t)
+	if _, err := captureRunStderr(t, "promote", "f5", "--state", "accepted",
+		"--note", "the repository description leads with the task, not the category"); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(line, "changed the renderer") {
-		t.Errorf("the line stopped carrying what the last session ended on:\n  %s", line)
+
+	if line := fileHookLine(dir, "/work/app", "/work/app/render.go"); line != "" {
+		t.Errorf("a note about something else went out in front of the edit:\n  %s", line)
 	}
 }
 

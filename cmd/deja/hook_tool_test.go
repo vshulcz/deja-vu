@@ -91,7 +91,7 @@ func TestToolHookFileLineIsScopedToTheProject(t *testing.T) {
 	touch := func(proj, cwd, id string) {
 		writeClaudeFixture(t, filepath.Join(root, proj, id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"` + cwd + `","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit config"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"` + cwd + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"` + cwd + `/config.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"` + cwd + `","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"` + cwd + `/config.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	// Six sessions in each of two projects, both editing a file named config.go.
@@ -130,7 +130,7 @@ func TestToolHookIgnoresNonEditingTools(t *testing.T) {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
@@ -160,7 +160,7 @@ func TestToolHookSpeaksForALowercaseRead(t *testing.T) {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
@@ -200,7 +200,7 @@ func TestToolHookFileScopingIsLoadBearing(t *testing.T) {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
@@ -231,7 +231,7 @@ func TestToolHookReadsTheFileFromAnApplyPatch(t *testing.T) {
 		id := "s" + string(rune('0'+i))
 		writeClaudeFixture(t, filepath.Join(root, "alpha", id+".jsonl"), id, []string{
 			`{"type":"user","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"edit"}}`,
-			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
+			`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/alpha","timestamp":"2026-01-02T03:04:06Z","message":{"role":"assistant","content":[{"type":"text","text":"We settled on config.go loading the sentinel before any read."},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"/work/alpha/config.go","old_string":"a","new_string":"b"}}]}}`,
 		})
 	}
 	if _, err := captureRun(t, "index"); err != nil {
@@ -315,7 +315,7 @@ func TestToolHookFileLineCarriesThePriorDecision(t *testing.T) {
 
 // A decision the session itself took back must not be surfaced at the point of
 // an edit — that would push the agent to redo what was undone. When the only
-// session with a conclusion says it reverted, the line falls back to the pointer.
+// session with a conclusion says it reverted, there is nothing left to say.
 func TestToolHookFileLineSkipsARevertedDecision(t *testing.T) {
 	tmp := hermeticEnv(t)
 	t.Setenv("DEJA_INDEX_DIR", filepath.Join(tmp, "index.db"))
@@ -337,16 +337,8 @@ func TestToolHookFileLineSkipsARevertedDecision(t *testing.T) {
 	}
 	t.Setenv("CLAUDE_PROJECT_DIR", "/work/alpha")
 	out := toolHookRun(t, `{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"/work/alpha/config.go"},"session_id":"now","cwd":"/work/alpha"}`)
-	var resp sessionStartHookResponse
-	if err := json.Unmarshal([]byte(out), &resp); err != nil {
-		t.Fatal(err)
-	}
-	ctx := resp.HookSpecificOutput.AdditionalContext
-	if strings.Contains(ctx, "ARENAGUARD") {
-		t.Errorf("a reverted decision was surfaced at the edit:\n%s", ctx)
-	}
-	if !strings.Contains(ctx, "deja blame config.go") {
-		t.Errorf("with no usable decision it should fall back to the pointer:\n%s", ctx)
+	if out != "" {
+		t.Errorf("with no usable decision the line should stay silent:\n%s", out)
 	}
 }
 

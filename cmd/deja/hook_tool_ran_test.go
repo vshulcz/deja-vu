@@ -78,16 +78,12 @@ func TestTheFileLineHandsOverTheCommandThatPassedHere(t *testing.T) {
 }
 
 // The claim is that the command passed, so a command the transcript recorded as
-// failing must not become one — the file line falls back to the pointer it
-// always had.
+// failing must not become one.
 func TestAFailingCommandIsNotOfferedAsTheWayToCheckAnEdit(t *testing.T) {
 	dir := ranStoreFor(t, "go test -tags golden ./internal/store", false, 5)
 	line := fileHookLine(dir, "/work/app", "/work/app/internal/store/store.go")
 	if strings.Contains(line, "go test -tags golden") {
 		t.Errorf("a command nobody saw pass is offered as one that did:\n  %s", line)
-	}
-	if !strings.Contains(line, "deja blame") {
-		t.Errorf("without evidence the line no longer offers the history:\n  %s", line)
 	}
 }
 

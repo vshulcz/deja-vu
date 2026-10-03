@@ -41,7 +41,7 @@ import (
 // coincidence. A measured A/B settled the payload: a line that only pointed at
 // `deja blame` changed nothing an agent did, while the same line carrying the
 // decision drove it to reuse the prior fix — so the file line names the decision
-// and keeps the pointer only as a fallback.
+// and otherwise says nothing.
 
 const (
 	// toolHookMaxBytes caps the whole payload. Wider than a bare pointer because
@@ -56,11 +56,8 @@ const (
 	// toolHookMsgTail caps the messages scanned per session for the same reason:
 	// a decision states itself near the end, not buried in a long transcript.
 	toolHookMsgTail = 150
-	// toolHookMinFileSessions is when a file's history stops being noise. A
-	// file two sessions touched is ordinary work; five is a place with a past.
-	toolHookMinFileSessions = 5
-	// toolHookMinFileSessionsWithDecision is the same bar for a line that
-	// carries a decision rather than a count. One session is the session that
+	// toolHookMinFileSessionsWithDecision is how many sessions must have touched
+	// a file before its line can speak. One session is the session that
 	// made the decision and has nobody to tell it to; two is the first time it
 	// is worth repeating.
 	toolHookMinFileSessionsWithDecision = 2
@@ -148,7 +145,7 @@ func runHookTool(dir string, stdin io.Reader, stdout io.Writer) error {
 // to 154 different files, which is a line on every edit saying the same thing.
 // What repeats is the decision, not the sentence built around it.
 func dedupeFact(line string) string {
-	for _, label := range []string{standingLabel, decisionLabel, endedLabel, ranLabel, failLabel} {
+	for _, label := range []string{standingLabel, decisionLabel, ranLabel, failLabel} {
 		if i := strings.Index(line, label); i >= 0 {
 			return line[i:]
 		}
@@ -812,98 +809,37 @@ func fileHookLineOutside(dir, cwd, path, self string) string {
 	// speaking to the agent (#1863).
 	name := search.SafePath(baseName(path))
 	head := fmt.Sprintf("%s has been worked on in %s%s", name, toolSessionCount(sessions), when)
-	// Below the bar for a count, the line still stands if it carries a decision.
-	//
-	// The two are not the same claim. "Worked on in three sessions" is a number
-	// an agent can do nothing with, which is why the bar is five. A decision is
-	// the thing the same measurement showed an agent acts on — and a file two or
-	// three sessions argued over has one as often as a file with a long past.
-	// Counted from the manifest of a real store across every harness: in the
-	// projects worked in more than one session, 39-62% of files have been
-	// touched twice, against 13-36% five times, so the bar was hiding most of
-	// the channel behind a number nobody needed.
-	if sessions < toolHookMinFileSessions {
-		if d := promotedDecisionFor(inScope); d != "" {
-			return head + standingLabel + d
-		}
-		// Two sessions that both touched this file and both ended cleanly on
-		// the same command clear the same bar a decision does: it is a pattern
-		// rather than a coincidence. Before the scanned line, because that one
-		// is the newest thing a session said about the file and a command that
-		// passed twice is the one fact here the agent can check for itself.
-		if ran := fileHookRanLine(dir, inScope); ran != "" {
-			return head + ran
-		}
-		if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) {
-			return head + decisionLabelFor(path, d) + d
-		}
-		// A count on its own is the number the bar above exists to withhold.
-		return ""
-	}
-	// The measured difference between a nudge that changes what an agent does
-	// and one it ignores is whether it carries the decision or only points at
-	// it: a line that said "deja blame X has the history" drove no reuse, while
-	// the same moment carrying the prior decision did. So surface the decision
-	// here, and fall back to the pointer only when none can be extracted.
-	// Named for what it is. A promoted note is the user's own decision; a line
-	// the conclusion scan found is the last thing a session said about the
-	// file, which is often "changed the renderer (5)". The line was built on a
-	// measurement — an agent follows a decision where it ignores a pointer —
-	// and calling filler a decision spends exactly that credibility (#2526).
-	// The command line has said the weaker "last time:" all along.
-	if d := promotedDecisionFor(inScope); d != "" {
+	// The line speaks only when what it carries is about this file: a decision
+	// that names it, or a command two sessions here ran on it. Read from a month
+	// of real Claude Code sessions, 114 file lines and not one the agent acted
+	// on: no recall or blame that followed from one, no reply that used it. 56
+	// of them were the same accepted note about the repository description,
+	// reached through one long session that touched every file; the
+	// session-start block already carries that note as a standing decision.
+	// 37 were the closing sentence of
+	// the newest session ("last session on it ended") and 8 the bare `deja
+	// blame` pointer, which the A/B behind this hook already found changed
+	// nothing. What the same A/B found an agent reuses is the decision about the
+	// file, so that is what is left.
+	if d := promotedDecisionFor(inScope); d != "" && mentionsFile(path, d) {
 		return head + standingLabel + d
 	}
-	// The user's own decision outranks it; a scanned conclusion does not. That
-	// line is the newest thing a session said about the file, as often
-	// "changed the renderer (5)" as a decision, while this one is a command
-	// two sessions ran here and the transcript saw pass.
+	// A scanned conclusion does not outrank this: that line is the newest thing
+	// a session said about the file, while this one is a command two sessions
+	// ran here and the transcript saw pass.
 	if ran := fileHookRanLine(dir, inScope); ran != "" {
 		return head + ran
 	}
-	if d := fileDecisionLine(dir, inScope); d != "" {
-		// A scanned line is called a decision only when it reads as one. The
-		// scan's own fallback is the newest session's closing sentence, which
-		// is as often "changed the renderer (5)" as it is a decision, and the
-		// same marker list the digest uses can tell them apart.
-		if digest.CarriesDecision(d) {
-			return head + decisionLabelFor(path, d) + d
-		}
-		return head + endedLabel + d
+	// A scanned line is a decision about the file only when it reads as one and
+	// names the file. Of 63 lines once offered as "prior decision", none named
+	// the file or its package.
+	if d := fileDecisionLine(dir, inScope); d != "" && digest.CarriesDecision(d) && mentionsFile(path, d) {
+		return head + decisionLabel + d
 	}
-	return fileHookBlameOffer(head, name)
+	return ""
 }
 
-// fileHookBlameOffer is the line that hands the agent a command to run on the
-// file it is about to touch. The name came out of a transcript, so it is
-// quoted the way every pasted value is: raw, an escape byte in it reaches the
-// terminal and a metacharacter changes what the command does (#2768).
-func fileHookBlameOffer(head, name string) string {
-	return fmt.Sprintf("%s — `deja blame %s` has the history.", head, pasteSafe(name))
-}
-
-// decisionLabelFor says what the line is about to hand over: a decision about
-// this file, or the closing words of a session that worked on it.
-//
-// The distinction is not cosmetic. Read from a real store, of the 63 lines that
-// called something "prior decision" about a file, *none* mentioned the file or
-// the package it sits in — they were the last decision-shaped sentence of a
-// session that happened to touch it. One incident diagnosis was offered as the
-// prior decision about five different `main.go` files, and an answer to a
-// question about Zed's wiring as the decision about three different SKILL.md.
-// A decision earns the word by being about the file; otherwise it is reported
-// for what it is, which is what the weaker label has always said.
-func decisionLabelFor(path, text string) string {
-	if mentionsFile(path, text) {
-		return decisionLabel
-	}
-	return endedLabel
-}
-
-const (
-	decisionLabel = " — prior decision: "
-	endedLabel    = " — last session on it ended: "
-)
+const decisionLabel = " — prior decision: "
 
 // mentionsFile reports whether the text names the file or the directory it sits
 // in. Stems count: a decision about `render.go` says "renderer", and one about

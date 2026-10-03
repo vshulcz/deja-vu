@@ -15,7 +15,7 @@ func TestTheDecisionLabelIsEarned(t *testing.T) {
 		{"/work/app/notes.jsonl", "a note keeps its own state, not the session's"},
 	}
 	for _, c := range about {
-		if got := decisionLabelFor(c.path, c.text); got != decisionLabel {
+		if !mentionsFile(c.path, c.text) {
 			t.Errorf("a decision about the file was not called one:\n  %s\n  %s", c.path, c.text)
 		}
 	}
@@ -26,7 +26,7 @@ func TestTheDecisionLabelIsEarned(t *testing.T) {
 		{"/work/app/cmd/deja/doctor.go", "The largest content-quality problem is not retrieval order"},
 	}
 	for _, c := range elsewhere {
-		if got := decisionLabelFor(c.path, c.text); got != endedLabel {
+		if mentionsFile(c.path, c.text) {
 			t.Errorf("a conclusion about something else was called this file's decision:\n  %s\n  %s", c.path, c.text)
 		}
 	}
@@ -35,10 +35,10 @@ func TestTheDecisionLabelIsEarned(t *testing.T) {
 // And the same sentence in front of five files is one fact, whichever label it
 // arrived under.
 func TestOneSentenceIsOneFactWhateverTheLabel(t *testing.T) {
-	a := "main.go has been worked on in 6 sessions" + endedLabel + "explore start rejected by the moderation check"
-	b := "main.go has been worked on in 9 sessions" + endedLabel + "explore start rejected by the moderation check"
+	a := "main.go has been worked on in 6 sessions" + standingLabel + "explore start rejected by the moderation check"
+	b := "README.md has been worked on in 9 sessions" + standingLabel + "explore start rejected by the moderation check"
 	if dedupeFact(a) != dedupeFact(b) {
-		t.Error("the same closing sentence counts twice")
+		t.Error("the same decision counts twice")
 	}
 	c := "render.go has been worked on in 6 sessions" + decisionLabel + "the renderer never re-wraps"
 	if dedupeFact(a) == dedupeFact(c) {
