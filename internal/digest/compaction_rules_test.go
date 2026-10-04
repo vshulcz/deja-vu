@@ -95,9 +95,9 @@ func TestStandingRulesSkipWhatIsNotAnInstruction(t *testing.T) {
 func TestStandingRulesInOtherShapes(t *testing.T) {
 	for turn, want := range map[string]string{
 		"Fix the export. Don't touch the install code, another person is on it.": "Don't touch the install code, another person is on it.",
-		"давай дальше. не трогай legacy и не запускай go test сам":                  "не трогай legacy и не запускай go test сам",
-		"Use slices instead of sort in new code.":                                   "Use slices instead of sort in new code.",
-		"всегда гоняй тесты через ./check.sh":                                       "всегда гоняй тесты через ./check.sh",
+		"давай дальше. не трогай legacy и не запускай go test сам":               "не трогай legacy и не запускай go test сам",
+		"Use slices instead of sort in new code.":                                "Use slices instead of sort in new code.",
+		"всегда гоняй тесты через ./check.sh":                                    "всегда гоняй тесты через ./check.sh",
 	} {
 		rules := ExtractStandingRules(rulesSession(turn), nil)
 		if len(rules) != 1 || rules[0].Text != want {
