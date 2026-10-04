@@ -152,6 +152,8 @@ func afterForkNoise(r Record) bool {
 	switch {
 	case t == "":
 		return true
+	case r.Role == roleSummary:
+		return true
 	case r.Role == "user":
 		return harnessPreamble(t)
 	case r.Role == "assistant":
@@ -197,7 +199,9 @@ const openingTextBytes = 256
 // session has no timed user turn, so a store without times never matches.
 func SessionOpening(s model.Session) uint64 {
 	for _, msg := range s.Messages {
-		if msg.Role != "user" || msg.Time.IsZero() {
+		// A compacted session opens on the harness's summary, filed under its
+		// own role; a fork of it opens on the same record.
+		if (msg.Role != "user" && msg.Role != roleSummary) || msg.Time.IsZero() {
 			continue
 		}
 		// The text as the index keeps it, whichever side this runs on: the

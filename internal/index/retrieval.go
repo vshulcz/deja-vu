@@ -1853,11 +1853,15 @@ func RecentProject(dir, project string, n int) ([]model.Session, error) {
 // record of what a turn touched, not something said; an invocation is an
 // action, not an answer; a replaced span is the file's old contents. All three
 // are indexed and searchable, and served only when asked for by name.
+//
+// So is a harness's compaction summary (#3384). It names every topic the
+// session touched, and served by default it carried a marathon into the
+// answer for questions the session never discussed.
 func recordServable(role string, o query.Options) bool {
 	if o.Role != "" && !roleMatches(role, o.Role) {
 		return false
 	}
-	for _, work := range []string{roleFiles, roleCommand, roleEdit} {
+	for _, work := range []string{roleFiles, roleCommand, roleEdit, roleSummary} {
 		if role == work && o.Role != work {
 			return false
 		}

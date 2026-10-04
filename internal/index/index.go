@@ -662,7 +662,12 @@ import (
 // 41 through 46: the colon inside the token stopped every assignment rule, so
 // a store built before this holds the ones pasted in prose or assigned to a
 // variable as written.
-const version = 62
+//
+// 63 files Claude Code's compaction summary and Gemini's state snapshot under
+// the summary role, as opencode's and Hermes's already were (#3384). Read as
+// the person's words, 41 Claude summaries supplied 191 of 622 first-hit quotes
+// on 453 real recall questions.
+const version = 63
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

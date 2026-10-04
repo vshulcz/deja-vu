@@ -733,14 +733,13 @@ func IsHookStatusLine(t string) bool {
 // kilobytes and the handoff has a budget to spend on what was actually said.
 func compactedHalf(s model.Session) string {
 	for _, m := range s.Messages {
-		if m.Role != "user" {
+		if m.Role != "user" && m.Role != sources.RoleSummary {
 			continue
 		}
-		trimmed := strings.TrimSpace(m.Text)
-		if !IsCompactionSummary(trimmed) {
+		if !isHostSummary(m) {
 			return ""
 		}
-		return compactionIntent(trimmed)
+		return compactionIntent(strings.TrimSpace(m.Text))
 	}
 	return ""
 }

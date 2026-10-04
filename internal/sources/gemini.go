@@ -426,6 +426,10 @@ func appendGeminiMessages(s *model.Session, msgs []geminiMessage) {
 		if text == "" {
 			continue
 		}
+		// Compression hands the model its own summary back as a user turn.
+		if role == "user" && strings.HasPrefix(strings.TrimSpace(text), "<state_snapshot>") {
+			role = RoleSummary
+		}
 		s.Touch(t)
 		s.Messages = append(s.Messages, model.Message{Role: role, Text: text, Time: t})
 	}

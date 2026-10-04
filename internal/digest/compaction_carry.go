@@ -12,6 +12,14 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
+// isHostSummary reports whether a message is the summary a harness wrote of the
+// turns it compacted away: filed under the summary role by the parsers that
+// know the record, or under the user role by an index built before they did.
+func isHostSummary(m model.Message) bool {
+	return m.Role == sources.RoleSummary ||
+		(m.Role == "user" && IsCompactionSummary(strings.TrimSpace(m.Text)))
+}
+
 // The "keep until closed" list: what a host's compaction summary tends to drop,
 // taken from the transcript without a model and carried from one compaction to
 // the next until the transcript closes it. Measured on 189 real compactions:
@@ -78,7 +86,7 @@ func ExtractCarry(messages []model.Message, prev []model.ContextCarry) []model.C
 			break
 		}
 		text := strings.TrimSpace(m.Text)
-		if m.Role == sources.RoleSummary || (m.Role == "user" && IsCompactionSummary(text)) {
+		if isHostSummary(m) {
 			break
 		}
 		var kind byte

@@ -210,7 +210,7 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 	// statement from the user. Its bounded primary intent is still the only
 	// honest objective when the retained tail contains only "continue".
 	for _, m := range s.Messages {
-		if m.Role != "user" || !IsCompactionSummary(strings.TrimSpace(m.Text)) {
+		if !isHostSummary(m) {
 			continue
 		}
 		if text := contextProse(compactionIntent(m.Text), contextObjectiveBytes); text != "" {

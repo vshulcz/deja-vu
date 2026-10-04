@@ -228,7 +228,9 @@ func TestALongHeadedForksPromptRecallLeavesOutItsSource(t *testing.T) {
 		pad := strings.Repeat("x", 70<<10)
 		return fmt.Sprintf(`{"type":"attachment","uuid":"att-1","sessionId":%q,"cwd":"/w/p","timestamp":%q,"attachment":{"type":"file","content":%q}}`, id, at(time.Second), pad) + "\n" +
 			fmt.Sprintf(`{"type":"user","uuid":"u-1","sessionId":%q,"cwd":"/w/p","timestamp":%q,"isCompactSummary":true,"message":{"role":"user","content":%q}}`, id, at(0), opening) + "\n" +
-			fmt.Sprintf(`{"type":"assistant","uuid":"a-1","sessionId":%q,"cwd":"/w/p","timestamp":%q,"message":{"role":"assistant","content":"Looking at the retry loop in fetch.go now."}}`, id, at(5*time.Second)) + "\n" + more
+			// The summary is served only when asked for, so the source's own
+			// words are what the control is answered with.
+			fmt.Sprintf(`{"type":"assistant","uuid":"a-1","sessionId":%q,"cwd":"/w/p","timestamp":%q,"message":{"role":"assistant","content":"Looking at the retry loop in fetch.go that spins on HTTP 500 now."}}`, id, at(5*time.Second)) + "\n" + more
 	}
 	const source = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 	const fork = "ffffffff-ffff-4fff-8fff-ffffffffffff"

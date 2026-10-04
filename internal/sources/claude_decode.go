@@ -46,6 +46,11 @@ type claudeLine struct {
 	// placeholder. Indexed as the person's words, a skill body became 52
 	// questions nobody asked on one machine (#3267).
 	IsMeta bool `json:"isMeta"`
+	// IsCompactSummary marks the user-role record Claude Code writes after a
+	// compaction: the model's summary of the turns it dropped. Filed as user
+	// speech it named every topic a marathon touched, and on 453 real recall
+	// questions 191 of 622 first-hit quotes came out of 41 such records.
+	IsCompactSummary bool `json:"isCompactSummary"`
 	// RequestID is the API call this record reports on. A store that appends a
 	// snapshot per stream chunk repeats it, which is how a run of prefixes is
 	// recognised as one reply (#3644).
@@ -151,6 +156,9 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 			if toolOut {
 				role = RoleToolOutput
 			}
+		}
+		if v.Type == "user" && v.IsCompactSummary && role == "user" {
+			role = RoleSummary
 		}
 		if txt != "" {
 			// A snapshot run is one reply: the later record carries the longer
