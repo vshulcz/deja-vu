@@ -183,7 +183,7 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 			continue
 		}
 		text := contextProse(m.Text, contextObjectiveBytes)
-		if text != "" && !trivialContinuation(text) {
+		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
 	}
@@ -202,7 +202,7 @@ func contextObjective(s model.Session, window []model.Message) model.ContextFact
 			continue
 		}
 		text := contextProse(m.Text, contextObjectiveBytes)
-		if text != "" && !trivialContinuation(text) {
+		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
 	}

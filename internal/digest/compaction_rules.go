@@ -202,7 +202,7 @@ func sessionGoal(s model.Session) model.ContextFact {
 			text = text[:i]
 		}
 		text = contextProse(text, goalBytes)
-		if text != "" && !trivialContinuation(text) {
+		if text != "" && !trivialContinuation(text) && !notARequest(m.Text) {
 			return model.ContextFact{Text: text, Provenance: contextRef(s, m)}
 		}
 	}
