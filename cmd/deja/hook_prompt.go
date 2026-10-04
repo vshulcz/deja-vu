@@ -1123,7 +1123,12 @@ func forgetInjected(dir, sid string) {
 		if line == "" {
 			continue
 		}
-		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] {
+		// A packet's delivery mark stays. It names one capture, and the next
+		// compaction is a new capture with a new mark, so keeping it never holds
+		// a packet back. Dropping it did: a forked agent that compacts runs
+		// PreCompact under its parent's session id, and the parent's packet from
+		// a day earlier was delivered again on its next prompt.
+		if parts := strings.Fields(line); len(parts) >= 2 && keys[parts[0]] && !strings.HasPrefix(parts[1], "compaction:") {
 			continue
 		}
 		kept = append(kept, line)
@@ -1217,7 +1222,7 @@ func rotateHookseen(p, sid string) {
 	// a long session able to fill the file with its own entries, after which
 	// every write rotated a megabyte again: the tool hooks write a token per
 	// call, so that is reachable rather than theoretical (#2164).
-	var keep, mine []string
+	var keep, mine, packets []string
 	prefix := hookseenKey(sid) + " "
 	for i, ln := range lines {
 		if ln == "" {
@@ -1228,12 +1233,30 @@ func rotateHookseen(p, sid string) {
 			keep = append(keep, ln)
 		case strings.HasPrefix(ln, prefix):
 			mine = append(mine, ln)
+		case compactionMark(ln):
+			packets = append(packets, ln)
 		}
 	}
 	if len(mine) > tailLines {
 		mine = mine[len(mine)-tailLines:]
 	}
-	_ = atomicfile.Write(p, []byte(strings.Join(append(mine, keep...), "\n")+"\n"), 0o600)
+	if len(packets) > compactionMarksKept {
+		packets = packets[len(packets)-compactionMarksKept:]
+	}
+	_ = atomicfile.Write(p, []byte(strings.Join(append(append(packets, mine...), keep...), "\n")+"\n"), 0o600)
+}
+
+// compactionMarksKept bounds the compaction marks a rotation carries over. One
+// is written per compaction, so this is hundreds of compactions' worth.
+const compactionMarksKept = 1000
+
+// compactionMark reports a line that says a compaction packet was delivered,
+// or must not be. Those are once-only, and a long session's packet can be
+// delivered days before the rotation comes: losing the mark then delivers it
+// again into a session that has moved on.
+func compactionMark(line string) bool {
+	parts := strings.Fields(line)
+	return len(parts) >= 2 && strings.HasPrefix(parts[1], "compaction")
 }
 
 // rememberInjectedIDs records arbitrary dedupe tokens against a session, so a

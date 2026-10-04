@@ -85,9 +85,44 @@ func carryPlain(s string) string {
 }
 
 // carryBNorm keeps the text inside backticks: "`#2261` ждёт CI" names the PR.
+// ё is read as е, which is how most of the word lists are spelled: "Смёржил PR
+// #4604" closed nothing while "Смержил" did. Both are two bytes in UTF-8, so the
+// offsets carryBState reads stay where they were.
 func carryBNorm(s string) string {
 	s = strings.ReplaceAll(carryLinkRE.ReplaceAllString(s, "$1"), "**", "")
-	return strings.ReplaceAll(s, "`", "")
+	return carryYo.Replace(strings.ReplaceAll(s, "`", ""))
+}
+
+var carryYo = strings.NewReplacer("ё", "е", "Ё", "Е")
+
+var (
+	carryIssueNumRE = regexp.MustCompile(`(?i)` + carryLB + `(?:issue|ишью|иш[ую]|задач\p{L}*)\s*#(\d{2,6})`)
+	carryPRNumRE    = regexp.MustCompile(`(?i)` + carryLB + `(?:PR|pull request|пулл?-?реквест\p{L}*|пр)\s*#(\d{2,6})`)
+)
+
+// carryIssuePRPairs links each issue a unit names to the one PR it names with
+// it: "Открыл issue #4638 и PR #4639". The PR's body says "Closes #4638", so
+// merging it closes the issue on GitHub, and nobody writes that down — the
+// session says "PR #4639 смёржен", and the issue stayed on the list for days.
+// A unit naming two PRs pairs nothing: which one closes the issue is not said.
+func carryIssuePRPairs(s string) map[int]int {
+	prs := carryPRNumRE.FindAllStringSubmatch(s, -1)
+	if len(prs) == 0 {
+		return nil
+	}
+	pr := atoiCarry(prs[0][1])
+	for _, m := range prs[1:] {
+		if atoiCarry(m[1]) != pr {
+			return nil
+		}
+	}
+	out := map[int]int{}
+	for _, m := range carryIssueNumRE.FindAllStringSubmatch(s, -1) {
+		if n := atoiCarry(m[1]); n != pr {
+			out[n] = pr
+		}
+	}
+	return out
 }
 
 // carryAsk reports whether the unit hands a decision to the user.

@@ -101,10 +101,16 @@ func ExtractCarry(messages []model.Message, prev []model.ContextCarry) []model.C
 func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry {
 	lastU := -1
 	closed := map[int][]int{}
+	closedBy := map[int]int{} // issue -> the PR it was opened with
 	var texts []string
 	var userMerged []int
 	for j, e := range ev {
 		texts = append(texts, strings.ToLower(e.text))
+		if e.kind != 't' {
+			for issue, pr := range carryIssuePRPairs(carryBNorm(e.text)) {
+				closedBy[issue] = pr
+			}
+		}
 		if e.kind == 't' {
 			for _, line := range strings.Split(e.text, "\n") {
 				if carryCloseCmdRE.MatchString(line) { // "for n in 12 34; do gh pr merge $n" too
@@ -160,6 +166,17 @@ func carryBuild(ev []carryEvent, prev []model.ContextCarry) []model.ContextCarry
 				}
 			}
 		}
+	}
+	// The pairing a carried line was opened with holds after the compaction too.
+	for _, p := range prev {
+		for issue, pr := range carryIssuePRPairs(carryBNorm(p.Text)) {
+			if _, ok := closedBy[issue]; !ok {
+				closedBy[issue] = pr
+			}
+		}
+	}
+	for issue, pr := range closedBy {
+		closed[issue] = append(closed[issue], closed[pr]...)
 	}
 	closedAfter := func(n, j int) bool {
 		return slices.ContainsFunc(closed[n], func(k int) bool { return k > j })
