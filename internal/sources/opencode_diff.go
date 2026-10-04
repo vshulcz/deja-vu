@@ -27,7 +27,7 @@ import (
 
 // OpencodeDiffDir is where those files live: beside the database, under
 // `storage/session_diff`. Derived from the database path so every override —
-// DEJA_OPENCODE_DB, XDG_DATA_HOME on Linux — carries over without a second
+// DEJA_OPENCODE_DB, OPENCODE_DB, XDG_DATA_HOME — carries over without a second
 // variable to keep in step.
 func OpencodeDiffDir() string {
 	if p := os.Getenv("DEJA_OPENCODE_DIFFS"); p != "" {

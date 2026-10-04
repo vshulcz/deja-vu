@@ -3,7 +3,6 @@ package sources
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -46,14 +45,12 @@ func TestUpstreamHomeVariables(t *testing.T) {
 		}
 	})
 
-	t.Run("opencode XDG_DATA_HOME linux only", func(t *testing.T) {
+	t.Run("opencode XDG_DATA_HOME", func(t *testing.T) {
 		t.Setenv("DEJA_OPENCODE_DB", "")
+		t.Setenv("OPENCODE_DB", "")
 		t.Setenv("XDG_DATA_HOME", filepath.Join(home, "xdg"))
 		got := OpencodeDB()
-		want := filepath.Join(home, ".local", "share", "opencode", "opencode.db")
-		if runtime.GOOS == "linux" {
-			want = filepath.Join(home, "xdg", "opencode", "opencode.db")
-		}
+		want := filepath.Join(home, "xdg", "opencode", "opencode.db")
 		if got != want {
 			t.Fatalf("OpencodeDB=%q want %q", got, want)
 		}

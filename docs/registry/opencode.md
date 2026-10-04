@@ -2,7 +2,7 @@
 
 ## Store and files
 
-opencode stores sessions in `~/.local/share/opencode/opencode.db`. On Linux it honors `XDG_DATA_HOME`, producing `$XDG_DATA_HOME/opencode/opencode.db`; deja also accepts `DEJA_OPENCODE_DB`. The store is SQLite and deja reads it through the `sqlite3` command-line tool.
+opencode stores sessions in `~/.local/share/opencode/opencode.db`. `XDG_DATA_HOME` moves it to `$XDG_DATA_HOME/opencode/opencode.db` on every OS, and `OPENCODE_DB` names the file, absolute or relative to that directory. When `XDG_DATA_HOME` is set but no store exists there, deja reads the default one. `DEJA_OPENCODE_DB` overrides all of this. The store is SQLite and deja reads it through the `sqlite3` command-line tool.
 
 Beside the database, opencode writes one file per session recording what that
 session changed: `storage/session_diff/ses_<id>.json`, a list of

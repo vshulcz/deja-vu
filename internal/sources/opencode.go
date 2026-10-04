@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -17,18 +16,32 @@ import (
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
-// OpencodeDB mirrors upstream's path logic: XDG_DATA_HOME is honored on Linux
-// only (opencode's xdg-basedir dependency ignores it elsewhere).
+// OpencodeDB mirrors upstream's path logic (core/src/database): the data
+// directory is $XDG_DATA_HOME/opencode on every OS, since xdg-basedir has no
+// platform check, else ~/.local/share/opencode; OPENCODE_DB names the file,
+// absolute or relative to that directory. A shell that exports XDG_DATA_HOME
+// while opencode is started without it leaves the store in the default
+// directory, so that one is read when the XDG one does not exist.
 func OpencodeDB() string {
 	if p := os.Getenv("DEJA_OPENCODE_DB"); p != "" {
 		return p
 	}
-	if runtime.GOOS == "linux" {
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
-			return filepath.Join(xdg, "opencode", "opencode.db")
-		}
+	def := filepath.Join(Home(), ".local", "share", "opencode")
+	data := def
+	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+		data = filepath.Join(xdg, "opencode")
 	}
-	return filepath.Join(Home(), ".local", "share", "opencode", "opencode.db")
+	if p := os.Getenv("OPENCODE_DB"); p != "" && p != ":memory:" {
+		if filepath.IsAbs(p) {
+			return p
+		}
+		return filepath.Join(data, p)
+	}
+	db := filepath.Join(data, "opencode.db")
+	if data != def && !fileExists(db) && fileExists(filepath.Join(def, "opencode.db")) {
+		return filepath.Join(def, "opencode.db")
+	}
+	return db
 }
 
 func LoadOpencode() []model.Session {

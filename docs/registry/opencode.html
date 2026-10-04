@@ -38,7 +38,7 @@
 <article>
 <h1>opencode session format</h1>
 <h2 id="store-and-files">Store and files</h2>
-<p>opencode stores sessions in <code>~/.local/share/opencode/opencode.db</code>. On Linux it honors <code>XDG_DATA_HOME</code>, producing <code>$XDG_DATA_HOME/opencode/opencode.db</code>; deja also accepts <code>DEJA_OPENCODE_DB</code>. The store is SQLite and deja reads it through the <code>sqlite3</code> command-line tool.</p>
+<p>opencode stores sessions in <code>~/.local/share/opencode/opencode.db</code>. <code>XDG_DATA_HOME</code> moves it to <code>$XDG_DATA_HOME/opencode/opencode.db</code> on every OS, and <code>OPENCODE_DB</code> names the file, absolute or relative to that directory. When <code>XDG_DATA_HOME</code> is set but no store exists there, deja reads the default one. <code>DEJA_OPENCODE_DB</code> overrides all of this. The store is SQLite and deja reads it through the <code>sqlite3</code> command-line tool.</p>
 <p>Beside the database, opencode writes one file per session recording what that</p>
 <p>session changed: <code>storage/session_diff/ses_&lt;id&gt;.json</code>, a list of</p>
 <p><code>{file, status, additions, deletions, patch}</code> with <code>patch</code> in unified-diff form.</p>
