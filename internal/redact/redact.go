@@ -68,7 +68,12 @@ var (
 	// came back as `https:[redacted:credential]` and a log path as the whole
 	// value (#3589). The leading group is a character, not a lookbehind, so it
 	// is put back with the rest.
-	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=][^\n:=]{0,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	//
+	// The filler stops at '[': an earlier rule's marker carries a colon of its
+	// own, so "токен [redacted:telegram-bot-token]" read as a key word, some
+	// filler, a delimiter and an eighteen-character value, and came out as
+	// `[redacted:[redacted:credential]]`.
+	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=\[][^\n:=\[]{0,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
 	bearerRE              = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
@@ -105,6 +110,19 @@ var (
 	// positive.
 	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]*[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
 	jwtRE      = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`)
+	// A Telegram bot token: the bot's numeric id, a colon, and 35 characters
+	// that open with "A". It has no prefix providerRE could key on, and the
+	// colon in the middle defeats every assignment rule — `BOT_TOKEN=<id>:<…>`
+	// hands genericKVRE a value that stops at the colon, nine digits long — so
+	// the only thing that ever caught one was the entropy pass, and only when a
+	// label sat in front of it. "вот токен <value>" and a `NAME=` line went
+	// into the index as written.
+	//
+	// The leading group is a non-digit rather than \b so the token is found
+	// where it most often travels, inside `api.telegram.org/bot<id>:<…>`. The
+	// tail is read greedily and the length checked after, because RE2 has no
+	// lookahead: a run longer than 35 is some other identifier.
+	telegramBotTokenRE = regexp.MustCompile(`(?:^|[^0-9])([0-9]{5,16}:A[A-Za-z0-9_-]{34,})`)
 	// Password is greedy so a password containing '@' (user:p@ss@host) splits on
 	// the last '@' and is redacted whole, not just up to the first '@'.
 	connURLRE = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9+.-]*://)([^\s/@:]*):([^\s]+)@([^\s]+)`) // scheme://[user]:pass@host
@@ -499,6 +517,12 @@ func textPass(s string, allow map[string]bool) (string, Counts) {
 	if containsAnyFold(s, providerHints) {
 		s = replaceProvider(s, p)
 	}
+	if strings.Contains(s, ":A") {
+		s = replaceGroup(s, telegramBotTokenRE, 1, "telegram-bot-token", p, func(m []string) bool {
+			_, tail, _ := strings.Cut(m[1], ":")
+			return len(tail) != 35
+		})
+	}
 	// The gate has to admit every spelling the pattern accepts, and it did not:
 	// `api_key "…"` and `apikey "…"` were masked while `api-key "…"`,
 	// `API-KEY: "…"` and `x-api-key: "…"` went through in the clear, because
@@ -793,8 +817,8 @@ var kinds = map[string]bool{
 	"entropy": true, "github-token": true, "gitlab-token": true, "google-api-key": true,
 	"groq-key": true, "huggingface-token": true, "jwt": true, "npm-token": true,
 	"openai-key": true, "password": true, "private-key": true, "provider-token": true,
-	"quoted-secret": true, "slack-token": true, "stripe-key": true, "url-credentials": true,
-	"xai-key": true,
+	"quoted-secret": true, "slack-token": true, "stripe-key": true, "telegram-bot-token": true,
+	"url-credentials": true, "xai-key": true,
 }
 
 // IsKind reports whether a name is a rule this package can write, so a caller

@@ -657,7 +657,12 @@ import (
 // repeat failures 110 of 119 answers had nothing to do with the error. Such a
 // line now pairs only with itself in a form that ran, or with another program
 // doing the missing one's job; otherwise nothing is said.
-const version = 61
+//
+// 62 masks Telegram bot tokens. Redaction runs at ingest, the same reason as
+// 41 through 46: the colon inside the token stopped every assignment rule, so
+// a store built before this holds the ones pasted in prose or assigned to a
+// variable as written.
+const version = 62
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
