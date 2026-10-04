@@ -40,8 +40,9 @@ func copilotHooksPath() string {
 }
 
 // copilotHooks is every event deja wires in Copilot CLI. --copilot makes
-// hook-context answer in the only shape Copilot reads. The two after
-// sessionStart keep recall from answering with the session asking it (#4551):
+// hook-context answer in the only shape Copilot reads. postToolUse carries
+// the fix line after a failed command. The other two keep recall from
+// answering with the session asking it (#4551):
 // preMcpToolCall restamps it before each MCP request, which a sessionStart
 // stamp alone stops covering twenty minutes in, and sessionEnd takes the
 // stamp back. Both payloads name the session as `sessionId` (1.0.91).
@@ -50,6 +51,7 @@ var copilotHooks = []struct {
 	args  []string
 }{
 	{"sessionStart", []string{"hook-context", "--copilot"}},
+	{"postToolUse", []string{"hook-tool-after", "--copilot"}},
 	{"preMcpToolCall", []string{"hook-mcp-call"}},
 	{"sessionEnd", []string{"hook-session-end"}},
 }

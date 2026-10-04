@@ -42,7 +42,11 @@ already name every file.
   about who is calling, so the first marks the session live before each MCP
   request and recall leaves it out, and the second clears the mark. A
   `preMcpToolCall` hook's output becomes the request's `_meta`, so it prints
-  nothing. `COPILOT_HOME` moves all of these files.
+  nothing. `postToolUse` (`deja hook-tool-after --copilot`) answers a failed
+  command with what this machine ran after the same error before: a non-zero
+  exit is still a successful tool call in Copilot, and the `additionalContext`
+  is appended to the result the model reads next. `COPILOT_HOME` moves all of
+  these files.
 - **Resume**: `copilot --resume=<sessionId>`.
 - **Handoff**: exec.
 

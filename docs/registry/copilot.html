@@ -86,7 +86,11 @@
 <p>about who is calling, so the first marks the session live before each MCP</p>
 <p>request and recall leaves it out, and the second clears the mark. A</p>
 <p><code>preMcpToolCall</code> hook&#39;s output becomes the request&#39;s <code>_meta</code>, so it prints</p>
-<p>nothing. <code>COPILOT_HOME</code> moves all of these files.</p>
+<p>nothing. <code>postToolUse</code> (<code>deja hook-tool-after --copilot</code>) answers a failed</p>
+<p>command with what this machine ran after the same error before: a non-zero</p>
+<p>exit is still a successful tool call in Copilot, and the <code>additionalContext</code></p>
+<p>is appended to the result the model reads next. <code>COPILOT_HOME</code> moves all of</p>
+<p>these files.</p>
 <ul>
 <li><strong>Resume</strong>: <code>copilot --resume=&lt;sessionId&gt;</code>.</li>
 <li><strong>Handoff</strong>: exec.</li>

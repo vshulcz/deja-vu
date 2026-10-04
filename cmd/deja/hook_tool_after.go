@@ -164,6 +164,14 @@ func runHookToolAfterMode(dir string, stdin io.Reader, stdout io.Writer, plain b
 		fmt.Fprint(stdout, payload)
 		return nil
 	}
+	// Copilot CLI reads only the flat shape. Measured on 1.0.91: a command
+	// that exits non-zero is still a successful tool call there, so it is
+	// postToolUse that fires, and its additionalContext is appended to the
+	// result the model reads next, in the same turn.
+	if copilotHookOutput {
+		emitCopilotContext(stdout, payload)
+		return nil
+	}
 	var resp sessionStartHookResponse
 	// The event it was sent. Claude Code fires PostToolUseFailure for a command
 	// that exited non-zero and drops a reply naming any other event (#4488);
@@ -237,7 +245,8 @@ func toolResponseText(raw json.RawMessage) string {
 	// a shell tool is the command's own output inside a wrapper of its own.
 	// output_for_prompt is grok's: its `output` is the raw bytes as a number
 	// array, and this is the text the model reads (#4499).
-	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent", "output_for_prompt"} {
+	// textResultForLlm is Copilot CLI's: the output as its model gets it.
+	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent", "output_for_prompt", "textResultForLlm"} {
 		v, ok := obj[key].(string)
 		if !ok || strings.TrimSpace(v) == "" {
 			continue

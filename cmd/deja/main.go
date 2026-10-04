@@ -268,6 +268,10 @@ var commands = map[string]command{
 			return nil
 		}
 		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
+		// --copilot: the flat answer Copilot CLI reads (see hook_strict.go).
+		if len(rest) > 0 && (rest[0] == "--copilot" || rest[0] == "-copilot") {
+			copilotHookOutput = true
+		}
 		return runHookToolAfterMode(dir, os.Stdin, os.Stdout, plain)
 	},
 	"check": func(dir string, rest []string) error {

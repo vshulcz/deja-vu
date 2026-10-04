@@ -10,10 +10,12 @@ import (
 )
 
 // Hermes takes plugins as a directory under ~/.hermes/plugins with a
-// plugin.yaml manifest and an __init__.py exporting register(ctx). Of its
-// hooks only pre_llm_call can inject: whatever it returns under "context" is
-// appended to the user message, which is also where Hermes wants it — the
-// system prompt stays byte-identical so provider caching survives.
+// plugin.yaml manifest and an __init__.py exporting register(ctx). Two of its
+// hooks reach the model: pre_llm_call, whose "context" is appended to the user
+// message, which is also where Hermes wants it — the system prompt stays
+// byte-identical so provider caching survives — and transform_tool_result,
+// whose string replaces the tool result, which carries the fix line after a
+// failed command.
 func installHermesPlugin(exe string, uninstall bool) (installResult, error) {
 	// The launcher, not this binary: a generated plugin is as much a
 	// config as a hooks.json, and one that names the build it was
@@ -77,6 +79,7 @@ version: 0.1.0
 description: Recall your own past coding sessions before answering
 provides_hooks:
   - pre_llm_call
+  - transform_tool_result
 provides_commands:
   - deja
 `
@@ -169,6 +172,31 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     return {"context": hit} if hit else None
 
 
+def repair(tool_name=None, result=None, session_id=None, **kwargs):
+    # A shell command failed: what this machine ran after that same error
+    # before, appended to the result the model is about to read. This is the
+    # line Claude Code gets from its PostToolUse hook. Nothing else in Hermes
+    # reaches the model mid-turn: pre_llm_call runs before the turn, and a
+    # memory provider's hooks are never called. Silence unless deja holds a
+    # pair, and a command that exited 0 is not asked about.
+    if tool_name != "terminal" or not isinstance(result, str):
+        return None
+    try:
+        parsed = json.loads(result)
+        if isinstance(parsed, dict) and parsed.get("exit_code") == 0 and not parsed.get("error"):
+            return None
+    except Exception:
+        pass
+    payload = json.dumps({
+        "tool_name": tool_name,
+        "tool_response": result,
+        "session_id": session_id or "",
+        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
+    })
+    line = _deja(["hook-tool-after", "--plain"], payload, timeout=5)
+    return result + "\n\n" + line if line else None
+
+
 def search(raw_args):
     """/deja <query> — search past sessions without waiting for a recall."""
     query = (raw_args or "").strip()
@@ -187,6 +215,9 @@ def search(raw_args):
 
 def register(ctx):
     ctx.register_hook("pre_llm_call", recall)
+    # transform_tool_result arrived after pre_llm_call; an older Hermes logs
+    # the unknown name and never calls it.
+    ctx.register_hook("transform_tool_result", repair)
     # Hermes surfaces registered commands in every session and gateway, which
     # is the cheapest way to be found by someone who has not read the docs.
     ctx.register_command(
