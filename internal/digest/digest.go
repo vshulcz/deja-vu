@@ -1454,7 +1454,7 @@ func decisionLead(text string, substantial bool) string {
 	}
 	for _, sent := range sentencesOf(text) {
 		// "Fixed the same way." carries a marker and nothing else.
-		if CarriesDecision(sent) && !(substantial && thinSentence(sent)) {
+		if CarriesDecision(sent) && (!substantial || !thinSentence(sent)) {
 			return sent
 		}
 	}
