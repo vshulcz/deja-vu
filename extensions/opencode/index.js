@@ -312,7 +312,9 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         // opencode sends each entry as its own system message, and a backend
         // whose template allows one (vLLM or SGLang serving Qwen) rejects the
         // request: "System message must be at the beginning." (#4058)
-        if (output.system.length) output.system[0] = context + "\n\n" + output.system[0]
+        // After opencode's own prompt, not before it: that prompt is the same
+        // in every session and is what the provider's prompt cache keeps.
+        if (output.system.length) output.system[0] = output.system[0] + "\n\n" + context
         else output.system.push(context)
         return
       }

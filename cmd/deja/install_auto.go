@@ -319,6 +319,8 @@ export default {
     // the system message to come first rejects the whole request
     // otherwise, so installing deja made opencode fail every turn against
     // a local model: "Not Found: System message must be at the beginning."
+    // It goes after opencode's own prompt, which is the same in every session
+    // and is what the provider's prompt cache keeps.
     await ctx.session.hook("context", async (event) => {
       try {
         const key = event.sessionID || "default"
@@ -338,7 +340,7 @@ export default {
         }
         const digest = cache.get(key)
         if (digest) {
-          if (event.system.length) event.system[0].text = digest + "\n\n" + event.system[0].text
+          if (event.system.length) event.system[0].text = event.system[0].text + "\n\n" + digest
           else event.system.push({ type: "text", text: digest })
           return
         }
@@ -657,7 +659,9 @@ func legacyPluginJSFor(target, exe string) string {
           // message to come first rejects the whole request otherwise, so
           // installing deja made opencode fail every turn against a local
           // model: "Not Found: System message must be at the beginning."
-          if (output.system.length) output.system[0] = ctx + "\n\n" + output.system[0]
+          // After opencode's own prompt, not before it: that prompt is the
+          // same in every session and is what the provider's prompt cache keeps.
+          if (output.system.length) output.system[0] = output.system[0] + "\n\n" + ctx
           else output.system.push(ctx)
           return
         }

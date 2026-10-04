@@ -204,7 +204,7 @@ test("the session digest joins the first system message instead of adding one", 
 
     const output = { system: ["agent prompt"] }
     await transform({ sessionID: "s1" }, output)
-    assert.deepEqual(output.system, ["past work\n\nagent prompt"])
+    assert.deepEqual(output.system, ["agent prompt\n\npast work"])
 
     const empty = { system: [] }
     await transform({ sessionID: "s1" }, empty)

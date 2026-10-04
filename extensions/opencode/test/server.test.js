@@ -149,7 +149,7 @@ test("setup wires every channel the 1.x hooks have onto 2.x's seams", async () =
     }
     await hooks.session.context[0](context)
     assert.equal(context.system.length, 1)
-    assert.equal(context.system[0].text, "past work\n\nagent prompt")
+    assert.equal(context.system[0].text, "agent prompt\n\npast work")
     assert.equal(context.messages[0].content[0].text, "why does TestRetry flake\n\nrecalled")
 
     const spawn = { tool: "subagent", sessionID: "s1", input: { prompt: "child brief", description: "d" } }
