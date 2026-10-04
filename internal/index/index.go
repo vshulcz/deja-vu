@@ -667,7 +667,11 @@ import (
 // the summary role, as opencode's and Hermes's already were (#3384). Read as
 // the person's words, 41 Claude summaries supplied 191 of 622 first-hit quotes
 // on 453 real recall questions.
-const version = 63
+//
+// 64 masks the tail of a key-value secret that ends in punctuation:
+// `--password=Sup3rS3cretValue!!xyz` was stored with `!!xyz` after the marker
+// (#4682). Redaction runs at ingest, so only a rebuild drops the tails.
+const version = 64
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
