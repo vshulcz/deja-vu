@@ -1124,6 +1124,78 @@ func conclusionsAboutIt(cs []string, q string, snippets []string) ([]string, boo
 	return kept, true
 }
 
+// longSessionTurns is how many user turns make a session one that worked on
+// many things. On a real store the sessions recall quoted had at most 15 or at
+// least 84, so anywhere between gives the same answers.
+const longSessionTurns = 20
+
+// conclusionSource is what recall reads "what this session concluded" from: the
+// whole session, or for a long one the turns its excerpts were cut from.
+//
+// A long session concluded something about everything it touched, and read
+// whole its newest conclusions win. On 453 real recall queries one session's
+// last conclusion sat under 205 answers; checked by hand on 60 of them, the
+// block was about the question on 13 and about other work on 47. Read around
+// the quoted turns it was about the question on 19, about other work on 15, and
+// absent on 26.
+//
+// A passage quoted from a compaction summary is no anchor: the turn around a
+// summary is whatever the session did next.
+func conclusionSource(whole model.Session, quoted []string) (model.Session, bool) {
+	if userTurns(whole) < longSessionTurns {
+		return whole, false
+	}
+	return episodeAround(whole, quoted), true
+}
+
+func userTurns(s model.Session) int {
+	n := 0
+	for _, m := range s.Messages {
+		if m.Role == "user" {
+			n++
+		}
+	}
+	return n
+}
+
+// episodeAround is the part of a session around the messages a hit quoted: for
+// each, the user turn it sits in, through to the next user turn. Nothing when
+// none of them is in the session.
+func episodeAround(whole model.Session, quoted []string) model.Session {
+	want := make(map[string]bool, len(quoted))
+	for _, q := range quoted {
+		if !digest.IsCompactionSummary(q) {
+			want[q] = true
+		}
+	}
+	ms := whole.Messages
+	keep := make([]bool, len(ms))
+	for i, m := range ms {
+		if !want[m.Text] {
+			continue
+		}
+		start := i
+		for start > 0 && ms[start].Role != "user" {
+			start--
+		}
+		end := i + 1
+		for end < len(ms) && ms[end].Role != "user" {
+			end++
+		}
+		for j := start; j < end; j++ {
+			keep[j] = true
+		}
+	}
+	ep := whole
+	ep.Messages = nil
+	for i, k := range keep {
+		if k {
+			ep.Messages = append(ep.Messages, ms[i])
+		}
+	}
+	return ep
+}
+
 // sharesAWord is word overlap that holds for identifiers: `ManifestBuiltAt`
 // lowercases to one token, so a question about the manifest shares nothing with
 // it on equality alone, and the conclusion that named it was dropped for a query
@@ -1673,8 +1745,18 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// ones about something else, and asking for exactly three
 				// showed one where three were available.
 				want := 3 + shownAnswers(h.Snippets) + conclusionGateSlack
-				cs := withoutShownAnswer(digest.Conclusions(whole, left, want), h.Snippets)
+				// A long session is read around the passages it was quoted
+				// for, not as a whole: its newest conclusions are about
+				// whatever it did last.
+				src, long := conclusionSource(whole, h.QuotedMessages())
+				cs := withoutShownAnswer(digest.Conclusions(src, left, want), h.Snippets)
 				cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
+				if long && !aboutIt {
+					// The one-line offer below is the newest thing the
+					// passages' turns settled, which in a long session is
+					// rarely the thing asked about.
+					cs = nil
+				}
 				if len(cs) > 0 {
 					if len(cs) > 3 {
 						cs = cs[:3]

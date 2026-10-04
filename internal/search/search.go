@@ -130,7 +130,14 @@ type Hit struct {
 	// 127.8 MB one query allocated (#3544). The strings are the record text
 	// already in memory, so holding them costs a header apiece.
 	snipTexts []string
+	// quoted are the messages the rendered excerpts were cut from, kept so a
+	// caller can find where in the session the hit is about.
+	quoted []string
 }
+
+// QuotedMessages are the texts of the messages this hit's excerpts were cut
+// from, in the order the excerpts appear.
+func (h Hit) QuotedMessages() []string { return h.quoted }
 
 const (
 	bm25K1        = 1.2
@@ -458,6 +465,7 @@ func renderSnippets(hits []Hit, o Options, n int) {
 			// once it is stripped, and printed as an empty bullet (#4247).
 			if sn := snippet(text, o.Query, re); sn != "" {
 				hits[i].Snippets = append(hits[i].Snippets, sn)
+				hits[i].quoted = append(hits[i].quoted, text)
 			}
 		}
 		hits[i].snipTexts = nil
@@ -2793,6 +2801,7 @@ func ErrorHits(ss []model.Session) []Hit {
 			}
 			if sn := snippet(m.Text, "", nil); sn != "" {
 				hit.Snippets = append(hit.Snippets, sn)
+				hit.quoted = append(hit.quoted, m.Text)
 			}
 			if len(hit.Snippets) == 2 {
 				break
@@ -2948,6 +2957,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 		for i := 0; i < len(best) && i < 2; i++ {
 			if sn := snippet(s.Messages[best[i].idx].Text, best[i].center, nil); sn != "" {
 				hit.Snippets = append(hit.Snippets, sn)
+				hit.quoted = append(hit.quoted, s.Messages[best[i].idx].Text)
 			}
 		}
 		hit.Score = float64(len(ss) - rank)

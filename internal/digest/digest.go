@@ -413,13 +413,27 @@ func noisyMessage(s string) bool {
 		}
 	}
 	// Prose, so only where it opens the message.
-	if strings.HasPrefix(t, "Caveat:") || IsCompactionSummary(t) || IsHookStatusLine(t) {
+	if strings.HasPrefix(t, "Caveat:") || IsCompactionSummary(t) || IsHookStatusLine(t) || harnessNotice(t) {
 		return true
 	}
 	if strings.Contains(t, "tool_use") || strings.Contains(t, "tool_result") {
 		return true
 	}
 	return looksLikeDataDump(t)
+}
+
+// harnessNotice is a line the harness wrote in the assistant's place: a usage
+// limit or an API error. It ends a turn, so it was picked as what the turn
+// concluded.
+func harnessNotice(t string) bool {
+	if len(t) > 200 {
+		return false
+	}
+	if strings.HasPrefix(t, "API Error: ") {
+		return true
+	}
+	return (strings.HasPrefix(t, "You've hit your ") || strings.HasPrefix(t, "You've reached your ")) &&
+		strings.Contains(t, "limit")
 }
 
 // looksLikeDataDump flags pasted JSON, CLI output, or blobs with very long

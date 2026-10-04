@@ -62,3 +62,27 @@ func TestConclusionsKeepTheWorkAfterACreditLine(t *testing.T) {
 		t.Errorf("the work after the credit line was dropped: %q", got)
 	}
 }
+
+// A usage-limit notice or an API error is written by the harness in the
+// assistant's place, and it ends the turn, so it was served as what the turn
+// settled.
+func TestConclusionsSkipHarnessNotices(t *testing.T) {
+	for _, notice := range []string{
+		"You've hit your session limit · resets 2:40am (Europe/Moscow)",
+		"You've reached your Fable limit. Run /usage-credits to continue or switch models with /model.",
+		"API Error: 529 Overloaded",
+	} {
+		s := model.Session{Messages: []model.Message{
+			{Role: "user", Text: "why does the nightly export stall"},
+			{Role: "assistant", Text: "Root cause: the exporter holds the table lock while it uploads. Fixed by releasing the lock before the upload."},
+			{Role: "assistant", Text: notice},
+		}}
+		joined := strings.Join(Conclusions(s, 800, 3), "\n")
+		if strings.Contains(joined, notice[:12]) {
+			t.Errorf("a harness notice was served as a conclusion: %q", joined)
+		}
+		if !strings.Contains(joined, "Root cause") {
+			t.Errorf("the session's real conclusion is missing next to %q: %q", notice, joined)
+		}
+	}
+}
