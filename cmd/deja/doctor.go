@@ -138,6 +138,7 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 	// Under the index rows: what the harnesses' own cleanup is about to take,
 	// which the index will keep.
 	doctorRetentionDue(w, time.Now())
+	doctorCompactWindow(w, time.Now())
 	fmt.Fprintln(w)
 	if report.Embed != nil {
 		doctorEmbed(w, *report.Embed)
