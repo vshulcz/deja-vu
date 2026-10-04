@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>The one memory your coding agents share, built from the history already on your disk.</b></p>
+<p align="center"><b>Your coding agents stop re-debugging what you already fixed.</b></p>
 
-<p align="center">Your agent is about to re-debug something you fixed in March — in a different agent.
-deja starts full: it indexes what Claude Code, Codex, Cursor and 32 more agents already wrote to disk,
-and hands it back in whichever agent asks.</p>
+<p align="center">Claude Code, Codex, Cursor and 32 more agents already save every session to disk.
+deja indexes all of it, months back, and hands the part that matters
+to whichever agent is working now.</p>
 
 <p align="center">English | <a href="docs/readme/README.zh.md">简体中文</a> | <a href="docs/readme/README.zh-TW.md">繁體中文</a> | <a href="docs/readme/README.ja.md">日本語</a> | <a href="docs/readme/README.ko.md">한국어</a> | <a href="docs/readme/README.es.md">Español</a> | <a href="docs/readme/README.pt.md">Português</a> | <a href="docs/readme/README.fr.md">Français</a> | <a href="docs/readme/README.de.md">Deutsch</a> | <a href="docs/readme/README.ru.md">Русский</a> | <a href="docs/readme/README.tr.md">Türkçe</a> | <a href="docs/readme/README.hi.md">हिन्दी</a></p>
 
@@ -27,9 +27,9 @@ deja install --auto
 
 <table align="center">
 <tr>
-<td align="center" width="33%">Most accurate<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>MemPalace publishes 96.6%, agentmemory 95.2%</sub></td>
-<td align="center" width="33%">Cheapest<br><b>half the tokens</b> of agentmemory<br><sub>on a task this machine had already solved</sub></td>
-<td align="center" width="33%">Fastest<br><b>17.6 s</b> to index 19,195 sessions<br><sub>the next of seven tools takes 72 s</sub></td>
+<td align="center" width="33%">Recall<br><b>97.2% R@5</b> on LongMemEval-S<br><sub>MemPalace publishes 96.6%, agentmemory 95.2%</sub></td>
+<td align="center" width="33%">Tokens<br><b>half the tokens</b> of agentmemory<br><sub>on a task this machine had already solved</sub></td>
+<td align="center" width="33%">Index time<br><b>17.6 s</b> to index 19,195 sessions<br><sub>the next of seven tools takes 72 s</sub></td>
 </tr>
 </table>
 

@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Une seule mémoire pour tous vos agents de code, construite à partir de l'historique déjà présent sur votre disque.</b></p>
+<p align="center"><b>Vos agents de code arrêtent de redéboguer ce que vous avez déjà corrigé.</b></p>
 
-<p align="center">Votre agent s'apprête à redéboguer quelque chose que vous avez corrigé en mars, dans un autre
-agent. deja indexe les sessions que Claude Code, Codex, Cursor et tous les autres agents de cette machine
-écrivent déjà sur le disque, et rend la bonne à celui qui pose la question.</p>
+<p align="center">Claude Code, Codex, Cursor et les autres agents de cette machine enregistrent déjà chaque session sur le disque.
+deja indexe tout, des mois en arrière compris, et donne la partie utile
+à l'agent qui travaille maintenant.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la même question au même agent deux fois : sans mémoire il ne se souvient de rien, avec deja il répond avec une conclusion vieille de huit mois"></p>
 
@@ -21,9 +21,9 @@ agent. deja indexe les sessions que Claude Code, Codex, Cursor et tous les autre
 
 <table align="center">
 <tr>
-<td align="center" width="33%">La plus précise<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>mêmes 19,195 sessions : 19/100 au premier rang, le suivant 14</sub></td>
-<td align="center" width="33%">La moins chère<br><b>moitié moins de tokens</b> qu'agentmemory<br><sub>53,558 contre 104,974 sur une tâche déjà résolue<br>477 tokens de définitions d'outils, le moins des sept</sub></td>
-<td align="center" width="33%">La plus rapide<br><b>17.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
+<td align="center" width="33%">Rappel<br><b>97.2% R@5</b> sur LongMemEval-S<br><sub>les 500 questions · MemPalace 96.6%, agentmemory 95.2%<br>mêmes 19,195 sessions : 19/100 au premier rang, le suivant 14</sub></td>
+<td align="center" width="33%">Tokens<br><b>moitié moins de tokens</b> qu'agentmemory<br><sub>53,558 contre 104,974 sur une tâche déjà résolue<br>477 tokens de définitions d'outils, le moins des sept</sub></td>
+<td align="center" width="33%">Indexation<br><b>17.6 s</b> pour indexer 19,195 sessions<br><sub>le suivant des sept : 72 s<br>26 ms jusqu'à la première réponse, recherche médiane en 97 ms</sub></td>
 </tr>
 </table>
 

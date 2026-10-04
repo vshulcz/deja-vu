@@ -28,6 +28,13 @@ func (c Counts) Total() int {
 	return total
 }
 
+// kvValue is the value the key-value rules mask. A password often ends in
+// punctuation the base class stops at, and `--password=Sup3rS3cretValue!!xyz`
+// came back as `[redacted:credential]!!xyz`: the tail sat in the index in the
+// clear. Runs of those characters and what follows them are taken in too. '&',
+// '?', ',' and ')' stay out, so a query string or a sentence keeps its rest.
+const kvValue = `[A-Za-z0-9/+=._-]{16,}(?:[!#$%^*~@]+[A-Za-z0-9/+=._-]*)*`
+
 var (
 	awsAccessKeyRE = regexp.MustCompile(`A(?:KIA|SIA)[0-9A-Z]{16}`)
 	awsSecretRE    = regexp.MustCompile(`(?i)\b(aws[_-]?secret[_-]?access[_-]?key)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=_-]{32,})(\\*['"]?)`)
@@ -39,7 +46,7 @@ var (
 	// only English: a Russian speaker writes "пароль: …" or "токен: …" and the
 	// secret sat in the clear because every pattern here was English-only. The
 	// value class and length floor are the same, so the looseness is unchanged.
-	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	genericKVRE = regexp.MustCompile(`(?i)\b([\w.-]{0,64}?(?:api[_-]?key|secret|token|passwd|password|authorization))(\\*['"]?\s*[:=]\s*)(\\*['"]?)(` + kvValue + `)(\\*['"]?)`)
 	// An environment variable holding a credential does not have to say "api" or
 	// "token" in its name: DEJA_EMBED_KEY, GROQ_KEY, VOYAGE_KEY all end in plain
 	// _KEY, which genericKVRE never matched, so an opaque value — one with no
@@ -49,12 +56,12 @@ var (
 	// Case-sensitive on purpose: this is the shell shape, and matching `_key`
 	// as well would take `cache_key: <16 chars>` out of every YAML file people
 	// paste, which costs recall for no secret.
-	envKeyRE = regexp.MustCompile(`\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_KEY)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	envKeyRE = regexp.MustCompile(`\b([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*_KEY)(\\*['"]?\s*[:=]\s*)(\\*['"]?)(` + kvValue + `)(\\*['"]?)`)
 	// The same shape in the languages people actually type in. \b is ASCII-only
 	// in RE2, so a Cyrillic or CJK key word can never sit behind it — these get
 	// their own pattern. A Russian speaker writing "пароль: …" had the secret
 	// stored in the clear because every pattern here was English-only.
-	genericKVIntlRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	genericKVIntlRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)(\\*['"]?\s*[:=]\s*)(\\*['"]?)(` + kvValue + `)(\\*['"]?)`)
 	// The same key words with a few of their own between the word and the
 	// colon. "пароль от стейджа: …" is how the line is actually written, and
 	// genericKVIntlRE needs the delimiter to follow the word directly. The
@@ -73,7 +80,7 @@ var (
 	// own, so "токен [redacted:telegram-bot-token]" read as a key word, some
 	// filler, a delimiter and an eighteen-character value, and came out as
 	// `[redacted:[redacted:credential]]`.
-	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=\[][^\n:=\[]{0,32}[:=]\s*)(\\*['"]?)([A-Za-z0-9/+=._-]{16,})(\\*['"]?)`)
+	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=\[][^\n:=\[]{0,32}[:=]\s*)(\\*['"]?)(` + kvValue + `)(\\*['"]?)`)
 	bearerRE              = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"

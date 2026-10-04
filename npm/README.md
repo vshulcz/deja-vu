@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<p align="center"><strong>Your agent is about to re-debug something you fixed in March — in a different agent.</strong></p>
+<p align="center"><strong>Your coding agents stop re-debugging what you already fixed.</strong></p>
 
 **deja starts full**: the history 35 agents already wrote, with no model and no capture step. It
 indexes the sessions your coding agents already wrote to disk — months of

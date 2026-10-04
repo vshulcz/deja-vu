@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Una sola memoria para todos tus agentes de código, construida con el historial que ya tienes en disco.</b></p>
+<p align="center"><b>Que tus agentes de código dejen de depurar otra vez lo que ya arreglaste.</b></p>
 
-<p align="center">Tu agente está a punto de volver a depurar algo que arreglaste en marzo, en otro agente.
-deja indexa las sesiones que Claude Code, Codex, Cursor y el resto de los agentes de esta máquina ya escriben
-en disco, y devuelve la que corresponde a cualquiera de ellos que pregunte.</p>
+<p align="center">Claude Code, Codex, Cursor y el resto de los agentes de esta máquina ya guardan cada sesión en disco.
+deja lo indexa todo, meses atrás incluidos, y le pasa lo que importa
+al agente que está trabajando ahora.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="la misma pregunta al mismo agente dos veces: sin memoria no recuerda nada, con deja responde con una conclusión de hace ocho meses"></p>
 
@@ -21,9 +21,9 @@ en disco, y devuelve la que corresponde a cualquiera de ellos que pregunte.</p>
 
 <table align="center">
 <tr>
-<td align="center" width="33%">La más precisa<br><b>97.2% R@5</b> en LongMemEval-S<br><sub>las 500 preguntas · MemPalace 96.6%, agentmemory 95.2%<br>mismas 19,195 sesiones: 19/100 en primer lugar, la siguiente 14</sub></td>
-<td align="center" width="33%">La más barata<br><b>la mitad de tokens</b> que agentmemory<br><sub>53,558 frente a 104,974 en una tarea ya resuelta<br>477 tokens de definiciones de herramientas, la menor de siete</sub></td>
-<td align="center" width="33%">La más rápida<br><b>17.6 s</b> para indexar 19,195 sesiones<br><sub>la siguiente de siete: 72 s<br>26 ms hasta la primera respuesta, 97 ms de mediana de búsqueda</sub></td>
+<td align="center" width="33%">Recall<br><b>97.2% R@5</b> en LongMemEval-S<br><sub>las 500 preguntas · MemPalace 96.6%, agentmemory 95.2%<br>mismas 19,195 sesiones: 19/100 en primer lugar, la siguiente 14</sub></td>
+<td align="center" width="33%">Tokens<br><b>la mitad de tokens</b> que agentmemory<br><sub>53,558 frente a 104,974 en una tarea ya resuelta<br>477 tokens de definiciones de herramientas, la menor de siete</sub></td>
+<td align="center" width="33%">Indexado<br><b>17.6 s</b> para indexar 19,195 sesiones<br><sub>la siguiente de siete: 72 s<br>26 ms hasta la primera respuesta, 97 ms de mediana de búsqueda</sub></td>
 </tr>
 </table>
 

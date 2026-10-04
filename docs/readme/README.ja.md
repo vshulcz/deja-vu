@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>すべてのコーディングエージェントが共有するひとつの記憶。材料は、すでにディスク上にある履歴です。</b></p>
+<p align="center"><b>解決済みの問題を、コーディングエージェントにもう一度デバッグさせない。</b></p>
 
-<p align="center">あなたのエージェントは、3月に直したはずの問題を、また一からデバッグしようとしています——しかも前回とは別のエージェントで。
-deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあらゆるエージェントがすでにディスクに書き出したセッションをインデックス化し、
-どのエージェントから尋ねられても、該当するセッションを返します。</p>
+<p align="center">Claude Code、Codex、Cursor をはじめ、このマシン上のエージェントはすべてのセッションをすでにディスクに保存しています。
+deja はそれを数か月前の分まで丸ごとインデックス化し、
+いま作業中のエージェントに必要な部分を渡します。</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同じエージェントに同じ質問を2回する：記憶がないと何の記録もないが、deja があると8か月前の決定をもとに答える"></p>
 
@@ -25,9 +25,9 @@ deja は、Claude Code、Codex、Cursor をはじめ、このマシン上のあ�
 
 <table align="center">
 <tr>
-<td align="center" width="33%">最も正確<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
-<td align="center" width="33%">最も安い<br>agentmemory の<b>半分のトークン</b><br><sub>解決済みのタスクで 53,558 対 104,974<br>ツール定義は 1 ターン 477 トークン、7 つの中で最少</sub></td>
-<td align="center" width="33%">最も速い<br>19,195 セッションを <b>17.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
+<td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
+<td align="center" width="33%">トークン<br>agentmemory の<b>半分のトークン</b><br><sub>解決済みのタスクで 53,558 対 104,974<br>ツール定義は 1 ターン 477 トークン、7 つの中で最少</sub></td>
+<td align="center" width="33%">インデックス時間<br>19,195 セッションを <b>17.6 秒</b>でインデックス<br><sub>7 ツール中の次点は 72 秒<br>最初の回答まで 26 ms、検索の中央値 97 ms</sub></td>
 </tr>
 </table>
 

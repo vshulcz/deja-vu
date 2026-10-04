@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Ein gemeinsames Gedächtnis für alle Coding-Agents, gebaut aus der Historie, die ohnehin schon auf der Platte liegt.</b></p>
+<p align="center"><b>Deine Coding-Agents debuggen nicht mehr neu, was du längst behoben hast.</b></p>
 
-<p align="center">Dein Agent setzt gerade an, etwas neu zu debuggen, das du im März behoben hast — damals in
-einem anderen Agenten. deja indiziert die Sessions, die Claude Code, Codex, Cursor und alle übrigen Agents
-dieser Maschine ohnehin auf die Platte schreiben, und gibt die richtige an den zurück, der fragt.</p>
+<p align="center">Claude Code, Codex, Cursor und die übrigen Agents dieser Maschine speichern jede Session ohnehin auf der Platte.
+deja indiziert alles, auch Monate zurück, und gibt dem Agenten,
+der gerade arbeitet, den Teil, der zählt.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="dieselbe Frage zweimal an denselben Agenten: ohne Gedächtnis weiß er nichts, mit deja antwortet er mit einem acht Monate alten Ergebnis"></p>
 
@@ -21,9 +21,9 @@ dieser Maschine ohnehin auf die Platte schreiben, und gibt die richtige an den z
 
 <table align="center">
 <tr>
-<td align="center" width="33%">Am genauesten<br><b>97.2% R@5</b> auf LongMemEval-S<br><sub>alle 500 Fragen · MemPalace 96.6%, agentmemory 95.2%<br>dieselben 19,195 Sessions: 19/100 auf Rang eins, der Nächstbeste 14</sub></td>
-<td align="center" width="33%">Am günstigsten<br><b>halb so viele Tokens</b> wie agentmemory<br><sub>53,558 gegen 104,974 bei einer schon gelösten Aufgabe<br>477 Tokens Tool-Definitionen, die wenigsten von sieben</sub></td>
-<td align="center" width="33%">Am schnellsten<br><b>17.6 s</b> für den Index über 19,195 Sessions<br><sub>der Nächste von sieben: 72 s<br>26 ms bis zur ersten Antwort, Suche im Median 97 ms</sub></td>
+<td align="center" width="33%">Recall<br><b>97.2% R@5</b> auf LongMemEval-S<br><sub>alle 500 Fragen · MemPalace 96.6%, agentmemory 95.2%<br>dieselben 19,195 Sessions: 19/100 auf Rang eins, der Nächstbeste 14</sub></td>
+<td align="center" width="33%">Tokens<br><b>halb so viele Tokens</b> wie agentmemory<br><sub>53,558 gegen 104,974 bei einer schon gelösten Aufgabe<br>477 Tokens Tool-Definitionen, die wenigsten von sieben</sub></td>
+<td align="center" width="33%">Indexzeit<br><b>17.6 s</b> für den Index über 19,195 Sessions<br><sub>der Nächste von sieben: 72 s<br>26 ms bis zur ersten Antwort, Suche im Median 97 ms</sub></td>
 </tr>
 </table>
 

@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Bütün kodlama ajanlarının paylaştığı tek bellek — diskinizde zaten duran geçmişten kurulur.</b></p>
+<p align="center"><b>Kodlama ajanlarınız, zaten düzelttiğiniz şeyi yeniden hata ayıklamaz.</b></p>
 
-<p align="center">Ajanınız, mart ayında düzelttiğiniz bir şeyi yeniden hata ayıklamak üzere; üstelik o zaman başka
-bir ajandaydınız. deja, Claude Code, Codex, Cursor ve bu makinedeki diğer bütün ajanların zaten diske yazdığı
-oturumları indeksler ve soran hangisiyse ona doğru olanı geri verir.</p>
+<p align="center">Claude Code, Codex, Cursor ve bu makinedeki diğer ajanlar her oturumu zaten diske kaydediyor.
+deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
+şu an çalışan ajana verir.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="aynı soru aynı ajana iki kez: bellek yokken hiçbir şey hatırlamıyor, deja varken sekiz ay önceki sonuçla yanıtlıyor"></p>
 
@@ -21,9 +21,9 @@ oturumları indeksler ve soran hangisiyse ona doğru olanı geri verir.</p>
 
 <table align="center">
 <tr>
-<td align="center" width="33%">En isabetli<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı · MemPalace %96.6, agentmemory %95.2<br>aynı 19,195 oturumda: 100 sorudan 19'u ilk sırada, en yakını 14</sub></td>
-<td align="center" width="33%">En ucuz<br>agentmemory'nin <b>yarısı kadar token</b><br><sub>zaten çözülmüş bir görevde 104,974'e karşı 53,558<br>tur başına 477 token araç tanımı, yedi sunucunun en azı</sub></td>
-<td align="center" width="33%">En hızlı<br>19,195 oturumu <b>17.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
+<td align="center" width="33%">İsabet<br>LongMemEval-S'te <b>%97.2 R@5</b><br><sub>500 sorunun tamamı · MemPalace %96.6, agentmemory %95.2<br>aynı 19,195 oturumda: 100 sorudan 19'u ilk sırada, en yakını 14</sub></td>
+<td align="center" width="33%">Token<br>agentmemory'nin <b>yarısı kadar token</b><br><sub>zaten çözülmüş bir görevde 104,974'e karşı 53,558<br>tur başına 477 token araç tanımı, yedi sunucunun en azı</sub></td>
+<td align="center" width="33%">İndeksleme<br>19,195 oturumu <b>17.6 sn</b>'de indeksler<br><sub>yedi araçtan sonraki: 72 sn<br>ilk yanıta 26 ms, arama medyanı 97 ms</sub></td>
 </tr>
 </table>
 

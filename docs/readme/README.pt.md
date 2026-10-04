@@ -5,11 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>Uma só memória para todos os seus agentes de código, construída com o histórico que já está no seu disco.</b></p>
+<p align="center"><b>Seus agentes de código param de depurar de novo o que você já resolveu.</b></p>
 
-<p align="center">Seu agente está prestes a depurar de novo algo que você resolveu em março, naquela vez em outro
-agente. O deja indexa as sessões que Claude Code, Codex, Cursor e os demais agentes desta máquina já escrevem
-em disco, e devolve a certa para qualquer um deles que perguntar.</p>
+<p align="center">Claude Code, Codex, Cursor e os demais agentes desta máquina já salvam cada sessão em disco.
+O deja indexa tudo, inclusive meses atrás, e entrega a parte que importa
+ao agente que está trabalhando agora.</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="a mesma pergunta ao mesmo agente duas vezes: sem memória ele não lembra de nada, com o deja responde com uma conclusão de oito meses atrás"></p>
 
@@ -21,9 +21,9 @@ em disco, e devolve a certa para qualquer um deles que perguntar.</p>
 
 <table align="center">
 <tr>
-<td align="center" width="33%">A mais precisa<br><b>97.2% R@5</b> no LongMemEval-S<br><sub>todas as 500 perguntas · MemPalace 96.6%, agentmemory 95.2%<br>mesmas 19,195 sessões: 19/100 em primeiro lugar, a seguinte 14</sub></td>
-<td align="center" width="33%">A mais barata<br><b>metade dos tokens</b> do agentmemory<br><sub>53,558 contra 104,974 numa tarefa já resolvida<br>477 tokens de definições de ferramentas, a menor de sete</sub></td>
-<td align="center" width="33%">A mais rápida<br><b>17.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
+<td align="center" width="33%">Recall<br><b>97.2% R@5</b> no LongMemEval-S<br><sub>todas as 500 perguntas · MemPalace 96.6%, agentmemory 95.2%<br>mesmas 19,195 sessões: 19/100 em primeiro lugar, a seguinte 14</sub></td>
+<td align="center" width="33%">Tokens<br><b>metade dos tokens</b> do agentmemory<br><sub>53,558 contra 104,974 numa tarefa já resolvida<br>477 tokens de definições de ferramentas, a menor de sete</sub></td>
+<td align="center" width="33%">Indexação<br><b>17.6 s</b> para indexar 19,195 sessões<br><sub>a seguinte de sete: 72 s<br>26 ms até a primeira resposta, mediana de busca de 97 ms</sub></td>
 </tr>
 </table>
 

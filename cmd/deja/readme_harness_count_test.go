@@ -271,8 +271,7 @@ func TestNpmReadmeLeadsWithWhatTheMainOneLeadsWith(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, line := range []string{
-		"Your agent is about to re-debug something you fixed in March — in a different agent.",
-		"deja starts full",
+		"Your coding agents stop re-debugging what you already fixed.",
 	} {
 		if !strings.Contains(string(main), line) {
 			t.Fatalf("the main README no longer says %q — update this test with it", line)

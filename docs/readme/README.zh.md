@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>所有编程智能体共用的一份记忆，来自你磁盘上已有的历史。</b></p>
+<p align="center"><b>别再让编程智能体重新调试你已经修好的问题。</b></p>
 
-<p align="center">你的智能体正准备重新调试一个你三月份就修好的问题——当时是在另一个智能体里修的。deja 索引 Claude Code、Codex、Cursor
-以及这台机器上其他所有智能体本来就写在磁盘上的会话，无论哪个智能体来问，都把对的那一条交回来。</p>
+<p align="center">Claude Code、Codex、Cursor 以及这台机器上的其他智能体，本来就把每次会话写在磁盘上。deja 把这些历史全部索引，几个月前的也在，
+再把有用的那部分交给正在干活的智能体。</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一个问题问同一个智能体两次：没有记忆时它毫无印象，有 deja 时它用八个月前的结论作答"></p>
 
@@ -20,9 +20,9 @@
 
 <table align="center">
 <tr>
-<td align="center" width="33%">最准<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
-<td align="center" width="33%">最省<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
-<td align="center" width="33%">最快<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
+<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 题 · MemPalace 96.6%，agentmemory 95.2%<br>同样 19,195 个会话：100 题中 19 题排第一，第二名 14 题</sub></td>
+<td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做过的任务：53,558 对比 104,974<br>工具定义每轮 477 token，七个里最少</sub></td>
+<td align="center" width="33%">索引耗时<br><b>17.6 秒</b>索引 19,195 个会话<br><sub>七个工具里第二名：72 秒<br>首次回答 26 毫秒，搜索中位数 97 毫秒</sub></td>
 </tr>
 </table>
 

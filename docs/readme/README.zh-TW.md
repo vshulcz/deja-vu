@@ -5,10 +5,10 @@
   </picture>
 </p>
 
-<p align="center"><b>所有編碼代理共用的一份記憶，來自你磁碟上已有的歷史。</b></p>
+<p align="center"><b>別再讓編碼代理重新除錯你已經修好的問題。</b></p>
 
-<p align="center">你的代理正準備重新除錯一個你三月就修好的問題——當時是在另一個代理裡修的。deja 索引 Claude Code、Codex、Cursor
-以及這台機器上其他所有代理本來就寫在磁碟上的會話，無論哪個代理來問，都把對的那一筆交回去。</p>
+<p align="center">Claude Code、Codex、Cursor 以及這台機器上的其他代理，本來就把每次會話寫在磁碟上。deja 把這些歷史全部索引，幾個月前的也在，
+再把有用的那部分交給正在工作的代理。</p>
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/demo.gif" width="720" alt="同一個問題問同一個代理兩次：沒有記憶時它毫無印象，有 deja 時它用八個月前的結論作答"></p>
 
@@ -20,9 +20,9 @@
 
 <table align="center">
 <tr>
-<td align="center" width="33%">最準<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 題 · MemPalace 96.6%，agentmemory 95.2%<br>同樣 19,195 個會話：100 題中 19 題排第一，第二名 14 題</sub></td>
-<td align="center" width="33%">最省<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做過的任務：53,558 對比 104,974<br>工具定義每輪 477 token，七個裡最少</sub></td>
-<td align="center" width="33%">最快<br><b>17.6 秒</b>索引 19,195 個會話<br><sub>七個工具裡第二名：72 秒<br>首次回答 26 毫秒，搜尋中位數 97 毫秒</sub></td>
+<td align="center" width="33%">召回率<br><b>97.2% R@5</b>（LongMemEval-S）<br><sub>全部 500 題 · MemPalace 96.6%，agentmemory 95.2%<br>同樣 19,195 個會話：100 題中 19 題排第一，第二名 14 題</sub></td>
+<td align="center" width="33%">Token 用量<br>token 只有 agentmemory 的<b>一半</b><br><sub>已做過的任務：53,558 對比 104,974<br>工具定義每輪 477 token，七個裡最少</sub></td>
+<td align="center" width="33%">索引耗時<br><b>17.6 秒</b>索引 19,195 個會話<br><sub>七個工具裡第二名：72 秒<br>首次回答 26 毫秒，搜尋中位數 97 毫秒</sub></td>
 </tr>
 </table>
 
