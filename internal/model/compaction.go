@@ -52,6 +52,8 @@ type RepositoryFreshness struct {
 // open beyond what the transcript itself explicitly records.
 type CompactionContext struct {
 	Objective   ContextFact         `json:"objective,omitempty"`
+	Goal        ContextFact         `json:"goal,omitzero"`
+	Rules       []ContextFact       `json:"rules,omitempty"`
 	Conclusions []ContextFact       `json:"conclusions,omitempty"`
 	Tests       []ContextTest       `json:"tests,omitempty"`
 	Gaps        []ContextOpenItem   `json:"gaps,omitempty"`

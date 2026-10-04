@@ -23,6 +23,15 @@ compactions. It is capped at twelve lines: three awaiting, four verdicts, three
 rechecks, the rest open items. It is printed first and may take at most 40% of
 the packet.
 
+After it come the user's standing instructions: sentences from any user turn in
+the session that tell the agent how to work ("Never modify internal/legacy/",
+"не трогай legacy", "use slices instead of sort"), and a whole numbered list when
+two thirds of its items are such instructions. Quoted lines, code fences,
+harness blocks, questions and turns longer than 6 KiB are skipped. At most eight
+lines and 1000 bytes, carried from one compaction to the next so a transcript
+read from its tail does not lose them. When the newest request is a step
+("Next: T13"), the first request of the session is printed beside it, labelled.
+
 The next session-start, prompt, or tool hook for that same session and workspace
 returns a recovery packet once. Its 4 KiB limit includes the untrusted-history
 frame. The packet labels assistant conclusions as reported claims. A recorded

@@ -145,6 +145,14 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 	var prev []model.ContextCarry
 	if last, found, err := index.Compaction(dir, input.SessionID, workspace); err == nil && found {
 		prev = last.Data.Carry
+		// A transcript read from its tail may no longer reach the turn that
+		// stated the rules or the first request; the last packet still has them.
+		if len(last.Data.Rules) > 0 {
+			data.Rules = digest.ExtractStandingRules(transcript.Session, last.Data.Rules)
+		}
+		if transcript.Truncated && last.Data.Goal.Text != "" {
+			data.Goal = last.Data.Goal
+		}
 	}
 	data.Carry = digest.ExtractCarry(transcript.Session.Messages, prev)
 	saved, err := index.PutCompaction(dir, index.CompactionState{

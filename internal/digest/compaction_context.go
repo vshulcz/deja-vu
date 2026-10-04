@@ -57,6 +57,10 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 	window, clipped := contextWindow(s.Messages, opts)
 	c := model.CompactionContext{Truncated: clipped}
 	c.Objective = contextObjective(s, window)
+	if goal := sessionGoal(s); goal.Text != "" && !sameRequest(goal.Text, c.Objective.Text) {
+		c.Goal = goal
+	}
+	c.Rules = ExtractStandingRules(s, nil)
 
 	for i := len(window) - 1; i >= 0; i-- {
 		m := window[i]
@@ -491,6 +495,13 @@ func RedactCompactionContext(c model.CompactionContext) model.CompactionContext 
 	c.Conflicts = append([]model.ContextOpenItem(nil), c.Conflicts...)
 	c.Sources = append([]model.ContextRef(nil), c.Sources...)
 	c.Carry = append([]model.ContextCarry(nil), c.Carry...)
+	c.Rules = append([]model.ContextFact(nil), c.Rules...)
+	for i := range c.Rules {
+		c.Rules[i].Text = limitContextText(redactContextText(c.Rules[i].Text), standingRuleBytes)
+		c.Rules[i].Provenance = redactContextRef(c.Rules[i].Provenance)
+	}
+	c.Goal.Text = limitContextText(redactContextText(c.Goal.Text), goalBytes)
+	c.Goal.Provenance = redactContextRef(c.Goal.Provenance)
 	for i := range c.Carry {
 		c.Carry[i].Text = limitContextText(redactContextText(c.Carry[i].Text), carryTextBytes)
 		c.Carry[i].Key = limitContextText(redactContextText(c.Carry[i].Key), carryTextBytes)
@@ -550,6 +561,7 @@ func rebuildSources(c *model.CompactionContext) {
 		seen[ref] = true
 		c.Sources = append(c.Sources, ref)
 	}
+	add(c.Goal.Provenance)
 	add(c.Objective.Provenance)
 	for _, fact := range c.Conclusions {
 		add(fact.Provenance)
@@ -587,6 +599,10 @@ func boundCompactionContext(c model.CompactionContext) model.CompactionContext {
 			c.Gaps = c.Gaps[:len(c.Gaps)-1]
 		case len(c.Conflicts) > 1:
 			c.Conflicts = c.Conflicts[:len(c.Conflicts)-1]
+		case c.Goal.Text != "":
+			c.Goal = model.ContextFact{}
+		case len(c.Rules) > 0:
+			c.Rules = c.Rules[:len(c.Rules)-1]
 		case len(c.Objective.Text) > len(cutMark)+8:
 			c.Objective.Text = limitContextText(c.Objective.Text, len(c.Objective.Text)/2)
 		// The carried list goes last. It is at most twelve lines, and it holds
@@ -639,14 +655,18 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 	// Ahead of the objective because the budget cuts from the bottom, and this
 	// is the part the host's own summary does not carry.
 	addCarrySection(&b, &omittedAny, limit, c.Carry)
-	if c.Objective.Text != "" {
+	addRulesSection(&b, &omittedAny, limit, c.Rules)
+	switch {
+	case c.Objective.Text != "" && c.Goal.Text != "":
+		// The newest request alone is a step; the first one says what the steps
+		// are for. Labelled, so neither reads as the other.
+		add("\nObjective\n- Session started with: " + c.Goal.Text + provenanceSuffix(c.Goal.Provenance) + "\n" +
+			"- Latest request before compaction: " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
+	case c.Objective.Text != "":
 		add("\nObjective\n- " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
 	}
 	addOpenSection(&b, &omittedAny, limit, "Explicit gaps", c.Gaps)
 	addOpenSection(&b, &omittedAny, limit, "Explicit conflicts", c.Conflicts)
-	// Conclusions before the command list, for the reason boundCompactionContext
-	// drops the list first: the render budget cuts from the bottom, so whatever
-	// is printed last is what a tight packet loses.
 	// Conclusions before the command list, for the reason boundCompactionContext
 	// drops the list first: the render budget cuts from the bottom, so whatever
 	// is printed last is what a tight packet loses.
