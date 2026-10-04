@@ -36,7 +36,9 @@ func TestAProjectOfOnlySubagentRunsStillGetsADigest(t *testing.T) {
 	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
 		t.Fatal(err)
 	}
-	if got := hookDigest(index.DefaultDir()); !strings.Contains(got, "Sending verdict") {
+	// The session, not its "Sending verdict": that line is process talk, which
+	// the digest no longer quotes as what a session concluded.
+	if got := hookDigest(index.DefaultDir()); !strings.Contains(got, "quokkaonly") {
 		t.Errorf("a project whose only history is subagent runs got nothing:\n%s", got)
 	}
 }

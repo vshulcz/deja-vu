@@ -1749,7 +1749,7 @@ func recallTextResultFrom(dir, q, harness string, limit, offset, budget int) (st
 				// for, not as a whole: its newest conclusions are about
 				// whatever it did last.
 				src, long := conclusionSource(whole, h.QuotedMessages())
-				cs := withoutShownAnswer(digest.Conclusions(src, left, want), h.Snippets)
+				cs := withoutShownAnswer(digest.SubstantialConclusions(src, left, want), h.Snippets)
 				cs, aboutIt := conclusionsAboutIt(cs, q, h.Snippets)
 				if long && !aboutIt {
 					// The one-line offer below is the newest thing the

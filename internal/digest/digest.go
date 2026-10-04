@@ -1312,6 +1312,22 @@ func dedupeStatus(ms []model.Message) []model.Message {
 // same ones `share` puts under "Key assistant conclusions", trimmed to one or
 // two lines each so the whole block costs a few hundred bytes.
 func Conclusions(s model.Session, budget int, max int) []string {
+	return conclusions(s, budget, max, false)
+}
+
+// SubstantialConclusions is Conclusions for a reader who has nothing else from
+// the session: the session-start digest, a recall page, a recap. A line that
+// says nothing on its own — "Fixed the same way.", "работает", a greeting, an
+// announcement of the next step — is passed over for one that does.
+//
+// The surfaces that pair the line with something the reader already holds keep
+// Conclusions: under the command an agent is about to run, "tests pass" is the
+// answer, not filler.
+func SubstantialConclusions(s model.Session, budget int, max int) []string {
+	return conclusions(s, budget, max, true)
+}
+
+func conclusions(s model.Session, budget int, max int, substantial bool) []string {
 	if budget <= 0 || max <= 0 {
 		return nil
 	}
@@ -1338,7 +1354,7 @@ func Conclusions(s model.Session, budget int, max int) []string {
 	var out []string
 	spent := 0
 	for i := len(picked) - 1; i >= 0 && len(out) < max; i-- {
-		line := decisionLead(MessageText(picked[i].Text))
+		line := decisionLead(MessageText(picked[i].Text), substantial)
 		if line == "" {
 			continue
 		}
@@ -1348,7 +1364,12 @@ func Conclusions(s model.Session, budget int, max int) []string {
 			// end of it — "we decided to cap retries at three after weighing the
 			// options" arrived without the "and then reverted that" it ended on,
 			// which is the opposite of what the session concluded (#1336).
-			if line = firstSentences(line, 1); spent+len(line) > budget {
+			if substantial {
+				line = firstSubstantialSentence(line)
+			} else {
+				line = firstSentences(line, 1)
+			}
+			if spent+len(line) > budget {
 				// Unless one line is the whole answer. Measured on this
 				// machine's index at the tool hook's budget: of 120 sessions,
 				// 29 yielded no conclusion and 16 of those had one — a sentence
@@ -1370,6 +1391,9 @@ func Conclusions(s model.Session, budget int, max int) []string {
 					}
 				}
 				break
+			}
+			if line == "" {
+				continue
 			}
 		}
 		out = append(out, line)
@@ -1420,13 +1444,17 @@ func concludingFirst(ms []model.Message) []model.Message {
 //
 // One sentence, not the head plus it: the budget is the reason the conclusion
 // fell off in the first place.
-func decisionLead(text string) string {
+func decisionLead(text string, substantial bool) string {
 	head := firstSentences(text, 2)
+	if substantial {
+		head = substantialLead(text, head)
+	}
 	if head == "" || CarriesDecision(head) {
 		return head
 	}
 	for _, sent := range sentencesOf(text) {
-		if CarriesDecision(sent) {
+		// "Fixed the same way." carries a marker and nothing else.
+		if CarriesDecision(sent) && !(substantial && thinSentence(sent)) {
 			return sent
 		}
 	}
@@ -1454,7 +1482,10 @@ func sentencesOf(s string) []string {
 			continue
 		}
 		end := i + utf8.RuneLen(r)
-		if sent := strings.TrimSpace(s[start:end]); sent != "" {
+		sent := strings.TrimSpace(s[start:end])
+		// A list item's number is not a sentence of its own, and the item
+		// after it reads the same without it.
+		if sent != "" && !listMarker(sent) {
 			out = append(out, sent)
 		}
 		start = end
@@ -1506,7 +1537,7 @@ func firstSentences(s string, n int) string {
 	if s == "" {
 		return ""
 	}
-	count := 0
+	count, start := 0, 0
 	for i, r := range s {
 		switch {
 		case r == '.' || r == '!' || r == '?':
@@ -1520,6 +1551,11 @@ func firstSentences(s string, n int) string {
 		default:
 			continue
 		}
+		end := i + utf8.RuneLen(r)
+		if listMarker(s[start:end]) {
+			continue
+		}
+		start = end
 		count++
 		if count == n {
 			return strings.TrimSpace(s[:i+utf8.RuneLen(r)])

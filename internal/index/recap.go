@@ -149,7 +149,7 @@ func ScanRecap(dir string, since time.Duration, perSession int) (Recap, error) {
 func recapLines(s model.Session, max int, masked redact.Counts) []string {
 	// Asked for more than the cap, because trimming drops some of what comes
 	// back and a session that concluded three things should still show three.
-	raw := digest.Conclusions(s, recapLineMax*max*4, max*4)
+	raw := digest.SubstantialConclusions(s, recapLineMax*max*4, max*4)
 	var out []string
 	var kept []map[string]bool
 	for _, line := range raw {

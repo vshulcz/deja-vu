@@ -140,7 +140,7 @@ func BuildAutoRecall(ss []model.Session, o AutoRecallOptions) AutoRecallResult {
 	// the other surface.
 	settled := make(map[string]bool, len(candidates))
 	for _, c := range candidates {
-		lines := digest.Conclusions(c, settledProbeBudget, 1)
+		lines := digest.SubstantialConclusions(c, settledProbeBudget, 1)
 		settled[c.Harness+":"+c.ID] = len(lines) > 0 && digest.CarriesDecision(lines[0])
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
@@ -460,9 +460,9 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 		// the first two things the agent said, which are "let me look" and "I
 		// have found the file". What the session decided is at the end of it.
 		//
-		// digest.Conclusions already picks the decision-carrying lines, newest
+		// digest.SubstantialConclusions picks the decision-carrying lines, newest
 		// first, and is what `deja share` prints under the same heading.
-		conclusions = digest.Conclusions(s, 400, 2)
+		conclusions = digest.SubstantialConclusions(s, 400, 2)
 		matched = len(conclusions) > 0
 	}
 	for _, m := range s.Messages {
@@ -504,7 +504,10 @@ func autoRecallSessionForAsked(s model.Session, now time.Time, provenance bool, 
 				problem = firstLine(text, 160)
 			}
 		case "assistant":
-			if len(conclusions) < 2 {
+			// The fallback is held to the same bar as the conclusions it
+			// stands in for, or a session that settled nothing still opened
+			// on "Hi. What do you want to work on?" or "Waiting for CI.".
+			if len(conclusions) < 2 && digest.SaysSomething(text) {
 				conclusions = append(conclusions, firstLine(text, 220))
 			}
 		}
