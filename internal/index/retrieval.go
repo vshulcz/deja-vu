@@ -2247,6 +2247,18 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 			}
 		}
 	}
+	// The id Claude Code's remote control shows, alone or as the
+	// claude.ai/code URL it sits in. No file is named by it, so a session
+	// continued from the phone or the browser was "no session matches" (#4667).
+	if len(matches) == 0 {
+		if rid := sources.RemoteSessionID(p); rid != "" {
+			for _, meta := range m.Sessions {
+				if meta.RemoteID != "" && strings.HasPrefix(meta.RemoteID, rid) {
+					matches = append(matches, meta)
+				}
+			}
+		}
+	}
 	if len(matches) == 0 {
 		for _, meta := range m.Sessions {
 			if idLooselyMatches(meta.ID, p) {
@@ -2338,6 +2350,19 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 		}
 		if strings.HasPrefix(meta.ID, p) {
 			n++
+		}
+	}
+	if n == 0 {
+		// The remote-control id, counted where the resolver tries it (#4667).
+		if rid := sources.RemoteSessionID(p); rid != "" {
+			for _, meta := range m.Sessions {
+				if allow != nil && !allow(meta.Project) {
+					continue
+				}
+				if meta.RemoteID != "" && strings.HasPrefix(meta.RemoteID, rid) {
+					n++
+				}
+			}
 		}
 	}
 	if n == 0 {

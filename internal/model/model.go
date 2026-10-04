@@ -70,6 +70,11 @@ type Session struct {
 	// promoted note stopped looking like one across a machine boundary and the
 	// rules written for notes stopped applying to it (#975).
 	OrigID string `json:"orig_id,omitempty"`
+	// RemoteID is the id Claude Code's remote control gives this session —
+	// the session_01… in claude.ai/code/session_01…, which is what a person
+	// copies from the phone or the browser. Nothing on disk is named by it, so
+	// "claude --resume session_01…" found nothing (#4667).
+	RemoteID string `json:"remote_id,omitempty"`
 	// FormerID is the id an older deja gave this session, when a parser has
 	// since changed how it names them. Only the tombstone check reads it: a
 	// session forgotten under the old id stays forgotten under the new one.

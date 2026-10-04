@@ -824,6 +824,9 @@ type SessionMeta struct {
 	// silently stopped applying (#975). Additive: older manifests decode with
 	// it empty.
 	OrigID string `json:",omitempty"`
+	// RemoteID is the remote-control id of a Claude Code session, the one a
+	// person copies from claude.ai/code. Additive like OrigID.
+	RemoteID string `json:",omitempty"`
 	// Kind, Parent and Agent describe a session an agent spawned: the
 	// harness's own word for it, the session it was forked from, and the agent
 	// that ran it. Only filled where the harness writes the edge itself.

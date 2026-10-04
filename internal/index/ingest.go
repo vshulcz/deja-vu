@@ -2083,7 +2083,7 @@ func metaForSession(s model.Session) SessionMeta {
 	}
 	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent, Opening: SessionOpening(s),
-		OrigID: s.OrigID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
+		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
 
 // sessionSettled is what this session concluded, taken from its tail.
@@ -2630,7 +2630,7 @@ func sessionFromMeta(meta SessionMeta) model.Session {
 		GaveUp: meta.GaveUp,
 		Words:  meta.Words,
 		Kind:   meta.Kind, Parent: meta.Parent, Agent: meta.Agent,
-		OrigID: meta.OrigID, From: meta.From, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
+		OrigID: meta.OrigID, RemoteID: meta.RemoteID, From: meta.From, Lifecycle: meta.Lifecycle, LifecycleNote: meta.LifecycleNote, LifecycleAt: meta.LifecycleAt,
 	}
 }
 
@@ -4653,6 +4653,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// the wrong conversation's files surfacing in blame (#1304).
 			if owns {
 				extendDerived(&meta, s.Messages)
+				// The bridge record can land in any append, and a later one
+				// read from the watermark does not carry it again.
+				if s.RemoteID != "" {
+					meta.RemoteID = s.RemoteID
+				}
 			}
 			m.Sessions[key] = meta
 			for _, msg := range s.Messages {

@@ -53,6 +53,10 @@ type claudeLine struct {
 	// UUID is the record's own id, the fallback identity when neither
 	// requestId nor message.id is present.
 	UUID string `json:"uuid"`
+	// Subtype and URL carry remote control's bridge_status record, whose URL
+	// ends in the session_01… id a person copies from claude.ai/code (#4667).
+	Subtype string `json:"subtype"`
+	URL     string `json:"url"`
 }
 
 type claudeMessage struct {
@@ -108,6 +112,12 @@ func parseClaudeTypedWithOptions(path string, scan func(func([]byte)) error,
 		var v claudeLine
 		if json.Unmarshal(line, &v) != nil {
 			diagMalformedLine(path)
+			return
+		}
+		if v.Type == "system" && v.Subtype == "bridge_status" {
+			if id := RemoteSessionID(v.URL); id != "" {
+				s.RemoteID = id
+			}
 			return
 		}
 		if v.Type != "user" && v.Type != "assistant" {
