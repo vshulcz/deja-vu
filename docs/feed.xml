@@ -11,6 +11,13 @@
     <name>vshulcz</name>
   </author>
   <entry>
+    <title>deja-vu — the one memory your coding agents share</title>
+    <id>https://vshulcz.github.io/deja-vu/</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
+    <updated>2026-10-04T00:00:00Z</updated>
+    <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 33 more agents, built from the sessions already on your disk.</summary>
+  </entry>
+  <entry>
     <title>Persistent memory for coding agents over MCP — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/agents.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
@@ -44,13 +51,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/opencode.html"></link>
     <updated>2026-10-04T00:00:00Z</updated>
     <summary>Where opencode writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>deja-vu — the one memory your coding agents share</title>
-    <id>https://vshulcz.github.io/deja-vu/</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
-    <updated>2026-10-03T00:00:00Z</updated>
-    <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 33 more agents, built from the sessions already on your disk.</summary>
   </entry>
   <entry>
     <title>Delete Kiro session history — deja-vu</title>

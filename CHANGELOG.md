@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.6] - 2026-10-04
+
+This release is mostly about what reaches the model, and when. After a
+compaction, opencode, Kilo, Hermes and Gemini CLI now get the recovery packet
+Claude Code already had, and the packet carries the user's standing
+instructions and first request. `deja handoff` builds from the end of a
+session instead of the start, and agents can fetch it over MCP. Hermes and
+Copilot CLI get the after-failure fix line. The per-prompt hooks send less:
+spawned agents get a one-line pointer, the line before a Bash command is now
+opt-in with `DEJA_COMMAND_HINTS=on`, and the file line before an edit speaks
+only when it has something about the file. Telegram bot tokens are redacted.
+The index version is now 63, so the store rebuilds once on the first run after
+upgrading.
+
+### Added
+
+- Compaction recovery packet for opencode, Kilo, Hermes and Gemini CLI: after a compaction the next turn gets the commands, errors and state from before it, as in Claude Code. Run the matching `deja install <client>-auto` again to update the plugin. Also fixes a Gemini parser bug where a resume dropped earlier commands (#4641).
+- The compaction packet carries the user's standing instructions from any turn ("never", "do not", "always", "use X instead of Y", "не трогай" and the like, up to 8 lines), and the session's first request when the latest one is just a step. On 60 days of real transcripts, 276 of 2,486 sessions get rules (#4656).
+- `deja handoff` takes its body from the compaction packet, so conclusions come from the end of the session (median position 0.88-1.00 on 12 real sessions, was 0.00-0.37). The MCP tool has a `handoff` mode, and a session whose first prompt asks to continue another one by id or harness name gets the packet (#4674).
+- After a failed terminal command, Hermes and Copilot CLI get the fix this machine found for the same error before, through Hermes' `transform_tool_result` and a Copilot `postToolUse` hook. Run `deja install hermes-auto` or `copilot-auto` again to get it (#4660).
+- `deja doctor` follows every hook, plugin and MCP entry to the deja binary it runs and prints one row per binary older than the one running doctor, with the update command (#4658).
+- `show`, `resume` and `handoff` accept a Claude Code remote-control id (`session_01…`) or its claude.ai/code URL (#4668).
+
+### Changed
+
+- The line before a Bash command is off unless `DEJA_COMMAND_HINTS=on`, and a spawned agent gets the one-line pointer instead of the full digest. On 200 real Task prompts that went from 257,769 B to 67,217 B (#4644).
+- The file line before an edit only speaks when it carries something about the file: a note or decision naming it or its directory, or a command that passed there. On 480 replayed edits, 20 lines (7,290 B) went to 2 (659 B) (#4646).
+- Full per-prompt digests are capped at four per session, later matches get the pointer line. On 120 real prompts, 129.8 KB to 50.5 KB injected (#4637).
+- The opencode session digest goes after opencode's system prompt, so the provider cache reuses the base prompt. Uncached input on the first request went from 3,988 to 1,941 tokens (median) (#4650).
+- MCP calls run in parallel (up to 4 read the index at once), honour cancel, and a call still running at 20 s (`DEJA_MCP_DEADLINE`) returns a note instead of a client timeout. p95 on batches of 4 went from 11.4 s to 6.3 s (#4639).
+- Claude Code compaction summaries and Gemini state snapshots are filed under the `summary` role, as opencode and Hermes already were, so recall stops quoting them as the user's words (#4678).
+- Install resolves far fewer paths: a 39-target install goes from 2,435 to 268 symlink walks, uninstall from 857 to 312 (#4635).
+
+### Fixed
+
+- Telegram bot tokens are redacted and named in `deja secrets`. On a rebuilt real store, raw tokens in the index went from 11 copies to 0. The Russian filler rule no longer re-masks an earlier marker into `[redacted:[redacted:credential]]` (#4676).
+- After `command not found`, `No module named` or zsh's `== not found`, `deja fix` and the after-failure hook answer with the same command in a form that ran, another program doing the job, or an install, and stay silent otherwise. On 231 real repeat failures, unrelated answers from the hook went from 95 to 15 and useful ones from 0 to 44 (#4666).
+- Recall on a session with 20+ user turns takes its conclusions from around the quoted turns. Hand-checked on 60 pages, blocks about other work went from 47 to 15 (#4664).
+- The session-start digest, recall and recap skip conclusion lines that say nothing on their own ("Waiting for CI.", "работает", a bare number). On 212 real session starts, 152 such lines dropped (#4672).
+- The compaction packet closes an issue when its PR merges, keeps its delivery mark across a forked agent's compaction, and its objective skips status polls, bare slash commands and harness notices (#4670).
+- opencode's store is read under `$XDG_DATA_HOME/opencode` on every OS, and `OPENCODE_DB` is honoured (#4648).
+
 ## [0.21.5] - 2026-10-02
 
 Most of this release came from two rounds of running every supported harness
@@ -1667,7 +1709,8 @@ See the release notes: Antigravity harness, share redaction hardening.
 - Stdio MCP memory server with `recall` and `recall_context` tools.
 - Idempotent installers for claude-code, codex, and opencode MCP config.
 
-[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.5...HEAD
+[Unreleased]: https://github.com/vshulcz/deja-vu/compare/v0.21.6...HEAD
+[0.21.6]: https://github.com/vshulcz/deja-vu/compare/v0.21.5...v0.21.6
 [0.21.5]: https://github.com/vshulcz/deja-vu/compare/v0.21.4...v0.21.5
 [0.21.4]: https://github.com/vshulcz/deja-vu/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/vshulcz/deja-vu/compare/v0.21.2...v0.21.3
