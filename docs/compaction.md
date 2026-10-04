@@ -91,21 +91,6 @@ has not yet been indexed, and prevents it from being captured again. As with the
 rest of the index, redaction does not remove all sensitive prose and storage is
 not encrypted.
 
-## Compaction window
-
-Every call re-sends the whole context, so a session that grows to Claude Code's
-default compaction point pays for most of a million tokens on each call near
-the top. When Claude Code sessions from the last 30 days went past 400k tokens
-of context, `deja doctor` prints a `compaction` row with the count and the
-setting that compacts sooner: `"autoCompactWindow": 250000` in
-`~/.claude/settings.json`, or `CLAUDE_CODE_AUTO_COMPACT_WINDOW=250000`. It is
-advice only; deja does not write the setting. The row stays silent when the
-window is already at or under 400k (top level, `modelSettings`, the settings
-`env` block or the environment), or when `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE`,
-`DISABLE_AUTO_COMPACT` or `DISABLE_COMPACT` is set. The peak is read from each
-transcript's last recorded usage, or from the size a `compact_boundary` record
-says it compacted at.
-
 ## Measuring recovery
 
 `deja stats` reports locally observed raw tool calls between capture and the
