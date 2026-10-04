@@ -45,7 +45,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@vshulcz/deja-vu": "^0.21.5"
+    "@vshulcz/deja-vu": "^0.21.6"
   },
   "peerDependencies": {
     "openclaw": ">=2026.7.1"
