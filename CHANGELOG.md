@@ -17,9 +17,9 @@ session instead of the start, and agents can fetch it over MCP. Hermes and
 Copilot CLI get the after-failure fix line. The per-prompt hooks send less:
 spawned agents get a one-line pointer, the line before a Bash command is now
 opt-in with `DEJA_COMMAND_HINTS=on`, and the file line before an edit speaks
-only when it has something about the file. Telegram bot tokens are redacted.
-The index version is now 63, so the store rebuilds once on the first run after
-upgrading.
+only when it has something about the file. Telegram bot tokens are redacted,
+and a secret ending in punctuation is masked whole. The index version is now
+64, so the store rebuilds once on the first run after upgrading.
 
 ### Added
 
@@ -43,6 +43,7 @@ upgrading.
 ### Fixed
 
 - Telegram bot tokens are redacted and named in `deja secrets`. On a rebuilt real store, raw tokens in the index went from 11 copies to 0. The Russian filler rule no longer re-masks an earlier marker into `[redacted:[redacted:credential]]` (#4676).
+- A key-value secret that ends in punctuation is masked whole. `--password=Sup3rS3cretValue!!xyz` was stored with `!!xyz` after the marker, and the same for `#`, `$`, `^`, `~`, `@` and `*` tails. The index rebuild drops tails already stored (#4683).
 - After `command not found`, `No module named` or zsh's `== not found`, `deja fix` and the after-failure hook answer with the same command in a form that ran, another program doing the job, or an install, and stay silent otherwise. On 231 real repeat failures, unrelated answers from the hook went from 95 to 15 and useful ones from 0 to 44 (#4666).
 - Recall on a session with 20+ user turns takes its conclusions from around the quoted turns. Hand-checked on 60 pages, blocks about other work went from 47 to 15 (#4664).
 - The session-start digest, recall and recap skip conclusion lines that say nothing on their own ("Waiting for CI.", "работает", a bare number). On 212 real session starts, 152 such lines dropped (#4672).
