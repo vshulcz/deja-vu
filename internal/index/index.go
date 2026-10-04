@@ -650,7 +650,14 @@ import (
 //
 // 60 also: a DeepSeek Harness session.v4.jsonl is read, in place of the older
 // log dsh leaves beside it, and a v4 error result keeps its edit out (#4600).
-const version = 60
+//
+// 61 re-mines the fix pairs for a line the shell could not run. `== not
+// found`, `command not found` and `No module named` were answered with the
+// next file the session edited or the next thing it ran, and on one machine's
+// repeat failures 110 of 119 answers had nothing to do with the error. Such a
+// line now pairs only with itself in a form that ran, or with another program
+// doing the missing one's job; otherwise nothing is said.
+const version = 61
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

@@ -85,6 +85,12 @@ type FixPair struct {
 	// store name nothing the error names, because they are not a command about
 	// the error, they are the command that caused it, working.
 	Failed string `json:",omitempty"`
+	// Substitute marks the remedy for a missing program as another program
+	// doing its job on the same arguments: `git ls-remote …/o/r refs/pull/9`
+	// after `gh pr view 9 --repo o/r` failed with `gh: command not found`.
+	// Evidence of the same kind as Repaired — the session wanted exactly this
+	// done and found a way — so it does not wait for a second sighting.
+	Substitute bool `json:",omitempty"`
 	// Candidate marks a sighting that is not a pair yet: the remedy named
 	// nothing the error named, and no other session has done the same thing
 	// after the same error. Evidence of the second kind accumulates across
@@ -188,7 +194,24 @@ func selfEvidentPair(p FixPair) bool {
 	if p.Edit != "" {
 		return false
 	}
-	return p.Repaired || sharesTerm(p.Error, p.Command)
+	return p.Repaired || p.Substitute || sharesTerm(p.Error, p.Command)
+}
+
+// MachineFact reports whether the pair answers a program or module missing
+// from this machine with a command that got the job done. That is a fact
+// about the machine, not about the project it was learned in: `timeout` is
+// missing from every checkout on a Mac.
+func (p FixPair) MachineFact() bool {
+	if p.Candidate || p.Command == "" || !(p.Repaired || p.Substitute) {
+		return false
+	}
+	low := strings.ToLower(p.Error)
+	for _, phrase := range envPhrases {
+		if strings.Contains(low, phrase) {
+			return true
+		}
+	}
+	return false
 }
 
 // repetitionConfirms reports whether a second sighting is evidence for this
@@ -395,13 +418,30 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// The command that produced this error, for the remedy that is that
 		// same command corrected.
 		failedCmd := commandBefore(ms, i)
+		// The shell could not run the line at all: the answer is that line in a
+		// form that runs, or nothing.
+		env := commandLevelFailure(m.Text, line)
+		if env {
+			// An error that names the missing program names the line it came
+			// from. The record before the error is not always that line:
+			// Hermes runs a turn's calls together and stores every output after
+			// all of the commands, and a script fails on its ninth line, not
+			// its first.
+			if ran := commandRunningBefore(ms, i, missingProgram(line)); ran != "" {
+				failedCmd = ran
+			} else if failedCmd == "" {
+				failedCmd = commandRunningBefore(ms, i, "")
+			}
+		}
 		// The first file the session changed after the error, kept in case the
 		// window holds no command that answers it.
 		edited := ""
 		paired := false
 		for j := i + 1; j < len(ms) && j <= i+fixLookAhead; j++ {
 			if ms[j].Role == roleEdit {
-				if edited == "" {
+				// No file edit answers a line the shell refused; it is the
+				// session going back to its work.
+				if edited == "" && !env {
 					edited = strings.TrimSpace(firstLineOf(ms[j].Text))
 				}
 				continue
@@ -447,7 +487,21 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			// `--include=*.go` — a grep, rejected here as investigation, and
 			// one of the most repeated walls on the machine that mined it.
 			repaired := repairedVariant(failedCmd, cmd)
-			if !repaired && investigationCommand(cmd) {
+			substituted := false
+			// Only when the refused line is known: without it there is nothing
+			// to hold the next command against, and that command is judged
+			// the way every other remedy is.
+			if env && failedCmd != "" {
+				repaired, substituted = envRemedy(line, failedCmd, cmd)
+				// Anything else after a refused line is the session moving
+				// on, and handed back it reads as the answer. An install is
+				// still one, named or not: `brew install ripgrep` answers
+				// `command not found: rg`.
+				if !repaired && !substituted && !sharesTerm(line, cmd) && !installVerbRE.MatchString(strings.ToLower(cmd)) {
+					continue
+				}
+			}
+			if !repaired && !substituted && investigationCommand(cmd) {
 				continue
 			}
 			// A command that names a scratch file is not a remedy anyone can
@@ -467,7 +521,8 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 				failed = failedCmd
 			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key,
-				When: ms[j].Time, Project: project, Repaired: repaired, Failed: failed})
+				When: ms[j].Time, Project: project, Repaired: repaired, Failed: failed,
+				Substitute: substituted})
 			paired = true
 			break
 		}

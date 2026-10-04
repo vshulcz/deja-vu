@@ -444,6 +444,20 @@ func fixPairLine(dir, cwd, output string) string {
 			return line
 		}
 	}
+	// Except a program this machine does not have. `timeout` missing in one
+	// checkout is missing in all of them, and the command that worked without
+	// it was learned wherever the agent happened to be.
+	elsewhere := index.FixesFor(dir, output, 4, func(project string) bool {
+		return pol.Allows(policy.ActivationAuto, project) && project != "" && !hookProjectIs(cwd, project)
+	})
+	for _, p := range elsewhere {
+		if !p.MachineFact() {
+			continue
+		}
+		if line := fixLine(p, frictionCount(dir, p, pol)); line != "" {
+			return line
+		}
+	}
 	return ""
 }
 
