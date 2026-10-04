@@ -244,6 +244,7 @@ whether or not the tool is called.
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
 | `orient` | nothing — it asks about the project | `project?`, `limit?` | The commands past sessions ran here and the files they worked in. |
 | `remember` | one durable fact or decision | `project?`, `tags?` | Stores a durable decision for later recall. |
+| `handoff` | a session id or harness name; empty for the newest session here | `harness?` | Another session's goal, standing instructions, latest conclusions, passed checks and where it stopped, to continue it. |
 
 </details>
 

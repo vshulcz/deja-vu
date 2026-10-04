@@ -231,6 +231,11 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 		requestWarmup(dir)
 		return emitNudgeOnly(stdout, plain, nudge)
 	}
+	// A new session whose first words ask to carry on another one gets that
+	// session's packet instead of a recall on the words of the request.
+	if emitAskedHandoff(dir, input, asked, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), plain, stdout) {
+		return nil
+	}
 	// The same question, from the same reader, was answered a moment ago. The
 	// cooldowns below are per session shown, so an identical prompt arriving
 	// every minute — a `/loop 1m …` sends the same text on each tick — walked

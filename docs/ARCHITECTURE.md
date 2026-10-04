@@ -225,6 +225,7 @@ One tool, `deja`, with a required `mode`:
 - `how`: the real invocation for a tool here, from what agents ran.
 - `orient`: the project's recurring commands and the files its sessions open, for an agent that would otherwise find them by reading.
 - `remember`: stores one durable decision for later recall.
+- `handoff`: the packet `deja handoff` prints, for an agent that reaches deja only through MCP.
 
 Six tools were six envelopes declaring the same arguments, and six descriptions
 each arguing they were the entry point — a question about a command went to

@@ -314,13 +314,14 @@ func dejaTool() map[string]any {
 			"- how: the command and flags this user really runs for a thing, instead of a guessed one.\n" +
 			"- orient: the commands past sessions ran in this project and the files they worked in, before you go reading.\n" +
 			"- remember: store one settled decision for a later session.\n" +
+			"- handoff: continue another session's work. q: its id or harness.\n" +
 			"A bracketed marker on a result is the user's own later judgement; act on what it says. " +
 			"When a result helps, open your reply with one line: \"déjà vu: <what> — <how you used it> (deja:<session id>)\". Say nothing about recalls that did not help.",
 		"annotations": map[string]any{"title": "This user's past sessions", "openWorldHint": false},
 		"inputSchema": map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember"}},
+				"mode":    map[string]any{"type": "string", "enum": []string{"recall", "context", "blame", "fix", "how", "orient", "remember", "handoff"}},
 				"q":       map[string]any{"type": "string", "description": "What to ask about: the question or exact token; for blame a path, for fix the failing output verbatim, for remember the fact."},
 				"harness": map[string]any{"type": "string", "description": harnessFilterDescription()},
 				"project": map[string]any{"type": "string", "description": "Optional project filter; for remember, where it is filed."},
@@ -364,6 +365,7 @@ var dispatcherModes = map[string]string{
 	"how":            "how",
 	"orient":         "orient",
 	"remember":       "remember",
+	"handoff":        "handoff",
 }
 
 // qField is the argument each mode reads its subject from. One declared `q`
@@ -384,6 +386,7 @@ var qField = map[string]string{
 	"how":            "what",
 	"orient":         "",
 	"remember":       "text",
+	"handoff":        "session",
 }
 
 // spreadQ copies q into the field the mode reads, unless the caller already
@@ -549,6 +552,8 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		return recordedMCPAnswer(dir, usage.KindHow, func() (string, int, error) { return mcpHow(dir, name, raw) })
 	case "orient":
 		return recordedMCPAnswer(dir, usage.KindOrient, func() (string, int, error) { return mcpOrient(dir, name, raw) })
+	case "handoff":
+		return recordedMCPAnswer(dir, usage.KindHandoff, func() (string, int, error) { return mcpHandoff(dir, name, raw) })
 	case "remember":
 		var a struct {
 			Text    string   `json:"text"`

@@ -21,6 +21,7 @@ One tool, `deja`, called with a `mode`:
 | `how` | The real invocation for a build, test or deploy, from what ran here. |
 | `orient` | The commands past sessions ran in this project and the files they worked in. |
 | `remember` | Stores one durable decision for later recall. |
+| `handoff` | Another session's state, to continue its work where it stopped. |
 
 ## Install
 

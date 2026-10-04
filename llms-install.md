@@ -54,6 +54,7 @@ One MCP tool, `deja`, with a `mode` argument (clients wired earlier can still ca
 - `how` — the real invocation for a tool here, with its real flags.
 - `orient` — the commands past sessions ran in this project and the files they worked in, before reading the tree.
 - `remember` — store one durable decision for a later session to recall.
+- `handoff` — another session's state, to continue its work: the goal, standing instructions, latest conclusions and where it stopped.
 
 No API keys and no configuration. Indexing, search and every tool above are
 local and make no network calls; the exceptions are commands somebody runs on

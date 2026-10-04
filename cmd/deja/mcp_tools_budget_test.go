@@ -23,10 +23,11 @@ import (
 // Then the description lost the prose the server instructions already carry
 // and the five per-mode payload fields collapsed into one declared `q`:
 // 3,196 chars became 1,689, which is 828 tokens down to 444 on o200k_base.
-// A seventh mode, orient, put back 100 of those chars.
+// A seventh mode, orient, put back 100 of those chars, and an eighth, handoff,
+// 77 more: the hosts that reach deja only through MCP had no other way to it.
 // The budget is set just above what that costs, because the point of it is to
 // notice growth rather than to leave room for it.
-const mcpToolsListCharBudget = 1850
+const mcpToolsListCharBudget = 1900
 
 func TestMCPToolsListStaysWithinItsTokenBudget(t *testing.T) {
 	hermeticEnv(t)

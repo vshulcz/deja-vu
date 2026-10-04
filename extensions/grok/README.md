@@ -37,7 +37,7 @@ hooks into `~/.grok/hooks/deja.json`. Either path is enough on its own.
 ## What you get
 
 The MCP server, with the one tool deja serves everywhere: `deja`, called with
-a mode of `recall`, `context`, `blame`, `fix`, `how`, `orient` or `remember`.
+a mode of `recall`, `context`, `blame`, `fix`, `how`, `orient`, `remember` or `handoff`.
 
 The `deja-history` skill, so the agent knows the CLI contract when the tools are
 not reachable.

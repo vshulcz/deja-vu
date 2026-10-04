@@ -628,6 +628,21 @@ func serializedContextBytes(c model.CompactionContext) int {
 // state as transcript-derived and preserves explicit absence of a repository
 // freshness check rather than implying that a repository is clean.
 func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
+	return renderContext(c, byteBudget,
+		"Compaction context from normalized transcript records. Conclusions and open items are recorded claims, not independently verified.\n",
+		true)
+}
+
+// RenderHandoffContext is the same packet for a session handed to another
+// agent. A handoff has no hook that checked the repository, so the freshness
+// line would only ever say it was not recorded.
+func RenderHandoffContext(c model.CompactionContext, byteBudget int) string {
+	return renderContext(c, byteBudget,
+		"State of the session from its transcript records. Conclusions and open items are its own claims, not independently verified.\n",
+		false)
+}
+
+func renderContext(c model.CompactionContext, byteBudget int, header string, compaction bool) string {
 	if byteBudget <= 0 {
 		byteBudget = defaultRenderBudget
 	}
@@ -650,8 +665,12 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 		b.WriteString(chunk)
 		return true
 	}
-	add("Compaction context from normalized transcript records. Conclusions and open items are recorded claims, not independently verified.\n")
-	add(renderFreshness(c.Freshness))
+	add(header)
+	latest := "Latest request"
+	if compaction {
+		add(renderFreshness(c.Freshness))
+		latest = "Latest request before compaction"
+	}
 	// Ahead of the objective because the budget cuts from the bottom, and this
 	// is the part the host's own summary does not carry.
 	addCarrySection(&b, &omittedAny, limit, c.Carry)
@@ -661,7 +680,7 @@ func RenderCompactionContext(c model.CompactionContext, byteBudget int) string {
 		// The newest request alone is a step; the first one says what the steps
 		// are for. Labelled, so neither reads as the other.
 		add("\nObjective\n- Session started with: " + c.Goal.Text + provenanceSuffix(c.Goal.Provenance) + "\n" +
-			"- Latest request before compaction: " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
+			"- " + latest + ": " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
 	case c.Objective.Text != "":
 		add("\nObjective\n- " + c.Objective.Text + provenanceSuffix(c.Objective.Provenance) + "\n")
 	}

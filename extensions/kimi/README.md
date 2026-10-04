@@ -44,7 +44,7 @@ kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with thi
 - **Recall on every prompt.** A `UserPromptSubmit` hook runs `deja hook-prompt`
   and Kimi appends what it finds to the turn. Silent when nothing matches.
 - **Tools.** The plugin declares `deja mcp` as an MCP server: one `deja` tool
-  with a mode of `recall`, `context`, `blame`, `fix`, `how`, `orient` or `remember`.
+  with a mode of `recall`, `context`, `blame`, `fix`, `how`, `orient`, `remember` or `handoff`.
 - **`/deja:recall <query>`** to search history directly.
 - **The `deja-history` skill**, loaded at session start, so the agent knows to
   look before re-debugging something.

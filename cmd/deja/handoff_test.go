@@ -93,7 +93,7 @@ func TestHandoffDigestShape(t *testing.T) {
 	for _, want := range []string{
 		"picking up work handed off from a claude session",
 		"project gateway",
-		"## User problem statement(s)",
+		"Session started with: pool exhausted under load",
 		"## Where it stopped",
 		"**assistant:** staging pgbouncer caps at 20",
 	} {

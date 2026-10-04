@@ -820,6 +820,7 @@ const (
 
 func Handoff(s model.Session, budget int) string {
 	earlier := compactedHalf(s)
+	whole := s
 	s = cleanSession(s)
 	var b strings.Builder
 	date := "unknown"
@@ -838,16 +839,27 @@ func Handoff(s model.Session, budget int) string {
 	// so the instruction above stays outside and what is quoted is named as a
 	// transcript rather than as a command.
 	b.WriteString("\n" + handoffQuoteOpen + "\n")
-	body := Share(s, budget*3/4)
-	// Drop the share header line; the framing above replaces it.
-	if i := strings.Index(body, "\n"); i > 0 && strings.HasPrefix(body, "# deja share:") {
-		body = strings.TrimSpace(body[i:])
-	}
 	// What the compaction threw away, when the harness's own summary is all
 	// that is left of it (#3366).
+	body := ""
 	if earlier != "" {
-		body = "## Earlier, from the harness's summary of the compacted half\n\n" +
-			earlier + "\n\n" + body
+		body = "## Earlier, from the harness's summary of the compacted half\n\n" + earlier + "\n\n"
+	}
+	// The packet a compaction hands back, not Share: Share's conclusions are
+	// read from the top of the session, and on 11 of 12 real sessions every one
+	// it handed over came from the first tenth of the work — a handoff on a
+	// month-long session described a blocker from four weeks earlier. The
+	// packet reads backwards from where the session stopped and carries the
+	// first and latest request, standing instructions and the checks that ran.
+	if packet := strings.TrimSpace(RenderHandoffContext(ExtractCompactionContext(whole, ExtractOptions{}), budget*3/4-len(body))); packet != "" {
+		body += packet
+	} else {
+		share := Share(s, budget*3/4-len(body))
+		// Drop the share header line; the framing above replaces it.
+		if i := strings.Index(share, "\n"); i > 0 && strings.HasPrefix(share, "# deja share:") {
+			share = strings.TrimSpace(share[i:])
+		}
+		body += share
 	}
 	// The marker says the passage before it was cut and that the block ends
 	// there — that is the rule Share and the tail each keep on their own. The

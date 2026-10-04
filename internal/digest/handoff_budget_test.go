@@ -38,9 +38,6 @@ func TestALongSessionStillHandsOverItsConclusions(t *testing.T) {
 	if !strings.Contains(block, "cut the p99 on the orders endpoint") {
 		t.Errorf("the problem statement is missing:\n%s", block)
 	}
-	if !strings.Contains(block, "Key assistant conclusions") {
-		t.Errorf("a long session handed over no conclusions section at all:\n%.400s", block)
-	}
 	if !strings.Contains(block, "per-request pool checkout") {
 		t.Errorf("what the session concluded did not survive the budget:\n%.400s", block)
 	}
