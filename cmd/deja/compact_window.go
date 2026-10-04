@@ -176,7 +176,7 @@ func leadingInt(b []byte) (int, bool) {
 func claudeCompactWindowLowered(userSettings string) bool {
 	env := map[string]string{}
 	for _, k := range []string{"CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "DISABLE_AUTO_COMPACT", "DISABLE_COMPACT"} {
-		if v, ok := os.LookupEnv(k); ok {
+		if v := os.Getenv(k); v != "" {
 			env[k] = v
 		}
 	}

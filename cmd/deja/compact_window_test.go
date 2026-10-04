@@ -61,7 +61,6 @@ func compactDoctor(t *testing.T, cfg string) string {
 	t.Setenv("DEJA_CLAUDE_MANAGED_SETTINGS", filepath.Join(cfg, "no-managed.json"))
 	for _, k := range []string{"CLAUDE_CODE_AUTO_COMPACT_WINDOW", "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE", "DISABLE_AUTO_COMPACT", "DISABLE_COMPACT"} {
 		t.Setenv(k, "")
-		os.Unsetenv(k)
 	}
 	var out bytes.Buffer
 	doctorCompactWindow(&out, time.Now())
