@@ -202,7 +202,7 @@ func selfEvidentPair(p FixPair) bool {
 // about the machine, not about the project it was learned in: `timeout` is
 // missing from every checkout on a Mac.
 func (p FixPair) MachineFact() bool {
-	if p.Candidate || p.Command == "" || !(p.Repaired || p.Substitute) {
+	if p.Candidate || p.Command == "" || (!p.Repaired && !p.Substitute) {
 		return false
 	}
 	low := strings.ToLower(p.Error)
