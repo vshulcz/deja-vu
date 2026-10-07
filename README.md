@@ -260,7 +260,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Harness | MCP recall | Auto-recall | Skill | Command | Resume | Handoff | Needs |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
-| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | threads from 0.0.1774963753 on live on ampcode.com; only older local threads are read |
+| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | threads from 0.0.1774963753 on live on ampcode.com; deja reads those its plugin has written out, and older local ones |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |

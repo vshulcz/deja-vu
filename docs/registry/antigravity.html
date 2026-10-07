@@ -64,6 +64,14 @@
 <p>the line deja keeps for that file, and a <code>CHECKPOINT</code> step, which is how a</p>
 <p>compaction shows, gets the session as it stood before it, once. Antigravity</p>
 <p>keeps the steps before a checkpoint, so nothing else is needed.</p>
+<h2 id="status-line">Status line</h2>
+<p>agy runs a command for its status line, set by <code>/statusline &lt;command&gt;</code> or the</p>
+<p><code>statusLine</code> key in <code>~/.gemini/antigravity-cli/settings.json</code> (agy 1.3.1).</p>
+<p><code>antigravity-auto</code> writes <code>deja statusline</code> there with <code>stack_with_default</code>,</p>
+<p>so agy&#39;s own line stays above deja&#39;s. agy pipes <code>session_id</code> and a</p>
+<p><code>transcript_path</code> that ends in <code>transcript.jsonl</code> for every conversation, so</p>
+<p>the line finds the session by its id. A status line already set up there is</p>
+<p>left alone.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>User-visible content and machine metadata share one string field.</li>

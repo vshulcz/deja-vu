@@ -29,6 +29,8 @@ func TestMain(m *testing.M) {
 		"CURSOR_CONFIG_DIR":       "",
 		"VSCODE_EXTENSIONS":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
+		"AIDER_READ":              "",
+		"AIDER_GIT":               "",
 		"XDG_CONFIG_HOME":         "",
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),

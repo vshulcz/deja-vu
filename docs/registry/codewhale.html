@@ -132,10 +132,26 @@
 <li><code>session_end</code> (on <code>/quit</code>, not on a kill) ends the live stamp.</li>
 </ul>
 <p><code>tool_call_after</code>, <code>turn_end</code> and <code>session_start</code> output never reaches the</p>
-<p>model, and there is no compaction event, so the fix for a failed command</p>
-<p>and a compaction packet have no channel yet. The hooks&#39; <code>sess_…</code> ids are not</p>
-<p>the store&#39;s file ids, so a session&#39;s live stamp does not keep MCP recall off</p>
-<p>its own transcript.</p>
+<p>model, so the fix for a failed command has no channel yet. The hooks&#39;</p>
+<p><code>sess_…</code> ids are made fresh for each hook executor and are not the store&#39;s</p>
+<p>file ids, so a session&#39;s live stamp does not keep MCP recall off its own</p>
+<p>transcript.</p>
+<ul>
+<li><strong>Compaction.</strong> There is no compaction event. Before compacting, CodeWhale</li>
+</ul>
+<p>saves the whole history as</p>
+<p><code>sessions/&lt;id&gt;/artifacts/context-transfer-&lt;checkpoint&gt;.json</code>, and once the</p>
+<p>summary is written, the summary beside it in <code>.md</code></p>
+<p>(<code>compact_messages_safe</code>). The next <code>message_submit</code> or <code>tool_call_before</code></p>
+<p>takes the newest pair written since that hook session was first seen, for a</p>
+<p>saved session in the same workspace, and the packet rides it. A <code>.json</code></p>
+<p>without its <code>.md</code> is a failed attempt or a prune and is skipped. Checked on</p>
+<p>a 0.10.0 stand.</p>
+<ul>
+<li><strong>Status line.</strong> None to write to: the footer takes only built-in items</li>
+</ul>
+<p>(<code>StatusItem</code> in <code>crates/tui/src/config.rs</code>), and observer hooks&#39; stdout is</p>
+<p>discarded.</p>
 <ul>
 <li><strong>Resume.</strong> <code>codewhale --help</code> on 0.9.13 lists <code>--resume</code>, <code>--session-id</code></li>
 </ul>

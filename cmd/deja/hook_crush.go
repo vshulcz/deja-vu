@@ -99,11 +99,13 @@ func crushCompactionPacket(dir, sid, cwd string) string {
 	return strings.TrimSpace(out.String())
 }
 
-// Command Code fires no per-prompt hook: SessionStart, PreToolUse, PostToolUse
-// and Stop (1.77.0 buildHookPayload). Its PreToolUse context reaches the model
-// and the payload names the transcript, so the first tool call after a
-// question answers it, once per question, from the newest turn the person
-// typed there.
+// Command Code fires no per-prompt or compaction hook: SessionStart,
+// PreToolUse, PostToolUse and Stop (1.77.0 buildHookPayload). A compaction is
+// written into the transcript the PreToolUse payload names, so it is caught
+// up there before hook-tool runs, and its packet is what this call answers
+// with. The question is not read from there: a turn reaches the file only
+// once it commits, after its tool calls (1.77.0 stand), so the mod answers it
+// (commandCodeModTS).
 func commandCodeStoreHere() bool {
 	fi, err := os.Stat(sources.CommandCodeRoot())
 	return err == nil && fi.IsDir()
@@ -120,34 +122,13 @@ func runCommandCodeTool(dir string, rest []string, cmd command) error {
 		TranscriptPath string `json:"transcript_path"`
 	}
 	_ = json.Unmarshal(raw, &p)
-	if p.SessionID == "" || !sources.CommandCodeUnderRoot(p.TranscriptPath) {
-		return withStdin(raw, func() error { return cmd(dir, rest) })
+	if p.SessionID != "" && sources.CommandCodeUnderRoot(p.TranscriptPath) {
+		pre := precompactHookInput{SessionID: p.SessionID, TranscriptPath: p.TranscriptPath, CWD: p.CWD}
+		catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
+			return sources.ReadCommandCodeCompaction(p.TranscriptPath, p.SessionID)
+		})
 	}
-	var out []byte
-	err := withStdin(raw, func() error {
-		var cerr error
-		out, cerr = captureDeferredStdout(func() error { return cmd(dir, rest) })
-		return cerr
-	})
-	extra := ""
-	if text, key := sources.CommandCodeLatestPrompt(p.TranscriptPath); key != "" && !recallIsOff() {
-		token := "cmd-prompt:" + shortHash(key)
-		if !alreadyInjected(dir, p.SessionID)[token] {
-			rememberInjectedIDs(dir, p.SessionID, token)
-			b, _ := json.Marshal(map[string]any{
-				"hook_event_name": "UserPromptSubmit", "session_id": p.SessionID,
-				"cwd": p.CWD, "transcript_path": p.TranscriptPath, "prompt": text,
-			})
-			var got []byte
-			_ = withStdin(b, func() error {
-				got, _ = captureDeferredStdout(func() error { return commands["hook-prompt"](dir, []string{"--plain"}) })
-				return nil
-			})
-			extra = hookOutputContext(got)
-		}
-	}
-	_, _ = os.Stdout.Write(withDeferred(out, extra, false, "PreToolUse"))
-	return err
+	return withStdin(raw, func() error { return cmd(dir, rest) })
 }
 
 // withCrushContext puts extra in front of the context of Crush's own answer,

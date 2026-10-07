@@ -62,7 +62,7 @@ func rulesOut(t *testing.T, args ...string) (string, error) {
 // The status names every installed agent and what its copy is: in sync, stale,
 // missing, or an agent whose global rules file deja does not know.
 func TestRulesStatusNamesEveryState(t *testing.T) {
-	home := rulesHome(t, "claude-auto", "codex", "opencode", "zcode", "statusline")
+	home := rulesHome(t, "claude-auto", "codex", "opencode", "trae-ide", "statusline")
 	for _, d := range []string{".claude", ".codex", filepath.Join(".config", "opencode")} {
 		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
 			t.Fatal(err)
@@ -84,7 +84,7 @@ func TestRulesStatusNamesEveryState(t *testing.T) {
 		// opencode reads ~/.claude/CLAUDE.md while it has no AGENTS.md of
 		// its own, so that is its copy.
 		"opencode     in sync   " + shortHome(claude),
-		"zcode        no global rules file known",
+		"trae-ide     no global rules file known",
 		"run `deja rules sync`",
 	} {
 		if !strings.Contains(out, want) {

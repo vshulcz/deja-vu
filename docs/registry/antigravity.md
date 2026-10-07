@@ -42,6 +42,16 @@ the line deja keeps for that file, and a `CHECKPOINT` step, which is how a
 compaction shows, gets the session as it stood before it, once. Antigravity
 keeps the steps before a checkpoint, so nothing else is needed.
 
+## Status line
+
+agy runs a command for its status line, set by `/statusline <command>` or the
+`statusLine` key in `~/.gemini/antigravity-cli/settings.json` (agy 1.3.1).
+`antigravity-auto` writes `deja statusline` there with `stack_with_default`,
+so agy's own line stays above deja's. agy pipes `session_id` and a
+`transcript_path` that ends in `transcript.jsonl` for every conversation, so
+the line finds the session by its id. A status line already set up there is
+left alone.
+
 ## Known quirks and drift
 
 - User-visible content and machine metadata share one string field.

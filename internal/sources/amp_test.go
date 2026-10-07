@@ -61,6 +61,20 @@ func TestParseAmpThread(t *testing.T) {
 	}
 }
 
+func TestAmpProjectReadsAWindowsDriveURI(t *testing.T) {
+	cases := map[string]string{
+		"file:///tmp/proj":      "/tmp/proj",
+		"file:///C:/work/app":   filepath.FromSlash("C:/work/app"),
+		"file:///d:/x":          filepath.FromSlash("d:/x"),
+		"https://example.com/a": "fallback",
+	}
+	for uri, want := range cases {
+		if got := ampProject(uri, "fallback"); got != want {
+			t.Errorf("ampProject(%q) = %q, want %q", uri, got, want)
+		}
+	}
+}
+
 func TestParseAmpFallsBackToTitleWithoutWorkingDirectory(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "thread.json")
 	data := `{"id":"fallback-1","title":"Untitled work","created":1767337445000,"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}]}`

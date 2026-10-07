@@ -84,10 +84,22 @@ either.
     tool that ran without error: a failed call's result goes out without it.
   - `session_end` (on `/quit`, not on a kill) ends the live stamp.
   `tool_call_after`, `turn_end` and `session_start` output never reaches the
-  model, and there is no compaction event, so the fix for a failed command
-  and a compaction packet have no channel yet. The hooks' `sess_…` ids are not
-  the store's file ids, so a session's live stamp does not keep MCP recall off
-  its own transcript.
+  model, so the fix for a failed command has no channel yet. The hooks'
+  `sess_…` ids are made fresh for each hook executor and are not the store's
+  file ids, so a session's live stamp does not keep MCP recall off its own
+  transcript.
+- **Compaction.** There is no compaction event. Before compacting, CodeWhale
+  saves the whole history as
+  `sessions/<id>/artifacts/context-transfer-<checkpoint>.json`, and once the
+  summary is written, the summary beside it in `.md`
+  (`compact_messages_safe`). The next `message_submit` or `tool_call_before`
+  takes the newest pair written since that hook session was first seen, for a
+  saved session in the same workspace, and the packet rides it. A `.json`
+  without its `.md` is a failed attempt or a prune and is skipped. Checked on
+  a 0.10.0 stand.
+- **Status line.** None to write to: the footer takes only built-in items
+  (`StatusItem` in `crates/tui/src/config.rs`), and observer hooks' stdout is
+  discarded.
 - **Resume.** `codewhale --help` on 0.9.13 lists `--resume`, `--session-id`
   and `--continue`, and `--continue` refuses in a directory with no saved
   session, which is how the per-workspace scoping shows. `codewhale exec`
