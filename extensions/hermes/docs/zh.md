@@ -21,6 +21,9 @@ hermes config set memory.provider deja-memory
 - 每个会话的第一轮之前，它把 deja 的钩子平时交给 Claude Code 和 Codex 的那份摘要交给 Hermes：这个项目最近做了什么，哪些结论站住了。之后只有当刚问的问题和以前的某次工作对得上时才补充内容，大多数轮次它什么都不加。
 - 三个工具：`deja_recall` 搜索过去的会话，`deja_fix` 告诉你上次遇到同一个报错之后运行了什么，`deja_blame` 列出改过某个文件的会话。
 - Hermes 往 MEMORY.md 或 USER.md 里加的条目，也会存成一条 deja 笔记，排序时排在周围那些会话前面。
+- 压缩时保留会话正在做的事，交给下一轮；会话结束时撤掉它的在线标记。
+
+有一件事记忆提供者做不到：在刚失败的命令旁边放上以前的修复。那要靠插件钩子 `transform_tool_result`，而 Hermes 交给记忆提供者的上下文里 `register_hook` 什么都不做（`plugins/memory/__init__.py`，0.17.0）。`deja install hermes-auto` 写入的钩子插件负责这一项。
 
 它从不把 Hermes 的对话写到别处：Hermes 自己已经存了，deja 下次刷新时会读那个存储。
 

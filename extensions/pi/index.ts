@@ -75,7 +75,10 @@ export default function (pi: any) {
     if (installerExtensionPaths(homedir()).some((p) => existsSync(p))) return;
   } catch {}
 
-  let injected = false;
+  // Once per session, not once per process: /new, a resume and a fork keep the
+  // process and switch the session, and a flag set on the first one left every
+  // later session with no digest.
+  const injected = new Set<string>();
   let toldBuilding = false;
   // The tool and compaction events carry no session id of their own, and
   // recall dedupes per session: without one it repeats itself and forgets
@@ -123,17 +126,17 @@ export default function (pi: any) {
 
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
-      if (!injected) {
+      const key = sessionKey(event, ctx);
+      if (key) session = key;
+      if (!injected.has(session)) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode).
-        const key = sessionKey(event, ctx);
-        if (key) session = key;
         const { context: digest, receipt } = contextText(
-          run(["hook-context"], JSON.stringify({ session_id: key, cwd: process.cwd() })),
+          run(["hook-context"], JSON.stringify({ session_id: session, cwd: process.cwd() })),
         );
         if (digest) {
-          injected = true;
+          injected.add(session);
           ctx.ui.setStatus("deja", "");
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.

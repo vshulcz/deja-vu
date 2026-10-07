@@ -32,6 +32,14 @@ before it activates the provider.
   file.
 - An entry Hermes adds to MEMORY.md or USER.md is kept as a deja note too, so
   it ranks above the sessions around it.
+- A compaction keeps what the session was in the middle of for the next turn,
+  and the end of a session drops its live stamp.
+
+One thing a memory provider cannot do: put the earlier fix beside a command
+that just failed. That rides `transform_tool_result`, a plugin hook, and Hermes
+hands a memory provider a context whose `register_hook` does nothing
+(`plugins/memory/__init__.py`, 0.17.0). `deja install hermes-auto` writes the
+hook plugin that carries it.
 
 It never writes Hermes turns anywhere: Hermes already stores them, and deja
 reads that store on its next refresh.
