@@ -197,6 +197,12 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 	if err := json.Unmarshal(b, &doc); err != nil {
 		return nil, err
 	}
+	return parseCodeWhaleDoc(path, doc), nil
+}
+
+// parseCodeWhaleDoc reads a decoded session; a compaction capture hands over
+// the session file's metadata with the messages a compaction saved.
+func parseCodeWhaleDoc(path string, doc codeWhaleSession) []model.Session {
 	id := doc.Metadata.ID
 	if id == "" {
 		id = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
@@ -260,9 +266,9 @@ func ParseCodeWhaleFile(path string) ([]model.Session, error) {
 		s.Touch(doc.Metadata.UpdatedAt)
 	}
 	if len(s.Messages) == 0 {
-		return nil, nil
+		return nil
 	}
-	return []model.Session{s}, nil
+	return []model.Session{s}
 }
 
 // stripCodeWhaleTurnMeta drops the <turn_meta> block CodeWhale 0.10.0 saves as

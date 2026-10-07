@@ -75,6 +75,14 @@ func ParseCommandCodeFile(path string) ([]model.Session, error) {
 
 // ParseCommandCodeFileFromOffset is the incremental read.
 func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseCommandCodeWith(path, func(fn func(map[string]any)) error {
+		return scanJSONLWithHeaderFromOffset(path, offset, fn)
+	})
+}
+
+// parseCommandCodeWith reads the records scan hands over as one transcript at
+// path; the compaction capture hands over the records before a summary.
+func parseCommandCodeWith(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	s := model.Session{
 		Harness: "commandcode",
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
@@ -82,7 +90,7 @@ func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session,
 		Path:    path,
 	}
 	exits := commandExits{}
-	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
+	err := scan(func(m map[string]any) {
 		switch typ, _ := m["type"].(string); typ {
 		case "session":
 			// The folder name is a lossy slug of the cwd; the header has it
@@ -90,6 +98,14 @@ func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session,
 			applyPiHeader(&s, m, true)
 		case "message":
 			commandCodeMessage(&s, m, exits)
+		case "compaction":
+			// The summary a compaction wrote; the turns it replaced stay in
+			// the file above it.
+			if text, _ := m["summary"].(string); strings.TrimSpace(text) != "" {
+				t := parseTimeAny(m["timestamp"])
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
+			}
 		default:
 			flatRoleLine(&s, m)
 		}

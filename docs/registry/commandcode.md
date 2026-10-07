@@ -34,7 +34,7 @@ The older shape, one flat `role`/`content`/`timestamp`/`sessionId` line per
 message, is still read. The client migrates such a file to v3 in place the
 next time it opens the session and keeps the old copy as `<session>.v2.bak`.
 
-**Last verified:** 2026-10-01 (command-code 1.73.4)
+**Last verified:** 2026-10-07 (command-code 1.77.0)
 
 ## Known quirks and drift
 
@@ -62,11 +62,20 @@ next time it opens the session and keeps the old copy as `<session>.v2.bak`.
   tests. The matcher is case-insensitive, so `SHELL` also fires on
   `powershell`; the hook payload carries the internal tool name and
   `tool_input.args` after `command`, and both are read (#4540).
-- There is no per-prompt event: the four documented are `SessionStart`,
-  `PreToolUse`, `PostToolUse` and `Stop`, so the digest rides SessionStart.
-  The question is answered at the first matched `PreToolUse` after it: that
-  payload names the transcript, the newest turn the person typed is read from
-  it, and its recall rides the tool call's context, once per question.
+- There is no per-prompt, compaction or session-end event among the shell
+  hooks: the four documented are `SessionStart`, `PreToolUse`, `PostToolUse`
+  and `Stop`, so the digest rides SessionStart. The rest goes through a mod,
+  `~/.commandcode/mods/deja.ts`, which `commandcode-auto` writes and Command
+  Code loads at the start of every session. Its `transformContext` adds the
+  question's recall to the question on each model call of the turn (it never
+  writes back, so the transcript keeps the person's words), `onSessionEnd`
+  ends the live stamp, and `cmd.ui.setStatus` puts `deja statusline` in the
+  TUI footer. A `PreToolUse` cannot answer the question: a turn reaches the
+  transcript only when it commits, after its tool calls (1.77.0 stand).
+- Compaction appends `{"type":"compaction","summary","firstKeptEntryId"}` and
+  keeps every turn above it. The next matched `PreToolUse` reads the session
+  as it stood before the newest one and answers with the packet, once. The
+  summary is indexed as a summary.
 - The transcript format above was read off files command-code 1.73.4 wrote
   and its bundle (`toStoredEntry`, `parseV3Lines`, `migrateToV3`). The wiring
   paths come from rulesync's `commandcode-paths.ts` and `types/hooks.ts`, and

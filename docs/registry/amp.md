@@ -7,6 +7,25 @@ deja does not do, so current Amp sessions are not indexed. When the data
 directory is there and `threads/` holds nothing, `deja doctor` says so on the
 amp row and in the store's `note` in `--json` (#4355).
 
+The plugin that `deja install amp-auto` writes fills that directory itself: on
+`agent.end` it reads the thread through the plugin API
+(`thread.messages({full: true})`, 20 at a time) and writes it to
+`threads/<id>.json` in the shape below. Threads from before the plugin was
+installed are still not read.
+
+The same plugin catches compactions up. Amp has no compaction event, but
+after one, `thread.messages()` opens with the summary while `{full: true}`
+still starts at the first turn. On `agent.start` the plugin compares the two,
+writes the turns before the first one kept to a temp file and hands it to
+`hook-precompact`, once per compaction; the packet rides the same
+`agent.start`. It also shows `deja statusline` in a status item
+(`amp.createStatusItem`), refreshed after each turn. The API shapes are
+`@ampcode/plugin`'s `index.d.ts`; Amp needs its server to run, so this was
+driven with a fake host rather than a live thread.
+
+Rules: `$HOME/.config/amp/AGENTS.md` is always included when it exists
+(ampcode.com/docs/customize/agents-md), and `deja rules sync` writes there.
+
 Earlier builds stored one JSON object per thread under the local data
 directory, and deja reads those:
 

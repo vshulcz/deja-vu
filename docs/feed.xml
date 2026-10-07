@@ -144,6 +144,13 @@
     <summary>Where each coding agent keeps its conversation history file, in thirty-eight formats, and how to read them without the tool that wrote them.</summary>
   </entry>
   <entry>
+    <title>Where Amp stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/amp.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/amp.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Amp writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Antigravity stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/antigravity.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/antigravity.html"></link>
@@ -275,13 +282,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Hermes stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/hermes.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Hermes stores its history — session format</title>

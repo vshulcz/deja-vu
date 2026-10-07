@@ -31,7 +31,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -191,6 +191,17 @@ func rulesFileFor(harness string) rulesFile {
 		// The app runs CodeBuddy's CLI with its own config dir, so the same
 		// file name there (measured on the bundled CLI 2.147.0).
 		return sharedRules(filepath.Join(sources.WorkBuddyConfigDir(), "CODEBUDDY.md"))
+	case "zcode":
+		// zcode-app-cli 3.14.4 reads ~/.zcode/AGENTS.md as the user scope of
+		// its instructions, ahead of the workspace's (bls and mls in
+		// vendor/zcode.cjs); a stub endpoint saw it as "user default
+		// instructions".
+		return sharedRules(filepath.Join(homeDir(), ".zcode", "AGENTS.md"))
+	case "amp":
+		// $HOME/.config/amp/AGENTS.md is always included when it exists
+		// (ampcode.com/docs/customize/agents-md). The directory is the one Amp
+		// keeps settings.json and its plugins in.
+		return sharedRules(filepath.Join(homeDir(), ".config", "amp", "AGENTS.md"))
 	case "commandcode":
 		// getUserMemoryPath in 1.77.0: ~/.commandcode/AGENTS.md, no override.
 		return sharedRules(filepath.Join(homeDir(), ".commandcode", "AGENTS.md"))

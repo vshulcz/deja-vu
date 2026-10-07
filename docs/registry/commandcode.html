@@ -69,7 +69,7 @@
 <p>The older shape, one flat <code>role</code>/<code>content</code>/<code>timestamp</code>/<code>sessionId</code> line per</p>
 <p>message, is still read. The client migrates such a file to v3 in place the</p>
 <p>next time it opens the session and keeps the old copy as <code>&lt;session&gt;.v2.bak</code>.</p>
-<p><strong>Last verified:</strong> 2026-10-01 (command-code 1.73.4)</p>
+<p><strong>Last verified:</strong> 2026-10-07 (command-code 1.77.0)</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>A sibling with the same extension.</strong> <code>&lt;session&gt;.checkpoints.jsonl</code> sits</li>
@@ -104,12 +104,23 @@
 <p><code>powershell</code>; the hook payload carries the internal tool name and</p>
 <p><code>tool_input.args</code> after <code>command</code>, and both are read (#4540).</p>
 <ul>
-<li>There is no per-prompt event: the four documented are <code>SessionStart</code>,</li>
+<li>There is no per-prompt, compaction or session-end event among the shell</li>
 </ul>
-<p><code>PreToolUse</code>, <code>PostToolUse</code> and <code>Stop</code>, so the digest rides SessionStart.</p>
-<p>The question is answered at the first matched <code>PreToolUse</code> after it: that</p>
-<p>payload names the transcript, the newest turn the person typed is read from</p>
-<p>it, and its recall rides the tool call&#39;s context, once per question.</p>
+<p>hooks: the four documented are <code>SessionStart</code>, <code>PreToolUse</code>, <code>PostToolUse</code></p>
+<p>and <code>Stop</code>, so the digest rides SessionStart. The rest goes through a mod,</p>
+<p><code>~/.commandcode/mods/deja.ts</code>, which <code>commandcode-auto</code> writes and Command</p>
+<p>Code loads at the start of every session. Its <code>transformContext</code> adds the</p>
+<p>question&#39;s recall to the question on each model call of the turn (it never</p>
+<p>writes back, so the transcript keeps the person&#39;s words), <code>onSessionEnd</code></p>
+<p>ends the live stamp, and <code>cmd.ui.setStatus</code> puts <code>deja statusline</code> in the</p>
+<p>TUI footer. A <code>PreToolUse</code> cannot answer the question: a turn reaches the</p>
+<p>transcript only when it commits, after its tool calls (1.77.0 stand).</p>
+<ul>
+<li>Compaction appends <code>{&#34;type&#34;:&#34;compaction&#34;,&#34;summary&#34;,&#34;firstKeptEntryId&#34;}</code> and</li>
+</ul>
+<p>keeps every turn above it. The next matched <code>PreToolUse</code> reads the session</p>
+<p>as it stood before the newest one and answers with the packet, once. The</p>
+<p>summary is indexed as a summary.</p>
 <ul>
 <li>The transcript format above was read off files command-code 1.73.4 wrote</li>
 </ul>

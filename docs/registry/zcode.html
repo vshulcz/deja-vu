@@ -53,6 +53,22 @@
 <p><strong>Last verified:</strong> 2026-10-07</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
+<li><strong>Compaction.</strong> There is no compaction hook, and the <code>transcript_path</code> a</li>
+</ul>
+<p>hook gets is a temp file holding the one message of that call</p>
+<p>(<code>createClaudeCompatibleHookStdin</code>). The CLI database keeps the session</p>
+<p>whole: a compaction adds a user message with `semantics.kind:</p>
+<p>&#34;compact_summary&#34;<code> and a </code>compaction` part, and the turns before it stay.</p>
+<p>The next <code>UserPromptSubmit</code> or <code>PreToolUse</code> reads the session as it stood</p>
+<p>before the newest summary and answers with the packet, once. Checked on a</p>
+<p>3.14.4 stand with <code>/compact</code>.</p>
+<ul>
+<li><strong>Rules.</strong> <code>~/.zcode/AGENTS.md</code> is the user scope of ZCode&#39;s instructions,</li>
+</ul>
+<p>read ahead of the workspace&#39;s (<code>bls</code>/<code>mls</code> in <code>vendor/zcode.cjs</code>); a stub</p>
+<p>endpoint saw it under &#34;user default instructions&#34;. <code>deja rules sync</code></p>
+<p>writes there.</p>
+<ul>
 <li><strong>The CLI database is OpenCode&#39;s schema with Claude Code&#39;s tool names.</strong></li>
 </ul>
 <p>It goes through OpenCode&#39;s schema reader (see below), checked against a</p>

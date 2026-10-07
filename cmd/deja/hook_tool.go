@@ -222,6 +222,10 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// answer with the transcript being written (#3945, #3965).
 	markSessionLive(dir, input.SessionID)
 	measureCompactionRecovery(dir, input)
+	// A ZCode compaction in the middle of a turn shows up at the next tool.
+	if !postToolEvent(input.HookEventName) {
+		catchUpZCodeCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
+	}
 	event := "PreToolUse"
 	if postToolEvent(input.HookEventName) {
 		event = "PostToolUse"

@@ -203,6 +203,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	if input.HookEventName == "BeforeAgent" {
 		catchUpCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
 	}
+	catchUpZCodeCompaction(dir, precompactHookInput{SessionID: input.SessionID, TranscriptPath: input.TranscriptPath, CWD: input.CWD, WorkspaceRoots: input.WorkspaceRoots})
 	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "UserPromptSubmit", shape, stdout); delivered {
 		return err
 	}
