@@ -76,8 +76,16 @@
 <p>is the one hook answer goose puts in front of the model, as a user message</p>
 <p>in the same turn (agent.rs). It blocks only when something waits: the fix</p>
 <p>pair for a command that failed this turn, read from <code>sessions.db</code> because</p>
-<p>the failure event carries no output, or the packet for a compaction this</p>
-<p>turn, found in <code>sessions.db</code> by its agent-only note. Each is handed over once.</p>
+<p>the failure event carries no output, the packet for a compaction this</p>
+<p>turn, found in <code>sessions.db</code> by its agent-only note, or the pre-edit line</p>
+<p>for each file the turn&#39;s <code>edit</code>, <code>write</code> or <code>text_editor</code> calls changed.</p>
+<p>Each is handed over once.</p>
+<ul>
+<li><strong>Status line</strong>: goose has none. The one hook output it shows the person is</li>
+</ul>
+<p>a <code>SessionStart</code> hook&#39;s <code>{&#34;banner&#34;: …}</code>, printed once when an interactive</p>
+<p><code>goose session</code> opens (goose-cli session/mod.rs), so the <code>SessionStart</code></p>
+<p>hook prints <code>deja statusline</code> there. <code>goose run</code> shows no banner.</p>
 <ul>
 <li><strong>Resume</strong>: <code>goose session --resume --session-id &lt;id&gt;</code>. A session no longer in <code>sessions.db</code> (deleted in goose) is refused with a pointer to <code>deja show</code>.</li>
 <li><strong>Handoff</strong>: exec, <code>goose run -t</code>.</li>

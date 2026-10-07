@@ -10,10 +10,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// Each host's payload, as captured on its stand, finds the session the way
-// Claude's transcript_path does: Qwen sends only session_id, Kimi sessionId,
-// Copilot names the session's directory, and Cursor, CodeBuddy and Grok send
-// a transcript path whose name is the id.
+// Each host's payload, as captured on its stand or documented, finds the
+// session the way Claude's transcript_path does: Qwen sends only session_id,
+// Kimi sessionId, Copilot names the session's directory, agy sends
+// session_id beside a transcript named transcript.jsonl, and Cursor,
+// CodeBuddy and Grok send a transcript path whose name is the id.
 func TestStatuslinePayloadsOfEveryHostFindTheSession(t *testing.T) {
 	dir := seedTouchedIndex(t, 3, "/w/t/pool.go")
 	for name, payload := range map[string]string{
@@ -22,6 +23,8 @@ func TestStatuslinePayloadsOfEveryHostFindTheSession(t *testing.T) {
 		"copilot":   `{"cwd":"/w/t","session_id":"t02","transcript_path":"/h/.copilot/session-state/t02"}`,
 		"cursor":    `{"session_id":"x","transcript_path":"/h/.cursor/projects/w-t/agent-transcripts/t02/t02.jsonl","cwd":"/w/t"}`,
 		"codebuddy": `{"hook_event_name":"Status","session_id":"t02","transcript_path":"/h/.codebuddy/projects/w-t/t02.jsonl"}`,
+		"agy": `{"conversation_id":"t02","session_id":"t02","transcript_path":"/h/.gemini/antigravity-cli/brain/t02/.system_generated/logs/transcript.jsonl",` +
+			`"cwd":"/w/t","workspace":{"current_dir":"/w/t","project_dir":"/w/t"},"agent_state":"idle"}`,
 	} {
 		in := readStatuslineInput(strings.NewReader(payload))
 		if m, ok := statuslineMemory(dir, in); !ok || m.Path != "/w/t/pool.go" {
@@ -76,6 +79,7 @@ func hostStatuslineCases(home string) []struct {
 		{"codebuddy-auto", filepath.Join(home, ".codebuddy", "settings.json"), jsonAt("statusLine")},
 		{"grok-auto", filepath.Join(home, ".grok", "config.toml"), tomlAt("ui.status_line")},
 		{"kimi-auto", filepath.Join(home, ".kimi-code", "tui.toml"), tomlAt("status_line")},
+		{"antigravity-auto", filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), jsonAt("statusLine")},
 	}
 }
 
