@@ -1017,7 +1017,15 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "vscode", "copilot-chat":
 		return installVSCode(exe, uninstall)
 	case "vscode-auto", "copilot-chat-auto":
-		return installVSCodeAuto(exe, uninstall)
+		hooks, err := installVSCodeAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		status, err := installVSCodeStatusItem(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(hooks, status), nil
 	case "hermes":
 		return installHermesMCP(exe, uninstall)
 	case "hermes-auto":

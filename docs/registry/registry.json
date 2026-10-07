@@ -355,7 +355,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "VS Code shows a status item only from an extension of its own (#4801)"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "the vscode-auto target adds a local extension that shows deja statusline in VS Code's status bar (VS Code 1.140)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction summaries are not checked, and VS Code deletes old transcripts (#4801)"}
       }
     },

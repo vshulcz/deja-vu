@@ -27,6 +27,7 @@ func TestMain(m *testing.M) {
 		"CODEX_HOME":              "",
 		"GEMINI_CLI_HOME":         "",
 		"CURSOR_CONFIG_DIR":       "",
+		"VSCODE_EXTENSIONS":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
 		"XDG_CONFIG_HOME":         "",
 		"XDG_DATA_HOME":           "",
