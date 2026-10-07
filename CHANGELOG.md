@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crush's one hook carries the per-prompt recall and the previous command's fix pair, since Crush fires no per-prompt hook.
 - Command Code, ZCode, CodeWhale and Amp get the compaction packet. None of them has a compaction hook; each keeps the turns before the summary (the transcript, the CLI database, a saved history, the full thread), and the next hook that reaches the model catches it up.
 - `commandcode-auto` writes a mod: the question's recall goes into its model calls, the session's end clears its live stamp, and the footer shows `deja statusline`. Amp's plugin writes each thread it runs to the thread store so deja can read it, and shows a status item.
+- Crush's one hook carries the per-prompt recall and the previous command's fix pair, and Command Code's tool hook answers the newest question, since neither host fires a per-prompt hook.
+- goose's `Stop` block also carries the pre-edit line for each file the turn edited, and its `SessionStart` hook prints deja's status line as the banner goose shows when an interactive session opens. `antigravity-auto` puts `deja statusline` in agy's `statusLine`, stacked under agy's own line; the line finds an agy session by `session_id`, since every agy transcript is named `transcript.jsonl`.
 - `deja statusline` in the status line of Cursor CLI, Copilot CLI, Qwen Code, CodeBuddy Code, Grok Build and Kimi Code (0.30 and later), from their `-auto` targets. opencode and Kilo CLI get it through a TUI plugin. A status line already set up there is left alone and install prints the line that runs both. The line finds the session from a `session_id` or `sessionId` when the host sends no transcript path.
 
 ### Changed

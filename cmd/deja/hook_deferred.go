@@ -412,8 +412,9 @@ func runHookStop(dir string, stdin io.Reader, stdout io.Writer) error {
 	key, _ := readDeferredPayload(raw)
 	pending := takeDeferred(dir, key)
 	if pending == "" {
+		turn := gooseStopTurn(raw)
 		var parts []string
-		for _, p := range []string{gooseStopCompaction(dir, raw), gooseStopFixPair(dir, raw)} {
+		for _, p := range []string{gooseStopCompaction(dir, raw), gooseStopFixPair(dir, raw, turn), gooseStopEditLines(dir, raw, turn)} {
 			if p != "" {
 				parts = append(parts, p)
 			}
@@ -455,18 +456,41 @@ func gooseStopCompaction(dir string, raw []byte) string {
 	return strings.TrimSpace(out.String())
 }
 
+type gooseStopPayload struct {
+	SessionID  string `json:"session_id"`
+	WorkingDir string `json:"working_dir"`
+	CWD        string `json:"cwd"`
+}
+
+// gooseStopTurn reads the turn the Stop ends out of sessions.db, once for
+// both answers below.
+func gooseStopTurn(raw []byte) sources.GooseTurnState {
+	var p gooseStopPayload
+	if json.Unmarshal(raw, &p) != nil || p.SessionID == "" {
+		return sources.GooseTurnState{}
+	}
+	return sources.GooseTurn(p.SessionID)
+}
+
+// gooseStopEditLines is the pre-edit line for each file the turn edited.
+// goose drops what PreToolUse prints, so the line arrives when the turn ends,
+// with the edit already made, the way it does on Antigravity.
+func gooseStopEditLines(dir string, raw []byte, turn sources.GooseTurnState) string {
+	var p gooseStopPayload
+	if len(turn.Edits) == 0 || json.Unmarshal(raw, &p) != nil || p.SessionID == "" {
+		return ""
+	}
+	return editFileLines(dir, turn.Edits, p.SessionID, hookCWD(adoptGrok(p.WorkingDir, p.CWD)))
+}
+
 // gooseStopFixPair is the fix pair for the command that failed in this turn,
 // read from goose's store, once per pair and session.
-func gooseStopFixPair(dir string, raw []byte) string {
-	var p struct {
-		SessionID  string `json:"session_id"`
-		WorkingDir string `json:"working_dir"`
-		CWD        string `json:"cwd"`
-	}
+func gooseStopFixPair(dir string, raw []byte, turn sources.GooseTurnState) string {
+	var p gooseStopPayload
 	if json.Unmarshal(raw, &p) != nil || p.SessionID == "" || !planIndexReady(dir) {
 		return ""
 	}
-	out := sources.GooseTurnFailure(p.SessionID)
+	out := turn.Failure
 	if out == "" {
 		return ""
 	}

@@ -32,13 +32,14 @@ func (c surfaceClaim) claimed() bool { return c.Status == "yes" || c.Status == "
 // hook-antigravity is one command for every PreInvocation, and answers the
 // digest, the question, a failed step and a new checkpoint (hook_antigravity.go).
 // hook-codewhale is one command for message_submit, tool_call_before and
-// session_end (hook_codewhale.go).
+// session_end (hook_codewhale.go). hook-stop is goose's Stop block, which
+// carries the edit line, the fix pair and a compaction (hook_deferred.go).
 var surfaceHooks = map[string][]string{
 	"digest":           {"hook-context", "hook-goose", "hook-antigravity", "hook-codewhale"},
 	"prompt":           {"hook-prompt", "hook-goose-prompt", "hook-antigravity", "hook-codewhale"},
-	"pre_tool":         {"hook-tool", "hook-codewhale"},
-	"failure":          {"hook-tool-after", "hook-antigravity"},
-	"compaction_reset": {"hook-precompact", "hook-antigravity"},
+	"pre_tool":         {"hook-tool", "hook-codewhale", "hook-antigravity", "hook-stop"},
+	"failure":          {"hook-tool-after", "hook-antigravity", "hook-stop"},
+	"compaction_reset": {"hook-precompact", "hook-antigravity", "hook-stop"},
 	"session_end":      {"hook-session-end", "hook-codewhale"},
 }
 
@@ -130,6 +131,18 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 	case "claude":
 		// A target of its own, deliberately outside --auto.
 		got["statusline"] = slices.Contains(installTargetNames(), "statusline")
+	case "crush":
+		// PreToolUse is Crush's only event; `hook-tool --crush` carries the
+		// digest, the newest message, the previous failure and a summary
+		// read from crush.db (hook_crush.go).
+		if strings.Contains(all, "hook-tool --crush") {
+			for _, s := range []string{"digest", "prompt", "failure", "compaction_reset"} {
+				got[s] = true
+			}
+		}
+	case "goose":
+		// The SessionStart hook prints deja's status line as goose's banner.
+		got["statusline"] = tokens["hook-goose"]
 	case "gemini":
 		// PreCompress fires on every attempt and nothing fires after one, so
 		// the prompt hook catches a compaction up from the transcript.
