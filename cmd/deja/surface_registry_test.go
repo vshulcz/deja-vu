@@ -42,8 +42,12 @@ var surfaceHooks = map[string][]string{
 
 // statusMarks are the calls a generated plugin makes to show something in the
 // host's own UI: pi's footer, opencode 1.x and Kilo's toast, Hermes's recall
-// indicator.
-var statusMarks = []string{"setStatus(", "showToast(", "RecallStatus"}
+// indicator. opencode's TUI plugin execs `deja statusline`.
+var statusMarks = []string{"setStatus(", "showToast(", "RecallStatus", `["statusline"]`}
+
+// statuslineRun is a host's status line command running deja, through the
+// launcher or the binary, quoted or not.
+var statuslineRun = regexp.MustCompile(`deja[^\s"']*["']? statusline\b`)
 
 // reasonixSurfaces maps the extension points deja's Reasonix extension
 // subscribes to onto surfaces. The installed manifest is just "reasonix-ext",
@@ -111,6 +115,9 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 		if strings.Contains(all, m) {
 			got["statusline"] = true
 		}
+	}
+	if statuslineRun.MatchString(all) {
+		got["statusline"] = true
 	}
 	switch harness {
 	case "aider":

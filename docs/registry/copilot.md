@@ -64,6 +64,14 @@ already name every file.
 - **Resume**: `copilot --resume=<sessionId>`.
 - **Handoff**: exec.
 
+## Status line
+
+`deja install copilot-auto` sets `statusLine` in `~/.copilot/settings.json`
+(`$COPILOT_HOME`), with `refreshInterval: 1` so a first index build moves on
+screen; without it Copilot runs the command on events only. Copilot's
+`transcript_path` is the session's directory, which deja reads as the session
+id. A status line already set there is left alone. Rendered live on 1.0.79.
+
 ## Known quirks and drift
 
 - `assistant.message` records whose content is empty and whose work is entirely

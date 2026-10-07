@@ -74,6 +74,17 @@ Parts with `type: "text"` are messages; the role comes from `message.data.role`.
 - **Package**: the `opencode-deja` npm package ships `index.js` for 1.x and `server.js`, exported as `opencode-deja/server`, for 2.x. 2.x resolves that subpath first and wants a default `{ id, setup }`; 1.x from 1.3.4 resolves it too and calls its `server`; older 1.x loads `index.js`. In `opencode.json` it goes under `plugin` on 1.x and `plugins` on 2.x.
 - **Resume**: `opencode -s <id>`, run in the session's directory, or from the current one when that directory is gone.
 
+## Status line
+
+opencode has no command status line, so `deja install opencode-auto` adds a
+TUI plugin that runs `deja statusline` every 10 seconds and when the session
+changes, and shows the first line. On 1.x it is `plugins/deja-status.tsx`,
+listed in `tui.json` (1.x finds TUI plugins only there), and the line shows in
+the sidebar, the prompt row and the home screen. On 2.x it is
+`plugins/deja-status/tui.tsx`, which 2.x finds on its own, in the prompt and
+home footers. A `tui.jsonc` is not edited; install says what to add. Rendered
+live on 1.18.34 and 2.0.24.
+
 ## Known quirks and drift
 
 - The database can be several gigabytes. deja projects JSON scalars in SQL instead of streaming complete blobs.

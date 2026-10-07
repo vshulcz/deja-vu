@@ -307,7 +307,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "statusLine.command exists; its stdin shape is unchecked (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the copilot-auto target writes statusLine.command in ~/.copilot/settings.json"},
         "reader": {"status": "partial", "proof": "fixture", "note": "session.compaction_complete summaryContent is not indexed (#4801)"}
       }
     },
@@ -400,7 +400,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "no", "proof": "todo", "note": "whether cursor-agent's .cursor/rules walk reaches the home directory is unchecked (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "cli-config.statusLine takes a command with a Claude-shaped payload (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the cursor-auto target writes statusLine in cli-config.json for cursor-agent"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -579,7 +579,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "[status_line] command (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the grok-auto target writes the [status_line] command"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -658,7 +658,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "tui.toml [status_line] command in 2.1.1 (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the kimi-auto target writes the [status_line] command in tui.toml"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction_summary is not indexed (#4801)"}
       }
     },
@@ -983,7 +983,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "partial", "proof": "stand", "note": "qwen -p never fires SessionEnd (0.20.0); interactive exits do"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "ui.statusLine (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the qwen-auto target writes ui.statusLine in settings.json"},
         "reader": {"status": "partial", "proof": "fixture", "note": "system/chat_compression is skipped (#4801)"}
       }
     },
@@ -1568,7 +1568,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "statusLine.command (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the codebuddy-auto target writes statusLine.command in settings.json"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },

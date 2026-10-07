@@ -85,10 +85,17 @@ func TestInstallCopilotAutoWiresEverySurfaceInItsOwnFile(t *testing.T) {
 	if len(cfg.Hooks) != 8 {
 		t.Errorf("hook file carries %d events, want 8:\n%s", len(cfg.Hooks), first)
 	}
-	for _, name := range []string{"settings.json", "config.json"} {
-		if _, err := os.Stat(filepath.Join(home, ".copilot", name)); err == nil {
-			t.Errorf("install wrote Copilot's own %s", name)
-		}
+	if _, err := os.Stat(filepath.Join(home, ".copilot", "config.json")); err == nil {
+		t.Errorf("install wrote Copilot's own config.json")
+	}
+	// settings.json gets the status line and nothing else.
+	var settings map[string]any
+	if b, err := os.ReadFile(filepath.Join(home, ".copilot", "settings.json")); err != nil || json.Unmarshal(b, &settings) != nil {
+		t.Fatalf("no status line in settings.json: %v", err)
+	}
+	line, _ := settings["statusLine"].(map[string]any)
+	if cmd, _ := line["command"].(string); len(settings) != 1 || !strings.HasSuffix(cmd, " statusline") {
+		t.Errorf("settings.json = %v, want deja's statusLine alone", settings)
 	}
 
 	if _, err := captureRun(t, "install", "copilot-auto", "--no-index"); err != nil {
