@@ -63,8 +63,10 @@ next time it opens the session and keeps the old copy as `<session>.v2.bak`.
   `powershell`; the hook payload carries the internal tool name and
   `tool_input.args` after `command`, and both are read (#4540).
 - There is no per-prompt event: the four documented are `SessionStart`,
-  `PreToolUse`, `PostToolUse` and `Stop`, so the digest rides SessionStart and
-  the rest is the tool-time pair.
+  `PreToolUse`, `PostToolUse` and `Stop`, so the digest rides SessionStart.
+  The question is answered at the first matched `PreToolUse` after it: that
+  payload names the transcript, the newest turn the person typed is read from
+  it, and its recall rides the tool call's context, once per question.
 - The transcript format above was read off files command-code 1.73.4 wrote
   and its bundle (`toStoredEntry`, `parseV3Lines`, `migrateToV3`). The wiring
   paths come from rulesync's `commandcode-paths.ts` and `types/hooks.ts`, and

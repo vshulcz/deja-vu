@@ -86,15 +86,25 @@ func TestInstallCodeBuddyAuto(t *testing.T) {
 	hooks, _ := root["hooks"].(map[string]any)
 	for _, w := range codeBuddyHookWiring {
 		entries, _ := hooks[w.Event].([]any)
-		if len(entries) != 1 {
-			t.Fatalf("%s: %d entries, want 1", w.Event, len(entries))
+		var entry map[string]any
+		var h map[string]any
+		for _, e := range entries {
+			m := e.(map[string]any)
+			hh := m["hooks"].([]any)[0].(map[string]any)
+			if strings.HasSuffix(hh["command"].(string), " "+w.Sub) {
+				if entry != nil {
+					t.Fatalf("%s: %s wired twice", w.Event, w.Sub)
+				}
+				entry, h = m, hh
+			}
 		}
-		entry := entries[0].(map[string]any)
+		if entry == nil {
+			t.Fatalf("%s: no %s entry in %v", w.Event, w.Sub, entries)
+		}
 		if m, _ := entry["matcher"].(string); m != w.Matcher {
 			t.Fatalf("%s matcher = %q, want %q", w.Event, m, w.Matcher)
 		}
-		h := entry["hooks"].([]any)[0].(map[string]any)
-		if h["type"] != "command" || !strings.HasSuffix(h["command"].(string), " "+w.Sub) {
+		if h["type"] != "command" {
 			t.Fatalf("%s hook = %v", w.Event, h)
 		}
 		// Seconds: CodeBuddy multiplies the field by 1000.

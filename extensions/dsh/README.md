@@ -58,6 +58,12 @@ whether this machine's history answers the prompt and adds the answer to the
 runtime context. Silence is the common case — it speaks only when there is
 something to say.
 
+The same recall also wires what `deja install dsh-auto` wires: after a read,
+edit or write the model gets what past sessions said about that file, after a
+command that failed it gets what this machine ran after the same error before,
+a compaction keeps what the session was in the middle of, and a session that
+ends drops its live stamp.
+
 ```yaml
 - insert:
     - id: deja

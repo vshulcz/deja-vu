@@ -84,6 +84,15 @@ part(id, message_id, data)</code></pre>
 <li><strong>Package</strong>: the <code>opencode-deja</code> npm package ships <code>index.js</code> for 1.x and <code>server.js</code>, exported as <code>opencode-deja/server</code>, for 2.x. 2.x resolves that subpath first and wants a default <code>{ id, setup }</code>; 1.x from 1.3.4 resolves it too and calls its <code>server</code>; older 1.x loads <code>index.js</code>. In <code>opencode.json</code> it goes under <code>plugin</code> on 1.x and <code>plugins</code> on 2.x.</li>
 <li><strong>Resume</strong>: <code>opencode -s &lt;id&gt;</code>, run in the session&#39;s directory, or from the current one when that directory is gone.</li>
 </ul>
+<h2 id="status-line">Status line</h2>
+<p>opencode has no command status line, so <code>deja install opencode-auto</code> adds a</p>
+<p>TUI plugin that runs <code>deja statusline</code> every 10 seconds and when the session</p>
+<p>changes, and shows the first line. On 1.x it is <code>plugins/deja-status.tsx</code>,</p>
+<p>listed in <code>tui.json</code> (1.x finds TUI plugins only there), and the line shows in</p>
+<p>the sidebar, the prompt row and the home screen. On 2.x it is</p>
+<p><code>plugins/deja-status/tui.tsx</code>, which 2.x finds on its own, in the prompt and</p>
+<p>home footers. A <code>tui.jsonc</code> is not edited; install says what to add. Rendered</p>
+<p>live on 1.18.34 and 2.0.24.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The database can be several gigabytes. deja projects JSON scalars in SQL instead of streaming complete blobs.</li>

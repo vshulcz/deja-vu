@@ -101,12 +101,49 @@ export function promptText(event) {
   return ""
 }
 
-// sessionKey is what recall dedups on: a hit shown once in a session is not
-// shown again. Without a key every turn could repeat the same session.
-export function sessionKey(event, ctx) {
-  return (
-    (ctx && (ctx.sessionKey || ctx.sessionId)) ||
+// toolCall is the deja call for a finished tool, or null when there is none:
+// a file's history after a read or an edit, and after a command the repair
+// this machine ran after the same error before. The same mapping as the
+// installer's plugin (#4808).
+export function toolCall(event, at) {
+  const name = (event && event.toolName) || ""
+  const args = (event && event.args) || {}
+  const base = { session_id: at.id, cwd: (event && event.cwd) || at.cwd }
+  if (name === "read" || name === "edit" || name === "write") {
+    const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : ""
+    if (!path) return null
+    return { args: ["hook-tool", "--plain"], payload: { tool_name: name === "read" ? "read" : "edit", tool_input: { file_path: path }, ...base } }
+  }
+  if (name === "apply_patch" && typeof args.input === "string") {
+    return { args: ["hook-tool", "--plain"], payload: { tool_name: "apply_patch", tool_input: { command: args.input }, ...base } }
+  }
+  if (name === "exec" || name === "bash") {
+    const content = Array.isArray(event && event.result && event.result.content) ? event.result.content : []
+    const out = content.filter((c) => c && c.type === "text" && typeof c.text === "string").map((c) => c.text).join("\n")
+    if (!out.trim()) return null
+    return {
+      args: ["hook-tool-after", "--plain"],
+      payload: { tool_name: "bash", tool_input: { command: String(args.command || "") }, tool_response: out, ...base },
+    }
+  }
+  return null
+}
+
+// where names the session and workspace a hook runs for, the way the
+// installer's plugin does. The id is the transcript id, not the session key:
+// hook-context stamps the session live under that id, which keeps it out of
+// its own MCP recall, and agent:main:main names no transcript (#4582). The
+// automatic compaction inside a run hands its hook only the session key, so
+// what each key last ran as is kept in seen.
+export function where(seen, event, ctx, cwd) {
+  const key = (ctx && ctx.sessionKey) || ""
+  const last = (key && seen.get(key)) || {}
+  const id =
+    (ctx && ctx.sessionId) ||
+    last.id ||
     (event && (event.sessionId || event.session_id || (event.session && event.session.id))) ||
     ""
-  )
+  const dir = (ctx && ctx.workspaceDir) || last.dir || ""
+  if (key && (id || dir)) seen.set(key, { id, dir })
+  return { id: id || key, cwd: dir || cwd }
 }

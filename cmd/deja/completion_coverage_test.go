@@ -14,7 +14,7 @@ func TestCompletionsListEveryUserFacingCommand(t *testing.T) {
 		"hook-context": true, "hook-prompt": true, "hook-precompact": true,
 		"hook-antigravity": true, "hook-goose": true, "hook-goose-prompt": true,
 		"hook-refresh": true, "hook-session-end": true, "hook-mcp-call": true,
-		"hook-plan": true, "hook-tool": true, "hook-tool-after": true, "hook-codewhale": true,
+		"hook-stop": true, "hook-plan": true, "hook-tool": true, "hook-tool-after": true, "hook-codewhale": true,
 		"warmup-status": true, "mcp": true, "reasonix-ext": true,
 	}
 	// The emitted script, not the template: the command list is substituted at

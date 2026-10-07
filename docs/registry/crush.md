@@ -56,8 +56,12 @@ endpoint: the store landed beside the project, the registry gained its path and
   expansion is unverified here.
 - **Auto-recall**: `deja install crush-auto` adds a `PreToolUse` hook —
   `deja hook-tool --crush`, matcher `^(bash|edit|write|multiedit)$`. `PreToolUse`
-  is the only event Crush fires, so there is no session-start or per-prompt
-  channel: the command-and-file line is the whole of it. A hook answers with a
+  is the only event Crush fires, so that one hook carries the rest: the
+  session's digest on its first call, the recall for the newest message the
+  person sent, the fix pair when the previous command failed, and the packet
+  after a summary. The message, the failure and the summary come out of
+  `crush.db` by the payload's session id, each once, one tool call late; a turn
+  with no matched tool call gets none of it. A hook answers with a
   flat `{"version":1,"context":…}` rather than Claude's nested envelope, which
   is what the `--crush` flag writes; no `decision` field, because `"allow"`
   there is affirmative pre-approval and would skip the permission prompt on

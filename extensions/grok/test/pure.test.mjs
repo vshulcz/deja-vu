@@ -8,7 +8,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import test from "node:test"
 
-import { grokHome, hooksPresent, installerOwns, mcpPresent, resolveDeja, wellKnown } from "../lib.mjs"
+import { grokHome, hookArgs, hooksPresent, installerOwns, mcpPresent, resolveDeja, wellKnown } from "../lib.mjs"
 
 test("grokHome follows GROK_HOME, the same variable the installer reads", () => {
   assert.equal(grokHome({ GROK_HOME: "/tmp/grok" }, "/home/x"), "/tmp/grok")
@@ -67,4 +67,50 @@ test("installerOwns reads the two files the installer writes", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// The plugin used to wire UserPromptSubmit alone, whose output Grok drops, so
+// it did nothing a user could see. hooks.json now runs the five hooks the
+// installer writes, each naming its subcommand.
+test("each hooks.json entry reaches deja as the subcommand it names", async () => {
+  const { execFileSync } = await import("node:child_process")
+  const { chmodSync, readFileSync } = await import("node:fs")
+  const dir = mkdtempSync(join(tmpdir(), "deja-grok-args-"))
+  try {
+    const fake = join(dir, "deja")
+    writeFileSync(fake, '#!/bin/sh\necho "ARGS $*"\n')
+    chmodSync(fake, 0o755)
+    const manifest = JSON.parse(readFileSync(new URL("../hooks/hooks.json", import.meta.url), "utf8"))
+    const script = new URL("../hooks/recall.mjs", import.meta.url).pathname
+    const seen = {}
+    for (const [event, entries] of Object.entries(manifest.hooks)) {
+      for (const entry of entries) {
+        for (const hook of entry.hooks) {
+          const args = hook.command.split(" ").slice(2)
+          const out = execFileSync(process.execPath, [script, ...args], {
+            input: JSON.stringify({ hookEventName: event, sessionId: "s1" }),
+            encoding: "utf8",
+            env: { ...process.env, DEJA_BIN: fake, GROK_HOME: dir },
+          })
+          seen[event] = out.trim()
+        }
+      }
+    }
+    assert.deepEqual(seen, {
+      SessionStart: "ARGS hook-context",
+      PreCompact: "ARGS hook-precompact",
+      UserPromptSubmit: "ARGS hook-prompt",
+      PreToolUse: "ARGS hook-tool",
+      PostToolUse: "ARGS hook-tool-after",
+      SessionEnd: "ARGS hook-session-end",
+    })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("hookArgs passes deja's hooks and nothing else", () => {
+  assert.deepEqual(hookArgs([]), ["hook-prompt", "--plain"])
+  assert.deepEqual(hookArgs(["hook-tool"]), ["hook-tool"])
+  assert.deepEqual(hookArgs(["index"]), ["hook-prompt", "--plain"])
 })

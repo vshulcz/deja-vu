@@ -91,6 +91,17 @@ export function hooksPresent(json) {
   }
 }
 
+// hookArgs is the deja call a hooks.json entry asks for. Only deja's own hook
+// subcommands pass: anything else in a manifest could run `deja index` on
+// every tool call.
+export const HOOKS = ["hook-context", "hook-prompt", "hook-precompact", "hook-session-end", "hook-tool", "hook-tool-after"]
+
+export function hookArgs(argv) {
+  const args = Array.isArray(argv) ? argv.map(String) : []
+  if (args.length === 0 || !HOOKS.includes(args[0])) return ["hook-prompt", "--plain"]
+  return args
+}
+
 function readFileOrEmpty(path) {
   try {
     return readFileSync(path, "utf8")

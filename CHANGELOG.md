@@ -10,8 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `deja rules sync` writes to 32 agents, up from 8. The new ones are Copilot CLI and Chat, Cline, Roo, Continue, Kilo, Zed, Crush, Kiro, CodeBuddy, WorkBuddy, Cherry Studio, CodeWhale, Command Code, TRAE CLI, Hermes, aider, Antigravity, pi, omp, Senpi, gjc, prime-agent and Kimchi. A stand or the host's source showed each file reaching the model. Where a host loads only the first of several files, the block goes into the one already loaded, so opencode and Kilo no longer lose a `~/.claude/CLAUDE.md` they were reading (#4805).
+- The harnesses page has a table of every hook surface per harness (digest, per-prompt, pre-tool, after-failure, compaction, MCP, handoff, session end, rules, statusline, reader), each with how it was checked and why a missing one is missing. A test installs every target and fails when the table and the wiring disagree (#4801).
 - `deja recall <words>` prints the page the MCP recall tool answers, for a skill or script that runs deja through the shell. `deja search --json` was the only option there and ran to 1-2 MB, which harnesses truncate to nothing (#4781).
 - New targets `kimchi-auto`, `codewhale`, `codewhale-auto` and `cherrystudio-auto`. `kiro-auto` also writes `~/.kiro/hooks/deja.json`, which the IDE and `kiro-cli --v3` run in every chat, and `deja install kiro` the skill. ZCode gets the shared skill and `/deja` (#4802).
+- A hook whose answer the host drops now hands it to the next hook of that session that reaches the model, once: Grok's session start and prompt ride its next tool hook, and Kimi's and Kiro's fix pair for a failed command rides the next prompt. goose gets the fix pair through a `Stop` hook that blocks once, the one hook answer it shows the model.
+- Antigravity, Crush and goose, which have no compaction event, get the compaction packet on the next hook that reaches the model, read from the turns their stores keep before the summary. Antigravity also gets the pre-edit line for the file a planner step edited.
+- Crush's one hook carries the per-prompt recall and the previous command's fix pair, and Command Code's tool hook answers the newest question, since neither host fires a per-prompt hook.
+- `deja statusline` in the status line of Cursor CLI, Copilot CLI, Qwen Code, CodeBuddy Code, Grok Build and Kimi Code (0.30 and later), from their `-auto` targets. opencode and Kilo CLI get it through a TUI plugin. A status line already set up there is left alone and install prints the line that runs both. The line finds the session from a `session_id` or `sessionId` when the host sends no transcript path.
 
 ### Changed
 
@@ -20,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The command install suggests for running your status line beside deja's kept deja's half on a second row when your script ended in a newline, and hosts that show only the first row dropped it.
+- The kimi, grok, openclaw, dsh, hermes, opencode and pi packages run every hook their `deja install <x>-auto` counterpart wires; a test installs each target and fails when its package misses one. The Hermes provider, Cline's plugin, the opencode 2.x plugin and the pi family now name the session they stamp live, so it is cleared at the end and kept out of its own recall. omp and pi give a new session its digest after `/new`. dsh ended sessions under `session-<uuid>` while stamping the bare uuid, so the stamp stayed; Cline under `--yolo` recalled its own `[SYSTEM]` reminder instead of the prompt. Shown on live stands for dsh, Cline, OpenClaw, Hermes and Kimi.
 - Two goose sessions no longer read each other's recall. Every `deja goose` shared one MOIM file, and plain goose wrote per-prompt recall into the global AGENTS.md every session reads; the wrapper now gives each process its own file and removes it on exit, and plain goose keeps the session-start digest only (#4795).
 - opencode 2.x: the turn after a compaction is recalled on what the person last said, not on the whole `<conversation-checkpoint>` summary (#4795).
 - opencode 1.x and Kilo no longer put the session digest into the title-generation request (#4795).

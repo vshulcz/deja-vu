@@ -98,7 +98,7 @@ harness falls back to the first prompt.
   are `headless`, which takes a task and exits, and `web`, whose flags are all
   about the server. Reopening a conversation is something the web sidebar does,
   so there is nothing for deja to print.
-- **Handoff**: paste.
+- **Handoff**: exec, `dsh --profile headless <prompt>` answers it once and exits.
 
 Format verified by installing dsh 0.1.1-rc.2, pointing it at a local model over
 an OpenAI-compatible route, and reading what it wrote across sessions that

@@ -588,6 +588,20 @@ func writeGooseHook(exe string) (string, error) {
 					"timeout": 10,
 				}},
 			}},
+			// A failed command's fix pair. Goose drops what every hook prints,
+			// and its PostToolUseFailure carries no output (agent.rs builds it
+			// from the tool name and input only), so the Stop hook reads the
+			// turn's failed command out of sessions.db and hands the pair to
+			// the model once, as the reason it blocks the turn from ending:
+			// that reason reaches the model as a user message in the same turn
+			// (1.46 and 1.53, measured).
+			"Stop": []any{map[string]any{
+				"hooks": []any{map[string]any{
+					"type":    "command",
+					"command": hookRun(exe, "hook-stop"),
+					"timeout": 20,
+				}},
+			}},
 		},
 	}, "", "  ")
 	if err != nil {

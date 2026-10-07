@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -19,7 +18,7 @@ import (
 // and the session's chat_history.jsonl carried no deja-recall. deja answered
 // both with the full receipt ("1.7 KB of context") and logged them as memory
 // that arrived (#4588). Grok runs every command hook with GROK_HOOK_EVENT set.
-func TestGrokSessionStartAndPromptClaimNothingGrokDrops(t *testing.T) {
+func TestGrokStartAndPromptWaitForTheFirstToolHook(t *testing.T) {
 	tmp := t.TempDir()
 	home := filepath.Join(tmp, "home")
 	if err := os.MkdirAll(home, 0o755); err != nil {
@@ -56,48 +55,51 @@ func TestGrokSessionStartAndPromptClaimNothingGrokDrops(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(cwd)
-	log := strings.TrimSuffix(dir, string(filepath.Separator)) + ".injections.jsonl"
 	// Quoted as JSON: a Windows cwd's backslashes are not valid escapes.
 	cwdJSON, _ := json.Marshal(cwd)
 
+	// Through the dispatcher, the way grok runs them.
+	run := func(name, payload string) string {
+		withHookStdin(t, payload)
+		return captureStdout(t, func() { _ = runHookDeferred(dir, name, nil, commands[name]) })
+	}
 	start := func(id string) string {
-		withHookStdin(t, `{"hookEventName":"session_start","sessionId":"`+id+`","cwd":`+string(cwdJSON)+`,"source":"new","hook_event_name":"SessionStart","session_id":"`+id+`"}`)
-		return captureStdout(t, func() { _ = runHookContext(dir, false) })
+		return run("hook-context", `{"hookEventName":"session_start","sessionId":"`+id+`","cwd":`+string(cwdJSON)+`,"source":"new","hook_event_name":"SessionStart","session_id":"`+id+`"}`)
 	}
 	prompt := func(id string) string {
-		var out bytes.Buffer
-		in := strings.NewReader(`{"hookEventName":"user_prompt_submit","sessionId":"` + id + `","cwd":` + string(cwdJSON) + `,"prompt":"what did we change in the retry_loop in fetcher","hook_event_name":"UserPromptSubmit","session_id":"` + id + `"}`)
-		if err := runHookPrompt(dir, in, &out); err != nil {
-			t.Fatal(err)
-		}
-		return out.String()
+		return run("hook-prompt", `{"hookEventName":"user_prompt_submit","sessionId":"`+id+`","cwd":`+string(cwdJSON)+`,"prompt":"what did we change in the retry_loop in fetcher","hook_event_name":"UserPromptSubmit","session_id":"`+id+`"}`)
+	}
+	tool := func(id string) string {
+		return run("hook-tool", `{"hookEventName":"pre_tool_use","sessionId":"`+id+`","cwd":`+string(cwdJSON)+`,"toolName":"list_dir","toolInput":{}}`)
 	}
 
 	t.Setenv("GROK_HOOK_EVENT", "session_start")
-	if out := start("grok-1"); strings.Contains(out, "additionalContext") || strings.Contains(out, "of context") || strings.Contains(out, "recalled") {
+	// The receipt still goes out: grok shows the person systemMessage.
+	if out := start("grok-1"); strings.Contains(out, "additionalContext") {
 		t.Errorf("grok's session start was answered with context it drops: %q", out)
 	}
 	t.Setenv("GROK_HOOK_EVENT", "user_prompt_submit")
-	if out := prompt("grok-1"); strings.Contains(out, "retry_loop") || strings.Contains(out, "additionalContext") {
+	if out := prompt("grok-1"); strings.Contains(out, "additionalContext") {
 		t.Errorf("grok's prompt was answered with context it drops: %q", out)
 	}
-	logged, _ := os.ReadFile(log)
-	if strings.Contains(string(logged), "grok-1") {
-		t.Errorf("an answer grok dropped was logged as memory that arrived:\n%s", logged)
+	// The session's next tool hook is the one grok delivers, with the tool's
+	// result, and it carries both.
+	t.Setenv("GROK_HOOK_EVENT", "pre_tool_use")
+	out := tool("grok-1")
+	if !strings.Contains(out, `"hookEventName":"PreToolUse"`) || !strings.Contains(out, "retry_loop") {
+		t.Fatalf("grok's first tool hook did not carry the deferred recall: %q", out)
+	}
+	if again := tool("grok-1"); strings.Contains(again, "retry_loop") {
+		t.Fatalf("the deferred recall was delivered twice: %q", again)
+	}
+	// Another session's tool hook gets none of it.
+	if other := tool("grok-2"); strings.Contains(other, "retry_loop") {
+		t.Fatalf("one session's deferred recall reached another: %q", other)
 	}
 	t.Setenv("GROK_HOOK_EVENT", "")
 
-	// The control, after: the same payloads outside grok are answered and
-	// logged, so the silence above is grok's and not the fixture's.
+	// The control: outside grok the same start is answered in place.
 	if out := start("ctl-1"); !strings.Contains(out, "additionalContext") {
 		t.Fatalf("session start delivered nothing outside grok, so this measures nothing: %q", out)
-	}
-	if out := prompt("ctl-1"); !strings.Contains(out, "retry_loop") {
-		t.Fatalf("the prompt recalled nothing outside grok, so this measures nothing: %q", out)
-	}
-
-	after, _ := os.ReadFile(log)
-	if !strings.Contains(string(after), "ctl-1") {
-		t.Fatalf("the control was not logged, so this measures nothing:\n%s", after)
 	}
 }

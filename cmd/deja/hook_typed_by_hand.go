@@ -19,6 +19,7 @@ import (
 //	  hook-precompact    10 to 40 ms
 //	  hook-session-end   under 10 ms
 //	  hook-mcp-call      under 10 ms
+//	  hook-stop          10 to 20 ms, plus goose's sqlite3 reads
 //
 //	once per session, allowed one expensive run
 //	  hook-context       0.85 s, then 50 ms

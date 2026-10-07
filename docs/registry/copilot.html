@@ -120,6 +120,12 @@
 <li><strong>Resume</strong>: <code>copilot --resume=&lt;sessionId&gt;</code>.</li>
 <li><strong>Handoff</strong>: exec.</li>
 </ul>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install copilot-auto</code> sets <code>statusLine</code> in <code>~/.copilot/settings.json</code></p>
+<p>(<code>$COPILOT_HOME</code>), with <code>refreshInterval: 1</code> so a first index build moves on</p>
+<p>screen; without it Copilot runs the command on events only. Copilot&#39;s</p>
+<p><code>transcript_path</code> is the session&#39;s directory, which deja reads as the session</p>
+<p>id. A status line already set there is left alone. Rendered live on 1.0.79.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><code>assistant.message</code> records whose content is empty and whose work is entirely</li>

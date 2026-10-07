@@ -197,8 +197,10 @@ for (const f of handlers["session/created"]) f({ id: "session-B" });
 for (const f of handlers["session/disposed"]) f({ id: "session-A" });
 for (const f of handlers["session/disposed"]) f({ id: "session-A" });
 `)
-	if got := endedSessions(calls()); strings.Join(got, ",") != "session-A,session-B" {
-		t.Errorf("hook-session-end ran for %v, want session-A at its disposal and session-B at exit", got)
+	// The live stamp is under the bare uuid hook-context was given; an end
+	// naming "session-A" matched no stamp and left it (stand on 0.1.1-rc.2).
+	if got := endedSessions(calls()); strings.Join(got, ",") != "A,B" {
+		t.Errorf("hook-session-end ran for %v, want A at its disposal and B at exit, prefix stripped", got)
 	}
 }
 

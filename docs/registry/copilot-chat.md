@@ -44,6 +44,6 @@ Edits are `textEditGroup` parts: a `uri` and a list of lists of `{text, range}`,
   own. Checked against the workbench and extension source; not yet run
   against a live VS Code.
 - **Resume**: Chat: Show Chats… in the editor, not a command. The list holds only the open workspace’s chats; `deja resume <id>` names the folder to open first.
-- **Handoff**: paste.
+- **Handoff**: exec, `code chat -m agent <prompt>` opens VS Code's chat in agent mode with it.
 
 **Last verified:** 2026-10-07

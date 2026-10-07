@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/url"
 	"path/filepath"
@@ -93,9 +92,12 @@ func TestGrokCompactionPacketRidesTheNextToolCall(t *testing.T) {
 		t.Errorf("the capture is filed under %q, want grok", state.Harness)
 	}
 
-	// The prompt hook answers nothing on Grok, and must not spend the packet.
+	// The prompt hook answers nothing on Grok: what it has waits for the
+	// session's next tool hook (hook_deferred.go).
 	t.Setenv("GROK_HOOK_EVENT", "user_prompt_submit")
-	if out := hostsPrompt(t, dir, map[string]any{"sessionId": id, "session_id": id, "cwd": workspace, "prompt": "carry on"}); out != "" {
+	prompt, _ := json.Marshal(map[string]any{"sessionId": id, "session_id": id, "cwd": workspace, "prompt": "carry on"})
+	withHookStdin(t, string(prompt))
+	if out := captureStdout(t, func() { _ = runHookDeferred(dir, "hook-prompt", nil, commands["hook-prompt"]) }); strings.Contains(out, "additionalContext") {
 		t.Fatalf("Grok's prompt hook answered: %s", out)
 	}
 
@@ -107,13 +109,11 @@ func TestGrokCompactionPacketRidesTheNextToolCall(t *testing.T) {
 		"hook_event_name": "PreToolUse", "session_id": id, "transcript_path": path,
 		"tool_name": "run_terminal_command", "tool_input": map[string]any{"command": "go test ./parser/...", "description": "run it"}, "tool_use_id": "call_2",
 	})
-	var out bytes.Buffer
-	if err := runHookTool(dir, bytes.NewReader(tool), &out); err != nil {
-		t.Fatal(err)
-	}
+	withHookStdin(t, string(tool))
+	out := captureStdout(t, func() { _ = runHookDeferred(dir, "hook-tool", nil, commands["hook-tool"]) })
 	var response sessionStartHookResponse
-	if err := json.Unmarshal(out.Bytes(), &response); err != nil {
-		t.Fatalf("PreToolUse reply: %v %s", err, out.String())
+	if err := json.Unmarshal([]byte(out), &response); err != nil {
+		t.Fatalf("PreToolUse reply: %v %s", err, out)
 	}
 	if response.HookSpecificOutput.HookEventName != "PreToolUse" {
 		t.Errorf("reply names %q", response.HookSpecificOutput.HookEventName)

@@ -30,9 +30,13 @@ func TestInstallWorkBuddyAuto(t *testing.T) {
 	}
 	root := readCodeBuddyJSON(t, settings)
 	hooks, _ := root["hooks"].(map[string]any)
+	want := map[string]int{}
 	for _, w := range codeBuddyHookWiring {
-		if entries, _ := hooks[w.Event].([]any); len(entries) != 1 {
-			t.Fatalf("%s: %d entries, want 1", w.Event, len(entries))
+		want[w.Event]++
+	}
+	for event, n := range want {
+		if entries, _ := hooks[event].([]any); len(entries) != n {
+			t.Fatalf("%s: %d entries, want %d", event, len(entries), n)
 		}
 	}
 	if root["proxy"] == nil {

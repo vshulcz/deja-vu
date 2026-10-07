@@ -124,20 +124,18 @@ func TestInstallPrimeAutoWritesADiscoverableExtension(t *testing.T) {
 	}
 }
 
-// tool_call and tool_result are in prime-agent's extension docs and never fire
-// on 0.9.1 — measured with a probe extension against a recording endpoint, in
-// --print mode, both as an installed extension and through -e. Wiring the fix
-// pair to them would be a channel that looks present and says nothing, so it
-// stays out until they deliver.
-func TestPrimeExtensionDoesNotWireTheEventsThatNeverFire(t *testing.T) {
+// tool_result fires on prime-agent 0.9.8 for its one tool, ipython; the probe
+// that found it silent on 0.9.1 called a bash tool the model is never given.
+// tool_call still carries nothing the model reads.
+func TestPrimeExtensionWiresTheToolResult(t *testing.T) {
 	src := primeExtensionTS("/bin/deja")
-	for _, wrong := range []string{`pi.on("tool_result"`, `pi.on("tool_call"`} {
-		if strings.Contains(src, wrong) {
-			t.Fatalf("wired to %s, which does not fire on prime-agent 0.9.1:\n%s", wrong, src)
-		}
+	if strings.Contains(src, `pi.on("tool_call"`) {
+		t.Fatalf("wired to tool_call, whose return reaches nothing:\n%s", src)
 	}
-	if strings.Contains(src, "hook-tool-after") {
-		t.Fatalf("the fix pair is wired with no event to carry it:\n%s", src)
+	for _, want := range []string{`pi.on("tool_result"`, `"ipython"`, "hook-tool-after", `"hook-tool", "--plain"`} {
+		if !strings.Contains(src, want) {
+			t.Fatalf("extension missing %s:\n%s", want, src)
+		}
 	}
 }
 

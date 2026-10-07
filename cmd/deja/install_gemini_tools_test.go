@@ -40,8 +40,12 @@ func TestInstallGeminiWiresTheFixPair(t *testing.T) {
 		"AfterTool": "hook-tool-after",
 	} {
 		entries := root.Hooks[event]
-		if len(entries) != 1 {
-			t.Fatalf("%s entries = %d, want 1: %s", event, len(entries), b)
+		// The fix pair, and the file line after a read or an edit.
+		if len(entries) != 2 {
+			t.Fatalf("%s entries = %d, want 2: %s", event, len(entries), b)
+		}
+		if m := entries[1].Matcher; m != "read_file|replace|write_file" || !strings.HasSuffix(entries[1].Hooks[0].Command, "hook-tool") {
+			t.Errorf("%s second entry = %q %q, want the file line on read_file|replace|write_file", event, m, entries[1].Hooks[0].Command)
 		}
 		if got := entries[0].Hooks[0].Command; !strings.HasSuffix(got, sub) {
 			t.Errorf("%s runs %q, want %s", event, got, sub)

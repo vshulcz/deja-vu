@@ -214,6 +214,8 @@ func isCommandTool(name string) bool {
 		// matcher sees (#4371); that matcher is a case-insensitive regex, so it
 		// fires on powershell too (#4540).
 		"shell_command",
+		// Kiro's shell tool.
+		"execute_bash",
 		// VS Code Copilot Chat's terminal tool; its result ends with
 		// "Command exited with code N" when the command failed.
 		"run_in_terminal":
@@ -260,7 +262,8 @@ func toolResponseText(raw json.RawMessage) string {
 	// output_for_prompt is grok's: its `output` is the raw bytes as a number
 	// array, and this is the text the model reads (#4499).
 	// textResultForLlm is Copilot CLI's: the output as its model gets it.
-	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent", "output_for_prompt", "textResultForLlm"} {
+	// message is Kimi's: a failed tool's `error` is {code, message, ...}.
+	for _, key := range []string{"stderr", "error", "output", "stdout", "content", "result", "llmContent", "output_for_prompt", "textResultForLlm", "message"} {
 		v, ok := obj[key].(string)
 		if !ok || strings.TrimSpace(v) == "" {
 			continue

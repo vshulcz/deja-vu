@@ -35,7 +35,11 @@ Media is out of scope.
   (`deja hook-context --plain --once`, `deja hook-prompt --plain`) and a
   `PreCompact` one, and a `SessionEnd` hook that runs `deja hook-session-end`. Measured on 0.28.1, `UserPromptSubmit` is the only event
   whose output reaches the model, and it takes plain stdout, so the session
-  digest rides the first prompt rather than a session-start hook.
+  digest rides the first prompt rather than a session-start hook. Two more
+  entries, `PostToolUse` and `PostToolUseFailure` on `Bash`, run
+  `deja hook-tool-after --defer`: Kimi does not wait for them and drops what
+  they print, so the fix pair for a failed command is held and handed over
+  once, on the session's next prompt.
 - **Resume**: `kimi --session <sessionId>`, run in the `workDir` from the
   session's `state.json`: Kimi refuses a session from any other directory
   (verified live on 0.28.1). A `workDir` that is gone is refused with a
@@ -44,5 +48,13 @@ Media is out of scope.
 
 Requested and specified by [@yearth](https://github.com/yearth) in
 [#248](https://github.com/vshulcz/deja-vu/issues/248).
+
+## Status line
+
+`deja install kimi-auto` adds `[status_line] command` to
+`$KIMI_CODE_HOME/tui.toml`. Kimi Code has read it since 0.30.0; 0.28 and 0.29
+have no status line and ignore the file. Kimi pipes camelCase JSON with
+`sessionId` and no transcript path, and drops an answer slower than 300 ms. A
+status line already set there is left alone. Rendered live on 2.1.1.
 
 **Last verified:** 2026-07-28

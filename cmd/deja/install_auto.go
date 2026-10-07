@@ -322,6 +322,25 @@ export default {
     // for twenty minutes (#4571).
     const live = new Set()
     const endSession = (id) => runHook("hook-session-end", JSON.stringify({ session_id: id }), cwd)
+    // A sub-agent's session names its parent. Without it the sub-agent's
+    // digest and recall led with the parent, which is live and is the very
+    // session that spawned it (#4548, fixed for 1.x). 2.x hands the plugin
+    // ctx.session.get, whose SessionInfo carries parentID; asked once per
+    // session.
+    const parents = new Map()
+    const parentOf = async (id) => {
+      if (!id) return ""
+      if (!parents.has(id)) {
+        let parent = ""
+        try {
+          parent = (await ctx.session.get({ sessionID: id }))?.parentID || ""
+        } catch {
+          // no parent to leave out
+        }
+        parents.set(id, parent)
+      }
+      return parents.get(id)
+    }
     // The per-prompt recall each user message was given, by message.
     const recalled = new Map()
     const remember = (key, extra) => {
@@ -344,7 +363,7 @@ export default {
           // The session id rides along so the digest leaves this session
           // out: the context hook runs after the first message is stored,
           // and the index can already hold it (#4199).
-          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", cwd }), cwd)
+          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", parent_session_id: await parentOf(event.sessionID), cwd }), cwd)
           let digest = ""
           try {
             digest = JSON.parse(raw)?.hookSpecificOutput?.additionalContext || ""
@@ -392,7 +411,7 @@ export default {
           // that call is what stamps the session live again after its last
           // turn ended it (#4573).
           if (sid) live.add(sid)
-          const raw = await runHook("hook-prompt", JSON.stringify({ prompt: last.prompt, session_id: sid, cwd }))
+          const raw = await runHook("hook-prompt", JSON.stringify({ prompt: last.prompt, session_id: sid, parent_session_id: await parentOf(sid), cwd }))
           remember(last.key, last.prompt && raw.trim() ? JSON.parse(raw)?.hookSpecificOutput?.additionalContext || "" : "")
         }
         // Every message gets back what it was given, in every call, the way
@@ -573,18 +592,26 @@ var opencodeVersionMajor = opencodeVersionMajorReal
 // 2.0 home has already migrated its tables. Neither answers on a machine where
 // opencode has never run, and a fresh install is 2.x.
 func opencodePluginJSFor(exe string) string {
+	if opencodeIsV1() {
+		return opencodeLegacyPluginJS(exe)
+	}
+	return opencodePluginJS(exe)
+}
+
+// opencodeIsV1 is whether the opencode here loads 1.x plugins.
+func opencodeIsV1() bool {
 	switch major := opencodeVersionMajor(); {
 	case major == 1:
-		return opencodeLegacyPluginJS(exe)
+		return true
 	case major >= 2:
-		return opencodePluginJS(exe)
+		return false
 	}
 	if db := sources.OpencodeDB(); db != "" {
 		if _, err := os.Stat(db); err == nil && !sources.OpencodeStoreIsV2(db) {
-			return opencodeLegacyPluginJS(exe)
+			return true
 		}
 	}
-	return opencodePluginJS(exe)
+	return false
 }
 
 // opencodeLegacyPluginJS is the 1.x plugin: a named export returning the
@@ -935,6 +962,9 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	// The fix pair, at the failure. Matched on the tool that runs a command so
 	// it never spawns on a read.
 	{"PostToolUseFailure", "hook-tool-after", "run_shell_command"},
+	// The file line, after a read or an edit: PreToolUse is not read, and
+	// what PostToolUse returns goes in beside the tool's result.
+	{"PostToolUse", "hook-tool", "read_file|edit|write_file"},
 	// Compaction throws away the blocks this session was shown while the list
 	// that stops them repeating outlives them, so without this the memory qwen
 	// just lost is the memory recall refuses to send again.
@@ -946,11 +976,12 @@ var qwenHookWiring = []struct{ Event, Sub, Matcher string }{
 	{"SessionEnd", "hook-session-end", ""},
 }
 
-// qwenRetiredEvents are events deja used to write for qwen and no longer does.
-// The PostToolUse entry fired only after a tool that succeeded, so it looked
-// up a repair for commands that did not need one and stayed quiet for the ones
-// that did; leaving it behind would keep that cost on every green command.
-var qwenRetiredEvents = map[string]bool{"PostToolUse": true}
+// qwenRetiredEvents are hooks deja used to write for qwen and no longer does,
+// by event and subcommand. The PostToolUse fix pair fired only after a tool
+// that succeeded, so it looked up a repair for commands that did not need one
+// and stayed quiet for the ones that did; leaving it behind would keep that
+// cost on every green command.
+var qwenRetiredEvents = map[string]string{"PostToolUse": "hook-tool-after"}
 
 func installQwenAuto(exe string, uninstall bool) (installResult, error) {
 	exe = hookExeFor(exe, uninstall)
@@ -981,10 +1012,12 @@ func installSettingsHookCmd(path, event, matcher string, timeout int, cmd string
 	return installSettingsHookRetiring(path, event, matcher, timeout, cmd, uninstall, nil)
 }
 
-// installSettingsHookRetiring also drops deja hooks under events this harness
-// no longer uses. Without it a generator fix ships and the old, dead entry
-// keeps firing next to the new one for everyone who installed before.
-func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]bool) (installResult, error) {
+// installSettingsHookRetiring also drops deja hooks this harness no longer
+// uses: under each event in retire, the entries running that subcommand, or
+// every deja entry when it is "". Without it a generator fix ships and the
+// old, dead entry keeps firing next to the new one for everyone who installed
+// before.
+func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd string, uninstall bool, retire map[string]string) (installResult, error) {
 	old, err := readConfig(path)
 	if err != nil {
 		return installResult{}, err
@@ -1019,15 +1052,18 @@ func installSettingsHookRetiring(path, event, matcher string, timeout int, cmd s
 		hooks = map[string]any{}
 		root["hooks"] = hooks
 	}
-	for name := range retire {
-		if name == event {
+	for name, sub := range retire {
+		if name == event && sub == "" {
 			continue
 		}
 		old, _ := hooks[name].([]any)
 		var survivors []any
 		for _, entryAny := range old {
 			entry, _ := entryAny.(map[string]any)
-			if entry != nil && dejaHookEntry(entry) {
+			if entry != nil && sub == "" && dejaHookEntry(entry) {
+				continue
+			}
+			if entry != nil && sub != "" && entryHasCommand(entry, "deja "+sub) {
 				continue
 			}
 			survivors = append(survivors, entryAny)
@@ -1154,7 +1190,14 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 			"\n" + kimiHookEntry("PreCompact", hookRun(exe, "hook-precompact", "--harness", "kimi")) +
 			// The session is over, so its live stamp goes: the next session's
 			// MCP recall can answer with it now rather than in twenty minutes.
-			"\n" + kimiHookEntry("SessionEnd", hookRun(exe, "hook-session-end"))
+			"\n" + kimiHookEntry("SessionEnd", hookRun(exe, "hook-session-end")) +
+			// A failed command's fix pair: Kimi fires these and drops what
+			// they print, so the pair waits for the session's next prompt
+			// (hook_deferred.go). The payload is snake_case with the shell
+			// tool named Bash and the failure under `error` (0.28.1
+			// toHookInputData, notifyPostToolUse).
+			"\n" + kimiHookEntryMatching("PostToolUse", "Bash", hookRun(exe, "hook-tool-after", "--defer")) +
+			"\n" + kimiHookEntryMatching("PostToolUseFailure", "Bash", hookRun(exe, "hook-tool-after", "--defer"))
 		if s != "" {
 			s += "\n\n"
 		}
@@ -1170,6 +1213,12 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 // removeKimiHookBlock takes them all and leaves a hand-written hook alone.
 func kimiHookEntry(event, command string) string {
 	return kimiHookMarker + "\n[[hooks]]\nevent = " + strconv.Quote(event) +
+		"\ncommand = " + strconv.Quote(command) + "\ntimeout = 30\n"
+}
+
+func kimiHookEntryMatching(event, matcher, command string) string {
+	return kimiHookMarker + "\n[[hooks]]\nevent = " + strconv.Quote(event) +
+		"\nmatcher = " + strconv.Quote(matcher) +
 		"\ncommand = " + strconv.Quote(command) + "\ntimeout = 30\n"
 }
 

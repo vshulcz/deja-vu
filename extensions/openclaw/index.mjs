@@ -14,7 +14,8 @@ import {
   installerPluginPath,
   mcpWired,
   promptText,
-  sessionKey,
+  toolCall,
+  where,
 } from "./lib.mjs"
 
 const require = createRequire(import.meta.url)
@@ -172,16 +173,38 @@ export default {
       })
     }
 
+    // The same three seams `deja install openclaw-auto` writes: the project's
+    // digest at the start of the session, recall for each prompt, and the
+    // compaction capture. The package lagged the installer on the first and
+    // the last, so a gateway with only the package had no digest and lost what
+    // a compacted session had been shown.
     if (adds.recall) {
+      const seen = new Map()
+      api.on(
+        "agent_turn_prepare",
+        async (event, ctx) => {
+          const at = where(seen, event, ctx, process.cwd())
+          // agent_turn_prepare fires once per agent run, so deja_once is what
+          // keeps the digest to the first of them.
+          const digest = await ask(
+            ["hook-context", "--plain"],
+            JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true }),
+            10000,
+          )
+          if (!digest) return
+          return { prependContext: digest }
+        },
+        { timeoutMs: 15000 },
+      )
       api.on(
         "before_prompt_build",
         async (event, ctx) => {
           const prompt = promptText(event)
           if (!prompt) return
-          const key = sessionKey(event, ctx)
+          const at = where(seen, event, ctx, process.cwd())
           const recall = await ask(
             ["hook-prompt", "--plain"],
-            JSON.stringify({ prompt, session_id: key, cwd: process.cwd() }),
+            JSON.stringify({ prompt, session_id: at.id, cwd: at.cwd }),
             10000,
           )
           // Silence is the common case — the hook speaks only when the user's
@@ -191,6 +214,58 @@ export default {
         },
         { timeoutMs: 15000 },
       )
+      // Compaction throws away the blocks this session was shown, and the list
+      // that stops them repeating outlives it. The event names the session
+      // file, which still holds the turns about to be summarised: deja reads
+      // them from it, and the next prompt's recall carries the packet.
+      api.on(
+        "before_compaction",
+        async (event, ctx) => {
+          const at = where(seen, event, ctx, process.cwd())
+          await ask(
+            ["hook-precompact"],
+            JSON.stringify({
+              session_id: at.id,
+              transcript_path: (event && event.sessionFile) || "",
+              cwd: at.cwd,
+              harness: "openclaw",
+            }),
+            10000,
+          )
+        },
+        { timeoutMs: 15000 },
+      )
+      // The session is over: its live stamp goes, so the next session's MCP
+      // recall can answer with it now rather than twenty minutes from now.
+      // session_end names the transcript id the hooks above stamped.
+      api.on(
+        "session_end",
+        async (event, ctx) => {
+          const id = (event && event.sessionId) || where(seen, event, ctx, process.cwd()).id
+          if (!id) return
+          await ask(["hook-session-end"], JSON.stringify({ session_id: id }), 5000)
+        },
+        { timeoutMs: 10000 },
+      )
+      // A tool result middleware rewrites what the model reads back from a
+      // tool, the one place a line arrives beside the result it is about. It
+      // needs contracts.agentToolResultMiddleware in the manifest; an OpenClaw
+      // without the API goes without it.
+      if (typeof api.registerAgentToolResultMiddleware === "function") {
+        api.registerAgentToolResultMiddleware(
+          async (event, ctx) => {
+            try {
+              const call = toolCall(event, where(seen, event, ctx, process.cwd()))
+              if (!call) return
+              const line = await ask(call.args, JSON.stringify(call.payload), 5000)
+              if (!line) return
+              const content = Array.isArray(event.result && event.result.content) ? event.result.content : []
+              return { result: { ...event.result, content: [...content, { type: "text", text: line }] } }
+            } catch {}
+          },
+          { runtimes: ["openclaw"] },
+        )
+      }
     }
 
     // /deja answers the person directly. The hooks above only reach the

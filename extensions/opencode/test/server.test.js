@@ -298,3 +298,34 @@ test("the compaction seam hands deja the compacting session", async () => {
     assert.equal(sent.harness, "opencode")
   })
 })
+
+// A sub-agent's session names its parent, and deja leaves the parent out of the
+// sub-agent's digest and recall: the parent is live and is the session that
+// spawned it (#4548). 1.x asked client.session.get; on 2.x the plugin was
+// handed a client with no session at all, so the parent never went out.
+test("on 2.x a sub-agent's digest and recall name its parent", async () => {
+  await withHome(async (dir) => {
+    const bin = join(dir, "deja")
+    const calls = join(dir, "calls")
+    writeFileSync(bin, `#!/bin/sh\nif [ "$1" = version ]; then echo 0.0.0; exit 0; fi\nprintf '%s %s\\n' "$1" "$(cat)" >> ${calls}\n`, {
+      mode: 0o755,
+    })
+    const { ctx, hooks } = fakeContext(dir, { bin })
+    ctx.session.get = async ({ sessionID }) => (sessionID === "child" ? { id: "child", parentID: "parent" } : { id: sessionID })
+    await plugin.setup(ctx)
+    await hooks.session.context[0]({
+      sessionID: "child",
+      system: [],
+      messages: [{ role: "user", content: [{ type: "text", text: "the retry loop" }] }],
+    })
+    const sent = readFileSync(calls, "utf8")
+      .split("\n")
+      .filter((l) => l.startsWith("hook-context ") || l.startsWith("hook-prompt "))
+      .map((l) => JSON.parse(l.slice(l.indexOf(" ") + 1)))
+    assert.equal(sent.length, 2)
+    for (const payload of sent) {
+      assert.equal(payload.session_id, "child")
+      assert.equal(payload.parent_session_id, "parent")
+    }
+  })
+})

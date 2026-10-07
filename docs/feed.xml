@@ -130,11 +130,25 @@
     <summary>deja is local by design: no background network, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.</summary>
   </entry>
   <entry>
+    <title>Switch from Claude Code to Codex or Cursor — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/switching-agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/switching-agents.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>How to switch between agents — Claude Code, Codex, Cursor — without re-explaining the project to each one.</summary>
+  </entry>
+  <entry>
     <title>Where Claude Code and Codex store sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where each coding agent keeps its conversation history file, in thirty-eight formats, and how to read them without the tool that wrote them.</summary>
+  </entry>
+  <entry>
+    <title>Where Antigravity stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/antigravity.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/antigravity.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Antigravity writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Cherry Studio stores its history — session format</title>
@@ -151,11 +165,25 @@
     <summary>Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where CodeBuddy Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/codebuddy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/codebuddy.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where CodeBuddy Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where CodeWhale stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/codewhale.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/codewhale.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where CodeWhale writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Command Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/commandcode.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/commandcode.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Command Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Continue stores its history — session format</title>
@@ -179,11 +207,25 @@
     <summary>Where Copilot CLI writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Crush stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/crush.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/crush.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Crush writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Cursor stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/cursor.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/cursor.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Cursor writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where DeepSeek Harness stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/deepseek.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/deepseek.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where DeepSeek Harness writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where DeepSeek Harness stores its history — session format</title>
@@ -214,6 +256,20 @@
     <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Goose stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/goose.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/goose.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
+    <title>Where Grok Build stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Grok Build stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
@@ -228,66 +284,10 @@
     <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
-    <title>Where Kilo Code stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/kilocode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kilocode.html"></link>
+    <title>Where Hermes stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/hermes.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Kilo Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Kimchi Coding stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/kimchi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kimchi.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Kimchi Coding writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Kimi Code stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/kimi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kimi.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Kimi Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Kiro stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/kiro.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/kiro.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Kiro writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where omp (Oh My Pi) stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/omp.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/omp.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where omp (Oh My Pi) stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/omp.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/omp.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where omp (Oh My Pi) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where OpenClaw stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/openclaw.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/openclaw.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where OpenClaw writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where opencode stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/opencode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/opencode.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where opencode writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where pi stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/pi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/pi.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where pi writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+    <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
 </feed>

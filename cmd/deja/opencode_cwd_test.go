@@ -25,10 +25,10 @@ func TestOpencodePluginRunsInTheProjectDirectory(t *testing.T) {
 	}
 	// Every call says where it is inside its payload, and hook-context is
 	// also run from there.
-	if !strings.Contains(compact, `runHook("hook-context",JSON.stringify({session_id:event.sessionID||"",cwd}),cwd)`) {
+	if !strings.Contains(compact, `runHook("hook-context",JSON.stringify({session_id:event.sessionID||"",parent_session_id:awaitparentOf(event.sessionID),cwd}),cwd)`) {
 		t.Error("hook-context does not run in the project")
 	}
-	if !strings.Contains(compact, `session_id:event.sessionID||"",cwd}`) {
+	if !strings.Contains(compact, `session_id:sid,parent_session_id:awaitparentOf(sid),cwd}`) {
 		t.Error("the per-prompt payload does not carry the project")
 	}
 	if !strings.Contains(compact, `session_id:event.sessionID||"",cwd,`) {

@@ -37,7 +37,9 @@ import (
 //
 // PostToolUse has changed since 1.0.5: grok 1.0.41's hook docs say its
 // context goes to the model with the tool's result, so a failed command gets
-// the fix pair there too (#4499). Session start and the prompt have not: on
+// the fix pair there too (#4499). So has PreToolUse: on 1.0.41 its context
+// reaches the model as a system reminder after the tool's result, which is
+// where the file line arrives. Session start and the prompt have not: on
 // 1.0.41 they still drop additionalContext, so hook-context and hook-prompt
 // answer nothing under grok rather than a receipt for memory that never
 // arrived (#4588, grokDropsContext).
@@ -112,14 +114,17 @@ func installGrokAuto(exe string, uninstall bool) (installResult, error) {
 	root = updateClaudeHook(root, "SessionStart", hookRun(exe, "hook-context"), "", false)
 	root = updateClaudeHook(root, "PreCompact", hookRun(exe, "hook-precompact"), "", false)
 	root = updateClaudeHook(root, "UserPromptSubmit", hookRun(exe, "hook-prompt"), "", false)
-	// Scoped to the tools that change something, so it never fires on a read.
 	// Grok maps the Claude names onto its own, so `Bash` here reaches
-	// run_terminal_command, `Write` reaches write and `Agent` reaches
-	// spawn_subagent — the one of them whose reply grok acts on.
-	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
+	// run_terminal_command, `Read` read_file, `Write` write and `Agent`
+	// spawn_subagent. On 1.0.41 the context reaches the model too, as a
+	// system reminder after the tool's result, so the file line goes out at
+	// the read, the step before an edit, as well as at the edit.
+	root = updateClaudeHook(root, "PreToolUse", hookRun(exe, "hook-tool"), "Bash|Read|Edit|Write|MultiEdit|NotebookEdit|Task|Agent", false)
 	// Grok fires PostToolUse for a run_terminal_command that exited non-zero
 	// and hands the hook's context to the model with the result, so a failure
-	// gets the earlier fix the way claude's does (#4499).
+	// gets the earlier fix the way claude's does (#4499). PostToolUseFailure
+	// is not the failure event here: grok fires it when a tool fails to
+	// dispatch or an MCP tool errors, never for a command's exit code.
 	root = updateClaudeHook(root, "PostToolUse", hookRun(exe, "hook-tool-after"), "Bash", false)
 	// The session is over, so its live stamp goes: the next session's MCP
 	// recall can answer with it now rather than twenty minutes from now. Grok

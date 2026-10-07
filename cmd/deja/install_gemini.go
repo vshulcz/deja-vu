@@ -109,10 +109,20 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			//
 			// Matched on the tool that runs a command; gemini honours the
 			// matcher, so this never spawns on a read or a glob.
+			//
+			// The file line goes the same way, after a read or an edit: the
+			// read is the step before an edit, and an edit's line still
+			// reaches the edits after it.
 			"AfterTool": []any{map[string]any{
 				"matcher": "run_shell_command",
 				"hooks": []any{map[string]any{
 					"type": "command", "command": hookRun(exe, "hook-tool-after"),
+					"timeout": 10000,
+				}},
+			}, map[string]any{
+				"matcher": "read_file|replace|write_file",
+				"hooks": []any{map[string]any{
+					"type": "command", "command": hookRun(exe, "hook-tool"),
 					"timeout": 10000,
 				}},
 			}},

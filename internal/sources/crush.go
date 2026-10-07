@@ -127,6 +127,10 @@ func ParseCrushDBSince(db string, t time.Time) ([]model.Session, error) {
 		// re-offered costs a re-read of what is already held, nothing more.
 		where = " where " + newerThanEpoch("s.updated_at", t.Add(-time.Second))
 	}
+	return parseCrushWhere(db, where)
+}
+
+func parseCrushWhere(db, where string) ([]model.Session, error) {
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. A parts column is stored JSON.
 	q := "select json_object('session_id',cast(s.id as text),'title',cast(s.title as text)," +

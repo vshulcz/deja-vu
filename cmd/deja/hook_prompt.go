@@ -194,9 +194,10 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// above is renewed (#4573). opencode has no text part to put an answer
 	// in, so the compaction packet waits for a turn or tool call that can
 	// carry it rather than being marked delivered and dropped.
-	// Grok discards what this hook returns. Answering anyway logged memory as
-	// arrived and marked it shown to a session that never saw it (#4588).
-	if strings.TrimSpace(string(input.Prompt)) == "" || grokDropsContext() {
+	// Grok discards what this hook returns, so the answer waits for the
+	// session's next tool hook (hook_deferred.go) rather than being logged as
+	// arrived to a session that never saw it (#4588).
+	if strings.TrimSpace(string(input.Prompt)) == "" {
 		return nil
 	}
 	if input.HookEventName == "BeforeAgent" {

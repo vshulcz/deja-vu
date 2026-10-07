@@ -46,12 +46,28 @@ func TestKimiPluginManifest(t *testing.T) {
 	}
 
 	// UserPromptSubmit is the only event whose output Kimi appends to the
-	// turn. A SessionStart hook runs and its answer goes nowhere.
-	if len(manifest.Hooks) != 1 || manifest.Hooks[0].Event != "UserPromptSubmit" {
-		t.Fatalf("recall has to hang off UserPromptSubmit, got %+v", manifest.Hooks)
+	// turn, so the digest and the recall both hang off it. A SessionStart hook
+	// runs and its answer goes nowhere. PreCompact and SessionEnd print
+	// nothing; they are there for what they do to deja's own state.
+	speaks := map[string]bool{}
+	for _, h := range manifest.Hooks {
+		switch h.Event {
+		case "UserPromptSubmit":
+			for _, sub := range []string{"hook-context", "hook-prompt"} {
+				if strings.Contains(h.Command, " "+sub+" ") {
+					speaks[sub] = true
+				}
+			}
+		case "PreCompact", "SessionEnd":
+		default:
+			t.Fatalf("%s: Kimi drops what a hook on this event prints, or never runs it: %+v", h.Event, h)
+		}
+		if h.Timeout < 1 || h.Timeout > 600 {
+			t.Fatalf("timeout %d is outside the 1-600s Kimi allows", h.Timeout)
+		}
 	}
-	if manifest.Hooks[0].Timeout < 1 || manifest.Hooks[0].Timeout > 600 {
-		t.Fatalf("timeout %d is outside the 1-600s Kimi allows", manifest.Hooks[0].Timeout)
+	if !speaks["hook-context"] || !speaks["hook-prompt"] {
+		t.Fatalf("the digest and the recall have to hang off UserPromptSubmit, got %+v", manifest.Hooks)
 	}
 
 	// `command: "node"` is the one form Kimi rewrites to its own runtime when

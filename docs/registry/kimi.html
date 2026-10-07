@@ -75,7 +75,11 @@
 <p>(<code>deja hook-context --plain --once</code>, <code>deja hook-prompt --plain</code>) and a</p>
 <p><code>PreCompact</code> one, and a <code>SessionEnd</code> hook that runs <code>deja hook-session-end</code>. Measured on 0.28.1, <code>UserPromptSubmit</code> is the only event</p>
 <p>whose output reaches the model, and it takes plain stdout, so the session</p>
-<p>digest rides the first prompt rather than a session-start hook.</p>
+<p>digest rides the first prompt rather than a session-start hook. Two more</p>
+<p>entries, <code>PostToolUse</code> and <code>PostToolUseFailure</code> on <code>Bash</code>, run</p>
+<p><code>deja hook-tool-after --defer</code>: Kimi does not wait for them and drops what</p>
+<p>they print, so the fix pair for a failed command is held and handed over</p>
+<p>once, on the session&#39;s next prompt.</p>
 <ul>
 <li><strong>Resume</strong>: <code>kimi --session &lt;sessionId&gt;</code>, run in the <code>workDir</code> from the</li>
 </ul>
@@ -87,6 +91,12 @@
 </ul>
 <p>Requested and specified by <a href="https://github.com/yearth">@yearth</a> in</p>
 <p><a href="https://github.com/vshulcz/deja-vu/issues/248">#248</a>.</p>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install kimi-auto</code> adds <code>[status_line] command</code> to</p>
+<p><code>$KIMI_CODE_HOME/tui.toml</code>. Kimi Code has read it since 0.30.0; 0.28 and 0.29</p>
+<p>have no status line and ignore the file. Kimi pipes camelCase JSON with</p>
+<p><code>sessionId</code> and no transcript path, and drops an answer slower than 300 ms. A</p>
+<p>status line already set there is left alone. Rendered live on 2.1.1.</p>
 <p><strong>Last verified:</strong> 2026-07-28</p>
 
 <hr>

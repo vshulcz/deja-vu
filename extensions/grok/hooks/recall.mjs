@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-// UserPromptSubmit: hand Grok the sessions this machine already has that match
-// what the user just asked. Grok reads hooks in Claude Code's shape and feeds a
-// hook's stdout back as context, which is the whole mechanism.
+// Runs one deja hook with Grok's payload on stdin. hooks.json names the same
+// five hooks `deja install grok-auto` writes, with the subcommand as the
+// argument. Grok discards what SessionStart and UserPromptSubmit print (its
+// hook guide, and a 1.0.41 session's chat_history.jsonl held none of it), so
+// those two run for their side effects: the index starts warming, the session
+// is stamped live. PreToolUse is where deja still speaks, through a spawned
+// agent's updatedInput, and PostToolUse carries the fix pair to the model with
+// a failed command's result. With no argument this is hook-prompt, which is
+// what it ran before it took one.
 //
 // Silence is the normal case, and nothing here may cost a turn: every failure
 // exits 0 with no output, which Grok treats as "nothing to add".
 
 import { spawn } from "node:child_process"
-import { installerOwns, resolveDeja } from "../lib.mjs"
+import { hookArgs, installerOwns, resolveDeja } from "../lib.mjs"
 
 const TIMEOUT_MS = 20000
 
@@ -20,7 +26,7 @@ async function main() {
   const payload = await readStdin()
   if (!payload.trim()) return
 
-  const out = await run(resolveDeja(), ["hook-prompt", "--plain"], payload)
+  const out = await run(resolveDeja(), hookArgs(process.argv.slice(2)), payload)
   if (out.trim()) process.stdout.write(out)
 }
 

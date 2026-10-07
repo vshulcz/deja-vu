@@ -362,6 +362,9 @@ func openclawPluginManifest() string {
   "activation": {
     "onStartup": true
   },
+  "contracts": {
+    "agentToolResultMiddleware": ["openclaw"]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false
@@ -406,10 +409,54 @@ function where(ctx) {
   return { id: id || key, cwd: dir || process.cwd() };
 }
 
+function resultText(result) {
+  const content = Array.isArray(result?.content) ? result.content : [];
+  return content.filter((c) => c && c.type === "text" && typeof c.text === "string").map((c) => c.text).join("\n");
+}
+
+// The line deja has for a finished tool call: a file's history after a read
+// or an edit, and after a failed command what this machine ran after the same
+// error before.
+function toolLine(event, ctx) {
+  const name = event?.toolName || "";
+  const args = event?.args || {};
+  const session_id = ctx?.sessionId || ctx?.sessionKey || "";
+  const cwd = event?.cwd || process.cwd();
+  if (name === "read" || name === "edit" || name === "write") {
+    const path = typeof args.path === "string" ? args.path : typeof args.file_path === "string" ? args.file_path : "";
+    if (!path) return "";
+    return ask(["hook-tool", "--plain"], { tool_name: name === "read" ? "read" : "edit", tool_input: { file_path: path }, session_id, cwd });
+  }
+  if (name === "apply_patch" && typeof args.input === "string") {
+    return ask(["hook-tool", "--plain"], { tool_name: "apply_patch", tool_input: { command: args.input }, session_id, cwd });
+  }
+  if (name === "exec" || name === "bash") {
+    const text = resultText(event?.result);
+    if (!text.trim()) return "";
+    return ask(["hook-tool-after", "--plain"], { tool_name: "bash", tool_input: { command: String(args.command || "") }, tool_response: text, session_id, cwd });
+  }
+  return "";
+}
+
 export default {
   id: %q,
   name: "deja recall",
   register(api) {
+    // A tool result middleware rewrites what the model reads back from a
+    // tool, which is the one place a line can arrive beside the result it is
+    // about. It needs contracts.agentToolResultMiddleware in the manifest and
+    // the plugin enabled, both of which install does; an OpenClaw without the
+    // API just goes without it.
+    if (typeof api.registerAgentToolResultMiddleware === "function") {
+      api.registerAgentToolResultMiddleware(async (event, ctx) => {
+        try {
+          const line = toolLine(event, ctx);
+          if (!line) return;
+          const content = Array.isArray(event?.result?.content) ? event.result.content : [];
+          return { result: { ...event.result, content: [...content, { type: "text", text: line }] } };
+        } catch {}
+      }, { runtimes: ["openclaw"] });
+    }
     // What this project settled, at the start of the session. The bootstrap
     // hook does this in gateway mode and does not run under the local agent,
     // where a session had no memory of the project at all until it happened to

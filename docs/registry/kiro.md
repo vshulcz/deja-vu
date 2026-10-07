@@ -106,7 +106,10 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   `userPromptSubmit` runs `deja hook-prompt --plain`. kiro-cli adds what those
   print to the model's context, the agentSpawn output for the whole
   conversation; what `preToolUse` and `postToolUse` print is not sent, so
-  there is no pre-edit line. The hooks run in that agent only:
+  there is no pre-edit line. A third hook, `postToolUse` running
+  `deja hook-tool-after --defer`, holds the fix pair for a failed
+  `execute_bash` and the next `userPromptSubmit` hands it over, once. An
+  agent hook may name no session, so the working directory keys it. The hooks run in that agent only:
   `kiro-cli chat --agent deja`, or `kiro-cli agent set-default deja`. The
   built-in `kiro_default` takes no hooks from a file (a `kiro_default.json` is
   ignored), and deja does not switch `chat.defaultAgent`, which would trade

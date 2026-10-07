@@ -77,6 +77,8 @@ type toolHookInput struct {
 		NotebookPath string `json:"notebook_path"`
 		// Muse's edit_file and write_file name it here (#4709).
 		Path string `json:"path"`
+		// Grok's read_file.
+		TargetFile string `json:"target_file"`
 		// Command Code's shell_command runs command with these after it
 		// (#4540).
 		Args any `json:"args"`
@@ -115,6 +117,9 @@ func (i *toolHookInput) adopt() {
 	}
 	if i.ToolInput.FilePath == "" {
 		i.ToolInput.FilePath = i.ToolInput.FilePathCamel
+	}
+	if i.ToolInput.FilePath == "" {
+		i.ToolInput.FilePath = i.ToolInput.TargetFile
 	}
 	if args := copilotToolArgs(i.ToolArgs); args != nil {
 		if i.ToolInput.Command == "" {
@@ -217,7 +222,11 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 	// answer with the transcript being written (#3945, #3965).
 	markSessionLive(dir, input.SessionID)
 	measureCompactionRecovery(dir, input)
-	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "PreToolUse", shape, stdout); delivered {
+	event := "PreToolUse"
+	if postToolEvent(input.HookEventName) {
+		event = "PostToolUse"
+	}
+	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), event, shape, stdout); delivered {
 		return err
 	}
 
@@ -310,7 +319,10 @@ func runHookToolMode(dir string, stdin io.Reader, stdout io.Writer, shape hookTo
 		return nil
 	}
 	var resp sessionStartHookResponse
-	resp.HookSpecificOutput.HookEventName = "PreToolUse"
+	// A host that reads the context only after the tool wants the event
+	// named as the one it sent; CodeBuddy drops it otherwise, and Gemini's
+	// AfterTool takes the same answer its failure hook already gives.
+	resp.HookSpecificOutput.HookEventName = event
 	resp.HookSpecificOutput.AdditionalContext = out
 	b, err := json.Marshal(resp)
 	if err != nil {
@@ -365,17 +377,18 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		// `read` instead — the step an agent takes before it edits. Claude Code
 		// sends "Read", which stays excluded: its hook fires before the action,
 		// so it has the edit itself to speak at.
-		"read":
-		path := strings.TrimSpace(input.ToolInput.FilePath)
-		if path == "" {
-			// TRAE CLI sends no file_path, only {"command": "Edit <path>"}.
-			path = strings.TrimSpace(strings.TrimPrefix(input.ToolInput.Command, input.ToolName+" "))
-			if path == strings.TrimSpace(input.ToolInput.Command) {
-				path = ""
-			}
-		}
-		if path != "" {
-			return fileHookLineOutside(dir, cwd, path, input.SessionID)
+		"read",
+		// Gemini CLI and Qwen Code read with read_file, and Gemini edits with
+		// replace. Both are wired after the tool only: neither hands a
+		// PreToolUse answer to the model.
+		"read_file", "replace":
+		return fileLineFor(dir, cwd, input)
+	case "Read":
+		// CodeBuddy and the other Claude-shaped hosts whose only channel is
+		// the tool's result: there the read is the step before the edit, as
+		// pi's is.
+		if postToolEvent(input.HookEventName) {
+			return fileLineFor(dir, cwd, input)
 		}
 	case "apply_patch":
 		// Codex and other OpenAI-style agents make every file edit through a
@@ -390,6 +403,34 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		}
 	}
 	return ""
+}
+
+// postToolEvent reports whether the hook was sent after the tool ran rather
+// than before it: Claude's PostToolUse, which CodeBuddy and Qwen share, and
+// Gemini's AfterTool.
+func postToolEvent(name string) bool {
+	switch name {
+	case "PostToolUse", "AfterTool":
+		return true
+	}
+	return false
+}
+
+// fileLineFor is the file line for an editor or reader call, by whichever
+// field the host named the file in.
+func fileLineFor(dir, cwd string, input toolHookInput) string {
+	path := strings.TrimSpace(input.ToolInput.FilePath)
+	if path == "" {
+		// TRAE CLI sends no file_path, only {"command": "Edit <path>"}.
+		path = strings.TrimSpace(strings.TrimPrefix(input.ToolInput.Command, input.ToolName+" "))
+		if path == strings.TrimSpace(input.ToolInput.Command) {
+			path = ""
+		}
+	}
+	if path == "" {
+		return ""
+	}
+	return fileHookLineOutside(dir, cwd, path, input.SessionID)
 }
 
 // commandHintsOn reports whether the line before a command is wanted. Off

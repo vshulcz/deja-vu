@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import apply from "../index.js";
-import { argv, contributions, guarded } from "../lib.js";
+import { argv, contributions, exitStatus, guarded, resultText } from "../lib.js";
 
 const source = readFileSync(new URL("../index.js", import.meta.url), "utf8");
 
@@ -268,4 +268,33 @@ test("contributions fills the gaps and never repeats the installer", () => {
   assert.deepEqual(contributions({ auto: true }, {}), { tools: true, command: true, recall: false });
   assert.deepEqual(contributions({}, { autoRecall: false }), { tools: true, command: true, recall: false });
   assert.deepEqual(contributions(undefined, undefined), { tools: true, command: true, recall: true });
+});
+
+// The point of action `deja install dsh-auto` wires: a read, edit or write gets
+// the file's history and a failed command its fix, both on tools/post-execute.
+// The package lagged here, so a profile with only the package got neither.
+test("the package answers a tool result the way the installer does", () => {
+  assert.match(source, /ctx\.on\("tools\/post-execute"/);
+  assert.match(source, /\["hook-tool", "--plain"\]/);
+  assert.match(source, /\["hook-tool-after", "--plain"\]/);
+  assert.match(source, /\["hook-session-end"\]/);
+  assert.match(source, /session_id: sessionId\(exec\.agent\)/);
+  const ctx = withDSHHome([], () => {
+    const ctx = fakeCtx();
+    const events = [];
+    ctx.on = (name) => events.push(name);
+    apply(ctx, {});
+    return { events };
+  });
+  for (const name of ["tools/post-execute", "session/created", "session/disposed"]) {
+    assert.ok(ctx.events.includes(name), `${name} is not listened to`);
+  }
+});
+
+test("a command's exit is read off its last line only", () => {
+  assert.deepEqual(exitStatus("boom\n[exit code: 2]"), { body: "boom", failed: true });
+  assert.deepEqual(exitStatus("ok\n[exit code: 0]"), { body: "ok", failed: false });
+  assert.deepEqual(exitStatus("x\n[killed by signal: SIGKILL]"), { body: "x", failed: true });
+  assert.deepEqual(exitStatus("quoted [exit code: 1] mid-output"), { body: "quoted [exit code: 1] mid-output", failed: false });
+  assert.equal(resultText({ content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }] }), "a\nb");
 });

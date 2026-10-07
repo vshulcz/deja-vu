@@ -457,20 +457,9 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// The first moment this session exists, so the first recall of it — the one
 	// an agent plans against — already knows whose transcript to leave out.
 	markSessionLive(dir, input.SessionID)
-	// Grok shows the receipt and drops the context, so nothing is served,
-	// claimed or logged as arrived; a note about the index still goes to the
-	// user, which is the part grok does show (#4588).
-	if grokDropsContext() {
-		if !plain {
-			if line := joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), buildNotice(dir))); line != "" {
-				var resp sessionStartHookResponse
-				resp.HookSpecificOutput.HookEventName = "SessionStart"
-				resp.SystemMessage = line
-				emitHookResponse(resp)
-			}
-		}
-		return nil
-	}
+	// Grok shows the receipt and drops the context (#4588); the digest waits
+	// for the session's first tool hook, which does reach the model
+	// (hook_deferred.go).
 	// CodeBuddy injects SessionStart context only while the input holds one
 	// user message (isFirstOrResumeMessage, 2.161.2), and after a compaction it
 	// holds the summary and the next prompt. Whatever this answered would be

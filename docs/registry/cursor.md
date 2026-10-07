@@ -63,6 +63,15 @@ chats from every directory. Live-verified: the resumed chat answered from its ow
 history. IDE chats carry a composer id from `state.vscdb` that the CLI does not
 take, so those still reopen only in the editor.
 
+## Status line
+
+`deja install cursor-auto` sets `statusLine` in `cli-config.json` to
+`{"type":"command","command":"<deja> statusline"}`. cursor-agent reads that file
+from `$CURSOR_CONFIG_DIR`, then `$XDG_CONFIG_HOME/cursor` (on macOS too), then
+`~/.cursor`. It runs the command without a shell and pipes Claude's payload,
+`transcript_path` included, after each turn; there is no timer. A status line
+already set there is left alone. Rendered live on cursor-agent 2026.09.02.
+
 ## Known quirks and drift
 
 - Cursor moved modern IDE chats toward global storage while older versions used workspace databases; both are scanned.

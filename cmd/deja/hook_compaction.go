@@ -107,10 +107,18 @@ func readCompactionFile(input precompactHookInput, workspace string) (sources.Co
 // so the next prompt finds it there. A compaction already stored is left alone,
 // which keeps its packet delivered once.
 func catchUpCompaction(dir string, input precompactHookInput) {
+	catchUpCompactionWith(dir, input, func() (sources.CompactionTranscript, bool, error) {
+		return sources.ReadGeminiCompaction(input.TranscriptPath, input.SessionID)
+	})
+}
+
+// catchUpCompactionWith is the same for a host whose transcript marks the
+// compaction its own way: Antigravity writes a CHECKPOINT step.
+func catchUpCompactionWith(dir string, input precompactHookInput, read func() (sources.CompactionTranscript, bool, error)) {
 	if input.SessionID == "" || input.TranscriptPath == "" || recallIsOff() {
 		return
 	}
-	transcript, found, err := sources.ReadGeminiCompaction(input.TranscriptPath, input.SessionID)
+	transcript, found, err := read()
 	if err != nil || !found {
 		return
 	}

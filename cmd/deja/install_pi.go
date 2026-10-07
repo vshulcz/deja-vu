@@ -130,7 +130,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (pi: any) {
-  let injected = false;
+  // Once per session, not once per process: /new, a resume and a fork keep the
+  // process and switch the session, and a flag set on the first one left every
+  // later session with no digest.
+  const injected = new Set<string>();
   let toldBuilding = false;
   // The tool and compaction events carry no session id, and recall dedupes per
   // session: without one it repeats itself and forgets nothing. pi keeps the id
@@ -195,7 +198,7 @@ export default function (pi: any) {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       remember(ctx);
-      if (!injected) {
+      if (!injected.has(sessionID())) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode). pi has no
@@ -212,7 +215,7 @@ export default function (pi: any) {
           digest = raw;
         }
         if (digest) {
-          injected = true;
+          injected.add(sessionID());
           ctx.ui.setStatus("deja", "");
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.
@@ -257,15 +260,16 @@ export default function (pi: any) {
       // and pi has no handler that runs earlier whose return the model reads.
       // So the file's own history goes out here: what was decided about it,
       // from the sessions that decided it. deja answers once per session per
-      // fact, so re-reading the same file stays quiet.
-      if (event.toolName === "read") {
+      // fact, so re-reading the same file stays quiet. An edit or a write
+      // without a read before it gets the same line, for the edits after it.
+      if (event.toolName === "read" || event.toolName === "edit" || event.toolName === "write") {
         const path = String((event.input && (event.input.path || event.input.file_path)) || "");
         if (!path) return;
         const parts = Array.isArray(event.content) ? event.content : [];
-        const id = "read:" + String(event.toolCallId || "");
+        const id = "file:" + String(event.toolCallId || "");
         if (!(id in repaired)) {
           repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
-            tool_name: "read",
+            tool_name: event.toolName,
             tool_input: { file_path: path },
             session_id: sessionID(),
             cwd: process.cwd(),

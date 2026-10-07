@@ -15,14 +15,11 @@
 // a turn on `event` "subscribe" and dispose on the cleanup setup returns.
 
 import { DejaPlugin } from "./index.js"
-import { jsonSchema, resultText, TOOL_SPECS, turnEnded, v1Messages, v1ToolName } from "./lib.js"
-
-// A 2.x server plugin has no channel to the TUI, so the toasts go nowhere.
-const noToast = { tui: { showToast: async () => {} } }
+import { jsonSchema, resultText, TOOL_SPECS, turnEnded, v1Client, v1Messages, v1ToolName } from "./lib.js"
 
 async function setup(ctx) {
   const directory = ctx.location?.directory || process.cwd()
-  const hooks = await DejaPlugin({ client: noToast, directory }, ctx.options || {})
+  const hooks = await DejaPlugin({ client: v1Client(ctx), directory }, ctx.options || {})
 
   const specs = hooks[TOOL_SPECS]
   if (specs) {

@@ -56,8 +56,10 @@ func TestQwenWiresTheFixPairToTheFailureEvent(t *testing.T) {
 	if matcher != "run_shell_command" {
 		t.Fatalf("the fix pair fires for every tool (matcher %q), not just the one that runs commands", matcher)
 	}
-	if _, _, ok := find("PostToolUse"); ok {
-		t.Fatalf("the old PostToolUse hook is still there; it fires only when the command worked:\n%s", b)
+	// PostToolUse carries the file line now, and only that: the fix pair on
+	// it fired only when the command worked.
+	if cmd, m, ok := find("PostToolUse"); !ok || strings.Contains(cmd, "hook-tool-after") || m != "read_file|edit|write_file" {
+		t.Fatalf("PostToolUse should run hook-tool on file tools only, got %q (matcher %q):\n%s", cmd, m, b)
 	}
 	if cmd, _, ok := find("PreCompact"); !ok || !strings.Contains(cmd, "hook-precompact") {
 		t.Fatalf("nothing forgets after a compaction:\n%s", b)

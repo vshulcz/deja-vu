@@ -122,7 +122,7 @@ Reasonix takes everything as one plugin package (`reasonix-plugin.json`,
   ran `reasonix`, the receipt-signing key and crash directory that run
   created go too, unless Reasonix has used the key since.
 - **Resume**: `reasonix --resume <id>` in the session's workspace.
-- **Handoff**: paste.
+- **Handoff**: exec, `reasonix run <prompt>`; the TUI takes no prompt.
 
 **Last verified:** 2026-09-27
 

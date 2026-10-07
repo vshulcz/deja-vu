@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -64,6 +67,10 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// record of having sent them outlives them, so the memory it just lost is
 	// the memory recall refuses to send again.
 	forgetOnCheckpoint(dir, input.ConversationID, newestCheckpoint(input.TranscriptPath))
+	// The compaction itself, caught up from the transcript the way Gemini's is:
+	// the steps before the CHECKPOINT are still in the file, so the session is
+	// captured as it stood then and the packet rides this invocation.
+	recovery := antigravityCompactionPacket(dir, input, workspace)
 	// Past the first invocation the digest is already in the transcript, and
 	// the harness has no per-prompt event of its own — so this is where the
 	// question gets answered. Silence is the usual result, and the prompt
@@ -86,13 +93,24 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 			block = antigravityPromptBlock(dir, latestUserRequest(input.TranscriptPath),
 				input.ConversationID, workspace)
 		}
-		if block == "" {
+		// The line the pre-tool hook gives before an edit, for the file the
+		// last call edited: PreToolUse cannot say it here, so it rides the
+		// next invocation with the edit's result.
+		var steps []antigravityInjectStep
+		if recovery != "" {
+			steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
+		}
+		if line := antigravityFileLines(dir, latestEditPaths(input.TranscriptPath), input.ConversationID, workspace); line != "" {
+			steps = append(steps, antigravityInjectStep{EphemeralMessage: line})
+		}
+		if block != "" {
+			steps = append(steps, antigravityInjectStep{EphemeralMessage: block})
+		}
+		if len(steps) == 0 {
 			fmt.Fprintln(stdout, "{}")
 			return nil
 		}
-		b, err := json.Marshal(antigravityHookResponse{
-			InjectSteps: []antigravityInjectStep{{EphemeralMessage: block}},
-		})
+		b, err := json.Marshal(antigravityHookResponse{InjectSteps: steps})
 		if err != nil {
 			fmt.Fprintln(stdout, "{}")
 			return nil
@@ -103,24 +121,46 @@ func runHookAntigravity(dir string, stdin io.Reader, stdout io.Writer) error {
 	// The payload, and nothing written back into the environment: deja used to
 	// export the workspace here, which carried this call's project into the
 	// next one in the same process and decided nothing else (#2185).
+	var steps []antigravityInjectStep
+	if recovery != "" {
+		steps = append(steps, antigravityInjectStep{EphemeralMessage: recovery})
+	}
 	digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, workspace, "")
-	if digest == "" {
+	if digest != "" {
+		digest = frameRecall(startLead(antigravityLead) + digest)
+		rememberDigestInjected(dir, input.ConversationID)
+		usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, "", sessions, raw,
+			policy.Load().Describe(policy.ActivationAuto), ids, projects)
+		steps = append(steps, antigravityInjectStep{EphemeralMessage: digest})
+	}
+	if len(steps) == 0 {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
-	digest = frameRecall(startLead(antigravityLead) + digest)
-	rememberDigestInjected(dir, input.ConversationID)
-	usage.RecordDigestPolicySessionsFrom(dir, usage.KindHook, digest, "", sessions, raw,
-		policy.Load().Describe(policy.ActivationAuto), ids, projects)
-	b, err := json.Marshal(antigravityHookResponse{
-		InjectSteps: []antigravityInjectStep{{EphemeralMessage: digest}},
-	})
+	b, err := json.Marshal(antigravityHookResponse{InjectSteps: steps})
 	if err != nil {
 		fmt.Fprintln(stdout, "{}")
 		return nil
 	}
 	fmt.Fprintln(stdout, string(b))
 	return nil
+}
+
+// antigravityCompactionPacket captures a compaction the transcript shows and
+// hands back its recovery packet once, or "".
+func antigravityCompactionPacket(dir string, input antigravityHookInput, workspace string) string {
+	if input.ConversationID == "" || input.TranscriptPath == "" || workspace == "" {
+		return ""
+	}
+	pre := precompactHookInput{SessionID: input.ConversationID, TranscriptPath: input.TranscriptPath, CWD: workspace}
+	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
+		return sources.ReadAntigravityCompaction(input.TranscriptPath, input.ConversationID, workspace)
+	})
+	var out bytes.Buffer
+	if delivered, _ := emitCompactionRecovery(dir, input.ConversationID, workspace, "PreInvocation", hookToolPlain, &out); !delivered {
+		return ""
+	}
+	return strings.TrimSpace(out.String())
 }
 
 const antigravityLead = "The sessions below are from this project's recent history. If any is relevant to what the user asks next, call recall_context with the session id printed beside it — an id is exact, a phrase is a guess — to pull the full details before acting. \nIf one of these helps, open your reply with that one line and nothing more about it: déjà vu: <what it said> — reusing it (deja:<session id>). If none helps, say nothing about them.\n"

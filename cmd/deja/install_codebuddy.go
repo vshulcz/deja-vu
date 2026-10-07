@@ -78,6 +78,9 @@ var codeBuddyHookWiring = []struct{ Event, Sub, Matcher string }{
 	{"UserPromptSubmit", "hook-prompt", ""},
 	{"PostToolUse", "hook-tool-after", "Bash|PowerShell"},
 	{"PostToolUseFailure", "hook-tool-after", "Bash|PowerShell"},
+	// The file line, after a read and after an edit, on the channel this
+	// file says is checked.
+	{"PostToolUse", "hook-tool", "Read|Edit|Write|MultiEdit"},
 	{"PreCompact", "hook-precompact", ""},
 	{"SessionEnd", "hook-session-end", ""},
 }
@@ -131,7 +134,15 @@ func codeBuddyHookRun(goos, exe, sub string) string {
 // installCodeBuddyAuto writes the hooks first: a settings file deja refuses
 // should leave nothing half-wired (#2745).
 func installCodeBuddyAuto(exe string, uninstall bool) (installResult, error) {
-	return installCodeBuddyAutoIn(codeBuddySettingsPath(), codeBuddyMCPPath(), exe, uninstall)
+	r, err := installCodeBuddyAutoIn(codeBuddySettingsPath(), codeBuddyMCPPath(), exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	status, err := installCodeBuddyStatusline(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(r, status), nil
 }
 
 func installWorkBuddyAuto(exe string, uninstall bool) (installResult, error) {

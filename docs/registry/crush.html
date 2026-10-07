@@ -98,8 +98,12 @@
 <li><strong>Auto-recall</strong>: <code>deja install crush-auto</code> adds a <code>PreToolUse</code> hook —</li>
 </ul>
 <p><code>deja hook-tool --crush</code>, matcher <code>^(bash|edit|write|multiedit)$</code>. <code>PreToolUse</code></p>
-<p>is the only event Crush fires, so there is no session-start or per-prompt</p>
-<p>channel: the command-and-file line is the whole of it. A hook answers with a</p>
+<p>is the only event Crush fires, so that one hook carries the rest: the</p>
+<p>session&#39;s digest on its first call, the recall for the newest message the</p>
+<p>person sent, the fix pair when the previous command failed, and the packet</p>
+<p>after a summary. The message, the failure and the summary come out of</p>
+<p><code>crush.db</code> by the payload&#39;s session id, each once, one tool call late; a turn</p>
+<p>with no matched tool call gets none of it. A hook answers with a</p>
 <p>flat <code>{&#34;version&#34;:1,&#34;context&#34;:…}</code> rather than Claude&#39;s nested envelope, which</p>
 <p>is what the <code>--crush</code> flag writes; no <code>decision</code> field, because <code>&#34;allow&#34;</code></p>
 <p>there is affirmative pre-approval and would skip the permission prompt on</p>

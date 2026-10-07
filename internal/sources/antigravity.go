@@ -109,6 +109,14 @@ func LoadAntigravity() []model.Session {
 }
 
 func ParseAntigravityFile(path string) ([]model.Session, error) {
+	return parseAntigravityWith(path, func(fn func(map[string]any)) error {
+		return scanJSONLFromOffset(path, 0, fn)
+	})
+}
+
+// parseAntigravityWith reads the records scan hands it as the transcript at
+// path: the whole file, or the part a compaction left behind it.
+func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	id := antigravitySessionID(path)
 	if id == "" || id == "." || id == string(filepath.Separator) {
 		return nil, nil
@@ -126,7 +134,7 @@ func ParseAntigravityFile(path string) ([]model.Session, error) {
 	// it answers the call it follows (#4530).
 	var running []int
 	asked := 0
-	err := scanJSONLFromOffset(path, 0, func(m map[string]any) {
+	err := scan(func(m map[string]any) {
 		role := ""
 		source, _ := m["source"].(string)
 		switch source {
@@ -435,6 +443,30 @@ func antigravityTakeWrite(text string, step []model.Message, pending map[string]
 		return []model.Message{{Role: RoleWrote, Text: rec, Time: t}}
 	}
 	return nil
+}
+
+// AntigravityEditPaths are the files a planner row's calls edit or create, in
+// call order.
+func AntigravityEditPaths(toolCalls any) []string {
+	calls, _ := toolCalls.([]any)
+	var out []string
+	for _, c := range calls {
+		call, _ := c.(map[string]any)
+		args, _ := call["args"].(map[string]any)
+		switch str(call["name"]) {
+		case "replace_file_content", "multi_replace_file_content", "write_to_file":
+		default:
+			continue
+		}
+		p := antigravityArg(args, "TargetFile")
+		if p == "" {
+			p = antigravityArg(args, "AbsolutePath")
+		}
+		if p = decodeURIPath(strings.TrimPrefix(p, "file://")); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // antigravityArg reads one call argument. On disk each value is JSON in its

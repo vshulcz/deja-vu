@@ -46,17 +46,27 @@ func TestCodeBuddyPluginMatchesTheInstaller(t *testing.T) {
 
 	root := filepath.Join("..", "..", "codebuddy-plugin")
 	const bridge = `"${CODEBUDDY_PLUGIN_ROOT}/hooks/deja.sh" `
-	if len(m.Hooks) != len(codeBuddyHookWiring) {
-		t.Fatalf("plugin wires %d events, the installer %d", len(m.Hooks), len(codeBuddyHookWiring))
+	entries := 0
+	for _, es := range m.Hooks {
+		entries += len(es)
+	}
+	if entries != len(codeBuddyHookWiring) {
+		t.Fatalf("plugin wires %d entries, the installer %d", entries, len(codeBuddyHookWiring))
 	}
 	for _, w := range codeBuddyHookWiring {
-		entries := m.Hooks[w.Event]
-		if len(entries) != 1 || entries[0].Matcher != w.Matcher || len(entries[0].Hooks) != 1 {
-			t.Fatalf("%s: plugin entry %+v, installer matcher %q", w.Event, entries, w.Matcher)
+		found := false
+		for _, e := range m.Hooks[w.Event] {
+			if len(e.Hooks) != 1 || e.Hooks[0].Command != bridge+w.Sub {
+				continue
+			}
+			found = true
+			h := e.Hooks[0]
+			if e.Matcher != w.Matcher || h.Type != "command" || h.Timeout != codeBuddyHookTimeout {
+				t.Fatalf("%s: plugin entry %+v, installer matcher %q", w.Event, e, w.Matcher)
+			}
 		}
-		h := entries[0].Hooks[0]
-		if h.Type != "command" || h.Command != bridge+w.Sub || h.Timeout != codeBuddyHookTimeout {
-			t.Fatalf("%s: plugin hook %+v, want %q", w.Event, h, bridge+w.Sub)
+		if !found {
+			t.Fatalf("%s: the plugin has no %q hook", w.Event, bridge+w.Sub)
 		}
 	}
 

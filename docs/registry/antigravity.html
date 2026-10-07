@@ -56,6 +56,14 @@
 <p>Antigravity&#39;s terminal client is <code>agy</code>, and <code>agy -i &lt;prompt&gt;</code> opens an</p>
 <p>interactive session on it, so <code>deja handoff --to agy</code> — or <code>--to antigravity</code>,</p>
 <p>the same target — starts it directly. Verified on agy 1.1.7.</p>
+<h2 id="hooks">Hooks</h2>
+<p><code>PreInvocation</code> is the one hook whose answer reaches the model, so it carries</p>
+<p>what other hosts split across events. After the first invocation it reads the</p>
+<p>transcript the payload names: a planner step that called</p>
+<p><code>replace_file_content</code>, <code>multi_replace_file_content</code> or <code>write_to_file</code> gets</p>
+<p>the line deja keeps for that file, and a <code>CHECKPOINT</code> step, which is how a</p>
+<p>compaction shows, gets the session as it stood before it, once. Antigravity</p>
+<p>keeps the steps before a checkpoint, so nothing else is needed.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>User-visible content and machine metadata share one string field.</li>

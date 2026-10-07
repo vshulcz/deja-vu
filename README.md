@@ -266,37 +266,37 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | paste | — |
+| VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | — |
 | Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (IDE chats, CLI tool output) |
-| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | paste | zstd |
+| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | zstd |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
 | Grok Build | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (grok-dev store) |
-| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 |
+| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 (2026.8+ store); zstd for .zst archives |
+| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 (2026.8+ store); zstd for .zst archives |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | paste | — |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | paste | import the server once in Settings -> MCP; enable the skill for the agent |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI database |
-| Kiro | ✅ | ✅ | ✅ | ? | ✅ | paste | sqlite3 for the CLI database |
-| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | sqlite3 for the CLI store |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
+| Kiro | ✅ | ✅ | ✅ | ? | ✅ | ✅ | sqlite3 for the CLI database |
+| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI store |
 | Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
-| CodeWhale | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
-| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | paste | none |
-| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | paste | zstd for 1.x sessions |
-| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
-| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | paste | none |
+| CodeWhale | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
+| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 

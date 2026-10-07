@@ -37,6 +37,8 @@ func installTrae(exe string, uninstall bool) (installResult, error) {
 // traeHookWiring is Codex's, with the pre-edit hook also on Edit and Write:
 // traecli 0.208 edits through Claude Code's tools, not apply_patch, and sends
 // PreToolUse with tool_name "Edit" and tool_input {"command": "Edit <path>"}.
+// A command that exits non-zero fires PostToolUseFailure and not PostToolUse
+// there, so the fix pair is wired on both.
 func traeHookWiring() []hookWire {
 	w := append([]hookWire(nil), codexHookWiring...)
 	for i := range w {
@@ -44,7 +46,7 @@ func traeHookWiring() []hookWire {
 			w[i].Matcher = "Bash|apply_patch|Edit|Write"
 		}
 	}
-	return w
+	return append(w, hookWire{"PostToolUseFailure", "hook-tool-after", "Bash"})
 }
 
 // installTraeAuto writes the hooks first: a hooks.json deja refuses should

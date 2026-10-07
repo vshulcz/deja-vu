@@ -15,7 +15,7 @@ import (
 // message, which is also where Hermes wants it — the system prompt stays
 // byte-identical so provider caching survives — and transform_tool_result,
 // whose string replaces the tool result, which carries the fix line after a
-// failed command.
+// failed command and a file's history after a read or an edit.
 func installHermesPlugin(exe string, uninstall bool) (installResult, error) {
 	// The launcher, not this binary: a generated plugin is as much a
 	// config as a hooks.json, and one that names the build it was
@@ -173,7 +173,33 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     return {"context": hit} if hit else None
 
 
-def repair(tool_name=None, result=None, session_id=None, **kwargs):
+def _file_line(tool_name, args, result, session_id):
+    # The file's history, appended to a read or an edit of it: the read is the
+    # step before an edit, and an edit's line still reaches the edits after
+    # it. A patch in patch mode names its files inside the patch.
+    if not isinstance(args, dict):
+        return None
+    path = args.get("path")
+    if tool_name == "patch" and args.get("mode") == "patch" and isinstance(args.get("patch"), str):
+        tool, tool_input = "apply_patch", {"command": args["patch"]}
+    elif isinstance(path, str) and path:
+        tool = "read" if tool_name == "read_file" else "edit"
+        tool_input = {"file_path": path}
+    else:
+        return None
+    payload = json.dumps({
+        "tool_name": tool,
+        "tool_input": tool_input,
+        "session_id": session_id or "",
+        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
+    })
+    line = _deja(["hook-tool", "--plain"], payload, timeout=5)
+    return result + "\n\n" + line if line else None
+
+
+def repair(tool_name=None, result=None, session_id=None, args=None, **kwargs):
+    if tool_name in ("read_file", "write_file", "patch") and isinstance(result, str):
+        return _file_line(tool_name, args, result, session_id)
     # A shell command failed: what this machine ran after that same error
     # before, appended to the result the model is about to read. This is the
     # line Claude Code gets from its PostToolUse hook. Nothing else in Hermes

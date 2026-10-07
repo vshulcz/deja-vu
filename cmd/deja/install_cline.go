@@ -8,10 +8,11 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// Cline's hooks cannot carry context: TaskStart and UserPromptSubmit are
+// Cline's hook files cannot carry context: TaskStart and UserPromptSubmit are
 // spawned detached with stdout closed, PreToolUse keeps only cancel and
 // overrideInput, PreCompact is mapped to no event at all, and --hooks-dir is
-// read by nothing. Verified against CLI 3.0.46.
+// read by nothing. Verified against CLI 3.0.46. A plugin's runtime hooks can:
+// beforeTool's appendContext reaches the model on 3.0.69.
 //
 // Plugins are the channel that works. A registered rule takes a function for
 // its content, resolved when the session builds its instructions — which is
@@ -194,6 +195,7 @@ function appendRepair(part, line) {
 // session, so both live out here.
 let session = "";
 let compacted = false;
+let workspace = "";
 
 // isCompactionStart reads cline's status notice for a compaction about to run:
 // {type:"status-notice", metadata:{kind:"auto_compaction", phase:"started"}}
@@ -204,6 +206,19 @@ function isCompactionStart(ev) {
   return Boolean(meta) && typeof meta.kind === "string" && meta.kind.endsWith("compaction") && meta.phase === "started";
 }
 
+// The files a tool call reads or edits, as hook-tool's names for them: the
+// line about a file goes out at the read, the step before an edit, and at the
+// edit for the edits after it.
+function fileCalls(tool, input) {
+  if (!input) return [];
+  if (tool === "read_files" && Array.isArray(input.files)) {
+    return input.files.filter((f) => f && typeof f.path === "string").map((f) => ["read", f.path]);
+  }
+  if (tool === "editor" && typeof input.path === "string") return [["edit", input.path]];
+  if (tool === "apply_patch" && typeof input.input === "string") return [["apply_patch", "", input.input]];
+  return [];
+}
+
 export default {
   name: "deja",
   manifest: { capabilities: ["rules", "commands", "skills", "hooks"] },
@@ -211,7 +226,24 @@ export default {
     onEvent: (ev) => {
       if (!isCompactionStart(ev) || !session) return;
       compacted = true;
-      run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: process.cwd(), harness: "cline" }));
+      run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: workspace || process.cwd(), harness: "cline" }));
+    },
+    // What beforeTool returns as appendContext reaches the model beside the
+    // tool's result (CLI 3.0.69). Cline's own PreToolUse hook file keeps only
+    // cancel and overrideInput, so the plugin is the channel here too.
+    beforeTool: (ctx) => {
+      try {
+        const name = (ctx && ctx.toolCall && ctx.toolCall.toolName) || "";
+        for (const [tool, path, patch] of fileCalls(name, ctx && ctx.input)) {
+          const line = run(["hook-tool", "--plain"], JSON.stringify({
+            tool_name: tool,
+            tool_input: patch ? { command: patch } : { file_path: path },
+            session_id: session,
+            cwd: workspace || process.cwd(),
+          }), 5000);
+          if (line) return { appendContext: line };
+        }
+      } catch {}
     },
     // A run is one prompt and everything the agent did for it. When it ends,
     // the session's live stamp goes, so another session's MCP recall can
@@ -225,6 +257,8 @@ export default {
   setup(api, ctx) {
     const sessionID = (ctx && ctx.session && ctx.session.sessionId) || "";
     session = sessionID;
+    workspace = (ctx && ctx.workspaceInfo && ctx.workspaceInfo.rootPath) || "";
+    const cwd = workspace || process.cwd();
     // build runs more than once for a single prompt — cline calls it again
     // with the message list it is about to send — and only the last return is
     // used. So the answer is cached per prompt rather than skipped after the
@@ -244,10 +278,13 @@ export default {
         const edit = () => out || (out = messages.slice());
 
         // The question just asked, answered from history. Prepended to the last
-        // user message.
+        // user message. Cline's own reminders ride as user messages too ("[SYSTEM]
+        // This run is not complete..." under --yolo, 3.0.69), so those are
+        // skipped or recall answers the boilerplate.
         let at = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i] && messages[i].role === "user" && userText(messages[i])) {
+          const text = messages[i] && messages[i].role === "user" ? userText(messages[i]) : "";
+          if (text && !/^\s*\[SYSTEM\]/.test(text)) {
             at = i;
             break;
           }
@@ -262,7 +299,7 @@ export default {
             recalled = run(["hook-prompt", "--plain"], JSON.stringify({
               prompt,
               session_id: sessionID,
-              cwd: process.cwd(),
+              cwd,
             }));
           }
           // Silence is the common case: the hook only speaks when the history
@@ -289,7 +326,7 @@ export default {
               tool_name: fail.name,
               tool_response: fail.output,
               session_id: sessionID,
-              cwd: process.cwd(),
+              cwd,
             })));
           }
           const line = repairs.get(fail.id);
@@ -316,7 +353,10 @@ export default {
       // A function, not a string: it runs when the session assembles its
       // instructions, so every session gets current history rather than
       // whatever was on disk at install time.
-      content: () => run(["hook-context", "--plain"]),
+      // The session and its workspace go with it: hook-context stamps the
+      // session live, which keeps it out of its own MCP recall, and ranks by
+      // the workspace rather than wherever cline was launched (#4199).
+      content: () => run(["hook-context", "--plain"], JSON.stringify({ session_id: sessionID, cwd })),
     });
     api.registerCommand({
       name: "deja",

@@ -106,8 +106,10 @@
 <ul>
 <li>There is no per-prompt event: the four documented are <code>SessionStart</code>,</li>
 </ul>
-<p><code>PreToolUse</code>, <code>PostToolUse</code> and <code>Stop</code>, so the digest rides SessionStart and</p>
-<p>the rest is the tool-time pair.</p>
+<p><code>PreToolUse</code>, <code>PostToolUse</code> and <code>Stop</code>, so the digest rides SessionStart.</p>
+<p>The question is answered at the first matched <code>PreToolUse</code> after it: that</p>
+<p>payload names the transcript, the newest turn the person typed is read from</p>
+<p>it, and its recall rides the tool call&#39;s context, once per question.</p>
 <ul>
 <li>The transcript format above was read off files command-code 1.73.4 wrote</li>
 </ul>

@@ -71,16 +71,22 @@
 <p>per prompt. <code>.goosehints</code> is where the block used to go; what deja wrote there</p>
 <p>is cleared, and anything else in that file is left alone. A <code>SessionEnd</code></p>
 <p>hook runs <code>deja hook-session-end</code>, so the session is back in the next one&#39;s</p>
-<p>MCP recall straight away.</p>
+<p>MCP recall straight away. A <code>Stop</code></p>
+<p>hook runs <code>deja hook-stop</code>: a Stop hook&#39;s <code>{&#34;decision&#34;:&#34;block&#34;,&#34;reason&#34;}</code></p>
+<p>is the one hook answer goose puts in front of the model, as a user message</p>
+<p>in the same turn (agent.rs). It blocks only when something waits: the fix</p>
+<p>pair for a command that failed this turn, read from <code>sessions.db</code> because</p>
+<p>the failure event carries no output, or the packet for a compaction this</p>
+<p>turn, found in <code>sessions.db</code> by its agent-only note. Each is handed over once.</p>
 <ul>
 <li><strong>Resume</strong>: <code>goose session --resume --session-id &lt;id&gt;</code>. A session no longer in <code>sessions.db</code> (deleted in goose) is refused with a pointer to <code>deja show</code>.</li>
 <li><strong>Handoff</strong>: exec, <code>goose run -t</code>.</li>
 <li><strong>Prerequisite</strong>: the per-prompt half needs <code>GOOSE_MOIM_MESSAGE_FILE</code>, which</li>
 </ul>
 <p>the <code>deja goose</code> wrapper sets.</p>
-<h2 id="what-the-other-nine-hook-events-can-carry">What the other nine hook events can carry</h2>
+<h2 id="what-the-other-hook-events-can-carry">What the other hook events can carry</h2>
 <p>Goose has eleven hook events (twelve on 1.49, which adds <code>PreToolUseResult</code>).</p>
-<p>deja wires three. Apart from <code>SessionEnd</code>, the rest were measured on a stand — isolated HOME, a recording</p>
+<p>deja wires four. Apart from <code>SessionEnd</code> and <code>Stop</code>, the rest were measured on a stand — isolated HOME, a recording</p>
 <p>endpoint, a hook on every event writing a marker into the MOIM file and a</p>
 <p><code>{&#34;additionalContext&#34;: …}</code> on stdout — on 1.46.0 and again on 1.49.0, with the</p>
 <p>same result both times.</p>
@@ -90,7 +96,7 @@
 <p>Every tool event carries the same four fields — <code>event</code>, <code>session_id</code>,</p>
 <p><code>tool_name</code>, <code>tool_input</code>, plus <code>working_dir</code> — and no output, no error text and</p>
 <p>no exit code. <code>Stop</code> carries <code>last_assistant_message</code>.</p>
-<p>Two things follow, and they are why the other eight stay unwired:</p>
+<p>Two things follow, and they are why the others stay unwired:</p>
 <ul>
 <li>Hook stdout is discarded. No marker written there appeared in any recorded</li>
 </ul>

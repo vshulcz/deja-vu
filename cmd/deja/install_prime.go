@@ -19,11 +19,9 @@ import (
 //     provider request, which is the channel the digest and per-prompt recall
 //     ride.
 //   - session_start fires, so the footer can say the first index is building.
-//   - tool_call and tool_result looked silent in --print on 0.9.1, but the
-//     probe called bash, which prime does not offer: its one tool is ipython
-//     (core/agent-session.ts:10889 on 0.9.8), and a 0.9.8 stand saw both fire
-//     for it, in --print too. They are not wired yet: a command runs inside an
-//     ipython cell and its exit status is only text in the result.
+//   - tool_result fires, in --print too (0.9.8). An earlier probe called a
+//     bash tool the model does not have: prime hands it one tool, ipython,
+//     and shell commands and edits run inside its cell.
 //   - session_before_compact and session_compact fire, in --print too (0.9.8
 //     stand). session_compact comes after the compaction entry is written and
 //     the session file still holds the turns before it, so the capture reads
@@ -171,7 +169,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (pi: any) {
-  let injected = false;
+  // Once per session, not once per process: /new, a resume and a fork keep the
+  // process and switch the session, and a flag set on the first one left every
+  // later session with no digest.
+  const injected = new Set<string>();
   let toldBuilding = false;
   // No event carries a session id; the session manager does, and every handler
   // reaches it through ctx. Recall dedupes per session, so without one the same
@@ -236,7 +237,7 @@ export default function (pi: any) {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       remember(ctx);
-      if (!injected) {
+      if (!injected.has(sessionID())) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode).
@@ -251,7 +252,7 @@ export default function (pi: any) {
           digest = raw;
         }
         if (digest) {
-          injected = true;
+          injected.add(sessionID());
           ctx.ui.setStatus("deja", "");
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.
@@ -288,6 +289,59 @@ export default function (pi: any) {
     try {
       remember(ctx);
       run(["hook-precompact"], JSON.stringify({ session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd(), harness: "prime" }));
+    } catch {}
+  });
+
+  // The model has one tool, ipython, and reads, edits and shell commands all
+  // run inside its cell: edit(path=...) is the pre-imported editor and
+  // bash('...') the shell. So the file line is asked for each file the cell
+  // names, and the repair when its output carries a failed bash. tool_result's
+  // content is what the model reads, and the handler's return replaces it.
+  const answered: Record<string, string> = {};
+  const fileRe = /\b(?:edit|open|Path)\s*\(\s*(?:path\s*=\s*)?[rbuf]?(["'])([^"'\n]+)\1/g;
+  pi.on("tool_result", async (event: any) => {
+    try {
+      if (!event || event.toolName !== "ipython") return;
+      const code = String((event.input && event.input.code) || "");
+      const parts = Array.isArray(event.content) ? event.content : [];
+      const id = String(event.toolCallId || "");
+      if (!(id in answered)) {
+        let line = "";
+        const output = parts
+          .filter((p: any) => p && p.type === "text" && typeof p.text === "string")
+          .map((p: any) => p.text)
+          .join("\n");
+        // bash() inside a cell does not fail the cell: the exit code is only
+        // in the text, as BashResult(exit_code=N, ...).
+        // The output is the repr of a Python string there, so its escapes
+        // are undone before the error in it is looked up.
+        const exit = /exit_code=(\d+)/.exec(output);
+        if (event.isError || (exit && exit[1] !== "0")) {
+          const repr = /output=(["'])((?:\\.|(?!\1)[^\\])*)\1/.exec(output);
+          const text = repr
+            ? repr[2].replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\(["'\\])/g, "$1") + "\nExit Code: " + (exit ? exit[1] : "1")
+            : output;
+          line = run(["hook-tool-after", "--plain"], JSON.stringify({
+            tool_name: "bash",
+            tool_response: text,
+            session_id: sessionID(),
+            cwd: process.cwd(),
+          }), 5000);
+        }
+        for (const m of code.matchAll(fileRe)) {
+          if (line) break;
+          line = run(["hook-tool", "--plain"], JSON.stringify({
+            tool_name: "edit",
+            tool_input: { file_path: m[2] },
+            session_id: sessionID(),
+            cwd: process.cwd(),
+          }), 5000);
+        }
+        answered[id] = line;
+      }
+      const note = answered[id];
+      if (!note) return;
+      return { content: parts.concat([{ type: "text", text: note }]) };
     } catch {}
   });
 

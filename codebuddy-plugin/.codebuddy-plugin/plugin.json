@@ -54,6 +54,17 @@
             "statusMessage": "Checking what fixed this before…"
           }
         ]
+      },
+      {
+        "matcher": "Read|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CODEBUDDY_PLUGIN_ROOT}/hooks/deja.sh\" hook-tool",
+            "timeout": 60,
+            "statusMessage": "Checking what fixed this before…"
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // Antigravity has no per-prompt event. PreInvocation is the only place a hook
@@ -33,6 +35,51 @@ type transcriptStep struct {
 	Type      string `json:"type"`
 	Content   string `json:"content"`
 	CreatedAt string `json:"created_at"`
+	ToolCalls any    `json:"tool_calls"`
+}
+
+// latestEditPaths are the files the newest planner row of this turn edits. By
+// the PreInvocation that follows it the edit has run, so the line arrives with
+// its result, the way it does on opencode and Grok: PreToolUse's reason never
+// reaches the model here (hook_antigravity.go).
+func latestEditPaths(path string) []string {
+	for _, step := range transcriptTailSteps(path) {
+		if step.Type == "USER_INPUT" {
+			return nil
+		}
+		if calls, ok := step.ToolCalls.([]any); ok && len(calls) > 0 {
+			return sources.AntigravityEditPaths(calls)
+		}
+	}
+	return nil
+}
+
+// antigravityFileLines is what the pre-tool hook would say before an edit of
+// each file, through the same hook every other harness runs, so its dedupe and
+// budget hold here too.
+func antigravityFileLines(dir string, paths []string, conversationID, workspace string) string {
+	var lines []string
+	for _, p := range paths {
+		payload, err := json.Marshal(map[string]any{
+			"hook_event_name": "PreToolUse",
+			"tool_name":       "Edit",
+			"tool_input":      map[string]string{"file_path": p},
+			"session_id":      conversationID,
+			"cwd":             workspace,
+		})
+		if err != nil {
+			continue
+		}
+		var out bytes.Buffer
+		if runHookTool(dir, bytes.NewReader(payload), &out) != nil {
+			continue
+		}
+		var resp sessionStartHookResponse
+		if json.Unmarshal(bytes.TrimSpace(out.Bytes()), &resp) == nil && resp.HookSpecificOutput.AdditionalContext != "" {
+			lines = append(lines, resp.HookSpecificOutput.AdditionalContext)
+		}
+	}
+	return strings.Join(lines, "\n\n")
 }
 
 // transcriptTailSteps decodes the end of a transcript, newest step first. A

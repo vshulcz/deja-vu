@@ -55,7 +55,7 @@ func TestClinePluginCapturesOnCompactionStart(t *testing.T) {
 	js := clinePluginJS("/bin/deja")
 	for _, want := range []string{
 		`meta.kind.endsWith("compaction") && meta.phase === "started"`,
-		`run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: process.cwd(), harness: "cline" }))`,
+		`run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: workspace || process.cwd(), harness: "cline" }))`,
 		`if (prompt !== asked || compacted) {`,
 		`"hooks"]`,
 	} {

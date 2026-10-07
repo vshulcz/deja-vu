@@ -105,7 +105,7 @@ func TestOmpInjectsTheSessionDigestOnce(t *testing.T) {
 	if !strings.Contains(js, `pi.on("before_agent_start"`) || !strings.Contains(js, "hook-context") {
 		t.Fatalf("no session digest:\n%s", js)
 	}
-	if !strings.Contains(js, "if (injected) return;") {
+	if !strings.Contains(js, "if (injected.has(key)) return;") {
 		t.Fatalf("the digest is not held to one per session:\n%s", js)
 	}
 	if !strings.Contains(js, "customType: \"deja-recall\"") {

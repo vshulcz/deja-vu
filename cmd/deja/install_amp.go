@@ -235,9 +235,32 @@ export default function (amp: any) {
   // the error instead of a turn later. tool.call cannot carry it: its result is
   // allow, reject, modify-input or synthesize — none of them add context.
   const repaired: Record<string, string> = {}
+  // A file's history goes the same way, after Read, the step before an edit,
+  // and after edit_file and create_file for the edits after it. deja answers
+  // once per thread per fact.
+  const FILE_TOOLS: Record<string, string> = { Read: "read", edit_file: "edit", create_file: "write" }
   amp.on("tool.result", async (event: any) => {
     try {
-      if (!event || event.status !== "error") return
+      if (!event) return
+      const fileTool = FILE_TOOLS[event.tool]
+      if (fileTool) {
+        if (event.status !== "done" || typeof event.output !== "string") return
+        const path = String((event.input && (event.input.path || event.input.file_path)) || "")
+        if (!path) return
+        const id = "file:" + String(event.toolUseID || "")
+        if (!(id in repaired)) {
+          repaired[id] = run(["hook-tool", "--plain"], JSON.stringify({
+            tool_name: fileTool,
+            tool_input: { file_path: path },
+            session_id: threadID(event),
+            cwd: process.cwd(),
+          }))
+        }
+        const line = repaired[id]
+        if (!line) return
+        return { status: "done", output: event.output + "\n\n" + line }
+      }
+      if (event.status !== "error") return
       if (event.tool !== "shell_command" && event.tool !== "Bash") return
       const output = typeof event.output === "string" ? event.output : JSON.stringify(event.output ?? "")
       const text = (output || "") + (event.error ? "\n" + event.error : "")

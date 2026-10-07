@@ -35,7 +35,22 @@
   "hooks": [
     {
       "event": "UserPromptSubmit",
-      "command": "node ./extensions/kimi/hooks/recall.mjs",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-context --plain --once",
+      "timeout": 30
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-prompt --plain",
+      "timeout": 30
+    },
+    {
+      "event": "PreCompact",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-precompact --harness kimi",
+      "timeout": 30
+    },
+    {
+      "event": "SessionEnd",
+      "command": "node ./extensions/kimi/hooks/recall.mjs hook-session-end",
       "timeout": 30
     }
   ]

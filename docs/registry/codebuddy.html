@@ -91,6 +91,13 @@
 <p>until you click Trust for it in Settings &gt; MCP and restart the app; install</p>
 <p>says so, and <code>deja doctor</code> reads the row as <code>untrusted</code> until then.</p>
 <p><strong>Last verified:</strong> 2026-10-05</p>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install codebuddy-auto</code> sets <code>statusLine.command</code> in</p>
+<p><code>~/.codebuddy/settings.json</code>. CodeBuddy pipes Claude&#39;s payload; before the</p>
+<p>first prompt the session id is <code>unknown</code> and there is no transcript path, and</p>
+<p>deja shows the day&#39;s line alone. A status line already set there is left</p>
+<p>alone. Rendered live on 2.16.0. WorkBuddy is not wired: its status line is</p>
+<p>unchecked.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>Checked against a live 2.161.2.</strong> Sessions written by the CLI itself</li>

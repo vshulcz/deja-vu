@@ -25,9 +25,10 @@ import (
 // command carries an absolute path — and the output schema discards the whole
 // response over one unrecognised key, which is what `--strict` is for.
 //
-// Two events are wired, the two deja has something to say at: SessionStart
-// puts the project's memory in front of the model before the first prompt, and
-// UserPromptSubmit answers the prompt that was just typed (#3651).
+// SessionStart puts the project's memory in front of the model before the
+// first prompt, and UserPromptSubmit answers the prompt that was just typed
+// (#3651). PreToolUse carries a file's history before an edit, and
+// PostToolUse the earlier fix after a failed command.
 func zcodeConfigPath() string {
 	return filepath.Join(sources.ZCodeConfigDir(), "cli", "setting.json")
 }
@@ -251,9 +252,20 @@ func zcodeHooksAt(path, exe string, uninstall bool) (installResult, error) {
 		noteBlockAdded(path, "hooks.events")
 	}
 
+	// The tool events take additionalContext into the conversation too, so
+	// the file line goes out before an edit and the earlier fix after a
+	// command that failed. A Bash that exits non-zero fires PostToolUse with
+	// its exitCode, not PostToolUseFailure (3.14.4). The matcher is the tool
+	// name, case-sensitive.
+	preTool := zcodeHookEntry(hookRun(exe, "hook-tool"), 10)
+	preTool["matcher"] = "Bash|Edit|Write"
+	afterTool := zcodeHookEntry(hookRun(exe, "hook-tool-after"), 10)
+	afterTool["matcher"] = "Bash"
 	wanted := map[string]map[string]any{
 		"SessionStart":     zcodeHookEntry(hookRun(exe, "hook-context", "--strict"), 30),
 		"UserPromptSubmit": zcodeHookEntry(hookRun(exe, "hook-prompt", "--strict"), 20),
+		"PreToolUse":       preTool,
+		"PostToolUse":      afterTool,
 	}
 	changed := false
 	note := ""

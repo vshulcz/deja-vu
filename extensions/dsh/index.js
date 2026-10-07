@@ -7,11 +7,12 @@
 
 import { createRequire } from "node:module";
 import { execFile, execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions, guarded } from "./lib.js";
+import { argv, contributions, exitStatus, guarded, resultText } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -411,6 +412,105 @@ function watchCompaction(ctx, compacted) {
   } catch {}
 }
 
+// The point of action, as `deja install dsh-auto` wires it. tools/post-execute
+// runs on every tool result, and an accept decision's additionalContexts reach
+// the model on the next step: a read, edit or write gets what deja knows about
+// the file, a bash that exited non-zero gets the fix this machine found for
+// that error before. The before-seam, tools/execute, has no channel to the
+// model.
+function toolNotes(ctx) {
+  if (typeof ctx.on !== "function") return;
+  try {
+    ctx.on("tools/post-execute", async (exec, result, next) => {
+      const decision = await next();
+      try {
+        if (!decision || decision.kind !== "accept" || !exec) return decision;
+        const note = await toolNote(exec, result);
+        if (!note) return decision;
+        return {
+          ...decision,
+          additionalContexts: [...(decision.additionalContexts || []), noteMessage(note)],
+        };
+      } catch {
+        return decision;
+      }
+    });
+  } catch {}
+}
+
+// A session is over when dsh disposes of it, or when the process goes: on
+// 0.1.1-rc.2 the headless profile exits without disposing anything, and only
+// process "exit" runs. The digest and the recall stamp a session live, which
+// keeps it out of its own MCP recall; dropping the stamp lets the next session
+// be answered with it now rather than twenty minutes from now.
+function sessionEnds(ctx) {
+  if (typeof ctx.on !== "function") return;
+  const live = new Set();
+  const end = (sid) => {
+    if (!sid || !live.has(sid)) return;
+    live.delete(sid);
+    run(["hook-session-end"], JSON.stringify({ session_id: sid }));
+  };
+  try {
+    ctx.on("session/created", (session) => {
+      const sid = bareSessionId(session && session.id);
+      if (sid) live.add(sid);
+    });
+    ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id)));
+    process.on("exit", () => {
+      for (const sid of [...live]) end(sid);
+    });
+  } catch {}
+}
+
+async function toolNote(exec, result) {
+  const args = exec.arguments || {};
+  const base = { session_id: sessionId(exec.agent), cwd: sessionCwd(exec.agent) };
+  if ((exec.name === "read" || exec.name === "edit" || exec.name === "write") && args.file_path) {
+    return runAsync(["hook-tool", "--plain"], JSON.stringify({
+      tool_name: exec.name,
+      tool_input: { file_path: String(args.file_path) },
+      ...base,
+    }));
+  }
+  // The profile's other editor names the file "path"; view is its read.
+  if (exec.name === "str_replace_editor" && args.path) {
+    return runAsync(["hook-tool", "--plain"], JSON.stringify({
+      tool_name: args.command === "view" ? "read" : "edit",
+      tool_input: { file_path: String(args.path) },
+      ...base,
+    }));
+  }
+  // pwsh is the Windows shell, with the same markers.
+  if (exec.name === "bash" || exec.name === "pwsh") {
+    const status = exitStatus(resultText(result));
+    if (!(result && result.isError) && !status.failed) return "";
+    return runAsync(["hook-tool-after", "--plain"], JSON.stringify({
+      tool_name: exec.name === "pwsh" ? "powershell" : "bash",
+      tool_input: { command: String(args.command || "") },
+      tool_response: status.body,
+      ...base,
+    }));
+  }
+  return "";
+}
+
+// A context message the way dsh's own plugins build one: user role, a plugin
+// source so it is not read back as something the person typed, a fresh id,
+// frozen.
+function noteMessage(text) {
+  const message = {
+    role: "user",
+    content: [{ type: "text", text }],
+    source: { kind: "plugin", plugin: "deja", form: "notice" },
+    id: randomUUID(),
+  };
+  Object.freeze(message.content[0]);
+  Object.freeze(message.content);
+  Object.freeze(message.source);
+  return Object.freeze(message);
+}
+
 // lastHumanText is the newest thing the person actually typed. At assembly
 // time the message has already left the inbox and has not been appended as a
 // "user/message" yet — the only durable record of it is the inbox splice that
@@ -471,6 +571,8 @@ function apply(ctx, config) {
   if (adds.recall) {
     autoDigest(ctx);
     autoRecall(ctx);
+    toolNotes(ctx);
+    sessionEnds(ctx);
   }
 }
 

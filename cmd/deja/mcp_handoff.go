@@ -14,9 +14,9 @@ import (
 )
 
 // mcpHandoff is `deja handoff` for an agent that cannot run a shell command.
-// Hermes, Kilo, OpenClaw and the other paste-only hosts reach deja through MCP
-// alone, so the package that continues another session's work existed for them
-// only if the person copied it in by hand. Measured over a quarter of real
+// A host reached through MCP alone, with no shell to run `deja handoff` in,
+// had the package that continues another session's work only if the person
+// copied it in by hand. Measured over a quarter of real
 // switches between harnesses, the person never ran the CLI: every handoff was an
 // agent calling it through a shell, or building its own export when it had none.
 //
