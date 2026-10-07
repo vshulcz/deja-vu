@@ -148,14 +148,31 @@
 <tr><th>Agent</th><th>In the project</th><th>Your global file (macOS, Linux)</th></tr>
 <tr><td>Claude Code</td><td><code>CLAUDE.md</code>, or <code>AGENTS.md</code> when there is no <code>CLAUDE.md</code> (2.1.277+)</td><td><code>~/.claude/CLAUDE.md</code></td></tr>
 <tr><td>Codex</td><td><code>AGENTS.md</code></td><td><code>~/.codex/AGENTS.md</code></td></tr>
-<tr><td>opencode</td><td><code>AGENTS.md</code></td><td><code>~/.config/opencode/AGENTS.md</code></td></tr>
-<tr><td>Gemini CLI</td><td><code>GEMINI.md</code></td><td><code>~/.gemini/GEMINI.md</code></td></tr>
+<tr><td>opencode</td><td><code>AGENTS.md</code></td><td><code>~/.config/opencode/AGENTS.md</code>, or <code>~/.claude/CLAUDE.md</code> while that one is missing</td></tr>
+<tr><td>Gemini CLI, Antigravity</td><td><code>GEMINI.md</code></td><td><code>~/.gemini/GEMINI.md</code></td></tr>
 <tr><td>Qwen Code</td><td><code>QWEN.md</code></td><td><code>~/.qwen/QWEN.md</code></td></tr>
 <tr><td>Kimi Code</td><td><code>AGENTS.md</code></td><td><code>~/.kimi-code/AGENTS.md</code></td></tr>
 <tr><td>Grok Build</td><td><code>AGENTS.md</code></td><td><code>~/.grok/AGENTS.md</code></td></tr>
 <tr><td>goose</td><td><code>.goosehints</code></td><td>its hints file under <code>~/.config/goose</code></td></tr>
+<tr><td>Copilot CLI, VS Code Copilot Chat</td><td><code>.github/copilot-instructions.md</code></td><td><code>~/.copilot/copilot-instructions.md</code></td></tr>
+<tr><td>Cline</td><td><code>.clinerules</code></td><td><code>~/.cline/rules/</code>, every file</td></tr>
+<tr><td>Roo Code</td><td><code>.roo/rules/</code></td><td><code>~/.roo/rules/</code>, every file</td></tr>
+<tr><td>Continue</td><td><code>.continue/rules/</code></td><td><code>~/.continue/rules/</code>, every file</td></tr>
+<tr><td>Kilo Code</td><td><code>AGENTS.md</code></td><td><code>~/.config/kilo/AGENTS.md</code>, or <code>~/.claude/CLAUDE.md</code> while that one is missing</td></tr>
+<tr><td>Zed</td><td><code>AGENTS.md</code> and others</td><td><code>~/.config/zed/AGENTS.md</code></td></tr>
+<tr><td>Crush</td><td><code>CRUSH.md</code>, <code>AGENTS.md</code></td><td><code>~/.config/crush/CRUSH.md</code></td></tr>
+<tr><td>Kiro</td><td><code>.kiro/steering/</code></td><td><code>~/.kiro/steering/</code>, files with <code>inclusion: always</code></td></tr>
+<tr><td>CodeBuddy, WorkBuddy</td><td><code>CODEBUDDY.md</code></td><td><code>~/.codebuddy/CODEBUDDY.md</code>, <code>~/.workbuddy/CODEBUDDY.md</code></td></tr>
+<tr><td>Cherry Studio agents</td><td><code>CLAUDE.md</code></td><td><code>CLAUDE.md</code> in the app's <code>Data/Agents/.claude</code></td></tr>
+<tr><td>CodeWhale</td><td><code>AGENTS.md</code></td><td><code>~/.codewhale/AGENTS.md</code>, or the first of <code>~/.agents</code> and <code>~/.deepseek</code> that has one</td></tr>
+<tr><td>Command Code</td><td><code>AGENTS.md</code></td><td><code>~/.commandcode/AGENTS.md</code></td></tr>
+<tr><td>TRAE CLI</td><td><code>AGENTS.md</code></td><td><code>~/.trae/AGENTS.md</code></td></tr>
+<tr><td>Hermes</td><td><code>AGENTS.md</code>, <code>.hermes.md</code></td><td><code>~/.hermes/SOUL.md</code></td></tr>
+<tr><td>aider</td><td>whatever <code>read:</code> lists</td><td>the files under <code>read:</code> in <code>~/.aider.conf.yml</code></td></tr>
+<tr><td>pi, Senpi, prime-agent, Kimchi</td><td><code>AGENTS.md</code></td><td><code>AGENTS.md</code> in the agent directory (<code>~/.pi/agent</code>, <code>~/.config/kimchi/harness</code> and so on)</td></tr>
+<tr><td>omp, gjc</td><td><code>AGENTS.md</code></td><td><code>AGENTS.md</code> in the agent directory, or else the first of Claude Code's, Codex's and Gemini's</td></tr>
 </table>
-<p>Cursor, Windsurf and most IDE agents keep your personal rules in their settings rather than in a file, so nothing outside the editor can write them.</p>
+<p>Cursor has no fixed global file: its rules are found by walking up from the project, and your user rules live in its settings on the server. Windsurf keeps them in <code>~/.codeium/windsurf/memories/global_rules.md</code>.</p>
 
 <h2>In one repository: make AGENTS.md the source</h2>
 <p><code>AGENTS.md</code> is the name most agents already read, so keep the rules there and point the rest at it.</p>
@@ -178,7 +195,7 @@ rules: ~/.config/deja/rules.md, 12 lines, 640 bytes
 run `deja rules sync` to bring them in line
 
 $ deja rules sync</pre>
-<p><code>sync</code> writes the rules into each file as a block between <code>&lt;!-- deja rules:start --&gt;</code> and <code>&lt;!-- deja rules:end --&gt;</code> and leaves everything else in the file alone. Edit <code>rules.md</code> and sync again; empty it and sync takes the blocks back out. It only writes to agents deja is installed for, and only to files it has verified the agent reads. An agent whose global file it does not know is listed and left alone rather than guessed at. <code>deja doctor</code> names any agent whose copy has fallen behind.</p>
+<p><code>sync</code> writes the rules into each file as a block between <code>&lt;!-- deja rules:start --&gt;</code> and <code>&lt;!-- deja rules:end --&gt;</code> and leaves everything else in the file alone. Where an agent reads a whole folder (Cline, Roo, Continue, Kiro) the block goes into a <code>deja-rules.md</code> of its own there. Where it loads only the first of several files, the block goes into the one already loaded, so a <code>CLAUDE.md</code> that Kilo or opencode reads is not hidden behind a new <code>AGENTS.md</code>. Hermes gets the block only in a <code>SOUL.md</code> it already made, since that file is also its identity. Edit <code>rules.md</code> and sync again; empty it and sync takes the blocks back out. It only writes to agents deja is installed for, and only to files it has verified the agent reads. An agent whose global file it does not know is listed and left alone rather than guessed at. <code>deja doctor</code> names any agent whose copy has fallen behind.</p>
 <p>The file is capped at 8 KB. Every agent reads it on every session, so it is worth keeping to what you would say to a new colleague on day one — <a href="rules-files.html">what belongs in a rules file</a> covers the rest.</p>
 
 <h2>Finding the rules you keep repeating</h2>

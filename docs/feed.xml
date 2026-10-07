@@ -109,6 +109,13 @@
     <summary>Roo Code has no lifecycle hooks yet, so deja arrives as an MCP server, a skill that says when to call it, a /deja command and an approval entry.</summary>
   </entry>
   <entry>
+    <title>CLAUDE.md, AGENTS.md, GEMINI.md: one rules file — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/one-rules-file.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.</summary>
+  </entry>
+  <entry>
     <title>Privacy — deja-vu docs</title>
     <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。</summary>
-  </entry>
-  <entry>
-    <title>给 Kimi Code 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>如何让 Kimi Code 查到这台机器上每个编程智能体的会话：插件怎么装、每次提问都会触发的那个钩子，以及走 CLI 的那条路。</summary>
   </entry>
 </feed>

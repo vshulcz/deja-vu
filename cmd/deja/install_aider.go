@@ -398,6 +398,11 @@ func writeAiderContext(body string) error {
 	if err != nil {
 		return err
 	}
+	// The file is aider's only global context, so `deja rules sync` keeps the
+	// reader's rules in it as a block; the refresh carries that block over.
+	if start, end := markerLines(string(old), rulesStart, rulesEnd); start >= 0 && end >= 0 {
+		body = strings.TrimRight(body, "\n") + "\n\n" + string(old)[start:end]
+	}
 	_, err = writeIfChanged(path, old, []byte(body))
 	return err
 }

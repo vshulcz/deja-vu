@@ -18,6 +18,12 @@ func rulesHome(t *testing.T, targets ...string) string {
 	t.Setenv("GROK_HOME", "")
 	t.Setenv("KIMI_CODE_HOME", "")
 	t.Setenv("GOOSE_PATH_ROOT", "")
+	for _, v := range []string{"CLINE_DIR", "KILO_CONFIG_DIR", "TRAE_HOME", "CONTINUE_GLOBAL_DIR", "DEJA_CONTINUE_ROOT",
+		"CRUSH_GLOBAL_CONFIG", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR", "CODEX_HOME", "GEMINI_CLI_HOME",
+		"CLAUDE_CONFIG_DIR", "DEJA_HERMES_HOME", "PI_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "GJC_CODING_AGENT_DIR",
+		"PRIME_AGENT_CODING_AGENT_DIR", "KIMCHI_CODING_AGENT_DIR", "DEJA_ZED_CONFIG"} {
+		t.Setenv(v, "")
+	}
 	home := os.Getenv("HOME")
 	b, err := json.Marshal(wiringState{Targets: targets})
 	if err != nil {
@@ -75,7 +81,9 @@ func TestRulesStatusNamesEveryState(t *testing.T) {
 	for _, want := range []string{
 		"claude-code  in sync",
 		"codex        stale",
-		"opencode     missing",
+		// opencode reads ~/.claude/CLAUDE.md while it has no AGENTS.md of
+		// its own, so that is its copy.
+		"opencode     in sync   " + shortHome(claude),
 		"cursor       no global rules file known",
 		"run `deja rules sync`",
 	} {
@@ -198,6 +206,87 @@ func TestRulesSyncNamesAnUnboundedFileAndWritesTheRest(t *testing.T) {
 	}
 	if !strings.Contains(readRulesTestFile(t, codex), rulesStart) {
 		t.Fatal("codex was not written after claude's refusal")
+	}
+}
+
+// A file deja owns alone carries the frontmatter its harness needs and goes
+// when the rules are emptied; a harness that loads the first of several files
+// gets the block in the one already winning; a file deja must not create is
+// left alone until the harness made it.
+func TestRulesSyncOwnedFirstWinsAndExistingOnly(t *testing.T) {
+	home := rulesHome(t, "kiro", "kilocode", "hermes", "codewhale")
+	for _, d := range []string{".kiro", filepath.Join(".config", "kilo"), ".hermes", ".codewhale"} {
+		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	claude := filepath.Join(home, ".claude", "CLAUDE.md")
+	writeRulesTestFile(t, claude, "mine\n")
+	agents := filepath.Join(home, ".agents", "AGENTS.md")
+	writeRulesTestFile(t, agents, "shared\n")
+	writeRulesTestFile(t, rulesSourcePath(), "- a rule\n")
+
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	steering := filepath.Join(home, ".kiro", "steering", "deja-rules.md")
+	if got, want := readRulesTestFile(t, steering), "---\ninclusion: always\n---\n\n"+rulesBlock("- a rule"); got != want {
+		t.Fatalf("kiro steering = %q, want %q", got, want)
+	}
+	if !strings.Contains(readRulesTestFile(t, claude), rulesStart) {
+		t.Fatal("kilo reads CLAUDE.md while it has no AGENTS.md, and the block is not there")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".config", "kilo", "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("kilo's AGENTS.md was created and now hides CLAUDE.md: %v", err)
+	}
+	if !strings.Contains(readRulesTestFile(t, agents), rulesStart) {
+		t.Fatal("codewhale loads ~/.agents/AGENTS.md here, and the block is not there")
+	}
+	if _, err := os.Stat(filepath.Join(home, ".hermes", "SOUL.md")); !os.IsNotExist(err) {
+		t.Fatalf("SOUL.md is Hermes' identity and was created by deja: %v", err)
+	}
+
+	writeRulesTestFile(t, rulesSourcePath(), "\n")
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(steering); !os.IsNotExist(err) {
+		t.Fatalf("an owned file with only its header left should go: %v", err)
+	}
+	if got := readRulesTestFile(t, claude); got != "mine\n" {
+		t.Fatalf("CLAUDE.md = %q", got)
+	}
+}
+
+// `deja aider` rewrites its context file, and the rules block sync put there
+// survives the rewrite.
+func TestAiderRefreshKeepsTheRulesBlock(t *testing.T) {
+	rulesHome(t, "aider")
+	writeRulesTestFile(t, aiderContextPath(), aiderPlaceholder)
+	writeRulesTestFile(t, rulesSourcePath(), "- a rule\n")
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeAiderContext("fresh digest\n"); err != nil {
+		t.Fatal(err)
+	}
+	got := readRulesTestFile(t, aiderContextPath())
+	if !strings.HasPrefix(got, "fresh digest\n") || !strings.Contains(got, rulesBlock("- a rule")) {
+		t.Fatalf("aider context after refresh:\n%s", got)
+	}
+}
+
+// Copilot CLI and Copilot Chat share ~/.copilot/copilot-instructions.md, and
+// uninstalling one leaves the other's copy.
+func TestUninstallKeepsARulesFileAnotherHarnessReads(t *testing.T) {
+	home := rulesHome(t, "copilot", "vscode")
+	path := filepath.Join(home, ".copilot", "copilot-instructions.md")
+	writeRulesTestFile(t, path, rulesBlock("- a rule"))
+	if _, action, err := dropRulesBlock("vscode"); err != nil || action != "unchanged" {
+		t.Fatalf("drop for vscode: action %q, err %v", action, err)
+	}
+	if !strings.Contains(readRulesTestFile(t, path), rulesStart) {
+		t.Fatal("copilot's copy went with vscode")
 	}
 }
 
