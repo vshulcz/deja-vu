@@ -130,6 +130,13 @@
     <summary>Where Cline writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where CodeBuddy Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/codebuddy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/codebuddy.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where CodeBuddy Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Continue stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/continue.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/continue.html"></link>
@@ -263,6 +270,13 @@
     <summary>Where prime-agent (PrimeIntellect) writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
+    <title>Where Qwen Code stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/qwen.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/qwen.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>Where Qwen Code writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>Where Reasonix stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/reasonix.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/reasonix.html"></link>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/zed.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Zed stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/zed.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/zed.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Zed writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Claude Code 丢了上下文：怎么找回来 — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>崩溃、清空窗口或重启会带走智能体的上下文，但带不走会话记录。怎么把工作找回来，以及怎样让下一次不必再付这个代价。</summary>
   </entry>
 </feed>

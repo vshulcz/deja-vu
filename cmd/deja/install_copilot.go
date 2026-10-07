@@ -88,7 +88,16 @@ const (
 // installCopilotAuto wires Copilot CLI's hooks, and VS Code Copilot Chat's
 // through the same file, with the MCP server beside them (#4231).
 func installCopilotAuto(exe string, uninstall bool) (installResult, error) {
-	return installCopilotHookFile(exe, uninstall, installCopilotMCP, "vscode")
+	r, err := installCopilotHookFile(exe, uninstall, installCopilotMCP, "vscode")
+	if err != nil {
+		return installResult{}, err
+	}
+	// VS Code Copilot Chat shares the hook file, not the CLI's status line.
+	status, err := installCopilotStatusline(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(r, status), nil
 }
 
 // installVSCodeAuto is the same hook file, reached from the VS Code side: a

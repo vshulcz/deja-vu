@@ -27,8 +27,15 @@ import (
 // session*, and a session's busiest files have been in the manifest since
 // #571. So the claim this makes is the one the data supports: the file this
 // session has worked on most, and what deja remembers about it.
+//
+// Qwen Code pipes the session id and no transcript path, Kimi Code the same as
+// sessionId, and Copilot CLI names the session's directory rather than its
+// events.jsonl; the id the path or the payload carries finds the session
+// either way.
 type transcriptSource struct {
 	TranscriptPath string `json:"transcript_path"`
+	SessionID      string `json:"session_id"`
+	KimiSessionID  string `json:"sessionId"`
 }
 
 // statuslineMaxTitle keeps the memory segment from pushing the usage numbers
@@ -81,10 +88,13 @@ type fileMemory struct {
 // no git. A status line re-runs on every assistant message, so anything that
 // forks or scans the log is disqualified.
 func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
-	if in.TranscriptPath == "" || strings.TrimSpace(in.TranscriptPath) == "" {
-		return fileMemory{}, false
+	id := strings.TrimSpace(in.SessionID)
+	if id == "" {
+		id = strings.TrimSpace(in.KimiSessionID)
 	}
-	id := strings.TrimSuffix(filepath.Base(in.TranscriptPath), ".jsonl")
+	if strings.TrimSpace(in.TranscriptPath) != "" {
+		id = strings.TrimSuffix(filepath.Base(in.TranscriptPath), ".jsonl")
+	}
 	if id == "" || id == "." || id == string(filepath.Separator) {
 		return fileMemory{}, false
 	}
@@ -100,7 +110,7 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	var self index.SessionMeta
 	var found bool
 	for _, m := range metas {
-		if m.Path == in.TranscriptPath {
+		if in.TranscriptPath != "" && m.Path == in.TranscriptPath {
 			self, found = m, true
 			break
 		}

@@ -63,6 +63,15 @@ says so, and `deja doctor` reads the row as `untrusted` until then.
 
 **Last verified:** 2026-10-05
 
+## Status line
+
+`deja install codebuddy-auto` sets `statusLine.command` in
+`~/.codebuddy/settings.json`. CodeBuddy pipes Claude's payload; before the
+first prompt the session id is `unknown` and there is no transcript path, and
+deja shows the day's line alone. A status line already set there is left
+alone. Rendered live on 2.16.0. WorkBuddy is not wired: its status line is
+unchecked.
+
 ## Known quirks and drift
 
 - **Checked against a live 2.161.2.** Sessions written by the CLI itself

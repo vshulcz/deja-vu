@@ -78,6 +78,14 @@ name a process by `id`), `notebook_read` a file from `path`, and
 `action` is `insert` or `replace`. A notebook path relative to the session
 directory is put under it (#4534).
 
+## Status line
+
+`deja install kilocode-auto` adds the opencode 1.x TUI plugin to Kilo CLI:
+`plugins/deja-status.tsx` in `~/.config/kilo`, listed in its `tui.json`. It
+runs `deja statusline` every 10 seconds and when the session changes, and
+shows the line in the sidebar, the prompt row and the home screen. Rendered
+live on Kilo CLI 7.8.8. The VS Code extension has no such surface.
+
 ## Known quirks and drift
 
 - Resume: `kilo -s <id>` for a session from the CLI store — "session id to
