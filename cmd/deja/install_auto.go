@@ -1141,10 +1141,11 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 		block := kimiHookEntry("UserPromptSubmit", hookRun(exe, "hook-context", "--plain", "--once")) +
 			"\n" + kimiHookEntry("UserPromptSubmit", hookRun(exe, "hook-prompt", "--plain")) +
 			// Compaction throws away what the session was shown, and the list
-			// that stops those blocks repeating has to go with it. Nothing is
-			// read back from this hook: forgetting is a side effect, which is
-			// all a fire-and-forget event can carry.
-			"\n" + kimiHookEntry("PreCompact", hookRun(exe, "hook-precompact"))
+			// that stops those blocks repeating has to go with it. Kimi waits
+			// for this hook before it compacts, so the session is read here
+			// from wire.jsonl and its packet rides the next prompt. The payload
+			// names only the session, hence --harness.
+			"\n" + kimiHookEntry("PreCompact", hookRun(exe, "hook-precompact", "--harness", "kimi"))
 		if s != "" {
 			s += "\n\n"
 		}

@@ -78,10 +78,27 @@ test("tool output declares a plain JSON schema", () => {
 test("automatic recall does not use the pre-step waterfall", () => {
   // A message spliced there is dropped by a later listener before the request
   // is built, with nothing reported.
-  // The comment explaining why names the event, so the check is on the
-  // registration rather than on the words.
-  assert.doesNotMatch(source, /ctx\.on\("agent\/pre-step"/);
+  // The one pre-step listener only waits for a compaction capture and hands
+  // the decision back untouched.
+  const preStep = source.split('ctx.on("agent/pre-step"').slice(1);
+  assert.ok(preStep.length <= 1);
+  for (const body of preStep) {
+    const handler = body.slice(0, body.indexOf("});"));
+    assert.doesNotMatch(handler, /messages/);
+    assert.match(handler, /return decision;/);
+  }
   assert.match(source, /ctx\.systemPrompt\.context\(/);
+});
+
+test("a compaction is captured and its packet asked for by session", () => {
+  // compaction/start leaves the shadowed turns in the log; deja reads them by
+  // the session's uuid, and only a prompt that names the session gets the
+  // packet back.
+  assert.match(source, /event\.type !== "compaction\/start"/);
+  assert.match(source, /\["hook-precompact"\]/);
+  assert.match(source, /harness: "deepseek"/);
+  assert.match(source, /replace\(\/\^session-\/, ""\)/);
+  assert.match(source, /JSON\.stringify\(\{ prompt, cwd, session_id: sid \}\)/);
 });
 
 test("the project digest opens the session once and asks deja for it", () => {
@@ -101,7 +118,7 @@ test("recall and the digest ask about the session's workspace", () => {
   assert.doesNotMatch(source, /cwd: process\.cwd\(\)/);
   // The same question asked in a second workspace is asked again, not answered
   // from the first workspace's cache.
-  assert.match(source, /prompt !== asked \|\| cwd !== askedIn/);
+  assert.match(source, /prompt !== asked \|\| cwd !== askedIn \|\| sid !== askedBy/);
 });
 
 // dsh refuses a name one of its registries already holds — "prompt context

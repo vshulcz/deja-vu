@@ -238,6 +238,9 @@ func trimCompactionTornTail(b []byte) []byte {
 }
 
 func compactionHarness(header, tail []byte) (string, error) {
+	// Claude is decided only once every record has been seen: a Qwen
+	// transcript opens with the same envelope and shows its parts later.
+	claude := false
 	for _, part := range [][]byte{header, tail} {
 		for len(part) > 0 {
 			i := bytes.IndexByte(part, '\n')
@@ -250,9 +253,18 @@ func compactionHarness(header, tail []byte) (string, error) {
 			var record struct {
 				Type      string `json:"type"`
 				SessionID string `json:"sessionId"`
+				Message   *struct {
+					Parts json.RawMessage `json:"parts"`
+				} `json:"message"`
 			}
 			if json.Unmarshal(line, &record) != nil {
 				continue
+			}
+			// Qwen Code kept Claude's sessionId and record types but writes a
+			// turn as Gemini parts. Read as Claude it came out empty; its own
+			// reader takes it (ReadCompactionSession).
+			if record.Message != nil && len(record.Message.Parts) > 0 {
+				return "", ErrUnsupportedCompactionTranscript
 			}
 			// CodeBuddy keeps Claude's sessionId beside OpenAI-style items,
 			// which no Claude record is typed as (#4705).
@@ -269,9 +281,12 @@ func compactionHarness(header, tail []byte) (string, error) {
 				return "codex", nil
 			}
 			if record.SessionID != "" {
-				return "claude", nil
+				claude = true
 			}
 		}
+	}
+	if claude {
+		return "claude", nil
 	}
 	return "", ErrUnsupportedCompactionTranscript
 }

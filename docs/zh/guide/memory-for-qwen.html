@@ -90,7 +90,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <li><code>SessionStart</code> 上的项目摘要：在你敲任何字之前，先给出这个项目过去的会话定下了什么。</li>
 <li><code>UserPromptSubmit</code> 上的召回，历史给不出答案时保持沉默。</li>
 <li><code>PostToolUseFailure</code> 上的修复，只针对 <code>run_shell_command</code>：某条命令报的错以前在这台机器上解决过，上次紧跟其后的做法会直接落在这次失败的工具结果上。</li>
-<li><code>PreCompact</code> 上的遗忘，让被压缩的线程刚丢掉的那些块可以再说一遍。</li>
+<li><code>PreCompact</code> 上的压缩恢复：deja 读钩子给出的会话记录，下一轮交还任务、跑过的命令及其成败、还没做完的事；被压缩的线程刚丢掉的那些块也可以再说一遍。</li>
 <li><code>SessionEnd</code>：刚退出的会话，下一个会话的 MCP 召回就能用上。Qwen 只在交互式退出时触发它，一次性的 <code>qwen -p</code> 不触发；那种会话要等最后一次钩子之后 20 分钟才回到召回里。</li>
 </ul>
 <p>以上在 Qwen Code 0.20.0 上靠读它实际发出的请求量过。<code>PostToolUse</code> 只在工具成功时触发——Qwen 给它加了判断，失败时走 <code>PostToolUseFailure</code>——所以修复以前挂在一个失败时永不触发的事件上；在旧版之上再装一次会把那条记录删掉。<code>PreToolUse</code> 会跑，但输出被丢弃。失败的载荷把命令输出放在 <code>error</code> 字段里，包在 Qwen 自己写的 <code>Command: / Output: / Exit Code:</code> 块中，deja 在匹配之前会把它拆开。索引读每条 shell 结果时也同样拆开，所以 Qwen 在成功的命令上写的 <code>Error: (none)</code> 不会被当成失败。</p>

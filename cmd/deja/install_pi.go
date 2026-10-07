@@ -136,11 +136,14 @@ export default function (pi: any) {
   // session: without one it repeats itself and forgets nothing. pi keeps the id
   // on the session manager, which every handler gets through ctx.
   let session = "";
+  let sessionFile = "";
   const remember = (ctx: any) => {
     try {
       const m = ctx && ctx.sessionManager;
       const id = m && (m.getSessionId ? m.getSessionId() : m.sessionId);
       if (id) session = String(id);
+      const file = m && (m.getSessionFile ? m.getSessionFile() : m.sessionFile);
+      if (file) sessionFile = String(file);
     } catch {}
   };
   const sessionID = () => session;
@@ -301,10 +304,13 @@ export default function (pi: any) {
   // Compaction throws away the blocks this session was shown, and the list that
   // stops them repeating outlives them. session_compact fires once the summary
   // has replaced the history, which is exactly when the session should be
-  // allowed to see those blocks again.
-  pi.on("session_compact", async (_event: any) => {
+  // allowed to see those blocks again. The session file keeps the turns the
+  // summary replaced, so deja reads them from it and the next prompt carries
+  // what the agent was in the middle of.
+  pi.on("session_compact", async (_event: any, ctx: any) => {
     try {
-      run(["hook-precompact"], JSON.stringify({ session_id: sessionID() }));
+      remember(ctx);
+      run(["hook-precompact"], JSON.stringify({ session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd() }));
     } catch {}
   });
 }

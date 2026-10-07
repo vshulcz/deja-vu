@@ -230,12 +230,16 @@ export default function (pi: any) {
   // Compaction throws away the blocks this session was shown, and the list
   // that stops them repeating outlives them. session_compact fires once the
   // summary has replaced the history, which is exactly when the session should
-  // be allowed to see those blocks again.
+  // be allowed to see those blocks again. The session file keeps the turns the
+  // summary replaced, so deja reads them from it and the next prompt carries
+  // what the agent was in the middle of.
   pi.on("session_compact", async (_event: any, ctx: any) => {
     try {
       const key = sessionKey(_event, ctx);
       if (key) session = key;
-      run(["hook-precompact"], JSON.stringify({ session_id: session }));
+      const m = ctx && ctx.sessionManager;
+      const file = m && m.getSessionFile ? String(m.getSessionFile() || "") : "";
+      run(["hook-precompact"], JSON.stringify({ session_id: session, transcript_path: file, cwd: process.cwd() }));
     } catch {}
   });
 }

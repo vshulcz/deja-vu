@@ -119,7 +119,7 @@ func TestKimiWiresTheThreeChannelsItHas(t *testing.T) {
 		`command = "` + exe + ` hook-context --plain --once"`,
 		`command = "` + exe + ` hook-prompt --plain"`,
 		`event = "PreCompact"`,
-		`command = "` + exe + ` hook-precompact"`,
+		`command = "` + exe + ` hook-precompact --harness kimi"`,
 	} {
 		if !strings.Contains(cfg, want) {
 			t.Fatalf("missing %s:\n%s", want, cfg)

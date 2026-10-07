@@ -159,8 +159,15 @@ func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 	if !strings.Contains(js, "ctx.systemPrompt.context(") {
 		t.Errorf("the plugin uses no seam whose text reaches the request:\n%s", js)
 	}
-	if strings.Contains(js, `ctx.on("agent/pre-step"`) {
-		t.Errorf("the plugin injects where the addition is silently dropped:\n%s", js)
+	// The one pre-step listener waits for a compaction capture and hands the
+	// decision back as it came.
+	if parts := strings.Split(js, `ctx.on("agent/pre-step"`); len(parts) > 2 {
+		t.Errorf("more than one pre-step listener:\n%s", js)
+	} else if len(parts) == 2 {
+		handler := parts[1][:strings.Index(parts[1], "});")]
+		if strings.Contains(handler, "messages") || !strings.Contains(handler, "return decision;") {
+			t.Errorf("the plugin injects where the addition is silently dropped:\n%s", handler)
+		}
 	}
 	if !strings.Contains(js, `apply.inject = ["systemPrompt"]`) {
 		t.Errorf("the service is not declared, so the plugin never applies:\n%s", js)

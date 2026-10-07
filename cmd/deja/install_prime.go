@@ -19,10 +19,15 @@ import (
 //     provider request, which is the channel the digest and per-prompt recall
 //     ride.
 //   - session_start fires, so the footer can say the first index is building.
-//   - tool_call and tool_result never fire in --print, although the extension
-//     docs list them. Without tool_result there is nowhere to put the repair
-//     that follows a failed command, so that half is not wired here rather
-//     than wired to an event that stays quiet.
+//   - tool_call and tool_result looked silent in --print on 0.9.1, but the
+//     probe called bash, which prime does not offer: its one tool is ipython
+//     (core/agent-session.ts:10889 on 0.9.8), and a 0.9.8 stand saw both fire
+//     for it, in --print too. They are not wired yet: a command runs inside an
+//     ipython cell and its exit status is only text in the result.
+//   - session_before_compact and session_compact fire, in --print too (0.9.8
+//     stand). session_compact comes after the compaction entry is written and
+//     the session file still holds the turns before it, so the capture reads
+//     that file.
 //   - MCP servers are read from ~/.prime/agent/settings.json, and the shared
 //     ~/.agents/skills directory is loaded — `deja install` writes the skill
 //     there already.
@@ -172,11 +177,14 @@ export default function (pi: any) {
   // reaches it through ctx. Recall dedupes per session, so without one the same
   // block goes out on every message.
   let session = "";
+  let sessionFile = "";
   const remember = (ctx: any) => {
     try {
       const m = ctx && ctx.sessionManager;
       const id = m && (m.getSessionId ? m.getSessionId() : m.sessionId);
       if (id) session = String(id);
+      const file = m && (m.getSessionFile ? m.getSessionFile() : m.sessionFile);
+      if (file) sessionFile = String(file);
     } catch {}
   };
   const sessionID = () => session;
@@ -273,11 +281,13 @@ export default function (pi: any) {
   });
 
   // Compaction throws away the blocks this session was shown, and the list that
-  // stops them repeating outlives them. Forgetting is a side effect, which is
-  // all this event can carry.
-  pi.on("session_compact", async (_event: any) => {
+  // stops them repeating outlives them. The session file still holds the turns
+  // the summary replaced: deja reads them from it, and the next prompt's recall
+  // carries what the agent was in the middle of.
+  pi.on("session_compact", async (_event: any, ctx: any) => {
     try {
-      run(["hook-precompact"], JSON.stringify({ session_id: sessionID() }));
+      remember(ctx);
+      run(["hook-precompact"], JSON.stringify({ session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd(), harness: "prime" }));
     } catch {}
   });
 }

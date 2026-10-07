@@ -34,7 +34,11 @@ import (
 //     discovered for session-start loading".
 //   - The events in src/extensibility/extensions/types.ts are pi's:
 //     `session_start`, `before_agent_start`, `context`, `tool_result`,
-//     `session_compact`, with the same result shapes.
+//     `session_compact`, with the same result shapes. 0.18.7 also has
+//     `session_before_compact`, `session.compacting`, whose returned context
+//     reaches the summarizer, and `session_shutdown`
+//     (extensibility/extensions/types.ts:1208-1213); all fire on a stand. The
+//     capture runs at `session_compact`, from the session file.
 //
 // Verified rather than inferred: with the extension in place, a print-mode
 // session against a mock provider carried deja's `<deja-recall>` block into

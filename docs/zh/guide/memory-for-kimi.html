@@ -85,7 +85,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <li><code>deja-history</code> 技能，这样在工具不可达时智能体也知道 CLI 的用法。</li>
 <li><code>/deja:recall &lt;查询&gt;</code>，用来直接提问。</li>
 <li>会话第一次提问时的项目摘要，之后每次提问时的召回——都走 <code>UserPromptSubmit</code> 钩子。Kimi 会把钩子的 stdout 追加到这一轮的上下文里，并且会把该事件上的每个钩子都跑一遍，所以两者并存；摘要限制为每个会话一次。历史给不出答案时，召回保持沉默。</li>
-<li>压缩时的遗忘，走 <code>PreCompact</code> 钩子：线程丢掉上下文时，已经给它看过的块列表也一起丢掉，这样召回可以再说一遍。</li>
+<li>压缩恢复，走 <code>PreCompact</code> 钩子：Kimi 压缩前会等这个钩子，deja 从 <code>wire.jsonl</code> 读出会话，下一次提问时交还任务、跑过的命令及其成败、还没做完的事。已经给它看过的块列表也一起丢掉，这样召回可以再说一遍。</li>
 </ul>
 <p>在 Kimi Code 0.28.1 上靠读它实际发出的请求量过：<code>UserPromptSubmit</code> 是唯一一个输出能到达模型的事件。<code>SessionStart</code> 钩子会跑，但输出无处可去，所以摘要改成搭第一次提问的车；<code>PreToolUse</code> 能拦住一个工具，却不能往里加东西；<code>PostToolUse</code> 和 <code>PostToolUseFailure</code> 是发出即忘，所以命令失败之后的那次修复——Claude Code 和 Codex 有的那一份——在这里没有落点。</p>
 

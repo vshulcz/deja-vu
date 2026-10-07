@@ -391,6 +391,21 @@ function ask(args, payload) {
   }
 }
 
+// The agent's workspace is the directory its tools run in and the cwd its
+// session header records; the gateway's own cwd is wherever it was started.
+// The hooks name the workspace, so a compaction captured against the header is
+// found again by the next prompt. The automatic compaction inside a run hands
+// its hook only the session key, so what each key last ran as is kept here.
+const seen = new Map();
+function where(ctx) {
+  const key = ctx?.sessionKey || "";
+  const last = (key && seen.get(key)) || {};
+  const id = ctx?.sessionId || last.id || "";
+  const dir = ctx?.workspaceDir || last.dir || "";
+  if (key && (id || dir)) seen.set(key, { id, dir });
+  return { id: id || key, cwd: dir || process.cwd() };
+}
+
 export default {
   id: %q,
   name: "deja recall",
@@ -412,9 +427,10 @@ export default {
         // The transcript id, not the session key: the live stamp hook-context
         // writes keeps this session out of its own MCP recall by the id the
         // index knows it by, and agent:main:main names no transcript (#4582).
+        const at = where(ctx);
         const digest = ask(["hook-context", "--plain"], {
-          session_id: ctx?.sessionId || ctx?.sessionKey || "",
-          cwd: process.cwd(),
+          session_id: at.id,
+          cwd: at.cwd,
           source: "startup",
           deja_once: true,
         });
@@ -432,11 +448,11 @@ export default {
         // session id. A payload without one turns that off: measured on a real
         // store, half of all injections were then a word-for-word repeat. The
         // event is {prompt, messages}; the session is on ctx (#4581).
-        const sessionID = ctx?.sessionId || ctx?.sessionKey || "";
+        const at = where(ctx);
         const recall = ask(["hook-prompt", "--plain"], {
           prompt,
-          session_id: sessionID,
-          cwd: process.cwd(),
+          session_id: at.id,
+          cwd: at.cwd,
         });
         // Silence is the common case — the hook speaks only when the user's
         // own history answers what they just asked.
@@ -447,12 +463,22 @@ export default {
     );
     // Compaction throws away the blocks this session was shown while the list
     // that stops them repeating outlives it, so without this the memory the
-    // session just lost is the memory recall refuses to send again. Nothing is
-    // read back: forgetting is a side effect, which is all this hook can carry.
+    // session just lost is the memory recall refuses to send again. The event
+    // names the session file, which still holds the turns about to be
+    // summarised: deja reads them from it, and the next prompt's recall
+    // carries what the agent was in the middle of.
     api.on(
       "before_compaction",
-      async (_event, ctx) => {
-        ask(["hook-precompact"], { session_id: ctx?.sessionId || ctx?.sessionKey || "" });
+      async (event, ctx) => {
+        // The gateway's compaction names no file and the run's own names no
+        // session id; deja finds the session by whichever it is given.
+        const at = where(ctx);
+        ask(["hook-precompact"], {
+          session_id: at.id,
+          transcript_path: event?.sessionFile || "",
+          cwd: at.cwd,
+          harness: "openclaw",
+        });
       },
       { timeoutMs: 15000 },
     );

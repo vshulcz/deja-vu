@@ -295,7 +295,7 @@ var commands = map[string]command{
 		return runBrief(dir, os.Stdout)
 	},
 	"hook-context":    cmdHookContext,
-	"hook-precompact": func(dir string, _ []string) error { runHookPrecompact(dir); return nil },
+	"hook-precompact": cmdHookPrecompact,
 	"wip":             func(dir string, args []string) error { return runWIP(dir, args, os.Stdout) },
 	"hook-refresh":    func(dir string, _ []string) error { runHookRefresh(dir); return nil },
 	"view":            runView,

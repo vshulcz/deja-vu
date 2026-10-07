@@ -59,7 +59,9 @@ func TestCompactionHooksRecoverBeforeIndexBuildOnceAndMeasureRawActions(t *testi
 	payload, _ := json.Marshal(map[string]any{"session_id": "compaction-fixture", "cwd": workspace, "source": "compact", "deja_once": true})
 	withHookStdin(t, string(payload))
 	out := captureStdout(t, func() {
-		if err := runHookContextMode(dir, true, true); err != nil {
+		// The payload's deja_once, as OpenClaw and dsh send it; the --once
+		// flag is Kimi's, whose prompt hook carries the packet instead.
+		if err := runHookContextMode(dir, true, false); err != nil {
 			t.Fatal(err)
 		}
 	})

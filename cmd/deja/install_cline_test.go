@@ -27,7 +27,7 @@ func TestInstallClineWritesAPlugin(t *testing.T) {
 	js := string(b)
 	// The registry validates the manifest before setup runs and rejects
 	// contributions that were not declared.
-	for _, want := range []string{`capabilities: ["rules", "commands", "skills"]`, "registerRule", "registerCommand"} {
+	for _, want := range []string{`capabilities: ["rules", "commands", "skills", "hooks"]`, "registerRule", "registerCommand"} {
 		if !strings.Contains(js, want) {
 			t.Fatalf("plugin missing %q:\n%s", want, js)
 		}

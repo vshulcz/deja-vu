@@ -6,7 +6,7 @@
 // machine, before dsh existed. The index is deja's; this file is the seam.
 
 import { createRequire } from "node:module";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -291,8 +291,14 @@ function autoDigest(ctx) {
   );
 }
 
+// dsh names a session "session-<uuid>" and its log's folder the same; deja
+// indexes it by the uuid, so that is the id every hook is given.
+function bareSessionId(id) {
+  return String(id || "").replace(/^session-/, "");
+}
+
 function sessionId(agent) {
-  return (agent && (agent.sessionId || (agent.session && agent.session.id))) || "";
+  return bareSessionId((agent && (agent.sessionId || (agent.session && agent.session.id))) || "");
 }
 
 // The workspace a session belongs to. One web or tui process serves sessions
@@ -307,7 +313,10 @@ function sessionCwd(agent) {
 function autoRecall(ctx) {
   let asked = "";
   let askedIn = "";
+  let askedBy = "";
   let recalled = "";
+  const compacted = new Set();
+  watchCompaction(ctx, compacted);
 
   guarded(() =>
     ctx.systemPrompt.context({
@@ -319,17 +328,87 @@ function autoRecall(ctx) {
         const prompt = lastHumanText(agent);
         if (!prompt) return "";
         const cwd = sessionCwd(agent);
-        // The same question asked in another workspace is a different question.
-        if (prompt !== asked || cwd !== askedIn) {
+        const sid = sessionId(agent);
+        const afterCompaction = compacted.delete(sid);
+        // The same question asked in another workspace is a different question,
+        // and so is one asked again after its session compacted: deja then
+        // answers with the recovery packet, which only a prompt naming the
+        // session gets back.
+        if (prompt !== asked || cwd !== askedIn || sid !== askedBy || afterCompaction) {
           asked = prompt;
           askedIn = cwd;
-          recalled = run(["hook-prompt", "--plain"], JSON.stringify({ prompt, cwd }));
+          askedBy = sid;
+          recalled = run(["hook-prompt", "--plain"], JSON.stringify({ prompt, cwd, session_id: sid }));
         }
         // Silence is the common case: this speaks only when the history answers.
         return recalled;
       },
     }),
   );
+}
+
+// runAsync is run for a seam dsh awaits, so the event loop goes on while deja
+// answers. It never rejects.
+function runAsync(args, input) {
+  return new Promise((resolve) => {
+    try {
+      const child = execFile(DEJA, args, { encoding: "utf8", timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) =>
+        resolve(err ? "" : String(stdout || "").trim()),
+      );
+      child.on("error", () => resolve(""));
+      child.stdin.on("error", () => {});
+      child.stdin.end(input);
+    } catch {
+      resolve("");
+    }
+  });
+}
+
+// Compaction shadows the turns it summarises but leaves them in the session
+// log, so deja reads the session there as compaction/start lands and keeps a
+// recovery packet: the task, each command with how it went, what was still
+// open. The log is written behind the session, so it is flushed first. dsh
+// assembles a step's context before its agent/pre-step waterfall, where the
+// compaction runs, so the step that compacts waits there for the capture and
+// the packet rides the recall of the next step, or of the next turn.
+function watchCompaction(ctx, compacted) {
+  if (typeof ctx.on !== "function") return;
+  const capturing = new Map();
+  const listen = (c) =>
+    c.on("session/event", (session, event) => {
+      if (!session || !event || event.type !== "compaction/start") return;
+      const sid = bareSessionId(session.id || (session.header && session.header.id));
+      if (!sid) return;
+      const cwd = (session.header && session.header.cwd) || process.cwd();
+      // One compaction can follow another inside a step; two captures at once
+      // contend for the index and the loser marks the packet unavailable, so
+      // each waits for the one before it.
+      const before = capturing.get(sid) || Promise.resolve();
+      const capture = before.then(async () => {
+        try {
+          if (c.sessions && typeof c.sessions.flush === "function") await c.sessions.flush(session);
+        } catch {}
+        await runAsync(["hook-precompact"], JSON.stringify({ session_id: sid, cwd, harness: "deepseek" }));
+        compacted.add(sid);
+      });
+      capturing.set(sid, capture);
+      capture.then(() => {
+        if (capturing.get(sid) === capture) capturing.delete(sid);
+      });
+    });
+  try {
+    if (typeof ctx.inject === "function") ctx.inject(["sessions"], listen);
+    else listen(ctx);
+  } catch {}
+  try {
+    ctx.on("agent/pre-step", async (step, next) => {
+      const sid = sessionId(step && step.agent);
+      if (capturing.has(sid)) await capturing.get(sid);
+      const decision = await next();
+      if (capturing.has(sid)) await capturing.get(sid);
+      return decision;
+    });
+  } catch {}
 }
 
 // lastHumanText is the newest thing the person actually typed. At assembly

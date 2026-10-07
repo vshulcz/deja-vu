@@ -147,7 +147,7 @@
 <p>That writes two things: the deja MCP server into <code>~/.prime/agent/settings.json</code>, so the model can ask for history itself (<code>deja install prime</code> writes this half alone), and an extension at <code>~/.prime/agent/extensions/deja.ts</code>, which is what makes recall arrive without being asked:</p>
 <ul>
 <li><b>The project digest</b> on the first turn — what this machine settled here — followed by recall on every prompt, both through <code>before_agent_start</code>.</li>
-<li><b>Forgetting on compaction</b>: when <code>session_compact</code> throws away the blocks the session was shown, the list that stops them repeating goes too, so recall can say them again.</li>
+<li><b>Compaction recovery</b>: at <code>session_compact</code> deja reads the session file, which still holds the turns the summary replaced, and the next prompt gets the task, the commands with whether they passed, and what was still open. The list of blocks already shown goes too, so recall can say them again.</li>
 <li><b>A <code>/deja</code> command</b> in the same session, for asking directly.</li>
 </ul>
 

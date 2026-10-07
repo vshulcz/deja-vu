@@ -139,10 +139,23 @@ func endsAValue(b []byte) bool {
 
 // runHookPrecompact is deliberately best effort: Claude must be able to
 // compact even when the input is incomplete or the index cannot start.
-func runHookPrecompact(dir string) {
+func runHookPrecompact(dir string) { runHookPrecompactFor(dir, "") }
+
+func cmdHookPrecompact(dir string, rest []string) error {
+	runHookPrecompactFor(dir, precompactHarnessArg(rest))
+	return nil
+}
+
+// runHookPrecompactFor takes the harness from the command line when the
+// payload does not name one: Kimi's PreCompact carries only the session id, and
+// the hook entry is the one place that knows whose session it is.
+func runHookPrecompactFor(dir, harness string) {
 	var input precompactHookInput
 	_ = json.Unmarshal(readHookStdin(), &input)
 	input.adopt()
+	if input.Harness == "" {
+		input.Harness = harness
+	}
 	// Compaction throws away the blocks this session was shown, and the list
 	// that stops them repeating outlives them — so the memory the agent just
 	// lost is exactly the memory recall refuses to send again. Forget what this
@@ -153,6 +166,20 @@ func runHookPrecompact(dir string) {
 	}
 	captureCompaction(dir, input)
 	requestWarmup(dir)
+}
+
+// precompactHarnessArg is the value of --harness, or "". A hook never fails
+// over its arguments, so anything else is ignored.
+func precompactHarnessArg(args []string) string {
+	for i, a := range args {
+		switch {
+		case (a == "--harness" || a == "-harness") && i+1 < len(args):
+			return args[i+1]
+		case strings.HasPrefix(a, "--harness="):
+			return strings.TrimPrefix(a, "--harness=")
+		}
+	}
+	return ""
 }
 
 // withoutSubagentRuns drops the sessions a parent spawned. The caller keeps
@@ -450,8 +477,13 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if input.Source == "compact" && sources.IsCodeBuddyTranscript(input.TranscriptPath) {
 		return nil
 	}
-	if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "SessionStart", shape, os.Stdout); delivered {
-		return err
+	// --once rides a per-prompt event beside hook-prompt, and Kimi runs the two
+	// in parallel: both found the packet undelivered and it arrived twice. The
+	// prompt hook carries it there.
+	if !once {
+		if delivered, err := emitCompactionRecovery(dir, input.SessionID, hookProjectPath(input.CWD, input.WorkspaceRoots), "SessionStart", shape, os.Stdout); delivered {
+			return err
+		}
 	}
 	if once {
 		input.Once = true

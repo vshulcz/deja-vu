@@ -66,8 +66,10 @@ async function setup(ctx) {
 
   const compacting = hooks["experimental.session.compacting"]
   if (compacting) {
-    await ctx.session.hook("compaction", async () => {
-      await compacting()
+    // The 1.x hook reads the session from its input; called with none, 2.x
+    // sent hook-precompact an empty id and nothing was read or forgotten.
+    await ctx.session.hook("compaction", async (event) => {
+      await compacting({ sessionID: event?.sessionID || "" })
     })
   }
 

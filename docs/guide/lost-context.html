@@ -157,7 +157,7 @@ deja "the thing you were doing"</pre>
 
 <h2>Not losing it the next time</h2>
 <pre>deja install --auto</pre>
-<p>After this the recovery is not a thing you have to think of. Recall arrives at session start, so a fresh window opens already knowing the project's recent decisions; on each prompt, so a question about old work is answered from the transcript instead of from a guess; and on Claude Code and Codex the working context is captured as a compaction starts and handed back once afterwards. A cleared window costs a paragraph of context rather than an afternoon.</p>
+<p>After this the recovery is not a thing you have to think of. Recall arrives at session start, so a fresh window opens already knowing the project's recent decisions; on each prompt, so a question about old work is answered from the transcript instead of from a guess; and on every agent with a compaction event deja hooks (Claude Code, Codex, Qwen, Kimi, Grok, Cursor CLI, opencode, pi and the rest) the working context is captured as a compaction starts and handed back once afterwards. A cleared window costs a paragraph of context rather than an afternoon.</p>
 
 <h2>What it cannot do</h2>
 <p>Anything the agent never wrote down is not recoverable, and deja does not pretend otherwise: it indexes the files, it does not reconstruct what was in the model's head. Sessions that were never flushed to disk before the crash — some tools write on turn boundaries, not on every token — lose their last turn. That last turn is usually the one you remember anyway.</p>

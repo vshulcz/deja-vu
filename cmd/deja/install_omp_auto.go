@@ -106,11 +106,14 @@ export default function extension(pi) {
   // reaches it through ctx. Recall skips what it already showed a session, so
   // without the id the same block goes out on every message.
   let session = "";
+  let sessionFile = "";
   const remember = (ctx) => {
     try {
       const m = ctx && ctx.sessionManager;
       const id = m && (m.getSessionId ? m.getSessionId() : m.sessionId);
       if (id) session = String(id);
+      const file = m && (m.getSessionFile ? m.getSessionFile() : m.sessionFile);
+      if (file) sessionFile = String(file);
     } catch {}
   };
   const sessionID = () => session;
@@ -269,12 +272,14 @@ export default function extension(pi) {
     }
   });
 
-  // Compaction throws away the blocks this session was shown; the list that
-  // keeps them from repeating outlives it. Forgetting is a side effect, so the
-  // handler returns nothing.
-  pi.on("session_compact", async (_event) => {
+  // Compaction throws away the blocks this session was shown, and the list that
+  // stops them repeating outlives them. The session file still holds the turns
+  // the summary replaced: deja reads them from it, and the next prompt's recall
+  // carries what the agent was in the middle of.
+  pi.on("session_compact", async (_event, ctx) => {
     try {
-      run(["hook-precompact"], JSON.stringify({ session_id: sessionID() }));
+      remember(ctx);
+      run(["hook-precompact"], JSON.stringify({ session_id: sessionID(), transcript_path: sessionFile, cwd: process.cwd(), harness: "omp" }));
     } catch {}
   });
 }

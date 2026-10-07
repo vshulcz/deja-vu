@@ -189,11 +189,34 @@ function appendRepair(part, line) {
   };
 }
 
+// The session this plugin serves and whether it compacted since the prompt
+// builder last asked. onEvent sits on the plugin object, setup sees the
+// session, so both live out here.
+let session = "";
+let compacted = false;
+
+// isCompactionStart reads cline's status notice for a compaction about to run:
+// {type:"status-notice", metadata:{kind:"auto_compaction", phase:"started"}}
+// on CLI 3.0.69. messages.json keeps every turn through it, so the capture
+// reads the whole session even though cline does not wait for this hook.
+function isCompactionStart(ev) {
+  const meta = ev && ev.type === "status-notice" && ev.metadata;
+  return Boolean(meta) && typeof meta.kind === "string" && meta.kind.endsWith("compaction") && meta.phase === "started";
+}
+
 export default {
   name: "deja",
-  manifest: { capabilities: ["rules", "commands", "skills"] },
+  manifest: { capabilities: ["rules", "commands", "skills", "hooks"] },
+  hooks: {
+    onEvent: (ev) => {
+      if (!isCompactionStart(ev) || !session) return;
+      compacted = true;
+      run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: process.cwd(), harness: "cline" }));
+    },
+  },
   setup(api, ctx) {
     const sessionID = (ctx && ctx.session && ctx.session.sessionId) || "";
+    session = sessionID;
     // build runs more than once for a single prompt — cline calls it again
     // with the message list it is about to send — and only the last return is
     // used. So the answer is cached per prompt rather than skipped after the
@@ -223,8 +246,11 @@ export default {
         }
         if (at >= 0) {
           const prompt = userText(messages[at]);
-          if (prompt !== asked) {
+          // After a compaction the same prompt is asked again: the answer is
+          // now the recovery packet, and it belongs in the next request.
+          if (prompt !== asked || compacted) {
             asked = prompt;
+            compacted = false;
             recalled = run(["hook-prompt", "--plain"], JSON.stringify({
               prompt,
               session_id: sessionID,

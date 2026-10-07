@@ -13,21 +13,22 @@ import (
 // five of those came within a minute.
 func TestPerPromptPayloadsCarryTheSessionID(t *testing.T) {
 	for _, tc := range []struct {
-		name, src, from string
+		name, src, from, payload string
 	}{
 		// pi puts no id on the event; it keeps one on the session manager, which
 		// every handler reaches through ctx.
-		{"pi", piExtensionTS("/bin/deja"), "m.getSessionId ? m.getSessionId() : m.sessionId"},
-		{"omp", ompExtensionJS("/bin/deja"), "m.getSessionId ? m.getSessionId() : m.sessionId"},
-		// OpenClaw's before_prompt_build event has none; it is on ctx (#4581).
-		{"openclaw", openclawPluginJS("/bin/deja"), "ctx?.sessionId"},
+		{"pi", piExtensionTS("/bin/deja"), "m.getSessionId ? m.getSessionId() : m.sessionId", "session_id: sessionID"},
+		{"omp", ompExtensionJS("/bin/deja"), "m.getSessionId ? m.getSessionId() : m.sessionId", "session_id: sessionID"},
+		// OpenClaw's before_prompt_build event has none; it is on ctx (#4581),
+		// read through where(), which also names the agent's workspace.
+		{"openclaw", openclawPluginJS("/bin/deja"), "ctx?.sessionId", "session_id: at.id"},
 	} {
 		if !strings.Contains(tc.src, "hook-prompt") {
 			t.Fatalf("%s: no per-prompt recall in the generated plugin", tc.name)
 		}
 		// The field has to be in the payload, not merely mentioned: reading a
 		// session id and then not sending it is the same defect.
-		if !strings.Contains(tc.src, "session_id: sessionID") {
+		if !strings.Contains(tc.src, tc.payload) {
 			t.Errorf("%s: payload has no session_id, so recall repeats itself:\n%s",
 				tc.name, tc.src)
 		}

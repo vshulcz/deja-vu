@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"path/filepath"
 	"strconv"
@@ -56,15 +57,15 @@ func compactionSource(input precompactHookInput, workspace string) (sources.Comp
 		err        error
 	)
 	switch {
-	case input.TranscriptPath != "" && sources.IsCopilotTranscript(input.TranscriptPath):
-		// Copilot CLI and VS Code Copilot Chat name their own event logs.
-		transcript, err = sources.ReadCompactionCopilot(input.TranscriptPath, input.SessionID)
 	case input.TranscriptPath != "":
-		transcript, err = sources.ReadCompactionTranscript(input.TranscriptPath, input.SessionID)
+		transcript, err = readCompactionFile(input, workspace)
 	case len(input.Messages) > 0:
 		transcript, err = sources.ReadCompactionMessages(input.Harness, input.SessionID, workspace, input.Messages)
 	case input.Harness != "":
 		transcript, err = sources.ReadCompactionStore(input.Harness, input.SessionID)
+		if errors.Is(err, sources.ErrUnsupportedCompactionTranscript) {
+			transcript, err = sources.ReadCompactionSession(input.Harness, input.SessionID, "", workspace)
+		}
 	case sources.MuseSessionPath(input.SessionID) != "":
 		// Muse names neither a transcript nor itself; its log is found by
 		// the session id, and the reader holds it to the log's own stream.
@@ -76,6 +77,28 @@ func compactionSource(input precompactHookInput, workspace string) (sources.Comp
 		return transcript, "transcript_unavailable"
 	}
 	return transcript, ""
+}
+
+// compactionTailHarnesses are the formats ReadCompactionTranscript reads from a
+// bounded tail with byte offsets, which the compaction-to-edit metric needs.
+// TRAE CLI is not one of them: its rollout opens with Codex's session_meta,
+// but 0.207 writes turns as history_mutation records the Codex parser does not
+// read, and a live /compact captured nothing (transcript_unavailable).
+var compactionTailHarnesses = map[string]bool{"claude": true, "codex": true, "codebuddy": true}
+
+// readCompactionFile reads the transcript the host named. Claude, Codex and
+// CodeBuddy files go through the bounded tail reader; any other store's file,
+// or one that reader does not recognise, is read by the parser that indexes
+// it, under the id the host gave.
+func readCompactionFile(input precompactHookInput, workspace string) (sources.CompactionTranscript, error) {
+	owner := sources.CompactionTranscriptHarness(input.TranscriptPath)
+	if owner == "" || compactionTailHarnesses[owner] {
+		transcript, err := sources.ReadCompactionTranscript(input.TranscriptPath, input.SessionID)
+		if !errors.Is(err, sources.ErrUnsupportedCompactionTranscript) {
+			return transcript, err
+		}
+	}
+	return sources.ReadCompactionSession(input.Harness, input.SessionID, input.TranscriptPath, workspace)
 }
 
 // catchUpCompaction captures a compaction the host only shows after the fact.
@@ -207,20 +230,28 @@ func withCommandOutcomes(data *model.CompactionContext, s model.Session) {
 		return
 	}
 	outcome := map[string]string{}
-	pending := ""
+	// Every output record that follows a command before anything else is that
+	// command's: Grok files a call's title and description as records of their
+	// own ahead of its output, and pairing the first alone read a failed run
+	// as passed.
+	pending, failed := "", false
 	for _, m := range s.Messages {
 		switch m.Role {
 		case sources.RoleCommand:
-			pending = compactionCommandKey(m.Text)
+			pending, failed = compactionCommandKey(m.Text), false
 		case sources.RoleToolOutput:
 			if pending == "" {
 				continue
 			}
 			if _, friction := index.FrictionLine(firstFrictionLine(m.Text)); friction {
+				failed = true
+			}
+			if failed {
 				outcome[pending] = "failed"
 			} else {
 				outcome[pending] = "passed"
 			}
+		default:
 			pending = ""
 		}
 	}

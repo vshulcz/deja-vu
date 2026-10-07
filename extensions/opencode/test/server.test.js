@@ -70,6 +70,7 @@ case "$1" in
   hook-prompt) echo '{"hookSpecificOutput":{"additionalContext":"recalled"}}' ;;
   hook-tool) cat >/dev/null; echo '{"hookSpecificOutput":{"updatedInput":{"prompt":"child brief + recall"},"additionalContext":"file history"}}' ;;
   hook-tool-after) echo '{"hookSpecificOutput":{"additionalContext":"ran next: go mod tidy"}}' ;;
+  hook-precompact) cat > "${join(dir, "precompact.json")}" ;;
   search) echo 'found it' ;;
   *) echo 0.0.0 ;;
 esac
@@ -284,3 +285,16 @@ function channel() {
     },
   }
 }
+
+// 2.x's compaction seam names the session; the 1.x hook it runs reads it from
+// its input, and called with none it sent hook-precompact an empty id.
+test("the compaction seam hands deja the compacting session", async () => {
+  await withHome(async (dir) => {
+    const { ctx, hooks } = fakeContext(dir, { bin: stubDeja(dir) })
+    await plugin.setup(ctx)
+    await hooks.session.compaction[0]({ sessionID: "ses_compact" })
+    const sent = JSON.parse(readFileSync(join(dir, "precompact.json"), "utf8"))
+    assert.equal(sent.session_id, "ses_compact")
+    assert.equal(sent.harness, "opencode")
+  })
+})

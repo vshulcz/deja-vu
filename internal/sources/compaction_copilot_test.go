@@ -9,8 +9,9 @@ import (
 )
 
 // VS Code Copilot Chat's PreCompact names the extension's transcript for the
-// chat; the workspace comes from workspace.json beside the storage directory.
-func TestReadCompactionCopilotReadsAVSCodeTranscript(t *testing.T) {
+// chat, in whichever profile it lives; the layout says whose it is, and the
+// workspace comes from workspace.json beside the storage directory.
+func TestCompactionSessionReadsAVSCodeTranscript(t *testing.T) {
 	ws := t.TempDir()
 	storage := filepath.Join(t.TempDir(), "workspaceStorage", "abc")
 	const id = "7c9e2d2c-0000-4000-8000-000000000000"
@@ -32,17 +33,14 @@ func TestReadCompactionCopilotReadsAVSCodeTranscript(t *testing.T) {
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if !IsCopilotTranscript(path) {
-		t.Fatal("a VS Code transcript is not recognised")
-	}
-	got, err := ReadCompactionCopilot(path, id)
+	got, err := ReadCompactionSession("", id, path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Harness != "copilot-chat" || len(got.Session.Messages) == 0 || filepath.Clean(got.Workspace) != filepath.Clean(ws) {
 		t.Errorf("harness=%q messages=%d workspace=%q, want copilot-chat, some, %q", got.Harness, len(got.Session.Messages), got.Workspace, ws)
 	}
-	if _, err := ReadCompactionCopilot(path, "another-chat"); !errors.Is(err, ErrTranscriptIdentity) {
+	if _, err := ReadCompactionSession("", "another-chat", path, ""); !errors.Is(err, ErrTranscriptIdentity) {
 		t.Errorf("a transcript was read for a session it is not: %v", err)
 	}
 }
@@ -50,13 +48,14 @@ func TestReadCompactionCopilotReadsAVSCodeTranscript(t *testing.T) {
 // Grok and Reasonix keep an events.jsonl as well; only Copilot CLI's, under
 // session-state/<id>/, is read as Copilot's.
 func TestOnlyCopilotsEventLogIsCopilots(t *testing.T) {
-	for path, want := range map[string]bool{
-		filepath.Join("h", ".copilot", "session-state", "abc", "events.jsonl"): true,
-		filepath.Join("h", ".grok", "sessions", "abc", "events.jsonl"):         false,
-		filepath.Join("h", "events.jsonl"):                                     false,
+	for path, want := range map[string]string{
+		filepath.Join("h", ".copilot", "session-state", "abc", "events.jsonl"):      "copilot",
+		filepath.Join("h", "ws", "GitHub.copilot-chat", "transcripts", "abc.jsonl"): "copilot-chat",
+		filepath.Join("h", ".grok", "sessions", "abc", "events.jsonl"):              "",
+		filepath.Join("h", "events.jsonl"):                                          "",
 	} {
-		if got := IsCopilotTranscript(path); got != want {
-			t.Errorf("IsCopilotTranscript(%s) = %v, want %v", path, got, want)
+		if got := compactionHarnessByLayout(path); got != want {
+			t.Errorf("compactionHarnessByLayout(%s) = %q, want %q", path, got, want)
 		}
 	}
 }

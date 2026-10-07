@@ -162,7 +162,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 <li>The <code>deja-history</code> skill, so the agent knows the CLI contract when the tools are not reachable.</li>
 <li><code>/deja:recall &lt;query&gt;</code> for asking directly.</li>
 <li>The project digest on the first prompt of a session, and recall on every prompt after it — both through <code>UserPromptSubmit</code> hooks. Kimi appends a hook's stdout to the turn's context, and it runs every hook on that event, so the two sit side by side; the digest is held to one per session. Recall stays silent when the history has no answer.</li>
-<li>Forgetting on compaction, through a <code>PreCompact</code> hook: when the thread loses its context, the list of blocks already shown to it goes too, so recall can say them again.</li>
+<li>Compaction recovery, through a <code>PreCompact</code> hook: Kimi waits for it before compacting, so deja reads the session from its <code>wire.jsonl</code> and the next prompt gets the task, the commands with whether they passed, and what was still open. The list of blocks already shown goes too, so recall can say them again.</li>
 </ul>
 <p>Measured on Kimi Code 0.28.1 by reading the requests it sent: <code>UserPromptSubmit</code> is the only event whose output reaches the model. A <code>SessionStart</code> hook runs and its output goes nowhere, which is why the digest rides the first prompt instead; <code>PreToolUse</code> can block a tool but not add anything to it; <code>PostToolUse</code> and <code>PostToolUseFailure</code> are fire-and-forget, so the repair that follows a failed command — which Claude Code and Codex get — has nowhere to land here.</p>
 

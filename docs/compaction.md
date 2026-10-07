@@ -1,9 +1,12 @@
 # Automatic compaction recovery
 
-With auto-recall installed, `hook-precompact` reads the current session before
-the host compacts it: the Claude Code or Codex JSONL transcript, the opencode or
-Kilo CLI session in their SQLite store, or the turns Hermes hands its memory
-provider. Gemini CLI is read after the fact, see below. It extracts the user's
+With auto-recall installed, `hook-precompact` reads the current session when
+the host compacts it. Claude Code, Codex and CodeBuddy transcripts go
+through a bounded tail reader; every other host's session is found through the
+source registry, by the transcript file the hook names or by the session id in
+that harness's store, and read by the parser that indexes it. Hermes hands over
+the turns themselves, and Gemini CLI is read after the fact, see below. It
+extracts the user's
 objective, assistant conclusions, recorded verification commands, and what a turn
 says is still open or in conflict. An open item is recognised by its shape — the
 line opens with the label, in either language ("Gap: …", "Осталось: …", "Still
@@ -77,14 +80,40 @@ files that change during reading cannot produce a successful capture.
 | Host | Capture | Packet handed back |
 |---|---|---|
 | Claude Code, Codex | `PreCompact` reads the JSONL transcript | next session-start, prompt or tool hook |
-| opencode, Kilo CLI | the plugin's `experimental.session.compacting` names the session; deja reads it from `opencode.db` / `kilo.db`, which keep the compacted turns | next prompt, appended to the user turn; the summary request itself gets neither recall nor the packet |
+| TRAE CLI | `PreCompact` names the rollout; 0.207 writes its turns as `history_mutation` records, so the TRAE reader takes it rather than Codex's | next prompt or tool hook |
+| CodeBuddy, WorkBuddy | `PreCompact` reads the transcript | next prompt |
+| Muse Code | `PreCompact` names only the session; its log is found by the id | next prompt or edit |
+| opencode, Kilo CLI | the plugin's `experimental.session.compacting` names the session; deja reads it from `opencode.db` / `kilo.db`, which keep the compacted turns | next prompt, appended to the user turn. The summary request gets neither recall nor the packet: on 1.x the plugin skips it, and 2.x never runs the context hook for it |
+| Qwen Code | `PreCompact` names `chats/<id>.jsonl`, read by the Qwen reader | next prompt or session start |
+| Kimi Code | `PreCompact` names only the session; the hook entry adds `--harness kimi` and the session's `wire.jsonl` is found by its id. Kimi waits for the hook before compacting | next prompt |
+| Grok Build | `PreCompact` names `updates.jsonl` | next `PreToolUse` (Grok drops what the prompt hook prints) |
+| Copilot CLI, VS Code Copilot Chat | `PreCompact`, one entry in `~/.copilot/hooks/deja.json` for both, names `session-state/<id>/events.jsonl` or `GitHub.copilot-chat/transcripts/<id>.jsonl`; the file's layout says which, so a VS Code profile outside the scanned roots still reads | next prompt or tool hook |
+| Cursor CLI | `preCompact` names the agent transcript and the workspace roots | next `beforeSubmitPrompt` or `preToolUse` |
+| pi, omp, Senpi, gajae-code, prime-agent | the extension's `session_compact` sends the session file; it fires after the compaction entry is appended, and the file keeps the turns before it | next prompt |
+| OpenClaw | the plugin's `before_compaction` sends the session file when the run compacts itself, or the session id when the gateway does; both in the agent's workspace | next prompt |
+| Cline CLI | the plugin's `onEvent` sees the status notice that opens a compaction and names the session. Cline does not wait for it, but `messages.json` keeps every turn and the summary goes to `<id>.compaction.json` | next request of the run: the prompt builder asks again after a compaction |
+| DeepSeek Harness | the plugin flushes the session on `compaction/start` and names it; the session log keeps the turns the summary shadows | next step's request |
 | Hermes | the memory provider keeps the turns from `on_pre_compress` and passes them on `on_session_switch` with `reason="compression"`, under the session id the next turn uses | next turn's prefetch |
 | Gemini CLI | none before: `PreCompress` fires on every compression attempt, compacting or not. The transcript keeps the old turns and records the rewrite that drops them, so the next `BeforeAgent` finds the compaction there and reads the session as it stood before it | that same `BeforeAgent` |
 
 On opencode the packet rides one request, like per-prompt recall there: the
 plugin adds it to the copy of the turn opencode sends, not to the stored turn.
-Other hosts keep the existing warmup and recall behavior until a supported
-reader and the required hook payload are available.
+A capture read through the registry has no byte offsets, so the
+raw-actions-to-first-edit metric below counts only the tail-read hosts.
+
+Hosts with a compaction event that only forget what the session was shown:
+
+| Host | Why no packet |
+|---|---|
+| Antigravity | no compaction event; `hook-antigravity` forgets when the transcript shows a checkpoint. Catching the compaction up on the next turn, as for Gemini, is not built yet |
+| TRAE IDE | blocked: the session store `database.db` is SQLCipher-encrypted and its key lives only in the IDE process, so there is nothing deja can read the turns from |
+| Hermes without the memory provider | `hermes-auto` does not set `memory.provider=deja-memory`; the provider path above is the one that captures |
+| Cline extension (VS Code) | blocked: its file-hook adapter maps TaskStart, UserPromptSubmit, PreToolUse, PostToolUse and TaskComplete and nothing on compaction (extension.js 4.1.23, lines 4365-4367), and its plugin loader fails for want of `jiti` in the VSIX |
+| Amp | blocked: the plugin events are `session.start`, `tool.call`, `tool.result`, `agent.start`, `agent.end` and `changes.prompt` (`@ampcode/plugin` index.d.ts:1887-1894); `thread.compact` appears nowhere in the 0.0.1791360091 bundle, and a turn cannot run against a stub because inference goes through Amp's own API |
+| Command Code | unverified: its mods get `compaction_start` and `compaction_done` (mod-builder reference api.md:81 in 1.77.0), but no stand has run a mod yet, so it is not wired |
+
+Crush, goose, ZCode and CodeWhale have no compaction event deja can hook.
+Roo Code, Continue, Zed and aider have no hooks at all.
 
 Reasonix is handled differently. Its extension receives the turns being folded,
 builds the same packet from them in process, and hands it to Reasonix's
