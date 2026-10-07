@@ -1167,7 +1167,11 @@ func installAntigravityAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return wroteAll(mcp, plugin), nil
+	status, err := installAntigravityStatusline(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin, status), nil
 }
 
 func installOpenClawAuto(exe string, uninstall bool) (installResult, error) {

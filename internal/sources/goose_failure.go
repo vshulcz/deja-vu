@@ -1,5 +1,15 @@
 package sources
 
+import "strings"
+
+// GooseTurnState is what goose's store says about the session's current
+// turn: the output of the newest shell command that failed, and the files the
+// agent's editor calls changed, newest first.
+type GooseTurnState struct {
+	Failure string
+	Edits   []string
+}
+
 // GooseTurnFailure is the output of the newest shell command that failed in
 // this goose session's current turn, read from sessions.db: goose hands its
 // hooks no tool output (PostToolUseFailure carries the tool's name and input
@@ -8,8 +18,13 @@ package sources
 // past in an earlier turn is not brought back. "" when there is none or the
 // store cannot be read.
 func GooseTurnFailure(sessionID string) string {
+	return GooseTurn(sessionID).Failure
+}
+
+// GooseTurn reads the session's current turn from sessions.db, one query.
+func GooseTurn(sessionID string) GooseTurnState {
 	if sessionID == "" {
-		return ""
+		return GooseTurnState{}
 	}
 	q := `select json_object('role',cast(m.role as text),'content_json',cast(m.content_json as text)) ` +
 		`from messages m where m.session_id='` + sqlEscape(sessionID) + `' ` +
@@ -18,28 +33,30 @@ func GooseTurnFailure(sessionID string) string {
 		if !nonEmptyFile(db) {
 			continue
 		}
-		if out, done := gooseTurnFailureIn(db, q); done {
-			return out
+		if st, done := gooseTurnIn(db, q); done {
+			return st
 		}
 	}
-	return ""
+	return GooseTurnState{}
 }
 
-// gooseTurnFailureIn reads one store newest-first. done is true when the
-// session was found there, failure or not.
-func gooseTurnFailureIn(db, q string) (string, bool) {
+// gooseTurnIn reads one store newest-first. done is true when the session was
+// found there.
+func gooseTurnIn(db, q string) (GooseTurnState, bool) {
+	var st GooseTurnState
 	cmd, stop := sqliteReadCmd(db, q)
 	defer stop()
 	dec, err := sqliteRows(cmd)
 	if err != nil {
-		return "", false
+		return st, false
 	}
 	defer func() { _ = cmd.Wait() }()
 	found := false
+	seen := map[string]bool{}
 	for dec.More() {
 		var r map[string]any
 		if dec.Decode(&r) != nil {
-			return "", found
+			return st, found
 		}
 		found = true
 		items, ok := gooseContentArray(r["content_json"])
@@ -54,10 +71,16 @@ func gooseTurnFailureIn(db, q string) (string, bool) {
 			}
 			switch m["type"] {
 			case "toolResponse":
+				if st.Failure != "" {
+					continue
+				}
 				if code, known := gooseExitCode(m); known && code != 0 {
-					if t := gooseToolResult(m); t != "" {
-						return t, true
-					}
+					st.Failure = gooseToolResult(m)
+				}
+			case "toolRequest":
+				if p := gooseEditPath(m); p != "" && !seen[p] {
+					seen[p] = true
+					st.Edits = append(st.Edits, p)
 				}
 			case "text":
 				if str(r["role"]) == "user" && withoutGooseTurnContext(str(m["text"])) != "" {
@@ -66,8 +89,26 @@ func gooseTurnFailureIn(db, q string) (string, bool) {
 			}
 		}
 		if person {
-			return "", true
+			return st, true
 		}
 	}
-	return "", found
+	return st, found
+}
+
+// gooseEditPath is the file an editor call changes: the developer
+// extension's edit and write, or text_editor's str_replace, insert and write.
+func gooseEditPath(m map[string]any) string {
+	name, args := gooseToolCall(m)
+	switch strings.TrimPrefix(name, "developer__") {
+	case "edit", "write":
+	case "text_editor":
+		switch str(args["command"]) {
+		case "str_replace", "insert", "write":
+		default:
+			return ""
+		}
+	default:
+		return ""
+	}
+	return strings.TrimSpace(str(args["path"]))
 }

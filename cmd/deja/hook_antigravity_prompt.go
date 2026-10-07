@@ -54,10 +54,11 @@ func latestEditPaths(path string) []string {
 	return nil
 }
 
-// antigravityFileLines is what the pre-tool hook would say before an edit of
-// each file, through the same hook every other harness runs, so its dedupe and
-// budget hold here too.
-func antigravityFileLines(dir string, paths []string, conversationID, workspace string) string {
+// editFileLines is what the pre-tool hook would say before an edit of each
+// file, through the same hook every other harness runs, so its dedupe and
+// budget hold on hosts whose pre-tool answer never reaches the model
+// (Antigravity, goose) and the line rides a later hook.
+func editFileLines(dir string, paths []string, conversationID, workspace string) string {
 	var lines []string
 	for _, p := range paths {
 		payload, err := json.Marshal(map[string]any{

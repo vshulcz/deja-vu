@@ -33,8 +33,14 @@ seconds) and `content` blocks (`type: text` only for v1). SQLite: `sessions` joi
   is the one hook answer goose puts in front of the model, as a user message
   in the same turn (agent.rs). It blocks only when something waits: the fix
   pair for a command that failed this turn, read from `sessions.db` because
-  the failure event carries no output, or the packet for a compaction this
-  turn, found in `sessions.db` by its agent-only note. Each is handed over once.
+  the failure event carries no output, the packet for a compaction this
+  turn, found in `sessions.db` by its agent-only note, or the pre-edit line
+  for each file the turn's `edit`, `write` or `text_editor` calls changed.
+  Each is handed over once.
+- **Status line**: goose has none. The one hook output it shows the person is
+  a `SessionStart` hook's `{"banner": …}`, printed once when an interactive
+  `goose session` opens (goose-cli session/mod.rs), so the `SessionStart`
+  hook prints `deja statusline` there. `goose run` shows no banner.
 - **Resume**: `goose session --resume --session-id <id>`. A session no longer in `sessions.db` (deleted in goose) is refused with a pointer to `deja show`.
 - **Handoff**: exec, `goose run -t`.
 - **Prerequisite**: the per-prompt half needs `GOOSE_MOIM_MESSAGE_FILE`, which
