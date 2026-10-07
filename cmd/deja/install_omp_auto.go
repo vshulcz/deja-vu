@@ -157,11 +157,6 @@ export default function extension(pi) {
   // later session with no digest. The set is keyed by the session manager's id,
   // read fresh on each turn.
   const injected = new Set();
-  pi.on("session_switch", async (_event, ctx) => {
-    try {
-      remember(ctx);
-    } catch {}
-  });
   pi.on("before_agent_start", async (_event, ctx) => {
     try {
       remember(ctx);

@@ -213,7 +213,7 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "partial", "proof": "fixture", "note": "the plugin runs hook-context with no stdin, so no session id reaches it and nothing is stamped live (#4199, #4801)"},
+        "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
@@ -438,7 +438,7 @@
       },
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
-        "prompt": {"status": "partial", "proof": "fixture", "note": "hook-prompt is called without session_id, so the session is never stamped live (#4801)"},
+        "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "fixture"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
@@ -609,7 +609,7 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "partial", "proof": "fixture", "note": "the memory provider runs hook-context without session_id, so the session is never stamped live (#4801)"},
+        "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
@@ -688,7 +688,7 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "partial", "proof": "fixture", "note": "once per process: /new arrives as session_switch, which the extension ignores, so a new session gets no digest (#4801)"},
+        "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
