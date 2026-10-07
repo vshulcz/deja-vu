@@ -108,7 +108,11 @@ function activate(context) {
       busy = false;
       return;
     }
-    if (child.stdin) child.stdin.end(JSON.stringify({ cwd: folder ? folder.uri.fsPath : "" }));
+    if (child.stdin) {
+      // deja can exit before reading stdin; the EPIPE that follows is not an error here.
+      child.stdin.on("error", () => {});
+      child.stdin.end(JSON.stringify({ cwd: folder ? folder.uri.fsPath : "" }));
+    }
   };
   refresh();
   const timer = setInterval(refresh, 10000);

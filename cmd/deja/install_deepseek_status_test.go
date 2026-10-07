@@ -57,7 +57,7 @@ func TestDeepSeekAutoAddsTheWebStatusPlugin(t *testing.T) {
 		t.Errorf("the command plugin's package.json has no version (%v):\n%s", err, b)
 	}
 	layer := filepath.Join(home, ".dsh", "cordis.patch.yml")
-	if l, _ := os.ReadFile(layer); !strings.Contains(string(l), "- id: deja-status\n") || !strings.Contains(string(l), filepath.Join(dir, "index.js")) {
+	if l, _ := os.ReadFile(layer); !strings.Contains(string(l), "- id: deja-status\n") || !strings.Contains(string(l), yamlQuote(filepath.Join(dir, "index.js"))) {
 		t.Errorf("the layer does not name the status plugin:\n%s", l)
 	}
 	if res, err := installDeepSeekAuto("/usr/local/bin/deja", false); err != nil || res.Action != "unchanged" {

@@ -82,7 +82,12 @@ function statusline() {
       cached = { at: Date.now(), line };
       resolve(line);
     });
-    child.stdin && child.stdin.end("{}");
+    // deja can exit before it reads stdin (a missing binary, a launcher that
+    // fails), and the write then fails with EPIPE, an uncaught error in dsh.
+    if (child.stdin) {
+      child.stdin.on("error", () => {});
+      child.stdin.end("{}");
+    }
   });
 }
 

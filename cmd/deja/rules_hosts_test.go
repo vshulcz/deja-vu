@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 func clearRulesHostEnv(t *testing.T) {
@@ -21,8 +23,10 @@ func clearRulesHostEnv(t *testing.T) {
 func TestRulesSyncWritesTheNewHostsFiles(t *testing.T) {
 	home := rulesHome(t, "deepseek", "reasonix", "cursor", "openclaw")
 	clearRulesHostEnv(t)
-	for _, d := range []string{".dsh", ".reasonix", ".cursor", filepath.Join(".openclaw", "workspace")} {
-		if err := os.MkdirAll(filepath.Join(home, d), 0o755); err != nil {
+	// Reasonix keeps its home under %APPDATA% on Windows, ~/.reasonix elsewhere.
+	rx := sources.ReasonixHome()
+	for _, d := range []string{filepath.Join(home, ".dsh"), rx, filepath.Join(home, ".cursor"), filepath.Join(home, ".openclaw", "workspace")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -30,7 +34,7 @@ func TestRulesSyncWritesTheNewHostsFiles(t *testing.T) {
 	if _, err := rulesOut(t, "sync"); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{filepath.Join(home, ".dsh", "AGENTS.md"), filepath.Join(home, ".reasonix", "AGENTS.md")} {
+	for _, p := range []string{filepath.Join(home, ".dsh", "AGENTS.md"), filepath.Join(rx, "AGENTS.md")} {
 		if got := readRulesTestFile(t, p); got != rulesBlock("- a rule") {
 			t.Errorf("%s = %q", p, got)
 		}
