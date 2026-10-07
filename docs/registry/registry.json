@@ -89,11 +89,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {
-          "status": "no",
-          "proof": "todo",
-          "note": "tool.result may return {output} before the model reads it (@ampcode/plugin index.d.ts:1737-1761) (#4801)"
-        },
+        "pre_tool": {"status": "yes", "proof": "fixture"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {
           "status": "no",
@@ -219,7 +215,7 @@
       "surfaces": {
         "digest": {"status": "partial", "proof": "fixture", "note": "the plugin runs hook-context with no stdin, so no session id reaches it and nothing is stamped live (#4199, #4801)"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "beforeTool's appendContext reaches the model on Cline CLI 3.0.69 (stand) (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture", "note": "CLI plugin onEvent auto_compaction; the VS Code extension has no compaction event"},
         "compaction_capture": {"status": "yes", "proof": "fixture", "note": "messages.json keeps the compacted turns"},
@@ -483,7 +479,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "what BeforeTool returns never reaches the model (docs/hooks/reference.md:92-113); AfterTool on the edit tools can carry the line (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture", "note": "caught up on the next prompt: PreCompress fires on every attempt"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -615,7 +611,7 @@
       "surfaces": {
         "digest": {"status": "partial", "proof": "fixture", "note": "the memory provider runs hook-context without session_id, so the session is never stamped live (#4801)"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "transform_tool_result can append to read_file, patch and write_file results (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
         "compaction_capture": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
@@ -694,7 +690,7 @@
       "surfaces": {
         "digest": {"status": "partial", "proof": "fixture", "note": "once per process: /new arrives as session_switch, which the extension ignores, so a new session gets no digest (#4801)"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "the file's history goes out only with read results, after the tool (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -736,8 +732,8 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "registerAgentToolResultMiddleware rewrites a result before the model reads it (#4801)"},
-        "failure": {"status": "no", "proof": "todo", "note": "registerAgentToolResultMiddleware sees isError and can append the pair (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
+        "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
@@ -900,7 +896,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "the file's history goes out only with read results, after the tool (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -940,8 +936,8 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "tool_result fires on prime 0.9.8 (stand); the model's only tool is ipython, so paths come out of input.code (#4801)"},
-        "failure": {"status": "no", "proof": "todo", "note": "tool_result fires on prime 0.9.8 (stand); a failed command reports exit_code in text, not isError (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
+        "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
@@ -978,7 +974,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "qwen marks PreToolUse context and never passes it on (0.20.0); PostToolUse on the edit tools can carry the line (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -1075,7 +1071,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "the file's history goes out only with read results, after the tool (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -1114,7 +1110,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "the file's history goes out only with read results, after the tool (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -1261,8 +1257,8 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "PreToolUse takes additionalContext; tool names for the matcher are unchecked (#4801)"},
-        "failure": {"status": "no", "proof": "todo", "note": "PostToolUse and PostToolUseFailure take additionalContext (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
+        "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "no", "proof": "todo", "note": "no PreCompact (diagnosing-hooks SKILL.md:26); a catch-up from transcript_path is possible (#4801)"},
         "compaction_capture": {"status": "no", "proof": "todo", "note": "no PreCompact; caught up from transcript_path (#4801)"},
         "compaction_packet": {"status": "no", "proof": "todo", "note": "no PreCompact; the packet would follow the catch-up (#4801)"},
@@ -1563,7 +1559,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},
-        "pre_tool": {"status": "no", "proof": "todo", "note": "executePreToolUseHooks drops additionalContext; PostToolUse on Edit|Write can carry the line (#4801)"},
+        "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -1657,7 +1653,7 @@
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
         "pre_tool": {"status": "yes", "proof": "stand"},
-        "failure": {"status": "partial", "proof": "stand", "note": "PostToolUse only: a failed Bash fires PostToolUseFailure, which is not wired (traecli 0.207.1) (#4801)"},
+        "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
