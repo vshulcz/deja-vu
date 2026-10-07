@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -41,6 +42,8 @@ const (
 	// has passed.
 	deferredTTL = 2 * time.Hour
 )
+
+var deferredSeq atomic.Uint64
 
 func deferredRoot(dir string) string { return filepath.Join(dir, "deferred") }
 
@@ -87,22 +90,15 @@ func deferText(dir, key, hook, text string) {
 			}
 		}
 	}
-	n := time.Now().UnixNano()
-	tmp := filepath.Join(d, fmt.Sprintf(".%s-%020d", order, n))
+	// Windows' clock can hand two calls in a row the same nanosecond, and the
+	// rename would put the second pair over the first: the sequence and the pid
+	// keep the names apart and the order intact.
+	name := fmt.Sprintf("%s-%020d-%010d-%d", order, time.Now().UnixNano(), deferredSeq.Add(1), os.Getpid())
+	tmp := filepath.Join(d, "."+name)
 	if err := os.WriteFile(tmp, []byte(text), 0o600); err != nil {
 		return
 	}
-	// Windows' clock gives two calls in a row the same nanosecond, and the
-	// second rename then replaced the first failure pair; take the next free
-	// name instead.
-	for {
-		dst := filepath.Join(d, fmt.Sprintf("%s-%020d", order, n))
-		if _, err := os.Lstat(dst); os.IsNotExist(err) {
-			_ = os.Rename(tmp, dst)
-			return
-		}
-		n++
-	}
+	_ = os.Rename(tmp, filepath.Join(d, name))
 }
 
 // hasDeferred is the cheap check every hook pays: one stat of a directory that
