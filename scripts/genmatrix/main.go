@@ -29,6 +29,13 @@ type entry struct {
 		Why    string `json:"why"`
 		Source string `json:"source"`
 	} `json:"gaps"`
+	Surfaces map[string]surface `json:"surfaces"`
+}
+
+type surface struct {
+	Status string `json:"status"`
+	Proof  string `json:"proof"`
+	Note   string `json:"note"`
 }
 
 // gapMark distinguishes the four reasons a capability is missing. A single dash
@@ -178,6 +185,66 @@ func htmlTable(r registry) string {
 	return b.String()
 }
 
+// surfaceColumns is the registry's surface order with the header each gets.
+var surfaceColumns = []struct{ key, label string }{
+	{"digest", "Digest"}, {"prompt", "Per prompt"}, {"pre_tool", "Pre-tool"}, {"failure", "After failure"},
+	{"compaction_reset", "Compaction reset"}, {"compaction_capture", "Compaction capture"},
+	{"compaction_packet", "Compaction packet"}, {"mcp", "MCP"}, {"handoff", "Handoff"},
+	{"session_end", "Session end"}, {"rules", "Rules"}, {"statusline", "Status"}, {"reader", "Reader"},
+}
+
+func surfaceMark(c surface) string {
+	switch {
+	case c.Status == "yes":
+		return "✅"
+	case c.Status == "partial":
+		return "◐"
+	case c.Proof == "blocked":
+		return "✕"
+	default:
+		return "—"
+	}
+}
+
+// parityTable renders every hook surface per harness, with each cell's proof
+// and note on hover and the gaps spelled out below. The test that holds these
+// claims to the installers is TestEverySurfaceClaimMatchesWhatInstallWires.
+func parityTable(r registry) string {
+	var b strings.Builder
+	b.WriteString("<table>\n<tr><th>Harness</th>")
+	for _, c := range surfaceColumns {
+		b.WriteString("<th>" + c.label + "</th>")
+	}
+	b.WriteString("</tr>\n")
+	var gaps strings.Builder
+	for _, e := range r.Harnesses {
+		if e.ID == "deja" {
+			continue
+		}
+		b.WriteString("<tr><td>" + registryLink(e.ID, e.DisplayName) + "</td>")
+		for _, col := range surfaceColumns {
+			c := e.Surfaces[col.key]
+			title := c.Proof
+			if c.Note != "" {
+				title += ": " + c.Note
+			}
+			fmt.Fprintf(&b, `<td data-surface="%s/%s" data-status="%s" title="%s">%s</td>`,
+				e.ID, col.key, c.Status, html.EscapeString(title), surfaceMark(c))
+			if c.Status != "yes" && c.Note != "" {
+				fmt.Fprintf(&gaps, "\n<li>%s <code>%s</code> (%s): %s</li>",
+					html.EscapeString(e.DisplayName), col.key, c.Proof, html.EscapeString(c.Note))
+			}
+		}
+		b.WriteString("</tr>\n")
+	}
+	b.WriteString("</table>\n")
+	b.WriteString("<p>✅ works &middot; ◐ partly, see the note &middot; — not built yet &middot; ✕ blocked by the harness itself. Hover a cell for how it was checked: on a live stand, or by a fixture test.</p>\n")
+	b.WriteString("<details>\n<summary>Every gap and partial cell, with its reason</summary>\n<ul>")
+	b.WriteString(gaps.String())
+	b.WriteString("\n</ul>\n</details>\n")
+	return b.String()
+}
+
 func replaceBetween(path, start, end, content string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -209,6 +276,10 @@ func main() {
 		os.Exit(1)
 	}
 	if err := replaceBetween("docs/guide/harnesses.html", "<!-- matrix:start -->", "<!-- matrix:end -->", htmlTable(r)); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if err := replaceBetween("docs/guide/harnesses.html", "<!-- parity:start -->", "<!-- parity:end -->", parityTable(r)); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
