@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
+  hookArgs,
   installerHookMarker,
   installerHookPresent,
   installerMcpPresent,
@@ -117,6 +118,45 @@ test("the hook stands down when the installer already wired the same recall", as
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+// The manifest runs the same three hooks `deja install kimi-auto` writes into
+// config.toml. The package used to run hook-prompt alone, so it had no digest
+// and a compaction left recall refusing what the session had just lost.
+test("each manifest hook reaches deja as the subcommand it names", async () => {
+  const { execFileSync } = await import("node:child_process")
+  const { readFileSync } = await import("node:fs")
+  const dir = mkdtempSync(join(tmpdir(), "deja-kimi-args-"))
+  try {
+    const fake = join(dir, "deja")
+    writeFileSync(fake, '#!/bin/sh\necho "ARGS $*"\n')
+    chmodSync(fake, 0o755)
+    const manifest = JSON.parse(readFileSync(new URL("../kimi.plugin.json", import.meta.url), "utf8"))
+    const seen = []
+    for (const hook of manifest.hooks) {
+      const [, script, ...args] = hook.command.split(" ")
+      const out = execFileSync(process.execPath, [new URL("../" + script, import.meta.url).pathname, ...args], {
+        input: JSON.stringify({ hook_event_name: hook.event, session_id: "s1", prompt: "p", cwd: dir }),
+        encoding: "utf8",
+        env: { ...process.env, DEJA_BIN: fake, KIMI_CODE_HOME: dir },
+      })
+      seen.push(hook.event + " " + out.trim())
+    }
+    assert.deepEqual(seen, [
+      "UserPromptSubmit ARGS hook-context --plain --once",
+      "UserPromptSubmit ARGS hook-prompt --plain",
+      "PreCompact ARGS hook-precompact --harness kimi",
+      "SessionEnd ARGS hook-session-end",
+    ])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test("hookArgs passes deja's hooks and nothing else", () => {
+  assert.deepEqual(hookArgs([]), ["hook-prompt", "--plain"])
+  assert.deepEqual(hookArgs(["hook-precompact", "--harness", "kimi"]), ["hook-precompact", "--harness", "kimi"])
+  assert.deepEqual(hookArgs(["index"]), ["hook-prompt", "--plain"])
 })
 
 // The MCP launcher is the plugin's other entry point: Kimi starts it, and

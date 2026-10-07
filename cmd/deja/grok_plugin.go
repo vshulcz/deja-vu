@@ -16,7 +16,7 @@ import (
 // #1721 while every installed copy was still 0.1.0. deja knows both numbers and
 // doctor is where someone looks, which is the argument kimiPluginVersion
 // already makes for Kimi (#1828).
-const grokPluginVersion = "0.2.0"
+const grokPluginVersion = "0.3.0"
 
 // grokPluginRoot finds the installed copy Grok runs, by its manifest rather
 // than by its path: the directory under installed-plugins is generated, so

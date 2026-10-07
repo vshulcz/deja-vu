@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { argv, configPath, contributions, installerPluginPath, mcpWired, promptText, sessionKey } from "../lib.mjs"
+import { argv, configPath, contributions, installerPluginPath, mcpWired, promptText, where } from "../lib.mjs"
 
 test("a query that starts with a dash gets the flag terminator", () => {
   assert.deepEqual(argv("search", ["--limit", "5"], "--json"), ["search", "--limit", "5", "--", "--json"])
@@ -29,7 +29,29 @@ test("the prompt and session key are read from the shapes the host sends", () =>
   assert.equal(promptText({ prompt: "  fix the pool  " }), "fix the pool")
   assert.equal(promptText({ prompt: ["a", "b"] }), "a\nb")
   assert.equal(promptText({}), "")
-  assert.equal(sessionKey({ sessionId: "e1" }, { sessionKey: "c1" }), "c1")
-  assert.equal(sessionKey({ session: { id: "e2" } }, {}), "e2")
-  assert.equal(sessionKey({}, {}), "")
+})
+
+test("hooks name the transcript id and the agent's workspace, not the session key", () => {
+  // hook-context stamps the session live under the id the index knows it by;
+  // agent:main:main names no transcript (#4582).
+  const seen = new Map()
+  assert.deepEqual(where(seen, {}, { sessionKey: "agent:main:main", sessionId: "t1", workspaceDir: "/w" }, "/gw"), { id: "t1", cwd: "/w" })
+  // The run's own compaction hands over only the key: what it last ran as stands in.
+  assert.deepEqual(where(seen, {}, { sessionKey: "agent:main:main" }, "/gw"), { id: "t1", cwd: "/w" })
+  assert.deepEqual(where(new Map(), { sessionId: "e1" }, {}, "/gw"), { id: "e1", cwd: "/gw" })
+  assert.deepEqual(where(new Map(), {}, { sessionKey: "k" }, "/gw"), { id: "k", cwd: "/gw" })
+})
+
+test("the package wires every seam the installer's plugin does", async () => {
+  const { default: plugin } = await import("../index.mjs")
+  const events = []
+  const prev = process.env.OPENCLAW_STATE_DIR
+  process.env.OPENCLAW_STATE_DIR = "/nonexistent-openclaw-state"
+  try {
+    plugin.register({ pluginConfig: { tools: false, bin: "/nonexistent/deja" }, on: (name) => events.push(name), registerTool() {} })
+  } finally {
+    if (prev === undefined) delete process.env.OPENCLAW_STATE_DIR
+    else process.env.OPENCLAW_STATE_DIR = prev
+  }
+  assert.deepEqual(events, ["agent_turn_prepare", "before_prompt_build", "before_compaction", "session_end"])
 })

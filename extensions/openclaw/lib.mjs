@@ -101,12 +101,21 @@ export function promptText(event) {
   return ""
 }
 
-// sessionKey is what recall dedups on: a hit shown once in a session is not
-// shown again. Without a key every turn could repeat the same session.
-export function sessionKey(event, ctx) {
-  return (
-    (ctx && (ctx.sessionKey || ctx.sessionId)) ||
+// where names the session and workspace a hook runs for, the way the
+// installer's plugin does. The id is the transcript id, not the session key:
+// hook-context stamps the session live under that id, which keeps it out of
+// its own MCP recall, and agent:main:main names no transcript (#4582). The
+// automatic compaction inside a run hands its hook only the session key, so
+// what each key last ran as is kept in seen.
+export function where(seen, event, ctx, cwd) {
+  const key = (ctx && ctx.sessionKey) || ""
+  const last = (key && seen.get(key)) || {}
+  const id =
+    (ctx && ctx.sessionId) ||
+    last.id ||
     (event && (event.sessionId || event.session_id || (event.session && event.session.id))) ||
     ""
-  )
+  const dir = (ctx && ctx.workspaceDir) || last.dir || ""
+  if (key && (id || dir)) seen.set(key, { id, dir })
+  return { id: id || key, cwd: dir || cwd }
 }

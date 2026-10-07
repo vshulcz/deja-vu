@@ -35,7 +35,22 @@
   "hooks": [
     {
       "event": "UserPromptSubmit",
-      "command": "node ./hooks/recall.mjs",
+      "command": "node ./hooks/recall.mjs hook-context --plain --once",
+      "timeout": 30
+    },
+    {
+      "event": "UserPromptSubmit",
+      "command": "node ./hooks/recall.mjs hook-prompt --plain",
+      "timeout": 30
+    },
+    {
+      "event": "PreCompact",
+      "command": "node ./hooks/recall.mjs hook-precompact --harness kimi",
+      "timeout": 30
+    },
+    {
+      "event": "SessionEnd",
+      "command": "node ./hooks/recall.mjs hook-session-end",
       "timeout": 30
     }
   ]
