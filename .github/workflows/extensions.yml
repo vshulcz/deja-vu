@@ -240,7 +240,11 @@ jobs:
             for (const key of Object.keys(m)) {
               if (!known.has(key)) { console.error("unknown manifest field: " + key); bad++; }
             }
-            for (const rel of [m.skills, m.commands, ...(m.hooks ?? []).map((h) => h.command.split(" ").pop()), ...Object.values(m.mcpServers ?? {}).flatMap((s) => s.args ?? [])]) {
+            // A hook command is a shell line, the script followed by the deja
+            // subcommand and its flags: the path is the token that starts with
+            // ./, and one has to be there.
+            const hookPaths = (m.hooks ?? []).map((h) => h.command.split(/\s+/).find((t) => t.startsWith("./")) ?? h.command);
+            for (const rel of [m.skills, m.commands, ...hookPaths, ...Object.values(m.mcpServers ?? {}).flatMap((s) => s.args ?? [])]) {
               if (typeof rel !== "string" || !rel.startsWith("./")) { console.error("path must start with ./ : " + rel); bad++; continue; }
               if (!fs.existsSync(rel)) { console.error("manifest points outside the plugin: " + rel); bad++; }
             }
@@ -295,7 +299,9 @@ jobs:
             for (const command of commands) {
               const at = String(command).indexOf(rootVar);
               if (at < 0) { console.error("path is not rooted at the plugin: " + command); bad++; continue; }
-              const rel = String(command).slice(at + rootVar.length).replace(/"$/, "");
+              // The path runs to its closing quote or the first space: a hook
+              // passes the deja subcommand after it.
+              const rel = String(command).slice(at + rootVar.length).split(/["\s]/)[0];
               if (!fs.existsSync(rel)) { console.error("points at a file that is not in the bundle: " + rel); bad++; }
             }
             process.exit(bad ? 1 : 0);

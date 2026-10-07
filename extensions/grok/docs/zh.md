@@ -25,7 +25,7 @@ brew install deja-vu
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 ```
 
-装了 CLI 的话，`deja install --auto` 同样能接上 Grok，那条路更短：它把 `[mcp_servers.deja]` 写进 `~/.grok/config.toml`，把四个钩子写进 `~/.grok/hooks/deja.json`。两条路各自都够用。
+装了 CLI 的话，`deja install --auto` 同样能接上 Grok，那条路更短：它把 `[mcp_servers.deja]` 写进 `~/.grok/config.toml`，把它的钩子写进 `~/.grok/hooks/deja.json`。两条路各自都够用：插件跑的是同样的钩子。
 
 ## 提供的能力
 
@@ -35,7 +35,13 @@ MCP 服务端，带着 deja 在各处提供的那一个工具：`deja`，模式�
 
 `/deja:recall <要查什么>`，用于你想直接问的时候。
 
-一个 `UserPromptSubmit` 钩子，会在这台机器的历史里找这条提问说的是什么。Grok Build 1.0.5 会丢掉提问钩子和工具钩子打印的内容，所以目前这份召回到不了模型；能到达模型的是 MCP 工具。Grok 唯一会采纳的钩子返回是 `PreToolUse` 的 `updatedInput`，`deja install grok` 用它把记忆放进派生出来的智能体的提示里。
+`deja install grok-auto` 写入的那些钩子，经由 `hooks/recall.mjs` 运行：
+
+- `Bash` 上的 `PostToolUse`：失败的命令旁边会附上这台机器上次遇到同样错误后跑过的修复（Grok 1.0.41 会把这个钩子的上下文交给模型）。
+- 会改动东西的工具上的 `PreToolUse`：派生出来的智能体通过 `updatedInput` 在提示里拿到这个项目的记忆。
+- `PreCompact`：忘掉这个会话已经看过的内容，压缩之后召回可以再次发送。
+- `SessionEnd`：撤掉会话的在线标记，下一个会话的召回就能用上它。
+- `SessionStart` 和 `UserPromptSubmit`：Grok 会丢掉它们打印的内容，所以它们只用来预热索引、标记会话在线，什么都不输出。提问要通过 MCP 工具到达历史。
 
 ## 两边都装也没问题
 

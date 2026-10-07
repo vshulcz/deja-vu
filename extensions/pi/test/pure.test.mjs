@@ -1,5 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { execFileSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
 import { argv, contextText, installerExtensionPath, installerExtensionPaths, sessionKey } from "../lib.mjs"
 
 test("the installer's extension is looked for where the installer writes it", () => {
@@ -35,4 +37,17 @@ test("the package stands down for either host's installed extension", () => {
     "/home/u/.pi/agent/extensions/deja.ts",
     "/home/u/.omp/agent/extensions/deja/index.js",
   ])
+})
+
+// pi loads index.ts by stripping its types, and a module that does not compile
+// never registers a single handler: the whole extension is silently gone.
+// npm test is what runs on every change, so the load is checked here too.
+test("index.ts loads under node's type stripping, the way pi loads it", () => {
+  const dir = fileURLToPath(new URL("..", import.meta.url))
+  const out = execFileSync(
+    process.execPath,
+    ["--experimental-strip-types", "--no-warnings", "-e", "const m = await import('./index.ts'); console.log(typeof m.default)"],
+    { cwd: dir, encoding: "utf8" },
+  )
+  assert.equal(out.trim(), "function")
 })

@@ -21,7 +21,7 @@ func TestPiFamilyStartSendsTheSession(t *testing.T) {
 		{"pi-auto", piExtensionTS("/bin/deja"), "sessionID()"},
 		{"omp-auto", ompExtensionJS("/bin/deja"), "sessionID()"},
 		{"prime-auto", primeExtensionTS("/bin/deja"), "sessionID()"},
-		{"pi package", string(pkg), "key"},
+		{"pi package", string(pkg), "session"},
 	} {
 		calls := strings.Split(tc.src, `run(["hook-context"]`)[1:]
 		if len(calls) == 0 {

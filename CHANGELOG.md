@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - The command install suggests for running your status line beside deja's kept deja's half on a second row when your script ended in a newline, and hosts that show only the first row dropped it.
+- The kimi, grok, openclaw, dsh, hermes, opencode and pi packages run every hook their `deja install <x>-auto` counterpart wires; a test installs each target and fails when its package misses one. The Hermes provider, Cline's plugin, the opencode 2.x plugin and the pi family now name the session they stamp live, so it is cleared at the end and kept out of its own recall. omp and pi give a new session its digest after `/new`. dsh ended sessions under `session-<uuid>` while stamping the bare uuid, so the stamp stayed; Cline under `--yolo` recalled its own `[SYSTEM]` reminder instead of the prompt. Shown on live stands for dsh, Cline, OpenClaw, Hermes and Kimi.
 - Two goose sessions no longer read each other's recall. Every `deja goose` shared one MOIM file, and plain goose wrote per-prompt recall into the global AGENTS.md every session reads; the wrapper now gives each process its own file and removes it on exit, and plain goose keeps the session-start digest only (#4795).
 - opencode 2.x: the turn after a compaction is recalled on what the person last said, not on the whole `<conversation-checkpoint>` summary (#4795).
 - opencode 1.x and Kilo no longer put the session digest into the title-generation request (#4795).

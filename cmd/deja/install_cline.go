@@ -226,7 +226,7 @@ export default {
     onEvent: (ev) => {
       if (!isCompactionStart(ev) || !session) return;
       compacted = true;
-      run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: process.cwd(), harness: "cline" }));
+      run(["hook-precompact"], JSON.stringify({ session_id: session, cwd: workspace || process.cwd(), harness: "cline" }));
     },
     // What beforeTool returns as appendContext reaches the model beside the
     // tool's result (CLI 3.0.69). Cline's own PreToolUse hook file keeps only
@@ -258,6 +258,7 @@ export default {
     const sessionID = (ctx && ctx.session && ctx.session.sessionId) || "";
     session = sessionID;
     workspace = (ctx && ctx.workspaceInfo && ctx.workspaceInfo.rootPath) || "";
+    const cwd = workspace || process.cwd();
     // build runs more than once for a single prompt — cline calls it again
     // with the message list it is about to send — and only the last return is
     // used. So the answer is cached per prompt rather than skipped after the
@@ -277,10 +278,13 @@ export default {
         const edit = () => out || (out = messages.slice());
 
         // The question just asked, answered from history. Prepended to the last
-        // user message.
+        // user message. Cline's own reminders ride as user messages too ("[SYSTEM]
+        // This run is not complete..." under --yolo, 3.0.69), so those are
+        // skipped or recall answers the boilerplate.
         let at = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i] && messages[i].role === "user" && userText(messages[i])) {
+          const text = messages[i] && messages[i].role === "user" ? userText(messages[i]) : "";
+          if (text && !/^\s*\[SYSTEM\]/.test(text)) {
             at = i;
             break;
           }
@@ -295,7 +299,7 @@ export default {
             recalled = run(["hook-prompt", "--plain"], JSON.stringify({
               prompt,
               session_id: sessionID,
-              cwd: process.cwd(),
+              cwd,
             }));
           }
           // Silence is the common case: the hook only speaks when the history
@@ -322,7 +326,7 @@ export default {
               tool_name: fail.name,
               tool_response: fail.output,
               session_id: sessionID,
-              cwd: process.cwd(),
+              cwd,
             })));
           }
           const line = repairs.get(fail.id);
@@ -349,7 +353,10 @@ export default {
       // A function, not a string: it runs when the session assembles its
       // instructions, so every session gets current history rather than
       // whatever was on disk at install time.
-      content: () => run(["hook-context", "--plain"]),
+      // The session and its workspace go with it: hook-context stamps the
+      // session live, which keeps it out of its own MCP recall, and ranks by
+      // the workspace rather than wherever cline was launched (#4199).
+      content: () => run(["hook-context", "--plain"], JSON.stringify({ session_id: sessionID, cwd })),
     });
     api.registerCommand({
       name: "deja",

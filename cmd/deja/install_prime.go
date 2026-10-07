@@ -169,7 +169,10 @@ function run(args: string[], input: string, timeout = 10000): string {
 }
 
 export default function (pi: any) {
-  let injected = false;
+  // Once per session, not once per process: /new, a resume and a fork keep the
+  // process and switch the session, and a flag set on the first one left every
+  // later session with no digest.
+  const injected = new Set<string>();
   let toldBuilding = false;
   // No event carries a session id; the session manager does, and every handler
   // reaches it through ctx. Recall dedupes per session, so without one the same
@@ -234,7 +237,7 @@ export default function (pi: any) {
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       remember(ctx);
-      if (!injected) {
+      if (!injected.has(sessionID())) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode).
@@ -249,7 +252,7 @@ export default function (pi: any) {
           digest = raw;
         }
         if (digest) {
-          injected = true;
+          injected.add(sessionID());
           ctx.ui.setStatus("deja", "");
           // The receipt is what tells the user memory arrived; without it the
           // recall is invisible and reads as the model guessing.

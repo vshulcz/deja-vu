@@ -1,14 +1,19 @@
 #!/usr/bin/env node
-// UserPromptSubmit: hand Kimi the sessions this machine already has that match
-// what the user just asked. Kimi appends a hook's stdout to the turn's context,
-// which is the whole mechanism — its structured output only carries permission
-// decisions.
+// Runs one deja hook with Kimi's payload on stdin, the same hooks
+// `deja install kimi-auto` writes into config.toml: the digest on the first
+// prompt (hook-context --once), recall on every prompt (hook-prompt), and the
+// compaction capture (hook-precompact --harness kimi), and the end of the
+// session (hook-session-end, which drops its live stamp). The manifest names the
+// subcommand; with none it is hook-prompt, which is what this file ran before
+// it took arguments. Kimi appends a UserPromptSubmit hook's stdout to the
+// turn's context, which is the whole mechanism — its structured output only
+// carries permission decisions.
 //
 // Silence is the normal case. Nothing here may cost the user a turn: every
 // failure exits 0 with no output, which Kimi treats as "nothing to add".
 
 import { spawn } from "node:child_process"
-import { installerOwns, resolveDeja } from "../lib.mjs"
+import { hookArgs, installerOwns, resolveDeja } from "../lib.mjs"
 
 const TIMEOUT_MS = 20000
 
@@ -20,7 +25,7 @@ async function main() {
   const payload = await readStdin()
   if (!payload.trim()) return
 
-  const out = await run(resolveDeja(), ["hook-prompt", "--plain"], payload)
+  const out = await run(resolveDeja(), hookArgs(process.argv.slice(2)), payload)
   if (out.trim()) process.stdout.write(out)
 }
 

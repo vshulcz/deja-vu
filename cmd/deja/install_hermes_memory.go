@@ -281,6 +281,7 @@ class DejaMemoryProvider(MemoryProvider):
 
     def initialize(self, session_id: str, **kwargs) -> None:
         self._first_turn = True
+        self._session_id = session_id or ""
 
     def system_prompt_block(self) -> str:
         return _ABOUT
@@ -294,9 +295,14 @@ class DejaMemoryProvider(MemoryProvider):
         # Both calls are milliseconds against a built index and never build
         # one; the timeouts are the ceiling for a machine that is swapping.
         parts = []
+        session_id = session_id or getattr(self, "_session_id", "")
         if self._first_turn:
             self._first_turn = False
-            digest = _deja(["hook-context", "--plain"], timeout=8)
+            # The session goes with it: hook-context stamps the session live,
+            # which keeps it out of its own MCP recall on this first turn, and
+            # keys the digest's once-per-session ledger (#4246 for the hook).
+            start = json.dumps({"session_id": session_id or "", "cwd": os.getcwd()})
+            digest = _deja(["hook-context", "--plain"], start, timeout=8)
             if digest:
                 parts.append(digest)
         if query:
@@ -321,6 +327,16 @@ class DejaMemoryProvider(MemoryProvider):
         # on its next refresh. Nothing to mirror.
         return None
 
+    def on_session_end(self, messages) -> None:
+        # Hermes calls this at a real session boundary only: exit, /reset,
+        # /new, a gateway session expiring, a compression rotating the id
+        # (run_agent.py shutdown_memory_provider and commit_memory_session,
+        # 0.17.0). The session's live stamp goes, so the next session's MCP
+        # recall can answer with it now rather than twenty minutes from now.
+        sid = getattr(self, "_session_id", "")
+        if sid:
+            _deja(["hook-session-end"], json.dumps({"session_id": sid}), timeout=3)
+
     def on_pre_compress(self, messages) -> str:
         # Held until the compression commits: Hermes can still abandon it, and
         # it may move the conversation to a new session id first.
@@ -330,6 +346,8 @@ class DejaMemoryProvider(MemoryProvider):
     def on_session_switch(self, new_session_id: str, *, parent_session_id: str = "", reset: bool = False, rewound: bool = False, **kwargs) -> None:
         # A new conversation, or one whose transcript was cut back, has lost
         # the digest; hand it over again on the next turn.
+        if new_session_id:
+            self._session_id = new_session_id
         if reset or rewound:
             self._first_turn = True
         # The compression committed. deja builds the recovery packet from the

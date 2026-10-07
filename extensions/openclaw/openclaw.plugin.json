@@ -6,7 +6,8 @@
     "onStartup": true
   },
   "contracts": {
-    "tools": ["deja_recall", "deja_fix", "deja_blame"]
+    "tools": ["deja_recall", "deja_fix", "deja_blame"],
+    "agentToolResultMiddleware": ["openclaw"]
   },
   "configSchema": {
     "type": "object",

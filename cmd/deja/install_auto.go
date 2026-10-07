@@ -322,6 +322,25 @@ export default {
     // for twenty minutes (#4571).
     const live = new Set()
     const endSession = (id) => runHook("hook-session-end", JSON.stringify({ session_id: id }), cwd)
+    // A sub-agent's session names its parent. Without it the sub-agent's
+    // digest and recall led with the parent, which is live and is the very
+    // session that spawned it (#4548, fixed for 1.x). 2.x hands the plugin
+    // ctx.session.get, whose SessionInfo carries parentID; asked once per
+    // session.
+    const parents = new Map()
+    const parentOf = async (id) => {
+      if (!id) return ""
+      if (!parents.has(id)) {
+        let parent = ""
+        try {
+          parent = (await ctx.session.get({ sessionID: id }))?.parentID || ""
+        } catch {
+          // no parent to leave out
+        }
+        parents.set(id, parent)
+      }
+      return parents.get(id)
+    }
     // The per-prompt recall each user message was given, by message.
     const recalled = new Map()
     const remember = (key, extra) => {
@@ -344,7 +363,7 @@ export default {
           // The session id rides along so the digest leaves this session
           // out: the context hook runs after the first message is stored,
           // and the index can already hold it (#4199).
-          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", cwd }), cwd)
+          const raw = await runHook("hook-context", JSON.stringify({ session_id: event.sessionID || "", parent_session_id: await parentOf(event.sessionID), cwd }), cwd)
           let digest = ""
           try {
             digest = JSON.parse(raw)?.hookSpecificOutput?.additionalContext || ""
@@ -392,7 +411,7 @@ export default {
           // that call is what stamps the session live again after its last
           // turn ended it (#4573).
           if (sid) live.add(sid)
-          const raw = await runHook("hook-prompt", JSON.stringify({ prompt: last.prompt, session_id: sid, cwd }))
+          const raw = await runHook("hook-prompt", JSON.stringify({ prompt: last.prompt, session_id: sid, parent_session_id: await parentOf(sid), cwd }))
           remember(last.key, last.prompt && raw.trim() ? JSON.parse(raw)?.hookSpecificOutput?.additionalContext || "" : "")
         }
         // Every message gets back what it was given, in every call, the way

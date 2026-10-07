@@ -31,8 +31,9 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 ```
 
 `deja install --auto` reaches Grok too, and is the shorter path when you have
-the CLI: it writes `[mcp_servers.deja]` into `~/.grok/config.toml` and the four
-hooks into `~/.grok/hooks/deja.json`. Either path is enough on its own.
+the CLI: it writes `[mcp_servers.deja]` into `~/.grok/config.toml` and its
+hooks into `~/.grok/hooks/deja.json`. Either path is enough on its own: the
+plugin runs the same hooks.
 
 ## What you get
 
@@ -44,10 +45,20 @@ not reachable.
 
 `/deja:recall <query>` for the times you want to ask directly.
 
-A `UserPromptSubmit` hook that searches this machine's history for what the
-prompt is about. Grok Build 1.0.5 discards what a prompt or tool hook prints, so
-today that recall does not reach the model; the MCP tool is how it does. The one hook answer Grok does apply is a `PreToolUse` `updatedInput`, and
-`deja install grok` uses it to put memory into a spawned agent's prompt.
+The hooks `deja install grok-auto` writes, run through `hooks/recall.mjs`:
+
+- `PostToolUse` on `Bash`: a command that failed gets the fix this machine ran
+  after the same error before, next to the result (Grok 1.0.41 hands this
+  hook's context to the model).
+- `PreToolUse` on the tools that change something: a spawned agent gets this
+  project's memory in its prompt through `updatedInput`.
+- `PreCompact`: what the session was shown is forgotten, so recall can send it
+  again after the compaction.
+- `SessionEnd`: the session's live stamp goes, so the next session's recall
+  can answer with it.
+- `SessionStart` and `UserPromptSubmit`: Grok discards what these print, so
+  they run for the index warmup and the session's live stamp, and print
+  nothing. The MCP tool is how a question reaches the history.
 
 ## Having both is fine
 

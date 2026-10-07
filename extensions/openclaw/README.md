@@ -27,9 +27,19 @@ what is missing.
 
 ## What it does
 
+- **At the start of a session** (`agent_turn_prepare`): what this project
+  settled, once per session.
 - **Before each turn** (`before_prompt_build`): the prompt is matched against
   the index and, when a past session answers it, that session goes in front of
   the model. Silence is the common case.
+- **Before a compaction** (`before_compaction`): deja reads the turns about to
+  be summarised from the session file, so the next turn carries what the agent
+  was in the middle of.
+- **At the end of a session** (`session_end`): the session's live stamp goes,
+  so the next session's recall can answer with it.
+- **After a tool** (tool result middleware): a read or an edit gets what past
+  sessions decided about that file, and a failed command gets what this machine
+  ran after the same error before, beside the result the model reads.
 - **Tools**: `deja_recall` (search the history), `deja_fix` (what was run after
   this error before), `deja_blame` (which sessions touched a file and what they
   concluded).

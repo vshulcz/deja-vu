@@ -353,10 +353,13 @@ function apply(ctx) {
     ask(["hook-session-end"], { session_id: sid });
   };
   try {
+    // The stamp is under the bare uuid, so the end has to name that too: the
+    // "session-<uuid>" dsh hands over matched nothing and the stamp stayed.
     ctx.on("session/created", (session) => {
-      if (session && session.id) live.add(String(session.id));
+      const sid = bareSessionId(session && session.id);
+      if (sid) live.add(sid);
     });
-    ctx.on("session/disposed", (session) => end(session && session.id ? String(session.id) : ""));
+    ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id)));
     process.on("exit", () => {
       for (const sid of [...live]) end(sid);
     });

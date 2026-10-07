@@ -31,7 +31,7 @@ kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with thi
 
 ## 提供的能力
 
-- **每条提问都有召回。** 一个 `UserPromptSubmit` 钩子运行 `deja hook-prompt`，Kimi 把找到的内容附加到本回合。没有匹配时保持沉默。
+- **`deja install kimi-auto` 写入的那些钩子。** 会话的第一条提问带上这个项目定下的事（`deja hook-context --once`）。每条提问都按刚问的内容召回（`deja hook-prompt`），Kimi 把它附加到本回合，没有匹配时保持沉默。压缩之前，从会话里读出要被折叠的回合，下一条提问就带上智能体正在做的事（`deja hook-precompact`）。`SessionEnd` 时撤掉会话的在线标记（`deja hook-session-end`）。
 - **工具。** 插件把 `deja mcp` 声明为 MCP 服务端：一个 `deja` 工具，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient` 或 `remember`。
 - **`/deja:recall <要查什么>`**，直接检索历史。
 - **`deja-history` 技能**，会话开始时加载，让智能体知道在重新调试之前先去查一查。

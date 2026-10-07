@@ -39,6 +39,29 @@ export function guarded(register) {
   }
 }
 
+// resultText is the text a tool handed back to the model.
+export function resultText(result) {
+  const content = result && result.content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part) => part && part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text)
+    .join("\n");
+}
+
+// exitStatus reads how a dsh command ended. dsh reports it in the text rather
+// than as an error result: a last line of "[exit code: N]" for a non-zero exit,
+// or "[killed by signal: X]". Only the last line counts, since output may quote
+// a marker anywhere else. The marker is cut from the body before the lookup:
+// an error whose last line is "[exit code: 1]" matches nothing on file.
+export function exitStatus(text) {
+  const signal = /\n\[killed by signal: [^\]\n]+\]$/.exec(text);
+  if (signal) return { body: text.slice(0, signal.index), failed: true };
+  const exit = /\n\[exit code: (\d+)\]$/.exec(text);
+  if (exit) return { body: text.slice(0, exit.index), failed: exit[1] !== "0" };
+  return { body: text, failed: false };
+}
+
 // contributions says what this package adds, given what `deja install` already
 // wrote into DSH_HOME and what the profile turned off. The rule is the same
 // everywhere: fill the gaps, never repeat the installer.
