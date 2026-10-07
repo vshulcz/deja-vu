@@ -42,7 +42,7 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 		if err := os.RemoveAll(dir); err != nil {
 			return installResult{}, err
 		}
-		if _, err := setOpenClawPluginEnabled(false); err != nil {
+		if err := removeOpenClawPluginEntry(); err != nil {
 			return installResult{}, err
 		}
 		if _, err := setOpenClawPluginLoadPath(dir, false); err != nil {
@@ -80,12 +80,8 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	// `openclaw plugins disable deja` writes enabled: false on the entry, and
-	// install wrote it back on while reporting "unchanged" (#4472).
-	var note string
-	if openclawEntrySwitchedOff("plugins.entries", openclawPluginID) {
-		note = "left deja's plugin switched off, the way it was — `openclaw plugins enable deja` turns it back on"
-	} else if _, err := setOpenClawPluginEnabled(true); err != nil {
+	cfg, err := setOpenClawPluginEntry()
+	if err != nil {
 		return installResult{}, err
 	}
 	if _, err := setOpenClawPluginLoadPath(dir, true); err != nil {
@@ -93,62 +89,90 @@ func installOpenClawPlugin(exe string, uninstall bool) (installResult, error) {
 	}
 	// The manifest and package.json beside it are deja's own and went unnamed
 	// on the screen whose job is saying what was touched, so the directory
-	// rides along (#3254).
-	return wroteAll(installResult{Path: entry, Action: a, Note: note},
-		installResult{Path: dir, Action: a}), nil
+	// rides along (#3254). The entry too: an upgrade that only added the grant
+	// said "unchanged".
+	return wroteAll(installResult{Path: entry, Action: a},
+		installResult{Path: dir, Action: a}, cfg), nil
 }
 
-// setOpenClawPluginEnabled adds or removes our entry under plugins.entries,
-// leaving every other plugin — and the user's allow list — untouched.
-func setOpenClawPluginEnabled(on bool) (string, error) {
-	path := filepath.Join(sources.OpenClawStateDir(), "openclaw.json")
+// setOpenClawPluginEntry writes our entry under plugins.entries, leaving
+// every other plugin — and the user's allow list — untouched.
+func setOpenClawPluginEntry() (installResult, error) {
+	path := openclawConfigPath()
 	old, err := readConfig(path)
 	if err != nil {
-		return "", err
+		return installResult{}, err
 	}
 	var root map[string]any
-	if len(bytes.TrimSpace(old)) == 0 {
-		if !on {
-			return "unchanged", nil
+	if len(bytes.TrimSpace(old)) > 0 {
+		if err := json.Unmarshal([]byte(jsoncToJSON(string(old))), &root); err != nil {
+			return installResult{}, openclawParseError(path, old)
 		}
+	}
+	if root == nil {
 		root = map[string]any{}
-	} else if configIsJSONC(old) {
-		// The same file the hook and the MCP entry are written into, and the
-		// same reason not to refuse it over a comment (#2811).
-		return setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", on)
-	} else if json.Unmarshal(old, &root) != nil {
-		return "", openclawParseError(path, old)
 	}
 	plugins, _ := root["plugins"].(map[string]any)
 	entries, _ := mapAt(plugins, "entries")
-	if !on {
-		if entries == nil {
-			return "unchanged", nil
-		}
-		delete(entries, openclawPluginID)
-		if len(entries) == 0 {
-			delete(plugins, "entries")
-		}
-		if len(plugins) == 0 {
-			delete(root, "plugins")
-		}
-	} else {
-		if plugins == nil {
-			plugins = map[string]any{}
-			root["plugins"] = plugins
-		}
-		if entries == nil {
-			entries = map[string]any{}
-			plugins["entries"] = entries
-		}
-		entries[openclawPluginID] = map[string]any{"enabled": true}
+	have, _ := mapAt(entries, openclawPluginID)
+	entry, note := openclawPluginEntry(have, openclawTakesConversationAccess())
+	if configIsJSONC(old) {
+		// The same file the hook and the MCP entry are written into, and the
+		// same reason not to refuse it over a comment (#2811).
+		a, err := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", true, entry)
+		return installResult{Path: path, Action: a, Note: note}, err
+	}
+	if plugins == nil {
+		plugins = map[string]any{}
+		root["plugins"] = plugins
+	}
+	if entries == nil {
+		entries = map[string]any{}
+		plugins["entries"] = entries
+	}
+	entries[openclawPluginID] = entry
+	next, err := marshalConfigLike(old, root)
+	if err != nil {
+		return installResult{}, err
+	}
+	a, err := writeIfChanged(path, old, append(next, '\n'))
+	return installResult{Path: path, Action: a, Note: note}, err
+}
+
+// removeOpenClawPluginEntry takes our entry out of plugins.entries, and the
+// blocks it leaves empty.
+func removeOpenClawPluginEntry() error {
+	path := openclawConfigPath()
+	old, err := readConfig(path)
+	if err != nil || len(bytes.TrimSpace(old)) == 0 {
+		return err
+	}
+	if configIsJSONC(old) {
+		_, err := setOpenClawEntryJSONC(path, old, "plugins.entries", openclawPluginID, "", false, nil)
+		return err
+	}
+	var root map[string]any
+	if json.Unmarshal(old, &root) != nil {
+		return openclawParseError(path, old)
+	}
+	plugins, _ := root["plugins"].(map[string]any)
+	entries, _ := mapAt(plugins, "entries")
+	if entries == nil || entries[openclawPluginID] == nil {
+		return nil
+	}
+	delete(entries, openclawPluginID)
+	if len(entries) == 0 {
+		delete(plugins, "entries")
+	}
+	if len(plugins) == 0 {
+		delete(root, "plugins")
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
-		return "", err
+		return err
 	}
-	next = append(next, '\n')
-	return writeIfChanged(path, old, next)
+	_, err = writeIfChanged(path, old, append(next, '\n'))
+	return err
 }
 
 // setOpenClawPluginLoadPath adds the plugin's directory to plugins.load.paths,

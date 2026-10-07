@@ -236,6 +236,20 @@ func clientHooksOff(name string) string {
 			return "switched off: deja's plugin, by `plugins.entries` or `plugins.deny` in " + reportPath(p) +
 				" — openclaw will not run its recall on each prompt"
 		}
+		// From 2026.8.1 the gateway drops the plugin's prompt hooks without the
+		// grant, and says so only in its own log.
+		grant := jsonAt(root, "plugins", "entries", openclawPluginID, "hooks", openclawAccessKey)
+		if jsonAt(root, "plugins", "entries", openclawPluginID) != nil && grant != true {
+			if v := openclawVersion(); v == "" || openclawVersionAtLeast(v, openclawAccessGate) {
+				what := "`plugins.entries.deja.hooks." + openclawAccessKey + "`"
+				if grant == false {
+					return "switched off: " + what + " is false in " + reportPath(p) +
+						" — OpenClaw " + openclawAccessGate + "+ then drops deja's digest and per-prompt recall"
+				}
+				return "blocked: no " + what + " in " + reportPath(p) +
+					" — OpenClaw " + openclawAccessGate + "+ drops deja's digest and per-prompt recall; `deja install openclaw-auto` sets it"
+			}
+		}
 	case "goose":
 		// Goose reads plugin settings from ~/.config/goose (or under
 		// GOOSE_PATH_ROOT) whatever XDG says, and the project's local and

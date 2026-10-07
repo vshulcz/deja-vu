@@ -146,7 +146,7 @@ func setOpenClawHookEnabled(on bool) (string, error) {
 		// A comment is not a broken file, and this writer shares openclaw.json
 		// with the MCP one — so refusing here left a target that wrote half its
 		// wiring, or could not take its own hook back out (#2811).
-		return setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on)
+		return setOpenClawEntryJSONC(path, old, openclawHookEntries, openclawHookName, openclawHookSwitch, on, nil)
 	} else if json.Unmarshal(old, &root) != nil {
 		return "", openclawParseError(path, old)
 	}
@@ -311,7 +311,9 @@ func openclawParseError(path string, old []byte) error {
 // the hook it matters as much as the entry does: without it the pack is
 // discovered, listed as ready, and never invoked, so the two are written
 // together and taken back out together (#2811).
-func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string, on bool) (string, error) {
+//
+// want is the entry to write, nil for {"enabled": true}.
+func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string, on bool, want map[string]any) (string, error) {
 	text := lfText(old)
 	var root map[string]any
 	// Trailing commas too: configIsJSONC sends a file here for those alone,
@@ -410,7 +412,10 @@ func setOpenClawEntryJSONC(path string, old []byte, blockKey, id, flagKey string
 			}
 		}
 	}
-	entry, err := jsoncEntryText(map[string]any{"enabled": true})
+	if want == nil {
+		want = map[string]any{"enabled": true}
+	}
+	entry, err := jsoncEntryText(want)
 	if err != nil {
 		return "", err
 	}

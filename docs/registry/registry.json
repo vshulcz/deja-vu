@@ -730,17 +730,17 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "yes", "proof": "stand"},
-        "prompt": {"status": "yes", "proof": "stand"},
+        "digest": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway)"},
+        "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway)"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
-        "compaction_reset": {"status": "yes", "proof": "stand"},
-        "compaction_capture": {"status": "yes", "proof": "fixture"},
-        "compaction_packet": {"status": "yes", "proof": "fixture"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for OpenClaw yet (#4801)"},
+        "rules": {"status": "no", "proof": "todo", "note": "not wired; the agent workspace's AGENTS.md reaches the model (stand on 2026.9.8) (#4801)"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status surface in the generated plugin (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction entries are dropped by the reader (#4801)"}
       }
