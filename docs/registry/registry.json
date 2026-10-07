@@ -448,7 +448,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "stand", "note": "$DSH_HOME/AGENTS.md, the user-global head of the instruction chain (0.2.0-rc.2)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "the plugin can show notes in /deja only; no status line found (#4801)"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "the deepseek-auto target adds a web client plugin that shows the line under the composer (0.2.0-rc.2); dsh has no terminal UI"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
