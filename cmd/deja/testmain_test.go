@@ -28,6 +28,8 @@ func TestMain(m *testing.M) {
 		"GEMINI_CLI_HOME":         "",
 		"CURSOR_CONFIG_DIR":       "",
 		"AIDER_CHAT_HISTORY_FILE": "",
+		"AIDER_READ":              "",
+		"AIDER_GIT":               "",
 		"XDG_CONFIG_HOME":         "",
 		"XDG_DATA_HOME":           "",
 		"APPDATA":                 filepath.Join(root, "AppData", "Roaming"),
