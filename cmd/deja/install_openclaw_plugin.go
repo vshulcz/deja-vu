@@ -438,10 +438,49 @@ function toolLine(event, ctx) {
   return "";
 }
 
+// The status page behind deja's Control UI tab: deja's status line, refreshed
+// while the tab is open.
+const STATUS_PATH = "/plugins/deja/status";
+function statusPage(line) {
+  const text = line.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  return '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="15"><title>deja</title>' +
+    '<style>body{margin:16px;font:14px ui-monospace,Menlo,Consolas,monospace;color:#888}@media(prefers-color-scheme:light){body{color:#444}}</style>' +
+    "<p>" + text + "</p>";
+}
+
 export default {
   id: %q,
   name: "deja recall",
   register(api) {
+    // The TUI footer takes nothing from plugins. The Control UI does take a
+    // sidebar tab rendering a gateway-auth route in a sandboxed frame, and
+    // unlike native plugin views that needs no Labs switch, so the tab shows
+    // deja's status line. An OpenClaw without these APIs goes without it.
+    if (typeof api.registerHttpRoute === "function") {
+      api.registerHttpRoute({
+        path: STATUS_PATH,
+        auth: "gateway",
+        match: "exact",
+        handler: async (_req, res) => {
+          res.statusCode = 200;
+          res.setHeader("content-type", "text/html; charset=utf-8");
+          res.setHeader("cache-control", "no-store");
+          res.end(statusPage(ask(["statusline"], {}) || "deja"));
+          return true;
+        },
+      });
+      const controls = api.session?.controls?.registerControlUiDescriptor ? api.session.controls : api;
+      if (typeof controls.registerControlUiDescriptor === "function") {
+        controls.registerControlUiDescriptor({
+          id: "status",
+          surface: "tab",
+          label: "deja",
+          description: "What deja recalled for your agents today",
+          path: STATUS_PATH,
+          group: "agent",
+        });
+      }
+    }
     // A tool result middleware rewrites what the model reads back from a
     // tool, which is the one place a line can arrive beside the result it is
     // about. It needs contracts.agentToolResultMiddleware in the manifest and

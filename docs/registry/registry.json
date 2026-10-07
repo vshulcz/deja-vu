@@ -741,7 +741,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand"},
         "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status surface in the generated plugin (#4801)"},
+        "statusline": {"status": "partial", "proof": "stand", "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction entries are dropped by the reader (#4801)"}
       }
     },
