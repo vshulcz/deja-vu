@@ -79,6 +79,7 @@ func hostStatuslineCases(home string) []struct {
 		{"codebuddy-auto", filepath.Join(home, ".codebuddy", "settings.json"), jsonAt("statusLine")},
 		{"grok-auto", filepath.Join(home, ".grok", "config.toml"), tomlAt("ui.status_line")},
 		{"kimi-auto", filepath.Join(home, ".kimi-code", "tui.toml"), tomlAt("status_line")},
+		{"trae-auto", filepath.Join(home, ".trae", "traecli.toml"), tomlAt("tui.statusline")},
 		{"antigravity-auto", filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"), jsonAt("statusLine")},
 	}
 }
@@ -132,6 +133,8 @@ func seedStatusline(t *testing.T, target, path, cmd string) {
 	switch {
 	case strings.HasSuffix(path, "tui.toml"):
 		seed = "[status_line]\ncommand = " + string(q) + "\n"
+	case strings.HasSuffix(path, "traecli.toml"):
+		seed = "[tui.statusline]\ntype = \"command\"\ncommand = " + string(q) + "\n"
 	case strings.HasSuffix(path, ".toml"):
 		seed = "[ui.status_line]\ntype = \"command\"\ncommand = " + string(q) + "\n"
 	case target == "qwen-auto":

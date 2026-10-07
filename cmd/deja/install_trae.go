@@ -60,8 +60,12 @@ func installTraeAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
+	status, err := installTraeStatusline(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
 	if !uninstall && hooks.Action != "unchanged" {
 		fmt.Println("trae: open traex once and trust the hooks it shows — until then it runs none of them")
 	}
-	return wroteAll(hooks, mcp), nil
+	return wroteAll(hooks, mcp, status), nil
 }

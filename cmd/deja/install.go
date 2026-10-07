@@ -1017,7 +1017,15 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 	case "vscode", "copilot-chat":
 		return installVSCode(exe, uninstall)
 	case "vscode-auto", "copilot-chat-auto":
-		return installVSCodeAuto(exe, uninstall)
+		hooks, err := installVSCodeAuto(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		status, err := installVSCodeStatusItem(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(hooks, status), nil
 	case "hermes":
 		return installHermesMCP(exe, uninstall)
 	case "hermes-auto":
@@ -1094,6 +1102,7 @@ func wroteAll(rs ...installResult) installResult {
 		}
 	}
 	var also []string
+	seen := map[string]bool{}
 	for _, r := range rs {
 		if r.Path != "" && r.Path == out.Path && r.Note != "" && !strings.Contains(out.Note, r.Note) {
 			// A second write to the same file with something to say: the
@@ -1107,7 +1116,9 @@ func wroteAll(rs ...installResult) installResult {
 		// does anything the other result was already carrying: the
 		// kept-snapshot line reads these paths, and a second run that changes
 		// nothing still has a snapshot beside each of them (review of #3389).
-		out.also = append(out.also, r.Path)
+		if !slices.Contains(out.also, r.Path) {
+			out.also = append(out.also, r.Path)
+		}
 		out.also = append(out.also, r.also...)
 		if r.Action == "unchanged" {
 			// A write that changed nothing can still have something to say: an
@@ -1118,6 +1129,15 @@ func wroteAll(rs ...installResult) installResult {
 			}
 			continue
 		}
+		// Two writes to one file — TRAE's MCP entry and status line — are one
+		// line in the report, not "created" and then "updated" about it.
+		if seen[r.Path] {
+			if r.Note != "" {
+				also = append(also, r.Note)
+			}
+			continue
+		}
+		seen[r.Path] = true
 		line := fmt.Sprintf("also %s %s", r.Action, shortHome(r.Path))
 		// The other write's own note rides with its line: gemini's extension
 		// says what switch it left on, and that was lost with the result.

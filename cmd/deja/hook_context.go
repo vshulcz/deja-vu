@@ -54,6 +54,9 @@ type precompactHookInput struct {
 	// turns it is compacting in Messages.
 	Harness  string          `json:"harness"`
 	Messages json.RawMessage `json:"messages"`
+	// CatchUp is a compaction found after the fact, which may be handed over
+	// again: it is captured once (catchUpCompactionWith).
+	CatchUp bool `json:"deja_catch_up"`
 	// Grok spells all of this in camelCase. See hook_grok.go.
 	grokEnvelope
 	// Antigravity names the conversation in camelCase too.
@@ -157,6 +160,18 @@ func runHookPrecompactFor(dir, harness string) {
 	input.adopt()
 	if input.Harness == "" {
 		input.Harness = harness
+	}
+	// A host that finds a compaction after the fact hands over the turns it
+	// had before it and may hand the same one over again: captured once, like
+	// Gemini's (Amp's plugin, on the next agent.start).
+	if input.CatchUp {
+		catchUpCompactionWith(dir, input, func() (sources.CompactionTranscript, bool, error) {
+			// The file is the harness's format wherever it was written.
+			t, err := sources.ReadCompactionSession(input.Harness, input.SessionID, input.TranscriptPath,
+				compactionWorkspace(hookProjectPath(input.CWD, input.WorkspaceRoots)))
+			return t, err == nil, err
+		})
+		return
 	}
 	// Compaction throws away the blocks this session was shown, and the list
 	// that stops them repeating outlives them — so the memory the agent just

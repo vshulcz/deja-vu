@@ -45,8 +45,9 @@ var surfaceHooks = map[string][]string{
 
 // statusMarks are the calls a generated plugin makes to show something in the
 // host's own UI: pi's footer, opencode 1.x and Kilo's toast, Hermes's recall
-// indicator. opencode's TUI plugin execs `deja statusline`.
-var statusMarks = []string{"setStatus(", "showToast(", "RecallStatus", `["statusline"]`}
+// indicator, Command Code's footer segment, Amp's status item. opencode's TUI
+// plugin execs `deja statusline`.
+var statusMarks = []string{"setStatus(", "showToast(", "RecallStatus", `["statusline"]`, "createStatusItem("}
 
 // statuslineRun is a host's status line command running deja, through the
 // launcher or the binary, quoted or not.
@@ -126,7 +127,9 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 	case "aider":
 		// No hooks: the target puts deja's context file in aider's read:
 		// list, which aider re-reads on every message and `deja aider` fills.
+		// The same wrapper serves the per-message recall (aider_live.go).
 		got["digest"] = strings.Contains(all, "aider-context.md")
+		got["prompt"] = got["digest"]
 	case "claude":
 		// A target of its own, deliberately outside --auto.
 		got["statusline"] = slices.Contains(installTargetNames(), "statusline")
@@ -146,6 +149,18 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 		// PreCompress fires on every attempt and nothing fires after one, so
 		// the prompt hook catches a compaction up from the transcript.
 		got["compaction_reset"] = tokens["hook-prompt"]
+	case "zcode":
+		// No compaction event: the prompt and tool hooks catch one up from
+		// the CLI database (hook_compaction.go catchUpZCodeCompaction).
+		got["compaction_reset"] = tokens["hook-prompt"]
+	case "codewhale":
+		// No compaction event: hook-codewhale catches one up from the history
+		// CodeWhale saves before it compacts.
+		got["compaction_reset"] = tokens["hook-codewhale"]
+	case "commandcode":
+		// No compaction shell hook: PreToolUse reads a compaction out of the
+		// transcript it names (runCommandCodeTool).
+		got["compaction_reset"] = tokens["hook-tool"]
 	case "reasonix":
 		if strings.Contains(all, "reasonix-ext") {
 			for _, point := range reasonixIntercepts {

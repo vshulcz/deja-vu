@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -74,6 +77,9 @@ func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error
 	}
 	markSessionLive(dir, in.SessionID)
 	var parts []string
+	if packet := codewhaleCompactionPacket(dir, in.SessionID, in.Workspace); packet != "" {
+		parts = append(parts, packet)
+	}
 	if !codewhaleDigestSent(dir, in.SessionID) {
 		digest, sessions, raw, _, _, ids, projects := cachedHookDigestFor(dir, in.Workspace, "")
 		if digest != "" {
@@ -126,6 +132,50 @@ func codewhaleRememberDigest(dir, sessionID string) {
 
 const codewhaleDigestMarker = "cw-digest"
 
+// codewhaleCatchUp captures a compaction CodeWhale saved while this session
+// ran: it has no compaction event, and keeps the history it compacted as an
+// artifact of the saved session (sources.ReadCodeWhaleCompaction). The hooks'
+// session id is not the saved one, so a compaction counts only from the first
+// time this hook session was seen; one from before it is another run's.
+func codewhaleCatchUp(dir, sessionID, workspace string) {
+	if sessionID == "" || workspace == "" {
+		return
+	}
+	since := codewhaleFirstSeen(dir, sessionID)
+	pre := precompactHookInput{SessionID: sessionID, TranscriptPath: sources.CodeWhaleRoot(), CWD: workspace}
+	catchUpCompactionWith(dir, pre, func() (sources.CompactionTranscript, bool, error) {
+		return sources.ReadCodeWhaleCompaction(workspace, since)
+	})
+}
+
+// codewhaleFirstSeen is when a hook first saw this session, written down then.
+func codewhaleFirstSeen(dir, sessionID string) time.Time {
+	key := "cw:" + sessionID
+	for token := range alreadyInjected(dir, key) {
+		if v, ok := strings.CutPrefix(token, "cw-first:"); ok {
+			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+				return time.Unix(n, 0)
+			}
+		}
+	}
+	// A second back: the summary's mtime and this stamp share a clock, and
+	// the file system may round it.
+	now := time.Now().Add(-time.Second)
+	rememberInjectedIDs(dir, key, "cw-first:"+strconv.FormatInt(now.Unix(), 10))
+	return now
+}
+
+// codewhaleCompactionPacket is the packet of a compaction not yet handed
+// over, for the message that goes out next.
+func codewhaleCompactionPacket(dir, sessionID, workspace string) string {
+	codewhaleCatchUp(dir, sessionID, workspace)
+	var out bytes.Buffer
+	if delivered, _ := emitCompactionRecovery(dir, sessionID, workspace, "UserPromptSubmit", hookToolPlain, &out); !delivered {
+		return ""
+	}
+	return strings.TrimSpace(out.String())
+}
+
 // codewhaleToolCallBefore turns CodeWhale's environment into the payload
 // hook-tool reads. Its tool names are already ones hook-tool knows — bash,
 // edit, write, read — with the file under `path` and the command under
@@ -142,6 +192,8 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 	if patch, ok := input["patch"].(string); ok && name == "apply_patch" {
 		input["command"] = patch
 	}
+	// hook-tool hands over the packet of a compaction caught up here.
+	codewhaleCatchUp(dir, os.Getenv("DEEPSEEK_SESSION_ID"), os.Getenv("DEEPSEEK_WORKSPACE"))
 	payload, err := json.Marshal(map[string]any{
 		"tool_name":  name,
 		"tool_input": input,

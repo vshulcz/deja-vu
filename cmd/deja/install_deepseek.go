@@ -477,6 +477,7 @@ func dshPatchBlock(exe string, withAuto bool) string {
 		"    - id: deja-command\n" +
 		"      name: " + yamlQuote(dshCommandPath()) + "\n" +
 		autoRow(withAuto) +
+		dshStatusRow(withAuto) +
 		dshBlockEnd
 }
 
@@ -643,6 +644,9 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err := os.RemoveAll(filepath.Dir(dshCommandPath())); err != nil {
 			return installResult{}, err
 		}
+		if err := os.RemoveAll(dshStatusDir()); err != nil {
+			return installResult{}, err
+		}
 		// And the plugins directory above it, when deja made it (#3698).
 		pruneCreatedDir(filepath.Dir(filepath.Dir(dshCommandPath())))
 		return installResult{Path: path, Action: a}, nil
@@ -673,13 +677,15 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	// declares CommonJS made dsh refuse both plugins ("Failed to load the ES
 	// module"), so the directory states its own type before either is written.
 	// The name is what lets mentionsDeja recognise the file as deja's wiring,
-	// so an uninstall takes its snapshot too.
+	// so an uninstall takes its snapshot too. The version is not optional: dsh
+	// 0.2's plugin inventory refuses a package without one, and that refusal
+	// failed every model request with REQUEST_EXTENSION.
 	pkgPath := filepath.Join(filepath.Dir(cmdPath), "package.json")
 	oldPkg, err := readConfig(pkgPath)
 	if err != nil {
 		return installResult{}, err
 	}
-	pkgAction, err := writeIfChanged(pkgPath, oldPkg, []byte("{\n  \"name\": \"deja\",\n  \"type\": \"module\"\n}\n"))
+	pkgAction, err := writeIfChanged(pkgPath, oldPkg, []byte("{\n  \"name\": \"deja\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\"\n}\n"))
 	if err != nil {
 		return installResult{}, err
 	}
@@ -698,6 +704,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if pkgAction != "unchanged" {
 		cmdAction = pkgAction
 	}
+	var status installResult
 	if withAuto {
 		autoPath := dshAutoPath()
 		oldAuto, err := readConfig(autoPath)
@@ -711,8 +718,18 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if autoAction != "unchanged" {
 			cmdAction = autoAction
 		}
-	} else if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
-		return installResult{}, err
+		statusAction, serr := writeDSHStatus(hookExe)
+		if serr != nil {
+			return installResult{}, serr
+		}
+		status = installResult{Path: dshStatusDir(), Action: statusAction}
+	} else {
+		if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
+			return installResult{}, err
+		}
+		if err := os.RemoveAll(dshStatusDir()); err != nil {
+			return installResult{}, err
+		}
 	}
 	a, err := writeIfChanged(path, old, []byte(patched))
 	if err != nil {
@@ -721,7 +738,11 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	// The plugin directory rides along: the files in it are deja's own and
 	// went unnamed on the screen whose job is saying what was touched (#3254).
 	plugins := installResult{Path: filepath.Dir(cmdPath), Action: cmdAction}
-	return wroteAll(installResult{Path: path, Action: a, Note: note}, plugins), nil
+	results := []installResult{{Path: path, Action: a, Note: note}, plugins}
+	if status.Path != "" {
+		results = append(results, status)
+	}
+	return wroteAll(results...), nil
 }
 
 // dshKeepSwitches carries a `disabled: true` the reader put on one of deja's

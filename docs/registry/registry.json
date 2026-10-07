@@ -48,7 +48,7 @@
       },
       "surfaces": {
         "digest": {"status": "partial", "proof": "stand", "note": "only under the `deja aider` wrapper, which writes the read: file aider re-reads on every message (aider 0.86.2)"},
-        "prompt": {"status": "no", "proof": "todo", "note": "the wrapper writes the read: file once; tailing the chat history lands one prompt late (stand on 0.86.2, history to request in 3-30 ms), so it needs a pty hand-off (#4801)"},
+        "prompt": {"status": "partial", "proof": "stand", "note": "only under `deja aider` on macOS and Linux: the wrapper serves a read-only file from a named pipe, and aider reads it after logging the message, so each read carries the recall for that message (aider 0.86.2). Windows keeps the file written at start"},
         "pre_tool": {"status": "no", "proof": "blocked", "note": "aider has no hooks: none in 0.86.2 or on main, and the hook request Aider-AI/aider#5712 is open"},
         "failure": {"status": "no", "proof": "blocked", "note": "aider has no hooks: none in 0.86.2 or on main, and the hook request Aider-AI/aider#5712 is open"},
         "compaction_reset": {"status": "no", "proof": "blocked", "note": "aider has no hooks and keeps its chat summary in memory only (0.86.2 base_coder.py)"},
@@ -83,7 +83,7 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "threads from 0.0.1774963753 on live on ampcode.com; only older local threads are read"
+        "prereq": "threads from 0.0.1774963753 on live on ampcode.com; deja reads those its plugin has written out, and older local ones"
       },
       "gaps": {},
       "surfaces": {
@@ -92,18 +92,18 @@
         "pre_tool": {"status": "yes", "proof": "fixture"},
         "failure": {"status": "yes", "proof": "fixture"},
         "compaction_reset": {
-          "status": "no",
-          "proof": "todo",
-          "note": "no compaction event in 0.0.1791360091 (PluginEventMap has none); a catch-up on agent.start comparing messages() with messages({full:true}) is possible (#4801)"
+          "status": "yes",
+          "proof": "fixture",
+          "note": "no compaction event in 0.0.1791360091; the plugin compares messages() with messages({full: true}) on agent.start and hands the turns before the cut to hook-precompact"
         },
-        "compaction_capture": {"status": "no", "proof": "todo", "note": "no compaction event in 0.0.1791360091; the catch-up on agent.start would capture after the fact (#4801)"},
-        "compaction_packet": {"status": "no", "proof": "todo", "note": "no compaction event in 0.0.1791360091; the packet would follow the catch-up (#4801)"},
+        "compaction_capture": {"status": "yes", "proof": "fixture"},
+        "compaction_packet": {"status": "yes", "proof": "fixture", "note": "rides hook-prompt on the same agent.start"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Amp yet (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "the plugin API has no status line; a notification is the closest surface (#4801)"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "threads live only on Amp's server since 0.0.1774963753, so the local reader sees older threads only; a plugin export on agent.end is #4801"}
+        "rules": {"status": "yes", "proof": "fixture", "note": "$HOME/.config/amp/AGENTS.md, always included when it exists (ampcode.com/docs/customize/agents-md)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "amp.createStatusItem, beside the prompt editor (@ampcode/plugin index.d.ts), refreshed on agent.end"},
+        "reader": {"status": "partial", "proof": "fixture", "note": "threads live on Amp's server since 0.0.1774963753; the plugin writes each thread it runs to the thread store on agent.end, so threads from before it was installed are not read"}
       }
     },
     {
@@ -355,7 +355,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "VS Code shows a status item only from an extension of its own (#4801)"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "the vscode-auto target adds a local extension that shows deja statusline in VS Code's status bar (VS Code 1.140)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction summaries are not checked, and VS Code deletes old transcripts (#4801)"}
       }
     },
@@ -399,7 +399,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "whether cursor-agent's .cursor/rules walk reaches the home directory is unchecked (#4801)"},
+        "rules": {"status": "partial", "proof": "fixture", "note": "~/.cursor/rules/deja-rules.mdc with alwaysApply; cursor-agent finds .cursor/rules only by walking up from the working directory (loadRulesFromDirAndAncestors, 2026.10.01), so projects outside the home directory miss it, and the IDE's user rules live on Cursor's server"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the cursor-auto target writes statusLine in cli-config.json for cursor-agent"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -447,8 +447,8 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for dsh yet (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "the plugin can show notes in /deja only; no status line found (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "$DSH_HOME/AGENTS.md, the user-global head of the instruction chain (0.2.0-rc.2)"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "the deepseek-auto target adds a web client plugin that shows the line under the composer (0.2.0-rc.2); dsh has no terminal UI"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -740,8 +740,8 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand"},
-        "rules": {"status": "no", "proof": "todo", "note": "not wired; the agent workspace's AGENTS.md reaches the model (stand on 2026.9.8) (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status surface in the generated plugin (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
+        "statusline": {"status": "partial", "proof": "stand", "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction entries are dropped by the reader (#4801)"}
       }
     },
@@ -817,16 +817,16 @@
         }
       },
       "surfaces": {
-        "digest": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "prompt": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "pre_tool": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "failure": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_reset": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_capture": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_packet": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
+        "digest": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "prompt": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "pre_tool": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "failure": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_reset": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_capture": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_packet": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
+        "session_end": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "cn has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture", "note": "the index keeps the turns a compaction rewrote out of the file (#4800)"}
@@ -1170,7 +1170,7 @@
       ],
       "parser_source": "internal/sources/commandcode.go",
       "display_name": "Command Code",
-      "last_verified": "2026-10-01",
+      "last_verified": "2026-10-07",
       "capabilities": {
         "mcp": true,
         "auto": true,
@@ -1183,18 +1183,18 @@
       "gaps": {},
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
-        "prompt": {"status": "no", "proof": "todo", "note": "four shell hooks only; mods, or a PreToolUse answer read from transcript_path (#4801)"},
+        "prompt": {"status": "yes", "proof": "stand", "note": "the mod's transformContext adds the recall to the question on every model call of the turn; a PreToolUse reads a transcript the turn is not yet written to (1.77.0 stand)"},
         "pre_tool": {"status": "yes", "proof": "fixture"},
         "failure": {"status": "yes", "proof": "fixture"},
-        "compaction_reset": {"status": "no", "proof": "todo", "note": "mods get compaction_start and compaction_done (mod-builder api.md:81) (#4801)"},
-        "compaction_capture": {"status": "no", "proof": "todo", "note": "mods get compaction_start and compaction_done (mod-builder api.md:81) (#4801)"},
-        "compaction_packet": {"status": "no", "proof": "todo", "note": "mods get compaction_start and compaction_done (mod-builder api.md:81) (#4801)"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "no compaction shell hook; the transcript gets a compaction record and keeps the turns above it, and the next PreToolUse catches it up (1.77.0 stand)"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next PreToolUse"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "no", "proof": "todo", "note": "mods get onSessionEnd (mod-builder api.md:77), shell hooks do not; wiring it is #4797"},
+        "session_end": {"status": "yes", "proof": "stand", "note": "the mod's onSessionEnd"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "blocked", "note": "Command Code has no status line, footer or toast a third party can write to"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the transcript reader (#4801)"}
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the mod's cmd.ui.setStatus, a footer segment under the input in the TUI (mod-builder ui.md, 1.77.0); headless runs show none"},
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1229,13 +1229,13 @@
         "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
-        "compaction_reset": {"status": "no", "proof": "todo", "note": "no PreCompact (diagnosing-hooks SKILL.md:26); a catch-up from transcript_path is possible (#4801)"},
-        "compaction_capture": {"status": "no", "proof": "todo", "note": "no PreCompact; caught up from transcript_path (#4801)"},
-        "compaction_packet": {"status": "no", "proof": "todo", "note": "no PreCompact; the packet would follow the catch-up (#4801)"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "no PreCompact; the CLI database keeps the turns a compact_summary message replaced, and the next prompt or tool hook catches it up (3.14.4 stand)"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next UserPromptSubmit or PreToolUse"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "blocked", "note": "ZCode CLI 0.16.9 has seven hook events and no session end (contracts/src/hooks/index.ts:7-15); Stop fires every turn"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for ZCode yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "~/.zcode/AGENTS.md, the user scope of its instructions (bls in vendor/zcode.cjs, 3.14.4); a stub endpoint saw it"},
         "statusline": {"status": "no", "proof": "blocked", "note": "ZCode has no status line, footer or toast a third party can write to"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the reader (#4801)"}
       }
@@ -1466,14 +1466,14 @@
         "prompt": {"status": "yes", "proof": "stand"},
         "pre_tool": {"status": "partial", "proof": "stand", "note": "tool_call_before additionalContext reaches the model only on a tool that ran without error (0.10.0 stand)"},
         "failure": {"status": "no", "proof": "blocked", "note": "tool_call_after stdout is discarded and a failed call's result drops tool_call_before context (turn_loop.rs, 0.10.0 stand)"},
-        "compaction_reset": {"status": "no", "proof": "todo", "note": "artifacts/context-transfer-<id>.json can be caught up (#4801)"},
-        "compaction_capture": {"status": "no", "proof": "todo", "note": "artifacts/context-transfer-<id>.json can be caught up (#4801)"},
-        "compaction_packet": {"status": "no", "proof": "todo", "note": "artifacts/context-transfer-<id>.json can be caught up (#4801)"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "no compaction hook; the history saved as artifacts/context-transfer-<id>.json beside its .md summary is caught up on the next message or tool call (0.10.0 stand)"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next message_submit or tool_call_before"},
         "mcp": {"status": "yes", "proof": "stand"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand", "note": "fires on /quit, not on a kill"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status surface identified for CodeWhale yet (#4801)"},
+        "statusline": {"status": "no", "proof": "blocked", "note": "CodeWhale 0.10.0's footer takes only built-in items (StatusItem in crates/tui/src/config.rs: mode, model, cost, git_branch and the like), and observer hook stdout is discarded"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the reader (#4801)"}
       }
     },
@@ -1560,7 +1560,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Reasonix yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "AGENTS.md in the Reasonix home (2.30.0)"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "host/ui/publish"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1608,7 +1608,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status line found in traecli 0.207 (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; 0.207.1 and 0.208.1-alpha.5 load it, and the TUI runs nothing before an enterprise login"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -1652,8 +1652,8 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Muse yet (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status line found for Muse yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "the first of <config>/muse/AGENTS.md, ~/.claude/CLAUDE.md and $CODEX_HOME/AGENTS.md, which is the one Muse loads (1.4.3)"},
+        "statusline": {"status": "no", "proof": "blocked", "note": "Muse 1.4.3's bottom bar (/hud, tui.hud) has a fixed item set: model, effort, path, permissions, context, branch, tokens, cost, quota; plugins add skills, commands, hooks, MCP servers and reminders, nothing in the UI"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -31,15 +32,13 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "deepseek", "openclaw", "reasonix", "muse"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
-// most of them a marker in the file arriving at a stub endpoint, Zed and the
-// Cline extension, prime and Senpi from their source. Cursor has no fixed
-// global file (its rules walk up from the working directory, and user rules
-// live on its server), and Muse is left out until a stand shows one: a block in
-// a file the agent never reads looks like a rule that was delivered.
+// most of them a marker in the file arriving at a stub endpoint, Zed, the
+// Cline extension and Cursor from their source, prime and Senpi from theirs: a
+// block in a file the agent never reads looks like a rule that was delivered.
 func rulesPath(harness string) string {
 	return rulesFileFor(harness).path
 }
@@ -191,6 +190,17 @@ func rulesFileFor(harness string) rulesFile {
 		// The app runs CodeBuddy's CLI with its own config dir, so the same
 		// file name there (measured on the bundled CLI 2.147.0).
 		return sharedRules(filepath.Join(sources.WorkBuddyConfigDir(), "CODEBUDDY.md"))
+	case "zcode":
+		// zcode-app-cli 3.14.4 reads ~/.zcode/AGENTS.md as the user scope of
+		// its instructions, ahead of the workspace's (bls and mls in
+		// vendor/zcode.cjs); a stub endpoint saw it as "user default
+		// instructions".
+		return sharedRules(filepath.Join(homeDir(), ".zcode", "AGENTS.md"))
+	case "amp":
+		// $HOME/.config/amp/AGENTS.md is always included when it exists
+		// (ampcode.com/docs/customize/agents-md). The directory is the one Amp
+		// keeps settings.json and its plugins in.
+		return sharedRules(filepath.Join(homeDir(), ".config", "amp", "AGENTS.md"))
 	case "commandcode":
 		// getUserMemoryPath in 1.77.0: ~/.commandcode/AGENTS.md, no override.
 		return sharedRules(filepath.Join(homeDir(), ".commandcode", "AGENTS.md"))
@@ -207,8 +217,79 @@ func rulesFileFor(harness string) rulesFile {
 		// and mode (see rooRulesPath). The extension's own storage is what says
 		// Roo is here; the rules directory is ours to create.
 		return rulesFile{path: filepath.Join(homeDir(), ".roo", "rules", "deja-rules.md"), root: rooFirstRoot()}
+	case "cursor":
+		// cursor-agent loads <dir>/.cursor/rules/*.mdc in every directory from
+		// the working directory up to / (loadRulesFromDirAndAncestors on
+		// 2026.10.01), and its own "User Rule" goes to ~/.cursor/rules. So the
+		// rule reaches projects under the home directory only; the IDE's user
+		// rules live on Cursor's server.
+		dir := filepath.Join(homeDir(), ".cursor")
+		return rulesFile{
+			path:   filepath.Join(dir, "rules", "deja-rules.mdc"),
+			root:   dir,
+			header: "---\nalwaysApply: true\n---\n\n",
+		}
+	case "deepseek":
+		// $DSH_HOME/AGENTS.md opens the instruction chain of every session
+		// (dsh-agent-instructions; a stub endpoint saw it on 0.2.0-rc.2).
+		return sharedRules(filepath.Join(sources.DSHHome(), "AGENTS.md"))
+	case "reasonix":
+		// User-global instruction files sit in the Reasonix home, AGENTS.md
+		// and REASONIX.md alike, and REASONIX_HOME moves them (stub endpoint
+		// on 2.30.0).
+		return sharedRules(filepath.Join(sources.ReasonixHome(), "AGENTS.md"))
+	case "openclaw":
+		// The agent workspace's AGENTS.md goes into the Project Context of
+		// every session (stub endpoint on 2026.9.8). OpenClaw seeds it on
+		// setup, and a workspace with any bootstrap file in it never gets the
+		// first-run ritual, so deja adds to one that exists and never creates it.
+		ws := openclawWorkspace()
+		return rulesFile{path: filepath.Join(ws, "AGENTS.md"), root: ws, existing: true}
+	case "muse":
+		return museRules()
 	}
 	return rulesFile{}
+}
+
+// openclawWorkspace is the default agent's workspace: OPENCLAW_WORKSPACE_DIR,
+// then agents.defaults.workspace in openclaw.json, then <state dir>/workspace.
+func openclawWorkspace() string {
+	if v := strings.TrimSpace(os.Getenv("OPENCLAW_WORKSPACE_DIR")); v != "" {
+		return v
+	}
+	if v, _ := openclawConfigAt("agents", "defaults", "workspace").(string); strings.TrimSpace(v) != "" {
+		v = strings.TrimSpace(v)
+		if v == "~" || strings.HasPrefix(v, "~/") || strings.HasPrefix(v, `~\`) {
+			return filepath.Join(homeDir(), strings.TrimLeft(v[1:], `/\`))
+		}
+		return v
+	}
+	return filepath.Join(sources.OpenClawStateDir(), "workspace")
+}
+
+// museRules: Muse 1.4.3 loads one personal rules file, the first of its own
+// <config>/muse/AGENTS.md, ~/.claude/CLAUDE.md and $CODEX_HOME/AGENTS.md (a stub
+// endpoint saw each win in turn). Creating its own file would hide the
+// reader's CLAUDE.md, so the block goes into whichever already wins. With
+// context.foreign_personal_rules off only its own file loads. CLAUDE_CONFIG_DIR
+// does not move the second one.
+func museRules() rulesFile {
+	dir := filepath.Join(xdgConfigHome(), "muse")
+	own := filepath.Join(dir, "AGENTS.md")
+	var settings struct {
+		Context struct {
+			ForeignPersonalRules *bool `json:"foreign_personal_rules"`
+		} `json:"context"`
+	}
+	if b, err := os.ReadFile(museSettingsPath()); err == nil {
+		_ = json.Unmarshal(b, &settings)
+	}
+	if p := settings.Context.ForeignPersonalRules; p != nil && !*p {
+		return rulesFile{path: own, root: dir}
+	}
+	return rulesFile{path: firstExisting(own,
+		filepath.Join(homeDir(), ".claude", "CLAUDE.md"),
+		filepath.Join(sources.CodexHome(), "AGENTS.md")), root: dir}
 }
 
 // firstExisting is for a harness that loads the first of several files and

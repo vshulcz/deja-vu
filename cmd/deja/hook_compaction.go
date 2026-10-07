@@ -112,6 +112,19 @@ func catchUpCompaction(dir string, input precompactHookInput) {
 	})
 }
 
+// catchUpZCodeCompaction does it for ZCode, whose hooks have no compaction
+// event and whose database keeps the summarised turns. The payload says it is
+// ZCode's by the temp transcript ZCode writes for every hook call.
+func catchUpZCodeCompaction(dir string, input precompactHookInput) {
+	if !sources.ZCodeHookTranscript(input.TranscriptPath) {
+		return
+	}
+	input.TranscriptPath = sources.ZCodeDB()
+	catchUpCompactionWith(dir, input, func() (sources.CompactionTranscript, bool, error) {
+		return sources.ReadZCodeCompaction(input.SessionID)
+	})
+}
+
 // catchUpCompactionWith is the same for a host whose transcript marks the
 // compaction its own way: Antigravity writes a CHECKPOINT step.
 func catchUpCompactionWith(dir string, input precompactHookInput, read func() (sources.CompactionTranscript, bool, error)) {
@@ -172,6 +185,14 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 	if transcript.Workspace == "" || compactionWorkspace(transcript.Workspace) != workspace {
 		failure("workspace_mismatch")
 		return index.CompactionState{}, false
+	}
+	// A host that saves the message deja answered with its recall in it
+	// (CodeWhale's message_submit, Amp's agent.start) keeps the person's words
+	// in front of the block; the block alone would make the turn noise.
+	for i, m := range transcript.Session.Messages {
+		if m.Role == "user" && strings.Contains(m.Text, "<deja-recall>") {
+			transcript.Session.Messages[i].Text = digest.StripHarnessBlocks(m.Text)
+		}
 	}
 	data := digest.ExtractCompactionContext(transcript.Session, digest.ExtractOptions{})
 	withCommandOutcomes(&data, transcript.Session)
