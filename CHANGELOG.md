@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `deja rules sync` writes to 32 agents, up from 8. The new ones are Copilot CLI and Chat, Cline, Roo, Continue, Kilo, Zed, Crush, Kiro, CodeBuddy, WorkBuddy, Cherry Studio, CodeWhale, Command Code, TRAE CLI, Hermes, aider, Antigravity, pi, omp, Senpi, gjc, prime-agent and Kimchi. A stand or the host's source showed each file reaching the model. Where a host loads only the first of several files, the block goes into the one already loaded, so opencode and Kilo no longer lose a `~/.claude/CLAUDE.md` they were reading (#4805).
+- The harnesses page has a table of every hook surface per harness (digest, per-prompt, pre-tool, after-failure, compaction, MCP, handoff, session end, rules, statusline, reader), each with how it was checked and why a missing one is missing. A test installs every target and fails when the table and the wiring disagree (#4801).
 - `deja recall <words>` prints the page the MCP recall tool answers, for a skill or script that runs deja through the shell. `deja search --json` was the only option there and ran to 1-2 MB, which harnesses truncate to nothing (#4781).
 
 ### Changed
