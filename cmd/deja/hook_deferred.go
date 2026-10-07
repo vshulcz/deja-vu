@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -41,6 +42,8 @@ const (
 	// has passed.
 	deferredTTL = 2 * time.Hour
 )
+
+var deferredSeq atomic.Uint64
 
 func deferredRoot(dir string) string { return filepath.Join(dir, "deferred") }
 
@@ -87,7 +90,10 @@ func deferText(dir, key, hook, text string) {
 			}
 		}
 	}
-	name := fmt.Sprintf("%s-%020d", order, time.Now().UnixNano())
+	// Windows' clock can hand two calls in a row the same nanosecond, and the
+	// rename would put the second pair over the first: the sequence and the pid
+	// keep the names apart and the order intact.
+	name := fmt.Sprintf("%s-%020d-%010d-%d", order, time.Now().UnixNano(), deferredSeq.Add(1), os.Getpid())
 	tmp := filepath.Join(d, "."+name)
 	if err := os.WriteFile(tmp, []byte(text), 0o600); err != nil {
 		return
