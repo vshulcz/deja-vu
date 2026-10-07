@@ -858,10 +858,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
-		// Both halves in one result, in the order they run: the config and
+		status, err := installGrokStatusline(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Every half in one result, in the order they run: the config and
 		// settings writes reached nobody while the first result was dropped
 		// (#3220, the #3185 shape).
-		return wroteAll(base, hooks), nil
+		return wroteAll(base, hooks, status), nil
 	case "qwen":
 		return installMCPJSON(filepath.Join(sources.QwenConfigDir(), "settings.json"), exe, uninstall)
 	case "qwen-auto":
@@ -877,10 +881,14 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
-		// Both halves, not just the last one. Returning the MCP result alone
+		status, err := installQwenStatusline(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		// Every half, not just the last one. Returning the MCP result alone
 		// meant a machine that already had the server was told "unchanged"
 		// while the hooks under it were being rewired.
-		return wroteAll(hooks, mcp), nil
+		return wroteAll(hooks, mcp, status), nil
 	case "trae":
 		return installTrae(exe, uninstall)
 	case "trae-auto":
@@ -928,7 +936,11 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		if err != nil {
 			return installResult{}, err
 		}
-		return wroteAll(mcp, hooks), nil
+		status, err := installKimiStatusline(exe, uninstall)
+		if err != nil {
+			return installResult{}, err
+		}
+		return wroteAll(mcp, hooks, status), nil
 	case "zed":
 		return installZedMCP(sources.ZedSettingsPath(), exe, uninstall)
 	case "cline":
@@ -1075,6 +1087,11 @@ func wroteAll(rs ...installResult) installResult {
 	}
 	var also []string
 	for _, r := range rs {
+		if r.Path != "" && r.Path == out.Path && r.Note != "" && !strings.Contains(out.Note, r.Note) {
+			// A second write to the same file with something to say: the
+			// status line left in the settings file the hooks went into.
+			also = append(also, r.Note)
+		}
 		if r.Path == "" || r.Path == out.Path {
 			continue
 		}
@@ -1199,7 +1216,11 @@ func installCursorAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return wroteAll(mcp, hooks), nil
+	status, err := installCursorStatusline(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, hooks, status), nil
 }
 
 func installCodexAuto(exe string, uninstall bool) (installResult, error) {
@@ -1245,10 +1266,14 @@ func installOpencodeAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	if mcpErr != nil {
-		return plugin, mcpErr
+	tui, err := installOpencodeTUI(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
 	}
-	return wroteAll(mcp, plugin), nil
+	if mcpErr != nil {
+		return wroteAll(plugin, tui), mcpErr
+	}
+	return wroteAll(mcp, plugin, tui), nil
 }
 
 // pruneGuidanceDirs drops the directories install had to create for a guidance
@@ -2566,9 +2591,12 @@ func adoptMatcher(entry map[string]any, hooks []any, matcher string) {
 }
 
 // combinedStatusline builds a command that runs the existing statusline and
-// deja's, separated by a middle dot.
+// deja's, separated by a middle dot. Each output goes through $(…), which
+// drops its trailing newline: printed as is, a script ending in one put deja
+// on a second row, and Kimi and CodeBuddy, which show the first row only, lost
+// it (stands on Kimi 2.1.1 and CodeBuddy 2.16.0).
 func combinedStatusline(existing, exe string) string {
-	return fmt.Sprintf(`sh -c 'json=$(cat); printf "%%s" "$json" | %s; printf " · "; printf "%%s" "$json" | %s statusline'`, existing, exe)
+	return fmt.Sprintf(`sh -c 'json=$(cat); printf "%%s · %%s\n" "$(printf "%%s" "$json" | %s)" "$(printf "%%s" "$json" | %s statusline)"'`, existing, exe)
 }
 
 // statuslineIsDejas reports whether Claude's settings carry a status bar deja

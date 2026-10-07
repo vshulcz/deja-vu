@@ -65,6 +65,12 @@
 <p>session asked for it is not written down, and deja does not guess. A</p>
 <p><code>grok -p</code> run is marked <code>headless</code>, which says how the session was started,</p>
 <p>not that something spawned it, so deja records no kind for it (#4585).</p>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install grok-auto</code> adds <code>[ui.status_line]</code> with <code>type = &#34;command&#34;</code> to the</p>
+<p>user <code>config.toml</code>; Grok ignores the table in a project config. It pipes</p>
+<p>Claude&#39;s payload, <code>transcript_path</code> included once the first prompt is in, and</p>
+<p>reads the config at startup only. A status line already set there is left</p>
+<p>alone. Rendered live on 1.0.41.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The ACP stream contains large tool updates. deja filters lines for message chunk kinds before decoding JSON.</li>

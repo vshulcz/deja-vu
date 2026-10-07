@@ -108,6 +108,12 @@
 <p><code>notebook_edit</code> a file from <code>path</code> and written lines from <code>source</code> when its</p>
 <p><code>action</code> is <code>insert</code> or <code>replace</code>. A notebook path relative to the session</p>
 <p>directory is put under it (#4534).</p>
+<h2 id="status-line">Status line</h2>
+<p><code>deja install kilocode-auto</code> adds the opencode 1.x TUI plugin to Kilo CLI:</p>
+<p><code>plugins/deja-status.tsx</code> in <code>~/.config/kilo</code>, listed in its <code>tui.json</code>. It</p>
+<p>runs <code>deja statusline</code> every 10 seconds and when the session changes, and</p>
+<p>shows the line in the sidebar, the prompt row and the home screen. Rendered</p>
+<p>live on Kilo CLI 7.8.8. The VS Code extension has no such surface.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Resume: <code>kilo -s &lt;id&gt;</code> for a session from the CLI store — &#34;session id to</li>

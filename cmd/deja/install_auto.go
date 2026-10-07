@@ -592,18 +592,26 @@ var opencodeVersionMajor = opencodeVersionMajorReal
 // 2.0 home has already migrated its tables. Neither answers on a machine where
 // opencode has never run, and a fresh install is 2.x.
 func opencodePluginJSFor(exe string) string {
+	if opencodeIsV1() {
+		return opencodeLegacyPluginJS(exe)
+	}
+	return opencodePluginJS(exe)
+}
+
+// opencodeIsV1 is whether the opencode here loads 1.x plugins.
+func opencodeIsV1() bool {
 	switch major := opencodeVersionMajor(); {
 	case major == 1:
-		return opencodeLegacyPluginJS(exe)
+		return true
 	case major >= 2:
-		return opencodePluginJS(exe)
+		return false
 	}
 	if db := sources.OpencodeDB(); db != "" {
 		if _, err := os.Stat(db); err == nil && !sources.OpencodeStoreIsV2(db) {
-			return opencodeLegacyPluginJS(exe)
+			return true
 		}
 	}
-	return opencodePluginJS(exe)
+	return false
 }
 
 // opencodeLegacyPluginJS is the 1.x plugin: a named export returning the

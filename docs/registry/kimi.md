@@ -49,4 +49,12 @@ Media is out of scope.
 Requested and specified by [@yearth](https://github.com/yearth) in
 [#248](https://github.com/vshulcz/deja-vu/issues/248).
 
+## Status line
+
+`deja install kimi-auto` adds `[status_line] command` to
+`$KIMI_CODE_HOME/tui.toml`. Kimi Code has read it since 0.30.0; 0.28 and 0.29
+have no status line and ignore the file. Kimi pipes camelCase JSON with
+`sessionId` and no transcript path, and drops an answer slower than 300 ms. A
+status line already set there is left alone. Rendered live on 2.1.1.
+
 **Last verified:** 2026-07-28

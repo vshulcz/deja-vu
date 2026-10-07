@@ -36,6 +36,13 @@ directory is gone, or deja cannot tell which directory the session ran in,
 resume refuses and points at `deja show <id>`: the bare command would only get
 "No saved session found".
 
+## Status line
+
+`deja install qwen-auto` sets `ui.statusLine` in `settings.json` to a command
+with `refreshInterval: 1`. Qwen pipes `session_id` and the workspace but no
+transcript path, so deja finds the session by its id. A status line already
+set there is left alone. Rendered live on 0.20.0.
+
 ## Known quirks and drift
 
 - JSONL can end in a partial line while Qwen is writing. Malformed lines are skipped.

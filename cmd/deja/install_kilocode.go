@@ -157,7 +157,11 @@ func installKilocodeAuto(exe string, uninstall bool) (installResult, error) {
 	if err != nil {
 		return installResult{}, err
 	}
-	return wroteAll(mcp, plugin), nil
+	tui, err := installKiloTUI(exe, uninstall)
+	if err != nil {
+		return installResult{}, err
+	}
+	return wroteAll(mcp, plugin, tui), nil
 }
 
 // kilocodePluginJS is opencode's 1.x plugin whatever opencode is on PATH. Kilo
