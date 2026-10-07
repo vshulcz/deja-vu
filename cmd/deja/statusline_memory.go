@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -92,10 +93,14 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 	if id == "" {
 		id = strings.TrimSpace(in.KimiSessionID)
 	}
+	// The transcript's name is the id on most hosts; agy names every one
+	// transcript.jsonl and sends the id as session_id, so that is the fallback.
+	ids := []string{id}
 	if strings.TrimSpace(in.TranscriptPath) != "" {
-		id = strings.TrimSuffix(filepath.Base(in.TranscriptPath), ".jsonl")
+		ids = []string{strings.TrimSuffix(filepath.Base(in.TranscriptPath), ".jsonl"), id}
 	}
-	if id == "" || id == "." || id == string(filepath.Separator) {
+	ids = slices.DeleteFunc(ids, func(s string) bool { return s == "" || s == "." || s == string(filepath.Separator) })
+	if len(ids) == 0 {
 		return fileMemory{}, false
 	}
 	metas, err := index.AllMeta(dir)
@@ -115,7 +120,10 @@ func statuslineMemory(dir string, in transcriptSource) (fileMemory, bool) {
 			break
 		}
 	}
-	if !found {
+	for _, id := range ids {
+		if found {
+			break
+		}
 		for _, m := range metas {
 			if m.ID == id {
 				self, found = m, true
