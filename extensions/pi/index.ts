@@ -155,9 +155,7 @@ export default function (pi: any) {
         }
         return;
       }
-      const key = sessionKey(event, ctx);
-      if (key) session = key;
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: key }));
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: session }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");
