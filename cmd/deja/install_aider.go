@@ -398,13 +398,18 @@ func writeAiderContext(body string) error {
 	if err != nil {
 		return err
 	}
-	// The file is aider's only global context, so `deja rules sync` keeps the
-	// reader's rules in it as a block; the refresh carries that block over.
-	if start, end := markerLines(string(old), rulesStart, rulesEnd); start >= 0 && end >= 0 {
-		body = strings.TrimRight(body, "\n") + "\n\n" + string(old)[start:end]
-	}
-	_, err = writeIfChanged(path, old, []byte(body))
+	_, err = writeIfChanged(path, old, []byte(withAiderRules(body, string(old))))
 	return err
+}
+
+// withAiderRules carries the rules block over from old. The context file is
+// aider's only global context, so `deja rules sync` keeps the reader's rules in
+// it as a block.
+func withAiderRules(body, old string) string {
+	if start, end := markerLines(old, rulesStart, rulesEnd); start >= 0 && end >= 0 {
+		return strings.TrimRight(body, "\n") + "\n\n" + old[start:end]
+	}
+	return body
 }
 
 // aiderLeadFor names the directory the digest was built for. Every aider on
@@ -472,7 +477,16 @@ func cmdAider(dir string, rest []string, sourceInstance string) error {
 	if err != nil {
 		return fmt.Errorf("aider is not on PATH: %w", err)
 	}
-	cmd := exec.Command(bin, rest...)
+	args := rest
+	if wd, err := os.Getwd(); err == nil {
+		if extra, stop, ok := startAiderLive(dir, rest, wd, body); ok {
+			defer stop()
+			args = append(slices.Clone(rest), extra...)
+		} else {
+			args = append(slices.Clone(rest), aiderReadArgs(rest, wd, aiderContextPath())...)
+		}
+	}
+	cmd := exec.Command(bin, args...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return runOutlivingSignals(cmd)
 }

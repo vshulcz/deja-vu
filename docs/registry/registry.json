@@ -48,7 +48,7 @@
       },
       "surfaces": {
         "digest": {"status": "partial", "proof": "stand", "note": "only under the `deja aider` wrapper, which writes the read: file aider re-reads on every message (aider 0.86.2)"},
-        "prompt": {"status": "no", "proof": "todo", "note": "the wrapper writes the read: file once; tailing the chat history lands one prompt late (stand on 0.86.2, history to request in 3-30 ms), so it needs a pty hand-off (#4801)"},
+        "prompt": {"status": "partial", "proof": "stand", "note": "only under `deja aider` on macOS and Linux: the wrapper serves a read-only file from a named pipe, and aider reads it after logging the message, so each read carries the recall for that message (aider 0.86.2). Windows keeps the file written at start"},
         "pre_tool": {"status": "no", "proof": "blocked", "note": "aider has no hooks: none in 0.86.2 or on main, and the hook request Aider-AI/aider#5712 is open"},
         "failure": {"status": "no", "proof": "blocked", "note": "aider has no hooks: none in 0.86.2 or on main, and the hook request Aider-AI/aider#5712 is open"},
         "compaction_reset": {"status": "no", "proof": "blocked", "note": "aider has no hooks and keeps its chat summary in memory only (0.86.2 base_coder.py)"},
@@ -817,16 +817,16 @@
         }
       },
       "surfaces": {
-        "digest": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "prompt": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "pre_tool": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "failure": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_reset": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_capture": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "compaction_packet": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
+        "digest": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "prompt": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "pre_tool": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "failure": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_reset": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_capture": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
+        "compaction_packet": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
+        "session_end": {"status": "no", "proof": "blocked", "note": "cn 1.5.47 (latest on npm) loads Claude-format hooks from ~/.claude/settings.json and $CONTINUE_GLOBAL_DIR/settings.json (Q2i) and never calls fireEvent; on main (5522c6f44) the fire* helpers in hooks/fireHook.ts have no caller. Stand: 9 handlers loaded, none ran, a failing Bash call included"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "cn has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture", "note": "the index keeps the turns a compaction rewrote out of the file (#4800)"}

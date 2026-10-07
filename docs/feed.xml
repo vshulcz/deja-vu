@@ -46,6 +46,13 @@
     <summary>A crash, a cleared window or a restart takes the agent&#39;s context but not the transcript — how to get the work back and stop paying for it next time.</summary>
   </entry>
   <entry>
+    <title>Add memory to aider: its read-only context — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-aider.html"></link>
+    <updated>2026-10-07T00:00:00Z</updated>
+    <summary>aider appends every message to one markdown log and reads none of it back. deja keeps a read-only context file current and indexes every agent on the machine.</summary>
+  </entry>
+  <entry>
     <title>Add memory to VS Code Copilot Chat — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html"></link>
@@ -275,13 +282,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Hermes stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/hermes.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/hermes.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Hermes writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Hermes stores its history — session format</title>

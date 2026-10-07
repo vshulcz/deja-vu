@@ -125,7 +125,9 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 	case "aider":
 		// No hooks: the target puts deja's context file in aider's read:
 		// list, which aider re-reads on every message and `deja aider` fills.
+		// The same wrapper serves the per-message recall (aider_live.go).
 		got["digest"] = strings.Contains(all, "aider-context.md")
+		got["prompt"] = got["digest"]
 	case "claude":
 		// A target of its own, deliberately outside --auto.
 		got["statusline"] = slices.Contains(installTargetNames(), "statusline")
