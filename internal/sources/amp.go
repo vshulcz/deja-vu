@@ -380,5 +380,9 @@ func ampProject(uri, fallback string) string {
 	if err != nil || u.Scheme != "file" || u.Path == "" {
 		return fallback
 	}
+	// file:///C:/work parses to /C:/work; the folder is C:\work.
+	if p := u.Path; len(p) >= 3 && p[0] == '/' && p[2] == ':' && (p[1]|0x20) >= 'a' && (p[1]|0x20) <= 'z' {
+		return filepath.FromSlash(p[1:])
+	}
 	return u.Path
 }

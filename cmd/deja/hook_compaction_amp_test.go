@@ -21,9 +21,14 @@ func TestAmpCatchUpIsCapturedOnce(t *testing.T) {
 	workspace := compactionGitRepo(t)
 	dir := index.DefaultDir()
 	thread := filepath.Join(t.TempDir(), "deja-amp-1.json")
+	// Amp writes file:///C:/work on Windows and file:///work elsewhere.
+	uri := "file://" + filepath.ToSlash(workspace)
+	if !strings.HasPrefix(filepath.ToSlash(workspace), "/") {
+		uri = "file:///" + filepath.ToSlash(workspace)
+	}
 	body, _ := json.Marshal(map[string]any{
 		"id": "T-1", "title": "", "created": 1791000000000,
-		"env": map[string]any{"initial": map[string]any{"trees": []any{map[string]any{"uri": "file://" + workspace}}}},
+		"env": map[string]any{"initial": map[string]any{"trees": []any{map[string]any{"uri": uri}}}},
 		"messages": []any{
 			map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": "fix the tokenizer test"}}},
 			map[string]any{"role": "assistant", "content": []any{map[string]any{"type": "text", "text": "the tokenizer fails on escapes"}}},
