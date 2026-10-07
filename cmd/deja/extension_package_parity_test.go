@@ -37,11 +37,12 @@ func TestExtensionPackagesRunEveryHookTheInstallerDoes(t *testing.T) {
 		{dir: "openclaw", targets: []string{"openclaw-auto"}},
 		{dir: "dsh", targets: []string{"deepseek-auto"}},
 		{dir: "hermes", targets: []string{"hermes-auto"}, cannot: map[string]string{
-			// The fix pair rides transform_tool_result, a plugin hook. The
-			// catalog package is a memory provider, and Hermes loads one with
-			// a context whose register_hook does nothing
+			// The fix pair and the file line (#4808) ride transform_tool_result,
+			// a plugin hook. The catalog package is a memory provider, and
+			// Hermes loads one with a context whose register_hook does nothing
 			// (plugins/memory/__init__.py _ProviderCollector, 0.17.0).
 			"hook-tool-after": "a Hermes memory provider cannot register hooks",
+			"hook-tool":       "a Hermes memory provider cannot register hooks",
 		}},
 		{dir: "grok", targets: []string{"grok-auto"}},
 		{dir: "opencode", targets: []string{"opencode-auto"}, generated: func() []string {

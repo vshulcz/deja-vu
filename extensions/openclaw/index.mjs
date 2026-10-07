@@ -14,6 +14,7 @@ import {
   installerPluginPath,
   mcpWired,
   promptText,
+  toolCall,
   where,
 } from "./lib.mjs"
 
@@ -246,6 +247,25 @@ export default {
         },
         { timeoutMs: 10000 },
       )
+      // A tool result middleware rewrites what the model reads back from a
+      // tool, the one place a line arrives beside the result it is about. It
+      // needs contracts.agentToolResultMiddleware in the manifest; an OpenClaw
+      // without the API goes without it.
+      if (typeof api.registerAgentToolResultMiddleware === "function") {
+        api.registerAgentToolResultMiddleware(
+          async (event, ctx) => {
+            try {
+              const call = toolCall(event, where(seen, event, ctx, process.cwd()))
+              if (!call) return
+              const line = await ask(call.args, JSON.stringify(call.payload), 5000)
+              if (!line) return
+              const content = Array.isArray(event.result && event.result.content) ? event.result.content : []
+              return { result: { ...event.result, content: [...content, { type: "text", text: line }] } }
+            } catch {}
+          },
+          { runtimes: ["openclaw"] },
+        )
+      }
     }
 
     // /deja answers the person directly. The hooks above only reach the

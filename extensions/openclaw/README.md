@@ -37,6 +37,9 @@ what is missing.
   was in the middle of.
 - **At the end of a session** (`session_end`): the session's live stamp goes,
   so the next session's recall can answer with it.
+- **After a tool** (tool result middleware): a read or an edit gets what past
+  sessions decided about that file, and a failed command gets what this machine
+  ran after the same error before, beside the result the model reads.
 - **Tools**: `deja_recall` (search the history), `deja_fix` (what was run after
   this error before), `deja_blame` (which sessions touched a file and what they
   concluded).
