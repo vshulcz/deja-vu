@@ -437,10 +437,10 @@
         }
       },
       "surfaces": {
-        "digest": {"status": "yes", "proof": "fixture"},
-        "prompt": {"status": "yes", "proof": "fixture"},
+        "digest": {"status": "yes", "proof": "stand"},
+        "prompt": {"status": "yes", "proof": "stand"},
         "pre_tool": {"status": "yes", "proof": "fixture"},
-        "failure": {"status": "yes", "proof": "fixture"},
+        "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
