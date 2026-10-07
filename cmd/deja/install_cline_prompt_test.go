@@ -102,6 +102,57 @@ console.log(String(out ? out.filter((m) => m.role === "user").length : 0));
 	}
 }
 
+// Under --yolo, Cline 3.0.69 appends its own "[SYSTEM] This run is not
+// complete..." as a second user message. The recall has to be asked for the
+// person's prompt, not that reminder (stand, 07.10).
+func TestClinePluginSkipsClinesOwnSystemReminder(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stub deja is a shell script")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed to run the plugin cline would run")
+	}
+	home := t.TempDir()
+	stub := filepath.Join(home, "deja")
+	calls := filepath.Join(home, "calls")
+	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$* $in\" >> " + calls + "\n"
+	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plugin := filepath.Join(home, "index.mjs")
+	if err := os.WriteFile(plugin, []byte(clinePluginJS(stub)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+import plugin from ` + jsString(plugin) + `;
+let build;
+plugin.setup({ registerMessageBuilder: (b) => { build = b.build }, registerRule() {}, registerCommand() {} },
+  { session: { sessionId: "s1" } });
+build([
+  { role: "user", content: [{ type: "text", text: "why does the deploy job time out?" }] },
+  { role: "user", content: [{ type: "text", text: "[SYSTEM] This run is not complete until you call one of these terminal completion tools: submit_and_exit." }] },
+]);
+`
+	run := filepath.Join(home, "drive.mjs")
+	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command(node, run).CombinedOutput(); err != nil {
+		t.Fatalf("driving the plugin: %v\n%s", err, out)
+	}
+	body, _ := os.ReadFile(calls)
+	var prompt string
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.HasPrefix(line, "hook-prompt") {
+			prompt = line
+		}
+	}
+	if !strings.Contains(prompt, "deploy job time out") || strings.Contains(prompt, "[SYSTEM]") {
+		t.Errorf("hook-prompt was asked %q, want the person's question", prompt)
+	}
+}
+
 // jsString quotes a path for embedding in a module specifier.
 func jsString(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`

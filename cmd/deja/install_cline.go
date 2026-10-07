@@ -278,10 +278,13 @@ export default {
         const edit = () => out || (out = messages.slice());
 
         // The question just asked, answered from history. Prepended to the last
-        // user message.
+        // user message. Cline's own reminders ride as user messages too ("[SYSTEM]
+        // This run is not complete..." under --yolo, 3.0.69), so those are
+        // skipped or recall answers the boilerplate.
         let at = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-          if (messages[i] && messages[i].role === "user" && userText(messages[i])) {
+          const text = messages[i] && messages[i].role === "user" ? userText(messages[i]) : "";
+          if (text && !/^\s*\[SYSTEM\]/.test(text)) {
             at = i;
             break;
           }
