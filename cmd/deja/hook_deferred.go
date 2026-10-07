@@ -87,12 +87,22 @@ func deferText(dir, key, hook, text string) {
 			}
 		}
 	}
-	name := fmt.Sprintf("%s-%020d", order, time.Now().UnixNano())
-	tmp := filepath.Join(d, "."+name)
+	n := time.Now().UnixNano()
+	tmp := filepath.Join(d, fmt.Sprintf(".%s-%020d", order, n))
 	if err := os.WriteFile(tmp, []byte(text), 0o600); err != nil {
 		return
 	}
-	_ = os.Rename(tmp, filepath.Join(d, name))
+	// Windows' clock gives two calls in a row the same nanosecond, and the
+	// second rename then replaced the first failure pair; take the next free
+	// name instead.
+	for {
+		dst := filepath.Join(d, fmt.Sprintf("%s-%020d", order, n))
+		if _, err := os.Lstat(dst); os.IsNotExist(err) {
+			_ = os.Rename(tmp, dst)
+			return
+		}
+		n++
+	}
 }
 
 // hasDeferred is the cheap check every hook pays: one stat of a directory that
