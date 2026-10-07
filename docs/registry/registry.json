@@ -57,7 +57,7 @@
         "mcp": {"status": "no", "proof": "blocked", "note": "aider has no MCP client. Not a design limit but an unimplemented feature: several open requests and an open PR adding it, so this becomes work the day they ship it. Until then recall reaches aider through the read: context file"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "no", "proof": "blocked", "note": "aider has no hooks: none in 0.86.2 or on main, and the hook request Aider-AI/aider#5712 is open"},
-        "rules": {"status": "no", "proof": "todo", "note": "aider's read: list can carry the rules file next to the context file (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "aider has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -143,7 +143,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "a rules/ directory in the plugin or GEMINI.md, unverified for agy (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "agy has /statusline with built-in items only, no command item found (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "CHECKPOINT summaries are not indexed as summaries (#4801)"}
       }
@@ -227,7 +227,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file; the plugin can register one (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Cline has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -310,7 +310,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.copilot/copilot-instructions.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "statusLine.command exists; its stdin shape is unchecked (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "session.compaction_complete summaryContent is not indexed (#4801)"}
       }
@@ -358,7 +358,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "prompts/*.instructions.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "VS Code shows a status item only from an extension of its own (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction summaries are not checked, and VS Code deletes old transcripts (#4801)"}
       }
@@ -623,7 +623,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Hermes yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "partial", "proof": "fixture", "note": "the provider reports a recall count where Hermes has RecallStatus; 0.17 has none"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -702,7 +702,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for omp yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -831,7 +831,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.continue/rules or a rules: block in config.yaml (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "cn has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture", "note": "the index keeps the turns a compaction rewrote out of the file (#4800)"}
       }
@@ -871,7 +871,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "no", "proof": "blocked", "note": "Crush v0.97.1 has only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in the open charmbracelet/crush#3146"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.config/crush/CRUSH.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Crush has no status line, footer or toast a third party can write to"},
         "reader": {"status": "partial", "proof": "fixture", "note": "summary_message_id is not marked (#4801)"}
       }
@@ -908,7 +908,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "whether <agentDir>/AGENTS.md is read is unchecked (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -948,7 +948,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for prime yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -1044,7 +1044,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "todo", "note": "Claude-runtime agents load hooks from <userData>/Data/Agents/.claude/settings.json (stand on 2.0.14); a cherrystudio-auto target is #4801"},
-        "rules": {"status": "no", "proof": "todo", "note": "<Data/Agents/.claude>/CLAUDE.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Cherry Studio has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1083,7 +1083,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -1122,7 +1122,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -1177,7 +1177,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Kimchi yet (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
         "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
       }
@@ -1216,7 +1216,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "todo", "note": "mods get onSessionEnd (mod-builder api.md:77), shell hooks do not; wiring it is #4797"},
-        "rules": {"status": "no", "proof": "todo", "note": "no documented user rules file (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Command Code has no status line, footer or toast a third party can write to"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the transcript reader (#4801)"}
       }
@@ -1329,7 +1329,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "todo", "note": "V3 SessionEnd, on TUI exit only (stand on 2.28.0); wiring it is #4797"},
-        "rules": {"status": "no", "proof": "todo", "note": "a steering file with inclusion: always reaches the model in V2 and V3 (stand) (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Kiro has no status line, footer or toast a third party can write to"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1371,7 +1371,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.config/kilo/AGENTS.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "partial", "proof": "fixture", "note": "a toast in the CLI's TUI; the VS Code extension shows none"},
         "reader": {"status": "partial", "proof": "fixture", "note": "condense summaries in the extension's legacy tasks are not marked (#4801)"}
       }
@@ -1417,7 +1417,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "blocked", "note": "RooCodeInc/Roo-Code was archived on 15.05.2026 and 3.54.0 has no hook events (rechecked 07.10)"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.roo/rules (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "RooCodeInc/Roo-Code was archived on 15.05.2026 and 3.54.0 has no hook events (rechecked 07.10)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "condense summaries are indexed as plain text (#4801)"}
       }
@@ -1470,7 +1470,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "blocked", "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"},
-        "rules": {"status": "no", "proof": "todo", "note": "Zed reads ~/.config/zed/AGENTS.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Zed 1.22.0 has no lifecycle hooks: zed#57890 and zed#52688 went to discussions and the hooks PR zed#52729 closed unmerged"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1529,7 +1529,7 @@
         "mcp": {"status": "no", "proof": "todo", "note": "CodeWhale reads an MCP server map and a hook block out of its own config, and it has a plugin marketplace besides; none of it is written yet — this release reads the store and wires nothing (#3794)."},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "no", "proof": "todo", "note": "no install target yet; CodeWhale's HOOKS.md has message_submit, tool_call_before and session_end (#4801)"},
-        "rules": {"status": "no", "proof": "todo", "note": "AGENTS.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status surface identified for CodeWhale yet (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the reader (#4801)"}
       }
@@ -1571,7 +1571,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "~/.codebuddy/CODEBUDDY.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "statusLine.command (#4801)"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1664,7 +1664,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "$TRAE_HOME/AGENTS.md (#4801)"},
+        "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status line found in traecli 0.207 (#4801)"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
