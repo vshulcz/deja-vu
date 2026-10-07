@@ -171,8 +171,13 @@
 <tr><td>aider</td><td>whatever <code>read:</code> lists</td><td>the files under <code>read:</code> in <code>~/.aider.conf.yml</code></td></tr>
 <tr><td>pi, Senpi, prime-agent, Kimchi</td><td><code>AGENTS.md</code></td><td><code>AGENTS.md</code> in the agent directory (<code>~/.pi/agent</code>, <code>~/.config/kimchi/harness</code> and so on)</td></tr>
 <tr><td>omp, gjc</td><td><code>AGENTS.md</code></td><td><code>AGENTS.md</code> in the agent directory, or else the first of Claude Code's, Codex's and Gemini's</td></tr>
+<tr><td>dsh</td><td><code>AGENTS.md</code>, <code>CLAUDE.md</code></td><td><code>~/.dsh/AGENTS.md</code></td></tr>
+<tr><td>Reasonix</td><td><code>AGENTS.md</code>, <code>REASONIX.md</code>, <code>CLAUDE.md</code></td><td><code>~/.reasonix/AGENTS.md</code> or <code>REASONIX.md</code></td></tr>
+<tr><td>Muse Code</td><td><code>AGENTS.md</code></td><td><code>~/.config/muse/AGENTS.md</code>, or else <code>~/.claude/CLAUDE.md</code>, or else Codex's</td></tr>
+<tr><td>OpenClaw</td><td>the agent's workspace</td><td><code>AGENTS.md</code> in the workspace, <code>~/.openclaw/workspace</code> by default</td></tr>
+<tr><td>Cursor CLI</td><td><code>.cursor/rules/</code>, <code>AGENTS.md</code></td><td><code>~/.cursor/rules/</code>, for projects under your home directory only</td></tr>
 </table>
-<p>Cursor has no fixed global file: its rules are found by walking up from the project, and your user rules live in its settings on the server. Windsurf keeps them in <code>~/.codeium/windsurf/memories/global_rules.md</code>.</p>
+<p>Cursor has no truly global file: <code>cursor-agent</code> finds <code>.cursor/rules</code> by walking up from the project, so <code>~/.cursor/rules</code> (where its own "User Rule" goes) reaches projects under your home directory and no others, and the IDE keeps your user rules in its settings on the server. Windsurf keeps them in <code>~/.codeium/windsurf/memories/global_rules.md</code>.</p>
 
 <h2>In one repository: make AGENTS.md the source</h2>
 <p><code>AGENTS.md</code> is the name most agents already read, so keep the rules there and point the rest at it.</p>
@@ -195,7 +200,7 @@ rules: ~/.config/deja/rules.md, 12 lines, 640 bytes
 run `deja rules sync` to bring them in line
 
 $ deja rules sync</pre>
-<p><code>sync</code> writes the rules into each file as a block between <code>&lt;!-- deja rules:start --&gt;</code> and <code>&lt;!-- deja rules:end --&gt;</code> and leaves everything else in the file alone. Where an agent reads a whole folder (Cline, Roo, Continue, Kiro) the block goes into a <code>deja-rules.md</code> of its own there. Where it loads only the first of several files, the block goes into the one already loaded, so a <code>CLAUDE.md</code> that Kilo or opencode reads is not hidden behind a new <code>AGENTS.md</code>. Hermes gets the block only in a <code>SOUL.md</code> it already made, since that file is also its identity. Edit <code>rules.md</code> and sync again; empty it and sync takes the blocks back out. It only writes to agents deja is installed for, and only to files it has verified the agent reads. An agent whose global file it does not know is listed and left alone rather than guessed at. <code>deja doctor</code> names any agent whose copy has fallen behind.</p>
+<p><code>sync</code> writes the rules into each file as a block between <code>&lt;!-- deja rules:start --&gt;</code> and <code>&lt;!-- deja rules:end --&gt;</code> and leaves everything else in the file alone. Where an agent reads a whole folder (Cline, Roo, Continue, Kiro, Cursor) the block goes into a <code>deja-rules</code> file of its own there. Where it loads only the first of several files, the block goes into the one already loaded, so a <code>CLAUDE.md</code> that Kilo, opencode or Muse reads is not hidden behind a new <code>AGENTS.md</code>. Hermes gets the block only in a <code>SOUL.md</code> it already made, since that file is also its identity, and OpenClaw only in a workspace <code>AGENTS.md</code> it already seeded. Edit <code>rules.md</code> and sync again; empty it and sync takes the blocks back out. It only writes to agents deja is installed for, and only to files it has verified the agent reads. An agent whose global file it does not know is listed and left alone rather than guessed at. <code>deja doctor</code> names any agent whose copy has fallen behind.</p>
 <p>The file is capped at 8 KB. Every agent reads it on every session, so it is worth keeping to what you would say to a new colleague on day one — <a href="rules-files.html">what belongs in a rules file</a> covers the rest.</p>
 
 <h2>Finding the rules you keep repeating</h2>
