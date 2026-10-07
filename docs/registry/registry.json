@@ -399,7 +399,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "whether cursor-agent's .cursor/rules walk reaches the home directory is unchecked (#4801)"},
+        "rules": {"status": "partial", "proof": "fixture", "note": "~/.cursor/rules/deja-rules.mdc with alwaysApply; cursor-agent finds .cursor/rules only by walking up from the working directory (loadRulesFromDirAndAncestors, 2026.10.01), so projects outside the home directory miss it, and the IDE's user rules live on Cursor's server"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the cursor-auto target writes statusLine in cli-config.json for cursor-agent"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -447,7 +447,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for dsh yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "$DSH_HOME/AGENTS.md, the user-global head of the instruction chain (0.2.0-rc.2)"},
         "statusline": {"status": "no", "proof": "todo", "note": "the plugin can show notes in /deja only; no status line found (#4801)"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -740,7 +740,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for OpenClaw yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status surface in the generated plugin (#4801)"},
         "reader": {"status": "partial", "proof": "fixture", "note": "compaction entries are dropped by the reader (#4801)"}
       }
@@ -1560,7 +1560,7 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Reasonix yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "AGENTS.md in the Reasonix home (2.30.0)"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "host/ui/publish"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
@@ -1608,7 +1608,7 @@
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status line found in traecli 0.207 (#4801)"},
+        "statusline": {"status": "yes", "proof": "fixture", "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; 0.207.1 and 0.208.1-alpha.5 load it, and the TUI runs nothing before an enterprise login"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -1652,8 +1652,8 @@
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Muse yet (#4801)"},
-        "statusline": {"status": "no", "proof": "todo", "note": "no status line found for Muse yet (#4801)"},
+        "rules": {"status": "yes", "proof": "stand", "note": "the first of <config>/muse/AGENTS.md, ~/.claude/CLAUDE.md and $CODEX_HOME/AGENTS.md, which is the one Muse loads (1.4.3)"},
+        "statusline": {"status": "no", "proof": "blocked", "note": "Muse 1.4.3's bottom bar (/hud, tui.hud) has a fixed item set: model, effort, path, permissions, context, branch, tokens, cost, quota; plugins add skills, commands, hooks, MCP servers and reminders, nothing in the UI"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     }
