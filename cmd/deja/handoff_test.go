@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -49,7 +50,25 @@ func TestHandoffCommandTable(t *testing.T) {
 		"prime":   {"prime-agent", "--print", "P"},
 		"grok":    {"grok", "P"},
 		"cursor":  {"cursor-agent", "P"},
-		"copilot": {"copilot", "-p", "P"},
+		"copilot": {"copilot", "-i", "P"},
+		// Each from the host's own --help or source, on the version named in
+		// handoffCommand.
+		"copilot-chat": {"code", "chat", "-m", "agent", "P"},
+		"kilocode":     {"kilo", "--prompt", "P"},
+		"continue":     {"cn", "P"},
+		"commandcode":  {commandCodeBinForTest(), "P"},
+		"codebuddy":    {"codebuddy", "P"},
+		"trae":         {"traex", "P"},
+		"muse":         {"muse", "exec", "P"},
+		"kiro":         {"kiro-cli", "chat", "P"},
+		"gjc":          {"gjc", "P"},
+		"kimchi":       {"kimchi", "P"},
+		"codewhale":    {"codewhale", "P"},
+		"hermes":       {"hermes", "chat", "-q", "P"},
+		"openclaw":     {"openclaw", "chat", "--message", "P"},
+		"deepseek":     {"dsh", "--profile", "headless", "P"},
+		"reasonix":     {"reasonix", "run", "P"},
+		"zcode":        {"zcode", "-p", "P"},
 		// Verified against the running CLIs: cline answers a bare prompt
 		// argument, goose takes run -t, and kimi documents -p.
 		"cline": {"cline", "P"},
@@ -66,16 +85,36 @@ func TestHandoffCommandTable(t *testing.T) {
 			t.Fatalf("handoffCommand(%s) = %v, %v", target, argv, ok)
 		}
 	}
-	// These have no way to take a prompt from the command line: openclaw has
-	// no run command, hermes only opens a chat, and roo's tasks start from
-	// the extension.
-	for _, target := range []string{"openclaw", "hermes", "roo"} {
+	// These run the agent inside an app with no command line to take a prompt.
+	for _, target := range []string{"roo", "zed", "cherrystudio"} {
 		if _, ok := handoffCommand(target, "P"); ok {
 			t.Fatalf("%s has no CLI prompt entry point, must stay paste-only", target)
 		}
 	}
 	if len(handoffTargets()) != len(cases) {
 		t.Fatalf("handoffTargets() = %v out of sync with command table", handoffTargets())
+	}
+}
+
+func commandCodeBinForTest() string {
+	if runtime.GOOS == "windows" {
+		return "cmdc"
+	}
+	return "cmd"
+}
+
+// Each host's own bin name reaches its target, so `--to kilo` is the same as
+// `--to kilocode`.
+func TestHandoffAliasesResolve(t *testing.T) {
+	for alias, target := range handoffAlias {
+		if _, ok := handoffCommand(target, "P"); !ok {
+			t.Fatalf("alias %s points at %s, which has no command", alias, target)
+		}
+	}
+	withStatsStores(t)
+	out, err := captureRun(t, "handoff", "--to", "kilo", "c3")
+	if err != nil || !strings.Contains(out, "picking up work handed off") {
+		t.Fatalf("kilo handoff = %q, %v", out, err)
 	}
 }
 
@@ -134,13 +173,13 @@ func TestHandoffPasteModes(t *testing.T) {
 		t.Fatalf("agy handoff = %q, %v", out, err)
 	}
 	// a paste-only target prints the digest too
-	out, err = captureRun(t, "handoff", "--to", "hermes", "c3")
+	out, err = captureRun(t, "handoff", "--to", "zed", "c3")
 	if err != nil || !strings.Contains(out, "picking up work handed off") {
-		t.Fatalf("hermes handoff = %q, %v", out, err)
+		t.Fatalf("zed handoff = %q, %v", out, err)
 	}
 	// but cannot --exec
-	if err := runHandoff(index.DefaultDir(), []string{"--to", "hermes", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
-		t.Fatalf("hermes exec error = %v", err)
+	if err := runHandoff(index.DefaultDir(), []string{"--to", "zed", "c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "no CLI prompt entry") {
+		t.Fatalf("zed exec error = %v", err)
 	}
 	if err := runHandoff(index.DefaultDir(), []string{"c3", "--exec"}, discardWriter{}); err == nil || !strings.Contains(err.Error(), "--exec needs --to") {
 		t.Fatalf("bare exec error = %v", err)

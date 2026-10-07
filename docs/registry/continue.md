@@ -69,7 +69,7 @@ validation is still welcome.
   or, with that gone, a note that the fork runs where you are (#4460).
   `cn --resume` remains the last-session shortcut, and
   the editor reopens one from its history view.
-- **Handoff**: paste.
+- **Handoff**: exec, `cn <prompt>` opens an interactive session with it.
 
 Costs on that version, measured from the recorded requests: deja's tool schema
 is 3,112 bytes of the 10 KB tool block in every request, the skill adds 700

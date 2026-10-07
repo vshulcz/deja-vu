@@ -61,6 +61,6 @@ against a 2026.8.2 store and openclaw source
   `agent:main:main` with that session's history, and a run through
   `openclaw agent --session-id` answered from it. SQLite key lookup is covered
   by synthetic database tests.
-- **Handoff**: paste.
+- **Handoff**: exec, `openclaw chat --message <prompt>` sends it once the TUI connects.
 
 **Last verified:** 2026-09-02

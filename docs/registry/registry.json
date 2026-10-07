@@ -334,7 +334,7 @@
         "skill": true,
         "command": true,
         "resume": false,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": ""
       },
       "gaps": {
@@ -352,7 +352,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "VS Code shows a status item only from an extension of its own (#4801)"},
@@ -426,7 +426,7 @@
         "skill": true,
         "command": true,
         "resume": false,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "zstd"
       },
       "gaps": {
@@ -445,7 +445,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for dsh yet (#4801)"},
         "statusline": {"status": "no", "proof": "todo", "note": "the plugin can show notes in /deja only; no status line found (#4801)"},
@@ -604,7 +604,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "sqlite3"
       },
       "gaps": {},
@@ -617,7 +617,7 @@
         "compaction_capture": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
         "compaction_packet": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "partial", "proof": "fixture", "note": "the provider reports a recall count where Hermes has RecallStatus; 0.17 has none"},
@@ -725,7 +725,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "sqlite3 (2026.8+ store); zstd for .zst archives"
       },
       "gaps": {},
@@ -738,7 +738,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "stand"},
         "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for OpenClaw yet (#4801)"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status surface in the generated plugin (#4801)"},
@@ -806,7 +806,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": ""
       },
       "gaps": {
@@ -825,7 +825,7 @@
         "compaction_capture": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
         "compaction_packet": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "blocked", "note": "Continue's cn 1.5.47 defines fireEvent and never calls it: hooks load and none fire (stand, 5 runs incl. compaction)"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "cn has no status line, footer or toast a third party can write to"},
@@ -1103,7 +1103,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {},
@@ -1116,7 +1116,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
@@ -1142,7 +1142,7 @@
         "skill": false,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {
@@ -1171,7 +1171,7 @@
         "compaction_capture": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
         "compaction_packet": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "Kimchi loads pi extensions from <agentDir>/extensions; a kimchi-auto target is #4801"},
@@ -1197,7 +1197,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {},
@@ -1210,7 +1210,7 @@
         "compaction_capture": {"status": "no", "proof": "todo", "note": "mods get compaction_start and compaction_done (mod-builder api.md:81) (#4801)"},
         "compaction_packet": {"status": "no", "proof": "todo", "note": "mods get compaction_start and compaction_done (mod-builder api.md:81) (#4801)"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "todo", "note": "mods get onSessionEnd (mod-builder api.md:77), shell hooks do not; wiring it is #4797"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Command Code has no status line, footer or toast a third party can write to"},
@@ -1240,7 +1240,7 @@
         "skill": false,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {
@@ -1263,7 +1263,7 @@
         "compaction_capture": {"status": "no", "proof": "todo", "note": "no PreCompact; caught up from transcript_path (#4801)"},
         "compaction_packet": {"status": "no", "proof": "todo", "note": "no PreCompact; the packet would follow the catch-up (#4801)"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "blocked", "note": "ZCode CLI 0.16.9 has seven hook events and no session end (contracts/src/hooks/index.ts:7-15); Stop fires every turn"},
         "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for ZCode yet (#4801)"},
         "statusline": {"status": "no", "proof": "blocked", "note": "ZCode has no status line, footer or toast a third party can write to"},
@@ -1295,7 +1295,7 @@
         "skill": false,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "sqlite3 for the CLI database"
       },
       "gaps": {
@@ -1323,7 +1323,7 @@
         "compaction_capture": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "compaction_packet": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "todo", "note": "V3 SessionEnd, on TUI exit only (stand on 2.28.0); wiring it is #4797"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Kiro has no status line, footer or toast a third party can write to"},
@@ -1353,7 +1353,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "sqlite3 for the CLI store"
       },
       "surfaces": {
@@ -1365,7 +1365,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "partial", "proof": "fixture", "note": "a toast in the CLI's TUI; the VS Code extension shows none"},
@@ -1491,7 +1491,7 @@
         "skill": false,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {
@@ -1523,7 +1523,7 @@
         "compaction_capture": {"status": "no", "proof": "todo", "note": "artifacts/context-transfer-<id>.json can be caught up (#4801)"},
         "compaction_packet": {"status": "no", "proof": "todo", "note": "artifacts/context-transfer-<id>.json can be caught up (#4801)"},
         "mcp": {"status": "no", "proof": "todo", "note": "CodeWhale reads an MCP server map and a hook block out of its own config, and it has a plugin marketplace besides; none of it is written yet — this release reads the store and wires nothing (#3794)."},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "no", "proof": "todo", "note": "no install target yet; CodeWhale's HOOKS.md has message_submit, tool_call_before and session_end (#4801)"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status surface identified for CodeWhale yet (#4801)"},
@@ -1552,7 +1552,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {},
@@ -1565,7 +1565,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the codebuddy-auto target writes statusLine.command in settings.json"},
@@ -1598,7 +1598,7 @@
         "skill": true,
         "command": true,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "zstd for 1.x sessions"
       },
       "gaps": {},
@@ -1611,7 +1611,7 @@
         "compaction_capture": {"status": "yes", "proof": "stand"},
         "compaction_packet": {"status": "partial", "proof": "stand", "note": "the packet goes into the summarizer's instructions; nothing is held for the turn after"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Reasonix yet (#4801)"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "host/ui/publish"},
@@ -1640,7 +1640,7 @@
         "skill": true,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {
@@ -1658,7 +1658,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status line found in traecli 0.207 (#4801)"},
@@ -1685,7 +1685,7 @@
         "skill": true,
         "command": false,
         "resume": true,
-        "handoff": "paste",
+        "handoff": "exec",
         "prereq": "none"
       },
       "gaps": {
@@ -1703,7 +1703,7 @@
         "compaction_capture": {"status": "yes", "proof": "fixture"},
         "compaction_packet": {"status": "yes", "proof": "fixture"},
         "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "partial", "proof": "fixture", "note": "paste only: deja prints the prompt to paste, no command to run it with"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "no", "proof": "todo", "note": "no user rules file identified for Muse yet (#4801)"},
         "statusline": {"status": "no", "proof": "todo", "note": "no status line found for Muse yet (#4801)"},
