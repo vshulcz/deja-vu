@@ -298,6 +298,9 @@ var deferrableHooks = map[string]bool{
 // caught in a file rather than a pipe, so a child the hook detaches (the
 // background index build) cannot hold the read open.
 func runHookDeferred(dir, name string, rest []string, cmd command) error {
+	if hasFlag(rest, "--junie") {
+		return runJunieHook(dir, name, rest, cmd)
+	}
 	if name == "hook-tool" && hasFlag(rest, "--crush") {
 		return runCrushTool(dir, rest, cmd)
 	}

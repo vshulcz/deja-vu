@@ -19,6 +19,7 @@ var countWords = map[int]string{
 	28: "twenty-eight", 29: "twenty-nine", 30: "thirty", 31: "thirty-one", 32: "thirty-two",
 	33: "thirty-three", 34: "thirty-four", 35: "thirty-five", 36: "thirty-six",
 	37: "thirty-seven", 38: "thirty-eight", 39: "thirty-nine", 40: "forty",
+	41: "forty-one", 42: "forty-two", 43: "forty-three", 44: "forty-four",
 }
 
 // countWord is the word for a count, or a failure naming what to add.

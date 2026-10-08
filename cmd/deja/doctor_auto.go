@@ -73,6 +73,9 @@ func autoWirings() []autoWiring {
 		}, "hook-context", ""},
 		// CodeWhale's TUI hooks, in the config.toml beside its sessions.
 		{"codewhale", func() string { return codewhaleConfigPath() }, "hook-codewhale", ""},
+		// Junie's user hooks; SessionStart's output never reaches its model,
+		// so the digest rides the first prompt's hook.
+		{"junie", func() string { return junieConfigPath() }, "hook-context", ""},
 		// Kimchi loads it from its harness directory without a trust prompt.
 		{"kimchi", func() string { return filepath.Join(sources.KimchiConfigDir(), "extensions", "deja.ts") }, "hook-context", ""},
 		{"hermes", func() string {
@@ -129,7 +132,7 @@ func autoWirings() []autoWiring {
 // rather than one deja writes whole. Those exist whether deja ever wrote to
 // them or not, so the file being there says nothing about deja (#4275).
 var autoInClientConfig = map[string]bool{
-	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true,
+	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "junie": true,
 }
 
 // autoUnwired reports whether a row's file holds no deja wiring at all: it is

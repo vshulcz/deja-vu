@@ -368,6 +368,9 @@ func handoffCommand(target, prompt string) ([]string, bool) {
 	case "codewhale":
 		// "[PROMPT] Initial prompt to submit in the interactive TUI" (0.10.0).
 		return []string{"codewhale", prompt}, true
+	case "junie":
+		// `junie <task>` runs the task and exits (3110.7).
+		return []string{"junie", prompt}, true
 	case "hermes":
 		// `hermes chat -q` is a single query, the only prompt entry (0.17.0).
 		return []string{"hermes", "chat", "-q", prompt}, true
@@ -410,11 +413,11 @@ var handoffAlias = map[string]string{
 
 // handoffPasteOnly mirrors the registry's `handoff: paste` entries; the
 // capability drift test keeps the two in sync.
-// Roo, Zed and Cherry Studio run the agent inside the app, so there is no
+// Roo, Zed, Cherry Studio and JetBrains AI Assistant run the agent inside the app, so there is no
 // command line to hand a prompt to.
-var handoffPasteOnly = map[string]bool{"roo": true, "cherrystudio": true, "zed": true}
+var handoffPasteOnly = map[string]bool{"roo": true, "cherrystudio": true, "zed": true, "jetbrains": true}
 
 func handoffTargets() []string {
 	return []string{"claude", "codex", "opencode", "cursor", "copilot", "copilot-chat", "gemini", "qwen", "antigravity", "aider", "pi", "senpi", "omp", "amp", "prime", "grok", "cline", "goose", "kimi", "crush",
-		"kilocode", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "hermes", "openclaw", "deepseek", "reasonix", "zcode"}
+		"kilocode", "continue", "commandcode", "codebuddy", "trae", "muse", "kiro", "gjc", "kimchi", "codewhale", "junie", "hermes", "openclaw", "deepseek", "reasonix", "zcode"}
 }

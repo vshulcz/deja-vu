@@ -5,7 +5,7 @@ This document is for people changing `deja` internals.
 ## Source parsers
 
 Parsers live in `internal/sources` and return `[]model.Session`. The table is
-what the loader registers: the thirty-eight coding agents plus deja's own notes,
+what the loader registers: the forty coding agents plus deja's own notes,
 which is what `deja sources` prints. `docs/registry/` describes each store's
 layout in detail, and `internal/sources/registry_test.go` checks that index
 against the loader list.
@@ -35,6 +35,8 @@ against the loader list.
 | prime-agent (PrimeIntellect) | `prime.go` | JSONL transcripts under `~/.prime/agent/sessions` |
 | DeepSeek Harness | `deepseek.go` | zstd-compressed session JSONL under `~/.dsh/sessions` |
 | CodeWhale | `codewhale.go` | one JSON document per session under `${CODEWHALE_HOME:-~/.codewhale}/sessions`, and the pre-rebrand `~/.deepseek` root |
+| Junie | `junie.go`, `aui.go` | one `events.jsonl` per session under `${JUNIE_HOME:-~/.junie}/sessions`, blocks folded by step |
+| JetBrains AI Assistant | `jetbrains.go`, `aui.go` | the chats in each IDE's `workspace/*.xml`, agent chats in `aia-task-history/*.events` |
 | CodeBuddy Code | `codebuddy.go` | JSONL per session under `${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<cwd>/`, OpenAI Responses-style items; WorkBuddy's `~/.workbuddy` too |
 | Reasonix | `reasonix.go`, `reasonix_stores.go`, `reasonix_v4.go` | under `~/.reasonix` (`%APPDATA%\reasonix` on Windows): flat role/content JSONL in `sessions/` and `projects/<slug>/sessions/`, and the 1.x session directories (`sessions-v4/<id>/`, `desktop-sessions-v5/by-id/<id>/`) whose `events.frames` log is zstd-framed JSON |
 | TRAE CLI | `trae.go`, `codex.go` | Codex rollouts under `${TRAE_HOME:-~/.trae}/cli` (`sessions/`, `archived_sessions/`, `history.jsonl`); user turns from `user_message` and `item_completed` events only, tool calls from `history_mutation` |

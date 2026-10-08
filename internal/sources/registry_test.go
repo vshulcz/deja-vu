@@ -49,6 +49,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_MUSE_ROOTS",
 		"DEJA_CODEBUDDY_ROOTS", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR",
 		"DEJA_NOTES_FILE",
+		"DEJA_JUNIE_ROOT", "JUNIE_HOME", "DEJA_JETBRAINS_ROOT",
 	} {
 		t.Setenv(key, "")
 	}
@@ -354,6 +355,10 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseCopilotFile(path)
 	case "copilot-chat":
 		sessions, err = ParseCopilotChatFile(path)
+	case "junie":
+		sessions, err = ParseJunieFile(path)
+	case "jetbrains":
+		sessions, err = ParseJetBrainsFile(path)
 	case "deepseek":
 		// The fixture is stored raw: the harness writes zstd frames by default,
 		// and a registry fixture that needs an external tool to read cannot be
@@ -370,7 +375,7 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 
 // registryFixturesWithCalls are the registry fixtures whose tool calls are
 // read into work records.
-var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true}
+var registryFixturesWithCalls = map[string]bool{"deepseek": true, "continue": true, "trae": true, "muse": true, "codebuddy": true, "junie": true, "jetbrains": true}
 
 func validateRegistrySessions(t *testing.T, id string, sessions []model.Session) {
 	t.Helper()

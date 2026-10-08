@@ -108,6 +108,10 @@ func commandFilePath(harness string) string {
 		// zcode-app-cli 3.14.4: resolveDefaultCustomCommandRoots scans
 		// ~/.zcode/commands, then ~/.agents/commands, and expands $ARGUMENTS.
 		return filepath.Join(sources.ZCodeConfigDir(), "commands", "deja.md")
+	case "junie":
+		// $JUNIE_HOME/commands/<name>.md, the user half of the TUI's custom
+		// commands; a project's are in .junie/commands (3110.7).
+		return filepath.Join(sources.JunieHome(), "commands", "deja.md")
 	case "omp":
 		// The default profile's agent directory, ~/.omp/agent. A named
 		// profile reads its own and does not get the command.

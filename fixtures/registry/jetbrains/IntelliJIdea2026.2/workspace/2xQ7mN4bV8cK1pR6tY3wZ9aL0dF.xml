@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="0f0e0d0c-0000-4000-8000-000000000000" name="Changes" comment="" />
+  </component>
+  <component name="ChatSessionStateTemp">
+    <option name="chats">
+      <list>
+      <SerializedChat>
+        <option name="chatModelId" value="chat_mode" />
+        <option name="messages">
+          <list>
+            <SerializedChatMessage>
+              <option name="displayContent" value="how do I add cursor pagination to GET /notes" />
+              <option name="internalContent" value="how do I add cursor pagination to GET /notes" />
+              <option name="uid" value="m-70863" />
+            </SerializedChatMessage>
+            <SerializedChatMessage>
+              <option name="author" value="Assistant" />
+              <option name="displayContent" value="Return a next_cursor with the last note id and filter on id &gt; cursor in the query." />
+              <option name="internalContent" value="Return a next_cursor with the last note id and filter on id &gt; cursor in the query." />
+              <option name="uid" value="m-32287" />
+            </SerializedChatMessage>
+          </list>
+        </option>
+        <option name="modifiedAt" value="1788430160000" />
+        <option name="statisticInformation">
+          <ChatStatisticInformation>
+            <option name="sourceActionType" value="NEW_CHAT" />
+            <option name="timestamp" value="1788430100000" />
+          </ChatStatisticInformation>
+        </option>
+        <option name="title">
+          <SerializedChatTitle>
+            <option name="text" value="Paginate the notes endpoint" />
+          </SerializedChatTitle>
+        </option>
+        <option name="uid" value="7c1e9a52-3b4d-4f60-8a71-2d9e0b4c6f13" />
+      </SerializedChat>
+      <SerializedChat>
+        <option name="chatModelId" value="agent_acp.registry.local-agent" />
+        <option name="messages">
+          <list>
+            <SerializedChatMessage>
+              <option name="displayContent" value="the notes list test fails one run in five, find out why" />
+              <option name="internalContent" value="the notes list test fails one run in five, find out why" />
+              <option name="uid" value="m-62186" />
+            </SerializedChatMessage>
+          </list>
+        </option>
+        <option name="modifiedAt" value="1788430290000" />
+        <option name="statisticInformation">
+          <ChatStatisticInformation>
+            <option name="sourceActionType" value="NEW_CHAT" />
+            <option name="timestamp" value="1788430200000" />
+          </ChatStatisticInformation>
+        </option>
+        <option name="title">
+          <SerializedChatTitle>
+            <option name="text" value="Fix the flaky notes test" />
+          </SerializedChatTitle>
+        </option>
+        <option name="uid" value="b84f2c10-6e9a-4d37-9c25-1a7e3f8d0b46" />
+      </SerializedChat>
+      <SerializedChat>
+        <option name="chatModelId" value="agent_acp.registry.codex-acp" />
+        <option name="messages">
+          <list>
+            <SerializedChatMessage>
+              <option name="displayContent" value="rename package store to notestore" />
+              <option name="internalContent" value="rename package store to notestore" />
+              <option name="uid" value="m-5915" />
+            </SerializedChatMessage>
+          </list>
+        </option>
+        <option name="modifiedAt" value="1788430330000" />
+        <option name="statisticInformation">
+          <ChatStatisticInformation>
+            <option name="sourceActionType" value="NEW_CHAT" />
+            <option name="timestamp" value="1788430300000" />
+          </ChatStatisticInformation>
+        </option>
+        <option name="title">
+          <SerializedChatTitle>
+            <option name="text" value="Rename the store package" />
+          </SerializedChatTitle>
+        </option>
+        <option name="uid" value="e2a7d913-58c4-4b0f-a6e1-9f3c2b7d4a85" />
+      </SerializedChat>
+      </list>
+    </option>
+  </component>
+  <component name="PropertiesComponent">{"keyToString": {"RunOnceActivity.ShowReadmeOnStart": "true"}}</component>
+</project>

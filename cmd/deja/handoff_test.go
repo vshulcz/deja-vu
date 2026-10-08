@@ -64,6 +64,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		"gjc":          {"gjc", "P"},
 		"kimchi":       {"kimchi", "P"},
 		"codewhale":    {"codewhale", "P"},
+		"junie":        {"junie", "P"},
 		"hermes":       {"hermes", "chat", "-q", "P"},
 		"openclaw":     {"openclaw", "chat", "--message", "P"},
 		"deepseek":     {"dsh", "--profile", "headless", "P"},
@@ -86,7 +87,7 @@ func TestHandoffCommandTable(t *testing.T) {
 		}
 	}
 	// These run the agent inside an app with no command line to take a prompt.
-	for _, target := range []string{"roo", "zed", "cherrystudio"} {
+	for _, target := range []string{"roo", "zed", "cherrystudio", "jetbrains"} {
 		if _, ok := handoffCommand(target, "P"); ok {
 			t.Fatalf("%s has no CLI prompt entry point, must stay paste-only", target)
 		}

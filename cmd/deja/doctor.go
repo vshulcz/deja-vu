@@ -1143,6 +1143,13 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	cwRoots := sources.CodeWhaleRoots()
 	printFilesBesideIn("codewhale", sources.CodeWhaleRoot(), cwRoots, false, doctorExists(sources.CodeWhaleRoot()),
 		sources.CodeWhaleSessionFiles(), sources.CodeWhaleSidecarFiles()...)
+	// Junie keeps an index and two renderings beside each session's log.
+	printFilesBeside("junie", sources.JunieRoot(), doctorExists(sources.JunieRoot()),
+		sources.JunieSessionFiles(), sources.JunieSidecarFiles()...)
+	// AI Assistant's chats are inside each IDE's workspace files, most of
+	// which hold none; the count is the workspace files.
+	printRow("jetbrains", sources.JetBrainsRoot(), doctorExists(sources.JetBrainsRoot()),
+		doctorCount(len(sources.JetBrainsSessionFiles()), "workspace file"))
 	// Reasonix keeps a dozen sidecars beside each transcript — metadata, event
 	// logs, locks, subagent logs — so those are placed, not counted as unread.
 	rxRoot := sources.ReasonixRoot()
@@ -2047,6 +2054,8 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"senpi", senpiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"kimchi", kimchiMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"codewhale", codewhaleMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
+		{"junie", junieMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"jetbrains", jetBrainsMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},

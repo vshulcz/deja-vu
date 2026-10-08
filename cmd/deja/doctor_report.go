@@ -566,6 +566,8 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"zcode", []string{sources.ZCodeRoot(), sources.ZCodeDB(), sources.ZCodeLegacyRoot()}, sources.ZCodeSessionFiles(), doctorProbeZCode},
 		{"gjc", []string{sources.GjcRoot()}, sources.GjcSessionFiles(), sources.ParseGjcFile},
 		{"codewhale", sources.CodeWhaleRoots(), sources.CodeWhaleSessionFiles(), sources.ParseCodeWhaleFile},
+		{"junie", []string{sources.JunieRoot()}, sources.JunieSessionFiles(), sources.ParseJunieFile},
+		{"jetbrains", []string{sources.JetBrainsRoot()}, sources.JetBrainsSessionFiles(), sources.ParseJetBrainsFile},
 		{"reasonix", sources.ReasonixRoots(), sources.ReasonixSessionFiles(), sources.ParseReasonixFile},
 		{"muse", sources.MuseRoots(), sources.MuseSessionFiles(), sources.ParseMuseFile},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles(), sources.ParseDeepSeekFile},

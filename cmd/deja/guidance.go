@@ -110,6 +110,9 @@ var sharedSkillHarnesses = map[string]bool{
 	"codewhale": true,
 	// ZCode's skill loader scans ~/.agents/skills (#4802).
 	"zcode": true,
+	// Junie 3110.7 offers the model a skill placed only here, beside its own
+	// $JUNIE_HOME/skills (SkillsService, and a stand).
+	"junie": true,
 }
 
 // sharedSkillPath is the one file all of them read. Claude Code is deliberately

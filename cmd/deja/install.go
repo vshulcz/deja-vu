@@ -971,6 +971,12 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installCodeWhale(exe, uninstall)
 	case "codewhale-auto":
 		return installCodeWhaleAuto(exe, uninstall)
+	case "junie":
+		return installJunie(exe, uninstall)
+	case "junie-auto":
+		return installJunieAuto(exe, uninstall)
+	case "jetbrains":
+		return installJetBrains(exe, uninstall)
 	case "gjc":
 		return installGjc(exe, uninstall)
 	case "gjc-auto":
@@ -2254,6 +2260,12 @@ func hookCommandKindOf(existing any, cmd string) hookCommandKind {
 	}
 	s, cmd = unwrapPowerShellHook(s), unwrapPowerShellHook(cmd)
 	sub := cmd[strings.LastIndex(cmd, " ")+1:]
+	// A line that ends in flags is told apart by all of them: Junie runs
+	// `hook-context --plain --once --junie` and `hook-prompt --plain --junie`
+	// on one event, and the last word alone made each of them the other's.
+	if i := strings.LastIndex(cmd, " hook-"); i >= 0 && strings.Contains(cmd[i+1:], " ") {
+		sub = cmd[i+1:]
+	}
 	for i := 0; i < len(s); {
 		j := strings.Index(s[i:], " "+sub)
 		if j < 0 {
@@ -5063,7 +5075,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
+		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "junie", "junie-auto", "jetbrains", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -5216,6 +5228,8 @@ func existingTargetChecks() map[string]string {
 		"senpi":        sources.SenpiRoot(),
 		"kimchi":       sources.KimchiRoot(),
 		"codewhale":    sources.CodeWhaleRoot(), // its sessions; deja creates mcp.json
+		"junie":        sources.JunieRoot(),     // its sessions; deja creates config.json and mcp/
+		"jetbrains":    sources.JetBrainsRoot(), // the IDEs' config; deja writes ~/.ai/mcp
 		"gjc":          sources.GjcRoot(),
 		"zcode":        sources.ZCodeRoot(),
 		"commandcode":  commandCodeFirstRoot(),

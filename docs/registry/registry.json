@@ -1478,6 +1478,108 @@
       }
     },
     {
+      "id": "junie",
+      "store_paths": [
+        "${JUNIE_HOME:-~/.junie}/sessions/<session-id>/events.jsonl",
+        "${JUNIE_HOME:-~/.junie}/sessions/index.jsonl",
+        "${DEJA_JUNIE_ROOT}/<session-id>/events.jsonl"
+      ],
+      "format_kind": "jsonl",
+      "fixture_paths": [
+        "fixtures/registry/junie/sessions/session-260901-101500-k3m9/events.jsonl"
+      ],
+      "parser_source": "internal/sources/junie.go",
+      "last_verified": "2026-10-08",
+      "display_name": "Junie",
+      "capabilities": {
+        "mcp": true,
+        "auto": true,
+        "skill": true,
+        "command": true,
+        "resume": true,
+        "handoff": "exec",
+        "prereq": "none"
+      },
+      "gaps": {},
+      "surfaces": {
+        "digest": {"status": "yes", "proof": "stand", "note": "rides the first UserPromptSubmit of a session; SessionStart output is not delivered (3110.7)"},
+        "prompt": {"status": "yes", "proof": "stand"},
+        "pre_tool": {"status": "yes", "proof": "stand", "note": "PreToolUse on Bash, Read and Edit; Junie puts the line in front of the tool's result"},
+        "failure": {"status": "partial", "proof": "stand", "note": "no PostToolUse in 3110.7 (ExternalHookEvent); the pair for a failed command is read from events.jsonl and rides the next PreToolUse or UserPromptSubmit"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "no PreCompact in 3110.7; the ContextCompactionBlockUpdatedEvent in events.jsonl is caught up at the next prompt or tool call"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next UserPromptSubmit or PreToolUse"},
+        "mcp": {"status": "yes", "proof": "stand", "note": "offered to the model as mcp_deja_deja once Junie's capability filter picks it for the prompt"},
+        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec runs junie with the packet as its task"},
+        "session_end": {"status": "yes", "proof": "stand"},
+        "rules": {"status": "yes", "proof": "stand", "note": "$JUNIE_HOME/AGENTS.md is in front of every task (3110.7)"},
+        "statusline": {"status": "no", "proof": "blocked", "note": "Junie 3110.7's toolbar takes only built-in items (ToolbarElement in tui/app/state: WorkingDirectory, GitBranch, Model, ContextWindow and the like), no command"},
+        "reader": {"status": "yes", "proof": "fixture"}
+      }
+    },
+    {
+      "id": "jetbrains",
+      "store_paths": [
+        "~/Library/Application Support/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
+        "%APPDATA%\\JetBrains\\<Product><version>\\workspace\\<project-workspace-id>.xml",
+        "${XDG_CONFIG_HOME:-~/.config}/JetBrains/<Product><version>/workspace/<project-workspace-id>.xml",
+        "<JetBrains config>/<Product><version>/aia-task-history/<chat-uid>.events",
+        "${DEJA_JETBRAINS_ROOT}/<Product><version>/workspace/<project-workspace-id>.xml"
+      ],
+      "format_kind": "xml-and-base64-jsonl",
+      "fixture_paths": [
+        "fixtures/registry/jetbrains/IntelliJIdea2026.2/workspace/2xQ7mN4bV8cK1pR6tY3wZ9aL0dF.xml"
+      ],
+      "parser_source": "internal/sources/jetbrains.go",
+      "last_verified": "2026-10-08",
+      "display_name": "JetBrains AI Assistant",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "auto": {
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170 runs no user hooks: no hook configuration or hook runner is in the plugin, so nothing can put recall in front of its chat.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "skill": {
+          "state": "unknown",
+          "why": "AI Assistant 262.10968.170 manages skill folders for the ACP agents it hosts (ChatModeResolver names Claude and Codex); whether its own chat reads one is not checked without a signed-in IDE.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "command": {
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170 reads custom chat commands only from a project's .aiassistant/commands (CustomUserCommandsService); there is no user-level directory to write one to.",
+          "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "An AI Assistant chat reopens only from the IDE's chat history; no command line takes a chat id, so there is nothing for deja resume to print."
+        }
+      },
+      "surfaces": {
+        "digest": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no hook runner or session-start event in any of its jars"},
+        "prompt": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no per-prompt hook in any of its jars; recall reaches the chat only as an MCP tool"},
+        "pre_tool": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no tool hook in any of its jars; its agent tools run without a callback deja can answer"},
+        "failure": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no post-tool hook in any of its jars, so a failed command reaches no deja code"},
+        "compaction_reset": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"},
+        "compaction_capture": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no compaction event or hook in any of its jars"},
+        "compaction_packet": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no hook that could carry a packet into the next turn"},
+        "mcp": {"status": "yes", "proof": "fixture", "note": "~/.ai/mcp/mcp.json, the global file every JetBrains IDE's AI Assistant reads"},
+        "handoff": {"status": "partial", "proof": "fixture", "note": "the chat runs inside the IDE with no command line to take a prompt, so the packet is pasted"},
+        "session_end": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 has no session-end event or hook in any of its jars"},
+        "rules": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170 reads rules only from a project's .aiassistant/rules (AiRulesService); custom instructions are a per-project setting"},
+        "statusline": {"status": "no", "proof": "blocked", "note": "AI Assistant 262.10968.170's chat has no status line a command can write to; the IDE's status bar takes plugin widgets only"},
+        "reader": {"status": "partial", "proof": "fixture", "note": "messages carry no time of their own, so a chat's turns take its start time a millisecond apart; an agent chat run by Junie, Claude, Codex or another agent with its own store is left to that store"}
+      }
+    },
+    {
       "id": "codebuddy",
       "store_paths": [
         "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>.jsonl",

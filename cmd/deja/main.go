@@ -2811,6 +2811,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--write-back":       "resume",
 	"--plain":            "hook-prompt",
 	"--crush":            "hook-tool",
+	"--junie":            "hook-prompt",
 	"--no-open":          "view",
 	"--full":             "sync export",
 	"--include-imported": "sync export",
@@ -3376,6 +3377,8 @@ func printSources(dir string) {
 		{"amp", sources.AmpRoot(), []string{sources.AmpRoot()}, sources.AmpThreadFiles, sources.LoadAmp},
 		{"openclaw", sources.OpenClawRoot(), []string{sources.OpenClawRoot()}, sources.OpenClawStoreFiles, sources.LoadOpenClaw},
 		{"codewhale", sources.CodeWhaleRoot(), sources.CodeWhaleRoots(), sources.CodeWhaleSessionFiles, sources.LoadCodeWhale},
+		{"junie", sources.JunieRoot(), []string{sources.JunieRoot()}, sources.JunieSessionFiles, sources.LoadJunie},
+		{"jetbrains", sources.JetBrainsRoot(), []string{sources.JetBrainsRoot()}, sources.JetBrainsSessionFiles, sources.LoadJetBrains},
 		{"reasonix", sources.ReasonixRoot(), sources.ReasonixRoots(), sources.ReasonixSessionFiles, sources.LoadReasonix},
 		{"muse", sources.MuseRoot(), sources.MuseRoots(), sources.MuseSessionFiles, sources.LoadMuse},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
@@ -4156,11 +4159,11 @@ Usage:
   deja resume <id-prefix> [--write-back] [--exec]
   deja wip [--json]
   deja handoff [--to <agent>] [id-prefix] [--exec]
-  deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)
-  deja hook-context [--plain] [--once] [--strict] [--copilot] [--notes]  (session start: the project digest, once per session)
+  deja hook-prompt [--plain] [--junie]  (UserPromptSubmit hook: relevance recall per prompt)
+  deja hook-context [--plain] [--once] [--strict] [--copilot] [--notes] [--junie]  (session start: the project digest, once per session)
   deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
   deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
-  deja hook-tool [--plain] [--crush]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)
+  deja hook-tool [--plain] [--crush] [--junie]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)
   deja hook-tool-after  (PostToolUse Bash hook: the command that followed this error before)
   deja check -       (read a plan from stdin and print factual co-occurrences)
   deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)

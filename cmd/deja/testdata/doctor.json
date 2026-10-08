@@ -309,6 +309,24 @@
       "indexed_sessions": 0
     },
     {
+      "name": "junie",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.junie/sessions"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
+      "name": "jetbrains",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.config/JetBrains"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "reasonix",
       "state": "missing",
       "paths": [
@@ -527,6 +545,16 @@
       "path": "<tmp>/home/.codewhale/mcp.json"
     },
     {
+      "name": "junie",
+      "state": "config-missing",
+      "path": "<tmp>/home/.junie/mcp/mcp.json"
+    },
+    {
+      "name": "jetbrains",
+      "state": "config-missing",
+      "path": "<tmp>/home/.ai/mcp/mcp.json"
+    },
+    {
       "name": "gjc",
       "state": "config-missing",
       "path": "<tmp>/home/.gjc/agent/mcp.json"
@@ -647,6 +675,11 @@
       "name": "codewhale",
       "state": "missing",
       "path": "<tmp>/home/.codewhale/config.toml"
+    },
+    {
+      "name": "junie",
+      "state": "missing",
+      "path": "<tmp>/home/.junie/config.json"
     },
     {
       "name": "kimchi",
@@ -809,6 +842,11 @@
       "name": "zcode",
       "state": "missing",
       "path": "<tmp>/home/.zcode/commands/deja.md"
+    },
+    {
+      "name": "junie",
+      "state": "missing",
+      "path": "<tmp>/home/.junie/commands/deja.md"
     },
     {
       "name": "copilot-chat",

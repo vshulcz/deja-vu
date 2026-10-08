@@ -757,6 +757,30 @@ func allHarnesses() []Harness {
 			}},
 		},
 		{
+			// Junie, the CLI and the agent AI Assistant runs: a directory per
+			// session with an events.jsonl the CLI appends to. A block is
+			// updated in place by later lines, so it is read whole.
+			Name: "junie", Load: LoadJunie, Files: JunieSessionFiles,
+			Kinds: []FileKind{{
+				Name:    "junie",
+				Match:   isJunieSession,
+				Parse:   fullParse(ParseJunieFile),
+				Sidecar: besideSidecar("state.json"),
+			}},
+		},
+		{
+			// JetBrains AI Assistant: chats in each project's workspace file
+			// under the IDE's config directory, an agent chat's work in
+			// aia-task-history beside it.
+			Name: "jetbrains", Load: LoadJetBrains, Files: JetBrainsSessionFiles,
+			Kinds: []FileKind{{
+				Name:    "jetbrains",
+				Match:   isJetBrainsWorkspace,
+				Parse:   fullParse(ParseJetBrainsFile),
+				Sidecar: jetBrainsSidecar,
+			}},
+		},
+		{
 			Name: "deja", Load: LoadNotes, Files: func() []string { return []string{NotesFile()} },
 			Kinds: []FileKind{{
 				Name:      "deja",

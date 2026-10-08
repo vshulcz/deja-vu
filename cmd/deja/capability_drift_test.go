@@ -299,6 +299,11 @@ func plausibleSession(t *testing.T, harness string) model.Session {
 		// under this harness come from the grok-dev database and cannot resume.
 		s.Path = filepath.Join(t.TempDir(), "sessions", "workspace%2Fp", "abc123", "updates.jsonl")
 	}
+	if harness == "junie" {
+		// Junie's ids are session-<yymmdd>-<hhmmss>-<suffix>; nothing else goes
+		// on its command line.
+		s.ID = "session-260901-101500-k3m9"
+	}
 	if harness == "zcode" {
 		// The CLI database's sessions resume, and carry the directory they
 		// ran in as their path; a JSONL transcript does not (#4430).
