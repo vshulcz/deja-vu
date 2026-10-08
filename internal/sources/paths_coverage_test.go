@@ -85,7 +85,7 @@ func TestLoadersTolerateAbsentStores(t *testing.T) {
 	for _, v := range []string{
 		"DEJA_GROK_DB", "DEJA_GROK_ROOT", "DEJA_HERMES_HOME",
 		"DEJA_HERMES_PROFILES_ROOT", "DEJA_KIMI_ROOT", "DEJA_QWEN_ROOT",
-		"DEJA_OPENCLAW_ROOT",
+		"DEJA_OPENCLAW_ROOT", "HERMES_HOME",
 	} {
 		t.Setenv(v, "")
 	}
