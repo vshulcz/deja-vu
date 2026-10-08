@@ -39,6 +39,20 @@
     <summary>Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.</summary>
   </entry>
   <entry>
+    <title>How to recover a deleted Claude Code session — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"></link>
+    <updated>2026-10-08T00:00:00Z</updated>
+    <summary>A Claude Code session missing from --resume: where the file went, the four reasons it moved rather than vanished, and what is actually recoverable.</summary>
+  </entry>
+  <entry>
+    <title>Resume yesterday&#39;s Claude Code or Codex session — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/resume-a-session.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"></link>
+    <updated>2026-10-08T00:00:00Z</updated>
+    <summary>Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.</summary>
+  </entry>
+  <entry>
     <title>What compaction drops, and how to get it back — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html"></link>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/goose.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Grok Build stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Grok Build stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
 </feed>
