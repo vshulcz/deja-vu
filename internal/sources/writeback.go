@@ -254,9 +254,11 @@ func renderClaude(s model.Session, turns []model.Message) (string, []byte, error
 
 // Codex: a rollout under sessions/YYYY/MM/DD that opens with session_meta.
 // The index keeps the project's name, not the directory codex recorded, so
-// cwd comes from codex's own thread table when the thread is still listed
-// there, and is left empty otherwise; `codex resume` then works in the
-// directory it is run from. Each turn goes in twice, as a response item (what codex sends the
+// cwd comes from codex's own thread table while the thread is still listed
+// there, else from the files the session itself worked on, else from the one
+// directory codex recorded for the project in its other threads. A session
+// with none of these is refused: codex lists a session for the directory in
+// its session_meta. Each turn goes in twice, as a response item (what codex sends the
 // model on resume) and as an event (what its history view shows), the way
 // codex writes them.
 func codexWriteBackRoots() []string {
@@ -278,6 +280,10 @@ func renderCodex(s model.Session, turns []model.Message) (string, []byte, error)
 	if !strings.HasPrefix(base, "rollout-") || !strings.HasSuffix(base, ".jsonl") {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index has no rollout-….jsonl path for this session, which is what `codex resume` looks for"}
 	}
+	cwd := codexWriteBackCWD(s)
+	if cwd == "" {
+		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "codex's session_meta needs the directory the session ran in; the index keeps only the project's name, and neither codex's state database nor any file path in the session names that directory"}
+	}
 	start := turns[0].Time
 	if !s.Started.IsZero() && s.Started.Before(start) {
 		start = s.Started
@@ -288,7 +294,7 @@ func renderCodex(s model.Session, turns []model.Message) (string, []byte, error)
 		"payload": map[string]any{
 			"id":          s.ID,
 			"timestamp":   writeBackStamp(start),
-			"cwd":         codexThreadCWD(s.ID),
+			"cwd":         cwd,
 			"originator":  "deja",
 			"cli_version": "0.0.0",
 			"source":      "cli",
@@ -336,3 +342,94 @@ func codexThreadCWD(id string) string {
 }
 
 var codexThreadIDPattern = regexp.MustCompile(`^[0-9a-fA-F-]{8,64}$`)
+
+// codexWriteBackCWD is the directory a codex session ran in, from the first
+// record that still names it.
+func codexWriteBackCWD(s model.Session) string {
+	if cwd := codexThreadCWD(s.ID); cwd != "" {
+		return cwd
+	}
+	if cwd := sessionDirFromPaths(s); cwd != "" {
+		return cwd
+	}
+	return codexProjectCWD(s.Project)
+}
+
+// sessionDirFromPaths is the directory a session ran in, read off the
+// absolute paths of the files it touched: the nearest parent whose project
+// name is the session's. Most votes wins, so one file outside the checkout
+// does not move it.
+func sessionDirFromPaths(s model.Session) string {
+	if s.Project == "" || s.Project == "-" {
+		return ""
+	}
+	votes := map[string]int{}
+	best := ""
+	for _, m := range s.Messages {
+		var paths []string
+		switch m.Role {
+		case RoleFiles:
+			paths = strings.Split(m.Text, "\n")
+		case RoleEdit, RoleWrote:
+			paths = []string{firstLine(m.Text)}
+		default:
+			continue
+		}
+		for _, p := range paths {
+			p = strings.TrimSpace(p)
+			if !isAbsolutePath(p) {
+				continue
+			}
+			for dir := parentPath(p); dir != ""; dir = parentPath(dir) {
+				if cwdProjectName(dir) == s.Project {
+					votes[dir]++
+					if votes[dir] > votes[best] {
+						best = dir
+					}
+					break
+				}
+			}
+		}
+	}
+	return best
+}
+
+// parentPath drops the last segment of p in either separator convention, or
+// gives "" at the root.
+func parentPath(p string) string {
+	p = strings.TrimRight(p, `/\`)
+	i := strings.LastIndexAny(p, `/\`)
+	if i <= 0 || (i == 2 && p[1] == ':') {
+		return ""
+	}
+	return p[:i]
+}
+
+// codexProjectCWD is the directory codex's state database records for other
+// threads of the same project, when exactly one directory has that name.
+func codexProjectCWD(project string) string {
+	if project == "" || project == "-" {
+		return ""
+	}
+	found := ""
+	for _, root := range CodexRoots() {
+		dbs, _ := filepath.Glob(filepath.Join(root, "state_*.sqlite"))
+		for _, db := range dbs {
+			out, err := sqliteOutput(db, "select distinct cwd from threads")
+			if err != nil {
+				continue
+			}
+			for _, cwd := range strings.Split(string(out), "\n") {
+				cwd = strings.TrimSpace(cwd)
+				if cwd == "" || cwdProjectName(cwd) != project || cwd == found {
+					continue
+				}
+				if found != "" {
+					return ""
+				}
+				found = cwd
+			}
+		}
+	}
+	return found
+}

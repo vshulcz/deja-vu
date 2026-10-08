@@ -3,6 +3,7 @@ package sources
 import (
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,14 +76,90 @@ func TestWriteBackCodexReadsBackAsTheSameTurns(t *testing.T) {
 	t.Setenv("CODEX_HOME", root)
 	id := "01a0f6e6-8cd3-72c2-84ff-367e6191e458"
 	path := filepath.Join(root, "sessions", "2026", "10", "01", "rollout-2026-10-01T12-00-00-"+id+".jsonl")
-	assertTurns(t, writeAndRead(t, writeBackSample("codex", id, path), ParseCodexRollout))
+	assertTurns(t, writeAndRead(t, codexWriteBackSample(id, path), ParseCodexRollout))
 
 	// A rollout codex compressed goes back as plain JSONL beside it.
 	id2 := "01a0f6e6-8cd3-72c2-84ff-367e6191e459"
 	zst := filepath.Join(root, "sessions", "2026", "10", "01", "rollout-2026-10-01T12-00-00-"+id2+".jsonl.zst")
-	f, err := RenderWriteBack(writeBackSample("codex", id2, zst))
+	f, err := RenderWriteBack(codexWriteBackSample(id2, zst))
 	if err != nil || f.Path != strings.TrimSuffix(zst, ".zst") {
 		t.Fatalf("compressed rollout: %q, %v", f.Path, err)
+	}
+}
+
+// codexWriteBackSample is a codex session whose own edits name the directory
+// it ran in, which is all a write-back has once codex's thread row is gone.
+func codexWriteBackSample(id, path string) model.Session {
+	s := writeBackSample("codex", id, path)
+	s.Project = "work/api"
+	s.Messages = append(s.Messages, model.Message{Role: RoleFiles, Text: "/srv/work/api/pool.go"})
+	return s
+}
+
+func TestWriteBackCodexTakesTheDirectoryTheSessionRecorded(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_CODEX_ROOT", root)
+	t.Setenv("CODEX_HOME", root)
+	id := "01a0f6e6-8cd3-72c2-84ff-367e6191e460"
+	path := filepath.Join(root, "sessions", "2026", "10", "01", "rollout-2026-10-01T12-00-00-"+id+".jsonl")
+	meta := func(s model.Session) string {
+		t.Helper()
+		f, err := RenderWriteBack(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p := filepath.Join(t.TempDir(), "rollout.jsonl")
+		if err := os.WriteFile(p, f.Data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, cwd, _ := codexRolloutHead(p)
+		return cwd
+	}
+
+	// No thread row: the paths the session itself worked on, by majority,
+	// each at its nearest parent with the session's project name.
+	s := writeBackSample("codex", id, path)
+	s.Project = "work/api"
+	s.Messages = append(s.Messages,
+		model.Message{Role: RoleFiles, Text: "/srv/work/api/internal/pool/pool.go\n/srv/work/api/go.mod"},
+		model.Message{Role: RoleEdit, Text: "/srv/work/api/cmd/main.go\n-old"},
+		model.Message{Role: RoleWrote, Text: "/tmp/scratch/work/api/x.go\nabc"},
+	)
+	if got := meta(s); got != "/srv/work/api" {
+		t.Errorf("cwd from the session's files = %q, want /srv/work/api", got)
+	}
+
+	// Nothing names it anywhere: refused, not written with an empty cwd.
+	bare := writeBackSample("codex", id, path)
+	bare.Project = "work/api"
+	if _, err := RenderWriteBack(bare); err == nil || !strings.Contains(err.Error(), "directory the session ran in") {
+		t.Errorf("no cwd anywhere: %v, want a refusal naming the directory", err)
+	}
+
+	if !SQLite3Available() {
+		t.Skip("sqlite3 not available")
+	}
+	db := filepath.Join(root, "state_5.sqlite")
+	sql := func(q string) {
+		t.Helper()
+		if out, err := exec.Command("sqlite3", db, q).CombinedOutput(); err != nil {
+			t.Fatalf("sqlite3: %v %s", err, out)
+		}
+	}
+	sql("create table threads(id text, cwd text); insert into threads values('other-1','/home/a/work/api'),('other-2','/home/a/work/web');")
+	// Another thread of the same project, when one directory has its name.
+	if got := meta(bare); got != "/home/a/work/api" {
+		t.Errorf("cwd from codex's other threads = %q, want /home/a/work/api", got)
+	}
+	// The thread's own row wins over everything else.
+	sql("insert into threads values('" + id + "','/home/a/own/api');")
+	if got := meta(s); got != "/home/a/own/api" {
+		t.Errorf("cwd from the thread row = %q, want /home/a/own/api", got)
+	}
+	// Two directories share the project's name: no guess.
+	sql("delete from threads where id='" + id + "'; insert into threads values('other-3','/opt/work/api');")
+	if _, err := RenderWriteBack(bare); err == nil {
+		t.Error("two directories with the project's name: picked one")
 	}
 }
 
