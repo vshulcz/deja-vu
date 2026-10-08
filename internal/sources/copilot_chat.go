@@ -649,6 +649,7 @@ func copilotChatAppendRequest(s *model.Session, req map[string]any) {
 	var speech []string
 	var extras []model.Message
 	copilotChatWalkResponse(req["response"], at, &speech, &extras)
+	extras = append(extras, copilotChatRoundEdits(req, at)...)
 	if txt := strings.TrimSpace(strings.Join(speech, "")); txt != "" {
 		s.Touch(at)
 		s.Messages = append(s.Messages, model.Message{Role: "assistant", Text: txt, Time: at})
@@ -882,10 +883,10 @@ func copilotChatRefName(m map[string]any) string {
 // A `textEditGroup` part carries the file as a uri and the edits as ranges
 // plus the text that replaced each one. The new text is there in full; the old
 // text is not — the range is all that says what was there — so this is the
-// written side only, and there is nothing in the store for the replaced rule
-// to read. Counted on a local store: 655 edit groups across 34 session files,
-// none of which reached the index, so `deja files`, `restore` and line-level
-// blame were silent for every Copilot Chat user (#595).
+// written side only. The replaced side is in the edit call's arguments, read by
+// copilotChatRoundEdits. Counted on a local store: 655 edit groups across 34
+// session files, none of which reached the index, so `deja files`, `restore`
+// and line-level blame were silent for every Copilot Chat user (#595).
 func copilotChatEdits(m map[string]any, t time.Time, extras *[]model.Message) {
 	path := copilotChatRefPath(m["uri"])
 	if path == "" {

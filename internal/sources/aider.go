@@ -302,11 +302,15 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 	// rest of that block.
 	afterOutput := false
 	seenUser := false
+	edits := newAiderEdits(aiderResolver(fileRoot))
 
 	flush := func() {
 		if cur == nil || len(buf) == 0 {
 			role, buf = "", nil
 			return
+		}
+		if role == "assistant" {
+			edits.reply(strings.Join(buf, "\n"), cur.Started)
 		}
 		// A markdown transcript is bytes, not JSON: nothing on the way in
 		// rejects a sequence that is not UTF-8, which is what every other
@@ -344,6 +348,7 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 			id := aiderSessionID(path, ts, idx, starts)
 			cur = &model.Session{Harness: "aider", ID: id, Project: project, Path: path, Started: ts, Updated: ts}
 			seenFiles = map[string]bool{}
+			edits = newAiderEdits(aiderResolver(fileRoot))
 			// The ordinal id a `deja forget` before #4332 tombstoned.
 			if former := aiderSessionID(path, time.Time{}, idx, nil); former != id {
 				cur.FormerID = former
@@ -372,6 +377,12 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		case strings.HasPrefix(line, "#### "):
 			afterOutput = false
 			seenUser = true
+			// The reply before this question has had its "Applied edit"
+			// lines; what they did not name was not applied.
+			if role != "user" {
+				flush()
+			}
+			edits.drop()
 			t := strings.TrimPrefix(line, "#### ")
 			// A shell line is what ran, not what was asked (#4324).
 			if cmd, ok := aiderShellCommand(t); ok {
@@ -404,6 +415,10 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 			flush()
 			afterOutput = true
 			said := strings.TrimSpace(strings.TrimPrefix(line, ">"))
+			edits.noteOutput(said)
+			if f := aiderOutputFile(said); f != "" && strings.HasPrefix(said, "Applied edit to ") {
+				cur.Messages = append(cur.Messages, edits.applied(f)...)
+			}
 			if f := aiderOutputFile(said); f != "" && IndexToolPaths() && !strings.ContainsAny(f, "\n\r") {
 				if fileRoot != "" && !filepath.IsAbs(f) {
 					f = filepath.Join(fileRoot, f)

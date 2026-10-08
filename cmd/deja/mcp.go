@@ -1342,7 +1342,7 @@ func recallCountLine(q, tier string, offset, served, total, strict int, namesThe
 		// fill a context window with whatever ranked highest (#1308).
 		return fmt.Sprintf("deja recall for %q (%d of %d matched)\n", q, served, total)
 	default:
-		return fmt.Sprintf("deja recall for %q (%d match(es))\n", q, served)
+		return fmt.Sprintf("deja recall for %q (%s)\n", q, search.MatchCount(served))
 	}
 }
 
@@ -1807,7 +1807,10 @@ func recallTextResultIn(dir, q, harness, project string, limit, offset, budget i
 	// agent asks for offset=served and the arithmetic has to hold.
 	more := ""
 	if left := total - offset - served; left > 0 {
-		what := "match(es)"
+		what := "matches"
+		if left == 1 {
+			what = "match"
+		}
 		if result.Tier == search.TierRelevance {
 			// Nothing matched, so there are no more matches to offer — only
 			// more of the nearest wording.

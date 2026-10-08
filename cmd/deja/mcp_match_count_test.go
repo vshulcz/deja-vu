@@ -50,7 +50,7 @@ func TestRecallSaysHowManyMatchedNotJustHowManyCameBack(t *testing.T) {
 		t.Errorf("the answer does not say how many sessions matched:\n%s", firstLines(text, 4))
 	}
 	// And the follow-up line agrees with it.
-	if !strings.Contains(text, "35 more match(es) — call recall again with offset=5.") {
+	if !strings.Contains(text, "35 more matches — call recall again with offset=5.") {
 		t.Errorf("the numbers on the two lines do not add up:\n%s", text)
 	}
 }
@@ -66,7 +66,7 @@ func TestRecallKeepsThePlainCountWhenNothingWasHeldBack(t *testing.T) {
 	if strings.Contains(text, "matched)") {
 		t.Errorf("a complete answer was reported as a sample:\n%s", firstLines(text, 4))
 	}
-	if !strings.Contains(text, "match(es)") {
+	if !strings.Contains(text, " matches)") && !strings.Contains(text, " match)") {
 		t.Errorf("the count line went missing:\n%s", firstLines(text, 4))
 	}
 }
@@ -129,7 +129,10 @@ func TestTheFollowUpCountMatchesWhatWasServed(t *testing.T) {
 	if served >= 15 {
 		t.Fatalf("the budget no longer cuts this answer short (served %d of 15), so this test guards nothing", served)
 	}
-	want := fmt.Sprintf("%d more match(es) — call recall again with offset=%d.", 40-served, served)
+	want := fmt.Sprintf("%d more matches — call recall again with offset=%d.", 40-served, served)
+	if 40-served == 1 {
+		want = fmt.Sprintf("1 more match — call recall again with offset=%d.", served)
+	}
 	if !strings.Contains(text, want) {
 		t.Errorf("expected %q in:\n%s", want, text)
 	}

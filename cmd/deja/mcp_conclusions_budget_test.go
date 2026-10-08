@@ -86,7 +86,8 @@ func TestTheConclusionsBlockIsWithheldOnASmallPage(t *testing.T) {
 	if strings.Contains(small, "decided to cap") {
 		t.Errorf("a 600-byte page spent its budget on the block:\n%s", small)
 	}
-	if len(small) != 600 {
+	// The cut lands on a word, so a few bytes can go unused.
+	if len(small) > 600 || len(small) < 580 {
 		t.Errorf("the small page is %d bytes, not the 600 it was given", len(small))
 	}
 }
