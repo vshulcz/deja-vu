@@ -19,7 +19,7 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
 ## 做什么
 
 - **会话开始时**（`agent:bootstrap`）：这个项目定下的事，每个会话一次，放在 Project Context 里。不需要 `allowConversationAccess`，`openclaw agent --local` 下也会运行。
-- **每回合之前**（`before_prompt_build`）：把提问拿去和索引比对，如果某次历史会话能回答它，那次会话就送到模型面前。多数情况下是沉默。
+- **每回合之前**（`before_prompt_build`）：把提问拿去和索引比对，如果某次历史会话能回答它，那次会话就送到模型面前。多数情况下是沉默。OpenClaw 2026.8.1 及以后只有在插件条目上设了 `hooks.allowConversationAccess: true` 时才运行这个钩子（见配置）；没设时插件会在网关日志和 `/deja` 里说明。
 - **压缩之前**（`before_compaction`）：deja 从会话文件里读出要被总结的回合，下一回合就带上智能体正在做的事。
 - **会话结束时**（`session_end`）：撤掉会话的在线标记，下一个会话的召回就能用上它。
 - **工具**：`deja_recall`（检索历史）、`deja_fix`（这个报错之后上次跑了什么）、`deja_blame`（哪些会话动过某个文件、当时得出了什么结论）。
@@ -33,6 +33,7 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
     "entries": {
       "deja-vu": {
         "enabled": true,
+        "hooks": { "allowConversationAccess": true },
         "config": { "autoRecall": true, "tools": true, "bin": "/opt/homebrew/bin/deja" }
       }
     }
@@ -41,6 +42,12 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
 ```
 
 三项都是可选的。`autoRecall: false` 保留工具、去掉每回合的召回；`tools: false` 则相反。
+
+`hooks.allowConversationAccess` 是 OpenClaw 的授权，不是插件的配置：2026.8.1 及以后，非内置插件的 `before_prompt_build` 只有在它为 true 时才会运行，插件也无法在 manifest 里申请。一条命令即可设置：
+
+```sh
+openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
+```
 
 ## 用哪个可执行文件
 

@@ -68,7 +68,7 @@ dsh plugin --profile web add dsh-deja
 # Kimi Code：/plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI：codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
 # Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
-openclaw plugins install clawhub:@vshulcz/openclaw-deja
+openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
 ```
 

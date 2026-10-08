@@ -731,7 +731,7 @@
       "gaps": {},
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"},
-        "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway)"},
+        "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway); the ClawHub package cannot grant it to itself, so it names the key and the openclaw config set command in the gateway log and in /deja (stand on 2026.9.9)"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "stand", "note": "the packet rides the prompt hook, so it needs the same allowConversationAccess grant on 2026.8.1+"},

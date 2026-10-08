@@ -102,6 +102,13 @@
     <summary>Why coding agents start from scratch every session, what compaction keeps, and how to read the history Claude Code, Codex and Cursor already wrote.</summary>
   </entry>
   <entry>
+    <title>Install deja and index your agent history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/getting-started.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/getting-started.html"></link>
+    <updated>2026-10-08T00:00:00Z</updated>
+    <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
+  </entry>
+  <entry>
     <title>Claude Code, Codex, Cursor and 37 more agents — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kiro.html"></link>
     <updated>2026-10-08T00:00:00Z</updated>
     <summary>Kiro keeps every session on disk — the CLI one way, the IDE another — and starts each new one empty. deja reads both stores and answers from them in any agent.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Oh My Pi (omp): recall past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-omp.html"></link>
-    <updated>2026-10-08T00:00:00Z</updated>
-    <summary>Oh My Pi (omp) keeps a session log per agent directory and reads none of it back. deja wires its extension, MCP server and skill, and indexes every agent.</summary>
   </entry>
 </feed>

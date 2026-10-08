@@ -8,6 +8,7 @@ import { join } from "node:path"
 import { promisify } from "node:util"
 
 import {
+  accessNote,
   argv,
   configPath,
   contributions,
@@ -134,6 +135,7 @@ export default {
     const config = (api && api.pluginConfig) || {}
     const bin = resolveDeja(config.bin)
     const adds = contributions(installerWiring(), config)
+    const access = adds.recall ? accessNote(api && api.config, (api && api.id) || "deja-vu") : ""
     let installed = true
 
     const ask = async (args, input, timeout) => {
@@ -309,12 +311,20 @@ export default {
             // Asked here rather than read from installed: the startup check may
             // not have answered yet, and an empty search reads as no history.
             if (!out && !(await run(bin, ["--version"]))) return { text: MISSING }
-            const notes = await ask(["hook-context", "--notes"], undefined, 10000)
+            const notes = [await ask(["hook-context", "--notes"], undefined, 10000), access].filter(Boolean).join("\n")
             return { text: notes ? (out || NOTHING) + "\n\n" + notes : out || NOTHING }
           },
         })
       }
     } catch {}
+
+    // So is a missing grant: the gateway's own warning names the key but not
+    // what it costs.
+    if (access) {
+      try {
+        api.logger && api.logger.warn && api.logger.warn("deja-vu: " + access)
+      } catch {}
+    }
 
     // A missing binary is reported once, through the host, not on every turn.
     run(bin, ["--version"]).then((v) => {

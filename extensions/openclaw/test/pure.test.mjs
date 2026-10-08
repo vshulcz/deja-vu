@@ -1,6 +1,22 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { argv, configPath, contributions, installerPluginPath, mcpWired, promptText, toolCall, where } from "../lib.mjs"
+import { accessNote, argv, configPath, contributions, installerPluginPath, mcpWired, promptText, toolCall, where } from "../lib.mjs"
+
+test("a missing conversation-access grant is named with the command that sets it", () => {
+  const granted = { plugins: { entries: { "deja-vu": { hooks: { allowConversationAccess: true } } } } }
+  assert.equal(accessNote(granted, "deja-vu"), "")
+  const missing = [
+    undefined,
+    {},
+    { plugins: { entries: { "deja-vu": { enabled: true } } } },
+    { plugins: { entries: { "deja-vu": { hooks: { allowConversationAccess: false } } } } },
+    // The grant is per entry: another plugin's does not count.
+    { plugins: { entries: { other: { hooks: { allowConversationAccess: true } } } } },
+  ]
+  for (const cfg of missing) {
+    assert.match(accessNote(cfg, "deja-vu"), /openclaw config set plugins\.entries\.deja-vu\.hooks\.allowConversationAccess true/)
+  }
+})
 
 test("a query that starts with a dash gets the flag terminator", () => {
   assert.deepEqual(argv("search", ["--limit", "5"], "--json"), ["search", "--limit", "5", "--", "--json"])

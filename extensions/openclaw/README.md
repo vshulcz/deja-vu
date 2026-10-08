@@ -32,7 +32,9 @@ what is missing.
   `allowConversationAccess` and runs under `openclaw agent --local` too.
 - **Before each turn** (`before_prompt_build`): the prompt is matched against
   the index and, when a past session answers it, that session goes in front of
-  the model. Silence is the common case.
+  the model. Silence is the common case. OpenClaw 2026.8.1 and later run this
+  hook only with `hooks.allowConversationAccess: true` on the plugin's entry
+  (see Config); without it the plugin says so in the gateway log and in `/deja`.
 - **Before a compaction** (`before_compaction`): deja reads the turns about to
   be summarised from the session file, so the next turn carries what the agent
   was in the middle of.
@@ -54,6 +56,7 @@ what is missing.
     "entries": {
       "deja-vu": {
         "enabled": true,
+        "hooks": { "allowConversationAccess": true },
         "config": { "autoRecall": true, "tools": true, "bin": "/opt/homebrew/bin/deja" }
       }
     }
@@ -63,6 +66,14 @@ what is missing.
 
 All three are optional. `autoRecall: false` keeps the tools and drops the
 per-turn recall; `tools: false` the reverse.
+
+`hooks.allowConversationAccess` is OpenClaw's grant, not the plugin's: 2026.8.1
+and later run a non-bundled plugin's `before_prompt_build` only with it, and a
+plugin cannot ask for it in its manifest. One command sets it:
+
+```sh
+openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
+```
 
 ## Which binary
 

@@ -83,6 +83,21 @@ export function contributions(wiring, config = {}) {
   }
 }
 
+// accessNote is what to tell the person when this plugin's entry does not
+// grant conversation access. OpenClaw 2026.8.1 and later drop a non-bundled
+// plugin's before_prompt_build without it (registerTypedHook in
+// src/plugins/loader, 2026.9.9), and the plugin cannot grant it to itself:
+// it is a config key, not a manifest field. "" when it is granted.
+export function accessNote(hostConfig, id) {
+  const entry = hostConfig && hostConfig.plugins && hostConfig.plugins.entries && hostConfig.plugins.entries[id]
+  if (entry && entry.hooks && entry.hooks.allowConversationAccess === true) return ""
+  return (
+    "OpenClaw 2026.8.1 and later run deja's per-prompt recall only with " +
+    `plugins.entries.${id}.hooks.allowConversationAccess set to true: ` +
+    `openclaw config set plugins.entries.${id}.hooks.allowConversationAccess true`
+  )
+}
+
 // argv builds the call for a query somebody typed. A query that starts with a
 // dash is read by deja as a flag and the call fails, which run() turns into
 // "nothing in the history" — a wrong answer where an error would at least be

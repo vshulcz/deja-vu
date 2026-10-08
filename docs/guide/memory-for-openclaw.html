@@ -147,8 +147,9 @@
 
 <h2>Adding recall</h2>
 <p>From ClawHub, without the deja CLI on hand:</p>
-<pre>openclaw plugins install clawhub:@vshulcz/openclaw-deja</pre>
-<p>The package brings the binary along, recalls before each turn and registers <code>deja_recall</code>, <code>deja_fix</code> and <code>deja_blame</code>. Or, with the CLI installed:</p>
+<pre>openclaw plugins install clawhub:@vshulcz/openclaw-deja
+openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true</pre>
+<p>The package brings the binary along, recalls before each turn and registers <code>deja_recall</code>, <code>deja_fix</code> and <code>deja_blame</code>. The second line is OpenClaw's grant: 2026.8.1 and later run a plugin's per-prompt hook only with it, and a plugin cannot ask for it itself. Or, with the CLI installed:</p>
 <pre>deja install openclaw-auto</pre>
 <p>Three things are written, and all three are reversible with <code>deja uninstall openclaw</code>:</p>
 <ul>
