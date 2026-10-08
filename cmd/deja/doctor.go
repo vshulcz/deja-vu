@@ -575,6 +575,13 @@ func doctorLocationRoots(location string) []string {
 }
 
 func oneStoreDiskGone(path string) bool {
+	// A row that names a description rather than a path — roo's "VS Code
+	// globalStorage ..." — has no disk to lose. Walked up from the working
+	// directory, Cherry Studio's relative placeholder read as unplugged on
+	// every machine without the app.
+	if !filepath.IsAbs(path) {
+		return false
+	}
 	// Two levels is not enough for every store: `~/.local/share/goose/sessions`
 	// and `~/.cline/data/sessions` lose three on a machine that never installed
 	// them. A home directory that is there means the disk is there.
@@ -1060,7 +1067,7 @@ func doctorHarnesses(w io.Writer, dir string) {
 	// Cherry Studio writes Claude Code transcripts under its own app data, so
 	// the row names the roots it found rather than the app directory (#3644).
 	cherryFiles := len(sources.CherryStudioSessionFiles())
-	cherryLoc := "CherryStudio/Data/Agents/.claude"
+	cherryLoc := sources.CherryStudioDefaultRoot()
 	if roots := sources.CherryStudioAllRoots(); len(roots) > 0 {
 		cherryLoc = strings.Join(roots, string(os.PathListSeparator))
 	}

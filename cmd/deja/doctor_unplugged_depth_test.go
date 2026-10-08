@@ -44,3 +44,34 @@ func TestDoctorDoesNotCallADeepUninstalledStoreUnplugged(t *testing.T) {
 		}
 	}
 }
+
+// Cherry Studio's row named a relative placeholder when the app was not
+// installed, and a relative path has no disk to lose: walked up from the
+// working directory it read as `unplugged` on every machine without the app.
+// No row on a bare home may say it, whatever its location looks like.
+func TestDoctorCallsNoStoreOnABareHomeUnplugged(t *testing.T) {
+	tmp := hermeticEnv(t)
+	if err := os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".claude", "projects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// hermeticEnv points zed at a root outside the home; give it its parent
+	// so the row reads as an uninstalled store, which is what it is here.
+	if err := os.MkdirAll(filepath.Join(tmp, "zed"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(t.TempDir())
+
+	var out bytes.Buffer
+	doctorHarnesses(&out, filepath.Join(tmp, "index.db"))
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.Contains(line, "unplugged") {
+			t.Errorf("row on a bare home: %q", line)
+		}
+	}
+	if row := harnessRow(t, out.String(), "cherrystudio"); !strings.Contains(filepath.ToSlash(row), "CherryStudio/Data/Agents/.claude") {
+		t.Errorf("cherrystudio row does not name the app's default store: %q", row)
+	}
+	if storeDiskGone(filepath.Join("CherryStudio", "Data", "Agents", ".claude")) {
+		t.Error("a relative location was called unplugged")
+	}
+}
