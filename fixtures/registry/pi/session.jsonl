@@ -3,3 +3,6 @@
 {"type":"thinking_level_change","id":"tl1","parentId":"mc1","timestamp":"2026-07-17T10:00:01Z","thinkingLevel":"medium"}
 {"type":"message","id":"u1","parentId":"tl1","timestamp":"2026-07-17T10:00:05Z","message":{"role":"user","content":[{"type":"text","text":"registry conformance question"}],"timestamp":1784386805000}}
 {"type":"message","id":"a1","parentId":"u1","timestamp":"2026-07-17T10:00:10Z","message":{"role":"assistant","content":[{"type":"thinking","thinking":"reasoning"},{"type":"text","text":"registry conformance answer"}],"api":"anthropic","model":"claude-sonnet-4","usage":{"input":5,"output":10},"stopReason":"endTurn","timestamp":1784386810000}}
+{"type":"compaction","id":"c1","parentId":"a1","timestamp":"2026-07-17T10:00:20Z","summary":"PI-SUMMARY the registry conformance question was answered","firstKeptEntryId":"a1","tokensBefore":12345,"details":{"readFiles":[],"modifiedFiles":[]}}
+{"type":"branch_summary","id":"b1","parentId":"u1","timestamp":"2026-07-17T10:00:30Z","fromId":"c1","summary":"PI-BRANCH-SUMMARY the abandoned branch tried a second answer"}
+{"type":"message","id":"u2","parentId":"b1","timestamp":"2026-07-17T10:00:35Z","message":{"role":"user","content":[{"type":"text","text":"registry follow-up"}],"timestamp":1784386835000}}

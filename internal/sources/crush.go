@@ -104,6 +104,31 @@ type crushRow struct {
 	Parts     string `json:"parts"`
 	CreatedAt int64  `json:"created_at"`
 	UpdatedAt int64  `json:"updated_at"`
+	Summary   bool   `json:"summary"`
+}
+
+// crushSummaryExpr says in SQL whether a message is a summary Crush wrote when
+// it summarised the session. The summary is an assistant row; the session
+// points summary_message_id at the newest one, and since 2025-08 every one,
+// a failed attempt included, carries is_summary_message (v0.97.1
+// internal/agent/agent.go Summarize). An older store has only the pointer, or
+// neither.
+func crushSummaryExpr(db string) string {
+	out, _ := sqliteOutput(db, "select name from pragma_table_info('sessions') where name='summary_message_id'"+
+		" union all select name from pragma_table_info('messages') where name='is_summary_message'")
+	var conds []string
+	for _, col := range strings.Fields(string(out)) {
+		switch col {
+		case "summary_message_id":
+			conds = append(conds, "m.id = coalesce(s.summary_message_id,'')")
+		case "is_summary_message":
+			conds = append(conds, "m.is_summary_message = 1")
+		}
+	}
+	if len(conds) == 0 {
+		return "json('false')"
+	}
+	return "json(case when " + strings.Join(conds, " or ") + " then 'true' else 'false' end)"
 }
 
 // ParseCrushDB reads one project's store. The project is the directory the
@@ -135,7 +160,8 @@ func parseCrushWhere(db, where string) ([]model.Session, error) {
 	// what it escapes — see sqliteRows. A parts column is stored JSON.
 	q := "select json_object('session_id',cast(s.id as text),'title',cast(s.title as text)," +
 		"'parent_session_id',cast(coalesce(s.parent_session_id,'') as text),'updated_at',s.updated_at," +
-		"'id',cast(m.id as text),'role',cast(m.role as text),'parts',cast(m.parts as text),'created_at',m.created_at) " +
+		"'id',cast(m.id as text),'role',cast(m.role as text),'parts',cast(m.parts as text),'created_at',m.created_at," +
+		"'summary'," + crushSummaryExpr(db) + ") " +
 		"from sessions s join messages m on m.session_id = s.id" + where + " order by s.id, m.created_at"
 	rows, err := crushRows(db, q)
 	if err != nil {
@@ -163,7 +189,11 @@ func parseCrushWhere(db, where string) ([]model.Session, error) {
 			order = append(order, r.SessionID)
 		}
 		at := unixGuess(r.CreatedAt)
-		recs, results := crushMessages(r.Role, r.Parts, at)
+		role := r.Role
+		if r.Summary {
+			role = RoleSummary
+		}
+		recs, results := crushMessages(role, r.Parts, at)
 		joins[r.SessionID].add(s, recs, results)
 	}
 	out := make([]model.Session, 0, len(order))

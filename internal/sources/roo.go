@@ -298,6 +298,10 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 		// Roo stamps every turn in epoch milliseconds. A float, so a value
 		// written with a fraction does not fail the whole task.
 		TS float64 `json:"ts"`
+		// Condensing appends a summary turn flagged isSummary; the sliding
+		// window leaves a marker turn flagged isTruncationMarker.
+		IsSummary          bool `json:"isSummary"`
+		IsTruncationMarker bool `json:"isTruncationMarker"`
 	}
 	if err := json.Unmarshal(b, &turns); err != nil {
 		// One document per task, as in cline: a file that will not parse is a
@@ -341,6 +345,18 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 		if m.TS > 0 {
 			ts = time.UnixMilli(int64(m.TS))
 		}
+		if m.IsTruncationMarker {
+			// "[Sliding window truncation: N messages hidden …]": the
+			// extension's note, not the person's words.
+			continue
+		}
+		if m.IsSummary {
+			if text := rooSummaryText(m.Content); text != "" {
+				s.Touch(ts)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: ts})
+			}
+			continue
+		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
 			// A result of the XML era is a text block, not a tool_result
@@ -370,4 +386,39 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 		return nil, nil
 	}
 	return []model.Session{s}, nil
+}
+
+// rooSummaryText is the summary a condense wrote. Roo up to 3.42 and the Kilo
+// Code extension (5.16) write it as an assistant turn whose text block is the
+// summary, beside reasoning and the tool calls the kept turns still need; Roo
+// 3.43 on, including the last release 3.54.0, as a user turn whose first block
+// is "## Conversation Summary" and the summary, followed by blocks of
+// <system-reminder> and environment details the extension adds for the model
+// (src/core/condense/index.ts summarizeConversation).
+func rooSummaryText(raw json.RawMessage) string {
+	var asString string
+	if json.Unmarshal(raw, &asString) == nil {
+		return strings.TrimSpace(asString)
+	}
+	var blocks []struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	if json.Unmarshal(raw, &blocks) != nil {
+		return ""
+	}
+	var parts []string
+	for _, blk := range blocks {
+		t := strings.TrimSpace(blk.Text)
+		if blk.Type != "text" || t == "" || strings.HasPrefix(t, "<system-reminder>") || strings.HasPrefix(t, "<environment_details>") {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(t, "## Conversation Summary"); ok {
+			t = strings.TrimSpace(rest)
+		}
+		if t != "" {
+			parts = append(parts, t)
+		}
+	}
+	return strings.Join(parts, "\n")
 }

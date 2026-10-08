@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -452,6 +453,16 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 			trae.record(&s, m, payload, cwd, t, calls)
 			return
 		}
+		// A local compaction writes {"type":"compacted","payload":{"message":
+		// <summary>,"replacement_history":[…]}} (RolloutItem::Compacted, 0.149).
+		// Read as a bare message it was filed as something the person said. A
+		// remote compaction leaves message empty: its summary is encrypted.
+		if typ, _ := m["type"].(string); typ == "compacted" {
+			if msg, _ := payload["message"].(string); strings.TrimSpace(msg) != "" {
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: msg, Time: t})
+			}
+			return
+		}
 		switch pt, _ := payload["type"].(string); pt {
 		case "function_call":
 			codexCall(&s, payload, calls, t)
@@ -511,8 +522,10 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	}
 	// Only when the roled stream said nothing: an older rollout that carries
 	// its turns as events alone still has to be readable.
-	if len(s.Messages) == 0 {
-		s.Messages = events
+	// A compaction summary is not the roled stream speaking.
+	if onlySummaries(s.Messages) && len(events) > 0 {
+		s.Messages = append(events, s.Messages...)
+		sort.SliceStable(s.Messages, func(i, j int) bool { return s.Messages[i].Time.Before(s.Messages[j].Time) })
 	}
 	if len(s.Messages) == 0 {
 		// An appended tail of records with a time and no message, such as

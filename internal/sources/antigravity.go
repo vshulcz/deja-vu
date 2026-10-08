@@ -142,6 +142,21 @@ func parseAntigravityWith(path string, scan func(func(map[string]any)) error) ([
 			role = "user"
 		case "MODEL":
 			role = "assistant"
+		case "SYSTEM":
+			// A compaction writes a CHECKPOINT step whose content is the
+			// summary of the steps before it, which stay in the file.
+			if str(m["type"]) != "CHECKPOINT" {
+				return
+			}
+			if text := antigravityCheckpointSummary(str(m["content"])); text != "" {
+				t, _ := time.Parse(time.RFC3339Nano, str(m["created_at"]))
+				if t.IsZero() {
+					t = s.Started
+				}
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: capParsedMessage(text), Time: t})
+			}
+			return
 		default:
 			return
 		}

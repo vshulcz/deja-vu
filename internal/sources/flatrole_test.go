@@ -97,7 +97,8 @@ func TestSenpiAndKimchiReadThePiEnvelope(t *testing.T) {
 	if ss[0].Project != "workspace/senpi-demo" {
 		t.Errorf("project = %q, want it from the header's cwd", ss[0].Project)
 	}
-	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[1].Text, "acknowledged") {
+	// The third is the compaction summary the fixture ends with.
+	if len(ss[0].Messages) != 3 || !strings.Contains(ss[0].Messages[1].Text, "acknowledged") || ss[0].Messages[2].Role != RoleSummary {
 		t.Errorf("senpi messages = %+v", ss[0].Messages)
 	}
 
@@ -181,7 +182,7 @@ func TestGjcSkipsSubagentPassesUnlessAskedFor(t *testing.T) {
 	if ss[0].ID != "reg-gjc-001" {
 		t.Errorf("id = %q, want the header's id", ss[0].ID)
 	}
-	if len(ss[0].Messages) != 2 || !strings.Contains(ss[0].Messages[1].Text, "twice") {
+	if len(ss[0].Messages) != 3 || !strings.Contains(ss[0].Messages[1].Text, "twice") || ss[0].Messages[2].Role != RoleSummary {
 		t.Errorf("messages = %+v", ss[0].Messages)
 	}
 	// The service_tier_change line is not a turn, and read as one it is an

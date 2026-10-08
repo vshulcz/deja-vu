@@ -1,3 +1,5 @@
 {"kind":0,"v":{"version":3,"sessionId":"3b7e1f1b-0000-4000-8000-000000000000","creationDate":1763727100000,"customTitle":"fix the retry loop","requests":[],"inputState":{"selectedModel":{"metadata":{"auth":{"accountLabel":"someone"}}}},"workingDirectory":"file:///tmp/registry-demo"}}
 {"kind":2,"k":["requests"],"v":[{"requestId":"request_1","timestamp":1763727104742,"message":{"text":"the retry loop drops the last attempt"},"response":[{"value":"The loop compares with < where it needs <=."}]}]}
 {"kind":1,"k":["requests",0,"responseTimestamp"],"v":1763727400000}
+{"kind":2,"k":["requests"],"v":[{"requestId":"request_2","timestamp":1763727500000,"message":{"text":"now add a test for the last attempt"},"response":[{"kind":"progressTaskSerialized","content":{"value":"Summarized conversation history"}},{"value":"Added TestRetryKeepsLastAttempt."}],"result":{"metadata":{"summary":{"toolCallRoundId":"round_1","text":"COPILOT-CHAT-SUMMARY the retry loop compared with < and now uses <="}}}}]}
+{"kind":1,"k":["requests",1,"responseTimestamp"],"v":1763727600000}

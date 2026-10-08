@@ -201,7 +201,25 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 	case "commandcode":
 		sessions, err = ParseCommandCodeFile(path)
 	case "zcode":
-		sessions, err = ParseZCodeFile(path)
+		// The transcripts, and the CLI's OpenCode-schema database.
+		if strings.HasSuffix(path, ".sql") {
+			if !SQLite3Available() {
+				t.Skip("sqlite3 not installed")
+			}
+			sql, readErr := os.ReadFile(path)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			db := filepath.Join(work, "db.sqlite")
+			build := exec.Command("sqlite3", db)
+			build.Stdin = strings.NewReader(string(sql))
+			if out, runErr := build.CombinedOutput(); runErr != nil {
+				t.Fatalf("create sqlite fixture: %v: %s", runErr, out)
+			}
+			sessions, err = ParseZCodeDB(db)
+		} else {
+			sessions, err = ParseZCodeFile(path)
+		}
 	case "kiro":
 		// One store per client: the CLI's pair under cli/ and the IDE's
 		// per-workspace session directory.
@@ -399,7 +417,9 @@ func validateRegistrySessions(t *testing.T, id string, sessions []model.Session)
 			role := message.Role
 			work := registryFixturesWithCalls[id] &&
 				(role == RoleFiles || role == RoleCommand || role == RoleEdit || role == RoleWrote)
-			if (role != "user" && role != "assistant" && role != "tool-output" && !work) ||
+			// A compaction summary is allowed where the harness wrote one; the
+			// fixtures that carry one are pinned in compaction_summary_fixtures_test.go.
+			if (role != "user" && role != "assistant" && role != "tool-output" && role != RoleSummary && !work) ||
 				strings.TrimSpace(message.Text) == "" || message.Time.IsZero() {
 				t.Fatalf("%s fixture produced invalid message: %#v", id, message)
 			}

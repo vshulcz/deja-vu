@@ -373,7 +373,7 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`'path',` + opencodeV1Path(harness) + `,` +
 		`'cmd',` + opencodeV1Command(harness) + `,` +
 		`'patch',json_extract(p.data,'$.state.input.patchText'),` +
-		opencodeV1EditFields(harness) +
+		opencodeV1EditFields(harness) + opencodeV1CompactSummary(harness) +
 		// The output of a bash call and its exit status. Only bash: `read`
 		// output is 119 MB of file contents on this store against 49 MB of
 		// command output, and #547 measured file bodies as the weakest slice
@@ -415,6 +415,19 @@ func opencodeV1Query(harness, where string, limit int) string {
 		`and json_extract(p.data,'$.tool')='apply_patch')` + opencodeV1Tools(harness) + `)` +
 		where + ` order by s.id,m.time_created,p.id` + lim
 	return q
+}
+
+// opencodeV1CompactSummary marks ZCode's compaction summary: a user message
+// whose semantics.kind is compact_summary, with the raw summary under
+// summary.body and a synthetic text part (zcode-app-cli 3.14.4
+// persistCompactSummary). opencode's own summary flag is a different thing
+// there, so the kind decides.
+func opencodeV1CompactSummary(harness string) string {
+	if harness != "zcode" {
+		return ""
+	}
+	return `'zsum',case when json_extract(m.data,'$.semantics.kind')='compact_summary' ` +
+		`then coalesce(json_extract(m.data,'$.summary.body'),1) end,`
 }
 
 // opencodeV1EditFields read the two sides of an edit. opencode's own edit
@@ -538,7 +551,15 @@ func readOpencodeRows(harness, db, q string, by map[string]*model.Session) (int,
 			// question does not reach it and `--role summary` does.
 			role = RoleSummary
 		}
-		if opencodeSynthetic(r["synthetic"]) || opencodeSynthetic(r["ignored"]) {
+		if z, ok := r["zsum"]; ok && z != nil {
+			// ZCode's compaction summary: its text part is synthetic, the
+			// summary wrapped in the lines that tell the model to go on, and
+			// the summary itself is the message's summary.body.
+			role = RoleSummary
+			if body := strings.TrimSpace(str(z)); body != "" && body != "1" {
+				txt = body
+			}
+		} else if opencodeSynthetic(r["synthetic"]) || opencodeSynthetic(r["ignored"]) {
 			continue
 		}
 		// A read call carries no text, only the file it opened. Recorded under

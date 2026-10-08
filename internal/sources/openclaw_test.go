@@ -37,11 +37,11 @@ func TestParseOpenClawFile(t *testing.T) {
 	if s.ID != "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d" {
 		t.Fatalf("id = %q", s.ID)
 	}
-	if len(s.Messages) != 2 {
-		t.Fatalf("messages = %d, want 2", len(s.Messages))
+	if len(s.Messages) != 3 {
+		t.Fatalf("messages = %d, want 3", len(s.Messages))
 	}
-	if s.Messages[0].Role != "user" || s.Messages[1].Role != "assistant" {
-		t.Fatalf("roles = %q,%q", s.Messages[0].Role, s.Messages[1].Role)
+	if s.Messages[0].Role != "user" || s.Messages[1].Role != "assistant" || s.Messages[2].Role != RoleSummary {
+		t.Fatalf("roles = %q,%q,%q", s.Messages[0].Role, s.Messages[1].Role, s.Messages[2].Role)
 	}
 	// Header cwd promotes to the project key.
 	if s.Project != "workspace/registry-demo" {

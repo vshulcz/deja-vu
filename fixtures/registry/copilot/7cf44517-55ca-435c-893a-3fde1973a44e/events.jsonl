@@ -5,3 +5,6 @@
 {"type":"assistant.turn_start","data":{},"id":"t1","timestamp":"2026-07-20T05:13:58.678Z","parentId":null}
 {"type":"assistant.message","data":{"content":"the metrics poller leaks rows; add rows.Close in the scan loop"},"id":"a1","timestamp":"2026-07-20T05:14:00.973Z","parentId":null}
 {"type":"session.shutdown","data":{},"id":"e1","timestamp":"2026-07-20T05:14:01.029Z","parentId":null}
+{"type":"session.compaction_start","data":{},"id":"c0","timestamp":"2026-07-20T05:14:02.000Z","parentId":null}
+{"type":"session.compaction_complete","data":{"success":true,"preCompactionTokens":91000,"postCompactionTokens":4000,"messagesRemoved":6,"tokensRemoved":87000,"summaryContent":"COPILOT-SUMMARY the metrics poller leaked rows; rows.Close was added in the scan loop","checkpointNumber":1},"id":"c1","timestamp":"2026-07-20T05:14:03.000Z","parentId":null}
+{"type":"user.message","data":{"content":"run the pool test again"},"id":"u2","timestamp":"2026-07-20T05:14:04.000Z","parentId":null}

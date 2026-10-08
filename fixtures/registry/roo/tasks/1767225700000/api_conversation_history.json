@@ -1,4 +1,5 @@
 [
-  {"role": "user", "content": [{"type": "text", "text": "<task>\nFix the flaky test\n</task>"}]},
-  {"role": "assistant", "content": [{"type": "text", "text": "The retry loop reused a stale timeout; pinned it per attempt."}]}
+  {"role": "user", "content": [{"type": "text", "text": "<task>\nFix the flaky test\n</task>"}], "condenseParent": "6f1c2a90-0000-4000-8000-000000000001"},
+  {"role": "assistant", "content": [{"type": "text", "text": "The retry loop reused a stale timeout; pinned it per attempt."}], "condenseParent": "6f1c2a90-0000-4000-8000-000000000001"},
+  {"role": "user", "content": [{"type": "text", "text": "## Conversation Summary\nROO-SUMMARY the flaky test came from a stale timeout in the retry loop"}, {"type": "text", "text": "<system-reminder>\n## Active Workflows\nnone\n</system-reminder>"}], "ts": 1767225760001, "isSummary": true, "condenseId": "6f1c2a90-0000-4000-8000-000000000001"}
 ]

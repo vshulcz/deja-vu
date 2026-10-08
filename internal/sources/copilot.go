@@ -128,6 +128,18 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 					s.Project = copilotProjectName(cwd)
 				}
 			}
+		case "session.compaction_complete":
+			// {"success":true,"summaryContent":…} is the only record of the
+			// turns the compaction dropped from the model's context (1.0.79).
+			if data == nil {
+				return
+			}
+			ok, _ := data["success"].(bool)
+			txt, _ := data["summaryContent"].(string)
+			if ok && strings.TrimSpace(txt) != "" {
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: txt, Time: t})
+			}
 		case "user.message", "assistant.message":
 			if data == nil {
 				return

@@ -1,4 +1,7 @@
 [
   {"role": "user", "content": [{"type": "text", "text": "<task>why does the migration hang</task>"}]},
-  {"role": "assistant", "content": [{"type": "text", "text": "the advisory lock was never released"}]}
+  {"role": "assistant", "content": [{"type": "text", "text": "the advisory lock was never released"}], "condenseParent": "2b8d4e10-0000-4000-8000-000000000002"},
+  {"role": "assistant", "content": [{"type": "reasoning", "text": "Condensing conversation context. The summary below captures the key information from the prior conversation."}, {"type": "text", "text": "KILO-SUMMARY the migration hung on an advisory lock that was never released"}], "ts": 1767225799999, "isSummary": true, "condenseId": "2b8d4e10-0000-4000-8000-000000000002"},
+  {"role": "user", "content": [{"type": "text", "text": "and the rollback?"}], "ts": 1767225800000},
+  {"role": "user", "content": "[Sliding window truncation: 2 messages hidden to reduce context]", "ts": 1767225800001, "isTruncationMarker": true, "truncationId": "9a7c5e30-0000-4000-8000-000000000003"}
 ]

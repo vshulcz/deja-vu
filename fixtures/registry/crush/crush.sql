@@ -32,3 +32,7 @@ insert into messages values ('58e9fc46-a49d-48f1-870f-93a9d29bae4f', '942cbc1e-7
 -- same directory on every line and is stripped rather than indexed.
 insert into messages values ('7c1f0b52-2f77-4a71-9a2e-1b6b1e59b6a1', '942cbc1e-78c7-41cb-aa8a-78c3baab018c', 'tool', '[{"type":"tool_result","data":{"tool_call_id":"call_0","name":"bash","content":"build succeeded in 4.2s\n\n<cwd>/workspace/demo</cwd>","is_error":false}},{"type":"finish","data":{"reason":"stop","time":0}}]', null, 1784282401, 1784282401, null, null, 0);
 insert into messages values ('a4d1c0e7-6c2b-4a1e-9f39-7a5f0c4b8d22', '942cbc1e-78c7-41cb-aa8a-78c3baab018c', 'assistant', '[{"type":"text","data":{"text":"the build is green"}},{"type":"finish","data":{"reason":"end_turn","time":1784282402}}]', 'gpt-5', 1784282402, 1784282402, 1784282402, 'openai', 0);
+-- Summarising writes an assistant row flagged is_summary_message and points the
+-- session's summary_message_id at it (v0.97.1 internal/agent/agent.go Summarize).
+insert into messages values ('d2b7a9e0-3c1f-4e55-8a6b-0f4c2e9d7b13', '942cbc1e-78c7-41cb-aa8a-78c3baab018c', 'assistant', '[{"type":"text","data":{"text":"CRUSH-SUMMARY the build was run and is green"}},{"type":"finish","data":{"reason":"end_turn","time":1784282403}}]', 'gpt-5', 1784282403, 1784282403, 1784282403, 'openai', 1);
+update sessions set summary_message_id = 'd2b7a9e0-3c1f-4e55-8a6b-0f4c2e9d7b13', message_count = 4, updated_at = 1784282403 where id = '942cbc1e-78c7-41cb-aa8a-78c3baab018c';

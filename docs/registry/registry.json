@@ -141,7 +141,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "statusLine command in antigravity-cli/settings.json, stacked under agy's own line (agy 1.3.1)"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "CHECKPOINT summaries are not indexed as summaries (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -270,7 +270,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "tui.status_line takes built-in ids only and drops a command item with a warning (stand on 0.160.1, status_line_setup.rs:56)"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the compacted record's message is not indexed as a summary (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -308,7 +308,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the copilot-auto target writes statusLine.command in ~/.copilot/settings.json"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "session.compaction_complete summaryContent is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -356,7 +356,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "stand", "note": "the vscode-auto target adds a local extension that shows deja statusline in VS Code's status bar (VS Code 1.140)"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction summaries are not checked, and VS Code deletes old transcripts (#4801)"}
+        "reader": {"status": "partial", "proof": "fixture", "note": "compaction summaries are read from result.metadata; Copilot Chat 0.68 keeps the newest 20 agent transcripts per workspace and deletes older ones (cleanupOldTranscripts), so a transcript not indexed before that is gone"}
       }
     },
     {
@@ -659,7 +659,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the kimi-auto target writes the [status_line] command in tui.toml"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction_summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -700,7 +700,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -726,7 +726,7 @@
         "command": true,
         "resume": true,
         "handoff": "exec",
-        "prereq": "sqlite3 (2026.8+ store); zstd for .zst archives"
+        "prereq": "sqlite3 (2026.8+ store); zstd for .zst archives and compressed events (2026.9.9+)"
       },
       "gaps": {},
       "surfaces": {
@@ -742,7 +742,7 @@
         "session_end": {"status": "yes", "proof": "stand"},
         "rules": {"status": "yes", "proof": "stand", "note": "the agent workspace's AGENTS.md, added to when it exists (2026.9.8)"},
         "statusline": {"status": "partial", "proof": "stand", "note": "a deja tab in the Control UI sidebar shows the line (gateway-auth route, no Labs switch; 2026.9.8); the TUI footer takes nothing from plugins (formatTuiFooter), and an always-visible session header item needs the Custom plugin UI lab"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction entries are dropped by the reader (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -869,7 +869,7 @@
         "session_end": {"status": "no", "proof": "blocked", "note": "Crush v0.97.1 has only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in the open charmbracelet/crush#3146"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Crush has no status line, footer or toast a third party can write to"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "summary_message_id is not marked (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -906,7 +906,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -946,7 +946,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -984,7 +984,7 @@
         "session_end": {"status": "partial", "proof": "stand", "note": "qwen -p never fires SessionEnd (0.20.0); interactive exits do"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture", "note": "the qwen-auto target writes ui.statusLine in settings.json"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "system/chat_compression is skipped (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1077,7 +1077,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1116,7 +1116,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1155,7 +1155,7 @@
         "session_end": {"status": "yes", "proof": "stand"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "yes", "proof": "fixture"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "the pi reader drops compaction and branch_summary entries, so the summary is not indexed (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1209,7 +1209,8 @@
       ],
       "format_kind": "jsonl+sqlite",
       "fixture_paths": [
-        "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl"
+        "fixtures/registry/zcode/-workspace-zcode-demo/registry-zcode.jsonl",
+        "fixtures/registry/zcode/cli-db.sql"
       ],
       "parser_source": "internal/sources/zcode.go",
       "display_name": "ZCode",
@@ -1237,7 +1238,7 @@
         "session_end": {"status": "no", "proof": "blocked", "note": "ZCode CLI 0.16.9 has seven hook events and no session end (contracts/src/hooks/index.ts:7-15); Stop fires every turn"},
         "rules": {"status": "yes", "proof": "stand", "note": "~/.zcode/AGENTS.md, the user scope of its instructions (bls in vendor/zcode.cjs, 3.14.4); a stub endpoint saw it"},
         "statusline": {"status": "no", "proof": "blocked", "note": "ZCode has no status line, footer or toast a third party can write to"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the reader (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture", "note": "compaction summaries are read from the CLI database; the 3.14.4 CLI writes no projects/*.jsonl transcript, so that store has no compaction shape to read"}
       }
     },
     {
@@ -1329,7 +1330,7 @@
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "partial", "proof": "fixture", "note": "a toast in the CLI's TUI; the VS Code extension shows none"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "condense summaries in the extension's legacy tasks are not marked (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1375,7 +1376,7 @@
         "session_end": {"status": "no", "proof": "blocked", "note": "RooCodeInc/Roo-Code was archived on 15.05.2026 and 3.54.0 has no hook events (rechecked 07.10)"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "RooCodeInc/Roo-Code was archived on 15.05.2026 and 3.54.0 has no hook events (rechecked 07.10)"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "condense summaries are indexed as plain text (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {
@@ -1474,7 +1475,7 @@
         "session_end": {"status": "yes", "proof": "stand", "note": "fires on /quit, not on a kill"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "CodeWhale 0.10.0's footer takes only built-in items (StatusItem in crates/tui/src/config.rs: mode, model, cost, git_branch and the like), and observer hook stdout is discarded"},
-        "reader": {"status": "partial", "proof": "fixture", "note": "compaction is not marked in the reader (#4801)"}
+        "reader": {"status": "yes", "proof": "fixture"}
       }
     },
     {

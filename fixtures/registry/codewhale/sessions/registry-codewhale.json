@@ -5,7 +5,7 @@
     "title": "the retry loop drops the last attempt",
     "created_at": "2026-09-19T08:00:00Z",
     "updated_at": "2026-09-19T08:04:00Z",
-    "message_count": 3,
+    "message_count": 5,
     "total_tokens": 1840,
     "model": "deepseek-chat",
     "model_provider": "deepseek",
@@ -44,6 +44,28 @@
         {
           "type": "text",
           "text": "The deadline is checked before the attempt is counted, so the last one never runs."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "Codewhale handoff note. Earlier turns of this session were condensed to make room. Treat what follows as your own notes.\n\nCODEWHALE-SUMMARY the deadline check ran before the attempt was counted\n\nContinue the user's task from here. Do not repeat work already done."
+        },
+        {
+          "type": "text",
+          "text": "<!-- codewhale.compaction-checkpoint.v1 -->"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "text",
+          "text": "count the attempt first then"
         }
       ]
     }

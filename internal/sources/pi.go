@@ -74,6 +74,16 @@ func (r *piReader) line(m map[string]any) {
 		if cwd, _ := m["cwd"].(string); cwd != "" {
 			r.cwd = cwd
 		}
+	case "compaction", "branch_summary":
+		// pi writes a compaction, and the summary of a branch it left, as
+		// top-level entries with the text under summary (session-manager
+		// appendCompaction, branchWithSummary; pi 0.73-1.1, omp 17.4, gjc
+		// 0.18, senpi, kimchi, prime 0.9, OpenClaw 2026.9).
+		if txt, _ := m["summary"].(string); strings.TrimSpace(txt) != "" {
+			t := parseTimeAny(m["timestamp"])
+			s.Touch(t)
+			s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: strings.TrimSpace(txt), Time: t})
+		}
 	case "message":
 		msg, ok := m["message"].(map[string]any)
 		if !ok {
@@ -82,6 +92,14 @@ func (r *piReader) line(m map[string]any) {
 		role, _ := msg["role"].(string)
 		outRole := role
 		switch role {
+		case "compactionSummary", "branchSummary":
+			// The same summaries as messages, which prime's schema allows.
+			if txt, _ := msg["summary"].(string); strings.TrimSpace(txt) != "" {
+				t := parseTimeAny(m["timestamp"])
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: strings.TrimSpace(txt), Time: t})
+			}
+			return
 		case "user", "assistant":
 			// speech, kept under its own role
 		case "toolResult":

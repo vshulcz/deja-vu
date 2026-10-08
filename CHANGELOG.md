@@ -36,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The summary a harness writes when it compacts is indexed under the `summary` role for Codex, Copilot CLI, VS Code Copilot Chat, Antigravity, Kimi, pi, omp, prime-agent, Senpi, gjc, Kimchi, OpenClaw, Crush, Qwen Code, ZCode, Kilo Code, Roo Code and CodeWhale. Before, it was dropped, or filed as something the person or the agent said. Roo and Kilo's sliding-window note is no longer read as the person's words (#4801).
+- OpenClaw 2026.9.9 stores an event of 1 KiB or more zstd-compressed, and deja skipped those events; it decompresses them now, when `zstd` is installed.
 - A Cline CLI session removed with `cline history delete` stays searchable; deja took its deleted directory for a store that went away and dropped it.
 - A session with one hit reads `1 match`, not `1 matches`, in `deja search` and in the MCP recall listing (#4627).
 - `deja search` printed its results without colour even in a terminal: the output went through a counter for `deja log`, and the colour check only recognised a bare terminal, so the coloured header and highlighted matches never showed. It looks through the counter now; pipes, `NO_COLOR` and `TERM=dumb` stay plain (#4620).

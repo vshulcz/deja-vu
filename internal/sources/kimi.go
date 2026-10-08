@@ -335,6 +335,24 @@ func parseKimiFileFromOffset(path string, offset int64) ([]model.Session, error)
 	}
 	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
 		switch m["type"] {
+		case "context.apply_compaction":
+			// The summary the compaction left in place of the turns it
+			// dropped (kimi-code 0.28.1). summary is the model's text, an
+			// older record's a whole message; contextSummary is that text
+			// behind the line Kimi tells the model it was compacted with.
+			text, _ := m["summary"].(string)
+			if sm, ok := m["summary"].(map[string]any); ok {
+				text = kimiText(sm["content"])
+			}
+			if strings.TrimSpace(text) == "" {
+				text, _ = m["contextSummary"].(string)
+			}
+			if text = strings.TrimSpace(text); text != "" {
+				flush()
+				t := parseTimeAny(m["time"])
+				s.Touch(t)
+				s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
+			}
 		case "context.append_message":
 			msg, _ := m["message"].(map[string]any)
 			if msg == nil {

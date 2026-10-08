@@ -170,6 +170,16 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 			}
 			return
 		}
+		if typ == "system" {
+			if sub, _ := m["subtype"].(string); sub == "chat_compression" {
+				if text := qwenCompressionSummary(m["systemPayload"]); text != "" {
+					t := parseTimeAny(m["timestamp"])
+					s.Touch(t)
+					s.Messages = append(s.Messages, model.Message{Role: RoleSummary, Text: text, Time: t})
+				}
+			}
+			return
+		}
 		if typ != "user" && typ != "assistant" {
 			return
 		}
@@ -210,6 +220,42 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 		return nil, err
 	}
 	return []model.Session{s}, err
+}
+
+// Qwen Code records a compression as {"type":"system","subtype":
+// "chat_compression","systemPayload":{"info":…,"compressedHistory":[…]}}, and
+// the summary is the first entry of the history it continues with: a user
+// turn holding the summary and a fixed line telling the model to resume, then
+// the model's fixed acknowledgement (0.20.0 chatCompressionService
+// composePostCompactHistory). A manual microcompact writes the same record
+// with the trimmed history and no summary, so a first entry carrying neither
+// mark is not one.
+const (
+	qwenResumeTrailer = "Resume the prior task using the summary above. Continue from the last in-flight step; do not acknowledge the summary, do not re-introduce, do not greet the user again."
+	qwenSummaryAck    = "Got it. Thanks for the additional context!"
+)
+
+func qwenCompressionSummary(payload any) string {
+	p, _ := payload.(map[string]any)
+	history, _ := p["compressedHistory"].([]any)
+	if len(history) == 0 {
+		return ""
+	}
+	first, _ := history[0].(map[string]any)
+	if r, _ := first["role"].(string); r != "user" {
+		return ""
+	}
+	text := qwenText(first["parts"])
+	acked := false
+	if len(history) > 1 {
+		second, _ := history[1].(map[string]any)
+		acked = strings.TrimSpace(qwenText(second["parts"])) == qwenSummaryAck
+	}
+	trimmed := strings.TrimSuffix(strings.TrimSpace(text), qwenResumeTrailer)
+	if !acked && trimmed == strings.TrimSpace(text) {
+		return ""
+	}
+	return strings.TrimSpace(trimmed)
 }
 
 // qwenDialect is Qwen Code's tool vocabulary. The names follow Gemini's — Qwen

@@ -1,6 +1,8 @@
 package sources
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -118,8 +120,8 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	// json_object rather than the shell's -json mode, which is quadratic in
 	// what it escapes — see sqliteRows. An event_json is nothing but quotes
 	// and backslashes.
-	q := `select json_object('session_id',cast(e.session_id as text),'event_json',cast(e.event_json as text)) ` +
-		`from transcript_events e` + where + ` order by e.session_id, e.seq`
+	q := `select json_object('session_id',cast(e.session_id as text),'event_json',cast(e.event_json as text)` +
+		openclawZstdColumns(db) + `) from transcript_events e` + where + ` order by e.session_id, e.seq`
 	cmd, stopRead := sqliteReadCmd(db, q)
 	defer stopRead()
 	// Rows stream through the decoder rather than landing in one buffer: a
@@ -134,21 +136,28 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 	project := "openclaw-" + openclawDBAgent(db)
 	var out []model.Session
 	var s *model.Session
-	var r *piReader
+	var pending []openclawEventRow
 	flush := func() {
-		if r != nil {
-			r.finish()
+		if s == nil {
+			return
 		}
-		if s != nil && len(s.Messages) > 0 {
+		openclawInflate(pending)
+		r := newPiReader(s, true)
+		for _, row := range pending {
+			var m map[string]any
+			if err := json.Unmarshal([]byte(row.Event), &m); err != nil {
+				continue
+			}
+			r.line(m)
+		}
+		r.finish()
+		if len(s.Messages) > 0 {
 			out = append(out, *s)
 		}
-		s = nil
+		s, pending = nil, nil
 	}
 	for dec.More() {
-		var row struct {
-			SessionID string `json:"session_id"`
-			Event     string `json:"event_json"`
-		}
+		var row openclawEventRow
 		if err := dec.Decode(&row); err != nil {
 			_ = cmd.Wait()
 			return nil, fmt.Errorf("bad sqlite json: %w", err)
@@ -157,13 +166,8 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		if s == nil || s.ID != row.SessionID {
 			flush()
 			s = &model.Session{Harness: "openclaw", ID: row.SessionID, Project: project, Path: db}
-			r = newPiReader(s, true)
 		}
-		var m map[string]any
-		if err := json.Unmarshal([]byte(row.Event), &m); err != nil {
-			continue
-		}
-		r.line(m)
+		pending = append(pending, row)
 	}
 	flush()
 	if _, err := dec.Token(); err != nil && err != io.EOF {
@@ -180,4 +184,63 @@ func parseOpenClawDBWhere(db, where string) ([]model.Session, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// openclawEventRow is one transcript event. Since 2026.9.9 an event of 1 KiB
+// or more is stored zstd-compressed when that saves a tenth of it: event_json
+// is null, event_zstd holds one frame, and event_utf8_bytes its decoded size
+// (src/config/sessions/transcript-payload.ts prepareTranscriptPayload). A
+// compaction summary is usually one of those.
+type openclawEventRow struct {
+	SessionID string `json:"session_id"`
+	Event     string `json:"event_json"`
+	Zstd      string `json:"zstd"`
+	RawBytes  int    `json:"raw"`
+}
+
+// openclawZstdColumns selects the compressed payload, on a store that has one.
+func openclawZstdColumns(db string) string {
+	out, err := sqliteOutput(db, "select count(*) from pragma_table_info('transcript_events') where name in ('event_zstd','event_utf8_bytes')")
+	if err != nil || strings.TrimSpace(string(out)) != "2" {
+		return ""
+	}
+	return `,'zstd',case when e.event_json is null then hex(e.event_zstd) end,'raw',e.event_utf8_bytes`
+}
+
+// openclawInflate fills in the events a session stored compressed. Their frames
+// go through one zstd run and the output is cut at each event's recorded size;
+// a run that fails, or whose sizes do not add up, falls back to one frame at a
+// time, so a corrupt frame costs only its own event. Without zstd they stay
+// empty and are skipped, as before.
+func openclawInflate(rows []openclawEventRow) {
+	var at []int
+	var frames [][]byte
+	total := 0
+	for i, r := range rows {
+		if r.Event != "" || r.Zstd == "" {
+			continue
+		}
+		frame, err := hex.DecodeString(r.Zstd)
+		if err != nil || len(frame) == 0 {
+			continue
+		}
+		at = append(at, i)
+		frames = append(frames, frame)
+		total += r.RawBytes
+	}
+	if len(frames) == 0 || !ZstdAvailable() {
+		return
+	}
+	if out, _, err := zstdRun(bytes.Join(frames, nil)); err == nil && len(out) == total {
+		for _, i := range at {
+			n := rows[i].RawBytes
+			rows[i].Event, out = string(out[:n]), out[n:]
+		}
+		return
+	}
+	for k, i := range at {
+		if out, _, err := zstdRun(frames[k]); err == nil {
+			rows[i].Event = string(out)
+		}
+	}
 }
