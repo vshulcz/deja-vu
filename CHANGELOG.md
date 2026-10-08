@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - opencode 1.x and Kilo no longer put the session digest into the title-generation request (#4795).
 - Compaction summaries from Zed, Cline (`<id>.compaction.json`) and Continue are indexed under the summary role. Continue rewrites its session file to the summary alone, so the index now keeps the turns it already held for that file, through a rebuild too (#4795).
 - The Reasonix extension no longer scans the 1.x `sessions-v4` store for its session; 2.x names it in `session.start` before the first turn (#4795).
+- A `kiro-cli --v3` session no longer carries a `...` assistant turn for each time the model thought: V3 writes its thinking as an assistant record with the text encrypted.
 - After a Reasonix compaction the next turn gets deja's packet, as on the other hosts. It went only into the summarizer's guidance, and a summary that dropped it lost the commands and their outcomes.
 - `deja resume --write-back` for a Codex session whose thread is gone from Codex's state database writes the directory the session ran in, read from the files it worked on or from Codex's other threads in the same project. It wrote an empty `cwd`; with no directory anywhere it now says so instead.
 - Kilo Code's VS Code extension is marked auto-capable: it runs `kilo serve`, which loads the plugin `deja install kilocode-auto` writes (#4795).

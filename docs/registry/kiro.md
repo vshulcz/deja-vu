@@ -37,9 +37,15 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   and adds each session to `~/.kiro/session-index/<workspace>.jsonl`. A
   session listed there resumes with `kiro-cli --v3 chat --resume-id
   sess_<uuid>` in its first `workspacePaths` directory; one that is not is the
-  IDE's, reopens from the app, and `deja resume` says so (#4307). V3's
-  assistant and tool records were not seen: with no login the engine stops
-  before the model answers.
+  IDE's, reopens from the app, and `deja resume` says so (#4307). On a
+  logged-in 2.22.0 TUI turn V3 writes the answer as `assistant` records with
+  `operationType: "Say"`, the call as `tool_call` (`execute_bash` with
+  `args.command`, `status`, `actionType`) and its output as `tool_result`;
+  all three are read. Its thinking is an `assistant` record too, with
+  `operationType: "Reasoning"`, `"..."` for content and the text encrypted
+  in `reasoningSignature`: it is not an answer and is dropped.
+  `session_start` carries the system prompt and `pending_interaction` /
+  `interaction_resolved` the approval prompt; neither is a turn.
 - **A reply arrives in pieces.** Several `AssistantMessage` records can share
   one `data.message_id`: the CLI appends the answer as it streams, each record
   carrying the next piece rather than the whole answer so far. Read one message

@@ -75,9 +75,15 @@
 <p>and adds each session to <code>~/.kiro/session-index/&lt;workspace&gt;.jsonl</code>. A</p>
 <p>session listed there resumes with `kiro-cli --v3 chat --resume-id</p>
 <p>sess_&lt;uuid&gt;<code> in its first </code>workspacePaths` directory; one that is not is the</p>
-<p>IDE&#39;s, reopens from the app, and <code>deja resume</code> says so (#4307). V3&#39;s</p>
-<p>assistant and tool records were not seen: with no login the engine stops</p>
-<p>before the model answers.</p>
+<p>IDE&#39;s, reopens from the app, and <code>deja resume</code> says so (#4307). On a</p>
+<p>logged-in 2.22.0 TUI turn V3 writes the answer as <code>assistant</code> records with</p>
+<p><code>operationType: &#34;Say&#34;</code>, the call as <code>tool_call</code> (<code>execute_bash</code> with</p>
+<p><code>args.command</code>, <code>status</code>, <code>actionType</code>) and its output as <code>tool_result</code>;</p>
+<p>all three are read. Its thinking is an <code>assistant</code> record too, with</p>
+<p><code>operationType: &#34;Reasoning&#34;</code>, <code>&#34;...&#34;</code> for content and the text encrypted</p>
+<p>in <code>reasoningSignature</code>: it is not an answer and is dropped.</p>
+<p><code>session_start</code> carries the system prompt and <code>pending_interaction</code> /</p>
+<p><code>interaction_resolved</code> the approval prompt; neither is a turn.</p>
 <ul>
 <li><strong>A reply arrives in pieces.</strong> Several <code>AssistantMessage</code> records can share</li>
 </ul>

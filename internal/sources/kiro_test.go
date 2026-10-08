@@ -81,6 +81,54 @@ func TestKiroIDEReadsTheWorkspaceSession(t *testing.T) {
 	}
 }
 
+// A kiro-cli --v3 TUI turn that ran a shell command, taken from a logged-in
+// 2.22.0 stand: the prompt, the command, its output and the answer are read.
+// The Reasoning records hold "..." in place of the encrypted thinking, and
+// session_start holds the system prompt; neither is a turn.
+func TestKiroV3ReadsAssistantAndToolRecords(t *testing.T) {
+	path := filepath.Join("..", "..", "fixtures", "registry", "kiro-v3", "w-v3", "sess_00000000-0000-4000-8000-000000000003", "messages.jsonl")
+	ss, err := ParseKiroIDEFile(path)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("sessions = %d, %v", len(ss), err)
+	}
+	var got []string
+	for _, m := range ss[0].Messages {
+		got = append(got, m.Role+": "+strings.TrimSpace(m.Text))
+	}
+	// echo is below what deja keeps as a command (worthIndexing); the call
+	// itself is read, checked below with a command that is kept.
+	want := []string{
+		"user: Run the shell command: echo deja-v3-stand  -- then reply with one short sentence saying what it printed.",
+		RoleToolOutput + ": Output:\ndeja-v3-stand\n\n\nExit Code: 0",
+		"assistant: It printed `deja-v3-stand`.",
+	}
+	if strings.Join(got, "\n|") != strings.Join(want, "\n|") {
+		t.Errorf("messages:\n%s\nwant:\n%s", strings.Join(got, "\n|"), strings.Join(want, "\n|"))
+	}
+
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.Contains(line, `"type":"tool_call"`) {
+			continue
+		}
+		line = strings.Replace(line, "echo deja-v3-stand", "go test ./pool/...", 1)
+		var m map[string]any
+		if err := jsonUnmarshalString(line, &m); err != nil {
+			t.Fatal(err)
+		}
+		call, isCall, failed := kiroIDECall(m)
+		work := kiroWorkRecords([]any{call}, nil, parseTimeAny(m["timestamp"]))
+		if !isCall || failed || len(work) == 0 || work[0].Role != RoleCommand || work[0].Text != "$ go test ./pool/..." {
+			t.Errorf("V3 tool_call = %v %v %v, want the command record", isCall, failed, work)
+		}
+		return
+	}
+	t.Error("fixture has no tool_call record")
+}
+
 // A record whose type is not a turn must not become one. The file carries the
 // agent's own bookkeeping — context usage, turn boundaries, tool calls — and a
 // line attributed to a role on the way past is a message with somebody else's

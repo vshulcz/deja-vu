@@ -621,6 +621,12 @@ func kiroIDELine(m map[string]any) (string, string) {
 	case "user", "human", "prompt":
 		return "user", text
 	case "assistant", "bot", "response":
+		// V3 writes its thinking as an assistant record of its own, with
+		// "..." for content and the real text encrypted in
+		// reasoningSignature. It is not the answer.
+		if op, _ := payload["operationType"].(string); op == "Reasoning" {
+			return "", ""
+		}
 		return "assistant", text
 	case "tool_result":
 		return RoleToolOutput, text

@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataModelVersion": 1,
+  "id": "sess_00000000-0000-4000-8000-000000000003",
+  "title": "Execute Shell Command Echo Test",
+  "agentMode": "vibe",
+  "workspacePaths": [
+    "/w/v3"
+  ],
+  "rootPaths": [
+    "/w/v3"
+  ],
+  "createdAt": "2026-10-08T20:32:08.850Z",
+  "lastModifiedAt": "2026-10-08T20:32:48.817Z",
+  "modelId": "auto",
+  "status": "idle"
+}
