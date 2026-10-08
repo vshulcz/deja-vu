@@ -637,6 +637,15 @@ func coverageCounts(all, identifying map[uint32]int, identifyingTerms int) map[u
 // (#3214).
 const marathonShare = 0.5
 
+// toolMatchWeight is what a match inside a tool record — a file read, a
+// command's output, a JSON dump — is worth against the same match in speech.
+// At full weight one opencode session of 4 MB of tool output ranked 1st, 3rd
+// and 3rd on three unrelated questions over a real store of 1705 sessions; at
+// 0.5 it ranks 8th, 14th and 10th, at 0.25 12th, 17th and 10th, at 0.75 2nd,
+// 3rd and 6th (#4780). LongMemEval, LoCoMo and the bench arms hold no tool
+// records and do not move.
+const toolMatchWeight = 0.5
+
 // subjectShare is how much of the question's subject a session has to reach:
 // the rarest naming word the question holds, halved. Measured by sweeping the
 // whole prompt bench — at 0.5 and 0.6 the cross-paired arm loses a false fire
@@ -1192,6 +1201,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// session can be ranked by its best single message rather than by the
 	// total it collects across thousands of them.
 	msgIDF := map[uint32]map[int64]float64{}
+	// toolOff marks the matched records that are tool records rather than
+	// speech, so their credit can be weighed at toolMatchWeight below.
+	toolOff := map[int64]bool{}
 	// Counted over the whole store, not the sessions being ranked: the guard
 	// that reads it is telling a typo from a real word, and a word another
 	// project uses is a real word. Counted over the project, a question with
@@ -1280,6 +1292,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				for _, pp := range posts {
 					noteDF(df, pp.Sid, pp.Off)
 					if _, ok := inProject[pp.Sid]; ok {
+						if pp.Tool {
+							toolOff[pp.Off] = true
+						}
 						hit[pp.Sid] = true
 						tf[pp.Sid]++
 						oo := offs[pp.Sid]
@@ -1321,6 +1336,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 				for _, pp := range posts {
 					noteDF(df, pp.Sid, pp.Off)
 					if _, ok := inProject[pp.Sid]; ok {
+						if pp.Tool {
+							toolOff[pp.Off] = true
+						}
 						keyHit[pp.Sid] = true
 						keyTF[pp.Sid]++
 						oo := keyOffs[pp.Sid]
@@ -1432,6 +1450,18 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			// with quickly diminishing returns, so a marathon session cannot
 			// bury a focused one through sheer repetition.
 			weighted := rank * (1 + 0.25*math.Log2(float64(tf[ord])))
+			// A term the session only ever held in tool records was not said
+			// by anyone there; it sat in a file it read or a command's output.
+			spoken := false
+			for off := range offs[ord] {
+				if !toolOff[off] {
+					spoken = true
+					break
+				}
+			}
+			if !spoken {
+				weighted *= toolMatchWeight
+			}
 			score[ord] += weighted
 			if informative {
 				focus[ord] += weighted
@@ -1461,10 +1491,19 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// k distinct query terms scales the session's score. A session where
 		// one message answers the whole question outranks one that merely
 		// mentions every word somewhere.
-		best := 1
-		for _, k := range perMessage[ord] {
-			if k > best {
-				best = k
+		//
+		// A tool record co-occurs at toolMatchWeight: a 50 KB file read or
+		// JSON dump holds most words of any question, so one such record
+		// made a session that only ever read files look like it answered
+		// (#4780). Speech is weighed exactly as before.
+		best := 1.0
+		for off, k := range perMessage[ord] {
+			kk := float64(k)
+			if toolOff[off] {
+				kk = 1 + (kk-1)*toolMatchWeight
+			}
+			if kk > best {
+				best = kk
 			}
 		}
 		// A focused message beats diffuse mentions: the session's score is
@@ -1473,12 +1512,15 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		// one marathon session that brushes every query word somewhere
 		// outranks the short session that actually answers.
 		var bestMsg float64
-		for _, v := range msgIDF[ord] {
+		for off, v := range msgIDF[ord] {
+			if toolOff[off] {
+				v *= toolMatchWeight
+			}
 			if v > bestMsg {
 				bestMsg = v
 			}
 		}
-		coocc := 1 + 0.2*float64(best-1)
+		coocc := 1 + 0.2*(best-1)
 		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
 		// Coverage: distinct informative terms beat repetition.
 		if matchedTerms[ord] > 1 {
@@ -5074,6 +5116,9 @@ func rerankByBestMessage(ss []model.Session, terms []string, idf map[string]floa
 						score += 0.5 * w
 					}
 				}
+			}
+			if isToolRole(msg.Role) {
+				score *= toolMatchWeight
 			}
 			if score > best[i] {
 				best[i] = score
