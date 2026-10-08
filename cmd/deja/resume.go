@@ -23,18 +23,22 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if len(args) < 1 {
 		return idPrefixNeeded(dir, "resume needs an id-prefix", "resume needs id-prefix (see `deja last`)")
 	}
-	doExec := false
+	doExec, writeBack := false, false
 	prefix := ""
 	for _, a := range args {
 		if a == "--exec" {
 			doExec = true
 			continue
 		}
+		if a == "--write-back" {
+			writeBack = true
+			continue
+		}
 		// The last argument used to win, so a flag resume does not take, or a
 		// stray word, silently replaced the id and the refusal named it as the
 		// session that was missing (#2251).
 		if strings.HasPrefix(a, "-") && a != "-" {
-			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix and --exec", a)
+			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back and --exec", a)
 		}
 		if prefix != "" {
 			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
@@ -58,8 +62,21 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
 	}
+	indexDir := dir
 	dir, cmdline, err := resumeCommand(s)
+	// Some harnesses' resume reads the directory from the transcript itself
+	// (CodeBuddy, the pi family), which is what is gone: the command is worked
+	// out again once the file is back.
+	if writeBack && (err == nil || (transcriptGone(s) && !strings.HasPrefix(s.Project, "imported:"))) {
+		if werr := writeBackSession(indexDir, s, os.Stderr); werr != nil {
+			return werr
+		}
+		dir, cmdline, err = resumeCommand(s)
+	}
 	if err != nil {
+		if gone := resumeGoneError(s); gone != nil && !writeBack && !strings.HasPrefix(s.Project, "imported:") {
+			return gone
+		}
 		return err
 	}
 	if err := resumeGoneError(s); err != nil {

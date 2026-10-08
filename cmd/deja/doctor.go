@@ -210,7 +210,7 @@ func doctorKept(w io.Writer, r *index.DeepReport) {
 	if r == nil || len(r.Kept) == 0 {
 		return
 	}
-	fmt.Fprintf(w, "  kept     %d transcript%s no longer on disk, still searchable — `deja forget <id>` drops one for good\n", len(r.Kept), pluralS(len(r.Kept)))
+	fmt.Fprintf(w, "  kept     %d transcript%s no longer on disk, still searchable — `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n", len(r.Kept), pluralS(len(r.Kept)))
 }
 
 func deepDriftErr(r *index.DeepReport) error {

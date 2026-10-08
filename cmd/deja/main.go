@@ -2808,6 +2808,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--before":           "forget",
 	"--to":               "handoff",
 	"--exec":             "resume",
+	"--write-back":       "resume",
 	"--plain":            "hook-prompt",
 	"--crush":            "hook-tool",
 	"--no-open":          "view",
@@ -4152,7 +4153,7 @@ Usage:
   deja search [flags] <query>   (same, but a query may start with a dash)
   deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
   deja share <id-prefix>
-  deja resume <id-prefix> [--exec]
+  deja resume <id-prefix> [--write-back] [--exec]
   deja wip [--json]
   deja handoff [--to <agent>] [id-prefix] [--exec]
   deja hook-prompt [--plain]  (UserPromptSubmit hook: relevance recall per prompt)

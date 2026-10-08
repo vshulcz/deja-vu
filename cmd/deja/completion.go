@@ -136,7 +136,7 @@ _deja_completion() {
             fi
             ;;
         resume)
-            COMPREPLY=( $(compgen -W "--exec" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--exec --write-back" -- "$cur") )
             ;;
         secrets)
             if [[ "$prev" == "--limit" ]]; then
@@ -296,7 +296,7 @@ _deja() {
       fi
       ;;
     resume)
-      _arguments '--exec[launch the native harness]' '1:session ID prefix:'
+      _arguments '--exec[launch the native harness]' '--write-back[write a deleted transcript back from the index]' '1:session ID prefix:'
       ;;
     secrets)
       _arguments '--limit=[maximum findings]:count:' '--json[print JSON]' '--scrub[rewrite files to remove secrets]' '--dry-run[show what --scrub would change]'
@@ -399,6 +399,7 @@ complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcomma
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from rules; and __fish_seen_subcommand_from candidates' -l since -r
 complete -c deja -n '__fish_seen_subcommand_from resume' -l exec
+complete -c deja -n '__fish_seen_subcommand_from resume' -l write-back -d 'Write a deleted transcript back from the index'
 complete -c deja -n '__fish_seen_subcommand_from secrets' -l limit -r
 complete -c deja -n '__fish_seen_subcommand_from secrets' -l json
 complete -c deja -n '__fish_seen_subcommand_from secrets' -l scrub -d 'Rewrite files to remove secrets'
@@ -486,7 +487,7 @@ Register-ArgumentCompleter -Native -CommandName deja -ScriptBlock {
                 elseif ($action -eq 'candidates' -and $previous -notin @('--limit', '--since')) { @('--json', '--limit', '--since') }
                 else { @() }
             }
-            'resume' { @('--exec') }
+            'resume' { @('--exec', '--write-back') }
             'secrets' {
                 if ($previous -eq '--limit') { @() }
                 else { @('--limit', '--json', '--scrub', '--dry-run') }

@@ -95,6 +95,8 @@ func TestSessionDirNames(t *testing.T) {
 		"session_" + id:           true, // Kimi
 		"session-" + id:           true, // DeepSeek
 		"sess_" + id:              true, // Kiro
+		"1791454692202_zb19s":     true, // Cline CLI
+		"1791454692202":           false,
 		"-private-var-tmp-" + id:  false,
 		"Users-me-" + id + "-app": false,
 		"projects":                false,

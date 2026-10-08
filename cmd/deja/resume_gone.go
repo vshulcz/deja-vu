@@ -21,8 +21,13 @@ func resumeGoneError(s model.Session) error {
 	if !transcriptGone(s) {
 		return nil
 	}
-	return errors.New("session " + digest.Short(s.ID) + " is no longer in " + s.Harness +
-		"'s own store (deleted or expired), so it cannot be reopened there — `deja show " + digest.Short(s.ID) + "` still has it")
+	short := digest.Short(s.ID)
+	if sources.CanWriteBack(s.Harness) {
+		return errors.New("session " + short + " is no longer in " + s.Harness +
+			"'s own store (deleted or expired) — `deja resume " + short + " --write-back` writes it back from the index, and `deja show " + short + "` still has it")
+	}
+	return errors.New("session " + short + " is no longer in " + s.Harness +
+		"'s own store (deleted or expired), so it cannot be reopened there — `deja show " + short + "` still has it")
 }
 
 // transcriptGone reports whether the file a session was read from has left
