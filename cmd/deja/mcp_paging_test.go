@@ -49,7 +49,7 @@ func TestFullRecallPageKeepsThePagingLine(t *testing.T) {
 		t.Fatalf("fixture served %d of 12 — it does not fill a page", served)
 	}
 	want := fmt.Sprintf("offset=%d", served)
-	if !strings.Contains(out, "more match(es)") || !strings.Contains(out, want) {
+	if !strings.Contains(out, "more match") || !strings.Contains(out, want) {
 		t.Errorf("a full page dropped the paging line (want %q), tail was:\n%q", want, out[max(0, len(out)-200):])
 	}
 }

@@ -204,7 +204,7 @@ func TestMCPToolContract(t *testing.T) {
 	t.Run("recall envelope and hit", func(t *testing.T) {
 		resp := driveMCP(t, `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"recall","arguments":{"query":"frobnicator","harness":"claude"}}}`)
 		text := callText(t, resp[0])
-		if !strings.Contains(text, "frobnicator") || !strings.Contains(text, "2 match(es)") {
+		if !strings.Contains(text, "frobnicator") || !strings.Contains(text, "2 matches") {
 			t.Fatalf("recall text = %q, want 2 frobnicator matches", text)
 		}
 	})

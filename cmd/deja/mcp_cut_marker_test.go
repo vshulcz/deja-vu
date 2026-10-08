@@ -49,7 +49,7 @@ func TestTheLastExcerptOnAFullPageSaysItWasCut(t *testing.T) {
 		t.Fatalf("the page is %d bytes, over its 4096 budget", len(frameRecall(text)))
 	}
 	body := text
-	if i := strings.Index(body, "more match(es)"); i > 0 {
+	if i := strings.Index(body, "more match"); i > 0 {
 		body = strings.TrimSpace(body[:strings.LastIndex(body[:i], "\n")])
 	}
 	last := body[strings.LastIndexByte(body, '\n')+1:]

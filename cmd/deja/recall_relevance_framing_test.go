@@ -36,7 +36,7 @@ func TestTheCountLineSaysWhatFollowsIt(t *testing.T) {
 		},
 		{
 			name: "a real match, all of them shown", tier: search.TierExact, served: 2, total: 2,
-			want: `deja recall for "` + q + `" (2 match(es))`,
+			want: `deja recall for "` + q + `" (2 matches)`,
 		},
 		{
 			// Page two of an answer to a question nothing is about is still
