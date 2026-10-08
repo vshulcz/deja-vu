@@ -123,6 +123,23 @@ func TestCodeWhaleFixPairRidesTheNextToolCall(t *testing.T) {
 	}
 }
 
+// The TUI's bash tool sends tool_call_after no stdin, and a command that exits
+// non-zero arrives as "Failed to execute tool: <stderr>" (0.10.1 stand). The
+// pair is still found and waits for the next message.
+func TestCodeWhaleBashFailureWithoutReceiptParksThePair(t *testing.T) {
+	seedFixPair(t, "panic: sql: database is closed", "make clean && make CGO_ENABLED=0")
+	dir := os.Getenv("DEJA_INDEX_DIR")
+	codewhaleEnv(t, "/work/app", map[string]string{
+		"DEEPSEEK_TOOL_NAME": "bash", "DEEPSEEK_TOOL_CALL_ID": "call_1", "DEEPSEEK_TOOL_SUCCESS": "false",
+		"DEEPSEEK_TOOL_RESULT": "Failed to execute tool: panic: sql: database is closed",
+	})
+	codewhaleHook(t, dir, "tool_call_after", "")
+	got := codewhaleHook(t, dir, "message_submit", `{"event":"message_submit","text":"next","session_id":"sess_1","workspace":"/work/app"}`)
+	if !strings.Contains(got, "CGO_ENABLED=0") {
+		t.Fatalf("the next message did not carry the fix pair: %q", got)
+	}
+}
+
 // A call that fails to run goes back to the model as "Error: …" without the
 // tool_call_before context (turn_loop.rs, 0.10.1). Its line waits for the next
 // message then; a call that ran keeps nothing back.

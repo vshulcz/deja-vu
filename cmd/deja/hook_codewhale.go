@@ -248,6 +248,8 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 	return nil
 }
 
+const codewhaleExecFailed = "Failed to execute tool: "
+
 // codewhaleCallKey is where a tool_call_before answer waits for its call's
 // tool_call_after.
 func codewhaleCallKey(callID string) string { return deferredKey("cw-call:"+callID, "") }
@@ -295,7 +297,10 @@ func codewhaleToolCallAfter(dir string, stdin io.Reader) error {
 	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &doc)
 	output := strings.TrimSpace(doc.Receipt.Stderr + "\n" + doc.Receipt.Stdout)
 	if output == "" {
-		output = result
+		// The TUI's bash tool sends no receipt, and a command that exits
+		// non-zero comes back as a ToolError led by this prefix (0.10.1
+		// stand). Left on, the error line no longer matches the one indexed.
+		output = strings.TrimPrefix(result, codewhaleExecFailed)
 	}
 	payload, err := json.Marshal(map[string]any{
 		"hook_event_name": "PostToolUse",

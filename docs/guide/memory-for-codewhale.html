@@ -155,7 +155,7 @@
 <li>The MCP server, with the <code>deja</code> tool and the modes it serves everywhere.</li>
 <li>A digest of where you left off in the repo, with the session's first message: CodeWhale drops what <code>session_start</code> prints, so <code>message_submit</code> carries it.</li>
 <li>Recall for each message, and before an edit the file's history, on <code>tool_call_before</code>. For a call that failed to run, the line waits for the next tool call or message.</li>
-<li>After a failed command, the fix that worked last time. <code>tool_call_after</code> output never reaches the model, so the pair rides the next tool call or message.</li>
+<li>After a failed command, the fix that worked last time. <code>tool_call_after</code> output never reaches the model, and it fires after the next tool has already started, so the pair rides your next message.</li>
 <li>After a compaction, the state of the work, on the next message or tool call.</li>
 <li><code>/deja</code> in the slash menu, from <code>~/.codewhale/commands/deja.md</code>.</li>
 </ul>
