@@ -257,6 +257,13 @@ jobs:
             echo "::error::npm did not serve @vshulcz/openclaw-deja $want or later within 10 minutes"
             exit 1
           fi
+          # A rerun of a release ClawHub already has would fail on the
+          # duplicate and stop the skill step after it.
+          live="$(curl -fsS 'https://clawhub.ai/api/v1/packages/%40vshulcz%2Fopenclaw-deja' | jq -r '.latestVersion.version // empty' || true)"
+          if [ "$live" = "$version" ]; then
+            echo "@vshulcz/openclaw-deja $version is already on ClawHub"
+            exit 0
+          fi
           out="$(mktemp -d)/openclaw"
           cp -R extensions/openclaw "$out"
           node -e '
@@ -290,14 +297,17 @@ jobs:
             echo "::error::CLAWHUB_TOKEN is not set; deja-search on ClawHub stays behind this release"
             exit 1
           fi
+          # Log in first, so a rerun with nothing to publish still checks the
+          # token.
+          export CLAWHUB_CONFIG_PATH="$RUNNER_TEMP/clawhub.json"
+          trap 'rm -f "$CLAWHUB_CONFIG_PATH"' EXIT
+          npx -y clawhub@0.23.3 login --token "$CLAWHUB_TOKEN" --no-input
           version="${TAG#v}"
           live="$(curl -fsS https://clawhub.ai/api/v1/skills/deja-search | jq -r '.latestVersion.version // empty' || true)"
           if [ "$live" = "$version" ]; then
             echo "deja-search $version is already on ClawHub"
             exit 0
           fi
-          export CLAWHUB_CONFIG_PATH="$RUNNER_TEMP/clawhub.json"
-          npx -y clawhub@0.23.3 login --token "$CLAWHUB_TOKEN" --no-input
           npx -y clawhub@0.23.3 skill publish skills/deja-search \
             --slug deja-search \
             --version "$version" \
@@ -307,4 +317,3 @@ jobs:
             --source-path skills/deja-search \
             --changelog "deja-vu $TAG" \
             --no-input
-          rm -f "$CLAWHUB_CONFIG_PATH"
