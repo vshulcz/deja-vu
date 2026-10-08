@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - opencode 1.x and Kilo no longer put the session digest into the title-generation request (#4795).
 - Compaction summaries from Zed, Cline (`<id>.compaction.json`) and Continue are indexed under the summary role. Continue rewrites its session file to the summary alone, so the index now keeps the turns it already held for that file, through a rebuild too (#4795).
 - The Reasonix extension no longer scans the 1.x `sessions-v4` store for its session; 2.x names it in `session.start` before the first turn (#4795).
+- After a Reasonix compaction the next turn gets deja's packet, as on the other hosts. It went only into the summarizer's guidance, and a summary that dropped it lost the commands and their outcomes.
 - Kilo Code's VS Code extension is marked auto-capable: it runs `kilo serve`, which loads the plugin `deja install kilocode-auto` writes (#4795).
 - A word whose last consonant English doubles finds its other forms: `logging` and `logged` reach `log`, and `commit` reaches `committing`. Asked about "structured logging", recall missed the session that only says "log". On the bench's 56 agent queries the answer reached the page in 48, up from 44. LongMemEval-S unchanged (#4785).
 - Kimchi's directory is always `~/.config/kimchi/harness`; deja followed `KIMCHI_CODING_AGENT_DIR` and `XDG_CONFIG_HOME`, which Kimchi itself ignores. CodeWhale's `<turn_meta>` block is no longer indexed as the person's words (#4802).

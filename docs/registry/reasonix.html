@@ -136,7 +136,8 @@
 <p>and last eight lines) they go in front, on one line. At</p>
 <p><code>compaction.prepare</code> it adds deja&#39;s record of the folded turns, read from</p>
 <p>what the person typed rather than the recall appended to it, to the</p>
-<p>summarizer&#39;s guidance. It publishes a status line while the first index</p>
+<p>summarizer&#39;s guidance, and holds the same packet for the next turn, which</p>
+<p>carries it in place of that turn&#39;s recall. It publishes a status line while the first index</p>
 <p>builds and one &#34;recalled N prior sessions&#34; notice per session. Every answer</p>
 <p>has a budget under the host&#39;s timeout (4 s per prompt, 2 s per tool call,</p>
 <p>10 s for compaction); an error, a timeout or nothing to say leaves the turn</p>

@@ -448,7 +448,8 @@ func (x *rxExt) onToolAfter(ctx context.Context, fields map[string]json.RawMessa
 // itself — the same message shape Reasonix writes to its JSONL store — is
 // read into deja's compaction packet: the objective, what was concluded, and
 // each command with how it went. The packet goes to the summarizer as
-// guidance, so the summary keeps it. The next turn gets the digest again.
+// guidance, so the summary keeps it, and is stored for the next turn's
+// recall to carry. The next turn gets the digest again.
 func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMessage) map[string]json.RawMessage {
 	key := x.sessionKey()
 	x.mu.Lock()
@@ -465,12 +466,20 @@ func (x *rxExt) onCompaction(ctx context.Context, fields map[string]json.RawMess
 		return nil
 	}
 	lines := make([][]byte, len(messages))
+	folded := make([]json.RawMessage, len(messages))
 	for i, m := range messages {
-		lines[i] = withoutOwnRecall(m)
+		folded[i] = withoutOwnRecall(m)
+		lines[i] = folded[i]
 	}
 	session := sources.ParseReasonixMessages(lines, time.Now())
 	if len(session.Messages) == 0 {
 		return nil
+	}
+	// Held for the turn after as well, the way PreCompact holds it for other
+	// hosts: the summarizer may drop the guidance, and the next turn's
+	// hook-prompt hands the stored packet out once.
+	if raw, err := json.Marshal(folded); err == nil {
+		captureCompaction(x.dir, precompactHookInput{SessionID: key, CWD: cwd, Harness: "reasonix", Messages: raw})
 	}
 	data := digest.ExtractCompactionContext(session, digest.ExtractOptions{})
 	withCommandOutcomes(&data, session)

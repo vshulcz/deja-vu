@@ -61,9 +61,31 @@ func ReadCompactionStore(harness, nativeSessionID string) (CompactionTranscript,
 // Hermes passes its memory provider the message list it is about to compress,
 // in the OpenAI chat shape it keeps in state.db; the rows go through the same
 // reader as the store's, so commands, exit codes and results come out alike.
+// Reasonix hands its extension the messages being folded at
+// compaction.prepare, in the shape its JSONL store keeps.
 func ReadCompactionMessages(harness, nativeSessionID, workspace string, raw json.RawMessage) (CompactionTranscript, error) {
 	if strings.TrimSpace(nativeSessionID) == "" {
 		return CompactionTranscript{}, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
+	}
+	if harness == "reasonix" {
+		var lines []json.RawMessage
+		if err := json.Unmarshal(raw, &lines); err != nil || len(lines) == 0 {
+			return CompactionTranscript{}, errors.Join(ErrUnsupportedCompactionTranscript, err)
+		}
+		now := time.Now().UTC()
+		rows := make([][]byte, len(lines))
+		for i, l := range lines {
+			rows[i] = l
+		}
+		s := ParseReasonixMessages(rows, now)
+		if len(s.Messages) == 0 {
+			return CompactionTranscript{}, fmt.Errorf("%w: no readable messages", ErrUnsupportedCompactionTranscript)
+		}
+		s.ID, s.Project = nativeSessionID, projectName(workspace)
+		return CompactionTranscript{
+			Session: s, Harness: harness, NativeSessionID: nativeSessionID, Workspace: workspace,
+			Fingerprint: sessionFingerprint(s), SourceMTime: now,
+		}, nil
 	}
 	if harness != "hermes" {
 		return CompactionTranscript{}, ErrUnsupportedCompactionTranscript

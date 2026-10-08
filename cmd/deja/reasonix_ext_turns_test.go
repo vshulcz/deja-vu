@@ -230,6 +230,32 @@ func TestReasonixExtCarriesContextIntoTheCompactionSummary(t *testing.T) {
 	}
 }
 
+// The summarizer may drop the guidance, so the packet is also held for the
+// turn after, where hook-prompt hands it out once.
+func TestReasonixExtHoldsThePacketForTheTurnAfter(t *testing.T) {
+	calls := fakeRxHooks(t, func(string, map[string]any) (string, error) { return "", nil })
+	h := startFakeRxHost(t)
+	ws := t.TempDir()
+	h.handshakeAt(ws)
+	h.intercept("compaction.prepare", map[string]any{"messages": json.RawMessage(`[{"role":"user","content":"fix the flaky pool test"},` +
+		`{"role":"assistant","tool_calls":[{"id":"c1","name":"bash","arguments":"{\"command\":\"go test ./pool/...\"}"}]},` +
+		`{"role":"tool","content":"--- FAIL: TestPool (0.01s)\nFAIL","tool_call_id":"c1","name":"bash"}]`)})
+	h.intercept("input.receive", map[string]any{"text": "go on"})
+	key := ""
+	for _, c := range calls() {
+		if c.args[0] == "hook-prompt" {
+			key, _ = c.input["session_id"].(string)
+		}
+	}
+	if key == "" {
+		t.Fatal("no hook-prompt after the compaction")
+	}
+	_, packet := compactionRecovery(h.dir, key, ws)
+	if !strings.Contains(packet, "go test ./pool/...") {
+		t.Errorf("packet held for the next turn = %q, want the folded command", packet)
+	}
+}
+
 // The turns being folded carry the recall deja appended to them. The packet
 // is read from what the person typed, so the objective survives the fold.
 func TestReasonixExtCompactionKeepsTheObjectiveBehindRecall(t *testing.T) {
