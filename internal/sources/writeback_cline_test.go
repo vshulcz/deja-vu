@@ -27,7 +27,10 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(data, "logs"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	logLine := `{"sessionContext":{"rootSessionId":"` + id + `"},"workspaceRoots":["/work/api"],"workspaceInfo":{"rootPath":"/work/api"},"hookName":"agent_start"}` + "\n"
+	// An absolute path on this OS: cline logs C:\... on Windows.
+	root := filepath.Join(t.TempDir(), "api")
+	rootJSON, _ := json.Marshal(root)
+	logLine := `{"sessionContext":{"rootSessionId":"` + id + `"},"workspaceRoots":[` + string(rootJSON) + `],"workspaceInfo":{"rootPath":` + string(rootJSON) + `},"hookName":"agent_start"}` + "\n"
 	if err := os.WriteFile(filepath.Join(data, "logs", "hooks.jsonl"), []byte(logLine), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +57,7 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 			t.Errorf("manifest %s is empty", k)
 		}
 	}
-	if man["cwd"] != filepath.FromSlash("/work/api") && man["cwd"] != "/work/api" {
+	if man["cwd"] != root {
 		t.Errorf("cwd %v, want the hook log's workspace", man["cwd"])
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -71,7 +74,7 @@ func TestWriteBackClineTakesTheWorkspaceFromTheHookLog(t *testing.T) {
 		t.Fatalf("read back %d sessions, %v", len(ss), err)
 	}
 	assertTurns(t, ss[0].Messages)
-	if ss[0].Project != projectName("/work/api") {
+	if ss[0].Project != projectName(root) {
 		t.Errorf("project %q, want the workspace's", ss[0].Project)
 	}
 }
