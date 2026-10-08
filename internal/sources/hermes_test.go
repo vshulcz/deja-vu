@@ -144,6 +144,7 @@ func TestHermesFindsTheRootStore(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
 	t.Setenv("DEJA_HERMES_HOME", "")
+	t.Setenv("HERMES_HOME", "")
 	t.Setenv("DEJA_HERMES_DB", "")
 	t.Setenv("DEJA_HERMES_PROFILES_ROOT", "")
 	root := filepath.Join(home, ".hermes")

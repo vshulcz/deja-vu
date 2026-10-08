@@ -119,6 +119,12 @@ func cherryStudioAppDirs() []string {
 	return dirs
 }
 
+// CherryStudioDefaultRoot is where the app keeps its Claude Code store when
+// nothing moved it, for a report to name on a machine that has none.
+func CherryStudioDefaultRoot() string {
+	return filepath.Join(cherryStudioDefaultDir(), "Data", "Agents", ".claude")
+}
+
 func cherryStudioDefaultDir() string {
 	switch runtime.GOOS {
 	case "darwin":

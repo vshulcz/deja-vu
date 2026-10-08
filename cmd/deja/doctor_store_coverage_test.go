@@ -20,7 +20,9 @@ func TestDoctorNamesEveryStoreTheIndexerReads(t *testing.T) {
 	dir := tmp + "/index.db"
 
 	var text bytes.Buffer
-	if err := runDoctor(&text, nil, stubLookup("1.0.0", true), dir); err != nil {
+	// --all: a store that is simply absent folds into one line otherwise
+	// (#4625), and this asks whether doctor can name each one at all.
+	if err := runDoctor(&text, []string{"--all"}, stubLookup("1.0.0", true), dir); err != nil {
 		t.Fatal(err)
 	}
 	rows := map[string]bool{}
@@ -137,5 +139,54 @@ func TestBothFormsAgreeWhenHalfAStoreNeedsSqlite(t *testing.T) {
 	}
 	if store.State != "needs-sqlite3" {
 		t.Errorf("state = %q, want needs-sqlite3", store.State)
+	}
+}
+
+// Without --all, a store that is simply not on this machine folds into one
+// line, and a row with something to say keeps it (#4625).
+func TestDoctorFoldsStoresThatAreSimplyAbsent(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := tmp + "/index.db"
+	var text bytes.Buffer
+	if err := runDoctor(&text, nil, stubLookup("1.0.0", true), dir); err != nil {
+		t.Fatal(err)
+	}
+	stores := text.String()
+	if i := strings.Index(stores, "\n\n"); i >= 0 {
+		stores = stores[:i]
+	}
+	if strings.Contains(stores, "codex        missing") {
+		t.Errorf("a plainly absent store kept its row:\n%s", stores)
+	}
+	if !strings.Contains(stores, "not found on this machine — `deja doctor --all` lists them") {
+		t.Errorf("no fold line names how to list the folded stores:\n%s", stores)
+	}
+	// aider's row carries advice for someone who uses it, so it stays.
+	if !strings.Contains(stores, "aider        missing") {
+		t.Errorf("a missing store with advice was folded:\n%s", stores)
+	}
+
+	var all bytes.Buffer
+	if err := runDoctor(&all, []string{"--all"}, stubLookup("1.0.0", true), dir); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(all.String(), "codex        missing") || strings.Contains(all.String(), "doctor --all") {
+		t.Errorf("--all did not list every store unfolded:\n%s", all.String())
+	}
+}
+
+func TestOnlyAbsent(t *testing.T) {
+	for detail, want := range map[string]bool{
+		"":                  true,
+		"0 files":           true,
+		"0 CLI transcripts": true,
+		"0 stores":          true,
+		"notes":             false,
+		"1 file":            false,
+		"0 files — aider writes .aider.chat.history.md in each project": false,
+	} {
+		if got := onlyAbsent(detail); got != want {
+			t.Errorf("onlyAbsent(%q) = %v, want %v", detail, got, want)
+		}
 	}
 }

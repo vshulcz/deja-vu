@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `deja doctor` folds the stores that are simply not on this machine into one line, so the agents you use are not lost among thirty-odd `missing` rows. A store that was found, cannot be read, is excluded or unplugged, holds indexed sessions or carries advice (aider's) keeps its row. `deja doctor --all` lists every store (#4625).
 - Agents look up past decisions before the first edit in a task and before calling a change done, not only when asked about history. The skill, the MCP server instructions and the other agent-facing texts now say what deja holds: rules, banned or already-tried tools, checks required before merge, preferred values, owners. On a stand with ~1800 real sessions and 30 other skills, Claude Code applied the planted decision in 28-30 of 33 tasks, up from 14-15. opencode stayed at 15-17 (#4791).
 - The agent-facing `blame` answers in the same framed text as recall, `fix` and `how` instead of a JSON array: a numbered row per session in the `[harness] project · id` form, its title, the files it also worked on and its excerpts. The same 8 KB answer now carries all ten sessions where it carried five to seven, and a decision that was later taken back says so, which the JSON had no field for. `deja blame --json` is unchanged (#4634).
 

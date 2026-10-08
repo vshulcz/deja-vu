@@ -2832,7 +2832,7 @@ var (
 		"--json", "--html", "--redaction", "--impact", "--card", "--year",
 		"--harness", "--project", "--since", "--role",
 	}
-	doctorFlags   = []string{"--json", "--offline", "--deep"}
+	doctorFlags   = []string{"--json", "--offline", "--deep", "--all"}
 	viewFlags     = []string{"--out", "--no-open"}
 	logFlags      = []string{"--json", "--last"}
 	rememberFlags = []string{"--project", "--tag"}
@@ -4183,7 +4183,7 @@ Usage:
   deja completion <bash|zsh|fish|powershell>
   deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
   deja forget --list | --unforget <id>
-  deja doctor [--json] [--deep] [--offline]
+  deja doctor [--json] [--deep] [--offline] [--all]
   deja warmup
   deja index [--rebuild] [--quiet]
   deja embed

@@ -1105,7 +1105,15 @@ func writeGobAtomic(p string, v any) error {
 		_ = os.Remove(tmp)
 		return err
 	}
-	return os.Rename(tmp, p)
+	// The lock keeps other writers out but not readers, and on Windows a
+	// reader decoding manifest.gob refuses the rename onto it with "Access is
+	// denied": a recall beside a remember failed that way on windows CI. The
+	// reader is a decode away from closing, so wait it out as the swap does.
+	if err := renameWaiting(tmp, p, parkRenameWait); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func readGob(p string, v any) error {

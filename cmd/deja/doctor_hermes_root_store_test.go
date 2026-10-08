@@ -53,7 +53,8 @@ func TestDoctorDoesNotCallAHermesConfigDirAStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out, err := captureRun(t, "doctor")
+	// --all keeps the row: a plain missing store folds otherwise (#4625).
+	out, err := captureRun(t, "doctor", "--all")
 	if err != nil {
 		t.Fatal(err)
 	}
