@@ -32,7 +32,7 @@ const (
 
 // rulesHarnesses are the harnesses whose global rules file deja knows, in the
 // order `deja rules` lists them.
-var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "deepseek", "openclaw", "reasonix", "muse"}
+var rulesHarnesses = []string{"claude-code", "codex", "opencode", "gemini", "qwen", "kimi", "grok", "goose", "copilot", "vscode", "cline", "kilocode", "zed", "antigravity", "cherrystudio", "hermes", "aider", "continue", "trae", "trae-ide", "pi", "omp", "senpi", "gjc", "prime", "kimchi", "codewhale", "crush", "codebuddy", "workbuddy", "commandcode", "kiro", "roo", "zcode", "amp", "cursor", "deepseek", "openclaw", "reasonix", "muse"}
 
 // rulesPath is the file a harness reads its global rules from, or "" when deja
 // does not know one. Only paths something already showed reach the model —
@@ -154,6 +154,19 @@ func rulesFileFor(harness string) rulesFile {
 		// codex-rs's global AGENTS.md, at $TRAE_HOME rather than under cli/
 		// (traex debug prompt-input on 0.208.1).
 		return sharedRules(filepath.Join(sources.TraeHome(), "AGENTS.md"))
+	case "trae-ide":
+		// TRAE IDE 3.5.104 sends its agent every .md under
+		// ~/<dataFolderName>/user_rules as <user_rules>, plus the older
+		// user_rules.md beside it (MultiRuleService.getUserRules, fetched by
+		// the agent through icube.common.commands.tooling.getRulesDetails).
+		// A file without frontmatter is always applied; the header says so
+		// anyway. The IDE's user data directory is what says it is here.
+		e := traeIDEPresent()[0]
+		return rulesFile{
+			path:   filepath.Join(sources.Home(), e.dataFolder, "user_rules", "deja-rules.md"),
+			root:   e.userDir(),
+			header: "---\nalwaysApply: true\n---\n\n",
+		}
 	case "pi":
 		return piRules(sources.PiConfigDir())
 	case "omp", "gjc":

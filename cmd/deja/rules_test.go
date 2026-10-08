@@ -84,7 +84,6 @@ func TestRulesStatusNamesEveryState(t *testing.T) {
 		// opencode reads ~/.claude/CLAUDE.md while it has no AGENTS.md of
 		// its own, so that is its copy.
 		"opencode     in sync   " + shortHome(claude),
-		"trae-ide     no global rules file known",
 		"run `deja rules sync`",
 	} {
 		if !strings.Contains(out, want) {
@@ -93,6 +92,49 @@ func TestRulesStatusNamesEveryState(t *testing.T) {
 	}
 	if strings.Contains(out, "statusline") {
 		t.Errorf("statusline is not an agent and has no rules to read:\n%s", out)
+	}
+}
+
+// Every agent install gives guidance also gets the rules: one with a guidance
+// file and no rules file would carry deja's manual but none of the reader's
+// standing rules.
+func TestEveryGuidedAgentHasARulesFile(t *testing.T) {
+	rulesHome(t)
+	seen := map[string]bool{}
+	for _, n := range installTargetNames() {
+		h := guidanceHarness(n)
+		if seen[h] {
+			continue
+		}
+		seen[h] = true
+		if guidancePath(h) != "" && rulesPath(h) == "" {
+			t.Errorf("%s (install %s) has guidance but no rules file", h, n)
+		}
+	}
+}
+
+// TRAE IDE's copy is a file of deja's own in the user rules directory of the
+// build that is installed, written once the IDE's user data is there.
+func TestRulesSyncTraeIDE(t *testing.T) {
+	home := rulesHome(t, "trae-ide")
+	writeRulesTestFile(t, rulesSourcePath(), "- one line commits\n")
+	if err := os.MkdirAll(traeIDEEditions[1].userDir(), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(home, ".trae-cn", "user_rules", "deja-rules.md")
+	want := "---\nalwaysApply: true\n---\n\n" + rulesBlock("- one line commits")
+	if got := readRulesTestFile(t, path); got != want {
+		t.Fatalf("%s:\n%q\nwant\n%q", path, got, want)
+	}
+	writeRulesTestFile(t, rulesSourcePath(), "")
+	if _, err := rulesOut(t, "sync"); err != nil {
+		t.Fatal(err)
+	}
+	if fileExists(path) {
+		t.Fatalf("%s left behind after the rules were emptied", path)
 	}
 }
 
