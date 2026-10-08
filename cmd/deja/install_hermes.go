@@ -79,6 +79,8 @@ version: 0.1.0
 description: Recall your own past coding sessions before answering
 provides_hooks:
   - pre_llm_call
+  - pre_api_request
+  - post_llm_call
   - transform_tool_result
   - on_session_finalize
 provides_commands:
@@ -152,10 +154,84 @@ def _provider_active():
         return False
 
 
+_SUMMARY_PREFIXES = ("[CONTEXT COMPACTION", "[CONTEXT SUMMARY]:")
+
+# The history each session last showed, and the summaries in it: Hermes gives a
+# plugin no compaction hook, so a compaction is a summary that was not there
+# on the call before (0.17.0 compresses in place, under the same id).
+_seen = {}
+
+
+def _bounded_messages(messages, limit=768 * 1024):
+    # deja reads at most 1 MB of hook payload. The packet is about where the
+    # work stood, so the newest turns are kept and long tool output is cut.
+    out, size = [], 0
+    for m in reversed(list(messages or [])):
+        if not isinstance(m, dict):
+            continue
+        m = dict(m)
+        if isinstance(m.get("content"), str) and len(m["content"]) > 4000:
+            m["content"] = m["content"][:4000]
+        size += len(json.dumps(m, default=str))
+        if size > limit:
+            break
+        out.append(m)
+    out.reverse()
+    return out
+
+
+def _summaries(history):
+    out = set()
+    for m in history:
+        if not isinstance(m, dict):
+            continue
+        content = m.get("content")
+        if m.get("_compressed_summary") or (isinstance(content, str) and content.lstrip().startswith(_SUMMARY_PREFIXES)):
+            out.add(hash(str(content)))
+    return frozenset(out)
+
+
+def _watch_compaction(session_id, history, parent_session_id=""):
+    """Hand deja the turns a compaction just summarised, the way Claude Code's
+    PreCompact does; the packet goes out with the next hook-prompt."""
+    if not isinstance(history, list):
+        return
+    sid = session_id or ""
+    summaries = _summaries(history)
+    before = _seen.get(sid)
+    if before is None and summaries and parent_session_id:
+        # A compaction that moved the conversation to a new id.
+        before = _seen.get(parent_session_id)
+    _seen[sid] = (summaries, history)
+    if len(_seen) > 16:
+        _seen.pop(next(iter(_seen)))
+    if before is None or not (summaries - before[0]):
+        return
+    if _provider_active():
+        # deja-memory captures it from on_pre_compress.
+        return
+    payload = json.dumps({
+        "session_id": sid,
+        "cwd": os.getenv("TERMINAL_CWD") or os.getcwd(),
+        "harness": "hermes",
+        "messages": _bounded_messages(before[1]),
+    }, default=str)
+    _deja(["hook-precompact"], payload, timeout=10)
+
+
+def watch(session_id=None, conversation_history=None, parent_session_id="", **kwargs):
+    _watch_compaction(session_id, conversation_history, parent_session_id)
+    return None
+
+
 def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     # First turn gets the session digest, ranked by the project; every turn
     # after gets the relevance pass over what was just asked. Silence is the
     # normal answer — a hook that talks every turn is wallpaper.
+    #
+    # A compaction between turns (/compress) is caught here, before the
+    # hook-prompt that hands its packet back.
+    _watch_compaction(session_id, kwargs.get("conversation_history"), kwargs.get("parent_session_id") or "")
     if _provider_active():
         return None
     if is_first_turn:
@@ -253,6 +329,11 @@ def search(raw_args):
 
 def register(ctx):
     ctx.register_hook("pre_llm_call", recall)
+    # Every model call: a compaction in the middle of a turn shows up here
+    # first. post_llm_call keeps the turn's last reply in the history a
+    # /compress before the next prompt summarises.
+    ctx.register_hook("pre_api_request", watch)
+    ctx.register_hook("post_llm_call", watch)
     # transform_tool_result arrived after pre_llm_call; an older Hermes logs
     # the unknown name and never calls it.
     ctx.register_hook("transform_tool_result", repair)

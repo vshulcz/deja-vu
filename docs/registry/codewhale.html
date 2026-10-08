@@ -77,7 +77,7 @@
 <p><code>$CODEWHALE_HOME</code> is an isolation boundary in CodeWhale&#39;s own resolver — with it</p>
 <p>set, the legacy root is not consulted — and deja does not reach outside it</p>
 <p>either.</p>
-<p><strong>Last verified:</strong> 2026-10-07</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>No per-message timestamps.</strong> The file stores <code>created_at</code> and <code>updated_at</code></li>
@@ -109,6 +109,12 @@
 <p>servers lazily; without that entry the tool was missing from the request.</p>
 <p>The skill goes in <code>~/.agents/skills</code>, which CodeWhale lists beside its own</p>
 <p><code>skills/</code> and <code>~/.claude/skills</code> and shows each copy it finds.</p>
+<ul>
+<li><strong>Command.</strong> <code>~/.codewhale/commands/deja.md</code> is <code>/deja</code> in the slash menu</li>
+</ul>
+<p>(0.10.1). The directory is under <code>$HOME</code> even with <code>CODEWHALE_HOME</code> set. The</p>
+<p>file has no <code>description</code>: CodeWhale makes it the session&#39;s goal and keeps</p>
+<p>the turn going until the model closes it.</p>
 <ul>
 <li><strong>Auto-recall.</strong> <code>deja install codewhale-auto</code> adds three <code>[[hooks.hooks]]</code></li>
 </ul>

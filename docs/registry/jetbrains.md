@@ -52,6 +52,10 @@ left to it rather than read twice.
 - **No hooks.** Nothing in the 262.10968.170 plugin runs a user hook, so
   recall reaches the chat as the MCP tool only: no digest, per-prompt, tool,
   failure, compaction or session-end surface.
+- **No skill.** The plugin manages skill folders for the agents it hosts
+  (Junie, Claude, Codex), and its skill picker opens only for those. AI
+  Assistant's own chat reads none (`AgentSkillsAdditionalRootsProvider`,
+  `AgentSkillsContextPopupContributor`).
 - **Rules are per project.** AI Assistant reads rules from a project's
   `.aiassistant/rules/*.md` and custom instructions from a project setting;
   there is no user-level file for `deja rules` to write.

@@ -92,7 +92,7 @@ part(id, message_id, data)</code></pre>
 <p>the sidebar, the prompt row and the home screen. On 2.x it is</p>
 <p><code>plugins/deja-status/tui.tsx</code>, which 2.x finds on its own, in the prompt and</p>
 <p>home footers. A <code>tui.jsonc</code> is not edited; install says what to add. Rendered</p>
-<p>live on 1.18.34 and 2.0.24.</p>
+<p>live on 1.18.34, 2.0.24 and 2.0.25; on 2.x the muted colour is <code>theme.text.muted</code>.</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>The database can be several gigabytes. deja projects JSON scalars in SQL instead of streaming complete blobs.</li>
@@ -101,7 +101,7 @@ part(id, message_id, data)</code></pre>
 <li>A missing database must not be passed to SQLite because the CLI would create it.</li>
 <li>The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.</li>
 </ul>
-<p><strong>Last verified:</strong> 2026-09-30</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 
 <hr>
 <p>deja reads this format and thirty-nine others, and turns what it finds into memory your

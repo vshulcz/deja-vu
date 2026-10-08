@@ -43,7 +43,7 @@ rather than anything either side said.
 set, the legacy root is not consulted — and deja does not reach outside it
 either.
 
-**Last verified:** 2026-10-07
+**Last verified:** 2026-10-08
 
 ## Known quirks and drift
 
@@ -69,6 +69,10 @@ either.
   servers lazily; without that entry the tool was missing from the request.
   The skill goes in `~/.agents/skills`, which CodeWhale lists beside its own
   `skills/` and `~/.claude/skills` and shows each copy it finds.
+- **Command.** `~/.codewhale/commands/deja.md` is `/deja` in the slash menu
+  (0.10.1). The directory is under `$HOME` even with `CODEWHALE_HOME` set. The
+  file has no `description`: CodeWhale makes it the session's goal and keeps
+  the turn going until the model closes it.
 - **Auto-recall.** `deja install codewhale-auto` adds three `[[hooks.hooks]]`
   entries. Hooks fire only in the TUI; `codewhale exec`, the ACP and app
   servers fire none. Of the events, only two put text in front of the model:

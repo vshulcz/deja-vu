@@ -88,10 +88,14 @@ func TestV2TUIPluginNeedsNoList(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"setup(ctx)", `append: "prompt.footer.status"`, `["statusline"]`, "input.sessionID"} {
+	for _, want := range []string{"setup(ctx)", `append: "prompt.footer.status"`, `["statusline"]`, "input.sessionID", "ctx.theme.text.muted"} {
 		if !strings.Contains(string(b), want) {
 			t.Errorf("plugin lacks %q", want)
 		}
+	}
+	// 2.0.x has no theme.textMuted: the line came out in the default colour.
+	if strings.Contains(string(b), "textMuted") {
+		t.Error("plugin reads theme.textMuted, which 2.x does not have")
 	}
 	if _, err := os.Stat(filepath.Join(dir, "tui.json")); err == nil {
 		t.Error("a 2.x install wrote tui.json")

@@ -596,7 +596,7 @@
         "fixtures/registry/hermes/profiles/architect/hermes.sql"
       ],
       "parser_source": "internal/sources/hermes.go",
-      "last_verified": "2026-07-28",
+      "last_verified": "2026-10-08",
       "display_name": "Hermes",
       "capabilities": {
         "mcp": true,
@@ -613,9 +613,9 @@
         "prompt": {"status": "yes", "proof": "fixture"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "fixture"},
-        "compaction_reset": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
-        "compaction_capture": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
-        "compaction_packet": {"status": "partial", "proof": "fixture", "note": "only when memory.provider is deja-memory, which hermes-auto does not set"},
+        "compaction_reset": {"status": "yes", "proof": "stand", "note": "Hermes gives plugins no compaction hook; deja's plugin sees the new summary (_compressed_summary) in the history pre_api_request, post_llm_call and pre_llm_call carry, so memory.provider stays the reader's (stand on 0.17.0, /compress)"},
+        "compaction_capture": {"status": "yes", "proof": "stand", "note": "the history from the hook before the summary appeared; a compaction in the middle of a turn misses the tool results of the last round before it"},
+        "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next pre_llm_call; a compaction in the middle of a turn waits for the next prompt"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "yes", "proof": "fixture"},
@@ -760,7 +760,7 @@
         "fixtures/registry/opencode/opencode-v2.sql"
       ],
       "parser_source": "internal/sources/opencode.go",
-      "last_verified": "2026-09-30",
+      "last_verified": "2026-10-08",
       "display_name": "opencode",
       "capabilities": {
         "mcp": true,
@@ -783,7 +783,7 @@
         "handoff": {"status": "yes", "proof": "fixture"},
         "session_end": {"status": "yes", "proof": "fixture"},
         "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "partial", "proof": "fixture", "note": "1.x shows a toast; a 2.x server plugin has no channel to the TUI (#4801)"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "a TUI plugin: 1.x lists it in tui.json and shows the line in the sidebar and prompt row, 2.x finds plugins/deja-status/tui.tsx and shows it in the footer (stand on 1.18.34 and 2.0.25)"},
         "reader": {"status": "yes", "proof": "fixture"}
       }
     },
@@ -1257,23 +1257,18 @@
         "fixtures/registry/kiro/w-api/sess_00000000-0000-4000-8000-000000000000/messages.jsonl"
       ],
       "parser_source": "internal/sources/kiro.go",
-      "last_verified": "2026-10-07",
+      "last_verified": "2026-10-08",
       "display_name": "Kiro",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": true,
         "handoff": "exec",
         "prereq": "sqlite3 for the CLI database"
       },
-      "gaps": {
-        "command": {
-          "state": "unknown",
-          "why": "Kiro's upstream — Amazon Q Developer CLI — keeps user-level custom prompts in `~/.aws/amazonq/prompts` (`crates/chat-cli/src/util/paths.rs`), but Kiro renamed its config tree rather than moving it wholesale: its server file is `~/.kiro/settings/mcp.json`, not the Q path. So the location of Kiro's equivalent cannot be inferred from the fork, and writing a guessed directory would leave a command nothing lists (#3651)."
-        }
-      },
+      "gaps": {},
       "surfaces": {
         "digest": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
         "prompt": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
@@ -1443,24 +1438,18 @@
         "fixtures/registry/codewhale/sessions/registry-codewhale.json"
       ],
       "parser_source": "internal/sources/codewhale.go",
-      "last_verified": "2026-10-07",
+      "last_verified": "2026-10-08",
       "display_name": "CodeWhale",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": true,
         "handoff": "exec",
         "prereq": "none"
       },
-      "gaps": {
-        "command": {
-          "state": "unknown",
-          "why": "Custom commands come from its plugin marketplace rather than a directory deja can write; not checked against a live install.",
-          "source": "https://github.com/Hmbown/CodeWhale/blob/main/docs/TOOL_LIFECYCLE.md"
-        }
-      },
+      "gaps": {},
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "rides the first message_submit of a session; session_start stdout is discarded"},
         "prompt": {"status": "yes", "proof": "stand"},
@@ -1549,8 +1538,8 @@
           "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
         },
         "skill": {
-          "state": "unknown",
-          "why": "AI Assistant 262.10968.170 manages skill folders for the ACP agents it hosts (ChatModeResolver names Claude and Codex); whether its own chat reads one is not checked without a signed-in IDE.",
+          "state": "blocked",
+          "why": "AI Assistant 262.10968.170's own chat reads no SKILL.md. Its skill folders (IdeManagedSkillsLayout, ~/.claude/skills, ~/.codex/skills) are handed only to the ACP agents it hosts (AgentSkillsAdditionalRootsProvider: junie, claude-acp, codex), and the chat's skill picker opens only for a Claude or Codex agent (AgentSkillsContextPopupContributor). Those agents already get deja's skill from their own directories.",
           "source": "https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant"
         },
         "command": {
@@ -1681,23 +1670,18 @@
         "fixtures/registry/trae/rollout-2026-10-01T09-00-00-019fbcca-0000-7000-8000-00000000trae.jsonl"
       ],
       "parser_source": "internal/sources/trae.go",
-      "last_verified": "2026-10-05",
+      "last_verified": "2026-10-08",
       "display_name": "TRAE CLI",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": true,
         "handoff": "exec",
         "prereq": "none"
       },
-      "gaps": {
-        "command": {
-          "state": "unknown",
-          "why": "No custom-command directory for TRAE CLI was found in the sources read (#4680)."
-        }
-      },
+      "gaps": {},
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
@@ -1726,23 +1710,18 @@
         "fixtures/registry/muse/sessions/2026/09/18/01a0b7d1-0000-7000-8000-00000000d3a0/session.jsonl"
       ],
       "parser_source": "internal/sources/muse.go",
-      "last_verified": "2026-10-05",
+      "last_verified": "2026-10-08",
       "display_name": "Muse Code",
       "capabilities": {
         "mcp": true,
         "auto": true,
         "skill": true,
-        "command": false,
+        "command": true,
         "resume": true,
         "handoff": "exec",
         "prereq": "none"
       },
-      "gaps": {
-        "command": {
-          "state": "unknown",
-          "why": "Muse loads slash commands only from plugins (a .muse-plugin manifest with a commands capability), and no user-level commands directory is documented, so install writes no command file. The deja-history skill is what it reads instead (#4709)."
-        }
-      },
+      "gaps": {},
       "surfaces": {
         "digest": {"status": "yes", "proof": "fixture"},
         "prompt": {"status": "yes", "proof": "fixture"},

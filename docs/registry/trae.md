@@ -36,7 +36,7 @@ is a block list whose text blocks are joined; `apply_patch` is the Codex patch
 format. A call seen both there and as a `response_item` is read once, by
 `call_id`. A `replace` re-sends history the file already holds and is skipped.
 
-**Last verified:** 2026-10-05
+**Last verified:** 2026-10-08
 
 ## Known quirks and drift
 
@@ -62,5 +62,9 @@ format. A call seen both there and as a `response_item` is read once, by
   `deja install trae-ide-auto` adds Claude-shaped hooks to `~/.trae/hooks.json`. The IDE ships
   with hooks off and keeps that switch in its own settings store, so deja cannot
   tell whether they run: turn them on in Settings > Hooks and run them locally.
+- **The skill is the command.** TRAE CLI reads the deja-history skill from
+  `~/.agents/skills`, and its system prompt (0.207.1) has the model run a skill
+  when the user types `/<skill-name>`, so `/deja-history <query>` is deja's
+  command. It has no custom-prompt directory of its own.
 - **`~/.trae/hooks.json` is the IDE's, not the CLI's.** TRAE CLI 1.x read it;
   2.0 reads `cli/hooks.json` and says the old file is no longer read.

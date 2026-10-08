@@ -59,7 +59,7 @@
 <p><code>history</code> holds the turns: a <code>Prompt</code> or <code>ToolUseResults</code> user side, a</p>
 <p><code>ToolUse</code> or <code>Response</code> assistant side. `kiro-cli chat --resume-id</p>
 <p>&lt;conversation_id&gt;` reopens a row.</p>
-<p><strong>Last verified:</strong> 2026-10-07</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Resume: <code>cd &lt;cwd&gt; &amp;&amp; kiro-cli chat --resume-id &lt;sessionId&gt;</code>, which needs</li>
@@ -145,6 +145,11 @@
 </ul>
 <p>On kiro-cli 2.28 a skill there is listed in <code>disclose_context</code> in both</p>
 <p>engines (#4802).</p>
+<ul>
+<li>Command: <code>~/.kiro/prompts/deja.md</code>, a global prompt. V3 lists it in slash</li>
+</ul>
+<p>completion as <code>/deja</code>; V2 takes <code>@deja</code> or <code>/prompts get deja</code>. The file has</p>
+<p>no frontmatter, since a prompt is sent as written.</p>
 <ul>
 <li>Global hooks: <code>deja install kiro-auto</code> writes <code>~/.kiro/hooks/deja.json</code></li>
 </ul>

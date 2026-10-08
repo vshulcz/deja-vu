@@ -112,6 +112,17 @@ func commandFilePath(harness string) string {
 		// $JUNIE_HOME/commands/<name>.md, the user half of the TUI's custom
 		// commands; a project's are in .junie/commands (3110.7).
 		return filepath.Join(sources.JunieHome(), "commands", "deja.md")
+	case "codewhale":
+		// user_commands.rs global_commands_dir: $HOME/.codewhale/commands,
+		// which does not follow CODEWHALE_HOME, and a file of the name is /deja
+		// in the slash menu (0.10.1 stand).
+		return filepath.Join(homeDir(), ".codewhale", "commands", "deja.md")
+	case "kiro":
+		// kiro-cli's global prompts, ~/.kiro/prompts/<name>.md: the V3 engine
+		// lists them in slash completion as /deja, and V2 takes @deja or
+		// `/prompts get deja` (kiro.dev manage-prompts; the 2.22 TUI maps the
+		// backend's "global" prompts to /name in its command list).
+		return filepath.Join(sources.KiroConfigDir(), "prompts", "deja.md")
 	case "omp":
 		// The default profile's agent directory, ~/.omp/agent. A named
 		// profile reads its own and does not get the command.
@@ -130,7 +141,10 @@ func commandFilePath(harness string) string {
 // third entry doing what the other two already do, so Gemini joins the eight
 // harnesses where the skill is the command (#3665).
 func commandFileText(harness, exe string) string {
-	if harness == "cursor" {
+	// A Kiro prompt is sent as written, so frontmatter would reach the model
+	// as text. CodeWhale makes a command's description the session's goal and
+	// keeps the turn going until the model closes it, so its file has none.
+	if harness == "cursor" || harness == "kiro" || harness == "codewhale" {
 		return cursorCommand(exe)
 	}
 	return markdownCommand(exe)
