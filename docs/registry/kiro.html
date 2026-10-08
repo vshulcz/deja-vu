@@ -157,9 +157,12 @@
 </ul>
 <p>(<code>{&#34;version&#34;:&#34;v1&#34;,&#34;hooks&#34;:[…]}</code>): SessionStart runs <code>hook-context --plain</code>,</p>
 <p>UserPromptSubmit <code>hook-prompt --plain</code>, SessionEnd <code>hook-session-end</code>. The</p>
-<p>IDE and <code>kiro-cli --v3</code> run it in every chat, whatever the agent. On a 2.28</p>
-<p>stand both outputs reached the model; SessionEnd fires on leaving the TUI,</p>
-<p>not in <code>--no-interactive</code>. PreToolUse and PostToolUse stdout is dropped</p>
+<p>IDE and the <code>kiro-cli --v3</code> TUI run it in every chat, whatever the agent;</p>
+<p><code>--v3 --no-interactive</code> runs none of it. Both outputs reach the model. On</p>
+<p>2.28 SessionEnd fires on leaving the TUI; 2.22.0 maps SessionEnd to Stop,</p>
+<p>so there it fires after every turn and not on <code>/quit</code>. A turn-end clear is</p>
+<p>harmless: the next prompt marks the session live again. PreToolUse and</p>
+<p>PostToolUse stdout is dropped</p>
 <p>(<code>sendStdout:false</code> in <code>acp-server.js</code>), so a pre-edit line or a fix for a</p>
 <p>failed command can only ride the next prompt, which waits on deferred</p>
 <p>delivery. The default V2 engine ignores this file and runs the agent below.</p>
@@ -210,11 +213,25 @@
 </ul>
 <p><code>deja resume</code> prints for a CLI session. <code>-r</code>, <code>--resume-picker</code> are beside it.</p>
 <ul>
-<li>What could not be checked: <code>kiro-cli mcp list</code> refuses before a login</li>
+<li>The steering file is loaded: its text is in the request.</li>
 </ul>
-<p>(<code>You are not logged in, please log in with kiro-cli login</code>), so whether the</p>
-<p>server appears in its own list rests on Kiro&#39;s documentation rather than on a</p>
-<p>screen seen here. The steering file is loaded: its text is in the request.</p>
+<p><code>kiro-cli</code> 2.22.0 logged in, real model, hermetic HOME holding only the login:</p>
+<ul>
+<li><code>kiro-cli mcp list</code> lists <code>deja</code> for <code>kiro_default</code> and under global. In</li>
+</ul>
+<p><code>kiro-cli chat --no-interactive --agent deja</code> the model called the <code>deja</code></p>
+<p>tool (<code>mode: recall</code>) and answered from what it returned. The V3 TUI&#39;s</p>
+<p>default agent got <code>mcp_deja_deja</code> in its tool list and called it too.</p>
+<ul>
+<li><code>kiro-cli --v3 chat</code> TUI, default agent: the first request carried the</li>
+</ul>
+<p>SessionStart digest and the UserPromptSubmit recall from</p>
+<p><code>~/.kiro/hooks/deja.json</code>, and the model quoted both. `--v3 chat</p>
+<p>--no-interactive` ran no hook from that directory at all.</p>
+<ul>
+<li><code>kiro-cli chat --agent deja</code> TUI: the digest reached the model, which</li>
+</ul>
+<p>quoted the earlier session&#39;s rule back before editing.</p>
 
 <hr>
 <p>deja reads this format and thirty-nine others, and turns what it finds into memory your

@@ -72,7 +72,8 @@ func kiroSkillPath() string {
 // the IDE) reads for every chat, whatever agent it runs: acp-server.js puts
 // ~/.kiro/hooks in globalHookDirs. On a 2.28 stand SessionStart and
 // UserPromptSubmit stdout reached the model and SessionEnd fired on leaving
-// the TUI. PreToolUse and PostToolUse stdout is dropped by the host
+// the TUI; 2.22.0 maps SessionEnd to Stop, which fires after every turn.
+// The headless `--v3 --no-interactive` runs none of these. PreToolUse and PostToolUse stdout is dropped by the host
 // (sendStdout:false), so there is no pre-edit line here. The V2 engine, still
 // the CLI default, ignores this file and runs the deja agent's hooks instead.
 func kiroGlobalHooksPath() string {
