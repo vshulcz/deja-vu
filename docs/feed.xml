@@ -51,6 +51,8 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"></link>
     <updated>2026-10-08T00:00:00Z</updated>
     <summary>Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.</summary>
+  </entry>
+  <entry>
     <title>Where aider stores its history — session format</title>
     <id>https://vshulcz.github.io/deja-vu/registry/aider.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/aider.html"></link>
@@ -287,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/goose.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Goose stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/goose.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/goose.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Goose writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where Grok Build stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/grok.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/grok.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where Grok Build writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
 </feed>
