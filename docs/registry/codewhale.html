@@ -110,7 +110,7 @@
 <p>The skill goes in <code>~/.agents/skills</code>, which CodeWhale lists beside its own</p>
 <p><code>skills/</code> and <code>~/.claude/skills</code> and shows each copy it finds.</p>
 <ul>
-<li><strong>Auto-recall.</strong> <code>deja install codewhale-auto</code> adds three <code>[[hooks.hooks]]</code></li>
+<li><strong>Auto-recall.</strong> <code>deja install codewhale-auto</code> adds four <code>[[hooks.hooks]]</code></li>
 </ul>
 <p>entries. Hooks fire only in the TUI; <code>codewhale exec</code>, the ACP and app</p>
 <p>servers fire none. Of the events, only two put text in front of the model:</p>
@@ -127,12 +127,16 @@
 </ul>
 <p>result as <code>[hook context] …</code> and capped at 2,000 characters. deja sends no</p>
 <p><code>decision</code>, which CodeWhale reads as allow. The line arrives only on a</p>
-<p>tool that ran without error: a failed call&#39;s result goes out without it.</p>
+<p>tool that ran: a call that fails to run (a <code>ToolError</code>, &#34;Failed to …&#34;)</p>
+<p>goes back as <code>Error: …</code> without it (<code>turn_loop.rs</code>, 0.10.1).</p>
 <ul>
 <li><code>session_end</code> (on <code>/quit</code>, not on a kill) ends the live stamp.</li>
 </ul>
 <p><code>tool_call_after</code>, <code>turn_end</code> and <code>session_start</code> output never reaches the</p>
-<p>model, so the fix for a failed command has no channel yet. The hooks&#39;</p>
+<p>model. So <code>tool_call_after</code> only parks text for the next <code>tool_call_before</code></p>
+<p>or <code>message_submit</code>: the fix pair for a failed shell command, read from the</p>
+<p>execution receipt on its stdin, and the <code>tool_call_before</code> line of a call</p>
+<p>that failed to run. The hooks&#39;</p>
 <p><code>sess_…</code> ids are made fresh for each hook executor and are not the store&#39;s</p>
 <p>file ids, so a session&#39;s live stamp does not keep MCP recall off its own</p>
 <p>transcript.</p>

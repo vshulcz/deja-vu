@@ -69,7 +69,7 @@ either.
   servers lazily; without that entry the tool was missing from the request.
   The skill goes in `~/.agents/skills`, which CodeWhale lists beside its own
   `skills/` and `~/.claude/skills` and shows each copy it finds.
-- **Auto-recall.** `deja install codewhale-auto` adds three `[[hooks.hooks]]`
+- **Auto-recall.** `deja install codewhale-auto` adds four `[[hooks.hooks]]`
   entries. Hooks fire only in the TUI; `codewhale exec`, the ACP and app
   servers fire none. Of the events, only two put text in front of the model:
   - `message_submit` may replace the message with `{"text": …}`. deja keeps
@@ -81,10 +81,14 @@ either.
   - `tool_call_before` may add `additionalContext`, appended to the tool's
     result as `[hook context] …` and capped at 2,000 characters. deja sends no
     `decision`, which CodeWhale reads as allow. The line arrives only on a
-    tool that ran without error: a failed call's result goes out without it.
+    tool that ran: a call that fails to run (a `ToolError`, "Failed to …")
+    goes back as `Error: …` without it (`turn_loop.rs`, 0.10.1).
   - `session_end` (on `/quit`, not on a kill) ends the live stamp.
   `tool_call_after`, `turn_end` and `session_start` output never reaches the
-  model, so the fix for a failed command has no channel yet. The hooks'
+  model. So `tool_call_after` only parks text for the next `tool_call_before`
+  or `message_submit`: the fix pair for a failed shell command, read from the
+  execution receipt on its stdin, and the `tool_call_before` line of a call
+  that failed to run. The hooks'
   `sess_…` ids are made fresh for each hook executor and are not the store's
   file ids, so a session's live stamp does not keep MCP recall off its own
   transcript.

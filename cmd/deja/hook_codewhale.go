@@ -27,7 +27,12 @@ import (
 //     appended to the tool's result. No decision is sent: allow and none are
 //     the same to CodeWhale, and deja has no business approving a tool.
 //
-// tool_call_after, turn_end and session_start stdout never reach the model.
+// tool_call_after, turn_end and session_start stdout never reach the model, so
+// what deja has to say after a tool waits for the next tool_call_before or
+// message_submit (hook_deferred.go): the fix pair for a failed command, and the
+// tool_call_before line of a call that failed to run, whose result goes out
+// without it (turn_loop.rs, 0.10.1).
+//
 // The replaced message is what CodeWhale saves, so everything deja adds is
 // framed in <deja-recall>, which the index strips before it reads the turn.
 const (
@@ -51,6 +56,8 @@ func runHookCodeWhale(dir string, args []string, stdin io.Reader, stdout io.Writ
 		return codewhaleMessageSubmit(dir, stdin, stdout)
 	case "tool_call_before":
 		return codewhaleToolCallBefore(dir, stdout)
+	case "tool_call_after":
+		return codewhaleToolCallAfter(dir, stdin)
 	case "session_end":
 		sid := os.Getenv("DEEPSEEK_SESSION_ID")
 		if sid == "" {
@@ -61,7 +68,7 @@ func runHookCodeWhale(dir string, args []string, stdin io.Reader, stdout io.Writ
 		endSessionLive(dir, sid)
 		return nil
 	}
-	return fmt.Errorf("hook-codewhale: unknown event %q — want message_submit, tool_call_before or session_end", event)
+	return fmt.Errorf("hook-codewhale: unknown event %q — want message_submit, tool_call_before, tool_call_after or session_end", event)
 }
 
 func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error {
@@ -77,6 +84,9 @@ func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error
 	}
 	markSessionLive(dir, in.SessionID)
 	var parts []string
+	if pending := takeDeferred(dir, deferredKey(in.SessionID, in.Workspace)); pending != "" {
+		parts = append(parts, pending)
+	}
 	if packet := codewhaleCompactionPacket(dir, in.SessionID, in.Workspace); packet != "" {
 		parts = append(parts, packet)
 	}
@@ -182,9 +192,10 @@ func codewhaleCompactionPacket(dir, sessionID, workspace string) string {
 // `command`, and apply_patch's patch is moved to where hook-tool looks for one.
 func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 	name := os.Getenv("DEEPSEEK_TOOL_NAME")
-	if name == "" {
+	if name == "" || recallIsOff() {
 		return nil
 	}
+	sid, workspace := os.Getenv("DEEPSEEK_SESSION_ID"), os.Getenv("DEEPSEEK_WORKSPACE")
 	input := map[string]any{}
 	if raw := os.Getenv("DEEPSEEK_TOOL_ARGS"); raw != "" {
 		_ = json.Unmarshal([]byte(raw), &input)
@@ -193,12 +204,12 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 		input["command"] = patch
 	}
 	// hook-tool hands over the packet of a compaction caught up here.
-	codewhaleCatchUp(dir, os.Getenv("DEEPSEEK_SESSION_ID"), os.Getenv("DEEPSEEK_WORKSPACE"))
+	codewhaleCatchUp(dir, sid, workspace)
 	payload, err := json.Marshal(map[string]any{
 		"tool_name":  name,
 		"tool_input": input,
-		"session_id": os.Getenv("DEEPSEEK_SESSION_ID"),
-		"cwd":        os.Getenv("DEEPSEEK_WORKSPACE"),
+		"session_id": sid,
+		"cwd":        workspace,
 	})
 	if err != nil {
 		return nil
@@ -208,13 +219,99 @@ func codewhaleToolCallBefore(dir string, stdout io.Writer) error {
 		return nil
 	}
 	ctx := strings.TrimSpace(out.String())
+	// What waits from an earlier call goes first when both fit under the cap;
+	// otherwise it waits for the next message, which takes far more.
+	key := deferredKey(sid, workspace)
+	if pending := takeDeferred(dir, key); pending != "" {
+		switch {
+		case ctx == "" && len(pending) <= codewhaleContextMax:
+			ctx = pending
+		case len(pending)+2+len(ctx) <= codewhaleContextMax:
+			ctx = pending + "\n\n" + ctx
+		default:
+			deferText(dir, key, "hook-tool-after", pending)
+		}
+	}
 	if ctx == "" {
 		return nil
+	}
+	// Kept until tool_call_after says the call ran: a call that fails to run
+	// goes back to the model without this context.
+	if id := os.Getenv("DEEPSEEK_TOOL_CALL_ID"); id != "" {
+		deferText(dir, codewhaleCallKey(id), "hook-tool", ctx)
 	}
 	b, err := json.Marshal(map[string]string{"additionalContext": truncateToolLine(ctx, codewhaleContextMax)})
 	if err != nil {
 		return nil
 	}
 	fmt.Fprintln(stdout, string(b))
+	return nil
+}
+
+// codewhaleCallKey is where a tool_call_before answer waits for its call's
+// tool_call_after.
+func codewhaleCallKey(callID string) string { return deferredKey("cw-call:"+callID, "") }
+
+// codewhaleCallErred reports whether a failed call's result is a ToolError
+// rather than the tool's own failing output. Those are the results CodeWhale
+// sends without the tool_call_before context (turn_loop.rs, 0.10.1), and each
+// of its messages starts with one of these (crates/tools/src/lib.rs).
+func codewhaleCallErred(result string) bool {
+	return strings.HasPrefix(result, "Failed to ") || strings.HasPrefix(result, "Tool execution cancelled")
+}
+
+// codewhaleToolCallAfter runs once a tool call settles, and CodeWhale discards
+// what it prints. So it parks text for the session's next tool_call_before or
+// message_submit: the tool_call_before line of a call that failed to run, and
+// the fix pair for a shell command that failed. A native shell call's receipt
+// comes on stdin (docs/HOOKS.md, 0.10.1); other calls get no stdin document
+// and their result in the environment.
+func codewhaleToolCallAfter(dir string, stdin io.Reader) error {
+	sid, workspace := os.Getenv("DEEPSEEK_SESSION_ID"), os.Getenv("DEEPSEEK_WORKSPACE")
+	key := deferredKey(sid, workspace)
+	line := ""
+	if id := os.Getenv("DEEPSEEK_TOOL_CALL_ID"); id != "" {
+		line = takeDeferred(dir, codewhaleCallKey(id))
+	}
+	if os.Getenv("DEEPSEEK_TOOL_SUCCESS") != "false" || recallIsOff() {
+		return nil
+	}
+	result := os.Getenv("DEEPSEEK_TOOL_RESULT")
+	if line != "" && codewhaleCallErred(result) {
+		deferText(dir, key, "hook-tool", line)
+	}
+	switch os.Getenv("DEEPSEEK_TOOL_NAME") {
+	case "exec_shell", "bash", "Bash", "task_shell_start":
+	default:
+		return nil
+	}
+	var doc struct {
+		Receipt struct {
+			Command string `json:"command"`
+			Stdout  string `json:"stdout"`
+			Stderr  string `json:"stderr"`
+		} `json:"execution_receipt"`
+	}
+	_ = json.Unmarshal(readHookPayload(stdin, hookStdinWait), &doc)
+	output := strings.TrimSpace(doc.Receipt.Stderr + "\n" + doc.Receipt.Stdout)
+	if output == "" {
+		output = result
+	}
+	payload, err := json.Marshal(map[string]any{
+		"hook_event_name": "PostToolUse",
+		"tool_name":       "Bash",
+		"tool_input":      map[string]string{"command": doc.Receipt.Command},
+		"tool_response":   output,
+		"session_id":      sid,
+		"cwd":             workspace,
+	})
+	if err != nil {
+		return nil
+	}
+	var out bytes.Buffer
+	if err := runHookToolAfterMode(dir, bytes.NewReader(payload), &out, true); err != nil {
+		return nil
+	}
+	deferText(dir, key, "hook-tool-after", out.String())
 	return nil
 }

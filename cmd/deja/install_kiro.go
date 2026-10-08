@@ -125,9 +125,8 @@ func installKiro(exe string, uninstall bool) (installResult, error) {
 // `~/.kiro/agents` takes agentSpawn, userPromptSubmit, preToolUse, postToolUse
 // and stop. Measured on 2.22.0, what an agentSpawn or userPromptSubmit hook
 // prints goes in front of the model, the first for the whole conversation;
-// what preToolUse and postToolUse print does not, so there is no pre-edit
-// line here (#4304), and a failed command's fix pair goes out with the next
-// prompt instead.
+// what preToolUse and postToolUse print does not (#4304), so the pre-edit
+// line and a failed command's fix pair go out with the next prompt instead.
 //
 // The hooks go in an agent of deja's own rather than into the reader's: the
 // built-in kiro_default takes no hooks from a file (a kiro_default.json beside
@@ -154,9 +153,10 @@ func kiroAgentJSON(exe string) (string, error) {
 		"hooks": map[string]any{
 			"agentSpawn":       hook("hook-context", "--plain"),
 			"userPromptSubmit": hook("hook-prompt", "--plain"),
-			// What postToolUse prints never reaches the model, so a failed
-			// command's fix pair waits for the next userPromptSubmit
-			// (hook_deferred.go).
+			// What preToolUse and postToolUse print never reaches the model,
+			// so the line about a file before an edit and a failed command's
+			// fix pair wait for the next userPromptSubmit (hook_deferred.go).
+			"preToolUse":  hook("hook-tool", "--defer"),
 			"postToolUse": hook("hook-tool-after", "--defer"),
 		},
 	}, "", "  ")

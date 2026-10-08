@@ -568,8 +568,8 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "partial", "proof": "stand", "note": "the hook runs and starts the index warming, but grok drops SessionStart output (#4588, 1.0.41); handing the digest out on the first PreToolUse is #4801"},
-        "prompt": {"status": "partial", "proof": "stand", "note": "the hook runs, but grok discards UserPromptSubmit additionalContext (#4588, 1.0.41); answering on the next PreToolUse is #4801"},
+        "digest": {"status": "partial", "proof": "fixture", "note": "grok drops SessionStart output (#4588, 1.0.41), so the digest is parked and rides the session's first PreToolUse or PostToolUse"},
+        "prompt": {"status": "partial", "proof": "fixture", "note": "grok discards UserPromptSubmit additionalContext (#4588, 1.0.41), so the recall is parked and rides the turn's first PreToolUse or PostToolUse; a turn with no tool call gets none"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
@@ -649,7 +649,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "rides the first prompt: Kimi ignores SessionStart output (0.28.1)"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "no", "proof": "blocked", "note": "Kimi's runPreToolUse returns only block.reason (0.28.1 source): a hook can stop a tool, not add to it"},
+        "pre_tool": {"status": "partial", "proof": "fixture", "note": "runPreToolUse keeps only block.reason (0.28.1), so the line for an Edit or Write is parked and arrives with the next UserPromptSubmit, after the edit"},
         "failure": {"status": "partial", "proof": "fixture", "note": "PostToolUse is fire and forget, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -866,7 +866,7 @@
         "compaction_packet": {"status": "yes", "proof": "fixture", "note": "rides the next PreToolUse"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture"},
-        "session_end": {"status": "no", "proof": "blocked", "note": "Crush v0.97.1 has only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in the open charmbracelet/crush#3146"},
+        "session_end": {"status": "no", "proof": "blocked", "note": "Crush v0.97.1 (latest release, checked 2026-10-08) and main at 140e8cb have only EventPreToolUse (internal/hooks/hooks.go:13-16); SessionEnd is in charmbracelet/crush#3146, still open"},
         "rules": {"status": "yes", "proof": "fixture"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Crush has no status line, footer or toast a third party can write to"},
         "reader": {"status": "partial", "proof": "fixture", "note": "summary_message_id is not marked (#4801)"}
@@ -1277,7 +1277,7 @@
       "surfaces": {
         "digest": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
         "prompt": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
-        "pre_tool": {"status": "no", "proof": "blocked", "note": "Kiro never sends PreToolUse or PostToolUse stdout to the model (acp-server.js L5478 sendStdout:false; stand on CLI 2.28.0, exit 0/1/2)"},
+        "pre_tool": {"status": "partial", "proof": "fixture", "note": "preToolUse stdout never reaches the model (acp-server.js L5478 sendStdout:false, CLI 2.28.0), so the deja agent parks the line and it arrives with the next userPromptSubmit, after the edit"},
         "failure": {"status": "partial", "proof": "fixture", "note": "PostToolUse output is dropped at call time, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step"},
         "compaction_reset": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "compaction_capture": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
@@ -1464,8 +1464,8 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "rides the first message_submit of a session; session_start stdout is discarded"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "partial", "proof": "stand", "note": "tool_call_before additionalContext reaches the model only on a tool that ran without error (0.10.0 stand)"},
-        "failure": {"status": "no", "proof": "blocked", "note": "tool_call_after stdout is discarded and a failed call's result drops tool_call_before context (turn_loop.rs, 0.10.0 stand)"},
+        "pre_tool": {"status": "partial", "proof": "stand", "note": "tool_call_before additionalContext reaches the model only on a tool that ran (0.10.0 stand); for a call that failed to run, tool_call_after parks the line for the next tool_call_before or message_submit (fixture, 0.10.1 source)"},
+        "failure": {"status": "partial", "proof": "fixture", "note": "tool_call_after stdout is discarded (tool_routing.rs, 0.10.1), so it parks the fix pair from the shell receipt and the pair rides the next tool_call_before or message_submit"},
         "compaction_reset": {"status": "yes", "proof": "stand", "note": "no compaction hook; the history saved as artifacts/context-transfer-<id>.json beside its .md summary is caught up on the next message or tool call (0.10.0 stand)"},
         "compaction_capture": {"status": "yes", "proof": "stand"},
         "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next message_submit or tool_call_before"},

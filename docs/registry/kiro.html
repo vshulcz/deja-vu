@@ -163,10 +163,12 @@
 <p>with two hooks: <code>agentSpawn</code> runs <code>deja hook-context --plain</code> and</p>
 <p><code>userPromptSubmit</code> runs <code>deja hook-prompt --plain</code>. kiro-cli adds what those</p>
 <p>print to the model&#39;s context, the agentSpawn output for the whole</p>
-<p>conversation; what <code>preToolUse</code> and <code>postToolUse</code> print is not sent, so</p>
-<p>there is no pre-edit line. A third hook, <code>postToolUse</code> running</p>
-<p><code>deja hook-tool-after --defer</code>, holds the fix pair for a failed</p>
-<p><code>execute_bash</code> and the next <code>userPromptSubmit</code> hands it over, once. An</p>
+<p>conversation; what <code>preToolUse</code> and <code>postToolUse</code> print is not sent. So</p>
+<p>two more hooks hold their answer for the next <code>userPromptSubmit</code>, which</p>
+<p>hands it over once: <code>preToolUse</code> runs <code>deja hook-tool --defer</code> for the line</p>
+<p>about a file <code>write</code>, <code>fs_write</code>, <code>fs_append</code> or <code>str_replace</code> edits, and</p>
+<p><code>postToolUse</code> runs <code>deja hook-tool-after --defer</code> for the fix pair of a</p>
+<p>failed <code>execute_bash</code>. Both arrive after the step they are about. An</p>
 <p>agent hook may name no session, so the working directory keys it. The hooks run in that agent only:</p>
 <p><code>kiro-cli chat --agent deja</code>, or <code>kiro-cli agent set-default deja</code>. The</p>
 <p>built-in <code>kiro_default</code> takes no hooks from a file (a <code>kiro_default.json</code> is</p>

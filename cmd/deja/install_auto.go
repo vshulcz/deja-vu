@@ -1197,7 +1197,12 @@ func installKimiAuto(exe string, uninstall bool) (installResult, error) {
 			// tool named Bash and the failure under `error` (0.28.1
 			// toHookInputData, notifyPostToolUse).
 			"\n" + kimiHookEntryMatching("PostToolUse", "Bash", hookRun(exe, "hook-tool-after", "--defer")) +
-			"\n" + kimiHookEntryMatching("PostToolUseFailure", "Bash", hookRun(exe, "hook-tool-after", "--defer"))
+			"\n" + kimiHookEntryMatching("PostToolUseFailure", "Bash", hookRun(exe, "hook-tool-after", "--defer")) +
+			// The line about a file before Kimi edits it: runPreToolUse
+			// keeps only a block's reason, so the line waits for the next
+			// prompt too, with the edit made by then. The matcher is a
+			// regex tested unanchored, hence the anchors.
+			"\n" + kimiHookEntryMatching("PreToolUse", "^(Edit|Write)$", hookRun(exe, "hook-tool", "--defer"))
 		if s != "" {
 			s += "\n\n"
 		}
