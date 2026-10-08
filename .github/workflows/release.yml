@@ -259,7 +259,7 @@ jobs:
           fi
           # A rerun of a release ClawHub already has would fail on the
           # duplicate and stop the skill step after it.
-          live="$(curl -fsS 'https://clawhub.ai/api/v1/packages/%40vshulcz%2Fopenclaw-deja' | jq -r '.latestVersion.version // empty' || true)"
+          live="$(curl -fsS 'https://clawhub.ai/api/v1/packages/%40vshulcz%2Fopenclaw-deja' | jq -r '.package.latestVersion // empty' || true)"
           if [ "$live" = "$version" ]; then
             echo "@vshulcz/openclaw-deja $version is already on ClawHub"
             exit 0
