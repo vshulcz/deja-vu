@@ -287,3 +287,67 @@ func TestTheParkingStepWaitsPastTheReadersWindow(t *testing.T) {
 		t.Errorf("the new index is not in place: %q %v", b, err)
 	}
 }
+
+// The manifest is renamed over while readers decode it, and Windows refuses
+// that rename for as long as one of them has the file open. The write gave up
+// on the first refusal: a recall beside a remember failed with "Access is
+// denied" on windows CI.
+func TestAManifestWriteWaitsOutAReader(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "manifest.gob")
+	if err := writeGobAtomic(p, manifestCore{Version: 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	onWindows(t)
+	swapClock(t)
+	var refusals atomic.Int32
+	refusals.Store(3)
+	real := renameFile
+	renameFile = func(from, to string) error {
+		if refusals.Add(-1) >= 0 {
+			return heldOpen(from, to)
+		}
+		return real(from, to)
+	}
+	t.Cleanup(func() { renameFile = real })
+
+	if err := writeGobAtomic(p, manifestCore{Version: 2}); err != nil {
+		t.Fatalf("the write gave up on a rename a reader was only holding: %v", err)
+	}
+	if refusals.Load() >= 0 {
+		t.Fatalf("the write never met the refusals: %d left", refusals.Load())
+	}
+	var got manifestCore
+	if err := readGob(p, &got); err != nil || got.Version != 2 {
+		t.Errorf("manifest = %+v, %v; want the new one in place", got, err)
+	}
+	if _, err := os.Stat(p + ".tmp"); err == nil {
+		t.Error("the temp file was left behind")
+	}
+}
+
+// The same on a real handle, which only Windows refuses: the reader closes
+// while the writer is waiting, and the write lands.
+func TestAManifestWriteLandsAfterARealReaderCloses(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "manifest.gob")
+	if err := writeGobAtomic(p, manifestCore{Version: 1}); err != nil {
+		t.Fatal(err)
+	}
+	r, err := os.Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- writeGobAtomic(p, manifestCore{Version: 2}) }()
+	time.Sleep(50 * time.Millisecond)
+	_ = r.Close()
+	if err := <-done; err != nil {
+		t.Fatalf("the write failed behind a reader that closed: %v", err)
+	}
+	var got manifestCore
+	if err := readGob(p, &got); err != nil || got.Version != 2 {
+		t.Errorf("manifest = %+v, %v; want the new one in place", got, err)
+	}
+}
