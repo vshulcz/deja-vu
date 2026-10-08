@@ -1681,8 +1681,9 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// One line, at most once a day, naming a command the reader may not have
 	// met (#4629). Only after an answer, only in a terminal and never for
 	// --json: a pipe, a script or a hook reads the results, not advice. On
-	// stderr, so the results themselves stay what they were.
-	if len(hits) > 0 && !o.JSON && briefWanted(os.Stdout) {
+	// stderr, so the results themselves stay what they were, and only when
+	// stderr is a terminal too: `2>file` is a log, not a reader.
+	if len(hits) > 0 && !o.JSON && briefWanted(os.Stdout) && briefWanted(os.Stderr) {
 		maybeTip(os.Stderr, dir+".tip", time.Now())
 	}
 	return nil

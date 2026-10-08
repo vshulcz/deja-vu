@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // One tip at most once a day, the next in rotation each time (#4629).
@@ -93,5 +95,8 @@ func TestSearchIntoAPipeShowsNoTip(t *testing.T) {
 	}
 	if strings.Contains(said, "tip:") || strings.Contains(out, "tip:") {
 		t.Errorf("a piped search showed a tip:\n%s\n%s", out, said)
+	}
+	if _, err := os.Stat(index.DefaultDir() + ".tip"); err == nil {
+		t.Error("a piped search left a tip stamp")
 	}
 }
