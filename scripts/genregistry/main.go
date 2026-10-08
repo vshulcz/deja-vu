@@ -1,7 +1,7 @@
 // Command genregistry renders the session-format registry into pages a search
 // engine can read.
 //
-// The registry documents where thirty-eight coding agents keep their history and
+// The registry documents where forty coding agents keep their history and
 // what is in those files. That is the one question people put to a search
 // engine in their own words — "where does Claude Code store conversations" —
 // and the answer sat in docs/registry as raw .md, which GitHub Pages serves as
@@ -161,7 +161,7 @@ func pageFor(id, display, h1 string) meta {
 	if id == "README" {
 		return meta{
 			Title:       "Where coding agents store their history — session format registry",
-			Description: "Where Claude Code, Codex, Cursor, opencode and thirty-four more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
+			Description: "Where Claude Code, Codex, Cursor, opencode and thirty-six more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.",
 			Heading:     h1,
 			Slug:        "README",
 		}

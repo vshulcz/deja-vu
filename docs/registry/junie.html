@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Junie stores its history — session format</title>
+<meta name="description" content="Where Junie writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/junie.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Junie stores its history — session format">
+<meta property="og:description" content="Where Junie writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/junie.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Junie stores its history — session format">
+<meta name="twitter:description" content="Where Junie writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Junie writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Junie","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/junie.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/junie.html","name":"Junie","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html" aria-current="page">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Junie</h1>
+<ul>
+<li><strong>ID</strong>: <code>junie</code></li>
+<li><strong>Store</strong>: <code>${JUNIE_HOME:-~/.junie}/sessions/&lt;session-id&gt;/events.jsonl</code> — one event log per session, listed in <code>sessions/index.jsonl</code></li>
+<li><strong>Read overrides</strong>: <code>DEJA_JUNIE_ROOT</code> replaces the sessions directory; <code>JUNIE_HOME</code> moves the whole store</li>
+<li><strong>Format</strong>: JSONL — one event per line, <code>{kind, timestampMs, …}</code></li>
+<li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: <code>cd &lt;projectDir&gt; &amp;&amp; junie --session-id &lt;id&gt; --resume</code>, the project from <code>sessions/index.jsonl</code></li>
+</ul>
+<p>Junie is JetBrains&#39; coding agent: the <code>junie</code> CLI, and the agent AI Assistant</p>
+<p>runs in the IDE. Both keep their sessions here. The home is <code>$JUNIE_HOME</code>, else</p>
+<p><code>.junie</code> under the JVM&#39;s <code>user.home</code> — not <code>$HOME</code>.</p>
+<p>A session directory holds <code>events.jsonl</code>, <code>state.json</code> (the agent&#39;s last</p>
+<p>state), <code>transcript.md</code> (a rendering of the same log) and one <code>task-*</code></p>
+<p>directory per task. <code>index.jsonl</code> has a line per session with its</p>
+<p><code>projectDir</code> and <code>taskName</code>.</p>
+<p>In the log, <code>UserPromptEvent</code> carries what the person typed (<code>prompt</code>,</p>
+<p><code>presentablePrompt</code>). The agent&#39;s work arrives as</p>
+<p><code>SessionA2uxEvent{event:{state, agentEvent:{kind, stepId, …}}}</code>, one block per</p>
+<p>step, updated in place:</p>
+<ul>
+<li><code>TerminalBlockUpdatedEvent</code> — <code>command</code>, <code>status</code> (<code>FAILED</code> on a non-zero</li>
+</ul>
+<p>exit), <code>exitCode</code>, <code>output</code>. Read as a command, <code>→ exit N</code> when it failed,</p>
+<p>and its output.</p>
+<ul>
+<li><code>ViewFilesBlockUpdatedEvent</code> — <code>files[].relativePath</code>, which holds an</li>
+</ul>
+<p>absolute path. Read as files.</p>
+<ul>
+<li><code>FileChangesBlockUpdatedEvent</code> — <code>changes[]</code> with <code>beforeContent.text</code>,</li>
+</ul>
+<p><code>afterContent.text</code> and the paths. Read as an edit of the changed lines and</p>
+<p>the written side.</p>
+<ul>
+<li><code>MarkdownBlockUpdatedEvent</code> and <code>ResultBlockUpdatedEvent</code> — the agent&#39;s</li>
+</ul>
+<p>text and the task&#39;s result.</p>
+<ul>
+<li><code>ContextCompactionBlockUpdatedEvent</code> — a compaction, written when the next</li>
+</ul>
+<p>task starts.</p>
+<p>Blocks are folded by <code>stepId</code>, the last update winning. A finished task</p>
+<p>replays all of its blocks with the event&#39;s state <code>COMPLETED</code>; those fold into</p>
+<p>the step they repeat. A headless run (<code>junie &#34;task&#34;</code>) writes no</p>
+<p><code>UserPromptEvent</code>: its task is read from the issue description in</p>
+<p><code>state.json</code>, with the <code>&lt;additional_context&gt;</code> hooks added in front of it cut.</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>Checked against a running install.</strong> Junie CLI 3110.7 against a stub</li>
+</ul>
+<p>endpoint, with a custom model profile and no account, in an isolated</p>
+<p><code>JUNIE_HOME</code>.</p>
+<ul>
+<li><strong>Wiring.</strong> <code>deja install junie</code> writes the server into</li>
+</ul>
+<p><code>$JUNIE_HOME/mcp/mcp.json</code> under <code>mcpServers</code>, and the <code>/deja</code> command into</p>
+<p><code>$JUNIE_HOME/commands/deja.md</code>. The skill goes in <code>~/.agents/skills</code>, which</p>
+<p>Junie reads beside its own <code>skills/</code>. Rules go in <code>$JUNIE_HOME/AGENTS.md</code>,</p>
+<p>which is in front of every task. A project&#39;s <code>.junie/</code> files are read only</p>
+<p>once the project is trusted.</p>
+<ul>
+<li><strong>Auto-recall.</strong> <code>deja install junie-auto</code> adds hooks to</li>
+</ul>
+<p><code>$JUNIE_HOME/config.json</code>, in Claude Code&#39;s schema. Junie puts a hook&#39;s</p>
+<p>stdout, plain or as <code>hookSpecificOutput.additionalContext</code>, in</p>
+<p><code>&lt;additional_context&gt;</code> before the prompt or the tool&#39;s result:</p>
+<ul>
+<li><code>UserPromptSubmit</code> runs <code>hook-context --once</code> (the digest, first prompt</li>
+</ul>
+<p>only) and <code>hook-prompt</code>. SessionStart&#39;s output is not delivered.</p>
+<ul>
+<li><code>PreToolUse</code> on <code>Bash|Read|Edit</code> runs <code>hook-tool</code>. It also fires for</li>
+</ul>
+<p>Junie&#39;s own tools, such as <code>submit</code>, so the matcher is narrow.</p>
+<ul>
+<li><code>SessionEnd</code> ends the live stamp.</li>
+<li><code>Stop</code> is not wired: any output there keeps the task from finishing.</li>
+</ul>
+<p>The payload&#39;s <code>cwd</code> is Junie&#39;s home, not the project; <code>--junie</code> takes the</p>
+<p>project from <code>project_path</code>.</p>
+<ul>
+<li><strong>No PostToolUse, no PreCompact.</strong> 3110.7&#39;s hook events are SessionStart,</li>
+</ul>
+<p>UserPromptSubmit, PreToolUse, PermissionRequest, Stop, StopFailure and</p>
+<p>SessionEnd. The <code>--junie</code> hooks read the rest from <code>events.jsonl</code>: when the</p>
+<p>newest command failed, its fix pair rides the next PreToolUse or prompt; a</p>
+<p>compaction is captured there too, and its packet delivered.</p>
+<ul>
+<li><strong>Status line.</strong> None to write to: the toolbar takes only built-in items</li>
+</ul>
+<p>(<code>ToolbarElement</code>).</p>
+<ul>
+<li><strong>Agent chats in the IDE.</strong> AI Assistant runs Junie over ACP and points its</li>
+</ul>
+<p>chat at the Junie session (<code>aia-task-history/&lt;chat&gt;.agentsession</code>); the</p>
+<p><code>jetbrains</code> reader leaves such a chat to this one.</p>
+
+<hr>
+<p>deja reads this format and thirty-nine others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

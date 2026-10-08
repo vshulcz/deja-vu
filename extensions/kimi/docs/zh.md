@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-[deja](https://github.com/vshulcz/deja-vu) 索引编程智能体本来就写在磁盘上的会话文件——Claude Code、Codex、Cursor、opencode 等其他三十七个智能体——并据此回答问题。这个插件把那个索引带进 Kimi Code：召回随提问一起到达，智能体也可以自己检索历史。
+[deja](https://github.com/vshulcz/deja-vu) 索引编程智能体本来就写在磁盘上的会话文件——Claude Code、Codex、Cursor、opencode 等其他三十九个智能体——并据此回答问题。这个插件把那个索引带进 Kimi Code：召回随提问一起到达，智能体也可以自己检索历史。
 
 ## 安装
 

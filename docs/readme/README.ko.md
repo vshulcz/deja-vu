@@ -194,7 +194,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Zed.
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Zed.
 
 각 도구가 MCP 회상, 자동 회상, skill, 명령, resume, handoff 중 무엇을 지원하는지는
 [영문 README의 기능 표](../../README.md#supported-harnesses)에 있습니다. 저장 위치를 바꿨다면 `DEJA_*_ROOT`

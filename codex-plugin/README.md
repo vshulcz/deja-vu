@@ -12,7 +12,7 @@ patch about what this machine already knows of it, and a capture as a compaction
 starts so what the summary drops is served back once.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-thirty-eight coding agents already write to disk, including sessions from before it
+forty coding agents already write to disk, including sessions from before it
 was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 

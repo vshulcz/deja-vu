@@ -2,7 +2,7 @@
 
 [English](../README.md) | 中文
 
-[deja](https://github.com/vshulcz/deja-vu) 索引编程智能体本来就写在磁盘上的会话文件——Claude Code、Codex、Cursor、opencode 等其他三十七个智能体——并据此回答问题。这个扩展把那个索引作为 context server 接到 Zed 的 agent 面板上，于是一个对话可以检索你先前做过什么，包括装 deja 之前的那些工作。
+[deja](https://github.com/vshulcz/deja-vu) 索引编程智能体本来就写在磁盘上的会话文件——Claude Code、Codex、Cursor、opencode 等其他三十九个智能体——并据此回答问题。这个扩展把那个索引作为 context server 接到 Zed 的 agent 面板上，于是一个对话可以检索你先前做过什么，包括装 deja 之前的那些工作。
 
 ## 智能体拿到什么
 

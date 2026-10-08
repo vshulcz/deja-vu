@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where JetBrains AI Assistant stores its history — session format</title>
+<meta name="description" content="Where JetBrains AI Assistant writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/jetbrains.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where JetBrains AI Assistant stores its history — session format">
+<meta property="og:description" content="Where JetBrains AI Assistant writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/jetbrains.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where JetBrains AI Assistant stores its history — session format">
+<meta name="twitter:description" content="Where JetBrains AI Assistant writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where JetBrains AI Assistant writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"JetBrains AI Assistant","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/jetbrains.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/jetbrains.html","name":"JetBrains AI Assistant","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html" aria-current="page">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>JetBrains AI Assistant</h1>
+<ul>
+<li><strong>ID</strong>: <code>jetbrains</code></li>
+<li><strong>Store</strong>: <code>&lt;config&gt;/&lt;Product&gt;&lt;version&gt;/workspace/&lt;projectWorkspaceId&gt;.xml</code>, the chats inside it, and <code>&lt;config&gt;/&lt;Product&gt;&lt;version&gt;/aia-task-history/&lt;chat uid&gt;.events</code> for agent chats</li>
+<li><strong>Config root</strong>: <code>~/Library/Application Support/JetBrains</code> on macOS, <code>%APPDATA%\JetBrains</code> on Windows, <code>${XDG_CONFIG_HOME:-~/.config}/JetBrains</code> elsewhere</li>
+<li><strong>Read overrides</strong>: <code>DEJA_JETBRAINS_ROOT</code> replaces the config root</li>
+<li><strong>Format</strong>: XML for chats; agent task logs are an <code>AUI_EVENTS_V1</code> line, then one base64 JSON record per line</li>
+<li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: none — a chat reopens from the IDE&#39;s own history</li>
+</ul>
+<p>AI Assistant is the chat inside IntelliJ IDEA, PyCharm, GoLand and the other</p>
+<p>JetBrains IDEs. Each product and version has its own config directory</p>
+<p>(<code>IntelliJIdea2026.2</code>, <code>PyCharm2026.1</code>, …), and deja reads all of them.</p>
+<p>A project&#39;s chats are the <code>ChatSessionStateTemp</code> component of its workspace</p>
+<p>file. The file is named after the project&#39;s workspace id, not its path</p>
+<p>(<code>ProjectStoreImpl</code> in intellij-community), and <code>options/recentProjects.xml</code></p>
+<p>maps it back: <code>&lt;entry key=&#34;$USER_HOME$/src/app&#34;&gt;</code> holds a</p>
+<p><code>RecentProjectMetaInfo</code> with that <code>projectWorkspaceId</code>. Most workspace files</p>
+<p>have no chat; the reader skips those on a byte search.</p>
+<p>A chat is a <code>SerializedChat</code>: <code>uid</code>, <code>chatModelId</code>, the title, a start time</p>
+<p>under <code>statisticInformation</code>, <code>modifiedAt</code>, and <code>messages</code> — each with</p>
+<p><code>author</code> (<code>Assistant</code>, or absent for the person), <code>displayContent</code> and</p>
+<p><code>internalContent</code>.</p>
+<p>An agent chat (<code>chatModelId</code> starting <code>agent_</code>) keeps only the prompts in the</p>
+<p>XML. Its work is in <code>aia-task-history/&lt;uid&gt;.events</code>: a</p>
+<p><code>ChatSessionUserPromptEvent</code> per prompt and a <code>ChatSessionMessageBlockEvent</code></p>
+<p>per block, the same blocks Junie&#39;s own log has (terminal, file views, file</p>
+<p>changes, markdown in <code>textChunk</code> pieces, result). They are read as commands,</p>
+<p>files, edits and text.</p>
+<p>When <code>&lt;uid&gt;.agentsession</code> names an agent whose own store deja reads —</p>
+<p><code>acp.registry.junie</code>, <code>claude-acp</code>, <code>codex-acp</code>, <code>github-copilot</code>, <code>cline</code>,</p>
+<p><code>kilo</code>, <code>opencode</code> — that store has the whole conversation, and the chat is</p>
+<p>left to it rather than read twice.</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>No per-message time.</strong> The XML stores the chat&#39;s start and last change,</li>
+</ul>
+<p>nothing per message, and the task log nothing per record. Messages take the</p>
+<p>start a millisecond apart, so two identical turns stay two.</p>
+<ul>
+<li><strong>Checked against</strong> chats and task logs from AI Assistant 2025.1 to 2026.2</li>
+</ul>
+<p>in public dotfiles, and the 262.10968.170 plugin&#39;s classes. No signed-in IDE</p>
+<p>ran on a stand.</p>
+<ul>
+<li><strong>Wiring.</strong> <code>deja install jetbrains</code> writes the server into</li>
+</ul>
+<p><code>~/.ai/mcp/mcp.json</code> under <code>mcpServers</code>, the global MCP file every JetBrains</p>
+<p>IDE&#39;s AI Assistant reads (<code>McpApplicationServerConfigurationService</code>).</p>
+<ul>
+<li><strong>No hooks.</strong> Nothing in the 262.10968.170 plugin runs a user hook, so</li>
+</ul>
+<p>recall reaches the chat as the MCP tool only: no digest, per-prompt, tool,</p>
+<p>failure, compaction or session-end surface.</p>
+<ul>
+<li><strong>Rules are per project.</strong> AI Assistant reads rules from a project&#39;s</li>
+</ul>
+<p><code>.aiassistant/rules/*.md</code> and custom instructions from a project setting;</p>
+<p>there is no user-level file for <code>deja rules</code> to write.</p>
+<ul>
+<li><strong>Junie in the IDE.</strong> The Junie agent AI Assistant runs keeps its sessions</li>
+</ul>
+<p>in Junie&#39;s own store, read as <code>junie</code>.</p>
+
+<hr>
+<p>deja reads this format and thirty-nine others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

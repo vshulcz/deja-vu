@@ -146,3 +146,5 @@ https://vshulcz.github.io/deja-vu/registry/reasonix.html
 https://vshulcz.github.io/deja-vu/registry/trae.html
 https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html
 https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html
+https://vshulcz.github.io/deja-vu/registry/jetbrains.html
+https://vshulcz.github.io/deja-vu/registry/junie.html

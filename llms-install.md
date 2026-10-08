@@ -26,7 +26,7 @@ Claude Code, etc.) add:
 
 If `deja` is not on PATH, use the npx form: `"command": "npx", "args": ["-y", "@vshulcz/deja-vu", "mcp"]`.
 
-deja reads the session files of thirty-eight coding agents and wires itself into
+deja reads the session files of forty coding agents and wires itself into
 most of them — Claude Code, Codex, Cursor, opencode, Gemini CLI, Cline, Roo
 Code, Kilo Code, Copilot CLI, aider, Goose, Qwen Code, Kimi Code, Antigravity,
 Grok Build, OpenClaw, pi, omp, DeepSeek Harness, Zed, Hermes and the rest that

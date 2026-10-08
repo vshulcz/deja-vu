@@ -51,7 +51,7 @@ deja install --auto
 ## Highlights
 
 - **Starts full.** Months of history from before you installed it are searchable on day one: `deja "connection pool exhausted"` over gigabytes.
-- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [thirty-eight agents](#supported-harnesses) read the same index.
+- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [forty agents](#supported-harnesses) read the same index.
 - **Nobody has to ask.** Recall arrives at session start, before a file is edited or a command runs, and after a command fails.
 - **Survives compaction.** Over 43 measured compactions the summary kept 77% of the decisions and 0.2% of the commands; deja hands back the rest ([how](docs/compaction.md)).
 - **Indexes the work, not just the talk.** The files each turn opened, the commands with their exit status, the exact spans an edit replaced.
@@ -142,7 +142,7 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale and ZCode each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, and Kiro the skill and a steering file, from their own install target.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale, ZCode and Junie each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build gets the shared skill in `~/.agents/skills`, which is what it reads; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, and Kiro the skill and a steering file, from their own install target.
 
 </details>
 
@@ -252,7 +252,7 @@ whether or not the tool is called.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
 
 <details>
 <summary>What each one supports</summary>
@@ -293,6 +293,8 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
 | CodeWhale | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| JetBrains AI Assistant | ✅ | ⚠ | ? | ⚠ | ✕ | paste | none |
 | CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
 | TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |

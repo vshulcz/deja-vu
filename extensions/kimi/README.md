@@ -4,7 +4,7 @@ English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/kimi/
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session files coding
 agents already write to disk — Claude Code, Codex, Cursor, opencode and
-thirty-four more — and answers from them. This plugin brings that index into
+thirty-six more — and answers from them. This plugin brings that index into
 Kimi Code: recall arrives with the prompt, and the agent can search history
 itself.
 

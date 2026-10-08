@@ -98,7 +98,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 三十八個編碼代理把每一次對話都寫進本機檔案，
+**在 Codex 裡解決，Claude 記得。** 四十個編碼代理把每一次對話都寫進本機檔案，
 deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
@@ -185,7 +185,7 @@ Grok Build · Hermes · Goose · Qwen Code · Kimi Code · pi · omp (Oh My Pi) 
 Copilot CLI · VS Code Copilot Chat · Amp · prime-agent (PrimeIntellect) · Roo Code ·
 Continue · Crush · DeepSeek Harness · Cherry Studio · Senpi · gajae-code · Kimchi Coding ·
 Command Code · ZCode · CodeWhale · Reasonix · Kiro · Kilo Code · CodeBuddy Code ·
-TRAE CLI · Muse Code · Zed。
+TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Zed。
 
 每個工具分別支援 MCP 召回、自動召回、skill、指令、resume 和 handoff 中的哪些，見
 [英文 README 的能力矩陣](../../README.md#supported-harnesses)。自訂儲存位置透過 `DEJA_*_ROOT`

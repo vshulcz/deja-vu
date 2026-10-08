@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where coding agents store their history — session format registry</title>
-<meta name="description" content="Where Claude Code, Codex, Cursor, opencode and thirty-four more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
+<meta name="description" content="Where Claude Code, Codex, Cursor, opencode and thirty-six more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/README.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Where coding agents store their history — session format registry">
-<meta property="og:description" content="Where Claude Code, Codex, Cursor, opencode and thirty-four more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
+<meta property="og:description" content="Where Claude Code, Codex, Cursor, opencode and thirty-six more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/README.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -22,19 +22,19 @@
 <meta name="color-scheme" content="dark light">
 <meta property="og:site_name" content="deja-vu">
 <meta name="twitter:title" content="Where coding agents store their history — session format registry">
-<meta name="twitter:description" content="Where Claude Code, Codex, Cursor, opencode and thirty-four more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
+<meta name="twitter:description" content="Where Claude Code, Codex, Cursor, opencode and thirty-six more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Claude Code, Codex, Cursor, opencode and thirty-four more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.","headline":"Session format registry","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/README.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Claude Code, Codex, Cursor, opencode and thirty-six more coding agents keep their conversation history on disk, what is inside those files, and how each format drifts.","headline":"Session format registry","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/README.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/README.html","name":"Session format registry","position":3}]}</script>
 </head>
 <body>
 <div class="glow"></div>
 <nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
 <div class="wrap"><div class="doc">
-<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html" aria-current="page">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html" aria-current="page">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
 <article>
 <h1>Session format registry</h1>
 <p>This registry records observed on-disk session formats for the harnesses that deja parses. Each entry describes store discovery, file layout, message records, role and timestamp handling, and known compatibility behavior. These are observations of upstream output, not specifications published by the harness vendors.</p>
@@ -70,6 +70,8 @@
 <tr><td><a href="commandcode.html">Command Code</a></td><td>session header + message envelopes, JSONL per session</td></tr>
 <tr><td><a href="zcode.html">ZCode</a></td><td>flat role/content JSONL per session, plus the CLI&#39;s OpenCode-schema SQLite</td></tr>
 <tr><td><a href="codewhale.html">CodeWhale</a></td><td>one JSON document per session, Anthropic-shaped content blocks</td></tr>
+<tr><td><a href="junie.html">Junie</a></td><td>one event-log JSONL per session directory, blocks folded by step</td></tr>
+<tr><td><a href="jetbrains.html">JetBrains AI Assistant</a></td><td>chats in each IDE&#39;s workspace XML, agent chats in base64 JSON task logs</td></tr>
 <tr><td><a href="codebuddy.html">CodeBuddy Code</a></td><td>Claude Code&#39;s project tree, OpenAI Responses-style items per line</td></tr>
 <tr><td><a href="reasonix.html">Reasonix</a></td><td>flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory</td></tr>
 <tr><td><a href="trae.html">TRAE CLI</a></td><td>Codex rollouts under <code>~/.trae/cli</code>, user turns from events only, tool calls in <code>history_mutation</code></td></tr>
@@ -94,7 +96,7 @@
 <p>SQLite fixture sources are stored as SQL so changes remain reviewable. The conformance test materializes them in a temporary directory before parsing.</p>
 
 <hr>
-<p>deja reads this format and thirty-seven others, and turns what it finds into memory your
+<p>deja reads this format and thirty-nine others, and turns what it finds into memory your
 agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
 wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
 history.</p>

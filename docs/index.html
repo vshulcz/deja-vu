@@ -6,14 +6,14 @@
 <script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
 <title>deja-vu — the one memory your coding agents share</title>
 <meta name="theme-color" content="#0b0f10">
-<meta name="description" content="The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 36 more agents, built from the sessions already on your disk.">
+<meta name="description" content="The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 38 more agents, built from the sessions already on your disk.">
 <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
 <link rel="alternate" type="application/atom+xml" title="deja-vu docs" href="https://vshulcz.github.io/deja-vu/feed.xml">
 <meta property="og:type" content="website">
 <meta property="og:title" content="deja-vu — the one memory your coding agents share">
-<meta property="og:description" content="Most accurate (97.2% R@5 on LongMemEval-S), half the tokens of agentmemory, 17.6 s to index 19,195 sessions. One memory for 38 coding agents, from the history already on disk.">
+<meta property="og:description" content="Most accurate (97.2% R@5 on LongMemEval-S), half the tokens of agentmemory, 17.6 s to index 19,195 sessions. One memory for 40 coding agents, from the history already on disk.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -316,7 +316,7 @@ footer a:hover{color:var(--ph-hi)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      38 of your coding agents already wrote to disk — months of history from before you
+      40 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
     <div class="cmdline">
       <span class="p">$</span>
@@ -412,7 +412,7 @@ footer a:hover{color:var(--ph-hi)}
 </section>
 
 <section class="reveal" id="harnesses">
-  <h2>Works with <span class="fig">38</span></h2>
+  <h2>Works with <span class="fig">40</span></h2>
   <div class="split">
     <div><p class="big" style="margin:0">Solve it in Codex. <em>Claude remembers.</em></p></div>
     <div class="right"><div class="agents" style="margin:0">
@@ -423,7 +423,7 @@ footer a:hover{color:var(--ph-hi)}
     <span>omp</span><span>DeepSeek Harness</span><span>Hermes</span><span>Zed</span>
     <span>Amp</span><span>Continue</span><span>Copilot Chat</span><span>prime-agent</span>
     <span>Crush</span><span>Senpi</span><span>Kimchi Coding</span><span>Command Code</span><span>ZCode</span><span>gajae-code</span><span>CodeWhale</span><span>Reasonix</span>
-    <span>CodeBuddy Code</span><span>TRAE CLI</span><span>Muse Code</span>
+    <span>CodeBuddy Code</span><span>TRAE CLI</span><span>Muse Code</span><span>Junie</span><span>JetBrains AI Assistant</span>
     <span class="more">one memory, all of them</span>
   </div></div>
   </div>
@@ -671,7 +671,7 @@ document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
   }
   var COMMANDS={
     'help':'<p class="none">this input is a tiny deja: type words to search 16 demo sessions.\ncommands: <span class="t">sources</span> · <span class="t">stats</span> · <span class="t">version</span> · <span class="t">clear</span>\nthe real CLI does far more — see <a href="guide/commands.html">cli reference</a></p>',
-    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse\n38 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
+    'sources':'<p class="none">claude&nbsp;&nbsp;codex&nbsp;&nbsp;opencode&nbsp;&nbsp;cursor&nbsp;&nbsp;gemini&nbsp;&nbsp;aider&nbsp;&nbsp;antigravity&nbsp;&nbsp;grok&nbsp;&nbsp;qwen&nbsp;&nbsp;kimi&nbsp;&nbsp;cline&nbsp;&nbsp;roo&nbsp;&nbsp;kilocode&nbsp;&nbsp;cherrystudio&nbsp;&nbsp;kiro&nbsp;&nbsp;pi&nbsp;&nbsp;omp&nbsp;&nbsp;openclaw&nbsp;&nbsp;goose&nbsp;&nbsp;copilot&nbsp;&nbsp;copilot-chat&nbsp;&nbsp;deepseek&nbsp;&nbsp;crush&nbsp;&nbsp;zed&nbsp;&nbsp;hermes&nbsp;&nbsp;prime&nbsp;&nbsp;amp&nbsp;&nbsp;continue&nbsp;&nbsp;senpi&nbsp;&nbsp;kimchi&nbsp;&nbsp;commandcode&nbsp;&nbsp;zcode&nbsp;&nbsp;gjc&nbsp;&nbsp;codewhale&nbsp;&nbsp;reasonix&nbsp;&nbsp;codebuddy&nbsp;&nbsp;trae&nbsp;&nbsp;muse&nbsp;&nbsp;junie&nbsp;&nbsp;jetbrains\n40 harnesses, one index — real paths in the <a href="guide/harnesses.html">harness table</a></p>',
     'stats':'<p class="none">sessions 16 · messages 412 · top project api-gateway\nlast 12 months&nbsp;&nbsp;▁▁▂▃▂▅▆▄▇█▆▇\n(demo numbers — <span class="t">deja stats</span> wraps your real year)</p>',
     'version':'<p class="none">deja 0.21.7</p>',
     'clear':''

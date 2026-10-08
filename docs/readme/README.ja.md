@@ -15,7 +15,7 @@ deja はそれを数か月前の分まで丸ごとインデックス化し、
 
 <p align="center"><sub><em>誰も検索していません——エージェントが自分で deja を呼び出しました。実際のモデルと実際のツール呼び出しによる2回の本物の実行で、対象は合成コーパスです。誰の履歴も公開していません。</em></sub></p>
 
-<p align="center"><b>deja は最初から満杯の状態で始まります。38 のエージェントがすでに書き残した履歴を、インデックス作成中から検索でき、モデルもキャプチャ手順も不要です。</b></p>
+<p align="center"><b>deja は最初から満杯の状態で始まります。40 のエージェントがすでに書き残した履歴を、インデックス作成中から検索でき、モデルもキャプチャ手順も不要です。</b></p>
 
 <p align="center">しかも、誰かが頼む必要もありません。リコールはセッション開始時、プロンプトごと、
 ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
@@ -114,13 +114,13 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 <details>
 <summary>各エージェント自身のガイダンスファイルに書き込まれる内容</summary>
 
-インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、Zed は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build には、それが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。Kilo Code、gajae-code、Command Code、Cherry Studio、Reasonix にはスキルが、Kiro にはステアリングファイルが、それぞれ専用のインストールターゲットから書き込まれます。
+インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、Zed、Junie は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build には、それが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。Kilo Code、gajae-code、Command Code、Cherry Studio、Reasonix にはスキルが、Kiro にはステアリングファイルが、それぞれ専用のインストールターゲットから書き込まれます。
 
 </details>
 
 ## できること
 
-**Codex で解決して、Claude が覚えている。** 38 のコーディングエージェントはすべての会話を
+**Codex で解決して、Claude が覚えている。** 40 のコーディングエージェントはすべての会話を
 ローカルファイルに書き出しています。deja はそれらのファイルを、全エージェントが読めるひとつの記憶レイヤーに変えます。
 
 | | |
@@ -281,7 +281,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
 
 <details>
 <summary>各ハーネスの対応状況</summary>
@@ -321,6 +321,8 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | CLI ストア用の sqlite3 |
 | Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | roo CLI（エディターのタスクはエディターで再開） |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | 貼り付け | sqlite3 + zstd |
+| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | 実行 | なし |
+| JetBrains AI Assistant | ✅ | ⚠ | ? | ⚠ | ✕ | 貼り付け | なし |
 | CodeWhale | — | — | ? | ? | ✅ | 貼り付け | なし |
 | CodeBuddy Code | ✅ | ✅ | — | — | — | 貼り付け | なし |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | 1.x セッション用の zstd |

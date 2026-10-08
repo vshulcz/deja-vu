@@ -14,7 +14,7 @@ wiring `deja install --auto` writes, packaged the way those harnesses install
 things.
 
 [deja](https://github.com/vshulcz/deja-vu) indexes the session transcripts
-thirty-eight coding agents already write to disk, including sessions from before it
+forty coding agents already write to disk, including sessions from before it
 was installed, and answers from them locally: BM25 over the transcripts, no
 model and no embeddings, credentials redacted as the index is built.
 

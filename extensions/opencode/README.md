@@ -3,7 +3,7 @@
 English | [中文](https://github.com/vshulcz/deja-vu/blob/main/extensions/opencode/docs/zh.md)
 
 opencode remembers its own sessions. This plugin answers the other question:
-what you did in the thirty-seven other coding agents on this machine — Claude Code,
+what you did in the thirty-nine other coding agents on this machine — Claude Code,
 Codex, Cursor, Gemini and Zed among them — including the months before you
 installed anything.
 

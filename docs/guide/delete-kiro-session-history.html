@@ -161,7 +161,7 @@
 <p>The sessions are the record of what was tried and what worked. A CLI session you remove can no longer be reopened with <code>kiro-cli chat --resume-id</code>. There is no archive: a removed session is gone, not moved.</p>
 
 <h2>Keeping it searchable instead</h2>
-<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other thirty-seven agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
+<p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other thirty-nine agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Kiro session about the migration"</pre>
 <p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>
