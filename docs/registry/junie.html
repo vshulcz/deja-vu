@@ -93,7 +93,9 @@
 <ul>
 <li><strong>Wiring.</strong> <code>deja install junie</code> writes the server into</li>
 </ul>
-<p><code>$JUNIE_HOME/mcp/mcp.json</code> under <code>mcpServers</code>, and the <code>/deja</code> command into</p>
+<p><code>$JUNIE_HOME/mcp/mcp.json</code> under <code>mcpServers</code>. Junie asks the model which</p>
+<p>capabilities a prompt needs before the task runs, and offers the tool as</p>
+<p><code>mcp_deja_deja</code> only when that pass picks it. The <code>/deja</code> command goes into</p>
 <p><code>$JUNIE_HOME/commands/deja.md</code>. The skill goes in <code>~/.agents/skills</code>, which</p>
 <p>Junie reads beside its own <code>skills/</code>. Rules go in <code>$JUNIE_HOME/AGENTS.md</code>,</p>
 <p>which is in front of every task. A project&#39;s <code>.junie/</code> files are read only</p>
