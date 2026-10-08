@@ -39,6 +39,13 @@
     <summary>Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.</summary>
   </entry>
   <entry>
+    <title>Where VS Code Copilot Chat stores its history — session format</title>
+    <id>https://vshulcz.github.io/deja-vu/registry/copilot-chat.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot-chat.html"></link>
+    <updated>2026-10-08T00:00:00Z</updated>
+    <summary>Where VS Code Copilot Chat writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
+  </entry>
+  <entry>
     <title>What compaction drops, and how to get it back — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/after-compaction.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/after-compaction.html"></link>
@@ -205,13 +212,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/continue.html"></link>
     <updated>2026-10-07T00:00:00Z</updated>
     <summary>Where Continue writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
-  </entry>
-  <entry>
-    <title>Where VS Code Copilot Chat stores its history — session format</title>
-    <id>https://vshulcz.github.io/deja-vu/registry/copilot-chat.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/registry/copilot-chat.html"></link>
-    <updated>2026-10-07T00:00:00Z</updated>
-    <summary>Where VS Code Copilot Chat writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.</summary>
   </entry>
   <entry>
     <title>Where Copilot CLI stores its history — session format</title>

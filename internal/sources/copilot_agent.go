@@ -66,8 +66,10 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 	id := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	s := model.Session{Harness: "copilot-chat", ID: id, Path: path}
 	var (
-		files []string
-		seen  = map[string]bool{}
+		files     []string
+		seen      = map[string]bool{}
+		held      = map[string][]model.Message{}
+		heldOrder []string
 	)
 	addPath := func(p string) {
 		if p == "" || seen[p] || !IndexToolPaths() {
@@ -150,13 +152,46 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 			}
 		case "tool.execution_start":
 			var d struct {
-				ToolName  string         `json:"toolName"`
-				Arguments map[string]any `json:"arguments"`
+				ToolCallID string         `json:"toolCallId"`
+				ToolName   string         `json:"toolName"`
+				Arguments  map[string]any `json:"arguments"`
 			}
 			if json.Unmarshal(e.Data, &d) == nil {
 				copilotAgentToolArgs(&s, d.ToolName, d.Arguments, at, addPath)
+				// An edit is held until the call says how it ended: a
+				// refused one changed nothing.
+				c := copilotChatCallChange(d.ToolName, d.Arguments)
+				for _, f := range c.files {
+					addPath(f)
+				}
+				if recs := copilotChatChangeRecords(c, at); len(recs) > 0 {
+					if d.ToolCallID == "" {
+						s.Messages = append(s.Messages, recs...)
+					} else {
+						held[d.ToolCallID] = recs
+						heldOrder = append(heldOrder, d.ToolCallID)
+					}
+				}
+			}
+		case "tool.execution_complete":
+			var d struct {
+				ToolCallID string `json:"toolCallId"`
+				Success    bool   `json:"success"`
+			}
+			if json.Unmarshal(e.Data, &d) == nil {
+				if recs, ok := held[d.ToolCallID]; ok {
+					if d.Success {
+						s.Messages = append(s.Messages, recs...)
+					}
+					delete(held, d.ToolCallID)
+				}
 			}
 		}
+	}
+	// A call still running when the file was read: what it was asked to do is
+	// all there is, and it is kept the way an unanswered Claude call is.
+	for _, id := range heldOrder {
+		s.Messages = append(s.Messages, held[id]...)
 	}
 	if len(s.Messages) == 0 {
 		return nil, nil
