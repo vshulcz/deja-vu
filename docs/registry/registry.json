@@ -568,8 +568,8 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "partial", "proof": "fixture", "note": "grok drops SessionStart output (#4588, 1.0.41), so the digest is parked and rides the session's first PreToolUse or PostToolUse"},
-        "prompt": {"status": "partial", "proof": "fixture", "note": "grok discards UserPromptSubmit additionalContext (#4588, 1.0.41), so the recall is parked and rides the turn's first PreToolUse or PostToolUse; a turn with no tool call gets none"},
+        "digest": {"status": "partial", "proof": "stand", "note": "grok drops SessionStart output (#4588, 1.0.41), so the digest is parked and rides the session's first PreToolUse or PostToolUse, as a system-reminder after the tool result (1.0.41 stand)"},
+        "prompt": {"status": "partial", "proof": "stand", "note": "grok discards UserPromptSubmit additionalContext (#4588, 1.0.41), so the recall is parked and rides the turn's first PreToolUse or PostToolUse (1.0.41 stand); a turn with no tool call, or whose call fails to parse, gets none"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
@@ -649,7 +649,7 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "rides the first prompt: Kimi ignores SessionStart output (0.28.1)"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "runPreToolUse keeps only block.reason (0.28.1), so the line for an Edit or Write is parked and arrives with the next UserPromptSubmit, after the edit"},
+        "pre_tool": {"status": "partial", "proof": "stand", "note": "runPreToolUse keeps only block.reason (0.28.1), so the line for an Edit or Write is parked and arrives with the next UserPromptSubmit, after the edit (0.28.1 stand)"},
         "failure": {"status": "partial", "proof": "fixture", "note": "PostToolUse is fire and forget, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step"},
         "compaction_reset": {"status": "yes", "proof": "fixture"},
         "compaction_capture": {"status": "yes", "proof": "fixture"},
@@ -1454,8 +1454,8 @@
       "surfaces": {
         "digest": {"status": "yes", "proof": "stand", "note": "rides the first message_submit of a session; session_start stdout is discarded"},
         "prompt": {"status": "yes", "proof": "stand"},
-        "pre_tool": {"status": "partial", "proof": "stand", "note": "tool_call_before additionalContext reaches the model only on a tool that ran (0.10.0 stand); for a call that failed to run, tool_call_after parks the line for the next tool_call_before or message_submit (fixture, 0.10.1 source)"},
-        "failure": {"status": "partial", "proof": "fixture", "note": "tool_call_after stdout is discarded (tool_routing.rs, 0.10.1), so it parks the fix pair from the shell receipt and the pair rides the next tool_call_before or message_submit"},
+        "pre_tool": {"status": "partial", "proof": "stand", "note": "tool_call_before additionalContext reaches the model only on a tool that ran; a call that failed to run goes back as Error: without it, so tool_call_after parks the line and it rides the next message_submit (0.10.1 stand)"},
+        "failure": {"status": "partial", "proof": "stand", "note": "tool_call_after stdout is discarded and it fires after the turn's next tool_call_before, so the fix pair is parked and rides the next message_submit (0.10.1 stand)"},
         "compaction_reset": {"status": "yes", "proof": "stand", "note": "no compaction hook; the history saved as artifacts/context-transfer-<id>.json beside its .md summary is caught up on the next message or tool call (0.10.0 stand)"},
         "compaction_capture": {"status": "yes", "proof": "stand"},
         "compaction_packet": {"status": "yes", "proof": "stand", "note": "rides the next message_submit or tool_call_before"},
