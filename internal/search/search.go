@@ -225,6 +225,9 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		// word the session had on the subject.
 		at   int
 		when time.Time
+		// dump is tool output that is a JSON document or a listing: it holds
+		// the query's words as entries, not as anything said about them.
+		dump bool
 	}
 	snipCands := make([]snipCand, 0, 16)
 	df := make([]int, len(qtoks))
@@ -330,7 +333,8 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 				// first three showed wherever a word happened to appear early
 				// rather than the passage that carries the answer.
 				w := tokenWindow(windowText, windowToks)
-				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time})
+				snipCands = append(snipCands, snipCand{text: text, weight: c, window: w, at: mi, when: m.Time,
+					dump: m.Role == roleToolOutput && isDataDump(text)})
 				if w > 0 && (doc.minWindow == 0 || w < doc.minWindow) {
 					doc.minWindow = w
 				}
@@ -361,8 +365,15 @@ func runScored(ss []model.Session, o Options) ([]Hit, error) {
 		// excerpt this way; the exact tier ranked on the raw count alone. Count
 		// still decides between passages that are equally tight, and among equals
 		// the order they were said in stands. Top three shown.
+		//
+		// A JSON or listing dump in tool output is quoted only when nothing
+		// else matched: its words meet tightly because it holds every word,
+		// and it took the excerpts of a session that was 4 MB of them (#4780).
 		sort.SliceStable(snipCands, func(i, j int) bool {
 			a, b := snipCands[i], snipCands[j]
+			if a.dump != b.dump {
+				return !a.dump
+			}
 			if (a.window > 0) != (b.window > 0) {
 				return a.window > 0
 			}
@@ -2910,6 +2921,7 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			distinct int
 			weighted float64
 			center   string
+			dump     bool
 		}
 		best := make([]msgScore, 0, 8)
 		for mi, m := range s.Messages {
@@ -2946,14 +2958,23 @@ func RelevanceHitsWeighted(ss []model.Session, terms []string, idf map[string]fl
 			}
 			if distinct > 0 {
 				hit.Count++
-				best = append(best, msgScore{mi, distinct, weighted, center})
+				best = append(best, msgScore{mi, distinct, weighted, center,
+					m.Role == roleToolOutput && isDataDump(m.Text)})
 			}
 		}
 		for _, b := range best {
 			hit.matched = append(hit.matched, b.idx)
 		}
-		// Heaviest first; a stable sort keeps message order among ties.
-		sort.SliceStable(best, func(i, j int) bool { return best[i].weighted > best[j].weighted })
+		// Heaviest first; a stable sort keeps message order among ties. A
+		// JSON or listing dump in tool output goes last whatever it weighs:
+		// it holds every word as an entry, and a session of them was quoted
+		// as `},\n {\n "type": "tool"` (#4780).
+		sort.SliceStable(best, func(i, j int) bool {
+			if best[i].dump != best[j].dump {
+				return !best[i].dump
+			}
+			return best[i].weighted > best[j].weighted
+		})
 		for i := 0; i < len(best) && i < 2; i++ {
 			if sn := snippet(s.Messages[best[i].idx].Text, best[i].center, nil); sn != "" {
 				hit.Snippets = append(hit.Snippets, sn)

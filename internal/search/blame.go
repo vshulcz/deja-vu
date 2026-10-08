@@ -740,6 +740,10 @@ func BlameLifecycleLine(h BlameHit) string {
 // handful; `git status` on a busy tree, `find` and an index dump name dozens.
 const dumpListingPaths = 10
 
+// rowPrefix is how far into a line a JSON record may start and still make the
+// line a row of data: room for a timestamp and a separator.
+const rowPrefix = 40
+
 // dumpMinBytes is the least tool output that can be a dump.
 const dumpMinBytes = 200
 
@@ -758,11 +762,22 @@ func isDataDump(text string) bool {
 	// The document can follow a line or two of its own: deja prints "deja:
 	// updated 2 files" to stderr ahead of its --json, and the harness keeps
 	// both. JSON from there on that is most of the output is the dump.
+	//
+	// rows and rowBytes count lines that open a JSON record within a short
+	// prefix, as `sqlite3` prints "2026-05-24 20:02|{"type": …}" — values long
+	// enough that the key count below does not see them as data (#4780).
+	rows, rowBytes := 0, 0
 	for off := 0; off < len(t); {
 		line := t[off:]
 		// Or after a one-word label on its line: a web search hands back
 		// "Links: [{"title": …".
-		if i := strings.Index(line, ": "); i > 0 && i <= 24 && !strings.ContainsAny(line[:i], " \t\n") {
+		// Only the label's width is searched: the whole rest of the text made
+		// this quadratic in the number of lines.
+		head := line
+		if len(head) > 26 {
+			head = head[:26]
+		}
+		if i := strings.Index(head, ": "); i > 0 && i <= 24 && !strings.ContainsAny(line[:i], " \t\n") {
 			if startsJSON(line[i+2:]) && (len(line)-i-2)*2 >= len(t) {
 				return true
 			}
@@ -770,11 +785,22 @@ func isDataDump(text string) bool {
 		if startsJSON(line) && len(line)*2 >= len(t) {
 			return true
 		}
-		nl := strings.IndexByte(t[off:], '\n')
+		nl := strings.IndexByte(line, '\n')
+		end := nl
+		if end < 0 {
+			end = len(line)
+		}
+		if prefix := line[:min(end, rowPrefix)]; strings.Contains(prefix, `{"`) {
+			rows++
+			rowBytes += end
+		}
 		if nl < 0 {
 			break
 		}
 		off += nl + 1
+	}
+	if rows >= 3 && rowBytes*2 >= len(t) {
+		return true
 	}
 	// Or rows that each carry a JSON record, as a database query prints
 	// them: a key every 40 bytes is data, where prose quoting a small
