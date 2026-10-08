@@ -78,6 +78,7 @@ func deferText(dir, key, hook, text string) {
 	if key == "" || text == "" {
 		return
 	}
+	sweepDeferred(dir)
 	d := filepath.Join(deferredRoot(dir), key)
 	if err := os.MkdirAll(d, 0o700); err != nil {
 		return
@@ -99,6 +100,22 @@ func deferText(dir, key, hook, text string) {
 		return
 	}
 	_ = os.Rename(tmp, filepath.Join(d, name))
+}
+
+// sweepDeferred drops what waited past deferredTTL for a session that never
+// came back, or a CodeWhale call whose tool_call_after never fired: takeDeferred
+// would skip it anyway, and nothing else would ever remove it.
+func sweepDeferred(dir string) {
+	root := deferredRoot(dir)
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if fi, err := e.Info(); err == nil && time.Since(fi.ModTime()) > deferredTTL {
+			_ = os.RemoveAll(filepath.Join(root, e.Name()))
+		}
+	}
 }
 
 // hasDeferred is the cheap check every hook pays: one stat of a directory that

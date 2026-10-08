@@ -147,15 +147,18 @@
 <p>This is not the DeepSeek Harness deja reads as <code>deepseek</code>: that one keeps zstd-framed JSONL under <code>~/.dsh</code> and has <a href="memory-for-dsh.html">its own page</a>.</p>
 
 <h2>Adding recall</h2>
-<p>Nothing to install yet, and this page says so rather than printing a command that writes nothing. CodeWhale reads an MCP server map and a hook block out of its own config, and has a plugin marketplace besides; deja wires none of it in this release. Its hook events are documented — <code>tool_call_before</code>, <code>tool_call_after</code>, <code>session_busy</code>, <code>session_idle</code>, <code>turn_end</code>, <code>subagent_spawn</code> — and a session-start channel is what an <code>-auto</code> target needs, which is the work left.</p>
-<p>What works today is the reading half, and it needs no configuration:</p>
-<pre>deja index
-deja last 5
-deja search "wasm bundle"</pre>
-<p>Any agent on this machine that <i>does</i> have the MCP server wired — Claude Code, Codex, Cursor, opencode and the rest — answers questions about your CodeWhale sessions, because it is one index rather than one per tool.</p>
+<pre>deja install codewhale-auto</pre>
+<p>That writes the MCP server into <code>~/.codewhale/mcp.json</code>, adds its tool to <code>tools.always_load</code> (CodeWhale starts a server only when a tool of it is named there), puts deja's hooks in <code>config.toml</code> and the <code>deja-history</code> skill under <code>~/.agents/skills</code>. Your own entries in those files stay as they are, and <code>deja uninstall codewhale-auto</code> takes out only deja's.</p>
 
 <h2>What arrives</h2>
-<p>Nothing on its own here: you ask. <code>deja last</code> is the session list, <code>deja search</code> the transcript search, <code>deja show</code> prints one in full, and <code>deja resume</code> prints the way back into a session for the client that wrote it. <a href="find-a-session.html">Finding a session</a> is the longer version.</p>
+<ul>
+<li>The MCP server, with the <code>deja</code> tool and the modes it serves everywhere.</li>
+<li>A digest of where you left off in the repo, with the session's first message: CodeWhale drops what <code>session_start</code> prints, so <code>message_submit</code> carries it.</li>
+<li>Recall for each message, and before an edit the file's history, on <code>tool_call_before</code>. For a call that failed to run, the line waits for the next tool call or message.</li>
+<li>After a failed command, the fix that worked last time. <code>tool_call_after</code> output never reaches the model, so the pair rides the next tool call or message.</li>
+<li>After a compaction, the state of the work, on the next message or tool call.</li>
+</ul>
+<p>CodeWhale's footer takes only its built-in items, so there is no deja status line here.</p>
 
 <h2>The part that is not about CodeWhale</h2>
 <p>The index covers every agent's transcripts on the machine — forty of them, each in its own format — so a fix found in Claude Code answers a question asked in CodeWhale, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

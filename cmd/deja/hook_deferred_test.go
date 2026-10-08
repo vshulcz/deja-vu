@@ -240,3 +240,25 @@ func TestDeferredExpires(t *testing.T) {
 		t.Errorf("a stale answer was delivered: %q", got)
 	}
 }
+
+func TestAStaleSessionIsSweptByTheNextDefer(t *testing.T) {
+	dir := t.TempDir()
+	gone := deferredKey("gone", "")
+	deferText(dir, gone, "hook-tool", "line for a session that never came back")
+	old := time.Now().Add(-deferredTTL - time.Minute)
+	p := filepath.Join(deferredRoot(dir), gone)
+	files, _ := filepath.Glob(filepath.Join(p, "*"))
+	for _, f := range append(files, p) {
+		if err := os.Chtimes(f, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+	live := deferredKey("live", "")
+	deferText(dir, live, "hook-tool", "fresh line")
+	if hasDeferredFor(dir, gone) {
+		t.Error("a session past the TTL kept its directory")
+	}
+	if !hasDeferredFor(dir, live) {
+		t.Error("the fresh session lost its line")
+	}
+}
