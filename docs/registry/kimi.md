@@ -39,7 +39,10 @@ Media is out of scope.
   entries, `PostToolUse` and `PostToolUseFailure` on `Bash`, run
   `deja hook-tool-after --defer`: Kimi does not wait for them and drops what
   they print, so the fix pair for a failed command is held and handed over
-  once, on the session's next prompt.
+  once, on the session's next prompt. A `PreToolUse` entry on `^(Edit|Write)$`
+  runs `deja hook-tool --defer` the same way: Kimi waits for it but keeps only
+  a block's reason (`runPreToolUse`), so the line about the edited file comes
+  with the next prompt, after the edit.
 - **Resume**: `kimi --session <sessionId>`, run in the `workDir` from the
   session's `state.json`: Kimi refuses a session from any other directory
   (verified live on 0.28.1). A `workDir` that is gone is refused with a

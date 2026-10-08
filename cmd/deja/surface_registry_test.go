@@ -157,6 +157,9 @@ func wiredSurfaces(t *testing.T, harness string) map[string]bool {
 		// No compaction event: hook-codewhale catches one up from the history
 		// CodeWhale saves before it compacts.
 		got["compaction_reset"] = tokens["hook-codewhale"]
+		// tool_call_after parks the fix pair for the next tool_call_before
+		// or message_submit.
+		got["failure"] = strings.Contains(all, "hook-codewhale tool_call_after")
 	case "junie":
 		// No PostToolUse and no PreCompact: the --junie prompt and tool hooks
 		// read a failed command and a compaction out of events.jsonl

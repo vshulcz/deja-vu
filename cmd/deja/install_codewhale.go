@@ -153,10 +153,10 @@ const codewhaleHookMarker = "# deja: auto-recall (managed by `deja install codew
 
 // codewhaleHookEvents are the events deja answers. message_submit carries the
 // digest and the prompt's recall, tool_call_before the line about a file or a
-// command, and session_end ends the session's live stamp. CodeWhale has no
-// compaction event, and the fix for a failed command would have to go out on
-// tool_call_after, whose stdout it discards.
-var codewhaleHookEvents = []string{"message_submit", "tool_call_before", "session_end"}
+// command, and session_end ends the session's live stamp. tool_call_after's
+// stdout is discarded, so it parks a failed command's fix pair for the next of
+// the first two. CodeWhale has no compaction event.
+var codewhaleHookEvents = []string{"message_submit", "tool_call_before", "tool_call_after", "session_end"}
 
 func installCodeWhaleAuto(exe string, uninstall bool) (installResult, error) {
 	base, err := installCodeWhale(exe, uninstall)

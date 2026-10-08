@@ -80,7 +80,7 @@
 <p><code>runtime.session.route_facts</code>, else <code>workspace_root</code> in</p>
 <p><code>session.workspace_branch.observed</code>; the title is the latest</p>
 <p><code>session.name.changed</code> <code>new_name</code>.</p>
-<p><strong>Last verified:</strong> 2026-10-05</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 <h2 id="sources">Sources</h2>
 <p>The shapes are not from Meta&#39;s documentation. They come from readers built</p>
 <p>against real sessions: AstroQore/agent-session-kit&#39;s <code>MuseSessionAdapter</code></p>
@@ -107,7 +107,8 @@
 <p>developer message. <code>edit_file</code> and <code>write_file</code> name the file under</p>
 <p><code>tool_input.path</code>.</p>
 <p>Muse reads user skills from <code>~/.agents/skills</code>, so install writes the</p>
-<p>deja-history skill there. Slash commands come only from plugins.</p>
+<p>deja-history skill there. Muse lists a user skill in its slash menu, so the</p>
+<p>skill is the command: <code>/deja-history &lt;query&gt;</code> loads it with the query (1.4.3).</p>
 <p><code>deja resume &lt;id&gt;</code> prints <code>muse resume &lt;id&gt;</code> in the session&#39;s</p>
 <p><code>workspace_root</code>: Muse finds the session from anywhere but takes the directory</p>
 <p>it runs in as the workspace (#4710). A subagent is not resumable on its own</p>

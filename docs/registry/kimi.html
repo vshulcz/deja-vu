@@ -79,7 +79,10 @@
 <p>entries, <code>PostToolUse</code> and <code>PostToolUseFailure</code> on <code>Bash</code>, run</p>
 <p><code>deja hook-tool-after --defer</code>: Kimi does not wait for them and drops what</p>
 <p>they print, so the fix pair for a failed command is held and handed over</p>
-<p>once, on the session&#39;s next prompt.</p>
+<p>once, on the session&#39;s next prompt. A <code>PreToolUse</code> entry on <code>^(Edit|Write)$</code></p>
+<p>runs <code>deja hook-tool --defer</code> the same way: Kimi waits for it but keeps only</p>
+<p>a block&#39;s reason (<code>runPreToolUse</code>), so the line about the edited file comes</p>
+<p>with the next prompt, after the edit.</p>
 <ul>
 <li><strong>Resume</strong>: <code>kimi --session &lt;sessionId&gt;</code>, run in the <code>workDir</code> from the</li>
 </ul>

@@ -40,9 +40,9 @@ import (
 // the fix pair there too (#4499). So has PreToolUse: on 1.0.41 its context
 // reaches the model as a system reminder after the tool's result, which is
 // where the file line arrives. Session start and the prompt have not: on
-// 1.0.41 they still drop additionalContext, so hook-context and hook-prompt
-// answer nothing under grok rather than a receipt for memory that never
-// arrived (#4588, grokDropsContext).
+// 1.0.41 they still drop additionalContext, so under grok hook-context and
+// hook-prompt park their answer for the next tool hook, which does reach the
+// model (#4588, grokDropsContext, hook_deferred.go).
 func grokHooksPath() string {
 	return filepath.Join(sources.GrokHome(), "hooks", "deja.json")
 }

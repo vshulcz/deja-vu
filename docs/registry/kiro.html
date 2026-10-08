@@ -59,7 +59,7 @@
 <p><code>history</code> holds the turns: a <code>Prompt</code> or <code>ToolUseResults</code> user side, a</p>
 <p><code>ToolUse</code> or <code>Response</code> assistant side. `kiro-cli chat --resume-id</p>
 <p>&lt;conversation_id&gt;` reopens a row.</p>
-<p><strong>Last verified:</strong> 2026-10-07</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li>Resume: <code>cd &lt;cwd&gt; &amp;&amp; kiro-cli chat --resume-id &lt;sessionId&gt;</code>, which needs</li>
@@ -146,6 +146,11 @@
 <p>On kiro-cli 2.28 a skill there is listed in <code>disclose_context</code> in both</p>
 <p>engines (#4802).</p>
 <ul>
+<li>Command: <code>~/.kiro/prompts/deja.md</code>, a global prompt. V3 lists it in slash</li>
+</ul>
+<p>completion as <code>/deja</code>; V2 takes <code>@deja</code> or <code>/prompts get deja</code>. The file has</p>
+<p>no frontmatter, since a prompt is sent as written.</p>
+<ul>
 <li>Global hooks: <code>deja install kiro-auto</code> writes <code>~/.kiro/hooks/deja.json</code></li>
 </ul>
 <p>(<code>{&#34;version&#34;:&#34;v1&#34;,&#34;hooks&#34;:[…]}</code>): SessionStart runs <code>hook-context --plain</code>,</p>
@@ -163,10 +168,12 @@
 <p>with two hooks: <code>agentSpawn</code> runs <code>deja hook-context --plain</code> and</p>
 <p><code>userPromptSubmit</code> runs <code>deja hook-prompt --plain</code>. kiro-cli adds what those</p>
 <p>print to the model&#39;s context, the agentSpawn output for the whole</p>
-<p>conversation; what <code>preToolUse</code> and <code>postToolUse</code> print is not sent, so</p>
-<p>there is no pre-edit line. A third hook, <code>postToolUse</code> running</p>
-<p><code>deja hook-tool-after --defer</code>, holds the fix pair for a failed</p>
-<p><code>execute_bash</code> and the next <code>userPromptSubmit</code> hands it over, once. An</p>
+<p>conversation; what <code>preToolUse</code> and <code>postToolUse</code> print is not sent. So</p>
+<p>two more hooks hold their answer for the next <code>userPromptSubmit</code>, which</p>
+<p>hands it over once: <code>preToolUse</code> runs <code>deja hook-tool --defer</code> for the line</p>
+<p>about a file <code>write</code>, <code>fs_write</code>, <code>fs_append</code> or <code>str_replace</code> edits, and</p>
+<p><code>postToolUse</code> runs <code>deja hook-tool-after --defer</code> for the fix pair of a</p>
+<p>failed <code>execute_bash</code>. Both arrive after the step they are about. An</p>
 <p>agent hook may name no session, so the working directory keys it. The hooks run in that agent only:</p>
 <p><code>kiro-cli chat --agent deja</code>, or <code>kiro-cli agent set-default deja</code>. The</p>
 <p>built-in <code>kiro_default</code> takes no hooks from a file (a <code>kiro_default.json</code> is</p>

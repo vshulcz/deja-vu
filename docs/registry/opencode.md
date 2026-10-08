@@ -83,7 +83,7 @@ listed in `tui.json` (1.x finds TUI plugins only there), and the line shows in
 the sidebar, the prompt row and the home screen. On 2.x it is
 `plugins/deja-status/tui.tsx`, which 2.x finds on its own, in the prompt and
 home footers. A `tui.jsonc` is not edited; install says what to add. Rendered
-live on 1.18.34 and 2.0.24.
+live on 1.18.34, 2.0.24 and 2.0.25; on 2.x the muted colour is `theme.text.muted`.
 
 ## Known quirks and drift
 
@@ -93,4 +93,4 @@ live on 1.18.34 and 2.0.24.
 - A missing database must not be passed to SQLite because the CLI would create it.
 - The committed conformance fixture is SQL rather than a binary database; the test creates a temporary SQLite file.
 
-**Last verified:** 2026-09-30
+**Last verified:** 2026-10-08

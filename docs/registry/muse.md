@@ -46,7 +46,7 @@ person typed. The workspace is `workspace_root` in the
 `session.workspace_branch.observed`; the title is the latest
 `session.name.changed` `new_name`.
 
-**Last verified:** 2026-10-05
+**Last verified:** 2026-10-08
 
 ## Sources
 
@@ -83,7 +83,8 @@ developer message. `edit_file` and `write_file` name the file under
 `tool_input.path`.
 
 Muse reads user skills from `~/.agents/skills`, so install writes the
-deja-history skill there. Slash commands come only from plugins.
+deja-history skill there. Muse lists a user skill in its slash menu, so the
+skill is the command: `/deja-history <query>` loads it with the query (1.4.3).
 
 `deja resume <id>` prints `muse resume <id>` in the session's
 `workspace_root`: Muse finds the session from anywhere but takes the directory

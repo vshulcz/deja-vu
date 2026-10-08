@@ -849,6 +849,16 @@
       "path": "<tmp>/home/.junie/commands/deja.md"
     },
     {
+      "name": "kiro",
+      "state": "missing",
+      "path": "<tmp>/home/.kiro/prompts/deja.md"
+    },
+    {
+      "name": "codewhale",
+      "state": "missing",
+      "path": "<tmp>/home/.codewhale/commands/deja.md"
+    },
+    {
       "name": "copilot-chat",
       "state": "missing",
       "path": "<tmp>/home/.config/Code/User/prompts/deja.prompt.md"
@@ -905,6 +915,16 @@
     },
     {
       "name": "qwen",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "trae",
+      "state": "missing",
+      "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
+    },
+    {
+      "name": "muse",
       "state": "missing",
       "path": "<tmp>/home/.agents/skills/deja-history/SKILL.md"
     },

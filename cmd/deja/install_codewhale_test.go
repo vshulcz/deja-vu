@@ -23,6 +23,10 @@ func TestInstallCodeWhaleWritesTheServerAndLoadsItsTool(t *testing.T) {
 	if _, err := captureRun(t, "install", "codewhale-auto", "--no-index"); err != nil {
 		t.Fatal(err)
 	}
+	// The test binary is deja.test, which is deja's only by the wiring record,
+	// and the record is cached per process: read before this install wrote it,
+	// the cache failed the check whenever an earlier test had filled it.
+	forgetWrittenExes()
 	var mcp struct {
 		Servers map[string]map[string]any `json:"servers"`
 	}
