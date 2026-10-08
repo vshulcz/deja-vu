@@ -78,8 +78,9 @@
 <p>user-turn rule, the <code>item_completed</code> dialect and <code>history_mutation</code> are read</p>
 <p>from botmux&#39;s TRAE reader (<code>src/services/traex-transcript.ts</code> and its tests);</p>
 <p>the store layout and the resume command from agentsview&#39;s TraeX provider</p>
-<p>(<code>internal/parser/traex.go</code>, <code>types.go</code>, <code>server/resume.go</code>). Nothing here</p>
-<p>has been checked against a rollout TRAE wrote on this machine.</p>
+<p>(<code>internal/parser/traex.go</code>, <code>types.go</code>, <code>server/resume.go</code>). A 0.208.1-alpha.5</p>
+<p>rollout written on a stand reads back with its prompts, replies, tool output</p>
+<p>and compactions (below).</p>
 <ul>
 <li><strong>An append that splits a pair is read whole.</strong> When the new bytes hold the</li>
 </ul>
@@ -107,11 +108,47 @@
 </ul>
 <p><code>~/.agents/skills</code>, and its system prompt (0.207.1) has the model run a skill</p>
 <p>when the user types <code>/&lt;skill-name&gt;</code>, so <code>/deja-history &lt;query&gt;</code> is deja&#39;s</p>
-<p>command. It has no custom-prompt directory of its own.</p>
+<p>command. 0.208.1-alpha.5 does not wait for the model: it sends the query as</p>
+<p>the user turn with the skill&#39;s <code>SKILL.md</code> beside it under</p>
+<p><code>&lt;skill&gt;&lt;command-name&gt;/deja-history&lt;/command-name&gt;</code>. It has no</p>
+<p>custom-prompt directory of its own.</p>
 <ul>
 <li><strong><code>~/.trae/hooks.json</code> is the IDE&#39;s, not the CLI&#39;s.</strong> TRAE CLI 1.x read it;</li>
 </ul>
 <p>2.0 reads <code>cli/hooks.json</code> and says the old file is no longer read.</p>
+<ul>
+<li><strong>A compaction&#39;s edit count is not measured.</strong> The rollout is read through</li>
+</ul>
+<p>TRAE&#39;s parser, which gives no byte offsets, so <code>deja log</code> notes the packet as</p>
+<p>stored with the edits after it not counted.</p>
+<h2 id="measured-on-a-live-install">Measured on a live install</h2>
+<p>TRAE CLI 0.208.1-alpha.5 (public alpha) in a hermetic HOME, with</p>
+<p><code>model_providers</code> pointed at a stub Responses server, no login. The 0.207.1</p>
+<p>enterprise build stops every model path at &#34;Trae enterprise authentication</p>
+<p>required. Run <code>traecli login</code> before using TraeCode CLI.&#34; After</p>
+<p><code>deja install trae-auto</code> and trusting the hooks in the TUI:</p>
+<ul>
+<li><code>/deja-history retry loop</code> sent the <code>deja-history</code> skill body and the query.</li>
+<li>A failing <code>Bash</code> call: the <code>PostToolUseFailure</code> fix pair was in the next</li>
+</ul>
+<p>request, as a developer message right after the call.</p>
+<ul>
+<li><code>/compact</code>: <code>PreCompact</code> stored the packet and the next turn&#39;s</li>
+</ul>
+<p><code>SessionStart</code> carried it.</p>
+<ul>
+<li><code>deja handoff --to trae --exec</code> opened the TUI with the packet as the first</li>
+</ul>
+<p>prompt.</p>
+<ul>
+<li>MCP: a code-mode <code>exec</code> script calling deja&#39;s server tool asked for</li>
+</ul>
+<p>approval and returned deja&#39;s recall. In <code>traecli exec</code> the same call fails</p>
+<p>with <code>MCP tool call requires approval, but approval policy is never</code>.</p>
+<ul>
+<li>The status line showed <code>deja · …</code>; <code>/quit</code> ran <code>SessionEnd</code>; a rule from</li>
+</ul>
+<p><code>deja rules sync</code> reached the request through <code>~/.trae/AGENTS.md</code>.</p>
 
 <hr>
 <p>deja reads this format and thirty-nine others, and turns what it finds into memory your

@@ -92,8 +92,10 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   On kiro-cli 2.28 a skill there is listed in `disclose_context` in both
   engines (#4802).
 - Command: `~/.kiro/prompts/deja.md`, a global prompt. V3 lists it in slash
-  completion as `/deja`; V2 takes `@deja` or `/prompts get deja`. The file has
-  no frontmatter, since a prompt is sent as written.
+  completion as `/deja`; V2 takes `@deja` or `/prompts get deja`. The 2.22.0
+  TUI lists it as `/deja` ("Prompt from global") and sends the file as the user
+  message with the arguments in it. The file has no frontmatter, since a
+  prompt is sent as written.
 - Global hooks: `deja install kiro-auto` writes `~/.kiro/hooks/deja.json`
   (`{"version":"v1","hooks":[…]}`): SessionStart runs `hook-context --plain`,
   UserPromptSubmit `hook-prompt --plain`, SessionEnd `hook-session-end`. The
@@ -113,7 +115,7 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
   hands it over once: `preToolUse` runs `deja hook-tool --defer` for the line
   about a file `write`, `fs_write`, `fs_append` or `str_replace` edits, and
   `postToolUse` runs `deja hook-tool-after --defer` for the fix pair of a
-  failed `execute_bash`. Both arrive after the step they are about. An
+  failed `shell` or `execute_bash`. Both arrive after the step they are about. An
   agent hook may name no session, so the working directory keys it. The hooks run in that agent only:
   `kiro-cli chat --agent deja`, or `kiro-cli agent set-default deja`. The
   built-in `kiro_default` takes no hooks from a file (a `kiro_default.json` is
@@ -132,6 +134,15 @@ kiro session in that directory and its answer. A probe agent with all five
 hooks echoing a marker showed the agentSpawn and userPromptSubmit markers in
 the request and the preToolUse and postToolUse ones nowhere.
 
+The 2.22.0 TUI (`kiro-cli chat --agent deja`, same mock, request bodies read
+from its trace log): a `write` to a file two earlier sessions decided about
+parked the pre-edit line, and the next prompt's request carried it in the
+hook context ahead of the user message. A failed `shell` call did the same
+with its fix pair. `/deja retry loop` sent `deja.md` as the user message with
+the query in its command. A rule from `deja rules sync` reached the request
+through `~/.kiro/steering/deja-rules.md`. `/quit` ran no SessionEnd: the V2
+agent has none.
+
 `kiro-cli` 2.22.0 (homebrew cask), in a hermetic HOME:
 
 - `deja install kiro` writes `~/.kiro/settings/mcp.json` and
@@ -141,5 +152,5 @@ the request and the preToolUse and postToolUse ones nowhere.
   `deja resume` prints for a CLI session. `-r`, `--resume-picker` are beside it.
 - What could not be checked: `kiro-cli mcp list` refuses before a login
   (`You are not logged in, please log in with kiro-cli login`), so whether the
-  server appears in its own list, and whether the steering file is loaded, rests
-  on Kiro's documentation rather than on a screen seen here.
+  server appears in its own list rests on Kiro's documentation rather than on a
+  screen seen here. The steering file is loaded: its text is in the request.

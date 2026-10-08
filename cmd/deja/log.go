@@ -145,6 +145,12 @@ func compactionFailureNote(e usage.Event) string {
 	if e.CompactionError == "" {
 		return ""
 	}
+	// These two stored the packet; only the edit count after it is not
+	// measured. On TRAE CLI every /compact read "stored nothing" while the
+	// packet reached the next turn.
+	if e.Kind == usage.KindCompactionCapture && (e.CompactionError == "incomplete_transcript" || e.CompactionError == "no_offsets") {
+		return "  (stored; edits after it not counted: " + compactionErrorWords(e.CompactionError) + ")"
+	}
 	return "  (stored nothing: " + compactionErrorWords(e.CompactionError) + ")"
 }
 
@@ -157,6 +163,8 @@ func compactionErrorWords(token string) string {
 		return "the host named a transcript deja could not read"
 	case "incomplete_transcript":
 		return "the transcript ended mid-turn"
+	case "no_offsets":
+		return "this host's store is read whole, with no byte offsets to count from"
 	case "transcript_rewritten":
 		return "the transcript was rewritten while deja read it"
 	case "boundary_unavailable":

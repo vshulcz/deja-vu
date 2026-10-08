@@ -230,6 +230,9 @@ func captureCompactionFrom(dir string, input precompactHookInput, read func(work
 		capture := usage.CompactionCapture{Key: compactionUsageKey(saved), ToolCalls: len(transcript.ToolCalls)}
 		if !transcript.MetricComplete {
 			capture.Error = "incomplete_transcript"
+			if !transcript.HasOffsets() {
+				capture.Error = "no_offsets"
+			}
 		}
 		usage.RecordCompactionCapture(dir, capture)
 	}

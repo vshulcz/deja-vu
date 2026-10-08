@@ -9,6 +9,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // encodeLikeClaude names a project folder the way Claude Code, Qwen Code and
@@ -113,6 +114,29 @@ func TestTraeRolloutCompactionIsReadByTheTraeReader(t *testing.T) {
 	wantCompactionPacket(t, out)
 	if state, _, _ := index.Compaction(dir, id, workspace); state.Harness != "trae" {
 		t.Errorf("the capture is filed under %q, want trae", state.Harness)
+	}
+	// The packet was stored, so the log must not say it stored nothing: on a
+	// TRAE CLI 0.208.1-alpha.5 stand every /compact read "(stored nothing: the
+	// transcript ended mid-turn)" while the packet reached the next turn.
+	journal, err := os.ReadFile(usage.Path(dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capture *usage.Event
+	for _, line := range strings.Split(strings.TrimSpace(string(journal)), "\n") {
+		var e usage.Event
+		if json.Unmarshal([]byte(line), &e) == nil && e.Kind == usage.KindCompactionCapture {
+			capture = &e
+		}
+	}
+	if capture == nil {
+		t.Fatalf("no compaction_capture event in the journal:\n%s", journal)
+	}
+	if capture.CompactionError != "no_offsets" {
+		t.Errorf("compaction_error = %q, want no_offsets for a store read through its parser", capture.CompactionError)
+	}
+	if note := compactionFailureNote(*capture); strings.Contains(note, "stored nothing") || !strings.Contains(note, "stored;") {
+		t.Errorf("the log row for a stored packet reads %q", note)
 	}
 }
 

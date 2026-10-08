@@ -1273,17 +1273,17 @@
       "surfaces": {
         "digest": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
         "prompt": {"status": "partial", "proof": "stand", "note": "~/.kiro/hooks fire in the IDE and kiro-cli --v3; the default V2 engine runs them only inside the deja agent"},
-        "pre_tool": {"status": "partial", "proof": "fixture", "note": "preToolUse stdout never reaches the model (acp-server.js L5478 sendStdout:false, CLI 2.28.0), so the deja agent parks the line and it arrives with the next userPromptSubmit, after the edit"},
-        "failure": {"status": "partial", "proof": "fixture", "note": "PostToolUse output is dropped at call time, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step"},
+        "pre_tool": {"status": "partial", "proof": "stand", "note": "preToolUse stdout never reaches the model (acp-server.js L5478 sendStdout:false, CLI 2.28.0), so the deja agent parks the line and it arrives with the next userPromptSubmit, after the edit (2.22.0 TUI stand)"},
+        "failure": {"status": "partial", "proof": "stand", "note": "PostToolUse output is dropped at call time, so the line is parked and arrives with the next UserPromptSubmit, not right after the failed step (2.22.0 TUI stand)"},
         "compaction_reset": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "compaction_capture": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "compaction_packet": {"status": "no", "proof": "blocked", "note": "Kiro's hook triggers have no compaction event (acp-server.js L5478 trigger list, CLI 2.28.0)"},
         "mcp": {"status": "yes", "proof": "fixture"},
         "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
         "session_end": {"status": "partial", "proof": "stand", "note": "V3 SessionEnd fires on leaving the TUI, not in --no-interactive, and V2 has none (CLI 2.28.0)"},
-        "rules": {"status": "yes", "proof": "fixture"},
+        "rules": {"status": "yes", "proof": "stand"},
         "statusline": {"status": "no", "proof": "blocked", "note": "Kiro has no status line, footer or toast a third party can write to"},
-        "reader": {"status": "yes", "proof": "fixture"}
+        "reader": {"status": "yes", "proof": "stand"}
       }
     },
     {
@@ -1687,16 +1687,16 @@
         "digest": {"status": "yes", "proof": "stand"},
         "prompt": {"status": "yes", "proof": "stand"},
         "pre_tool": {"status": "yes", "proof": "stand"},
-        "failure": {"status": "yes", "proof": "fixture"},
-        "compaction_reset": {"status": "yes", "proof": "fixture"},
-        "compaction_capture": {"status": "yes", "proof": "fixture"},
-        "compaction_packet": {"status": "yes", "proof": "fixture"},
-        "mcp": {"status": "yes", "proof": "fixture"},
-        "handoff": {"status": "yes", "proof": "fixture", "note": "deja handoff --exec opens it with the packet as the first prompt"},
-        "session_end": {"status": "yes", "proof": "fixture"},
-        "rules": {"status": "yes", "proof": "fixture"},
-        "statusline": {"status": "yes", "proof": "fixture", "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; 0.207.1 and 0.208.1-alpha.5 load it, and the TUI runs nothing before an enterprise login"},
-        "reader": {"status": "yes", "proof": "fixture"}
+        "failure": {"status": "yes", "proof": "stand"},
+        "compaction_reset": {"status": "yes", "proof": "stand"},
+        "compaction_capture": {"status": "yes", "proof": "stand"},
+        "compaction_packet": {"status": "yes", "proof": "stand"},
+        "mcp": {"status": "yes", "proof": "stand", "note": "the model reaches MCP tools only from a code-mode exec script, and each call asks for approval"},
+        "handoff": {"status": "yes", "proof": "stand", "note": "deja handoff --exec opens it with the packet as the first prompt"},
+        "session_end": {"status": "yes", "proof": "stand"},
+        "rules": {"status": "yes", "proof": "stand"},
+        "statusline": {"status": "yes", "proof": "stand", "note": "the trae-auto target writes [tui.statusline] type = command in traecli.toml; the 0.208.1-alpha.5 TUI shows it, and the 0.207.1 enterprise build runs nothing before a login"},
+        "reader": {"status": "yes", "proof": "stand"}
       }
     },
     {

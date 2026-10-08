@@ -78,6 +78,11 @@ type CompactionTranscript struct {
 	tail           []byte
 }
 
+// HasOffsets reports whether the transcript was read from the file's bytes,
+// so the edit count after a compaction can be measured against it. A store
+// read through its parser has none, and its MetricComplete is always false.
+func (t CompactionTranscript) HasOffsets() bool { return t.tail != nil }
+
 // ReadCompactionTranscript captures a regular Claude or Codex JSONL transcript
 // without consulting the index. nativeSessionID is mandatory: recovering a
 // nearby file with a guessed identity could put another conversation into an

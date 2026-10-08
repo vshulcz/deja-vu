@@ -148,8 +148,10 @@
 <ul>
 <li>Command: <code>~/.kiro/prompts/deja.md</code>, a global prompt. V3 lists it in slash</li>
 </ul>
-<p>completion as <code>/deja</code>; V2 takes <code>@deja</code> or <code>/prompts get deja</code>. The file has</p>
-<p>no frontmatter, since a prompt is sent as written.</p>
+<p>completion as <code>/deja</code>; V2 takes <code>@deja</code> or <code>/prompts get deja</code>. The 2.22.0</p>
+<p>TUI lists it as <code>/deja</code> (&#34;Prompt from global&#34;) and sends the file as the user</p>
+<p>message with the arguments in it. The file has no frontmatter, since a</p>
+<p>prompt is sent as written.</p>
 <ul>
 <li>Global hooks: <code>deja install kiro-auto</code> writes <code>~/.kiro/hooks/deja.json</code></li>
 </ul>
@@ -173,7 +175,7 @@
 <p>hands it over once: <code>preToolUse</code> runs <code>deja hook-tool --defer</code> for the line</p>
 <p>about a file <code>write</code>, <code>fs_write</code>, <code>fs_append</code> or <code>str_replace</code> edits, and</p>
 <p><code>postToolUse</code> runs <code>deja hook-tool-after --defer</code> for the fix pair of a</p>
-<p>failed <code>execute_bash</code>. Both arrive after the step they are about. An</p>
+<p>failed <code>shell</code> or <code>execute_bash</code>. Both arrive after the step they are about. An</p>
 <p>agent hook may name no session, so the working directory keys it. The hooks run in that agent only:</p>
 <p><code>kiro-cli chat --agent deja</code>, or <code>kiro-cli agent set-default deja</code>. The</p>
 <p>built-in <code>kiro_default</code> takes no hooks from a file (a <code>kiro_default.json</code> is</p>
@@ -189,6 +191,14 @@
 <p>kiro session in that directory and its answer. A probe agent with all five</p>
 <p>hooks echoing a marker showed the agentSpawn and userPromptSubmit markers in</p>
 <p>the request and the preToolUse and postToolUse ones nowhere.</p>
+<p>The 2.22.0 TUI (<code>kiro-cli chat --agent deja</code>, same mock, request bodies read</p>
+<p>from its trace log): a <code>write</code> to a file two earlier sessions decided about</p>
+<p>parked the pre-edit line, and the next prompt&#39;s request carried it in the</p>
+<p>hook context ahead of the user message. A failed <code>shell</code> call did the same</p>
+<p>with its fix pair. <code>/deja retry loop</code> sent <code>deja.md</code> as the user message with</p>
+<p>the query in its command. A rule from <code>deja rules sync</code> reached the request</p>
+<p>through <code>~/.kiro/steering/deja-rules.md</code>. <code>/quit</code> ran no SessionEnd: the V2</p>
+<p>agent has none.</p>
 <p><code>kiro-cli</code> 2.22.0 (homebrew cask), in a hermetic HOME:</p>
 <ul>
 <li><code>deja install kiro</code> writes <code>~/.kiro/settings/mcp.json</code> and</li>
@@ -203,8 +213,8 @@
 <li>What could not be checked: <code>kiro-cli mcp list</code> refuses before a login</li>
 </ul>
 <p>(<code>You are not logged in, please log in with kiro-cli login</code>), so whether the</p>
-<p>server appears in its own list, and whether the steering file is loaded, rests</p>
-<p>on Kiro&#39;s documentation rather than on a screen seen here.</p>
+<p>server appears in its own list rests on Kiro&#39;s documentation rather than on a</p>
+<p>screen seen here. The steering file is loaded: its text is in the request.</p>
 
 <hr>
 <p>deja reads this format and thirty-nine others, and turns what it finds into memory your
