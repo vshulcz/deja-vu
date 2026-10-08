@@ -288,17 +288,17 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
-| Kiro | ✅ | ✅ | ✅ | ? | ✅ | ✅ | sqlite3 for the CLI database |
+| Kiro | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI database |
 | Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 for the CLI store |
 | Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | paste | roo CLI (editor tasks reopen in the editor) |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | paste | sqlite3 + zstd |
-| CodeWhale | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
-| JetBrains AI Assistant | ✅ | ⚠ | ? | ⚠ | ✕ | paste | none |
+| JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | paste | none |
 | CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
-| TRAE CLI | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
-| Muse Code | ✅ | ✅ | ✅ | ? | ✅ | ✅ | none |
+| TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
+| Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 
 ✅ works &middot; — possible, not built yet &middot; ✕ the harness has no such mechanism &middot; ⚠ waiting on the harness itself &middot; ? not investigated
 

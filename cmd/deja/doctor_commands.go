@@ -88,7 +88,7 @@ func doctorCommandFiles() []doctorCommandFile {
 	// The shared table, in the order `deja install --all` walks it.
 	for _, name := range []string{
 		"opencode", "cursor", "roo", "kilocode", "crush",
-		"omp", "gjc", "commandcode", "codebuddy", "workbuddy", "zcode", "junie",
+		"omp", "gjc", "commandcode", "codebuddy", "workbuddy", "zcode", "junie", "kiro", "codewhale",
 	} {
 		if p := commandFilePath(name); p != "" {
 			out = append(out, doctorCommandFile{name: name, path: p})
@@ -148,14 +148,17 @@ func commandSkillPath(harness string) string {
 // Kimi invokes /skill:<name>; Copilot invokes /<skill-name>. Grok Build lists
 // skills with user-invocable frontmatter and an argument hint for its
 // slash-command autocomplete. Zed lists skills under `/` and invokes them by
-// their frontmatter name. Gemini is measured by its own complaint: with a
+// their frontmatter name. TRAE CLI 0.207.1's own system prompt says "When the
+// user types /<skill-name>, invoke it via Skill". Muse 1.4.3 lists the skill
+// in its slash menu as /deja-history and loads it with the arguments (stand).
+// Gemini is measured by its own complaint: with a
 // command file of deja's present it renamed one of the two (#3665).
 //
 // One list, read by the report and by the capability test, so neither can
 // drift from the other.
 func skillIsTheCommandHarnesses() []string {
 	return []string{"antigravity", "codex", "copilot", "gemini", "grok",
-		"kimi", "openclaw", "qwen", "zed"}
+		"kimi", "openclaw", "qwen", "trae", "muse", "zed"}
 }
 
 func skillIsTheCommand(harness string) bool {

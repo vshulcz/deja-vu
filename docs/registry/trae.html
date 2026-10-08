@@ -70,7 +70,7 @@
 <p>is a block list whose text blocks are joined; <code>apply_patch</code> is the Codex patch</p>
 <p>format. A call seen both there and as a <code>response_item</code> is read once, by</p>
 <p><code>call_id</code>. A <code>replace</code> re-sends history the file already holds and is skipped.</p>
-<p><strong>Last verified:</strong> 2026-10-05</p>
+<p><strong>Last verified:</strong> 2026-10-08</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
 <li><strong>The shapes come from other readers, not from a running install.</strong> The</li>
@@ -102,6 +102,12 @@
 <p><code>deja install trae-ide-auto</code> adds Claude-shaped hooks to <code>~/.trae/hooks.json</code>. The IDE ships</p>
 <p>with hooks off and keeps that switch in its own settings store, so deja cannot</p>
 <p>tell whether they run: turn them on in Settings &gt; Hooks and run them locally.</p>
+<ul>
+<li><strong>The skill is the command.</strong> TRAE CLI reads the deja-history skill from</li>
+</ul>
+<p><code>~/.agents/skills</code>, and its system prompt (0.207.1) has the model run a skill</p>
+<p>when the user types <code>/&lt;skill-name&gt;</code>, so <code>/deja-history &lt;query&gt;</code> is deja&#39;s</p>
+<p>command. It has no custom-prompt directory of its own.</p>
 <ul>
 <li><strong><code>~/.trae/hooks.json</code> is the IDE&#39;s, not the CLI&#39;s.</strong> TRAE CLI 1.x read it;</li>
 </ul>

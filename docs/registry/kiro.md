@@ -23,7 +23,7 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
 `ToolUse` or `Response` assistant side. `kiro-cli chat --resume-id
 <conversation_id>` reopens a row.
 
-**Last verified:** 2026-10-07
+**Last verified:** 2026-10-08
 
 ## Known quirks and drift
 
@@ -91,6 +91,9 @@ row of `conversations_v2` keyed by the directory it ran in, and the row's JSON
 - Skill: `deja install kiro` also writes `~/.kiro/skills/deja-history/SKILL.md`.
   On kiro-cli 2.28 a skill there is listed in `disclose_context` in both
   engines (#4802).
+- Command: `~/.kiro/prompts/deja.md`, a global prompt. V3 lists it in slash
+  completion as `/deja`; V2 takes `@deja` or `/prompts get deja`. The file has
+  no frontmatter, since a prompt is sent as written.
 - Global hooks: `deja install kiro-auto` writes `~/.kiro/hooks/deja.json`
   (`{"version":"v1","hooks":[…]}`): SessionStart runs `hook-context --plain`,
   UserPromptSubmit `hook-prompt --plain`, SessionEnd `hook-session-end`. The
