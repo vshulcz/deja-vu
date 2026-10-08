@@ -14,9 +14,9 @@ import (
 // plugins.entries.<id>.hooks.allowConversationAccess set to true, and without
 // it the gateway logs `typed hook "before_prompt_build" blocked` and drops the
 // handler (registerTypedHook in src/plugins/loader, 2026.9.8). That is the
-// digest and the per-prompt recall, and with it the packet after a
-// compaction. The tool middleware, before_compaction and session_end are not
-// behind it.
+// per-prompt recall, and with it the packet after a compaction. The digest
+// rides the plugin's agent:bootstrap hook, which is not behind it, and neither
+// are the tool middleware, before_compaction and session_end.
 //
 // The key itself is older than the gate: 2026.4.24 added it to the plugin
 // entry schema, which is strict, and 2026.4.23 refuses to start on a config
@@ -57,7 +57,7 @@ func openclawPluginEntry(have map[string]any, grant bool) (map[string]any, strin
 		delete(hooks, openclawAccessKey)
 	case hooks[openclawAccessKey] == false:
 		if note == "" {
-			note = "left plugins.entries.deja.hooks." + openclawAccessKey + " false, the way it was — OpenClaw " + openclawAccessGate + "+ then blocks deja's digest and per-prompt recall"
+			note = "left plugins.entries.deja.hooks." + openclawAccessKey + " false, the way it was — OpenClaw " + openclawAccessGate + "+ then blocks deja's per-prompt recall"
 		}
 	default:
 		hooks[openclawAccessKey] = true

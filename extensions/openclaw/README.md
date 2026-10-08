@@ -27,8 +27,9 @@ what is missing.
 
 ## What it does
 
-- **At the start of a session** (`agent_turn_prepare`): what this project
-  settled, once per session.
+- **At the start of a session** (`agent:bootstrap`): what this project
+  settled, once per session, in the Project Context. It needs no
+  `allowConversationAccess` and runs under `openclaw agent --local` too.
 - **Before each turn** (`before_prompt_build`): the prompt is matched against
   the index and, when a past session answers it, that session goes in front of
   the model. Silence is the common case.

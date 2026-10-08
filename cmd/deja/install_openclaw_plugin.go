@@ -11,10 +11,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
-// The bootstrap hook recalls once, against the session, and only in gateway
-// mode. OpenClaw's plugin runtime has the other half: before_prompt_build is
-// handed the prompt the user just typed and returns context that goes in front
-// of the model, and it fires under `openclaw agent --local` too.
+// The hook pack's digest runs only in gateway mode. OpenClaw's plugin runtime
+// has the rest: an agent:bootstrap hook of its own that also runs under
+// `openclaw agent --local`, and before_prompt_build, which is handed the prompt
+// the user just typed and returns context that goes in front of the model.
 //
 // Learned by running it against OpenClaw 2026.7.1-2:
 //   - A plugin needs both package.json with openclaw.extensions and
@@ -520,35 +520,57 @@ export default {
         } catch {}
       }, { runtimes: ["openclaw"] });
     }
-    // What this project settled, at the start of the session. The bootstrap
-    // hook does this in gateway mode and does not run under the local agent,
-    // where a session had no memory of the project at all until it happened to
-    // ask a question the store answered.
+    // What this project settled, at the start of the session. The digest
+    // goes into the Project Context through agent:bootstrap, registered as a
+    // plugin hook: unlike agent_turn_prepare it is not behind
+    // allowConversationAccess, and unlike the hook pack beside this plugin it
+    // runs under --local as well as in the gateway (2026.9.8). The event fires
+    // on every agent run, and in the gateway the pack answers it too; both send
+    // the transcript id with deja_once, so the session gets one digest.
     //
-    // agent_turn_prepare is the phase hook OpenClaw asks new plugins to use —
-    // before_agent_start is kept only for compatibility — and it is also where
-    // queued next-turn injections are drained, so this sits in the right place
-    // if that seam ever starts delivering. It fires once per agent run rather
-    // than once per session, so deja_once is what keeps the digest to the first
-    // of them.
-    api.on(
-      "agent_turn_prepare",
-      async (_event, ctx) => {
-        // The transcript id, not the session key: the live stamp hook-context
-        // writes keeps this session out of its own MCP recall by the id the
-        // index knows it by, and agent:main:main names no transcript (#4582).
-        const at = where(ctx);
-        const digest = ask(["hook-context", "--plain"], {
-          session_id: at.id,
-          cwd: at.cwd,
-          source: "startup",
-          deja_once: true,
-        });
-        if (!digest) return;
-        return { prependContext: digest };
-      },
-      { timeoutMs: 15000 },
-    );
+    // The transcript id, not the session key: the live stamp hook-context
+    // writes keeps this session out of its own MCP recall by the id the index
+    // knows it by, and agent:main:main names no transcript (#4582).
+    const digest = (ctx) => {
+      const at = where(ctx);
+      return ask(["hook-context", "--plain"], {
+        session_id: at.id,
+        cwd: at.cwd,
+        source: "startup",
+        deja_once: true,
+      });
+    };
+    let bootstrap = false;
+    // A plugin hook is wired only while hooks.internal.enabled is not false.
+    if (typeof api.registerHook === "function" && api.config?.hooks?.internal?.enabled !== false) {
+      try {
+        api.registerHook(
+          "agent:bootstrap",
+          async (event) => {
+            const context = event?.context;
+            if (!context || !Array.isArray(context.bootstrapFiles)) return;
+            const text = digest(context);
+            if (!text) return;
+            context.bootstrapFiles.push({ name: "DEJA-RECALL.md", path: "deja://recall", content: text, missing: false });
+          },
+          { name: "deja-digest", description: "deja's digest of this project's past sessions" },
+        );
+        bootstrap = true;
+      } catch {}
+    }
+    // Without plugin hooks the digest goes in front of the first prompt
+    // instead, which 2026.8.1+ runs only with allowConversationAccess.
+    if (!bootstrap) {
+      api.on(
+        "agent_turn_prepare",
+        async (_event, ctx) => {
+          const text = digest(ctx);
+          if (!text) return;
+          return { prependContext: text };
+        },
+        { timeoutMs: 15000 },
+      );
+    }
     api.on(
       "before_prompt_build",
       async (event, ctx) => {

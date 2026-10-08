@@ -20,9 +20,10 @@ import (
 // digest in front of the model without writing anything to the workspace.
 //
 // Two things this cost an hour to learn, both by running it:
-//   - The event only fires in gateway mode, and only when the agent workspace
-//     is first bootstrapped — not once per session. `openclaw agent --local`
-//     never emits it at all, so the pack looks dead when tested that way.
+//   - A pack in hooks/ is loaded by the gateway only: `openclaw agent --local`
+//     never runs it, so the pack looks dead when tested that way. The event
+//     itself fires on every agent run (2026.9.8), and deja's plugin answers it
+//     under --local too.
 //   - Internal hooks are off wholesale until hooks.internal.enabled is set, and
 //     a pack that is listed as "ready" still never runs until then.
 //
@@ -481,16 +482,26 @@ import { execFileSync } from "node:child_process";
 
 const DEJA = %q;
 
+// The event fires on every agent run, and deja's plugin answers the same one
+// in the same process. Both name the session by its transcript id and ask
+// once, so whichever runs first carries the digest and the rest of the
+// session's runs get nothing.
 export default async (event) => {
   if (event?.type !== "agent" || event?.action !== "bootstrap") return;
   const context = event.context;
   if (!context || !Array.isArray(context.bootstrapFiles)) return;
   try {
     const digest = execFileSync(DEJA, ["hook-context", "--plain"], {
+      input: JSON.stringify({
+        session_id: context.sessionId || context.sessionKey || event.sessionKey || "",
+        cwd: context.workspaceDir || process.cwd(),
+        source: "startup",
+        deja_once: true,
+      }),
       encoding: "utf8",
       timeout: 10000,
       maxBuffer: 4 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ["pipe", "pipe", "ignore"],
     }).trim();
     if (!digest) return;
     context.bootstrapFiles.push({

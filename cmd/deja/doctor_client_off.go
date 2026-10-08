@@ -244,10 +244,10 @@ func clientHooksOff(name string) string {
 				what := "`plugins.entries.deja.hooks." + openclawAccessKey + "`"
 				if grant == false {
 					return "switched off: " + what + " is false in " + reportPath(p) +
-						" — OpenClaw " + openclawAccessGate + "+ then drops deja's digest and per-prompt recall"
+						" — OpenClaw " + openclawAccessGate + "+ then drops deja's per-prompt recall"
 				}
 				return "blocked: no " + what + " in " + reportPath(p) +
-					" — OpenClaw " + openclawAccessGate + "+ drops deja's digest and per-prompt recall; `deja install openclaw-auto` sets it"
+					" — OpenClaw " + openclawAccessGate + "+ drops deja's per-prompt recall; `deja install openclaw-auto` sets it"
 			}
 		}
 	case "goose":

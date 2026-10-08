@@ -180,22 +180,48 @@ export default {
     // a compacted session had been shown.
     if (adds.recall) {
       const seen = new Map()
-      api.on(
-        "agent_turn_prepare",
-        async (event, ctx) => {
-          const at = where(seen, event, ctx, process.cwd())
-          // agent_turn_prepare fires once per agent run, so deja_once is what
-          // keeps the digest to the first of them.
-          const digest = await ask(
-            ["hook-context", "--plain"],
-            JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true }),
-            10000,
+      // Both seams below fire once per agent run, so deja_once is what keeps
+      // the digest to the first of them.
+      const digest = (event, ctx) => {
+        const at = where(seen, event, ctx, process.cwd())
+        return ask(
+          ["hook-context", "--plain"],
+          JSON.stringify({ session_id: at.id, cwd: at.cwd, source: "startup", deja_once: true }),
+          10000,
+        )
+      }
+      // agent:bootstrap puts the digest in the Project Context. As a plugin
+      // hook it is not behind allowConversationAccess, which OpenClaw 2026.8.1+
+      // wants for agent_turn_prepare, and it runs under --local too. It is
+      // wired only while hooks.internal.enabled is not false.
+      let bootstrap = false
+      if (typeof api.registerHook === "function" && api.config?.hooks?.internal?.enabled !== false) {
+        try {
+          api.registerHook(
+            "agent:bootstrap",
+            async (event) => {
+              const context = event && event.context
+              if (!context || !Array.isArray(context.bootstrapFiles)) return
+              const text = await digest(event, context)
+              if (!text) return
+              context.bootstrapFiles.push({ name: "DEJA-RECALL.md", path: "deja://recall", content: text, missing: false })
+            },
+            { name: "deja-vu-digest", description: "deja's digest of this project's past sessions" },
           )
-          if (!digest) return
-          return { prependContext: digest }
-        },
-        { timeoutMs: 15000 },
-      )
+          bootstrap = true
+        } catch {}
+      }
+      if (!bootstrap) {
+        api.on(
+          "agent_turn_prepare",
+          async (event, ctx) => {
+            const text = await digest(event, ctx)
+            if (!text) return
+            return { prependContext: text }
+          },
+          { timeoutMs: 15000 },
+        )
+      }
       api.on(
         "before_prompt_build",
         async (event, ctx) => {

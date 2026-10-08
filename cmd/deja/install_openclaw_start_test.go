@@ -10,18 +10,13 @@ import (
 	"testing"
 )
 
-// OpenClaw's bootstrap hook recalls once against the session and only in
-// gateway mode, so a local run had no memory of the project at all until it
-// happened to ask a question the store answered. agent_turn_prepare is the
-// plugin's session-start channel and its prependContext reaches the model
-// (measured on OpenClaw 2026.7.1-2, read off the provider request). OpenClaw's
-// own docs call before_agent_start a compatibility-only combined phase and ask
-// new plugins to use this hook, which is also where queued next-turn
-// injections are drained.
-//
-// It fires once per agent run rather than once per session, which is why the
-// payload carries deja_once: without it the project digest would go in front of
-// the model on every message.
+// The digest goes in through agent:bootstrap, which OpenClaw fires on every
+// agent run. The plugin answers it as a plugin hook, which runs under --local
+// and needs no allowConversationAccess; in the gateway the hook pack answers
+// the same event first. A gateway session got the digest twice, because the
+// pack named no session and the once-per-session check had nothing to match.
+// Both now send the transcript id with deja_once, so deja hands out one.
+// An OpenClaw without plugin hooks falls back to agent_turn_prepare.
 func TestOpenClawPluginOpensWithTheProjectDigest(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the stub deja is a shell script")
@@ -42,13 +37,29 @@ func TestOpenClawPluginOpensWithTheProjectDigest(t *testing.T) {
 	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	pack := filepath.Join(home, "handler.mjs")
+	if err := os.WriteFile(pack, []byte(openclawHandlerJS(stub)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// The context OpenClaw 2026.9.8 builds for agent:bootstrap.
 	driver := `
 import plugin from "` + plugin + `";
-let handler;
-plugin.register({ on: (name, fn) => { if (name === "agent_turn_prepare") handler = fn } });
-if (!handler) { console.log("NOHOOK"); process.exit(0) }
-const out = await handler({ prompt: "hello" }, { sessionKey: "agent:main:explicit:s1" });
-console.log(JSON.stringify(out ?? null));
+import pack from "` + pack + `";
+const ctx = () => ({ workspaceDir: "/w", bootstrapFiles: [], sessionKey: "agent:main:s1", sessionId: "6bb01805-a4da-4f4c-a26b-6159d976f6d5", agentId: "main" });
+const on = {}, hooks = {};
+plugin.register({ on: (name, fn) => { on[name] = fn }, registerHook: (name, fn) => { hooks[name] = fn } });
+const a = { type: "agent", action: "bootstrap", sessionKey: "agent:main:s1", context: ctx() };
+await hooks["agent:bootstrap"](a);
+const b = { type: "agent", action: "bootstrap", sessionKey: "agent:main:s1", context: ctx() };
+await pack(b);
+const old = {};
+plugin.register({ on: (name, fn) => { old[name] = fn } });
+console.log(JSON.stringify({
+  turnPrepare: "agent_turn_prepare" in on,
+  plugin: a.context.bootstrapFiles,
+  pack: b.context.bootstrapFiles,
+  fallback: await old["agent_turn_prepare"]?.({ prompt: "hello" }, { sessionKey: "agent:main:s1", sessionId: "6bb01805-a4da-4f4c-a26b-6159d976f6d5" }),
+}));
 `
 	run := filepath.Join(home, "drive.mjs")
 	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
@@ -58,41 +69,53 @@ console.log(JSON.stringify(out ?? null));
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, out)
 	}
-	first := strings.TrimSpace(strings.Split(strings.TrimSpace(string(out)), "\n")[0])
-	if first == "NOHOOK" {
-		t.Fatal("the plugin registers no agent_turn_prepare handler, so a local " +
-			"session still opens with no memory of the project")
+	var got struct {
+		TurnPrepare bool
+		Plugin      []map[string]any
+		Pack        []map[string]any
+		Fallback    map[string]string
 	}
-	var got map[string]string
-	if err := json.Unmarshal([]byte(first), &got); err != nil {
-		t.Fatalf("handler returned %s", first)
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(out))), &got); err != nil {
+		t.Fatalf("driver printed %s", out)
 	}
-	if !strings.Contains(got["prependContext"], "DIGEST") {
-		t.Errorf("the digest did not come back as prependContext, which is the "+
-			"only field openclaw reads here: %s", first)
+	if got.TurnPrepare {
+		t.Error("the plugin also answers agent_turn_prepare where plugin hooks run, a second digest path")
+	}
+	for name, files := range map[string][]map[string]any{"plugin": got.Plugin, "pack": got.Pack} {
+		if len(files) != 1 || !strings.Contains(files[0]["content"].(string), "DIGEST") || files[0]["path"] != "deja://recall" {
+			t.Errorf("the %s's bootstrap hook did not add the digest to the Project Context: %v", name, files)
+		}
+	}
+	if !strings.Contains(got.Fallback["prependContext"], "DIGEST") {
+		t.Errorf("without plugin hooks the digest should come back as prependContext: %v", got.Fallback)
 	}
 	asked, err := os.ReadFile(calls)
 	if err != nil {
-		t.Fatalf("the plugin never called deja: %v", err)
+		t.Fatalf("nothing called deja: %v", err)
 	}
-	var payload struct {
-		SessionID string `json:"session_id"`
-		Once      bool   `json:"deja_once"`
-		CWD       string `json:"cwd"`
+	lines := strings.Split(strings.TrimSpace(string(asked)), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("want three hook-context calls, got %d:\n%s", len(lines), asked)
 	}
-	if err := json.Unmarshal([]byte(strings.Split(strings.TrimSpace(string(asked)), "\n")[0]), &payload); err != nil {
-		t.Fatalf("payload is not JSON: %v (%s)", err, asked)
-	}
-	if !payload.Once {
-		t.Error("the payload does not ask for one digest per session, so it would " +
-			"go in on every message")
-	}
-	if payload.SessionID == "" {
-		t.Error("the payload names no session, and the guard that keeps the digest " +
-			"to one turn is keyed on it")
-	}
-	if payload.CWD == "" {
-		t.Error("the payload names no project, so the digest would be for whatever " +
-			"deja's own working directory happens to be")
+	for i, l := range lines {
+		var payload struct {
+			SessionID string `json:"session_id"`
+			Once      bool   `json:"deja_once"`
+			CWD       string `json:"cwd"`
+		}
+		if err := json.Unmarshal([]byte(l), &payload); err != nil {
+			t.Fatalf("payload %d is not JSON: %v (%s)", i, err, l)
+		}
+		// One id across all of them, the transcript's: the guard that keeps
+		// the digest to one turn is keyed on it.
+		if payload.SessionID != "6bb01805-a4da-4f4c-a26b-6159d976f6d5" {
+			t.Errorf("payload %d names session %q", i, payload.SessionID)
+		}
+		if !payload.Once {
+			t.Errorf("payload %d does not ask for one digest per session", i)
+		}
+		if i < 2 && payload.CWD != "/w" {
+			t.Errorf("payload %d names project %q, not the agent's workspace", i, payload.CWD)
+		}
 	}
 }

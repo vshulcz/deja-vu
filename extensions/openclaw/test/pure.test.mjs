@@ -48,12 +48,22 @@ test("the package wires every seam the installer's plugin does", async () => {
   const prev = process.env.OPENCLAW_STATE_DIR
   process.env.OPENCLAW_STATE_DIR = "/nonexistent-openclaw-state"
   try {
-    plugin.register({ pluginConfig: { tools: false, bin: "/nonexistent/deja" }, on: (name) => events.push(name), registerTool() {} })
+    const api = { pluginConfig: { tools: false, bin: "/nonexistent/deja" }, on: (name) => events.push(name), registerTool() {} }
+    plugin.register(api)
+    plugin.register({ ...api, registerHook: (name) => events.push("hook " + name) })
+    plugin.register({ ...api, config: { hooks: { internal: { enabled: false } } }, registerHook: (name) => events.push("hook " + name) })
   } finally {
     if (prev === undefined) delete process.env.OPENCLAW_STATE_DIR
     else process.env.OPENCLAW_STATE_DIR = prev
   }
-  assert.deepEqual(events, ["agent_turn_prepare", "before_prompt_build", "before_compaction", "session_end"])
+  const seams = ["before_prompt_build", "before_compaction", "session_end"]
+  // The digest rides agent:bootstrap where plugin hooks run, and the first
+  // prompt otherwise.
+  assert.deepEqual(events, [
+    "agent_turn_prepare", ...seams,
+    "hook agent:bootstrap", ...seams,
+    "agent_turn_prepare", ...seams,
+  ])
 })
 
 test("a finished tool maps to the call the installer's plugin makes", () => {

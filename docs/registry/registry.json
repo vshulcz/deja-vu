@@ -730,7 +730,7 @@
       },
       "gaps": {},
       "surfaces": {
-        "digest": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway)"},
+        "digest": {"status": "yes", "proof": "stand", "note": "the plugin's own agent:bootstrap hook puts it in the Project Context once per session, local and gateway, with or without allowConversationAccess; the gateway's hook pack asks under the same session id (stand on 2026.9.8)"},
         "prompt": {"status": "yes", "proof": "stand", "note": "OpenClaw 2026.8.1+ runs the plugin's prompt hooks only with plugins.entries.deja.hooks.allowConversationAccess, which install sets (stand on 2026.9.8, local and gateway)"},
         "pre_tool": {"status": "yes", "proof": "stand"},
         "failure": {"status": "yes", "proof": "stand"},
