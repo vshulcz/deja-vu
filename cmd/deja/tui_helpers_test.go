@@ -79,19 +79,21 @@ func TestContinueTargetsAndGrid(t *testing.T) {
 	if !last.paste || len(ts) != len(handoffTargets())+len(handoffPasteOnly) {
 		t.Errorf("paste-only last, all listed: %+v (%d)", last, len(ts))
 	}
-	pos, line, heads := continueGrid(ts[:5], 3)
-	if pos[2] != [2]int{1, 0} || pos[4] != [2]int{1, 2} || line[1] != 1 || line[2] != 4 || len(heads) != 2 || heads[1] != [2]int{3, groupElse} {
-		t.Errorf("grid = %v lines %v heads %v", pos, line, heads)
+	// No labels: a block starts its own row after one blank line.
+	pos, line := continueGrid(ts[:5], 2)
+	if pos[2] != [2]int{1, 0} || pos[4] != [2]int{2, 0} || line[1] != 0 || line[2] != 2 || line[4] != 3 {
+		t.Errorf("grid = %v lines %v", pos, line)
 	}
-	// The folded line fills a row of its own and has no label.
-	_, line, heads = continueGrid(append(ts[:1:1], continueTarget{more: 3}), 3)
-	if line[1] != 3 || len(heads) != 1 {
-		t.Errorf("fold at line %v, heads %v", line, heads)
+	// The folded line takes the next cell, with no gap above it.
+	pos, line = continueGrid(append(ts[:1:1], continueTarget{more: 3}), 2)
+	if line[1] != 0 || pos[1] != [2]int{0, 1} {
+		t.Errorf("fold at line %v", line)
 	}
-	if gridMove(pos, 4, -1) != 1 || gridMove(pos, 0, 1) != 2 || gridMove(pos, 9, 1) != 9 || gridMove(pos, 0, -1) != 0 {
+	pos, _ = continueGrid(ts[:5], 2)
+	if gridMove(pos, 4, -1) != 2 || gridMove(pos, 0, 1) != 2 || gridMove(pos, 9, 1) != 9 || gridMove(pos, 0, -1) != 0 {
 		t.Error("gridMove")
 	}
-	if gridCols(80) != 3 || gridCols(50) != 2 || gridCols(20) != 1 {
+	if gridCols(80) != 2 || gridCols(50) != 2 || gridCols(20) != 1 {
 		t.Error("gridCols")
 	}
 	if ts := continueTargets(nil, nil); len(ts) == 0 {

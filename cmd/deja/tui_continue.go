@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // The continue-in picker: every agent deja can hand a session to. The ones
@@ -61,7 +62,7 @@ func (a *tuiApp) openContinue() {
 }
 
 // withRecent moves the agents continued into before to the front, newest
-// first, marked so they draw as a group of their own.
+// first, marked so the newest can say it was used last.
 func withRecent(ts []continueTarget, recent []string) []continueTarget {
 	var front, rest []continueTarget
 	for _, id := range recent {
@@ -80,10 +81,10 @@ func withRecent(ts []continueTarget, recent []string) []continueTarget {
 	return append(front, rest...)
 }
 
-// The groups the picker draws, in order.
+// The blocks the picker draws, in order, a blank line apart. The recent
+// agents carry no block of their own: they lead the ones on this machine.
 const (
-	groupRecent = iota
-	groupHere
+	groupHere = iota
 	groupElse
 	groupMore // the one line the folded agents collapse to
 )
@@ -92,9 +93,7 @@ func (t continueTarget) group() int {
 	switch {
 	case t.more > 0:
 		return groupMore
-	case t.recent:
-		return groupRecent
-	case t.installed && !t.paste:
+	case t.recent || t.installed && !t.paste:
 		return groupHere
 	}
 	return groupElse
@@ -122,11 +121,9 @@ func (a *tuiApp) shownTargets() []continueTarget {
 	return out
 }
 
-// gridCols is how many columns of agents fit the modal.
+// gridCols is how many columns of agents fit the modal: two at most, so the
+// names have room around them.
 func gridCols(iw int) int {
-	if iw >= 66 {
-		return 3
-	}
 	if iw >= 40 {
 		return 2
 	}
@@ -134,23 +131,18 @@ func gridCols(iw int) int {
 }
 
 // continueGrid puts each target on a row and a column, and each row on a line
-// of the modal. A group starts on a row of its own under its label, with a
-// blank line above it; the folded line has no label and fills its row. pos
-// is the row and column, line the line, and heads the line and group of each
-// label.
-func continueGrid(ts []continueTarget, cols int) (pos [][2]int, line []int, heads [][2]int) {
+// of the modal. A block starts on a row of its own with a blank line above
+// it; the folded line takes the next cell, as the last entry of the list.
+// pos is the row and column, line the line.
+func continueGrid(ts []continueTarget, cols int) (pos [][2]int, line []int) {
 	r, c, l, prev := 0, 0, 0, -1
 	for i, t := range ts {
 		g := t.group()
-		if g != prev {
+		if g != prev && g != groupMore {
 			if i > 0 {
 				if c != 0 {
 					r, c, l = r+1, 0, l+1
 				}
-				l++
-			}
-			if g != groupMore {
-				heads = append(heads, [2]int{l, g})
 				l++
 			}
 			prev = g
@@ -161,7 +153,7 @@ func continueGrid(ts []continueTarget, cols int) (pos [][2]int, line []int, head
 			r, c, l = r+1, 0, l+1
 		}
 	}
-	return pos, line, heads
+	return pos, line
 }
 
 // gridMove steps a selection one row up or down, keeping its column where
@@ -182,7 +174,7 @@ func gridMove(pos [][2]int, sel, dr int) int {
 
 func (a *tuiApp) modalMove(dr int) int {
 	if a.modal == modalContinue {
-		pos, _, _ := continueGrid(a.shownTargets(), a.m.cols)
+		pos, _ := continueGrid(a.shownTargets(), a.m.cols)
 		return gridMove(pos, a.m.sel, dr)
 	}
 	return a.m.sel + dr*3
@@ -191,15 +183,15 @@ func (a *tuiApp) modalMove(dr int) int {
 func (a *tuiApp) drawContinue() {
 	p := a.p
 	ts := a.shownTargets()
-	a.m.cols = gridCols(min(88, p.W-4) - 4)
-	pos, line, heads := continueGrid(ts, a.m.cols)
+	a.m.cols = gridCols(min(76, p.W-4) - 4)
+	pos, line := continueGrid(ts, a.m.cols)
 	total := 1
 	if len(ts) > 0 {
 		total = line[len(ts)-1] + 1
 	}
 	const chrome = 11 // title, filter, note, button, the gaps and the border
 	room := min(total, p.H-2-chrome)
-	x, y, iw := a.modalBox(88, room+chrome)
+	x, y, iw := a.modalBox(76, room+chrome)
 	right := x + iw
 	cx := p.Put(x, y, "Continue this session in…", bold(cText), right)
 	p.PutClip(cx+3, y, "from "+agentName(a.m.src.Harness)+" · "+tuiProject(a.m.src), fgs(cMuted), right)
@@ -220,39 +212,29 @@ func (a *tuiApp) drawContinue() {
 			first = sl - room + 1
 		}
 	}
-	put := func(l int, draw func(yy int)) {
-		if l-first >= 0 && l-first < room {
-			draw(y + l - first)
-		}
-	}
 	colW := iw / a.m.cols
-	for _, h := range heads {
-		g := h[1]
-		put(h[0], func(yy int) {
-			switch g {
-			case groupRecent:
-				p.Put(x, yy, "RECENT", fgs(cMuted), right)
-			case groupHere:
-				p.Put(x, yy, "ON THIS MACHINE", fgs(cMuted), right)
-			default:
-				lx := p.Put(x, yy, "ALSO SUPPORTED", fgs(cMuted), right)
-				p.PutClip(lx+2, yy, "not installed here · they get the context on the clipboard", fgs(cFaint), right)
-			}
-		})
-	}
 	for i, t := range ts {
-		i, t := i, t
-		put(line[i], func(yy int) {
-			if t.more > 0 {
-				a.foldEntry(x, yy, iw, t.more, i == a.m.sel)
-				return
+		yy := y + line[i] - first
+		if line[i] < first || line[i]-first >= room {
+			continue
+		}
+		if t.more > 0 {
+			a.foldEntry(x+pos[i][1]*colW, yy, colW, t.more, i == a.m.sel)
+			continue
+		}
+		extra := ""
+		if t.paste {
+			extra = "paste"
+		}
+		ex := x + pos[i][1]*colW
+		a.gridEntry(ex, yy, colW, t.id, i == a.m.sel, !t.installed, extra)
+		if t.recent && t.id == a.continued[0] {
+			st := on(cFaint, cSurf)
+			if i == a.m.sel {
+				st = on(cMuted, cOver)
 			}
-			extra := ""
-			if t.paste {
-				extra = "paste"
-			}
-			a.gridEntry(x+pos[i][1]*colW, yy, colW, t.id, i == a.m.sel, !t.installed, extra)
-		})
+			p.Put(ex+5+termwidth.Columns(agentName(t.id)), yy, "last used", st, ex+colW-1)
+		}
 	}
 	if len(ts) == 0 {
 		p.Put(x, y, "No agent by that name.", fgs(cFaint), right)
@@ -263,17 +245,17 @@ func (a *tuiApp) drawContinue() {
 	}
 	y += min(last+1-first, room) + 1
 	label := "Open"
-	note := "Starts the agent here with what this session asked, decided and left open."
+	note := "Starts it here with what this session decided and left open."
 	if a.m.sel < len(ts) {
 		t := ts[a.m.sel]
 		label = "Open in " + agentName(t.id)
 		switch {
 		case t.more > 0:
 			label = "Show them"
-			note = "Lists the agents not installed here. Typing a name searches them too."
+			note = "They get the context on the clipboard; typing a name finds them."
 		case t.paste || !t.installed:
 			label = "Copy for " + agentName(t.id)
-			note = "Copies what this session asked, decided and left open, to paste as the first message."
+			note = "Copies the context, to paste as its first message."
 		}
 	}
 	p.PutClip(x, y, note, fgs(cSub), right)
@@ -288,8 +270,7 @@ func (a *tuiApp) foldEntry(x, y, w, n int, sel bool) {
 	bg := cSurf
 	if sel {
 		bg = cOver
-		p.Fill(x, y, w, 1, bg)
+		p.Fill(x, y, w-1, 1, bg)
 	}
-	mx := p.Put(x+1, y, "+"+tuiCount(n, "more agent"), on(cText, bg), x+w)
-	p.PutClip(mx, y, " · context goes to the clipboard", on(cMuted, bg), x+w)
+	p.Put(x+3, y, "+"+num(n)+" not installed here", on(cMuted, bg), x+w)
 }

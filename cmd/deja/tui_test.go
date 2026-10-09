@@ -341,9 +341,9 @@ func TestTUIContinueIn(t *testing.T) {
 		t.Fatal("ctrl-o opens continue-in")
 	}
 	s := screen(a.frame(120, 40))
-	wantOnScreen(t, s, "Continue this session in…", "+41 more agents · context goes to the clipboard", "Show them")
+	wantOnScreen(t, s, "Continue this session in…", "+41 not installed here", "Show them")
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEnter})
-	wantOnScreen(t, screen(a.frame(120, 40)), "ALSO SUPPORTED", "Copy for")
+	wantOnScreen(t, screen(a.frame(120, 40)), "Copy for")
 	for _, k := range []tui.Key{tui.KeyDown, tui.KeyRight, tui.KeyLeft, tui.KeyUp, tui.KeyTab} {
 		a.handle(tui.Event{Kind: tui.EvKey, Key: k})
 	}
