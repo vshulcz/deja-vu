@@ -174,7 +174,7 @@ func cardPunchline(r stats.Report) string {
 	case r.WeekRecalls > 0:
 		return fmt.Sprintf("deja handed your agents memory %s time%s this week.", formatStatNumber(r.WeekRecalls), pluralS(r.WeekRecalls))
 	case r.RepeatQuestions > 0:
-		return fmt.Sprintf("You asked the same thing %s time%s — deja remembered.", formatStatNumber(r.RepeatQuestions), pluralS(r.RepeatQuestions))
+		return fmt.Sprintf("You asked %s question%s more than once — deja remembered.", formatStatNumber(r.RepeatQuestions), pluralS(r.RepeatQuestions))
 	case r.Recall.Recalls+r.Recall.Injections > 0:
 		handed := r.Recall.Recalls + r.Recall.Injections
 		return fmt.Sprintf("deja handed your agents memory %s time%s.", formatStatNumber(handed), pluralS(handed))

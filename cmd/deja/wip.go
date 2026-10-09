@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -40,6 +41,12 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 			return fmt.Errorf("wip takes --json and nothing else")
 		}
 	}
+	// Built first, like every other reader: on a fresh machine the lookup
+	// below opened a manifest that was never written and printed the raw
+	// open error.
+	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+		return ensureError(dir, err)
+	}
 	s, r, ok, err := wipSession(dir)
 	if err != nil {
 		return err
@@ -60,6 +67,10 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 		})
 	}
 	if !ok {
+		if n, err := index.SessionCount(dir); err != nil || n == 0 {
+			fmt.Fprintln(stdout, emptyIndexHint("no session to pick up"))
+			return nil
+		}
 		fmt.Fprintln(stdout, "deja: no session in this project to pick up")
 		return nil
 	}

@@ -24,7 +24,9 @@ func TestCheckTellsAnOlderIndexFromNoIndex(t *testing.T) {
 		// damaged" on the same store while search answers from the snapshot
 		// and rebuilds behind it (#2682).
 		{name: "a damaged index", damaged: true, want: "the index is damaged"},
-		{name: "a healthy index with nothing to say", ready: true, want: "nothing found for this plan"},
+		// It reports walls, not decisions, and says so: a plan reversing a
+		// recorded decision came back with a bare "nothing found".
+		{name: "a healthy index with nothing to say", ready: true, want: "nothing found for this plan — it checks repeated errors, not decisions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			hermeticEnv(t)

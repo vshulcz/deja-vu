@@ -300,11 +300,15 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 		if namedAPath(hits[i]) != namedAPath(hits[j]) {
 			return namedAPath(hits[i])
 		}
+		// Among sessions that wrote the path out, newest first, the way a log
+		// reads: by score, one that named it a few more times sat above a newer
+		// one, and the listing read 06-29, 06-27, 06-28. Bare mentions keep the
+		// score, which is what holds an echo of the name below real work.
+		if namedAPath(hits[i]) && !hits[i].Session.Updated.Equal(hits[j].Session.Updated) {
+			return hits[i].Session.Updated.After(hits[j].Session.Updated)
+		}
 		if hits[i].Score != hits[j].Score {
 			return hits[i].Score > hits[j].Score
-		}
-		if !hits[i].Session.Updated.Equal(hits[j].Session.Updated) {
-			return hits[i].Session.Updated.After(hits[j].Session.Updated)
 		}
 		return hits[i].Session.ID < hits[j].Session.ID
 	})

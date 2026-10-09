@@ -222,6 +222,10 @@ func printScrub(w io.Writer, outcomes []scrubOutcome, unreachable map[string]int
 		}
 	}
 	switch {
+	case dryRun && files == 0:
+		// Every file was skipped, and the lines above say why. Pointing at
+		// --scrub here sent the reader to rewrite nothing.
+		fmt.Fprintln(w, "\ndeja: nothing would be rewritten")
 	case dryRun:
 		fmt.Fprintf(w, "\ndeja: %d value%s in %d file%s — `deja secrets --scrub` to rewrite them\n",
 			wrote, plural(wrote), files, plural(files))

@@ -32,8 +32,8 @@ type statsHTMLPage struct {
 	DateStart     string
 	DateEnd       string
 	Heatmap       stats.HeatmapStats
-	PeakMonth     string
-	PeakMessages  int
+	BusiestDay    string
+	BusiestCount  int
 	SessionsJSON  template.JS
 	SessionCount  int
 	Truncated     bool
@@ -104,18 +104,13 @@ func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLP
 	if err != nil {
 		return statsHTMLPage{}, fmt.Errorf("encode stats html data: %w", err)
 	}
-	// the busiest month, so the heading carries a number instead of a range
-	var peak stats.MonthStats
-	for _, m := range report.Monthly {
-		if m.Messages > peak.Messages {
-			peak = m
-		}
-	}
+	// The busiest day, the one the terminal names: the busiest month made a
+	// second, different claim from the same report.
 	return statsHTMLPage{
 		TotalSessions: report.TotalSessions, TotalMessages: report.TotalMessages,
 		Harnesses: len(report.Harnesses), DateStart: report.DateRange.Start,
 		DateEnd: report.DateRange.End, Heatmap: report.Heatmap,
-		PeakMonth: peak.Month, PeakMessages: peak.Messages,
+		BusiestDay: report.BusiestDay.Date, BusiestCount: report.BusiestDay.Messages,
 		SessionsJSON: template.JS(data), SessionCount: len(rows), Truncated: truncated,
 		Punchline: cardPunchline(report),
 	}, nil
@@ -135,7 +130,7 @@ const statsHTMLSource = `<!doctype html>
 :root{color-scheme:dark;--bg:#0b0f10;--panel:#12171a;--line:#1e262a;--text:#f4f7f7;--muted:#8b989a;--blue:#8787af;--green:#5ec27a;--orange:#ff8700}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px ui-monospace,SFMono-Regular,Menlo,monospace}main{max-width:1100px;margin:auto;padding:38px 22px}h1{margin:0;color:var(--text);font-size:26px;letter-spacing:.5px}.hero{display:flex;gap:22px;align-items:center;margin:0 0 6px}.heroText{min-width:0}.punch{margin:6px 0 0;color:var(--orange);font-size:22px;font-weight:700;line-height:1.35}.sub{margin:6px 0 0;color:var(--muted);font-size:13px}.catwrap{flex:none}.cat{shape-rendering:crispEdges}.cat .eyes-shut,.cat .t1,.cat .t2{opacity:0}/* the blink: shut for a tenth of a cycle, which is about how long a cat's is */@keyframes dv-open{0%,92%{opacity:1}93%,97%{opacity:0}98%,100%{opacity:1}}@keyframes dv-shut{0%,92%{opacity:0}93%,97%{opacity:1}98%,100%{opacity:0}}.cat .eyes-open{animation:dv-open 6.5s steps(1,end) infinite}.cat .eyes-shut{animation:dv-shut 6.5s steps(1,end) infinite}/* the tail: three positions of the same cells, ping-ponged. The body never   moves, or it reads as a jitter rather than as a wag. */@keyframes dv-t0{0%,24.9%{opacity:1}25%,100%{opacity:0}}@keyframes dv-t1{0%,24.9%{opacity:0}25%,49.9%{opacity:1}50%,74.9%{opacity:0}75%,100%{opacity:1}}@keyframes dv-t2{0%,49.9%{opacity:0}50%,74.9%{opacity:1}75%,100%{opacity:0}}.cat .t0{animation:dv-t0 1.15s steps(1,end) infinite}.cat .t1{animation:dv-t1 1.15s steps(1,end) infinite}.cat .t2{animation:dv-t2 1.15s steps(1,end) infinite}@media (prefers-reduced-motion:reduce){  .cat .eyes-open,.cat .eyes-shut,.cat .t0,.cat .t1,.cat .t2{animation:none}  .cat .eyes-shut,.cat .t1,.cat .t2{opacity:0}}.mark{vertical-align:-5px;margin-right:12px;shape-rendering:crispEdges}p{color:var(--muted)}.range{float:right;color:var(--muted);font-size:13px}.totals{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:32px 0}.stat,.chart,.table-wrap{background:var(--panel);border:1px solid var(--line);border-radius:12px}.stat{padding:18px}.stat b{display:block;font-size:28px}.stat span{color:var(--muted)}h2{font-size:12px;color:var(--muted);letter-spacing:1.5px;margin:30px 0 12px}.chart{padding:18px 18px 14px}.heat{position:relative}.heatMonths{position:relative;height:14px;color:var(--muted);font-size:10px}.heatMonths span{position:absolute;top:0}.heatGrid{display:flex;gap:3px}.wk{display:flex;flex-direction:column;gap:3px;flex:1 1 0;min-width:0}.wk i{width:100%;aspect-ratio:1;border-radius:2px;background:var(--blue);display:block}.heatKey{display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:10px;color:var(--muted);font-size:10px}.heatKey i{width:10px;height:10px;border-radius:2px;background:var(--blue)}.controls{display:flex;gap:10px;margin:12px 0}.controls input{width:100%;padding:11px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}th{color:var(--muted);font-size:11px}td.title{white-space:normal;min-width:260px}.badge{color:var(--green);cursor:pointer}.clickable{cursor:pointer}.empty{padding:20px;color:var(--muted)}footer{color:var(--muted);font-size:12px;margin-top:18px}@media(max-width:650px){main{padding:24px 12px}.range{float:none;display:block;margin-top:10px}.totals{grid-template-columns:1fr}.chart{gap:3px;padding:12px}}
 </style></head><body><main><span class="range">{{if .DateStart}}{{.DateStart}} - {{.DateEnd}}{{else}}-{{end}}</span><div class="hero"><span class="catwrap"><svg class="cat" viewBox="0 0 24 22" width="96" height="88" aria-hidden="true">{{MARK_ALIVE}}</svg></span><div class="heroText"><h1>deja stats</h1><p class="punch">{{.Punchline}}</p><p class="sub">indexed agent work, wrapped for sharing</p></div></div>
 <section class="totals"><div class="stat"><b>{{.TotalSessions}}</b><span>sessions</span></div><div class="stat"><b>{{.TotalMessages}}</b><span>messages</span></div><div class="stat"><b>{{.Harnesses}}</b><span>harnesses</span></div></section>
-<h2>ACTIVITY / LAST 12 MONTHS{{if .PeakMonth}} &#183; BUSIEST {{.PeakMonth}}, {{.PeakMessages}} MESSAGES{{end}}</h2><div class="chart"><div class="heat" role="img" aria-label="Daily activity over the last year"><div class="heatMonths">{{range .Heatmap.Months}}<span style="left:{{heatPct .Col $.Heatmap.Weeks}}%">{{.Label}}</span>{{end}}</div><div class="heatGrid">{{range .Heatmap.Weeks}}<div class="wk">{{range .}}<i style="opacity:{{heatOpacity . $.Heatmap.Max}}"></i>{{end}}</div>{{end}}</div><div class="heatKey"><span>less</span><i style="opacity:.10"></i><i style="opacity:.35"></i><i style="opacity:.62"></i><i style="opacity:1"></i><span>more</span></div></div></div>
+<h2>ACTIVITY / LAST 12 MONTHS{{if .BusiestDay}} &#183; BUSIEST DAY {{.BusiestDay}}, {{.BusiestCount}} MESSAGES{{end}}</h2><div class="chart"><div class="heat" role="img" aria-label="Daily activity over the last year"><div class="heatMonths">{{range .Heatmap.Months}}<span style="left:{{heatPct .Col $.Heatmap.Weeks}}%">{{.Label}}</span>{{end}}</div><div class="heatGrid">{{range .Heatmap.Weeks}}<div class="wk">{{range .}}<i style="opacity:{{heatOpacity . $.Heatmap.Max}}"></i>{{end}}</div>{{end}}</div><div class="heatKey"><span>less</span><i style="opacity:.10"></i><i style="opacity:.35"></i><i style="opacity:.62"></i><i style="opacity:1"></i><span>more</span></div></div></div>
 <h2>SESSIONS</h2><div class="controls"><input id="filter" type="search" placeholder="Filter sessions by harness, project, or title" aria-label="Filter sessions"></div><div class="table-wrap"><table><thead><tr><th>DATE</th><th>HARNESS</th><th>PROJECT</th><th>TITLE</th><th>MESSAGES</th></tr></thead><tbody id="sessions"></tbody></table><div id="empty" class="empty" hidden>No matching sessions.</div></div>
 <footer>{{.SessionCount}} sessions embedded: dates, harnesses, projects, message counts, and each session's title or its opening line, redacted and shortened. No other message text is in this file.{{if .Truncated}} The embedded list is capped at the 5,000 most recent sessions.{{end}}</footer></main><script>
 // Only metadata is embedded below: dates, harnesses, projects, counts, and redacted first-user titles. No message text.

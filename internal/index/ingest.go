@@ -33,10 +33,7 @@ import (
 func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session) {
 	counts := map[string]*HarnessCount{}
 	order := []string{}
-	parsed := 0
-	for _, s := range ss {
-		parsed += len(s.Messages)
-	}
+	parsed := sources.CountMessages(ss)
 	for _, s := range ss {
 		c := counts[s.Harness]
 		if c == nil {
@@ -45,7 +42,7 @@ func summarizeBuild(initial bool, sessions int, messages int, ss []model.Session
 			order = append(order, s.Harness)
 		}
 		c.Sessions++
-		c.Messages += len(s.Messages)
+		c.Messages += sources.CountMessages([]model.Session{s})
 	}
 	sort.Strings(order)
 	per := make([]HarnessCount, 0, len(order))
@@ -706,7 +703,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 				wroteMu.Lock()
 				wrote[key] = true
 				wroteMu.Unlock()
-				writtenMessages++
+				if sources.IsMessageRole(msg.Role) {
+					writtenMessages++
+				}
 				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}
@@ -1217,11 +1216,7 @@ func loadProgress(h string, progress io.Writer) []model.Session {
 			results[i] = loaded{name: name, ss: ss}
 			// Report as this store lands rather than after every store has,
 			// so the bar moves during the parse instead of jumping at the end.
-			msgs := 0
-			for _, x := range ss {
-				msgs += len(x.Messages)
-			}
-			reportHarness(name, len(ss), msgs)
+			reportHarness(name, len(ss), sources.CountMessages(ss))
 			// Only what the per-file reports did not already cover, so a store
 			// counts its weight once.
 			readMu.Lock()
@@ -1346,10 +1341,7 @@ func roundedSeconds(d time.Duration) string { return d.Round(time.Second).String
 // it is missing from recall. The skip reason was printed only for a store that
 // yielded nothing at all (#1758, the shape of #794).
 func harnessNarration(name string, ss []model.Session, skipped string, unreadable, refused int) string {
-	msgs := 0
-	for _, s := range ss {
-		msgs += len(s.Messages)
-	}
+	msgs := sources.CountMessages(ss)
 	// "deja" is the notes pseudo-source; it narrates as "notes".
 	label := name
 	if label == "deja" {
@@ -1705,7 +1697,9 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 				wroteMu.Lock()
 				wrote[key] = true
 				wroteMu.Unlock()
-				writtenMessages++
+				if sources.IsMessageRole(msg.Role) {
+					writtenMessages++
+				}
 				push(tokenJob{text: tokenizedPart(msg.Role, text), offset: off, sid: m.Sessions[key].Ord, when: msg.Time, tool: isToolRole(msg.Role)})
 			}
 		}

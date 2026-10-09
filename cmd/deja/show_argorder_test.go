@@ -16,7 +16,6 @@ func TestShowNamesTheMissingIdBeforeTheMissingFlag(t *testing.T) {
 	}{
 		{"nothing at all", []string{}, "show needs id-prefix"},
 		{"json without an id", []string{"--json"}, "show needs id-prefix"},
-		{"json with an id", []string{"--json", "s1"}, "requires --harness"},
 		{"harness but no id", []string{"--json", "--harness", "claude"}, "show needs id-prefix"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -111,7 +111,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return ensureError(dir, err)
 	}
-	cands, err := collectRuleCandidates(dir, since, limit)
+	cands, stands, err := collectRuleCandidates(dir, since, limit)
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 		return enc.Encode(cands)
 	}
 	if len(cands) == 0 {
-		fmt.Fprintln(w, "no corrections found in the indexed sessions")
+		fmt.Fprintln(w, noCandidatesLine(since, stands))
 		return nil
 	}
 	for i, c := range cands {
@@ -140,7 +140,7 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 // records in the order they alternated and keeps a user turn that corrects what
 // the agent just did. since and limit of zero mean everything; limit keeps the
 // newest.
-func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCandidate, error) {
+func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCandidate, int, error) {
 	type state struct {
 		skip                bool
 		seenUser, afterTurn bool
@@ -153,11 +153,15 @@ func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCa
 		cutoff = time.Now().Add(-since)
 	}
 	var out []ruleCandidate
+	stands := 0
 	err := index.EachRecordInRoles(dir, []string{"user", "assistant", "command", index.RoleEdit}, func(meta index.SessionMeta, r index.Record) {
 		st := states[r.Key]
 		if st == nil {
 			st = &state{skip: !candidateSession(meta, pol)}
 			states[r.Key] = st
+			if st.skip && (throwawayPath(meta.Path) || throwawayPath(meta.Project)) {
+				stands++
+			}
 		}
 		if st.skip {
 			return
@@ -192,7 +196,7 @@ func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCa
 		st.seenUser, st.afterTurn = true, false
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	sort.SliceStable(out, func(i, j int) bool {
 		if !out[i].time.Equal(out[j].time) {
@@ -207,7 +211,25 @@ func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCa
 	for i := range out {
 		out[i].N = i + 1
 	}
-	return out, nil
+	return out, stands, nil
+}
+
+// noCandidatesLine is the empty answer, with the window it searched and the
+// sessions it set aside as test stands: a stand under /tmp holding plain
+// corrections answered "no corrections found" and nothing said why.
+func noCandidatesLine(since time.Duration, stands int) string {
+	line := "no corrections found in the indexed sessions"
+	if since > 0 {
+		window := since.String()
+		if since%(24*time.Hour) == 0 {
+			window = strconv.Itoa(int(since/(24*time.Hour))) + "d"
+		}
+		line = "no corrections found in the last " + window
+	}
+	if stands > 0 {
+		line += fmt.Sprintf(" — %d session%s run from a temporary directory left out as test runs", stands, pluralS(stands))
+	}
+	return line
 }
 
 func isCorrection(x string) bool {

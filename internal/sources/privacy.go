@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -168,6 +169,40 @@ func CountSessions(ss []model.Session) int {
 		seen[s.Harness+":"+s.ID] = struct{}{}
 	}
 	return len(seen)
+}
+
+// IsMessageRole says whether a record is a message: something said or printed
+// in the conversation, as opposed to the command, file, edit and written-line
+// records deja derives from tool calls. Every count of messages uses it, so
+// index, sources and stats say one number for one store.
+func IsMessageRole(role string) bool {
+	switch role {
+	case RoleCommand, RoleFiles, RoleEdit, RoleWrote:
+		return false
+	}
+	return true
+}
+
+// CountMessages counts the messages in these sessions, by IsMessageRole, the
+// way the index keeps them: the same message arriving twice in one session —
+// a store's two formats of one conversation — is kept once.
+func CountMessages(ss []model.Session) int {
+	n := 0
+	seen := map[string]bool{}
+	for _, s := range ss {
+		for _, m := range s.Messages {
+			if !IsMessageRole(m.Role) {
+				continue
+			}
+			k := s.Harness + ":" + s.ID + "\x00" + m.Role + "\x00" + m.Time.UTC().Format(time.RFC3339Nano) + "\x00" + m.Text
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+			n++
+		}
+	}
+	return n
 }
 
 func FilterSessions(ss []model.Session) []model.Session {

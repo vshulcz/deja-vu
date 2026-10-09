@@ -754,8 +754,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		// A store that cannot be rebuilt — read-only, no space — falls through
 		// to the loader, which refuses and says why.
 		_ = index.Ensure(dir, "", false, os.Stderr)
-		// Exact identity first — that is what --harness is for, and what
-		// --json requires. But the usage line documents an id *prefix*, and
+		// Exact identity first — that is what --harness is for. But the usage line documents an id *prefix*, and
 		// routing --harness straight to the exact lookup made every
 		// prefix+harness call fail: "deja show 019fa282 --harness codex" said
 		// no session matches while the same prefix without --harness worked.
@@ -765,6 +764,11 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		}
 	} else {
 		s, ok, err = findByPrefix(dir, o.id)
+		// A machine reader cannot notice it was handed the newest of several
+		// matches, so --json answers only a prefix that names one session.
+		if err == nil && ok && o.json {
+			err = ambiguousJSONPrefix(dir, o.id)
+		}
 	}
 	if err != nil {
 		return err
@@ -1009,9 +1013,6 @@ func parseShow(args []string) (showOptions, error) {
 	// of it cost two runs to learn two missing things (#820).
 	if o.id == "" {
 		return o, errors.New(showNeedsID)
-	}
-	if o.json && o.harness == "" {
-		return o, fmt.Errorf("show --json requires --harness for exact identity")
 	}
 	if o.limit > 200 {
 		return o, fmt.Errorf("show --limit must not exceed 200")
@@ -2515,6 +2516,22 @@ func noteAmbiguousPrefix(dir, id, action string) {
 	fmt.Fprintf(os.Stderr, "deja: %d sessions match %q — %s the most recent; %s\n", n, id, action, advice)
 }
 
+// ambiguousJSONPrefix refuses a --json read whose prefix names more than one
+// session, and says what separates them.
+func ambiguousJSONPrefix(dir, id string) error {
+	pol := policy.Load()
+	n := index.PrefixMatchesAllowed(dir, id, func(project string) bool {
+		return pol.Allows(policy.ActivationSearch, project)
+	})
+	if n <= 1 {
+		return nil
+	}
+	if hs := index.PrefixHarnesses(dir, id); len(hs) > 1 {
+		return fmt.Errorf("%d sessions share the id %q — --json reads one; add --harness %s", len(hs), id, strings.Join(hs, " or --harness "))
+	}
+	return fmt.Errorf("%d sessions match %q — --json reads one; use a longer prefix (`deja last` prints ids whole)", n, id)
+}
+
 func findByPrefix(dir, p string) (model.Session, bool, error) {
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
@@ -2875,6 +2892,9 @@ type blameMode struct {
 	JSON        bool
 	Attribution bool
 	GitNote     bool
+	// AllProjects answers from the whole machine. A path names a file in this
+	// checkout, so by default sessions in other projects are left out.
+	AllProjects bool
 }
 
 func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
@@ -2907,6 +2927,8 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 			mode.GitNote = true
 		case "--all":
 			o.All = true
+		case "--all-projects":
+			mode.AllProjects = true
 		case "--harness", "--project", "--since":
 			if i+1 >= len(args) {
 				return "", o, mode, fmt.Errorf("%s needs value", a)
@@ -2983,9 +3005,38 @@ func runBlame(dir string, args []string) error {
 	if target.LineNote != "" && !jsonOutput {
 		fmt.Fprintf(os.Stderr, "deja: %s — answering for the whole file\n", target.LineNote)
 	}
+	// A path names a file in this checkout. Other repos have their own
+	// internal/pool/pool.go, and their sessions are about that file, not this
+	// one; they were listed in among this project's.
+	scope := blameScope(howCwd(), target, o.Project, mode.AllProjects)
+	wantAll := o.All
+	if len(scope) > 0 {
+		o.All = true
+	}
 	hits, hidden, total, err := findBlameHits(dir, target, o, policy.ActivationSearch, os.Stderr)
 	if err != nil {
 		return fmt.Errorf("blame search: %w", err)
+	}
+	elsewhere, onlyElsewhere := 0, false
+	if len(scope) > 0 {
+		var in []search.BlameHit
+		for _, h := range hits {
+			if howProjectMatches(h.Session.Project, scope) {
+				in = append(in, h)
+			}
+		}
+		elsewhere = len(hits) - len(in)
+		if len(in) > 0 {
+			hits = in
+		} else {
+			onlyElsewhere = len(hits) > 0
+		}
+		total = len(hits)
+		o.All = wantAll
+		hits = search.CapBlame(hits, o)
+	}
+	if onlyElsewhere && !jsonOutput && !mode.Attribution && !mode.GitNote {
+		fmt.Fprintf(os.Stderr, "deja: no session in %s mentions %s — these are from other projects\n", howScopeName(scope), target.Base)
 	}
 	// The line answer alone, in either rendering, and nothing about the file
 	// under it: that is what was asked for.
@@ -3045,7 +3096,25 @@ func runBlame(dir string, args []string) error {
 	if total > len(hits) {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), total)
 	}
+	if elsewhere > 0 && !onlyElsewhere {
+		fmt.Fprintf(os.Stderr, "deja: %d session%s in other projects mention their own %s — --all-projects lists them\n", elsewhere, pluralS(elsewhere), target.Base)
+	}
 	return nil
+}
+
+// blameScope is the project a blame answers from: the working directory's,
+// when the file lies inside it and nothing else was asked for. A file outside
+// the working directory, --project and --all-projects all leave it to the
+// rest of the options.
+func blameScope(cwd string, target search.BlameTarget, project string, allProjects bool) []string {
+	if allProjects || strings.TrimSpace(project) != "" || cwd == "" {
+		return nil
+	}
+	rel, err := filepath.Rel(cwd, target.FullPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return nil
+	}
+	return howScope(cwd, "", false)
 }
 
 func findBlameHits(dir string, target search.BlameTarget, o search.BlameOptions, activation string, progress io.Writer) ([]search.BlameHit, int, int, error) {
@@ -3425,10 +3494,7 @@ func printSources(dir string) {
 		raw := it.load()
 		ss := sources.FilterSessions(raw)
 		excluded := len(raw) - len(ss)
-		msg := 0
-		for _, s := range ss {
-			msg += len(s.Messages)
-		}
+		msg := sources.CountMessages(ss)
 		note := ""
 		// `deja sources` is where the empty-machine advice sends people, and a
 		// store deja is not allowed to read looked exactly like one nobody has
@@ -3488,7 +3554,7 @@ func printSources(dir string) {
 	}
 	aiderMessages := 0
 	for _, s := range aiderSessions {
-		aiderMessages += len(s.Messages)
+		aiderMessages += sources.CountMessages([]model.Session{s})
 	}
 	aiderLocation := filepath.Join(sources.Home(), ".aider.chat.history.md")
 	if roots := os.Getenv("DEJA_AIDER_ROOTS"); roots != "" {
@@ -4163,7 +4229,7 @@ func usageText() string {
 Usage:
   deja [flags] <query>
   deja search [flags] <query>   (same, but a query may start with a dash)
-  deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
+  deja show <id-prefix> [--json] [--harness name] [--offset n] [--limit n]
   deja share <id-prefix>
   deja resume <id-prefix> [--write-back] [--exec]
   deja wip [--json]
@@ -4179,7 +4245,7 @@ Usage:
   deja ctx <query|id-prefix>
   deja recall <words> [--project name] [--harness name] [--limit n]
              (what the MCP recall tool answers an agent: about 4 KB, this project first)
-  deja blame <path>[:line] [--all] [--json] [--project name] [--harness name] [--since 30d]
+  deja blame <path>[:line] [--all] [--all-projects] [--json] [--project name] [--harness name] [--since 30d]
   deja blame <path>:<line> --attribution [--json] [--git-note]  (the line answer alone)
   deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
   deja restore <path> [--span n] [-o|--out file] [--force]

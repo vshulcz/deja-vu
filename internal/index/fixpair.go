@@ -99,6 +99,24 @@ type FixPair struct {
 	// would have confirmed it existed, and the pair was lost for good (#1301).
 	// Kept, and promoted on the second sighting; never served to a caller.
 	Candidate bool `json:",omitempty"`
+	// Also holds the signatures of the other error lines in the same output.
+	// A failing test prints its name first and the reason under it, friction
+	// counts both, and a reader pastes whichever one explains it; keyed on the
+	// first line alone, `deja fix` with the second found nothing.
+	Also []uint64 `json:",omitempty"`
+}
+
+// answers reports whether the pair is about any of these signatures.
+func (p FixPair) answers(sigs map[uint64]bool) bool {
+	if sigs[p.Sig] {
+		return true
+	}
+	for _, s := range p.Also {
+		if sigs[s] {
+			return true
+		}
+	}
+	return false
 }
 
 func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
@@ -415,6 +433,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		if !ok {
 			continue
 		}
+		also := otherFrictionSigs(m.Text, sig)
 		// The command that produced this error, for the remedy that is that
 		// same command corrected.
 		failedCmd := commandBefore(ms, i)
@@ -522,7 +541,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 			}
 			out = append(out, FixPair{Sig: sig, Error: line, Command: cmd, Key: key,
 				When: ms[j].Time, Project: project, Repaired: repaired, Failed: failed,
-				Substitute: substituted})
+				Substitute: substituted, Also: also})
 			paired = true
 			break
 		}
@@ -530,7 +549,7 @@ func fixPairsIn(ms []model.Message, key, project string) []FixPair {
 		// remedy for a failing test, which is what the command window can
 		// never hold.
 		if !paired && edited != "" && looksLikeEditedPath(edited) {
-			out = append(out, FixPair{Sig: sig, Error: line, Edit: edited, Key: key, When: m.Time, Project: project})
+			out = append(out, FixPair{Sig: sig, Error: line, Edit: edited, Key: key, When: m.Time, Project: project, Also: also})
 		}
 	}
 	return out
@@ -592,6 +611,30 @@ func firstFrictionLine(text string) (string, uint64, bool) {
 		}
 	}
 	return "", 0, false
+}
+
+// otherFrictionSigs is every error line of a record past the first, hashed,
+// without repeats. Bounded: a build log can print hundreds.
+func otherFrictionSigs(text string, first uint64) []uint64 {
+	const most = 8
+	var out []uint64
+	seen := map[uint64]bool{first: true}
+	for _, raw := range strings.Split(text, "\n") {
+		line, ok := FrictionLine(raw)
+		if !ok {
+			continue
+		}
+		h := frictionHash(line)
+		if seen[h] {
+			continue
+		}
+		seen[h] = true
+		out = append(out, h)
+		if len(out) >= most {
+			break
+		}
+	}
+	return out
 }
 
 func firstLineOf(s string) string {
@@ -814,7 +857,7 @@ func FixesFor(dir, text string, limit int, allow func(project string) bool) []Fi
 		return ignored[project]
 	}
 	for _, p := range ReadFixes(dir) {
-		if !sigs[p.Sig] {
+		if !p.answers(sigs) {
 			continue
 		}
 		if remedyIsTheFailure(p) || remedyIsIrreversible(p.Command) {
@@ -969,7 +1012,7 @@ func FixCandidateSeen(dir, text string, allow func(project string) bool) bool {
 		return false
 	}
 	for _, p := range ReadFixes(dir) {
-		if !sigs[p.Sig] || !p.Candidate {
+		if !p.answers(sigs) || !p.Candidate {
 			continue
 		}
 		// A sighting FixesFor would drop is not one a second session can
@@ -1002,7 +1045,7 @@ func FixWithheldAsIrreversible(dir, text string, allow func(project string) bool
 	}
 	var ignored map[string]bool
 	for _, p := range ReadFixes(dir) {
-		if !sigs[p.Sig] || !remedyIsIrreversible(p.Command) {
+		if !p.answers(sigs) || !remedyIsIrreversible(p.Command) {
 			continue
 		}
 		if allow != nil && !allow(p.Project) {
