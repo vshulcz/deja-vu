@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bare `deja` at a terminal opens a search screen over every agent's history. Type to search, read a session at the hit, resume it, or carry it into another agent with `ctrl-o`. It opens on the sessions behind your uncommitted change, and on a first run it builds the index behind the screen instead of before it. Pipes, `TERM=dumb` and `DEJA_TUI=0` keep the text summary.
+- The first run of a new version says once what it brings: the top three changes in the terminal, one line in the session-start note.
+- An empty search in a terminal shows the surprised cat, and the first search that finds something shows the ready one, once per index.
 - An interactive command says, at most once a day, when a newer deja release is out, with the upgrade command for whatever installed it (`deja update`, brew, npm, scoop). The look at GitHub runs in a detached process and the next interactive command prints what it found, so no command waits on the network. Hooks, the MCP server, pipes, dev builds, `deja update`, `deja doctor` and `deja version` never start it, and `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1` turns it off with no request made (#4622).
 - After a search that finds something, in a terminal, deja shows one short tip at most once a day, naming a command you may not have met: `blame`, `fix`, `how` or `view`, in rotation. It goes to stderr and never appears in a pipe, a script, a hook or `--json` (#4629).
 - Kimi Code and Kiro get the line about a file before an edit, and CodeWhale the fix pair for a failed command. None of them shows the model what that hook prints, so the line waits for the next hook that does: the next prompt on Kimi and Kiro, the next tool call or message on CodeWhale. CodeWhale also hands over the pre-tool line of a call that failed to run, which it sends back without it.
@@ -40,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- One transcript its agent deleted made every search after it answer from the index as it was and start a background pass with nothing to do, and `deja handoff` printed the kept notice twice. A kept transcript is now marked in the index and no longer reads as a change.
 - `deja log` no longer says a compaction "stored nothing" when it stored the packet and only the edit count after it could not be measured. Every compaction on a host whose transcript deja reads through its own parser, such as TRAE CLI and Qwen Code, showed as lost.
 - CodeWhale's TUI got no fix pair for a failed command: its bash tool sends no receipt and reports the failure as "Failed to execute tool: …", and that prefix kept the error from matching. The pair now arrives with the next message.
 - The summary a harness writes when it compacts is indexed under the `summary` role for Codex, Copilot CLI, VS Code Copilot Chat, Antigravity, Kimi, pi, omp, prime-agent, Senpi, gjc, Kimchi, OpenClaw, Crush, Qwen Code, ZCode, Kilo Code, Roo Code and CodeWhale. Before, it was dropped, or filed as something the person or the agent said. Roo and Kilo's sliding-window note is no longer read as the person's words (#4801).
