@@ -12,10 +12,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja blame <path>:<line>` answers why a line is the way it is.
@@ -403,34 +405,52 @@ func tailSegments(p string, n int) string {
 
 // printLineAuthor writes the line-level answer above the ordinary listing.
 func printLineAuthor(w io.Writer, target search.BlameTarget, c lineCommit, a lineAuthor, found bool) {
+	color, width := search.ColorOK(w), printableWidth(w)
+	line := func(label, text string) {
+		hang := "    "
+		out := termwidth.Indent(text, width, "  "+label, hang)
+		if color && label != "" {
+			out = "  " + statBold + strings.TrimSuffix(label, " ") + statReset + " " + strings.TrimPrefix(out, "  "+label)
+		}
+		fmt.Fprintln(w, out)
+	}
 	when := ""
 	if !c.When.IsZero() {
-		when = " · " + c.When.Local().Format("2006-01-02")
+		when = " · " + search.DisplayDate(c.When)
 	}
-	fmt.Fprintf(w, "%s:%d last changed in %s%s · %s\n", target.Base, target.Line, shortSHA(c.SHA), when, firstLine(c.Subject))
+	head := fmt.Sprintf("%s:%d last changed in %s%s · %s", target.Base, target.Line, shortSHA(c.SHA), when, firstLine(c.Subject))
+	head = termwidth.Indent(head, width, "", "  ")
+	if color {
+		head = statBold + head + statReset
+	}
+	fmt.Fprintln(w, head)
 	if !found {
 		// Silence is the honest answer, and it has to say which silence: deja
 		// holds no session that wrote this line, rather than deja having
 		// nothing about the file at all.
-		fmt.Fprintf(w, "  no indexed session wrote this line or the lines this commit replaced — nothing to say about this line\n")
+		line("", "no indexed session wrote this line or the lines this commit replaced — nothing to say about this line")
 		return
 	}
 	s := a.Session
-	fmt.Fprintf(w, "  written in %s · %s · %s\n", search.SafeLine(s.Harness), shortID(s.ID), search.SafeLine(s.Project))
+	harness := search.SafeLine(s.Harness)
+	if color {
+		harness = harnesscolor.Paint(s.Harness, harness, true)
+	}
+	fmt.Fprintf(w, "  written in %s · %s · %s\n", harness, search.ShortID(s.ID), search.SafeLine(s.Project))
 	// Which rule answered, because the two are not equally strong and a reader
 	// deciding whether to trust the attribution needs to know which they have.
 	if a.Wrote {
-		fmt.Fprintf(w, "  wrote this line: %s\n", search.SafeLine(trunc80(a.Matched)))
+		line("wrote this line: ", search.SafeLine(trunc80(a.Matched)))
 	} else {
-		fmt.Fprintf(w, "  replaced: %s\n", search.SafeLine(trunc80(a.Matched)))
+		line("replaced: ", search.SafeLine(trunc80(a.Matched)))
 	}
 	if a.Asked != "" {
-		fmt.Fprintf(w, "  asked: %s\n", search.SafeLine(trunc80(a.Asked)))
+		line("asked: ", search.SafeLine(trunc80(a.Asked)))
 	}
 	if a.Said != "" {
-		fmt.Fprintf(w, "  %s%s\n", saidBeforePrefix, search.SafeLine(a.Said))
+		line(saidBeforePrefix, search.SafeLine(a.Said))
 	}
-	fmt.Fprintf(w, "  why, in full: deja ctx %s\n", shortID(s.ID))
+	line("why, in full: ", "deja ctx "+search.ShortID(s.ID))
 }
 
 func trunc80(s string) string {

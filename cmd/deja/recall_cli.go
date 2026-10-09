@@ -3,10 +3,13 @@ package main
 import (
 	"fmt"
 	"io"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -88,6 +91,43 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 	}
 	text = frameRecall(text)
 	usage.RecordServedFromInto(dir, usage.KindRecall, text, "", sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
+	if color, width := search.ColorOK(stdout), printableWidth(stdout); color || width > 0 {
+		text = recallForScreen(text, color, width)
+	}
 	_, err = fmt.Fprintln(stdout, text)
 	return err
+}
+
+// recallHitHead is a numbered hit line of the recall page:
+// "1. [claude] payments · a1f2c93b · 3 matches · updated 2025-11-29 (Nov 29 2025)".
+var (
+	recallHitHead = regexp.MustCompile(`^(\d+\.) \[([A-Za-z0-9_.-]+)\](.*)$`)
+	recallUpdated = regexp.MustCompile(` · updated \d{4}-\d{2}-\d{2} \(([^)]*)\)`)
+)
+
+// recallForScreen is the recall page as a person at a terminal reads it. A pipe
+// gets exactly what the MCP tool hands an agent; a terminal gets the same
+// words with the frame dimmed, each hit's number bold and its harness in its
+// colour, the day in one form instead of two, and every line wrapped to the
+// width at spaces.
+func recallForScreen(text string, color bool, width int) string {
+	lines := strings.Split(text, "\n")
+	for i, l := range lines {
+		if m := recallHitHead.FindStringSubmatch(l); m != nil {
+			rest := recallUpdated.ReplaceAllString(m[3], " · updated $1")
+			if color {
+				lines[i] = statBold + m[1] + statReset + " " + search.HarnessTag(m[2], true) + rest
+			} else {
+				lines[i] = m[1] + " [" + m[2] + "]" + rest
+			}
+			continue
+		}
+		frame := i < 2 || l == "</deja-recall>"
+		l = termwidth.WrapText(l, width)
+		if color && frame {
+			l = statDim + l + statReset
+		}
+		lines[i] = l
+	}
+	return strings.Join(lines, "\n")
 }

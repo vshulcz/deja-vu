@@ -48,7 +48,7 @@ func assertEditSurfaces(t *testing.T, harness, id, file, span, topic string) {
 		t.Fatalf("restore lists no %s span for %s:\n%s", harness, base, listing)
 	}
 	found := false
-	for n := 1; n <= strings.Count(listing, " B replaced"); n++ {
+	for n := 1; n <= strings.Count(listing, " B "); n++ {
 		out.Reset()
 		if err := runRestore(dir, []string{base, "--span", fmt.Sprint(n)}, &out); err != nil {
 			t.Fatalf("restore --span %d: %v", n, err)

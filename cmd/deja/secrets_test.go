@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 )
 
 // The one invariant this command cannot get wrong: it reports a credential
@@ -40,7 +42,7 @@ func TestSecretsNamesTheKindAndNeverTheValue(t *testing.T) {
 	if strings.Contains(got, planted) || strings.Contains(got, "s3cretzz") {
 		t.Fatal("the report printed the credential it found")
 	}
-	if !strings.Contains(got, "claude") || !strings.Contains(got, "2026-03-04") {
+	if !strings.Contains(got, "claude") || !strings.Contains(got, search.DisplayDate(time.Date(2026, 3, 4, 12, 0, 0, 0, time.UTC))) {
 		t.Errorf("the report does not say where to look:\n%s", got)
 	}
 	if !strings.Contains(got, "s1.jsonl") {

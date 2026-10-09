@@ -12,6 +12,8 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja recap` is the week, from the sessions rather than from memory (#544).
@@ -150,18 +152,30 @@ func printRecap(w io.Writer, r index.Recap, since string, limit int) {
 			order = append(order, name)
 		}
 	}
+	// On a terminal: project headings bold, the receipts dimmed with the
+	// harness in its colour, and every line wrapped at spaces. A pipe gets the
+	// draft unwrapped, since it is written to be pasted elsewhere.
+	color, width := search.ColorOK(w), printableWidth(w)
 	for _, name := range order {
-		fmt.Fprintf(w, "\n%s\n", name)
+		if color {
+			fmt.Fprintf(w, "\n%s%s%s\n", statBold, name, statReset)
+		} else {
+			fmt.Fprintf(w, "\n%s\n", name)
+		}
 		for _, s := range shown {
 			if recapProjectName(s.Project) != name {
 				continue
 			}
 			for _, line := range s.Lines {
-				fmt.Fprintf(w, "  · %s\n", line)
+				fmt.Fprintln(w, termwidth.Indent(line, width, "  · ", "    "))
 			}
 			// The receipt: which session said it, so the draft can be checked
 			// rather than trusted.
-			fmt.Fprintf(w, "    %s\n", recapSource(s))
+			if color {
+				fmt.Fprintf(w, "    %s%s\n", search.HarnessTag(s.Harness, true), statDim+strings.TrimPrefix(recapSource(s), s.Harness)+statReset)
+			} else {
+				fmt.Fprintf(w, "    %s\n", recapSource(s))
+			}
 		}
 	}
 	if n := len(r.Sessions) - len(shown); n > 0 {
@@ -186,13 +200,10 @@ func recapProjectName(p string) string {
 func recapSource(s index.RecapSession) string {
 	out := s.Harness
 	if !s.When.IsZero() {
-		out += " · " + s.When.Local().Format("2006-01-02")
+		out += " · " + search.DisplayDate(s.When)
 	}
-	if id := s.ID; id != "" {
-		if len(id) > 8 {
-			id = id[:8]
-		}
-		out += " · " + id
+	if s.ID != "" {
+		out += " · " + search.SafeLine(search.ShortID(s.ID))
 	}
 	return out
 }
@@ -201,8 +212,9 @@ func printRecapTail(w io.Writer, r index.Recap) {
 	if n := recapMaskedTotal(r.Masked); n > 0 {
 		// Said out loud, because the reader is about to paste this somewhere
 		// public and the masking is the reason they can.
-		fmt.Fprintf(w, "\nmasked for outbound use: %s — this text is written to be pasted, so addresses, internal hostnames, emails and home paths are removed\n",
+		line := fmt.Sprintf("masked for outbound use: %s — this text is written to be pasted, so addresses, internal hostnames, emails and home paths are removed",
 			recapMaskedSummary(r.Masked))
+		fmt.Fprintf(w, "\n%s\n", termwidth.Indent(line, printableWidth(w), "", ""))
 	}
 	if r.Withheld > 0 {
 		fmt.Fprintf(w, "the ignore rule kept %d session%s out of this recap\n", r.Withheld, pluralS(r.Withheld))

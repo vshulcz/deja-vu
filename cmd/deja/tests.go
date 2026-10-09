@@ -8,9 +8,12 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja tests` is the build and test history already in the transcripts (#539).
@@ -115,7 +118,7 @@ func printTests(w io.Writer, h index.TestHistory, limit int) {
 	}
 	fmt.Fprintf(w, "%d build and test run%s on %d day%s, %s to %s\n",
 		h.Runs, pluralS(h.Runs), h.Days, pluralS(h.Days),
-		h.First.Local().Format("2006-01-02"), h.Last.Local().Format("2006-01-02"))
+		search.DisplayDate(h.First), search.DisplayDate(h.Last))
 	weeks := h.Weeks
 	if len(weeks) > testsWeeks {
 		weeks = weeks[len(weeks)-testsWeeks:]
@@ -124,8 +127,12 @@ func printTests(w io.Writer, h index.TestHistory, limit int) {
 		fmt.Fprintf(w, "the last %d of %d weeks, newest last — `deja tests --json` for the whole series\n",
 			len(weeks), len(h.Weeks))
 	}
+	wWeek := 0
 	for _, k := range weeks {
-		fmt.Fprintf(w, "\n  week of %s  %4d run%s  %4d failed  %4d passed", k.Start.Format("2006-01-02"),
+		wWeek = max(wWeek, len(testsDay(k.Start)))
+	}
+	for _, k := range weeks {
+		fmt.Fprintf(w, "\n  week of %-*s  %4d run%s  %4d failed  %4d passed", wWeek, testsDay(k.Start),
 			k.Runs, pluralS(k.Runs), k.Failed, k.Passed)
 		if k.NoVerdict > 0 {
 			fmt.Fprintf(w, "  %4d no verdict", k.NoVerdict)
@@ -146,8 +153,9 @@ func printTests(w io.Writer, h index.TestHistory, limit int) {
 		// Said plainly, because the number is large and the reason for it is
 		// not a gap in the store: the agent piped its own run through a filter
 		// that printed nothing, so the verdict never reached the transcript.
-		fmt.Fprintf(w, "\nthe verdict is the runner's own line — %d run%s (%d%%) had it filtered out of the pipeline before the output was recorded, and are counted as neither\n",
+		line := fmt.Sprintf("the verdict is the runner's own line — %d run%s (%d%%) had it filtered out of the pipeline before the output was recorded, and are counted as neither",
 			h.NoVerdict, pluralS(h.NoVerdict), percentOf(h.NoVerdict, h.Runs))
+		fmt.Fprintf(w, "\n%s\n", termwidth.Indent(line, printableWidth(w), "", ""))
 	}
 	printTestRepeats(w, h, limit)
 	if h.Withheld > 0 {
@@ -168,13 +176,34 @@ func printTestRepeats(w io.Writer, h index.TestHistory, limit int) {
 	if limit > 0 && len(shown) > limit {
 		shown = shown[:limit]
 	}
+	// The count sits after the longest name shown, not at a fixed far column:
+	// at 80 columns that column pushed "last …" onto the next line.
+	wName := 0
 	for _, r := range shown {
-		fmt.Fprintf(w, "  %-52s %d failure%s on %d days, last %s\n", cutName(r.Name, 52),
-			r.Failures, pluralS(r.Failures), r.Days, r.LastFail.Local().Format("2006-01-02"))
+		wName = max(wName, termwidth.Columns(cutName(r.Name, 52)))
+	}
+	bold := search.ColorOK(w)
+	for _, r := range shown {
+		name := cutName(r.Name, 52)
+		pad := strings.Repeat(" ", wName-termwidth.Columns(name))
+		if bold {
+			name = statBold + name + statReset
+		}
+		fmt.Fprintf(w, "  %s%s  %d failure%s on %d days, last %s\n", name, pad,
+			r.Failures, pluralS(r.Failures), r.Days, search.DisplayDate(r.LastFail))
 	}
 	if n := len(h.Repeats) - len(shown); n > 0 {
 		fmt.Fprintf(w, "  %d more — `deja tests --limit 0` for all of them, `--json` for the series too\n", n)
 	}
+}
+
+// testsDay is a week's first day in the form the other screens print, in the
+// zone the week was cut in.
+func testsDay(t time.Time) string {
+	if t.Year() == time.Now().Year() {
+		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2 2006")
 }
 
 func cutName(s string, n int) string {

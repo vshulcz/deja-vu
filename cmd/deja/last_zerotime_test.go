@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -37,11 +38,11 @@ func TestLastPrintsADashForAMissingTimestamp(t *testing.T) {
 	if strings.Contains(out, "0001-01-01") {
 		t.Errorf("printed the zero date:\n%s", out)
 	}
-	if !strings.Contains(out, "· - · notime") {
+	if !regexp.MustCompile(`\s-\s+notime\s`).MatchString(out) {
 		t.Errorf("no dash for the undated session:\n%s", out)
 	}
 	// The dated one still shows its date.
-	if !strings.Contains(out, "2026-07-30 · ok") {
+	if !regexp.MustCompile(`Jul 30\s+ok\s`).MatchString(out) {
 		t.Errorf("dated session lost its date:\n%s", out)
 	}
 	// JSON keeps the raw value: a machine reader wants the field as stored.

@@ -169,7 +169,7 @@ func TestBlameLineNamesTheSessionBehindTheLine(t *testing.T) {
 	if !strings.Contains(out, "pool.go:3 last changed in") {
 		t.Fatalf("the line's own commit is not named:\n%s", out)
 	}
-	if !strings.Contains(out, "written in claude") || !strings.Contains(out, id[:12]) {
+	if !strings.Contains(out, "written in claude") || !strings.Contains(out, search.ShortID(id)) {
 		t.Fatalf("the session that wrote the replaced line is not named:\n%s", out)
 	}
 	if !strings.Contains(out, "connsPerShard") {

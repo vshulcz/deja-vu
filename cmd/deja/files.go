@@ -373,20 +373,16 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		})
 	}
 	fmt.Fprintf(stdout, "files touched while working on %q — %d session%s%s\n", q, scanned, plural(scanned), filesReadNote(matched))
-	// Which project answered. An agent that reads the paths and not this line
-	// still gets the right files; one that reads both knows whether they are in
-	// the repository it is standing in (#3713).
-	if name := howScopeName(scope); name != "" {
-		fmt.Fprintf(stdout, "— in %s; --all-projects asks the machine\n", name)
-	} else if widened {
-		fmt.Fprintln(stdout, "— nothing in this project; these are elsewhere")
-	}
 	// The path column was a fixed 56, which on a 60-column pane leaves nothing
 	// for the count and wraps every row (#604). Budgeted against the window
 	// instead, with the same 56 when the window is wide enough or unknown.
 	col := 56
-	if w := printableWidth(stdout); w > 0 && w-6 < col {
-		col = w - 6
+	label := 0
+	for _, r := range rows {
+		label = max(label, len(pluralSessions(nearSessions[r.path])))
+	}
+	if w := printableWidth(stdout); w > 0 && w-3-label < col {
+		col = w - 3 - label
 		if col < 16 {
 			col = 16
 		}
@@ -396,7 +392,13 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		// a Chinese directory is one rune and two columns per character, so the
 		// counts stopped lining up in a column of their own.
 		path := filesRowPath(r.path, col)
-		fmt.Fprintf(stdout, "  %s%s %d\n", path, strings.Repeat(" ", max(0, col-termwidth.Columns(path))), r.n)
+		fmt.Fprintf(stdout, "  %s%s %s\n", path, strings.Repeat(" ", max(0, col-termwidth.Columns(path))), pluralSessions(nearSessions[r.path]))
+	}
+	// Which project answered. An agent that reads the paths and not this line
+	// still gets the right files; one that reads both knows whether they are in
+	// the repository it is standing in (#3713).
+	if line := projectScopeHint(scope, widened); line != "" {
+		fmt.Fprintln(stdout, dimFor(stdout, line))
 	}
 	// Same as `how`: a list cut at the limit without a word reads as the whole
 	// list, and the line goes where search puts it (#1632).
@@ -404,6 +406,26 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — raise --limit for the rest\n", len(rows), cut)
 	}
 	return nil
+}
+
+// projectScopeHint is the line under a `files` or `how` answer that says which
+// project answered it, worded the same on both.
+func projectScopeHint(scope []string, widened bool) string {
+	if name := howScopeName(scope); name != "" {
+		return "— in " + name + " only; `--all-projects` looks at every project"
+	}
+	if widened {
+		return "— nothing in this project; these are from other projects"
+	}
+	return ""
+}
+
+// dimFor dims a secondary line when w is a terminal that takes colour.
+func dimFor(w io.Writer, line string) string {
+	if search.ColorOK(w) {
+		return statDim + line + statReset
+	}
+	return line
 }
 
 // filesJSON is the `deja files --json` envelope. See docs/json-output.md.

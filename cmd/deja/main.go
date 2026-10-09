@@ -24,6 +24,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -813,7 +814,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	if line := clippedMessageNote(dir, s); line != "" {
 		fmt.Fprintln(os.Stderr, line)
 	}
-	search.PrintSession(os.Stdout, s)
+	search.PrintSessionStyled(os.Stdout, s, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
 	return nil
 }
 
@@ -1049,7 +1050,7 @@ func ctxFromIDPrefix(dir, q string) (bool, error) {
 	if line := lifecycleLine(hits[0]); line != "" {
 		fmt.Fprintln(os.Stdout, line)
 	}
-	search.PrintContext(os.Stdout, s, "")
+	search.PrintContextStyled(os.Stdout, s, "", search.ColorOK(os.Stdout), printableWidth(os.Stdout))
 	return true, nil
 }
 
@@ -1187,7 +1188,7 @@ func cmdCtx(dir string, rest []string) error {
 	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
 		whole = full
 	}
-	search.PrintContext(os.Stdout, whole, q)
+	search.PrintContextStyled(os.Stdout, whole, q, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
 	return nil
 }
 
@@ -1300,49 +1301,7 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 	if total > len(ss) {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — `deja last %d` shows the rest\n", len(ss), total, total)
 	}
-	for _, s := range ss {
-		// A session whose timestamp was missing or unparseable carries the Go
-		// zero time, and "0001-01-01" reads as corrupted data rather than as a
-		// missing field. Search prints a dash here and the first screen leaves
-		// such sessions out of its range; this was the one place that did not
-		// follow the convention (#765).
-		when := "-"
-		if !s.Updated.IsZero() {
-			// The reader's zone, like the brief and stats: a session stamped
-			// 22:00 UTC is 01:00 tomorrow for its author, and this line put it
-			// on the day before the other two screens did (#849).
-			when = s.Updated.Local().Format("2006-01-02")
-		}
-		// The id's own day is not used here, unlike search: this line prints
-		// the id whole, so nothing has to be rebuilt from the date (#883),
-		// while borrowing the id's day made the column run 06, 07, 04 down
-		// the screen for a reader far enough east of the writer (#1038).
-
-		// Project, id and title are text a harness wrote, and this is one
-		// line: an escape byte in any of them recolours the rest of the
-		// listing and a carriage return rewinds it (#1090).
-		fmt.Printf("[%s · %s · %s · %s]", s.Harness, redact.SafeForDisplay(displayProject(s)), when, redact.SafeForDisplay(s.ID))
-		title := s.Title
-		if title == "" {
-			title = firstUserTitle(s)
-		}
-		// The title is transcript text going straight to a terminal: an escape
-		// in it repaints the screen and a carriage return rewinds the line.
-		// SafeForDisplay keeps a newline on purpose — the reading surfaces are
-		// the session's own layout — but this is one row of a listing, and a
-		// note title carries whatever a person wrote by hand (#2058).
-		if title = search.SafeNoteTitle(redact.SafeForDisplay(title)); title != "" {
-			// A session with no user turn borrows the assistant's opening line
-			// (#692), and unmarked it read like the reader's own question
-			// (#1100).
-			if s.AgentTitle {
-				fmt.Printf(" agent: %s", title)
-			} else {
-				fmt.Printf(" %s", title)
-			}
-		}
-		fmt.Println()
-	}
+	printLastRows(os.Stdout, ss)
 	// The listing is ordered by a date, so one that has not happened leads it
 	// and nothing else on the screen says why. The first screen carries the
 	// same sentence beside the same list, because leaving it unexplained makes
@@ -1352,6 +1311,126 @@ func cmdLast(dir string, rest []string, sourceInstance string) error {
 			n, pluralS(n), pluralThatThose(n))
 	}
 	return nil
+}
+
+// printLastRows lists sessions one per line in the form the search result
+// header uses — harness, project, day, short id — with the columns padded so
+// a screenful scans down, and the title after them. On a terminal the harness
+// is coloured, the day dimmed and the title cut to the width; a pipe gets every
+// title whole.
+func printLastRows(w io.Writer, ss []model.Session) {
+	type row struct{ tag, project, when, id, title string }
+	rows := make([]row, 0, len(ss))
+	wTag, wProject, wWhen, wID := 0, 0, 0, 0
+	for _, s := range ss {
+		// A session whose timestamp was missing or unparseable carries the Go
+		// zero time, and "0001-01-01" reads as corrupted data rather than as a
+		// missing field (#765). The reader's zone, like the brief and stats
+		// (#849).
+		when := "-"
+		if !s.Updated.IsZero() {
+			when = search.DisplayDate(s.Updated)
+		}
+		// Project, id and title are text a harness wrote, and this is one
+		// line: an escape byte in any of them recolours the rest of the
+		// listing and a carriage return rewinds it (#1090).
+		r := row{
+			tag:     "[" + s.Harness + "]",
+			project: redact.SafeForDisplay(displayProject(s)),
+			when:    when,
+			id:      redact.SafeForDisplay(search.ShortID(s.ID)),
+		}
+		title := s.Title
+		if title == "" {
+			title = firstUserTitle(s)
+		}
+		// SafeForDisplay keeps a newline on purpose — the reading surfaces are
+		// the session's own layout — but this is one row of a listing, and a
+		// note title carries whatever a person wrote by hand (#2058).
+		if title = search.SafeNoteTitle(redact.SafeForDisplay(title)); title != "" {
+			// A session with no user turn borrows the assistant's opening line
+			// (#692), and unmarked it read like the reader's own question
+			// (#1100).
+			if s.AgentTitle {
+				title = "agent: " + title
+			}
+		}
+		r.title = title
+		wTag = max(wTag, termwidth.Columns(r.tag))
+		wProject = max(wProject, termwidth.Columns(r.project))
+		wWhen = max(wWhen, termwidth.Columns(r.when))
+		wID = max(wID, termwidth.Columns(r.id))
+		rows = append(rows, r)
+	}
+	// A long project name would push every title off a narrow screen; past
+	// this it stops setting the column for the rest.
+	wProject = min(wProject, 24)
+	color, width := search.ColorOK(w), printableWidth(w)
+	pad := func(s string, n int) string {
+		if gap := n - termwidth.Columns(s); gap > 0 {
+			return s + strings.Repeat(" ", gap)
+		}
+		return s
+	}
+	for i, r := range rows {
+		tag := pad(r.tag, wTag)
+		if color {
+			tag = search.HarnessTag(ss[i].Harness, true) + strings.Repeat(" ", len(tag)-len(r.tag))
+		}
+		when := pad(r.when, wWhen)
+		if color {
+			when = statDim + when + statReset
+		}
+		head := tag + " " + pad(r.project, wProject) + "  " + when + "  " + pad(r.id, wID)
+		line := head
+		if r.title != "" {
+			title := r.title
+			if width > 0 {
+				used := wTag + 1 + max(wProject, termwidth.Columns(r.project)) + 2 + wWhen + 2 + wID + 2
+				// Too little room beside the columns and the title goes under
+				// them, the way a search hit's quote does, rather than being
+				// cut to a few words.
+				if width-used < 32 {
+					fmt.Fprintln(w, strings.TrimRight(line, " "))
+					fmt.Fprintln(w, "  "+cutToWidth(title, width-2))
+					continue
+				}
+				title = cutToWidth(title, width-used)
+			}
+			line += "  " + title
+		}
+		fmt.Fprintln(w, strings.TrimRight(line, " "))
+	}
+}
+
+// cutToWidth shortens s to width columns with an ellipsis, ending on a whole
+// word where one is near. Width zero or less leaves it alone.
+func cutToWidth(s string, width int) string {
+	if width <= 0 || termwidth.Columns(s) <= width {
+		return s
+	}
+	if width < 8 {
+		width = 8
+	}
+	cut := strings.TrimRight(termwidth.Cut(s, width-1), " ")
+	if at := strings.LastIndex(cut, " "); at > 0 && termwidth.Columns(cut[at:]) <= 14 {
+		cut = strings.TrimRight(cut[:at], " ")
+	}
+	return cut + "…"
+}
+
+// fitNotice wraps a one-line notice to the terminal w writes to, at spaces,
+// with the continuation indented under "deja: ". A pipe gets it unchanged.
+func fitNotice(w io.Writer, note string) string {
+	body, nl := strings.CutSuffix(note, "\n")
+	if strings.Contains(body, "\n") {
+		return note
+	}
+	out := termwidth.Indent(body, printableWidth(w), "", "      ")
+	if nl {
+		out += "\n"
+	}
+	return out
 }
 
 // stampedAheadCount counts the listed sessions whose stamp is after now, by the
@@ -1582,7 +1661,7 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 		fmt.Fprintf(os.Stderr, "deja: %s\n", note)
 	}
 	if note := otherWordFormsNote(dir, o, hits); note != "" {
-		fmt.Fprint(os.Stderr, note)
+		fmt.Fprint(os.Stderr, fitNotice(os.Stderr, note))
 	}
 	mistyped := false
 	if len(hits) == 0 {
@@ -1637,6 +1716,14 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// line, since a script reading deja wants the text and not the layout
 	// (#604).
 	o.Width = printableWidth(os.Stdout)
+	// --all is the whole list, and past the first screen the scores are near
+	// ties a reader cannot see, so the order read as random: Jun 2, May 13,
+	// Mar 4, then Jun 22 (#45). The whole list reads newest first; --json keeps
+	// the ranked order a script may rely on.
+	if o.All && !o.JSON && len(hits) > 1 {
+		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Session.Updated.After(hits[j].Session.Updated) })
+		fmt.Fprintf(os.Stderr, "deja: all %d matches, newest first\n", len(hits))
+	}
 	// Through a counter, so the log records what actually went out rather than
 	// a guess at it. `deja log` is the audit of what deja did, and the search
 	// kind has been named in the docs, in the comment over the kind constants
@@ -1932,9 +2019,9 @@ func printNoMatches(w io.Writer, dir, q string, regex bool) (mistypedCommand boo
 		}
 		return
 	} else if ok {
-		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", reach, pluralS(reach), q)
+		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", reach, pluralS(reach), q)))
 	} else if n, err := index.SessionCount(dir); err == nil {
-		fmt.Fprintf(w, "deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)
+		fmt.Fprint(w, fitNotice(w, fmt.Sprintf("deja: no matches in %d indexed session%s — try fewer words or --re (query %q)\n", n, pluralS(n), q)))
 	} else {
 		fmt.Fprintf(w, "deja: no matches — try fewer words or --re (query %q)\n", q)
 	}
@@ -3032,7 +3119,7 @@ func runBlame(dir string, args []string) error {
 		}
 		return nil
 	}
-	search.PrintBlame(os.Stdout, hits, false)
+	search.PrintBlameWidth(os.Stdout, hits, printableWidth(os.Stdout))
 	// The name the reader has is the one in their editor, and a rename drops
 	// everything said under the old one out of this answer (#1627).
 	if note := earlierNameNote(dir, path, target); note != "" {

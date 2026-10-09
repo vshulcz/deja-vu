@@ -18,6 +18,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -1592,7 +1593,7 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintln(w, note)
 		}
 		if h.Superseded != "" {
-			note := "  earlier attempt — this project has a newer session on the same ground (" + h.Superseded + ")"
+			note := "  earlier attempt — this project has a newer session on the same ground (" + supersededDay(h.Superseded) + ")"
 			if color {
 				note = cDim + note + cReset
 			}
@@ -1605,6 +1606,20 @@ func Print(w io.Writer, hits []Hit, o Options) {
 			fmt.Fprintf(w, "  %s\n", highlight(SafeText(fitLine(sn, o.Width-2)), o.Query, o.Regex, color))
 		}
 	}
+}
+
+// supersededDay prints the newer session's day the way the header above it
+// prints days. The marker is minted as a UTC date because lifecycle compares
+// against it, so it is read back in UTC; anything else is printed as it came.
+func supersededDay(day string) string {
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	if t.Year() == time.Now().Year() {
+		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2 2006")
 }
 
 // MatchCount is a session's hit count as the result line prints it: "1 match",
@@ -1744,13 +1759,28 @@ func repeatedStamps(ms []model.Message) map[string]bool {
 }
 
 func PrintSession(w io.Writer, s model.Session) {
+	PrintSessionStyled(w, s, false, 0)
+}
+
+// PrintSessionStyled is PrintSession for a terminal: the harness in its colour,
+// timestamps dimmed and roles bold so a long session scans by turn, and every
+// message wrapped to width at spaces. color false and width 0 is the plain
+// text a pipe gets.
+func PrintSessionStyled(w io.Writer, s model.Session, color bool, width int) {
 	// Project and id are transcript text a harness wrote, and this is one
 	// line: an escape byte in either recolours the transcript that follows, a
 	// carriage return rewinds the header, and a newline splits it into two
 	// lines of what reads as deja's own output. PrintContext below has said
 	// this since #1090; this header was missed by it.
-	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
+	harness := s.Harness
+	if color {
+		harness = harnesscolor.Paint(s.Harness, s.Harness, true) + cBold
+		fmt.Fprintf(w, "%s# %s · %s · %s%s\n", cBold, harness, SafeLine(s.Project), SafeLine(short(s.ID)), cReset)
+	} else {
+		fmt.Fprintf(w, "# %s · %s · %s\n", harness, SafeLine(s.Project), SafeLine(short(s.ID)))
+	}
 	repeated := repeatedStamps(s.Messages)
+	now := time.Now()
 	for _, m := range s.Messages {
 		txt := redact.SafeForDisplay(collapseTool(m.Text))
 		if strings.TrimSpace(txt) == "" {
@@ -1758,16 +1788,29 @@ func PrintSession(w io.Writer, s model.Session) {
 		}
 		t := ""
 		if !m.Time.IsZero() {
-			stamp := m.Time.Format("2006-01-02 15:04")
-			if repeated[stamp] {
+			// The day in the form every other screen prints it ("Mar 27",
+			// "Nov 29 2025"), in the timestamp's own zone as before.
+			day := m.Time.Format("Jan 2 2006")
+			if m.Time.Year() == now.Year() {
+				day = m.Time.Format("Jan 2")
+			}
+			stamp := day + " " + m.Time.Format("15:04")
+			if repeated[m.Time.Format("2006-01-02 15:04")] {
 				// The clocks went back and this minute happened twice. Both
 				// stamps are right, which is why an hour of conversation reads
 				// as a duplicated message without the offset (#1788).
-				stamp = m.Time.Format("2006-01-02 15:04 -07:00")
+				stamp += m.Time.Format(" -07:00")
+			}
+			if color {
+				stamp = cDim + stamp + cReset
 			}
 			t = stamp + " "
 		}
-		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, m.Role, SafeText(txt))
+		role := m.Role
+		if color {
+			role = cBold + role + cReset
+		}
+		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, role, termwidth.WrapText(SafeText(txt), width))
 	}
 }
 
@@ -1849,6 +1892,46 @@ func PrintContext(w io.Writer, s model.Session, query string) {
 		fmt.Fprintf(w, " · updated %s", s.Updated.Local().Format("2006-01-02"))
 	}
 	fmt.Fprintln(w)
+	printContextBody(w, s, query)
+}
+
+// PrintContextStyled is PrintContext for a terminal: the header in the form
+// the other screens print (harness in its colour, the short id, "Nov 29 2025"),
+// headings bold, and the turns wrapped to width at spaces. A pipe keeps
+// PrintContext's text, which is also what the MCP context tools hand an agent.
+func PrintContextStyled(w io.Writer, s model.Session, query string, color bool, width int) {
+	if !color && width <= 0 {
+		PrintContext(w, s, query)
+		return
+	}
+	head := "# deja context: " + harnesscolor.Paint(s.Harness, s.Harness, color)
+	if color {
+		head += cBold
+	}
+	head += " · " + SafeLine(s.Project) + " · " + SafeLine(short(s.ID))
+	if !s.Updated.IsZero() {
+		head += " · updated " + absoluteDate(s.Updated)
+	}
+	if color {
+		head = cBold + head + cReset
+	}
+	fmt.Fprintln(w, head)
+	var body strings.Builder
+	printContextBody(&body, s, query)
+	text := termwidth.WrapText(body.String(), width)
+	if color {
+		lines := strings.Split(text, "\n")
+		for i, l := range lines {
+			if strings.HasPrefix(l, "## ") {
+				lines[i] = cBold + l + cReset
+			}
+		}
+		text = strings.Join(lines, "\n")
+	}
+	fmt.Fprint(w, text)
+}
+
+func printContextBody(w io.Writer, s model.Session, query string) {
 	s = withoutHarnessEnvelopes(s)
 	qlow := strings.ToLower(query)
 	terms, phrases := QueryParts(query)
@@ -2554,22 +2637,28 @@ func colorOK(w io.Writer) bool {
 }
 
 func harnessTag(h string, color bool) string {
-	tag := "[" + h + "]"
 	if !color {
-		return tag
+		return "[" + h + "]"
 	}
-	switch h {
-	case "claude":
-		return cOrange + tag + cReset + cBold
-	case "codex":
-		return cGreen + tag + cReset + cBold
-	case "opencode":
-		return cBlue + tag + cReset + cBold
-	case "pi":
-		return cGreen + tag + cReset + cBold
-	}
-	return tag
+	return harnesscolor.Tag(h, true) + cBold
 }
+
+// HarnessTag is "[h]" in the harness's colour — one palette for every screen
+// (internal/harnesscolor). Unlike harnessTag it re-arms nothing after itself.
+func HarnessTag(h string, color bool) string { return harnesscolor.Tag(h, color) }
+
+// ColorOK reports whether w is a terminal that wants colour: a character
+// device, NO_COLOR unset, TERM not dumb.
+func ColorOK(w io.Writer) bool { return colorOK(w) }
+
+// ShortID is a session id as the result lines print it: whole up to twenty
+// runes, longer ones elided in the middle ("e7a3c210-…6b7c8d9e01"). Every
+// human screen prints this form, and `deja show` accepts it back.
+func ShortID(id string) string { return short(id) }
+
+// DisplayDate is a day as the result lines print it: "Mar 27" this year,
+// "Nov 29 2025" otherwise, in the reader's zone.
+func DisplayDate(t time.Time) string { return absoluteDate(t) }
 
 // dateColumn picks one form for a whole column and returns a formatter that
 // holds to it.

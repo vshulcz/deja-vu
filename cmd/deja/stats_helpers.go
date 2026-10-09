@@ -31,6 +31,54 @@ func monthLabels(months []stats.MonthStats) string {
 	return strings.Join(labels, " ")
 }
 
+// monthChart draws one bar per month, three cells wide and three rows tall,
+// with the month's name right under its own bar. The old chart was a
+// twelve-cell sparkline followed by twelve labels, so no label sat under the
+// bar it named. Without colour (a pipe, NO_COLOR) a cell is "#" or blank, the
+// same glyph the project bars use there.
+func monthChart(months []stats.MonthStats, color bool) []string {
+	const rows = 3
+	peak := 0
+	for _, m := range months {
+		peak = max(peak, m.Messages)
+	}
+	eighths := []string{" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
+	lines := make([]string, rows+1)
+	for i, m := range months {
+		// Height in eighths of a cell; any month with work shows at least one.
+		h := 0
+		if peak > 0 && m.Messages > 0 {
+			h = max(1, m.Messages*rows*8/peak)
+		}
+		for row := 0; row < rows; row++ {
+			fill := min(max(h-(rows-1-row)*8, 0), 8)
+			cell := eighths[fill]
+			if !color {
+				cell = " "
+				if fill >= 4 || (row == rows-1 && h > 0) {
+					cell = "#"
+				}
+			}
+			if i > 0 {
+				lines[row] += " "
+			}
+			lines[row] += strings.Repeat(cell, 3)
+		}
+		label := "   "
+		if t, err := time.Parse("2006-01", m.Month); err == nil {
+			label = t.Format("Jan")
+		}
+		if i > 0 {
+			lines[rows] += " "
+		}
+		lines[rows] += label
+	}
+	for i := range lines[:rows] {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return lines
+}
+
 func valueOrDash(s string) string {
 	if s == "" {
 		return "-"

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -35,7 +36,7 @@ func TestStatsSparklineSaysWhatItCoversWhenTheYearIsEmpty(t *testing.T) {
 	}
 	printStats(&buf, r)
 	out := buf.String()
-	if !strings.Contains(out, "none — this store covers 2025-06-24 → 2025-06-27") {
+	if !strings.Contains(out, "none — this store covers Jun 24 2025 → Jun 27 2025") {
 		t.Errorf("empty year: %q", sparklineSection(out))
 	}
 	if strings.Contains(out, "▁▁▁▁▁▁▁▁▁▁▁▁") {
@@ -47,7 +48,7 @@ func TestStatsSparklineSaysWhatItCoversWhenTheYearIsEmpty(t *testing.T) {
 	r.Monthly[10].Messages = 8
 	r.Sparkline = "▁▁▁▁▁▁▁▁▁▁█▁"
 	printStats(&buf, r)
-	if !strings.Contains(buf.String(), "▁▁▁▁▁▁▁▁▁▁█▁") {
+	if !strings.Contains(sparklineSection(buf.String()), "###") {
 		t.Errorf("chart lost: %q", sparklineSection(buf.String()))
 	}
 }
@@ -62,4 +63,20 @@ func sparklineSection(out string) string {
 		return rest[:j]
 	}
 	return rest
+}
+
+// Each month's name sits under its own bar: the chart used to be twelve
+// one-cell bars followed by twelve labels, so no label was under its bar.
+func TestMonthChartPutsEachLabelUnderItsBar(t *testing.T) {
+	months := make([]stats.MonthStats, 12)
+	for i := range months {
+		months[i].Month = fmt.Sprintf("2026-%02d", i+1)
+	}
+	months[2].Messages = 10
+	lines := monthChart(months, false)
+	bottom, labels := lines[len(lines)-2], lines[len(lines)-1]
+	at := strings.Index(bottom, "#")
+	if at < 0 || labels[at:at+3] != "Mar" || bottom[at:at+3] != "###" {
+		t.Errorf("bar and label disagree:\n%s\n%s", bottom, labels)
+	}
 }

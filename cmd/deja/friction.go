@@ -11,10 +11,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // frictionRowBytes is what one row of the list holds.
@@ -161,14 +163,32 @@ func runFriction(dir string, args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "what this machine keeps tripping over — %d session%s read\n", sessions, pluralS(sessions))
 	lines := frictionRowLines(rows)
+	// On a terminal the error is bold, the harnesses carry their colours and
+	// the line under it is dimmed, so the list scans by error.
+	color, width := search.ColorOK(stdout), printableWidth(stdout)
 	for i, r := range rows {
-		where := strings.Join(r.harnesses, ", ")
-		fmt.Fprintf(stdout, "  %2d sessions  %s\n", r.n, lines[i])
-		fmt.Fprintf(stdout, "               %s", where)
-		if !r.when.IsZero() {
-			fmt.Fprintf(stdout, " · last %s", r.when.Local().Format("Jan 2"))
+		line := termwidth.Indent(lines[i], width, fmt.Sprintf("  %2d sessions  ", r.n), "               ")
+		if color {
+			head := fmt.Sprintf("  %2d sessions  ", r.n)
+			line = head + statBold + strings.TrimPrefix(line, head) + statReset
 		}
-		fmt.Fprintln(stdout)
+		fmt.Fprintln(stdout, line)
+		where := strings.Join(r.harnesses, ", ")
+		if color {
+			names := make([]string, len(r.harnesses))
+			for j, h := range r.harnesses {
+				names[j] = harnesscolor.Paint(h, h, true)
+			}
+			where = strings.Join(names, statDim+", "+statReset)
+		}
+		last := ""
+		if !r.when.IsZero() {
+			last = " · last " + search.DisplayDate(r.when)
+		}
+		if color {
+			last = statDim + last + statReset
+		}
+		fmt.Fprintf(stdout, "               %s%s\n", where, last)
 	}
 	// The header claims to say what this machine keeps tripping over, so a cut
 	// list with nothing after it reads as all of it — the sentence `how` and

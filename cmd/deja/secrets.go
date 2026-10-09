@@ -11,6 +11,8 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/jsonout"
+	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja secrets` says which credentials an agent history is carrying.
@@ -151,16 +153,28 @@ func printSecrets(w io.Writer, scan index.SecretScan, limit int) {
 	if limit > 0 && len(shown) > limit {
 		shown = shown[:limit]
 	}
+	// Each session in the form the search result header uses: harness,
+	// project, day, short id — the id is what `deja show` and `forget` take.
+	// On a terminal the harness is coloured and the kinds, which say what to
+	// rotate, are bold.
+	color, width := search.ColorOK(w), printableWidth(w)
 	for _, g := range shown {
-		where := g.head.Harness
-		if !g.head.When.IsZero() {
-			where += " · " + g.head.When.Local().Format("2006-01-02")
-		}
+		where := search.HarnessTag(g.head.Harness, color)
 		if p := g.head.Project; p != "" && p != "-" {
-			where += " · " + p
+			where += " " + search.SafeLine(p)
+		}
+		if !g.head.When.IsZero() {
+			where += " · " + search.DisplayDate(g.head.When)
+		}
+		if g.head.ID != "" {
+			where += " · " + search.SafeLine(search.ShortID(g.head.ID))
 		}
 		fmt.Fprintf(w, "\n  %s\n", where)
-		fmt.Fprintf(w, "    %s\n", secretsKindList(g.kinds))
+		kinds := termwidth.Indent(secretsKindList(g.kinds), width, "    ", "    ")
+		if color {
+			kinds = statBold + kinds + statReset
+		}
+		fmt.Fprintln(w, kinds)
 		// The file is the actionable half, and only a file-based store has
 		// one. Printing a database path would send someone to a 3.5 GB file
 		// holding fifteen hundred other sessions.
@@ -173,8 +187,8 @@ func printSecrets(w io.Writer, scan index.SecretScan, limit int) {
 			n, pluralS(n))
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintln(w, "these values are in the source transcripts, not in deja's copy — deja redacted its own.")
-	fmt.Fprintln(w, "rotate the live ones; the files above are yours to edit or delete.")
+	fmt.Fprintln(w, termwidth.Indent("these values are in the source transcripts, not in deja's copy — deja redacted its own.", width, "", ""))
+	fmt.Fprintln(w, termwidth.Indent("rotate the live ones; the files above are yours to edit or delete.", width, "", ""))
 	// The rows with no file are the ones the closing line does not cover, and
 	// saying nothing left them looking like rows deja simply knew less about.
 	// A database store holds every session in one file, so editing it is not
@@ -182,7 +196,7 @@ func printSecrets(w io.Writer, scan index.SecretScan, limit int) {
 	// machine's store, 12 of the 41 sessions the report lists are in one, and
 	// they carry 36 of the 83 findings (#3823).
 	if n := groupsWithoutAFile(shown); n > 0 {
-		fmt.Fprintf(w, "%d of the sessions above keep their history in a database with every other session in it, so there is no file to edit — clear those in the harness itself.\n", n)
+		fmt.Fprintln(w, termwidth.Indent(fmt.Sprintf("%d of the sessions above keep their history in a database with every other session in it, so there is no file to edit — clear those in the harness itself.", n), width, "", ""))
 	}
 	printSecretsTail(w, scan)
 }
@@ -218,8 +232,9 @@ func printSecretsTail(w io.Writer, scan index.SecretScan) {
 		// Counted, not listed, and never called credentials: these rules fire
 		// on the shape of an assignment rather than on the shape of a key, so
 		// most of them are digests, lockfile hashes and identifiers.
-		fmt.Fprintf(w, "\n%d more redacted string%s came from the assignment and entropy rules (%s) — counted, not listed, because most are digests and identifiers\n",
+		line := fmt.Sprintf("%d more redacted string%s came from the assignment and entropy rules (%s) — counted, not listed, because most are digests and identifiers",
 			n, pluralS(n), secretsCountedSummary(scan.Counted))
+		fmt.Fprintf(w, "\n%s\n", termwidth.Indent(line, printableWidth(w), "", ""))
 	}
 	if scan.Withheld > 0 {
 		fmt.Fprintf(w, "the ignore rule kept %d session%s out of this scan\n", scan.Withheld, pluralS(scan.Withheld))

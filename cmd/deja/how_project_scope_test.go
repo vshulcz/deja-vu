@@ -91,7 +91,7 @@ func TestHowWidensWhenTheProjectHasNothing(t *testing.T) {
 	if !strings.Contains(out, "rtk go test") {
 		t.Errorf("a directory with no project of its own got no answer:\n%s", out)
 	}
-	if !strings.Contains(out, "ran elsewhere on this machine") {
+	if !strings.Contains(out, "these are from other projects") {
 		t.Errorf("the widening was not said:\n%s", out)
 	}
 }
