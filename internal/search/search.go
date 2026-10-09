@@ -1752,7 +1752,7 @@ func PrintSession(w io.Writer, s model.Session) {
 	fmt.Fprintf(w, "# %s · %s · %s\n", s.Harness, SafeLine(s.Project), SafeLine(s.ID))
 	repeated := repeatedStamps(s.Messages)
 	for _, m := range s.Messages {
-		txt := redact.SafeForDisplay(collapseTool(m.Text))
+		txt := redact.SafeForDisplay(collapseTool(wroteForDisplay(m)))
 		if strings.TrimSpace(txt) == "" {
 			continue
 		}
@@ -1769,6 +1769,25 @@ func PrintSession(w io.Writer, s model.Session) {
 		}
 		fmt.Fprintf(w, "\n%s%s:\n%s\n", t, m.Role, SafeText(txt))
 	}
+}
+
+// wroteForDisplay is a message's text as show prints it. A "wrote" record is a
+// path and the hashes of the lines written there (sources.RoleWrote), and show
+// printed the hashes bare, which read as an unlabelled commit sha.
+func wroteForDisplay(m model.Message) string {
+	if m.Role != "wrote" {
+		return m.Text
+	}
+	path, hashes, ok := strings.Cut(m.Text, "\n")
+	if !ok {
+		return m.Text
+	}
+	n := len(strings.Fields(hashes))
+	lines := "lines"
+	if n == 1 {
+		lines = "line"
+	}
+	return fmt.Sprintf("%s\n(%d written %s, kept as hashes for `deja blame`)", path, n, lines)
 }
 
 // roleMatches accepts the role names the help text documents. `--role tool`

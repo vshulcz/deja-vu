@@ -24,7 +24,7 @@ func TestLogSaysWhenItStoppedAtTheDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if rows := strings.Count(got, usage.KindDejaVu); rows != 20 {
+	if rows := strings.Count(got, logKindLabel(usage.KindDejaVu)); rows != 20 {
 		t.Fatalf("printed %d rows, want the default 20", rows)
 	}
 	if !strings.Contains(got, "20 of 25") {

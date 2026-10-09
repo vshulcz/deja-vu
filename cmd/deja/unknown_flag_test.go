@@ -24,7 +24,7 @@ func TestUnknownFlagNamesTheCommandAndTheNearMiss(t *testing.T) {
 		{"transposition", "log", logFlags, "--lsat", `log: unknown flag "--lsat" — did you mean --last?`},
 		{"truncation", "promote", promoteFlags, "--stat", `promote: unknown flag "--stat" — did you mean --state?`},
 		{"search is named too", "search", searchFlags, "--limt", `search: unknown flag "--limt" — did you mean --limit?`},
-		{"nothing close", "doctor", doctorFlags, "--nope", `doctor: unknown flag "--nope"`},
+		{"nothing close", "doctor", doctorFlags, "--nope", "doctor: unknown flag \"--nope\" — `deja doctor --help` lists its flags"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := unknownFlag(tc.command, tc.typed, tc.known).Error(); got != tc.want {

@@ -165,6 +165,7 @@
 <tr><td><code>deja completion &lt;bash|zsh|fish|powershell&gt;</code></td><td>Print a completion script for your shell. <code>pwsh</code> is accepted as an alias for PowerShell.</td></tr>
 <tr><td><code>deja uninstall &lt;target|--all&gt;</code></td><td>Remove deja's wiring from an agent. Other servers in shared config files are left alone.</td></tr>
 <tr><td><code>deja version</code></td><td>Print the version.</td></tr>
+<tr><td><code>deja help [command]</code></td><td>Every command with a line on each, or one command's usage, description and examples. <code>deja &lt;command&gt; --help</code> says the same.</td></tr>
 <tr><td><code>deja sources</code></td><td>Discovered stores per harness, with redaction counts.</td></tr>
 <tr><td><code>deja install &lt;target|--all|--auto&gt;</code></td><td>Wire MCP recall (and hooks) into your agents. <code>--no-guidance</code> skips the instruction block, <code>--no-index</code> skips the first index build.</td></tr>
 <tr><td><code>deja rules [sync]</code></td><td>Your standing rules in one file, <code>~/.config/deja/rules.md</code>. <code>deja rules</code> lists each installed agent's global rules file and whether its copy is in sync; <code>sync</code> writes the rules there as a marked block, leaving the rest of the file alone, and an empty file takes the copies back out. Agents whose global rules file deja has not verified are listed and left alone.</td></tr>
@@ -185,7 +186,7 @@
 <tr><td><code>deja goose [args]</code></td><td>Start Goose with recall re-read every turn rather than fixed when the session opened; the rest of the line goes to Goose.</td></tr>
 <tr><td><code>deja check -</code></td><td>Read a plan from stdin and print what this machine's history says about the things in it — what was decided, and what went wrong last time.</td></tr>
 </tbody></table>
-<div class="note">Bare <code>deja</code> on a terminal prints the living brief; piped or redirected it prints the usage summary, which <code>deja --help</code> also shows, and any command takes <code>--help</code> for its flags. <code>deja brief</code> prints that screen anywhere. Everything is offline except <code>update</code>, <code>sync ssh</code>, the <code>doctor</code> version check and <code>deja embed</code> against an endpoint you set.</div>
+<div class="note">Bare <code>deja</code> on a terminal prints the living brief; piped or redirected it prints three lines pointing at <code>deja help</code>, which lists every command, and any command takes <code>--help</code> for its flags and examples. <code>deja brief</code> prints that screen anywhere. Everything is offline except <code>update</code>, <code>sync ssh</code>, the <code>doctor</code> version check and <code>deja embed</code> against an endpoint you set.</div>
 
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article>

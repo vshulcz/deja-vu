@@ -76,7 +76,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no session matches %q%s", prefix, movedBucketHint(dir, prefix))
+		return noSessionMatches(dir, prefix)
 	}
 	// A session the trust policy hides must not be promotable: `--to` wrote its
 	// content to a file and the note it built repeated the wall, both under a
@@ -138,7 +138,7 @@ func runPromote(dir string, args []string, stdout io.Writer) error {
 	// the transcript. `remember` has done this since it was written; promote
 	// did not, so a decision recorded here was invisible to the hook — which
 	// never builds — until some other command happened to run (#910).
-	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
 		fmt.Fprintf(os.Stderr, "deja: the note is written; the index could not be updated yet — %v\n", err)
 	}
 	// Promoting a session that was forgotten writes the note back to disk, but

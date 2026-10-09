@@ -55,6 +55,8 @@ func sshOpts() []string {
 	return []string{"-o", "ConnectTimeout=" + sshConnectTimeout, "-o", "BatchMode=yes"}
 }
 
+var syncSSHFlags = []string{"--pull", "--both", "--full"}
+
 func runSyncSSH(dir string, args []string) error {
 	host := ""
 	pull, full := false, false
@@ -69,7 +71,7 @@ func runSyncSSH(dir string, args []string) error {
 			full = true
 		default:
 			if strings.HasPrefix(a, "-") {
-				return fmt.Errorf("sync ssh: unknown flag %q", a)
+				return unknownFlag("sync ssh", a, syncSSHFlags)
 			}
 			if host != "" {
 				return fmt.Errorf("sync ssh takes one host")
@@ -151,7 +153,10 @@ func runSyncAll(dir string, full bool) error {
 		if why != "" {
 			return fmt.Errorf("%s could not be read — %s", peers.Path(), remoteOutputForEcho(why))
 		}
-		return fmt.Errorf("no machines to sync with yet — name one once with `deja sync ssh <host>` and deja will remember it")
+		// A state, not a failure: nothing was asked of a machine and nothing
+		// went wrong, so a script running bare sync on a fresh box goes on.
+		fmt.Fprintln(os.Stderr, "deja: no machines to sync with yet — name one once with `deja sync ssh <host>` and deja will remember it")
+		return nil
 	}
 	var failed int
 	for _, p := range list {

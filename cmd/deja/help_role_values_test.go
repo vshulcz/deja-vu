@@ -75,6 +75,12 @@ func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The `deja last` usage line lives on its own page (#4626).
+	lastHelp, err := captureRun(t, "help", "last")
+	if err != nil {
+		t.Fatal(err)
+	}
+	help += lastHelp
 	// Both places help mentions roles, checked separately: the `deja last`
 	// usage line and the search-flag description. Asserting on the whole help
 	// text lets one of them carry the other.

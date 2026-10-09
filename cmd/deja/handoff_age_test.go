@@ -54,8 +54,12 @@ func TestHandoffStaleWarningReadsAsASentence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "this session is 11d old;") {
+	if !strings.Contains(out, "11d old") || !strings.Contains(out, "older than a week") {
 		t.Errorf("warning: %q", out)
+	}
+	// The age is said once, on the receipt line.
+	if strings.Count(out, "11d old") != 1 {
+		t.Errorf("the age is repeated: %q", out)
 	}
 	if strings.Contains(out, "old old") {
 		t.Errorf("still doubled: %q", out)

@@ -95,7 +95,7 @@ func runStatusline(dir string, stdin io.Reader, stdout io.Writer) error {
 		// been arriving since morning is the kind of untrue line #1403 is
 		// about.
 		if injected > 0 {
-			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · no agent recalls today · %s injected", humanBytes(int64(injected)))))
+			fmt.Fprint(stdout, withFileMemory(dir, in, fmt.Sprintf("deja · no recalls yet today · %s injected", humanBytes(int64(injected)))))
 			return nil
 		}
 		if wr, wb := n.WeekRecalls, n.WeekBytes; wr > 0 {

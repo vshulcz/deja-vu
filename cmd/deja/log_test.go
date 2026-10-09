@@ -38,7 +38,7 @@ func TestLogListsEventsAndLastDigest(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := out.String()
-	if !strings.Contains(s, "hook") || !strings.Contains(s, "recall") || !strings.Contains(s, "(empty result)") || !strings.Contains(s, "3 sessions") {
+	if !strings.Contains(s, "session digest") || !strings.Contains(s, "recall") || !strings.Contains(s, "(empty result)") || !strings.Contains(s, "3 sessions") {
 		t.Fatalf("log output = %q", s)
 	}
 
@@ -46,7 +46,7 @@ func TestLogListsEventsAndLastDigest(t *testing.T) {
 	if err := runLogTo(&out, dir, []string{"--last"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "the injected context body") || !strings.Contains(out.String(), "# hook") {
+	if !strings.Contains(out.String(), "the injected context body") || !strings.Contains(out.String(), "# session digest") {
 		t.Fatalf("--last output = %q", out.String())
 	}
 

@@ -60,12 +60,15 @@ func TestSyncRecordsAFailedExchange(t *testing.T) {
 func TestBareSyncSaysWhatToDoWithNoPeers(t *testing.T) {
 	setupLocalIndex(t)
 	t.Setenv("DEJA_PEERS_FILE", os.Getenv("DEJA_INDEX_DIR")+"-peers.json")
-	err := runSync(os.Getenv("DEJA_INDEX_DIR"), nil)
-	if err == nil {
-		t.Fatal("a sync with no peers reported success")
+	// No peers is a state, not a failure: exit 0, and the line says how to
+	// add one.
+	var err error
+	said := captureStderr(t, func() { err = runSync(os.Getenv("DEJA_INDEX_DIR"), nil) })
+	if err != nil {
+		t.Fatalf("a sync with no peers failed: %v", err)
 	}
-	if !strings.Contains(err.Error(), "deja sync ssh") {
-		t.Errorf("the error does not say how to add one: %v", err)
+	if !strings.Contains(said, "deja sync ssh") {
+		t.Errorf("the line does not say how to add one: %q", said)
 	}
 }
 

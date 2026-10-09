@@ -12,7 +12,7 @@ import (
 // (#1106). Help is now built from installTargetNames, and this holds it there.
 func TestHelpNamesEveryInstallTarget(t *testing.T) {
 	hermeticEnv(t)
-	out, err := captureRun(t, "help")
+	out, err := captureRun(t, "help", "install")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestHelpNamesEveryInstallTarget(t *testing.T) {
 	}
 	for _, n := range names {
 		if !strings.Contains(out, n) {
-			t.Errorf("`deja help` does not name install target %q:\n%s", n, out)
+			t.Errorf("`deja help install` does not name install target %q:\n%s", n, out)
 		}
 	}
 	// The refusal points at help; help must not point back with a shorter list.
@@ -62,7 +62,7 @@ func TestHelpTargetListFollowsTheTerminal(t *testing.T) {
 	hermeticEnv(t)
 	for _, width := range []int{40, 120} {
 		t.Setenv("COLUMNS", strconv.Itoa(width))
-		out, err := captureRun(t, "help")
+		out, err := captureRun(t, "help", "install")
 		if err != nil {
 			t.Fatal(err)
 		}

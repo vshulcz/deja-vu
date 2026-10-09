@@ -108,9 +108,10 @@ func TestBareSyncSaysThePeersFileIsBrokenRatherThanEmpty(t *testing.T) {
 	// The control: with no file at all, the invitation is still the right
 	// sentence.
 	t.Setenv("DEJA_PEERS_FILE", filepath.Join(tmp, "absent.json"))
-	err = runSyncAll(index.DefaultDir(), false)
-	if err == nil || !strings.Contains(err.Error(), "no machines to sync with yet") {
-		t.Errorf("a machine that never synced lost its invitation: %v", err)
+	// It is a state rather than an error, so it exits 0.
+	said := captureStderr(t, func() { err = runSyncAll(index.DefaultDir(), false) })
+	if err != nil || !strings.Contains(said, "no machines to sync with yet") {
+		t.Errorf("a machine that never synced lost its invitation: %v %q", err, said)
 	}
 }
 

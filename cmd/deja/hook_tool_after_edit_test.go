@@ -21,10 +21,15 @@ func TestFixLineNamesTheFileThatChangedNext(t *testing.T) {
 	if got == "" {
 		t.Fatal("an edit remedy produced no line")
 	}
-	for _, want := range []string{"deja: this error came up", "in deja-vu", "changed next", "internal/search/outcome_rank_test.go"} {
+	for _, want := range []string{"this error came up", "in deja-vu", "changed next", "internal/search/outcome_rank_test.go"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("line %q lacks %q", got, want)
 		}
+	}
+	// Inside the recall block, like hook-tool's line: the block already says
+	// who is speaking, and a "deja: " lead read as a log line.
+	if strings.HasPrefix(got, "deja: ") {
+		t.Errorf("the line carries a log prefix: %q", got)
 	}
 	if strings.Contains(got, "what followed it") || strings.Contains(got, " ran this ") {
 		t.Errorf("an edit is offered as a command: %q", got)

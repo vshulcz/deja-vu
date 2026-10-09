@@ -88,7 +88,7 @@ func TestStatsHTMLCommandAndConflicts(t *testing.T) {
 		t.Fatal(err)
 	}
 	abs, _ := filepath.Abs(path)
-	if strings.TrimSpace(out) != abs {
+	if strings.TrimSpace(out) != "deja: stats page written to "+abs {
 		t.Fatalf("HTML output=%q want=%q", out, abs)
 	}
 	if err := runStats(index.DefaultDir(), []string{"--html", "--json"}); err == nil || !strings.Contains(err.Error(), "choose one output") {

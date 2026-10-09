@@ -37,7 +37,7 @@ func TestLogRendersTheAuditTrail(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	for _, want := range []string{"hook", "recall"} {
+	for _, want := range []string{"session digest", "recall"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("log missing %q:\n%s", want, got)
 		}

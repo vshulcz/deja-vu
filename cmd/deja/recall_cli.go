@@ -10,6 +10,8 @@ import (
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
+var recallFlags = []string{"--project", "--harness", "--limit"}
+
 // runRecall prints what the MCP recall tool answers: the framed page, budgeted
 // the same way, this project first. `deja search --json` was the only answer
 // an agent could ask for on the command line, and it ran to 1-2 MB, which a
@@ -66,7 +68,7 @@ func runRecall(dir string, args []string, stdout io.Writer) error {
 			harness, i = v, i+1
 		default:
 			if strings.HasPrefix(a, "--") {
-				return fmt.Errorf("recall: unknown flag %q", a)
+				return unknownFlag("recall", a, recallFlags)
 			}
 			terms = append(terms, a)
 		}

@@ -14,7 +14,7 @@ import (
 // reader could not tell which parser had spoken (#1829).
 //
 // One sentence, then, in one place: `<command>: unknown flag "x"`, plus the
-// near miss when there is one.
+// near miss when there is one, or where the flags are listed when there is not.
 
 // nearestKnownFlag names the flag a token was probably meant to be, or "" when
 // nothing is close enough to be worth guessing at.
@@ -43,5 +43,7 @@ func unknownFlag(command, arg string, known []string) error {
 	if near := nearestKnownFlag(arg, known); near != "" {
 		return fmt.Errorf("%s: unknown flag %q — did you mean %s?", command, arg, near)
 	}
-	return fmt.Errorf("%s: unknown flag %q", command, arg)
+	// Without a near miss the reader still needs the list, and the command's
+	// own --help is it.
+	return fmt.Errorf("%s: unknown flag %q — `deja %s --help` lists its flags", command, arg, strings.Fields(command)[0])
 }

@@ -85,7 +85,7 @@ func runBrief(dir string, w io.Writer) error {
 	if color {
 		bold, dim, reset = logoBold, logoDim, logoReset
 	}
-	fmt.Fprintf(w, "%sdeja-vu%s %s · %s%d%s session%s across %s%d%s agent%s\n",
+	fmt.Fprintf(w, "%sdeja%s %s · %s%d%s session%s across %s%d%s agent%s\n",
 		bold, reset, version, bold, ov.Sessions, reset, pluralS(ov.Sessions),
 		bold, ov.Harnesses, reset, pluralS(ov.Harnesses))
 
@@ -557,7 +557,7 @@ func staleEmptyIndex(dir string) bool {
 // that the agent stores live somewhere this machine does not have.
 func printNoHistory(w io.Writer, stale bool) {
 	if stale {
-		fmt.Fprintln(w, "deja-vu "+version+" · history found, not indexed yet")
+		fmt.Fprintln(w, "deja "+version+" · history found, not indexed yet")
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "your agents have written since deja last looked — run `deja index`")
 		fmt.Fprintln(w)
@@ -566,7 +566,7 @@ func printNoHistory(w io.Writer, stale bool) {
 		fmt.Fprintln(w, "  deja help        every command")
 		return
 	}
-	fmt.Fprintln(w, "deja-vu "+version+" · no agent history found yet")
+	fmt.Fprintln(w, "deja "+version+" · no agent history found yet")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "deja reads the session stores your agents already write —")
 	// Counted from the registry: this line is the first screen a machine with

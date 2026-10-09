@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strings"
 	"testing"
 )
 
@@ -64,6 +65,18 @@ func TestHelpNamesEveryDispatchedCommand(t *testing.T) {
 			t.Errorf("deja help names %q, which is not dispatched", name)
 		}
 	}
+}
+
+// helpReference is everything help can say: the page and every command's own
+// --help. Flags live on the command pages now, so a check that a flag is
+// documented reads both (#4626).
+func helpReference() string {
+	var b strings.Builder
+	b.WriteString(usageText())
+	for _, e := range helpEntries {
+		b.WriteString(helpForCommand(e.name))
+	}
+	return b.String()
 }
 
 func captureHelp(t *testing.T) string {

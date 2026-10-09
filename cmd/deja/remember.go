@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -27,6 +28,18 @@ func projectForEcho(project string) string {
 		return "a name with no printable characters"
 	}
 	return out
+}
+
+// noteIndexNarration is where remember and promote send the index's progress
+// lines. Over an index that exists, the only update is the note just written,
+// and "deja: updated 1 file (1 new message)" above "remembered under …" read as
+// a second thing that happened. A first build still narrates: it takes long
+// enough that silence reads as a hang.
+func noteIndexNarration(dir string) io.Writer {
+	if index.HasManifest(dir) {
+		return io.Discard
+	}
+	return os.Stderr
 }
 
 func runRemember(dir string, args []string) error {
@@ -54,10 +67,10 @@ func runRemember(dir string, args []string) error {
 		// with a dash was otherwise refused as a flag.
 		if args[i] == "--" {
 			if i+1 >= len(args) {
-				return fmt.Errorf("remember: text required")
+				return fmt.Errorf("remember: text required — deja remember \"the note\"")
 			}
 			if text != "" {
-				return fmt.Errorf("remember: expected one text argument")
+				return fmt.Errorf("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 			}
 			text = args[i+1]
 			i++
@@ -67,12 +80,12 @@ func runRemember(dir string, args []string) error {
 			return unknownFlag("remember", args[i], rememberFlags)
 		}
 		if text != "" {
-			return fmt.Errorf("remember: expected one text argument")
+			return fmt.Errorf("remember: expected one text argument — quote the note: deja remember \"the whole note\"")
 		}
 		text = args[i]
 	}
 	if strings.TrimSpace(text) == "" {
-		return fmt.Errorf("remember: text required")
+		return fmt.Errorf("remember: text required — deja remember \"the note\"")
 	}
 	if strings.TrimSpace(project) == "" {
 		cwd, err := os.Getwd()
@@ -89,7 +102,7 @@ func runRemember(dir string, args []string) error {
 		}
 		return notesWriteError(err)
 	}
-	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
+	if err := index.EnsureForSearch(dir, search.Options{All: true}, false, noteIndexNarration(dir)); err != nil {
 		return err
 	}
 	// A day-note the reader forgot keeps its tombstone until unforget, so a

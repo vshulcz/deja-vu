@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // The build and test history a transcript already holds (#539).
@@ -48,42 +49,16 @@ const (
 // _test.go file.
 var buildTestRE = regexp.MustCompile(`(^|[;&|(]\s*|\s)(go test|go build|go vet|make test|make build|make check|npm test|npm run test|yarn test|pnpm test|pytest|python -m pytest|cargo test|cargo build|cargo check|jest|vitest|tox|docker build|docker compose build|gradle test|mvn test|dotnet test|ctest|bun test|swift test)\b`)
 
-// The verdict lines themselves. A runner says how it went in a shape it owns,
-// and that shape is what gets read — never the body of the output.
-var (
-	goFailRE = regexp.MustCompile(`(?m)^(--- FAIL: |FAIL[ \t]|FAIL$|# \S+ \[build failed\]|vet: )`)
-	// `ok` has to carry what `go test` prints after it — the package and either
-	// an elapsed time or `(cached)`. Accepting the bare word read `ok main`
-	// from a `git push` and `ok  friends.sh` from a shell script audit as
-	// passing test runs, two of sixteen in a hand-read sample.
-	goPassRE = regexp.MustCompile(`(?m)(^ok[ \t]+\S+[ \t]+(\(cached\)|[0-9.]+m?s)|^PASS$|^--- PASS: |^\?[ \t]+\S+[ \t]+\[no test files\])`)
-	pyFailRE = regexp.MustCompile(`(?m)^(=+ .*\b\d+ (failed|error|errors)\b|FAILED \S+)`)
-	pyPassRE = regexp.MustCompile(`(?m)^=+ .*\b\d+ passed\b`)
-	jsFailRE = regexp.MustCompile(`(?m)^(Tests:\s+\d+ failed|Test Suites:\s+\d+ failed)`)
-	jsPassRE = regexp.MustCompile(`(?m)^(Tests:\s+.*\d+ passed|Test Suites:\s+.*\d+ passed)`)
-	// Cargo's own shapes, not a bare `error:` — that one read `error: No valid
-	// patches in input` from a `git apply` as a failing test run.
-	rustFailRE  = regexp.MustCompile(`(?m)^(error\[E\d+\]: |error: (could not compile|test failed)|test result: FAILED)`)
-	rustPassRE  = regexp.MustCompile(`(?m)^test result: ok\.`)
-	wrapPassRE  = regexp.MustCompile(`(?m)^Go test: \d+ passed`)
-	compileFail = regexp.MustCompile(`(?m)^\S+\.(go|py|ts|tsx|js|rs|java|kt|swift):\d+:\d+: `)
-	namedFailRE = regexp.MustCompile(`(?m)^\s*--- FAIL: ([A-Za-z0-9_]+)`)
-)
+var namedFailRE = regexp.MustCompile(`(?m)^\s*--- FAIL: ([A-Za-z0-9_]+)`)
 
 // TestRunVerdict reads a runner's own verdict out of the output a run left
-// behind. A compiler error counts as a failure: the suite did not run, which is
-// not a pass by any reading.
-//
-// The order matters. `go build` prints nothing on success, so an agent's own
-// `echo ok` in the same pipeline sits above a compile error in the same output
-// — the failure has to win.
+// behind; the verdict lines live in sources, where the handoff packet reads
+// them too.
 func TestRunVerdict(out string) TestVerdict {
-	switch {
-	case goFailRE.MatchString(out), pyFailRE.MatchString(out), jsFailRE.MatchString(out),
-		rustFailRE.MatchString(out), compileFail.MatchString(out):
+	switch sources.RunOutputVerdict(out) {
+	case "failed":
 		return TestFailed
-	case goPassRE.MatchString(out), pyPassRE.MatchString(out), jsPassRE.MatchString(out),
-		rustPassRE.MatchString(out), wrapPassRE.MatchString(out):
+	case "passed":
 		return TestPassed
 	}
 	return TestNoVerdict

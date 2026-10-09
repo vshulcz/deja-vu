@@ -46,6 +46,16 @@ func runSync(dir string, args []string) error {
 		return runSyncAll(dir, len(args) == 1)
 	}
 	if len(args) < 2 {
+		// The word the reader typed is the part they got right; what is
+		// missing is the thing after it.
+		switch args[0] {
+		case "export", "import":
+			return fmt.Errorf("sync %s needs a directory: deja sync %s <dir>", args[0], args[0])
+		case "ssh":
+			return fmt.Errorf("sync ssh needs a host: deja sync ssh <host>")
+		case "forget":
+			return fmt.Errorf("sync forget needs a host — `deja doctor` lists the machines deja knows")
+		}
 		return fmt.Errorf("sync needs export <dir>, import <dir>, ssh <host> — or no argument at all, for every machine deja knows")
 	}
 	switch args[0] {
@@ -112,7 +122,7 @@ func runSync(dir string, args []string) error {
 			out = a
 		}
 		if out == "" {
-			return fmt.Errorf("sync export needs a target dir")
+			return fmt.Errorf("sync export needs a directory: deja sync export <dir>")
 		}
 		if err := index.EnsureForSearch(dir, search.Options{All: true}, false, os.Stderr); err != nil {
 			// An index that cannot be written stops the export before a record
@@ -273,7 +283,7 @@ func runSync(dir string, args []string) error {
 		}, "")
 		return nil
 	default:
-		return fmt.Errorf("unknown sync command %q", args[0])
+		return fmt.Errorf("unknown sync command %q — `deja sync --help` shows each form", args[0])
 	}
 }
 

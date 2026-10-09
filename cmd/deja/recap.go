@@ -108,13 +108,21 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 		}
 		return enc.Encode(out)
 	}
-	printRecap(stdout, r, sinceText, limit)
+	if r.Considered == 0 {
+		if line, ok := emptyStoreLine(dir, "nothing to recap"); ok {
+			fmt.Fprintln(stdout, line)
+			return nil
+		}
+	}
+	printRecap(stdout, r, sinceText, limit, newestSessionNote(dir, "recap", since))
 	return nil
 }
 
-func printRecap(w io.Writer, r index.Recap, since string, limit int) {
+// printRecap writes the recap screen. older is what newestSessionNote says
+// when the window holds nothing.
+func printRecap(w io.Writer, r index.Recap, since string, limit int, older string) {
 	if r.Considered == 0 {
-		fmt.Fprintf(w, "nothing in the last %s\n", since)
+		fmt.Fprintln(w, fitLine(w, fmt.Sprintf("nothing in the last %s%s", since, older)))
 		printRecapTail(w, r)
 		return
 	}

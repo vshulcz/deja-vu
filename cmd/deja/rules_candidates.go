@@ -124,7 +124,18 @@ func runRulesCandidates(dir string, w io.Writer, args []string) error {
 		return enc.Encode(cands)
 	}
 	if len(cands) == 0 {
-		fmt.Fprintln(w, "no corrections found in the indexed sessions")
+		if line, ok := emptyStoreLine(dir, "no corrections found"); ok {
+			fmt.Fprintln(w, line)
+			return nil
+		}
+		// Which window was searched, so an empty answer is not read as "you
+		// never corrected an agent".
+		if since > 0 {
+			fmt.Fprintln(w, fitLine(w, fmt.Sprintf("no corrections found in the last %s%s", sinceArg(args), newestSessionNote(dir, "rules candidates", since))))
+			return nil
+		}
+		n, _ := index.SessionCount(dir)
+		fmt.Fprintf(w, "no corrections found in the %d indexed session%s\n", n, pluralS(n))
 		return nil
 	}
 	for i, c := range cands {

@@ -13,7 +13,7 @@ import (
 
 func runShare(dir string, args []string, w io.Writer) error {
 	if len(args) < 1 {
-		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix (see `deja last`)")
+		return idPrefixNeeded(dir, "share needs an id prefix", "share needs an id prefix (see `deja last`)")
 	}
 	// Everything after the id used to be ignored, so `deja share <id> --to
 	// out.md` printed the share to the terminal and wrote no file — and said
@@ -29,7 +29,7 @@ func runShare(dir string, args []string, w io.Writer) error {
 	// nobody chose (#2259). The lookup refuses one now; this says which
 	// argument was missing rather than reporting a session that does not exist.
 	if strings.TrimSpace(args[0]) == "" {
-		return idPrefixNeeded(dir, "share needs an id-prefix", "share needs id-prefix (see `deja last`)")
+		return idPrefixNeeded(dir, "share needs an id prefix", "share needs an id prefix (see `deja last`)")
 	}
 	s, ok, err := findByPrefix(dir, args[0])
 	noteAmbiguousPrefix(dir, args[0], "sharing")
@@ -37,7 +37,7 @@ func runShare(dir string, args []string, w io.Writer) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no session matches %q", args[0])
+		return noSessionMatches(dir, args[0])
 	}
 	if err := denyPolicyHidden(args[0], s, os.Stderr); err != nil {
 		return err
@@ -72,7 +72,7 @@ func printSanitized(w io.Writer, text string) {
 	// One count, of the markers in what is being shared: adding the pass's own
 	// tally on top counted a secret this pass caught twice (#2061).
 	masked := strings.Count(redacted, redact.Marker)
-	fmt.Fprintf(os.Stderr, "deja: %d secret%s masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
+	fmt.Fprintf(os.Stderr, "\ndeja: %d secret%s masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
 }
 
 // stripBidiAndInvisible removes the characters that make a share render as

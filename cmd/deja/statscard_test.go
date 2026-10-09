@@ -93,7 +93,7 @@ func TestStatsCardCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	abs, _ := filepath.Abs(path)
-	if !strings.Contains(out, "saved "+abs) || !strings.Contains(out, "![deja]("+filepath.Base(path)+")") {
+	if !strings.Contains(out, "deja: card written to "+abs) || !strings.Contains(out, "![deja]("+filepath.Base(path)+")") {
 		t.Fatalf("card output = %q, want saved %q + share snippet", out, abs)
 	}
 	if b, err := os.ReadFile(path); err != nil || !strings.Contains(string(b), "· agent history") {

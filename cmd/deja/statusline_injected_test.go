@@ -61,7 +61,7 @@ func TestTheStatuslineCountsTheBlockItInjected(t *testing.T) {
 	// count in the source pins the block's wording, so changing a sentence in
 	// it failed this test for a reason that has nothing to do with counting.
 	got := strings.TrimSpace(line.String())
-	want := fmt.Sprintf("deja · no agent recalls today · %d B injected", injectedBytes(t, out))
+	want := fmt.Sprintf("deja · no recalls yet today · %d B injected", injectedBytes(t, out))
 	if got != want {
 		t.Errorf("statusline = %q,\n                 want %q", got, want)
 	}
