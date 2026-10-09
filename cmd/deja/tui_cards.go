@@ -9,17 +9,31 @@ import (
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
-// A card leads with what the session concluded, because that is what the
-// reader came back for; the question it started from goes in the meta line.
-// Until the session has been read whole, the question stands in.
-func (a *tuiApp) headline(s model.Session) (head string, concluded bool) {
-	if d := a.details[sessionKey(s)]; d != nil && len(d.conclusions) > 0 {
-		return d.conclusions[0], true
+// A card leads with what was asked, because that is what a person remembers
+// a session by; many sessions conclude in near-identical words. What it
+// concluded goes on a dim line under it. A session with no question recorded
+// leads with its conclusion instead.
+func (a *tuiApp) headline(s model.Session) string {
+	if t := strings.Join(strings.Fields(s.Title), " "); t != "" {
+		return t
 	}
-	if t := strings.TrimSpace(s.Title); t != "" {
-		return strings.Join(strings.Fields(t), " "), false
+	if c, _ := a.conclusion(s); c != "" {
+		return c
 	}
-	return "(no prompt recorded)", false
+	return "(no prompt recorded)"
+}
+
+// conclusion is the session's first concluding line, and whether the session
+// has been read whole yet to know it.
+func (a *tuiApp) conclusion(s model.Session) (string, bool) {
+	d := a.details[sessionKey(s)]
+	if d == nil {
+		return "", false
+	}
+	if len(d.conclusions) == 0 {
+		return "", true
+	}
+	return d.conclusions[0], true
 }
 
 func (a *tuiApp) sectionLabel() (string, string) {
@@ -56,31 +70,22 @@ func tuiCount(n int, word string) string {
 }
 
 // snippet is the matched line a card quotes: the first that does not repeat
-// its headline, or the question it started from when every one does.
+// its headline. With none, the card shows the conclusion instead.
 func (a *tuiApp) snippet(r tuiRow) string {
-	if len(r.snips) == 0 {
-		return ""
-	}
-	head, _ := a.headline(r.s)
+	head := a.headline(r.s)
 	for _, sn := range r.snips {
 		if !sameLine(sn, head) {
 			return sn
 		}
 	}
-	if t := strings.Join(strings.Fields(r.s.Title), " "); t != "" && !sameLine(t, head) {
-		return t
-	}
 	return ""
 }
 
-// cardHeight is a card's rows plus the gap after it. A search hit keeps its
-// third row even when the quote turns out empty, so cards do not jump as
-// their sessions finish loading.
+// cardHeight is a card's rows plus the gap after it. Every card keeps its
+// third row even while it is empty, so cards do not jump as their sessions
+// finish loading.
 func (a *tuiApp) cardHeight(r tuiRow) int {
-	h := 3
-	if len(r.snips) > 0 {
-		h = 4
-	}
+	h := 4
 	if r.section != "" {
 		h += 2
 	}
@@ -88,14 +93,13 @@ func (a *tuiApp) cardHeight(r tuiRow) int {
 }
 
 // groupHeading draws the heading a card starts its group with, and the count
-// or file beside it.
-func (a *tuiApp) groupHeading(l layout, r tuiRow, y int) {
+// beside it.
+func (a *tuiApp) groupHeading(l layout, i int, r tuiRow, y int) {
 	p := a.p
 	x1 := l.listX + l.listW
 	nx := p.Put(l.listX+1, y, strings.ToUpper(r.section), fgs(cMuted), x1)
 	note := ""
-	switch {
-	case r.file != "":
+	if r.file != "" {
 		n := 0
 		for _, b := range a.rows {
 			if b.file != "" {
@@ -103,8 +107,20 @@ func (a *tuiApp) groupHeading(l layout, r tuiRow, y int) {
 			}
 		}
 		note = tuiCount(n, "session")
-	case a.total > 0:
-		note = grouped(a.total)
+	} else {
+		// A date group counts its cards. The last one is only as long as
+		// the list was cut, so it names nothing it cannot count.
+		n, end := 0, len(a.rows)
+		for j := i; j < len(a.rows); j++ {
+			if j > i && a.rows[j].section != "" {
+				end = j
+				break
+			}
+			n++
+		}
+		if end < len(a.rows) || len(a.rows) >= a.total {
+			note = grouped(n)
+		}
 	}
 	p.PutClip(nx+2, y, note, fgs(cFaint), x1)
 }
@@ -168,9 +184,12 @@ func (a *tuiApp) drawDejaVu(l layout, n int, s model.Session) {
 	x := p.Put(x0+1, y, "✦", fgs(cMark), x1)
 	x = p.Put(x+1, y, "Déjà vu.", bold(cText), x1)
 	p.PutClip(x+1, y, "Asked in "+num(n)+" sessions before. Newest answer, "+tuiAgo(s.Updated, a.now)+":", fgs(cSub), x1-1)
-	head, concluded := a.headline(s)
-	if !concluded {
+	head, read := a.conclusion(s)
+	switch {
+	case !read:
 		head = "reading…"
+	case head == "":
+		head = a.headline(s)
 	}
 	p.PutClip(x0+3, y+1, head, bold(cText), x1-1)
 	bx := p.Put(x0+3, y+2, "↵", bold(cAcc), x1)
@@ -191,7 +210,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 	lines := a.cardHeight(r) - 1
 	if r.section != "" {
 		if y >= minY && y < maxY {
-			a.groupHeading(l, r, y)
+			a.groupHeading(l, i, r, y)
 		}
 		y += 2
 		lines -= 2
@@ -210,7 +229,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 		}
 	}
 	row := func(k int) (int, bool) { yy := y + k; return yy, yy >= minY && yy < maxY }
-	head, concluded := a.headline(r.s)
+	head := a.headline(r.s)
 	if yy, ok := row(0); ok {
 		x := x0 + 2
 		if a.keptIDs[sessionKey(r.s)] {
@@ -225,20 +244,21 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 			meta += " · " + tuiProject(r.s)
 		}
 		meta += " · " + tuiAgo(r.s.Updated, a.now)
-		x = p.PutClip(x+1, yy, meta, fgs(cSub), x1-1)
-		switch {
-		case r.file != "":
+		x = p.PutClip(x+1, yy, meta, fgs(cMuted), x1-1)
+		if r.file != "" {
 			x = p.Put(x, yy, " · touched ", fgs(cMuted), x1-1)
 			p.PutClip(x, yy, filepath.ToSlash(r.file), fgs(cPeach), x1-1)
-		case concluded && len(r.snips) == 0 && strings.TrimSpace(r.s.Title) != "":
-			p.PutClip(x, yy, " · "+strings.Join(strings.Fields(r.s.Title), " "), fgs(cMuted), x1-1)
 		}
 	}
+	// The third row is the matched line in a search, and what the session
+	// concluded otherwise or when no match says more than the headline.
 	if yy, ok := row(2); ok {
 		if sn := a.snippet(r); sn != "" {
 			x := p.Put(x0+4, yy, "“", fgs(cMuted), x1)
 			x = p.putHL(x, yy, sn, queryTerms(string(a.query)), on(cSub, surf), x1-2)
 			p.Put(x, yy, "”", fgs(cMuted), x1)
+		} else if c, _ := a.conclusion(r.s); c != "" && !sameLine(c, head) {
+			p.PutClip(x0+4, yy, c, on(cSub, surf), x1-1)
 		}
 	}
 }

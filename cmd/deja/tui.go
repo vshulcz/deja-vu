@@ -345,8 +345,17 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 					behind = append(behind, b)
 				}
 			}
-			label, _ := a.sectionLabel()
-			rows = withBehind(behind, rows, label)
+			now := time.Now()
+			if a.clock != nil {
+				now = a.clock()
+			}
+			last := ""
+			for i := range rows {
+				if g := dayGroup(rows[i].s.Updated, now); g != last {
+					rows[i].section, last = g, g
+				}
+			}
+			rows = withBehind(behind, rows)
 		}
 	}
 	a.rows, a.total = rows, total

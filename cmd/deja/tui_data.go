@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -151,6 +152,32 @@ func tuiAgentCounts(ss []model.Session) []agentCount {
 type agentCount struct {
 	h string
 	n int
+}
+
+// daysBefore counts calendar days from t back from now, in now's zone: 0 is
+// today, 1 yesterday. A time ahead of now counts as today.
+func daysBefore(t, now time.Time) int {
+	t = t.In(now.Location())
+	day := func(x time.Time) time.Time {
+		return time.Date(x.Year(), x.Month(), x.Day(), 12, 0, 0, 0, now.Location())
+	}
+	return max(0, int(math.Round(day(now).Sub(day(t)).Hours()/24)))
+}
+
+// dayGroup is the date heading a home card goes under.
+func dayGroup(t, now time.Time) string {
+	if t.IsZero() {
+		return "Earlier"
+	}
+	switch d := daysBefore(t, now); {
+	case d == 0:
+		return "Today"
+	case d == 1:
+		return "Yesterday"
+	case d < 7:
+		return "This week"
+	}
+	return "Earlier"
 }
 
 // tuiAgo is a card's date: relative while it is recent, a date after.

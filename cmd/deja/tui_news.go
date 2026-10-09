@@ -36,7 +36,7 @@ func (a *tuiApp) drawLeaving() {
 	cx := p.Put(tx, y+3, "↗ ", fgs(cAcc), right)
 	p.PutClip(cx, y+3, a.leaving, bold(cText), right)
 	if s.ID != "" {
-		head, _ := a.headline(s)
+		head := a.headline(s)
 		p.PutClip(tx, y+5, head, fgs(cSub), right)
 		p.PutClip(tx, y+6, agentName(s.Harness)+" · "+tuiProject(s)+" · "+tuiAgo(s.Updated, a.now), fgs(cMuted), right)
 	}

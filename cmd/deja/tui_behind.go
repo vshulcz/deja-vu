@@ -107,8 +107,10 @@ func (a *tuiApp) loadBehind() {
 	})
 }
 
-// withBehind puts the block over the recent list, each session once.
-func withBehind(behind []behindRow, recent []tuiRow, recentLabel string) []tuiRow {
+// withBehind puts the block over the recent list, each session once. The
+// recent list comes grouped by date; a group whose first card moved up into
+// the block hands its heading to the next card.
+func withBehind(behind []behindRow, recent []tuiRow) []tuiRow {
 	if len(behind) == 0 {
 		return recent
 	}
@@ -122,14 +124,15 @@ func withBehind(behind []behindRow, recent []tuiRow, recentLabel string) []tuiRo
 		rows = append(rows, r)
 		seen[sessionKey(b.s)] = true
 	}
-	first := true
+	carry := ""
 	for _, r := range recent {
+		if r.section != "" {
+			carry = r.section
+		}
 		if seen[sessionKey(r.s)] {
 			continue
 		}
-		if first {
-			r.section, first = recentLabel, false
-		}
+		r.section, carry = carry, ""
 		rows = append(rows, r)
 	}
 	return rows

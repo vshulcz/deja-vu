@@ -102,12 +102,18 @@ func TestTUIBehindTheUncommittedChange(t *testing.T) {
 
 	a1 := model.Session{Harness: "claude", ID: "a"}
 	b1 := model.Session{Harness: "claude", ID: "b"}
-	rows := withBehind([]behindRow{{s: a1, file: "pool.go"}}, []tuiRow{{s: b1}, {s: a1}}, "RECENT")
+	rows := withBehind([]behindRow{{s: a1, file: "pool.go"}}, []tuiRow{{s: b1, section: "Today"}, {s: a1}})
 	if len(rows) != 2 || rows[0].section != "Behind your uncommitted change" || rows[0].file != "pool.go" ||
-		rows[1].s.ID != "b" || rows[1].section != "RECENT" {
+		rows[1].s.ID != "b" || rows[1].section != "Today" {
 		t.Errorf("rows = %+v", rows)
 	}
-	if got := withBehind(nil, []tuiRow{{s: b1}}, "RECENT"); len(got) != 1 || got[0].section != "" {
+	// The card that moved up hands its date heading on.
+	c1 := model.Session{Harness: "claude", ID: "c"}
+	rows = withBehind([]behindRow{{s: a1, file: "pool.go"}}, []tuiRow{{s: a1, section: "Today"}, {s: b1}, {s: c1, section: "Earlier"}})
+	if len(rows) != 3 || rows[1].section != "Today" || rows[2].section != "Earlier" {
+		t.Errorf("heading handed on: %+v", rows)
+	}
+	if got := withBehind(nil, []tuiRow{{s: b1}}); len(got) != 1 || got[0].section != "" {
 		t.Errorf("no block: %+v", got)
 	}
 
