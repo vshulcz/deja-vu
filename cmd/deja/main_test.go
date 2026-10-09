@@ -25,6 +25,9 @@ func withTempStores(t *testing.T) string {
 	h := t.TempDir()
 	t.Setenv("HOME", h)
 	t.Setenv("USERPROFILE", h)
+	// Windows keeps notes under APPDATA, which HOME does not move: a note one
+	// test wrote surfaced in the next test's `deja last`.
+	t.Setenv("APPDATA", filepath.Join(h, "AppData", "Roaming"))
 	claude, _ := filepath.Abs(filepath.Join("..", "..", "fixtures", "synthetic", "claude"))
 	t.Setenv("DEJA_CLAUDE_ROOT", claude)
 	t.Setenv("DEJA_CODEX_ROOT", filepath.Join(t.TempDir(), "codex"))

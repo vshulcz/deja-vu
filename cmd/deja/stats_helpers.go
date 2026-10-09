@@ -21,16 +21,6 @@ func monthlyTotal(months []stats.MonthStats) int {
 	return n
 }
 
-func monthLabels(months []stats.MonthStats) string {
-	labels := make([]string, 0, len(months))
-	for _, m := range months {
-		if t, err := time.Parse("2006-01", m.Month); err == nil {
-			labels = append(labels, t.Format("Jan"))
-		}
-	}
-	return strings.Join(labels, " ")
-}
-
 // monthChart draws one bar per month, three cells wide and three rows tall,
 // with the month's name right under its own bar. The old chart was a
 // twelve-cell sparkline followed by twelve labels, so no label sat under the

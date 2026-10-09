@@ -30,7 +30,9 @@ func TestBlameAnswersFromThisProjectAndCountsTheRest(t *testing.T) {
 	}
 	at := time.Now().Add(-time.Hour).UTC().Format(time.RFC3339)
 	write := func(id, cwd string) {
-		dir := filepath.Join(root, strings.ReplaceAll(cwd, string(filepath.Separator), "-"))
+		// The project comes from the record's cwd; the directory name only has
+		// to be one Windows accepts, which an encoded C:\ path is not.
+		dir := filepath.Join(root, "-work-"+filepath.Base(cwd))
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
 		}

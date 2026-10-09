@@ -35,7 +35,9 @@ func TestRulesCandidatesReadsPlainCorrectionsAndNamesSkippedStands(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "in the last 1d") || !strings.Contains(out, "1 session run from a temporary directory") {
+	// The count is not pinned: on Linux t.TempDir is under /tmp too, so the
+	// two sessions above are stands as well.
+	if !strings.Contains(out, "in the last 1d") || !strings.Contains(out, "run from a temporary directory left out") {
 		t.Fatalf("the empty answer does not say what it skipped:\n%s", out)
 	}
 }
