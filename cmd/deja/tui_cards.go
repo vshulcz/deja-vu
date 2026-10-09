@@ -53,7 +53,7 @@ func (a *tuiApp) sectionLabel() (string, string) {
 		case a.scope == scopeHere:
 			note = "this project"
 		case a.scope == scopeKept:
-			note = "kept after deletion"
+			note = "deleted by their agent"
 		}
 		if f := box.note(); f != "" && note != "" {
 			note += " · " + f
@@ -66,7 +66,7 @@ func (a *tuiApp) sectionLabel() (string, string) {
 	case scopeHere:
 		return "Recent in this project", grouped(a.total)
 	case scopeKept:
-		return "Kept after their agent deleted them", grouped(a.total)
+		return "Deleted by their agent, kept by deja", grouped(a.total)
 	}
 	return "Recent", grouped(a.total)
 }
@@ -304,9 +304,9 @@ func (a *tuiApp) drawPreview(l layout) {
 	room := func(n int) bool { return cy+n < bottom-1 }
 	gone := d != nil && d.gone
 	if gone && room(3) {
-		p.Put(ix, cy, "◆ Kept after deletion", bold(cPeach), right)
+		p.Put(ix, cy, "◆ Deleted by "+agentName(s.Harness), bold(cPeach), right)
 		cy++
-		for _, ln := range wrapLines(agentName(s.Harness)+" deleted its copy. deja kept this one, and R writes it back.", iw, 2) {
+		for _, ln := range wrapLines("deja kept a copy. R writes it back where "+agentName(s.Harness)+" reads it.", iw, 2) {
 			p.Put(ix, cy, ln, fgs(cSub), right)
 			cy++
 		}

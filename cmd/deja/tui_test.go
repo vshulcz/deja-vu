@@ -416,7 +416,7 @@ func TestTUIResumeAndPutBack(t *testing.T) {
 	}
 	a.setScope(scopeKept)
 	s := screen(a.frame(120, 36))
-	wantOnScreen(t, s, "Kept 1", "KEPT AFTER THEIR AGENT DELETED THEM", "Kept after deletion", "Put back")
+	wantOnScreen(t, s, "Deleted 1", "DELETED BY THEIR AGENT, KEPT BY DEJA", "Deleted by Claude Code", "deja kept a copy", "Put back")
 	a.listFocus = true
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'r'})
 	if a.quit || !strings.Contains(a.toast, "R puts it back") {
@@ -427,8 +427,8 @@ func TestTUIResumeAndPutBack(t *testing.T) {
 	if _, err := os.Stat(path); err != nil || !strings.Contains(a.toast, "Put back") {
 		t.Errorf("put back: %v, toast %q", err, a.toast)
 	}
-	// Put back, it leaves Kept.
-	if len(a.kept) != 0 || len(a.rows) != 0 || strings.Contains(screen(a.frame(120, 36)), "Kept 1") {
+	// Put back, it leaves Deleted.
+	if len(a.kept) != 0 || len(a.rows) != 0 || strings.Contains(screen(a.frame(120, 36)), "Deleted 1") {
 		t.Errorf("still kept: %d kept, %d rows", len(a.kept), len(a.rows))
 	}
 	a.setScope(scopeAll)

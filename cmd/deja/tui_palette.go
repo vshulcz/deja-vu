@@ -31,7 +31,7 @@ func (a *tuiApp) paletteItems() []paletteItem {
 		add("Continue in another agent…", "o", a.openContinue)
 		add("Copy the context for any agent", "c", a.copyContext)
 	}
-	names := []string{"This project", "All projects", "Kept after deletion"}
+	names := []string{"This project", "All projects", "Deleted sessions"}
 	for i, n := range names {
 		if i != a.scope {
 			scope := i

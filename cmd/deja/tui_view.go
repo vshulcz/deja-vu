@@ -95,7 +95,7 @@ func (a *tuiApp) drawTop(l layout) {
 	p.Fill(0, 0, l.w, 1, cMantle)
 	x := p.Put(1, 0, "◆ deja", boldOn(cAcc, cMantle), l.w)
 	x += 3
-	kept := "Kept"
+	kept := "Deleted"
 	if a.keptLoaded && len(a.kept) > 0 {
 		kept += " " + num(len(a.kept))
 	}
