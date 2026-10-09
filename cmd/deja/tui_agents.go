@@ -40,6 +40,8 @@ type continueTarget struct {
 	id        string
 	installed bool
 	paste     bool
+	recent    bool // continued into from this screen before
+	more      int  // on the folded line: how many agents it stands for
 }
 
 // continueTargets lists every agent a session can be handed to: the ones whose

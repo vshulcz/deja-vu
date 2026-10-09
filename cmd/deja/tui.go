@@ -94,6 +94,7 @@ type tuiApp struct {
 	leaving   string // the agent the screen is handing over to
 
 	history    []string // past searches, oldest first
+	continued  []string // agents continued into, newest first
 	histAt     int      // where ↑ is in history, -1 when not browsing
 	firstShown int      // the first card on screen, for 1-9
 	beyond     beyond   // where an empty answer can go next
@@ -164,6 +165,7 @@ func newTUIApp(dir string, t *tui.Term) *tuiApp {
 	a.cwd = howCwd()
 	a.projects = howScope(a.cwd, "", false)
 	a.history, a.histAt = loadTUIHistory(dir), -1
+	a.continued = loadTUIContinued(dir)
 	return a
 }
 

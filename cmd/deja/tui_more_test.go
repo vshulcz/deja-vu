@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -200,5 +202,40 @@ func TestTUITheme(t *testing.T) {
 	setTheme(true)
 	if cBase == dark {
 		t.Error("the light set replaces the colours")
+	}
+}
+
+// The agents continued into before lead the picker, the newest picked, and
+// the ones not on this machine fold into one line a filter still searches.
+func TestTUIContinueRecentAndFold(t *testing.T) {
+	dir, _ := tuiStore(t)
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	if err := os.WriteFile(tuiContinuedPath(dir), []byte("codex\nnot-an-agent\ngemini\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a := newTestTUI(t, dir)
+	a.openContinue()
+	ts := a.shownTargets()
+	if len(ts) != 4 || ts[0].id != "codex" || ts[1].id != "gemini" || ts[2].id != "claude" || ts[3].more != 38 {
+		t.Fatalf("shown = %+v", ts)
+	}
+	wantOnScreen(t, screen(a.frame(80, 24)), "RECENT", "ON THIS MACHINE", "+38 more agents", "Copy for Codex CLI")
+	for _, r := range "kiro" {
+		a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: r})
+	}
+	if ts := a.shownTargets(); len(ts) != 1 || ts[0].id != "kiro" {
+		t.Fatalf("a filter reaches the folded agents: %+v", ts)
+	}
+	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEnter})
+	if got := loadTUIContinued(dir); strings.Join(got, ",") != "kiro,codex,gemini" {
+		t.Errorf("continued = %v", got)
+	}
+	a.openContinue()
+	if ts := a.shownTargets(); ts[0].id != "kiro" || a.m.sel != 0 {
+		t.Errorf("the newest pick leads and is selected: %+v", ts[0])
 	}
 }

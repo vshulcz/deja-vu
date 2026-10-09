@@ -11,13 +11,14 @@ import (
 )
 
 type modalState struct {
-	sel     int
-	cols    int // the continue grid's, as last drawn
-	filter  []rune
-	src     model.Session
-	targets []continueTarget
-	picked  map[string]bool
-	ids     []string
+	sel      int
+	cols     int  // the continue grid's, as last drawn
+	expanded bool // the continue grid shows the agents not installed here
+	filter   []rune
+	src      model.Session
+	targets  []continueTarget
+	picked   map[string]bool
+	ids      []string
 }
 
 func (a *tuiApp) openModal(m int) {
@@ -116,6 +117,10 @@ func (a *tuiApp) modalEnter() {
 		if a.m.sel >= len(ts) {
 			return
 		}
+		if ts[a.m.sel].more > 0 {
+			a.m.expanded = true
+			return
+		}
 		a.continueIn(ts[a.m.sel])
 	}
 }
@@ -126,6 +131,7 @@ func (a *tuiApp) modalEnter() {
 func (a *tuiApp) continueIn(t continueTarget) {
 	s := a.m.src
 	a.modal = modalNone
+	a.rememberContinued(t.id)
 	if t.paste || !t.installed {
 		a.copySession(s, "paste it into "+agentName(t.id))
 		return

@@ -79,9 +79,14 @@ func TestContinueTargetsAndGrid(t *testing.T) {
 	if !last.paste || len(ts) != len(handoffTargets())+len(handoffPasteOnly) {
 		t.Errorf("paste-only last, all listed: %+v (%d)", last, len(ts))
 	}
-	pos, split := continueGrid(ts[:5], 3)
-	if split != 2 || pos[2] != [2]int{1, 0} || pos[4] != [2]int{1, 2} {
-		t.Errorf("grid = %v split %d", pos, split)
+	pos, line, heads := continueGrid(ts[:5], 3)
+	if pos[2] != [2]int{1, 0} || pos[4] != [2]int{1, 2} || line[1] != 1 || line[2] != 4 || len(heads) != 2 || heads[1] != [2]int{3, groupElse} {
+		t.Errorf("grid = %v lines %v heads %v", pos, line, heads)
+	}
+	// The folded line fills a row of its own and has no label.
+	_, line, heads = continueGrid(append(ts[:1:1], continueTarget{more: 3}), 3)
+	if line[1] != 3 || len(heads) != 1 {
+		t.Errorf("fold at line %v, heads %v", line, heads)
 	}
 	if gridMove(pos, 4, -1) != 1 || gridMove(pos, 0, 1) != 2 || gridMove(pos, 9, 1) != 9 || gridMove(pos, 0, -1) != 0 {
 		t.Error("gridMove")
