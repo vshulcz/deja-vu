@@ -392,6 +392,9 @@ func run(args []string) error {
 		// briefWanted, not logoWanted: a reader who turned colour off still
 		// has an index and a terminal, and the brief is what that reader came
 		// for (#1596).
+		if tuiWanted() {
+			return runTUI(dir)
+		}
 		if briefWanted(os.Stdout) {
 			return runBrief(dir, os.Stdout)
 		}

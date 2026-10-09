@@ -478,7 +478,7 @@ jobs:
             [internal/nfcfold]=100 [internal/peers]=76 [internal/policy]=100
             [internal/prompt]=84 [internal/query]=100 [internal/redact]=94
             [internal/search]=93 [internal/sources]=87 [internal/stats]=91
-            [internal/termwidth]=100 [internal/usage]=95
+            [internal/termwidth]=100 [internal/tui]=88 [internal/usage]=95
           )
           fail=0
           declare -A seen=()

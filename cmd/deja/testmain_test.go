@@ -72,6 +72,14 @@ func TestMain(m *testing.M) {
 		"DEJA_OPENCODE_MAJOR": "0",
 		// Copilot's own switch moves install and the session root (#4240).
 		"COPILOT_HOME": "",
+		// The interactive screen picks its colours and its clipboard from
+		// these; a suite run from iTerm or over ssh would otherwise differ.
+		"COLORTERM":       "",
+		"TERM_PROGRAM":    "",
+		"WT_SESSION":      "",
+		"SSH_TTY":         "",
+		"SSH_CONNECTION":  "",
+		"WAYLAND_DISPLAY": "",
 	}
 	// The version lookup is the one thing in this package that talks to the
 	// internet, and only one test ever replaced it — so a full run asked

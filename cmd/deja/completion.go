@@ -219,7 +219,7 @@ _deja() {
     'index:build or refresh the index'
     'install:wire deja into an agent'
     'last:list recent sessions'
-    'brief:the screen bare deja prints on a terminal'
+    'brief:recent sessions and what deja served, as text'
     'log:show what deja served to agents'
     'mcp:serve the MCP protocol'
     'remember:store a durable note'

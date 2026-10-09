@@ -85,8 +85,8 @@ var helpEntries = []helpEntry{
 		examples: []string{"deja view", "deja view --no-open"}},
 	{name: "brief", group: groupSearch,
 		usage:    []string{"deja brief"},
-		desc:     "the screen bare deja prints on a terminal",
-		more:     "Today's sessions, what deja served, recent work and a search to try. Under its own name so it can be piped or paged.",
+		desc:     "recent sessions and what deja served, as text",
+		more:     "Today's sessions, what deja served, recent work and a search to try. Bare deja at a terminal opens the interactive screen instead; DEJA_TUI=0 brings this back there.",
 		examples: []string{"deja brief | less"}},
 
 	{name: "blame", group: groupAsk,
@@ -380,7 +380,7 @@ func bareDejaPointer(dir string) string {
 	}
 	return "deja - persistent memory for coding agents\n" + held + "\n\n" +
 		helpRow("deja <query>", "search your past agent sessions") + "\n" +
-		helpRow("deja brief", "the screen bare deja prints on a terminal") + "\n" +
+		helpRow("deja brief", "recent sessions and what deja served, as text") + "\n" +
 		helpRow("deja help", "every command, with a line on each") + "\n"
 }
 
