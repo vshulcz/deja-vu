@@ -1,6 +1,6 @@
 {
   "name": "deja",
-  "version": "0.21.7",
+  "version": "0.22.0",
   "description": "deja-vu memory for Gemini CLI: the coding sessions already on your disk — Gemini CLI, Claude Code, Codex, Cursor and thirty-seven more — searchable and recalled, including work from before it was installed.",
   "contextFileName": "GEMINI.md",
   "mcpServers": {
