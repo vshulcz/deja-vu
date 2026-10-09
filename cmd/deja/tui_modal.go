@@ -278,7 +278,7 @@ func (a *tuiApp) drawHelp() {
 		{"READ", [][2]string{{"↵", "open at the match"}, {"/", "find in the session"}, {"n N", "next / previous match"}, {"] [", "next / previous turn"}, {"t", "unfold long messages"}, {"g G", "top / bottom"}, {"esc", "back to the list"}}},
 		{"ACT", [][2]string{{"r", "resume in its agent"}, {"o", "continue in any agent"}, {"c", "copy the context"}, {"R", "put a deleted one back"}, {"^k", "every command by name"}}},
 	}
-	x, y, iw := a.modalBox(100, 14)
+	x, y, iw := a.modalBox(100, 16)
 	right := x + iw
 	cx := p.Put(x, y, "Keys", bold(cText), right)
 	p.Put(cx+3, y, "the three you need: type, ↵, o", fgs(cMuted), right)
@@ -292,5 +292,12 @@ func (a *tuiApp) drawHelp() {
 			p.PutClip(kx+1, y+1+i, k[1], fgs(cSub), cx+colW-1)
 		}
 	}
-	p.Put(x, y+9, "The mouse works too: click a card, double-click to open, scroll anywhere.", fgs(cMuted), right)
+	// The words the box takes as filters, each drawn as the chip it becomes.
+	fx := p.Put(x, y+9, "FILTERS", fgs(cMuted), right) + 2
+	chip := tui.Style{FG: cAcc, BG: cOver, Bold: true, Reverse: p.mono}
+	for _, f := range [][2]string{{"codex:", "one agent"}, {"today", "yesterday, week, month"}, {"in:api", "one project"}} {
+		fx = p.Put(fx, y+9, f[0], chip, right)
+		fx = p.Put(fx+1, y+9, f[1], fgs(cSub), right) + 3
+	}
+	p.PutClip(x, y+11, "The mouse works too: click a card, double-click to open, scroll anywhere.", fgs(cMuted), right)
 }

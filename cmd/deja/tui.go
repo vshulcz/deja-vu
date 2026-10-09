@@ -275,7 +275,7 @@ func (a *tuiApp) say(msg string, good bool) {
 
 // reload rebuilds the list for the current scope and query.
 func (a *tuiApp) reload() {
-	if len(a.query) == 0 {
+	if a.box().text == "" {
 		a.loadHome()
 		return
 	}
@@ -305,7 +305,13 @@ func (a *tuiApp) loadHome() {
 	case scopeKept:
 		ss, total = a.kept, len(a.kept)
 	default:
-		ss, total, _ = tuiRecent(a.dir, a.scopeProjects(), 60)
+		// Filtered, the list is read whole: yesterday's sessions sit behind
+		// today's, and a cut taken first would drop them.
+		box, n := a.box(), 60
+		if box.active() {
+			n = 0
+		}
+		ss, total, _ = tuiRecent(a.dir, box.options(a.scopeProjects()), n)
 	}
 	a.setRows(ss, nil, total)
 	a.widened = false
@@ -321,8 +327,9 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	}
 	a.listed = listed
 	var rows []tuiRow
+	box := a.box()
 	add := func(s model.Session, snips []string) {
-		if len(a.filter) > 0 && !a.filter[s.Harness] {
+		if len(a.filter) > 0 && !a.filter[s.Harness] || !box.keeps(s) {
 			return
 		}
 		rows = append(rows, tuiRow{s: s, snips: snips})
@@ -338,7 +345,7 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 		for _, s := range ss {
 			add(s, nil)
 		}
-		if a.scope != scopeKept {
+		if a.scope != scopeKept && !box.active() {
 			var behind []behindRow
 			for _, b := range a.behind {
 				if len(a.filter) == 0 || a.filter[b.s.Harness] {
@@ -359,7 +366,7 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 		}
 	}
 	a.rows, a.total = rows, total
-	if len(a.filter) > 0 || a.scope == scopeKept {
+	if len(a.filter) > 0 || a.scope == scopeKept || box.active() {
 		a.total = len(rows)
 	}
 	a.sel, a.scroll = 0, 0
@@ -378,7 +385,9 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 
 func (a *tuiApp) startSearch() {
 	a.seq++
-	seq, q, projects, scope := a.seq, string(a.query), a.scopeProjects(), a.scope
+	seq, q, scope, box := a.seq, string(a.query), a.scope, a.box()
+	o := box.options(a.scopeProjects())
+	o.Limit = 80
 	a.searching = true
 	a.latest.Store(int64(seq))
 	// A search already overtaken by the next keystroke is not run: on a large
@@ -390,10 +399,11 @@ func (a *tuiApp) startSearch() {
 			return
 		}
 		start := time.Now()
-		o := search.Options{Query: q, Projects: projects, Limit: 80}
 		hits, err := tuiSearch(a.dir, o)
 		widened := false
-		if err == nil && len(hits) == 0 && scope == scopeHere && len(projects) > 0 && !stale() {
+		// A project named with in: is what was asked for; only the tab's
+		// scope widens on its own.
+		if err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
 			o.Projects = nil
 			hits, err = tuiSearch(a.dir, o)
 			widened = len(hits) > 0
@@ -414,7 +424,7 @@ func (a *tuiApp) startSearch() {
 			// The banner offers the newest answer under ↵, so it is the
 			// one selected, on a new query only: a refresh of the same one
 			// keeps the reader's pick, which r or o is about to act on.
-			if n, s := dejaVu(q, a.rows); n > 0 && !refresh {
+			if n, s := dejaVu(box.text, a.rows); n > 0 && !refresh {
 				for i, r := range a.rows {
 					if sessionKey(r.s) == sessionKey(s) {
 						a.sel = i

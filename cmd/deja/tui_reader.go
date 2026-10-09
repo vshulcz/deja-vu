@@ -56,7 +56,7 @@ func (a *tuiApp) openReader() {
 		return
 	}
 	a.view = viewReader
-	a.reader = readerState{s: s, terms: queryTerms(string(a.query))}
+	a.reader = readerState{s: s, terms: queryTerms(a.box().text)}
 	a.want(s)
 }
 

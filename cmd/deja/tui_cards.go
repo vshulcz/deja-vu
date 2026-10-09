@@ -43,15 +43,24 @@ func (a *tuiApp) sectionLabel() (string, string) {
 			agents[r.s.Harness] = true
 		}
 		label := tuiCount(len(a.rows), "session") + " across " + tuiCount(len(agents), "agent")
+		box := a.box()
+		note := "all projects"
 		switch {
 		case a.widened:
-			return label, "none in this project, showing all"
+			note = "none in this project, showing all"
+		case len(box.projects) > 0:
+			note = "" // the filter names the project
 		case a.scope == scopeHere:
-			return label, "this project"
+			note = "this project"
 		case a.scope == scopeKept:
-			return label, "kept after deletion"
+			note = "kept after deletion"
 		}
-		return label, "all projects"
+		if f := box.note(); f != "" && note != "" {
+			note += " · " + f
+		} else if f != "" {
+			note = f
+		}
+		return label, note
 	}
 	switch a.scope {
 	case scopeHere:
@@ -128,7 +137,7 @@ func (a *tuiApp) groupHeading(l layout, i int, r tuiRow, y int) {
 func (a *tuiApp) drawCards(l layout) {
 	p := a.p
 	top := l.bodyTop
-	if n, s := dejaVu(string(a.query), a.rows); n > 0 && l.bodyH > 16 {
+	if n, s := dejaVu(a.box().text, a.rows); n > 0 && l.bodyH > 16 {
 		a.drawDejaVu(l, n, s)
 		top += 4
 	}
@@ -240,7 +249,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 	if yy, ok := row(1); ok {
 		x := p.Put(x0+2, yy, "●", fgs(agentColor(r.s.Harness)), x1)
 		meta := agentName(r.s.Harness)
-		if a.scope != scopeHere || a.widened {
+		if a.scope != scopeHere || a.widened || len(a.box().projects) > 0 {
 			meta += " · " + tuiProject(r.s)
 		}
 		meta += " · " + tuiAgo(r.s.Updated, a.now)
@@ -255,7 +264,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 	if yy, ok := row(2); ok {
 		if sn := a.snippet(r); sn != "" {
 			x := p.Put(x0+4, yy, "“", fgs(cMuted), x1)
-			x = p.putHL(x, yy, sn, queryTerms(string(a.query)), on(cSub, surf), x1-2)
+			x = p.putHL(x, yy, sn, queryTerms(a.box().text), on(cSub, surf), x1-2)
 			p.Put(x, yy, "”", fgs(cMuted), x1)
 		} else if c, _ := a.conclusion(r.s); c != "" && !sameLine(c, head) {
 			p.PutClip(x0+4, yy, c, on(cSub, surf), x1-1)
@@ -323,7 +332,7 @@ func (a *tuiApp) drawPreview(l layout) {
 	}
 	section("ASKED", wrapLines(s.Title, iw, 3), plain(cText))
 	if len(r.snips) > 0 {
-		terms := queryTerms(string(a.query))
+		terms := queryTerms(a.box().text)
 		section("MATCHED", wrapLines(r.snips[0], iw-2, 3), func(_ int, ln string) {
 			p.putHL(ix, cy, ln, terms, fgs(cSub), right)
 		})

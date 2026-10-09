@@ -66,9 +66,11 @@ func tuiSearch(dir string, o search.Options) ([]search.Hit, error) {
 	return d.Hits, err
 }
 
-// tuiRecent is the home list: the newest sessions in scope.
-func tuiRecent(dir string, projects []string, n int) ([]model.Session, int, error) {
-	ss, total, err := index.RecentMatchingCounted(dir, n, search.Options{Projects: projects})
+// tuiRecent is the home list: the newest sessions in scope, under whatever
+// filters the box holds.
+func tuiRecent(dir string, o search.Options, n int) ([]model.Session, int, error) {
+	o.Query = ""
+	ss, total, err := index.RecentMatchingCounted(dir, n, o)
 	if err != nil {
 		return nil, 0, err
 	}

@@ -122,7 +122,7 @@ func (a *tuiApp) status() string {
 		// Turns with the 250 ms tick, so a long read does not look stuck.
 		spin := []string{"◐", "◓", "◑", "◒"}[int(a.now.UnixMilli()/250)%4]
 		return spin + " reading new sessions…"
-	case len(a.query) > 0 && !a.searching:
+	case a.box().text != "" && !a.searching:
 		return "searched " + grouped(len(a.allMeta)) + " sessions in " + formatMS(a.tookMS)
 	}
 	return grouped(len(a.allMeta)) + " sessions · " + num(len(a.agentsAll)) + " agents"
@@ -156,11 +156,7 @@ func (a *tuiApp) drawSearch(l layout, y int) {
 		}
 		p.PutClip(x, y, "Search everything your agents ever did", fgs(cMuted), max)
 	} else {
-		q := string(a.query)
-		if termwidth.Columns(q) > max-x-1 {
-			q = "…" + termwidth.CutRight(q, max-x-2)
-		}
-		x = p.Put(x, y, q, bold(cText), max)
+		x = a.drawQuery(x, y, max)
 		if !a.listFocus {
 			p.Put(x, y, "▏", fgs(cAcc), max+1)
 		}
