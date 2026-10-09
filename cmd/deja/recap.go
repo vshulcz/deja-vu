@@ -170,12 +170,26 @@ func printRecap(w io.Writer, r index.Recap, since string, limit int, older strin
 		} else {
 			fmt.Fprintf(w, "\n%s\n", name)
 		}
+		// A conclusion repeated across sessions of one project is printed once,
+		// under the newest session that reached it; a session left with nothing
+		// new drops out of the draft. --json keeps every line.
+		said := map[string]bool{}
 		for _, s := range shown {
 			if recapProjectName(s.Project) != name {
 				continue
 			}
+			fresh := 0
 			for _, line := range s.Lines {
+				key := strings.Join(strings.Fields(line), " ")
+				if said[key] {
+					continue
+				}
+				said[key] = true
+				fresh++
 				fmt.Fprintln(w, termwidth.Indent(line, width, "  · ", "    "))
+			}
+			if fresh == 0 {
+				continue
 			}
 			// The receipt: which session said it, so the draft can be checked
 			// rather than trusted.

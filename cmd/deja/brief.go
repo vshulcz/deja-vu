@@ -284,7 +284,7 @@ func runBrief(dir string, w io.Writer) error {
 	asked, haveAsked := index.FindAskedTwice(dir, briefAllows)
 	askedText := ""
 	if haveAsked {
-		askedText = trimBriefTitle(asked.Text)
+		askedText = trimBriefTitleTo(asked.Text, briefRowMax(w))
 	}
 
 	// What the counters above cannot say: which memory kept being worth
@@ -315,7 +315,7 @@ func runBrief(dir string, w io.Writer) error {
 	}
 
 	if haveReused && !sameWork {
-		fmt.Fprintf(w, "reused     %s%s%s\n", bold, trimBriefTitle(r.Title), reset)
+		fmt.Fprintf(w, "reused     %s%s%s\n", bold, trimBriefTitleTo(r.Title, briefRowMax(w)), reset)
 		// Not "by agents": the count includes the déjà vu events written when
 		// the user's own prompt returns to the same ground, which is a person
 		// coming back rather than an agent pulling. And not "so far": the
@@ -328,7 +328,7 @@ func runBrief(dir string, w io.Writer) error {
 	// asked line above it — the command that reports the full list reads the
 	// record log, which is a hundred times this screen's budget.
 	if f, ok := index.FindFriction(dir, briefAllows); ok {
-		fmt.Fprintf(w, "hit        %s%s%s\n", bold, trimBriefTitle(f.Text), reset)
+		fmt.Fprintf(w, "hit        %s%s%s\n", bold, trimBriefTitleTo(f.Text, briefRowMax(w)), reset)
 		fmt.Fprintf(w, "again      %s%d sessions · last %s · deja friction%s\n",
 			dim, len(f.Sessions), search.RelativeDate(f.Last), reset)
 	}
@@ -405,6 +405,16 @@ const briefLabelColumns = 11
 // rule here would also cut `hook-context` output, which is not a terminal line
 // at all — that is a separate item (#1588).
 const briefTitleMax = 44
+
+// briefRowMax is what a fixed-prefix row has left on the terminal w is, so
+// the rows run to the edge as `recent` does; off a terminal it is
+// briefTitleMax.
+func briefRowMax(w io.Writer) int {
+	if n := printableWidth(w); n > briefLabelColumns+1 {
+		return n - briefLabelColumns - 1
+	}
+	return briefTitleMax
+}
 
 func trimBriefTitleTo(t string, max int) string {
 	t = strings.Map(func(r rune) rune {
