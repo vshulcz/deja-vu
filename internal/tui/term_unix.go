@@ -37,7 +37,7 @@ func makeRaw(in, out *os.File) (func(), error) {
 	if e := ioctl(in, ioctlSetTermios, unsafe.Pointer(&raw)); e != 0 {
 		return nil, ErrNotTerminal
 	}
-	return func() { ioctl(in, ioctlSetTermios, unsafe.Pointer(&old)) }, nil
+	return func() { _ = ioctl(in, ioctlSetTermios, unsafe.Pointer(&old)) }, nil
 }
 
 func size(f *os.File) (int, int, bool) {

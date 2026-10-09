@@ -38,24 +38,24 @@ func TestReadLoopAndClose(t *testing.T) {
 	go term.readLoop()
 	go term.watchSize()
 
-	w.Write([]byte("x\x1b[A"))
+	_, _ = w.Write([]byte("x\x1b[A"))
 	if ev := next(t, term); ev.Rune != 'x' {
 		t.Errorf("first = %+v", ev)
 	}
 	if ev := next(t, term); ev.Key != KeyUp {
 		t.Errorf("second = %+v", ev)
 	}
-	w.Write([]byte("\x1b"))
+	_, _ = w.Write([]byte("\x1b"))
 	if ev := next(t, term); ev.Key != KeyEsc {
 		t.Errorf("a lone ESC = %+v", ev)
 	}
-	w.Write([]byte("\x1b["))
+	_, _ = w.Write([]byte("\x1b["))
 	time.Sleep(50 * time.Millisecond)
-	w.Write([]byte("B"))
+	_, _ = w.Write([]byte("B"))
 	if ev := next(t, term); ev.Key != KeyDown {
 		t.Errorf("a sequence split over two reads = %+v", ev)
 	}
-	syscall.Kill(os.Getpid(), syscall.SIGWINCH)
+	_ = syscall.Kill(os.Getpid(), syscall.SIGWINCH)
 	if ev := next(t, term); ev.Kind != EvResize || ev.W != 80 || ev.H != 24 {
 		t.Errorf("resize = %+v", ev)
 	}

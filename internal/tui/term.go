@@ -42,7 +42,7 @@ func Open() (*Term, error) {
 		return nil, err
 	}
 	t := &Term{in: in, out: out, Mode: DetectMode(), events: make(chan Event, 64), stop: make(chan struct{}), restore: restore}
-	io.WriteString(out, enterSeq)
+	_, _ = io.WriteString(out, enterSeq)
 	t.wg.Add(2)
 	go t.readLoop()
 	go t.watchSize()
@@ -79,14 +79,14 @@ func (t *Term) Draw(c *Canvas) {
 		t.prev[y] = l
 	}
 	b.WriteString("\x1b[?2026l")
-	io.WriteString(t.out, b.String())
+	_, _ = io.WriteString(t.out, b.String())
 }
 
 // Invalidate forgets the last frame, so the next Draw writes everything.
 func (t *Term) Invalidate() { t.prev = nil }
 
 // Write sends a raw sequence, such as an OSC 52 copy.
-func (t *Term) Write(s string) { io.WriteString(t.out, s) }
+func (t *Term) Write(s string) { _, _ = io.WriteString(t.out, s) }
 
 // Close restores the terminal. It is safe to call more than once.
 func (t *Term) Close() {
@@ -98,7 +98,7 @@ func (t *Term) Close() {
 	t.closed = true
 	close(t.stop)
 	t.wg.Wait()
-	io.WriteString(t.out, leaveSeq)
+	_, _ = io.WriteString(t.out, leaveSeq)
 	t.restore()
 }
 

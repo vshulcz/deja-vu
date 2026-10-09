@@ -405,6 +405,7 @@ func TestRunTUIFallsBackWithoutATerminal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer f.Close()
 	os.Stdout = f
 	err = runTUI(dir)
 	os.Stdout = old
