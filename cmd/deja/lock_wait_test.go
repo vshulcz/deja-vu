@@ -1,9 +1,13 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // A command waiting out someone else's rebuild at a terminal keeps a moving
@@ -21,6 +25,23 @@ func TestWaitLine(t *testing.T) {
 	}
 	if !strings.HasSuffix(out, "\n") || !strings.Contains(out, "✓ the index is ready, waited 0.") {
 		t.Errorf("the end of the wait is not said: %q", out)
+	}
+
+	// The notice writes to stderr as it is when the wait starts: the screen
+	// has swapped it for the null device by then.
+	f, err := os.Create(filepath.Join(t.TempDir(), "stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldErr, oldNotice, oldDone := os.Stderr, index.LockWaitNotice, index.LockWaitDone
+	t.Cleanup(func() { os.Stderr, index.LockWaitNotice, index.LockWaitDone = oldErr, oldNotice, oldDone })
+	installLockWait()
+	os.Stderr = f
+	index.LockWaitNotice()
+	index.LockWaitDone()
+	os.Stderr = oldErr
+	if got, _ := os.ReadFile(f.Name()); !strings.Contains(string(got), "building the index") {
+		t.Errorf("the notice went past the swapped stderr: %q", got)
 	}
 
 	b.Reset()

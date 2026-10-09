@@ -75,10 +75,16 @@ func (a *tuiApp) firstBuild() {
 	a.post(func() {
 		a.welcome.done, a.welcome.err, a.welcome.took = true, err, took
 		a.indexing = false
-		a.loadHome()
-		if a.scope == scopeHere && a.total == 0 {
-			a.scope = scopeAll
+		if a.view != viewWelcome {
+			// Went in early: what is on screen is the reader's, so the rest
+			// of the history joins it without resetting a search or a pick.
+			a.reload()
+		} else {
 			a.loadHome()
+			if a.scope == scopeHere && a.total == 0 {
+				a.scope = scopeAll
+				a.loadHome()
+			}
 		}
 		if a.welcome.early && err == nil {
 			a.say("All "+grouped(len(a.allMeta))+" sessions are in.", true)

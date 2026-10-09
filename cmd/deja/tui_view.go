@@ -209,7 +209,7 @@ func (a *tuiApp) drawFooter() {
 	switch {
 	case a.view == viewReader:
 		keys = [][2]string{{"↑↓", "scroll"}, {"n N", "next hit"}, {"t", "full messages"}, {"r", "resume"}, {"o", "continue in…"}, {"c", "copy"}, {"esc", "back"}}
-	case a.listFocus:
+	case a.listFocus && len(a.rows) > 0:
 		keys = [][2]string{{"↵", "read"}, {"r", "resume"}, {"o", "continue in…"}, {"c", "copy context"}, {"a", "agents"}, {"/", "search"}, {"?", "help"}}
 	case len(a.query) > 0:
 		keys = [][2]string{{"↑↓", "pick"}, {"↵", "read"}, {"tab", "scope"}, {"^o", "continue in…"}, {"^k", "commands"}, {"esc", "clear"}}
@@ -229,6 +229,10 @@ func (a *tuiApp) drawFooter() {
 func (a *tuiApp) drawToast() {
 	if a.toast == "" || time.Now().After(a.toastUntil) {
 		a.toast = ""
+		return
+	}
+	if a.view == viewWelcome {
+		// The welcome says it in its own place, under the progress.
 		return
 	}
 	p := a.p
@@ -275,9 +279,14 @@ func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
 func (a *tuiApp) drawEmpty(l layout) {
 	p := a.p
 	mood := mark.Nothing
-	title, line := "Nothing for “"+string(a.query)+"”", "Not in "+grouped(len(a.allMeta))+" sessions from "+num(len(a.agentsAll))+" agents on this machine."
+	title, line := "Nothing for “"+strings.TrimSpace(string(a.query))+"”", "Not in "+grouped(len(a.allMeta))+" sessions from "+num(len(a.agentsAll))+" agents on this machine."
 	switch {
 	case a.searching:
+		// Nothing listed yet: placeholder cards, so a slow search on a large
+		// history reads as work rather than an empty screen.
+		for i, y := 0, l.bodyTop+1; y+2 < l.bodyTop+l.bodyH && i < 8; i, y = i+1, y+3 {
+			a.drawSkeleton(l.listX+2, y, l.listW-4, 2)
+		}
 		return
 	case len(a.query) == 0 && a.scope == scopeKept:
 		mood = mark.Ready

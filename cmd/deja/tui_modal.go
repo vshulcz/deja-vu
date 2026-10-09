@@ -259,7 +259,7 @@ func (a *tuiApp) drawAgents() {
 			p.Fill(ex, y+r, colW-1, 1, bg)
 		}
 		bx := p.Put(ex+1, y+r, box, on(cGrn, bg), ex+colW)
-		a.gridEntry(bx-1, y+r, colW-(bx-1-ex), h, i == a.m.sel, false, num(counts[h]))
+		a.gridEntry(bx-1, y+r, colW-(bx-1-ex), h, i == a.m.sel, false, grouped(counts[h]))
 	}
 	y += rows + 1
 	bx := p.button(x, y, "↵", "Apply", true, right)

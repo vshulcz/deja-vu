@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -63,6 +64,7 @@ type tuiApp struct {
 	widened     bool
 	searching   bool
 	seq         int
+	latest      atomic.Int64 // seq of the newest search, read off the loop
 
 	kept       []model.Session
 	keptLoaded bool
@@ -252,7 +254,12 @@ func (a *tuiApp) detailWorker() {
 // want queues a session for its full read unless it is in hand or on the way.
 func (a *tuiApp) want(s model.Session) {
 	k := sessionKey(s)
-	if a.details[k] != nil || a.loading[k] {
+	if a.loading[k] {
+		return
+	}
+	// One read on the first frame came from the index as it was; a session
+	// that has grown since the refresh is read again.
+	if d := a.details[k]; d != nil && (d.err != nil || d.full.ID == "" || !d.full.Updated.Before(s.Updated)) {
 		return
 	}
 	select {
@@ -285,6 +292,7 @@ func (a *tuiApp) scopeProjects() []string {
 func (a *tuiApp) loadHome() {
 	// A search still running answers a box that is empty now.
 	a.seq++
+	a.latest.Store(int64(a.seq))
 	a.searching = false
 	all, _, err := index.RecentMatchingCounted(a.dir, 0, search.Options{})
 	if err == nil {
@@ -363,12 +371,20 @@ func (a *tuiApp) startSearch() {
 	a.seq++
 	seq, q, projects, scope := a.seq, string(a.query), a.scopeProjects(), a.scope
 	a.searching = true
-	time.AfterFunc(30*time.Millisecond, func() {
+	a.latest.Store(int64(seq))
+	// A search already overtaken by the next keystroke is not run: on a large
+	// history each one is a full pass, and a word typed at speed started one
+	// per letter, which held the screen still for seconds.
+	stale := func() bool { return a.latest.Load() != int64(seq) }
+	time.AfterFunc(60*time.Millisecond, func() {
+		if stale() {
+			return
+		}
 		start := time.Now()
 		o := search.Options{Query: q, Projects: projects, Limit: 80}
 		hits, err := tuiSearch(a.dir, o)
 		widened := false
-		if err == nil && len(hits) == 0 && scope == scopeHere && len(projects) > 0 {
+		if err == nil && len(hits) == 0 && scope == scopeHere && len(projects) > 0 && !stale() {
 			o.Projects = nil
 			hits, err = tuiSearch(a.dir, o)
 			widened = len(hits) > 0
@@ -384,10 +400,12 @@ func (a *tuiApp) startSearch() {
 				return
 			}
 			a.tookMS, a.widened = took, widened
+			refresh := a.listed == num(a.scope)+"\x00"+q
 			a.setRows(nil, hits, len(hits))
 			// The banner offers the newest answer under ↵, so it is the
-			// one selected.
-			if n, s := dejaVu(q, a.rows); n > 0 {
+			// one selected, on a new query only: a refresh of the same one
+			// keeps the reader's pick, which r or o is about to act on.
+			if n, s := dejaVu(q, a.rows); n > 0 && !refresh {
 				for i, r := range a.rows {
 					if sessionKey(r.s) == sessionKey(s) {
 						a.sel = i
@@ -444,6 +462,18 @@ func (a *tuiApp) putBack() {
 				return
 			}
 			d.gone = false
+			// Back where its agent reads it, it is no longer a kept one.
+			k := sessionKey(s)
+			delete(a.keptIDs, k)
+			for i, ks := range a.kept {
+				if sessionKey(ks) == k {
+					a.kept = append(a.kept[:i:i], a.kept[i+1:]...)
+					break
+				}
+			}
+			if a.scope == scopeKept && a.view != viewReader {
+				a.reload()
+			}
 			a.say("Put back. r resumes it in "+agentName(s.Harness)+".", true)
 		})
 	}()

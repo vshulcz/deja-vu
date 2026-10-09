@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/tui"
@@ -35,9 +36,44 @@ func TestTUILateSearchAfterClear(t *testing.T) {
 	a.startSearch()
 	a.query = nil
 	a.loadHome()
-	drain(t, a)
+	// Overtaken before it ran, the search is not run at all.
+	time.Sleep(200 * time.Millisecond)
+	select {
+	case f := <-a.updates:
+		f()
+	default:
+	}
 	if len(a.rows) != 3 {
 		t.Errorf("home has %d rows after a late search", len(a.rows))
+	}
+}
+
+// A word typed at speed runs one search, not one per letter: on a large
+// history each was a full pass and together they held the screen still.
+func TestTUITypingRunsTheLastSearchOnly(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	for _, r := range "webhook" {
+		a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: r})
+	}
+	time.Sleep(400 * time.Millisecond)
+	n := 0
+	for len(a.updates) > 0 {
+		(<-a.updates)()
+		n++
+	}
+	if n != 1 || a.searching || len(a.rows) == 0 {
+		t.Errorf("%d searches answered, searching=%v, %d rows", n, a.searching, len(a.rows))
+	}
+}
+
+// The empty box takes ? as help, as the footer says.
+func TestTUIQuestionMarkOpensHelp(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: '?'})
+	if a.modal != modalHelp || len(a.query) != 0 {
+		t.Errorf("modal=%d query=%q", a.modal, string(a.query))
 	}
 }
 
@@ -108,5 +144,56 @@ func TestTUIPasteIntoModal(t *testing.T) {
 	a.handle(tui.Event{Kind: tui.EvPaste, Text: "x"})
 	if a.modal != modalHelp {
 		t.Error("a paste closed help")
+	}
+}
+
+// A refresh of the same search keeps the reader's pick, and a first build
+// finishing under an early start keeps the search on screen.
+func TestTUIRefreshKeepsWhatIsOnScreen(t *testing.T) {
+	dir, root := tuiStore(t)
+	// Asked twice, so the search names the newest and selects it.
+	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "e5555555-again", "cwd": "/work/payments", "timestamp": "2026-03-04T10:00:00Z",
+		"message": map[string]any{"role": "user", "content": "the retry double charges the card again"}})
+	writeClaudeFixture(t, filepath.Join(root, "payments", "e5555555-again.jsonl"), "e5555555-again", []string{string(user)})
+	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	a := newTestTUI(t, dir)
+	a.query = []rune("retry card")
+	a.startSearch()
+	drain(t, a)
+	if len(a.rows) < 2 {
+		t.Fatalf("%d rows", len(a.rows))
+	}
+	a.sel = (a.sel + 1) % len(a.rows)
+	picked := sessionKey(a.rows[a.sel].s)
+	a.reload()
+	drain(t, a)
+	if got := sessionKey(a.rows[a.sel].s); got != picked {
+		t.Errorf("a refresh moved the pick from %q to %q", picked, got)
+	}
+
+	a.welcome.early = true
+	a.firstBuild()
+	drain(t, a)
+	if string(a.query) != "retry card" || a.listed != num(a.scope)+"\x00retry card" {
+		t.Errorf("the finished build replaced the search: %q %q", string(a.query), a.listed)
+	}
+}
+
+// A session that grew after its first read is read again.
+func TestTUIGrownSessionIsReadAgain(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	s := a.rows[0].s
+	delete(a.loading, sessionKey(s))
+	a.want(s)
+	if a.loading[sessionKey(s)] {
+		t.Fatal("an unchanged session was read twice")
+	}
+	s.Updated = s.Updated.Add(time.Minute)
+	a.want(s)
+	if !a.loading[sessionKey(s)] {
+		t.Error("a session that grew keeps its first read")
 	}
 }

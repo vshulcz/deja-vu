@@ -391,6 +391,16 @@ func TestTUIResumeAndPutBack(t *testing.T) {
 	if _, err := os.Stat(path); err != nil || !strings.Contains(a.toast, "Put back") {
 		t.Errorf("put back: %v, toast %q", err, a.toast)
 	}
+	// Put back, it leaves Kept.
+	if len(a.kept) != 0 || len(a.rows) != 0 || strings.Contains(screen(a.frame(120, 36)), "Kept 1") {
+		t.Errorf("still kept: %d kept, %d rows", len(a.kept), len(a.rows))
+	}
+	a.setScope(scopeAll)
+	for i, r := range a.rows {
+		if r.s.ID == "c3333333-hook" {
+			a.sel = i
+		}
+	}
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'R'})
 	if !strings.Contains(a.toast, "nothing to put back") {
 		t.Errorf("toast %q", a.toast)

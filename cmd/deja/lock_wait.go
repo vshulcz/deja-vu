@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // waitLine is what a command says while another deja holds the index. At a
@@ -17,6 +20,18 @@ type waitLine struct {
 	stop  chan struct{}
 	done  chan struct{}
 	width int
+}
+
+// installLockWait takes stderr at the moment of the wait, not at start: the
+// screen swaps it for the null device while it is up, and a line spinning on
+// the real one would draw over the frame.
+func installLockWait() {
+	l := &waitLine{}
+	index.LockWaitNotice = func() {
+		l.w, l.live = os.Stderr, briefWanted(os.Stderr)
+		l.begin()
+	}
+	index.LockWaitDone = l.end
 }
 
 const waitText = "another deja is building the index, waiting for it"

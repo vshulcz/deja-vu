@@ -268,7 +268,20 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 	case tui.KeyEsc, tui.KeyBackspace:
 		a.view = viewList
 	case tui.KeyCtrl:
-		a.ctrlKey(ev.Rune)
+		// The list's own keys (^u ^w ^n ^p) would change the hidden list
+		// under an open session; here they move through it the way less does.
+		switch ev.Rune {
+		case 'n':
+			r.top++
+		case 'p':
+			r.top--
+		case 'd':
+			r.top += page / 2
+		case 'u':
+			r.top -= page / 2
+		case 'r', 'o', 'y', 'k':
+			a.ctrlKey(ev.Rune)
+		}
 	case tui.KeyRune:
 		switch ev.Rune {
 		case 'k':

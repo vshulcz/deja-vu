@@ -107,6 +107,12 @@ func (a *tuiApp) handleList(ev tui.Event) {
 		if a.listFocus && a.listAction(ev.Rune) {
 			return
 		}
+		// The footer offers ? for help on the empty box, and a lone ? is
+		// not a search anybody means.
+		if ev.Rune == '?' && len(a.query) == 0 {
+			a.openModal(modalHelp)
+			return
+		}
 		a.listFocus = false
 		a.query = append(a.query, ev.Rune)
 		a.reload()
