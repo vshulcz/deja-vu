@@ -110,7 +110,10 @@ func TestInstallTargetErrorsAndAliases(t *testing.T) {
 	// Several names are a target list since #3686 — the stale-wiring row asks
 	// for exactly that — so two unknown ones are two refusals, each named.
 	err := runInstall(index.DefaultDir(), []string{"a", "b"}, false)
-	if err == nil || !strings.Contains(err.Error(), "2 targets refused") {
+	// Nothing was written, so the answer is the two names and nothing about
+	// a partial run.
+	if err == nil || !strings.Contains(err.Error(), `unknown target "a"`) || !strings.Contains(err.Error(), `unknown target "b"`) ||
+		strings.Contains(err.Error(), "finished what it could") {
 		t.Fatalf("install args [a b] err = %v", err)
 	}
 	if err := runInstall(index.DefaultDir(), nil, true); err == nil || !strings.Contains(err.Error(), "uninstall needs a target") {

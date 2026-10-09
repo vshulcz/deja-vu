@@ -21,7 +21,7 @@ import (
 // terminal attached.
 func runResume(dir string, args []string, stdout io.Writer) error {
 	if len(args) < 1 {
-		return idPrefixNeeded(dir, "resume needs an id-prefix", "resume needs id-prefix (see `deja last`)")
+		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
 	doExec, writeBack := false, false
 	prefix := ""
@@ -46,7 +46,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		prefix = a
 	}
 	if prefix == "" {
-		return idPrefixNeeded(dir, "resume needs an id-prefix", "resume needs id-prefix (see `deja last`)")
+		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
 	s, ok, err := findByPrefix(dir, prefix)
 	noteAmbiguousPrefix(dir, prefix, "resuming")
@@ -54,7 +54,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no session matches %q", prefix)
+		return noSessionMatches(dir, prefix)
 	}
 	// Naming an exact id is still browsing under the search activation, so a
 	// session a trust rule withholds must not be reopenable here any more than
@@ -96,6 +96,11 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 			fmt.Fprintf(os.Stderr, "deja: run it from %q — the directory's name has characters the printed line cannot carry, so it leaves out the cd\n", dir)
 		}
 		fmt.Fprintln(stdout, line)
+		// At a terminal a bare command reads like output rather than an
+		// answer. stderr, so `$(deja resume …)` still gets the line alone.
+		if f, isFile := stdout.(*os.File); isFile && briefWanted(f) {
+			fmt.Fprintf(os.Stderr, "deja: run that line, or `deja resume %s --exec` opens it now\n", prefix)
+		}
 		return nil
 	}
 	parts, err := resumeArgv(cmdline)

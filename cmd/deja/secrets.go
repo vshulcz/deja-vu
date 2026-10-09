@@ -103,6 +103,12 @@ func runSecrets(dir string, args []string, stdout io.Writer) error {
 			Sessions: scan.Sessions, Withheld: scan.Withheld,
 		})
 	}
+	if len(scan.Findings) == 0 {
+		if line, ok := emptyStoreLine(dir, "nothing to scan for credentials"); ok {
+			fmt.Fprintln(stdout, line)
+			return nil
+		}
+	}
 	printSecrets(stdout, scan, limit)
 	return nil
 }

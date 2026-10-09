@@ -95,7 +95,7 @@ func renderStatsCard(r stats.Report) string {
 		// The files behind the spans cell, which is the sentence that makes
 		// the number mean something: 1,653 files on one real store.
 		cardText(&b, w-pad, rowY, 12, "400",
-			"across "+formatStatNumber(r.SpanFiles)+" file"+pluralS(r.SpanFiles)+" deja can restore", "#8b989a",
+			formatStatNumber(r.Spans)+" replaced span"+pluralS(r.Spans)+" in "+formatStatNumber(r.SpanFiles)+" file"+pluralS(r.SpanFiles)+" deja can restore", "#8b989a",
 			"text-anchor=\"end\"")
 	case r.RepeatQuestions > 0 && formatStatNumber(r.RepeatQuestions) != hero:
 		cardText(&b, w-pad, rowY, 12, "400",

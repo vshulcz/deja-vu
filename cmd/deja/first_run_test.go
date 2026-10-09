@@ -37,7 +37,7 @@ func TestFirstRunBuildsTheIndexAndBriefs(t *testing.T) {
 		t.Fatal("the first run should have built the index")
 	}
 	got := out.String()
-	if !strings.Contains(got, "deja-vu") || !strings.Contains(got, "1 session") {
+	if !strings.Contains(got, "deja dev") || !strings.Contains(got, "1 session") {
 		t.Fatalf("want a brief over the freshly built index, got:\n%s", got)
 	}
 	if strings.Contains(got, "Usage:") {

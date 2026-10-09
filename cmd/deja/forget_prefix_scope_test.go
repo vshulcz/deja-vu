@@ -74,7 +74,7 @@ func TestAmbiguousDryRunPreviewsTheCommandAsTyped(t *testing.T) {
 	if !strings.Contains(out, "as it stands this run drops nothing") {
 		t.Errorf("the dry run does not say the command as typed drops nothing:\n%s", out)
 	}
-	if !strings.Contains(out, "with --all-matches it would drop: 3 session(s)") {
+	if !strings.Contains(out, "with --all-matches it would drop: 3 sessions") {
 		t.Errorf("the dry run does not say whose 3 sessions those are:\n%s", out)
 	}
 	// The unambiguous form keeps its plain wording — nothing to qualify there.
@@ -82,7 +82,7 @@ func TestAmbiguousDryRunPreviewsTheCommandAsTyped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(one, "would drop: 1 session(s)") || strings.Contains(one, "as it stands") {
+	if !strings.Contains(one, "would drop: 1 session,") || strings.Contains(one, "as it stands") {
 		t.Errorf("an exact id got the ambiguous wording:\n%s", one)
 	}
 }

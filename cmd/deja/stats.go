@@ -239,7 +239,7 @@ func runStats(dir string, args []string) error {
 		// renders it; X, Threads, Reddit and every chat app refuse it, which
 		// the reader found out after writing the post. The page converts it
 		// locally, in their own browser.
-		fmt.Fprintf(os.Stdout, "saved %s\n\nin a README:\n  ![deja](%s)\n\nin a post, as a PNG:\n  https://vshulcz.github.io/deja-vu/card/\n", search.SafePath(path), search.SafePath(base))
+		fmt.Fprintf(os.Stdout, "deja: card written to %s\n\nin a README:\n  ![deja](%s)\n\nin a post, as a PNG:\n  https://vshulcz.github.io/deja-vu/card/\n", search.SafePath(path), search.SafePath(base))
 		return nil
 	}
 	if htmlPath != "" {
@@ -247,7 +247,9 @@ func runStats(dir string, args []string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, search.SafePath(path))
+		// The same sentence view and the card use, so the three files deja
+		// writes for sharing are reported one way.
+		fmt.Fprintf(os.Stdout, "deja: stats page written to %s\n", search.SafePath(path))
 		return nil
 	}
 	if jsonOut {
@@ -261,7 +263,7 @@ func runStats(dir string, args []string) error {
 	// SVG with a path — and nobody finds a flag they were not told about.
 	// Only where there is something worth a picture.
 	if report.TotalSessions > 0 {
-		fmt.Fprintln(os.Stdout, "\n  As a card       deja stats --card  ·  deja stats --card agent-history.svg")
+		fmt.Fprintln(os.Stdout, "\n  As a card       deja stats --card  ·  deja stats --card deja-stats.svg")
 	}
 	if sshTip != "" {
 		fmt.Fprintln(os.Stdout, sshTip)
@@ -316,10 +318,9 @@ func printStats(w io.Writer, r stats.Report) {
 	if color {
 		faint, bold, reset = statDim, statBold, statReset
 	}
-	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
-	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
 	// Section headings over an empty index read as a broken report rather
-	// than an empty one. Say what is missing and stop.
+	// than an empty one. Say what is missing and stop — the title too, which
+	// announced a report that then did not come.
 	if r.TotalSessions == 0 {
 		if r.EmptiedByPolicy {
 			// The rule is named on stderr a line above; repeating "run `deja
@@ -340,6 +341,8 @@ func printStats(w io.Writer, r stats.Report) {
 		fmt.Fprintln(w, emptyIndexHint("nothing indexed yet"))
 		return
 	}
+	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
+	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
 	if headline := statsHeadline(r); headline != "" {
 		fmt.Fprintf(w, "%s%s%s\n\n", bold, headline, reset)
 	}

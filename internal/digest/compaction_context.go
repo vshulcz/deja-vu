@@ -61,6 +61,7 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 		c.Goal = goal
 	}
 	c.Rules = ExtractStandingRules(s, nil)
+	verdicts := runOutputVerdicts(s.Messages)
 
 	for i := len(window) - 1; i >= 0; i-- {
 		m := window[i]
@@ -112,7 +113,7 @@ func ExtractCompactionContext(s model.Session, opts ExtractOptions) model.Compac
 				continue
 			}
 			c.Tests = append(c.Tests, model.ContextTest{
-				Command: command, Outcome: commandOutcome(m.Text), Provenance: ref,
+				Command: command, Outcome: outcomeWithOutput(commandOutcome(m.Text), verdicts, m), Provenance: ref,
 			})
 		}
 	}
@@ -481,6 +482,41 @@ func commandOutcome(command string) string {
 		return "passed"
 	}
 	return "failed"
+}
+
+// outcomeWithOutput settles a "recorded" run from the output that followed
+// it. Claude transcripts carry no exit code for a failed command, so a run
+// whose output ended in `--- FAIL` was labelled "recorded" next to the later
+// runs that passed. The runner's own verdict line is the evidence; output with
+// no such line leaves the run as recorded.
+func outcomeWithOutput(outcome string, verdicts map[string]string, m model.Message) string {
+	if outcome != "recorded" {
+		return outcome
+	}
+	if v := verdicts[runKey(m)]; v != "" {
+		return v
+	}
+	return outcome
+}
+
+func runKey(m model.Message) string { return m.Time.String() + "|" + m.Text }
+
+// runOutputVerdicts reads the verdict of the output that directly follows each
+// verification command without an exit code. The packet's window leaves tool
+// output out, so this reads the whole transcript once.
+func runOutputVerdicts(messages []model.Message) map[string]string {
+	out := map[string]string{}
+	for i, m := range messages {
+		if m.Role != sources.RoleCommand || commandOutcome(m.Text) != "recorded" || !isVerificationCommand(m.Text) {
+			continue
+		}
+		if i+1 < len(messages) && messages[i+1].Role == sources.RoleToolOutput {
+			if v := sources.RunOutputVerdict(messages[i+1].Text); v != "" {
+				out[runKey(m)] = v
+			}
+		}
+	}
+	return out
 }
 
 // RedactCompactionContext copies c and redacts every transcript-derived text

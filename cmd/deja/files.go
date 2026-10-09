@@ -44,6 +44,8 @@ const (
 	filesMaxSessions = 250
 )
 
+var filesFlags = []string{"--project", "--all-projects", "--limit", "--json"}
+
 func runFiles(dir string, args []string, stdout io.Writer) error {
 	var terms []string
 	limit := 10
@@ -85,7 +87,7 @@ func runFiles(dir string, args []string, stdout io.Writer) error {
 			i = len(args)
 		default:
 			if strings.HasPrefix(args[i], "-") {
-				return fmt.Errorf("files: unknown flag %q", args[i])
+				return unknownFlag("files", args[i], filesFlags)
 			}
 			if strings.TrimSpace(args[i]) != "" {
 				terms = append(terms, args[i])

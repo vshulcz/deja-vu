@@ -168,7 +168,7 @@ func TestStatuslineReportsInjectionsWhenNoAgentAsked(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "no agent recalls today") || !strings.Contains(got, "2.0 KB injected") {
+	if !strings.Contains(got, "no recalls yet today") || !strings.Contains(got, "2.0 KB injected") {
 		t.Fatalf("statusline = %q", got)
 	}
 }

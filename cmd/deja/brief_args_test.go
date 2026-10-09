@@ -13,7 +13,7 @@ func TestBriefRefusesArgumentsItDoesNotTake(t *testing.T) {
 
 	// The premise: it still prints the screen when asked for nothing.
 	out, err := captureRun(t, "brief")
-	if err != nil || !strings.Contains(out, "deja-vu") {
+	if err != nil || !strings.Contains(out, "deja dev") {
 		t.Fatalf("bare brief: %q err=%v", out, err)
 	}
 

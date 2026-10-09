@@ -59,7 +59,7 @@ func TestAnEmptySelectorIsNotASession(t *testing.T) {
 	err := runShare(dir, []string{""}, &out)
 	if err == nil {
 		t.Errorf("share of an empty selector printed: %q", out.String())
-	} else if !strings.Contains(err.Error(), "id-prefix") {
+	} else if !strings.Contains(err.Error(), "id prefix") {
 		t.Errorf("share of an empty selector said %v", err)
 	}
 

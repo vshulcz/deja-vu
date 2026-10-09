@@ -536,13 +536,13 @@ func fixLine(p index.FixPair, sessions int) string {
 		// Not something to run, so not offered as one: the file, in the words
 		// `deja fix` uses for the same pair.
 		if p.Candidate {
-			return "deja: this error came up" + how + " " + where + " before" + when +
+			return "this error came up" + how + " " + where + " before" + when +
 				" — one session changed this file after it, and nothing confirms it worked: " + edit
 		}
-		return "deja: this error came up" + how + " " + where + " before" + when + " — changed next: " + edit
+		return "this error came up" + how + " " + where + " before" + when + " — changed next: " + edit
 	}
 	if p.Candidate {
-		return "deja: this error came up" + how + " " + where + " before" + when +
+		return "this error came up" + how + " " + where + " before" + when +
 			" — one session ran this after it, and nothing confirms it worked: " + cmd
 	}
 	// A repaired remedy is not "what followed it", it is the command the reader
@@ -551,9 +551,9 @@ func fixLine(p index.FixPair, sessions int) string {
 	// twice. Of the 360 pairs served on a real store, 107 name nothing their
 	// error names for exactly this reason.
 	if p.Failed != "" {
-		return "deja: this error came up" + how + " " + where + " before" + when + " — the same command worked as: " + cmd
+		return "this error came up" + how + " " + where + " before" + when + " — the same command worked as: " + cmd
 	}
-	return "deja: this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
+	return "this error came up" + how + " " + where + " before" + when + " — what followed it: " + cmd
 }
 
 // withoutFailedExit drops the recorded exit status from a command, and reports

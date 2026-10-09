@@ -32,7 +32,6 @@ func TestHelpNamesTheFiltersACommandAccepts(t *testing.T) {
 	if err := index.Ensure(filepath.Join(tmp, "index.db"), "", false, nil); err != nil {
 		t.Fatal(err)
 	}
-	help := captureHelp(t)
 
 	// Read-only query surfaces only. A command that writes, installs or syncs
 	// has no business being run by a coverage check.
@@ -49,7 +48,7 @@ func TestHelpNamesTheFiltersACommandAccepts(t *testing.T) {
 		{"blame", []string{"main.go"}},
 		{"log", nil},
 	} {
-		line := helpLineFor(help, c.name)
+		line := helpLineFor(helpForCommand(c.name), c.name)
 		if line == "" {
 			t.Errorf("deja help has no usage line for %q", c.name)
 			continue

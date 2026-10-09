@@ -12,9 +12,12 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
+// embedFlags is empty: embed takes no flags.
+var embedFlags = []string{}
+
 func runEmbed(dir string, args []string) error {
 	if len(args) != 0 {
-		return fmt.Errorf("embed: unknown flag %q", args[0])
+		return unknownFlag("embed", args[0], embedFlags)
 	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 		return err

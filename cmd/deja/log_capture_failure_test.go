@@ -34,7 +34,7 @@ func TestTheLogNamesACaptureThatStoredNothing(t *testing.T) {
 	}
 	var failed, ok string
 	for _, line := range strings.Split(out, "\n") {
-		if !strings.Contains(line, "compaction_capture") {
+		if !strings.Contains(line, "compaction ") {
 			continue
 		}
 		if strings.Contains(line, "stored nothing") {

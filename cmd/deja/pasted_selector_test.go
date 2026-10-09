@@ -59,7 +59,7 @@ func TestAPastedIdIsAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "would drop: 1 session(s)") {
+	if !strings.Contains(out, "would drop: 1 session,") {
 		t.Errorf("forget --session harness:id matched nothing:\n%s", out)
 	}
 }

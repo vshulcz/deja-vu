@@ -33,6 +33,9 @@ func wrapUsageLine(line string, width int) []string {
 		return []string{line}
 	}
 	indent := line[:len(line)-len(strings.TrimLeft(line, " "))]
+	if rows := wrapColumnRow(line, indent, width); rows != nil {
+		return rows
+	}
 	fields := usageGroups(strings.TrimLeft(line, " "))
 	// The continuation sits under the command rather than under the margin, so
 	// a wrapped line still reads as one usage line.
@@ -113,4 +116,36 @@ func usageGroups(s string) []string {
 		out = append(out, s[start:])
 	}
 	return out
+}
+
+// wrapColumnRow wraps a "name  description" row of the help page so the
+// description continues under itself rather than under the margin. A row is a
+// line whose first word is followed by a gap of two or more spaces, with the
+// description starting in the left half of the screen; anything else is nil.
+func wrapColumnRow(line, indent string, width int) []string {
+	rest := line[len(indent):]
+	gap := strings.Index(rest, "  ")
+	if gap <= 0 {
+		return nil
+	}
+	col := len(indent) + gap + len(rest[gap:]) - len(strings.TrimLeft(rest[gap:], " "))
+	if col >= len(line) || len([]rune(line[:col])) > width/2 {
+		return nil
+	}
+	head, pad := line[:col], strings.Repeat(" ", len([]rune(line[:col])))
+	var out []string
+	cur, fresh := head, true
+	for _, word := range strings.Fields(line[col:]) {
+		if !fresh && len([]rune(cur))+1+len([]rune(word)) > width {
+			out = append(out, cur)
+			cur = pad + word
+			continue
+		}
+		if !fresh {
+			cur += " "
+		}
+		cur += word
+		fresh = false
+	}
+	return append(out, cur)
 }

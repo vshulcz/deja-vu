@@ -62,7 +62,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			enc.SetIndent("", "  ")
 			return enc.Encode(s)
 		}
-		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", s.Kind, s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
+		fmt.Fprintf(w, "# %s · %s · %d session%s · %s%s\n\n", logKindLabel(s.Kind), s.Time.Local().Format("2006-01-02 15:04"), s.Sessions, pluralS(s.Sessions), humanBytes(int64(s.Bytes)), snapshotTail(s))
 		fmt.Fprintln(w, s.Digest)
 		// This is the newest digest by its stamp (#2140), so a stamp from
 		// ahead of the clock holds the spot until the clock catches up — and
@@ -109,7 +109,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			// a host that sent nothing at all (#2161).
 			into = " · into: unknown (the host sent a payload deja could not read)"
 		}
-		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), e.Kind, humanBytes(int64(e.Bytes)), sess, into, compactionFailureNote(e), mark)
+		fmt.Fprintf(w, "%s  %-14s %s%s%s%s%s\n", e.Time.Local().Format("2006-01-02 15:04"), logKindLabel(e.Kind), humanBytes(int64(e.Bytes)), sess, into, compactionFailureNote(e), mark)
 	}
 	if total > len(events) {
 		// Nobody typed the 20 — it is the default above — and this is the
@@ -221,4 +221,27 @@ func snapshotTail(s usage.Snapshot) string {
 		b.WriteString(" · terms: " + strings.Join(s.Terms, ", "))
 	}
 	return b.String()
+}
+
+// logKindLabel is an event kind as the log screen names it. The stored names
+// are internal — `hook`, `dejavu`, `tool` — and --json keeps them; the screen
+// says what each one was.
+func logKindLabel(kind string) string {
+	switch kind {
+	case usage.KindHook:
+		return "session digest"
+	case usage.KindDejaVu:
+		return "prompt recall"
+	case usage.KindTool:
+		return "tool hint"
+	case usage.KindContext:
+		return "recall context"
+	case usage.KindResource:
+		return "session read"
+	case usage.KindCompactionCapture:
+		return "compaction"
+	case usage.KindCompactionRecovery:
+		return "recovered"
+	}
+	return kind
 }

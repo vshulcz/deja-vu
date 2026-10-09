@@ -31,7 +31,7 @@ func TestTheLogDoesNotCallAnInjectionWithBytesEmpty(t *testing.T) {
 		t.Fatal(err)
 	}
 	line := b.String()
-	if !strings.Contains(line, usage.KindHook) {
+	if !strings.Contains(line, logKindLabel(usage.KindHook)) {
 		t.Fatalf("the log has no injection row:\n%s", line)
 	}
 	if strings.Contains(line, "(empty result)") {

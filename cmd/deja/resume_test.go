@@ -126,8 +126,8 @@ func TestRunResumePrintAndErrors(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"missing", nil, "resume needs id-prefix"},
-		{"exec without prefix", []string{"--exec"}, "resume needs id-prefix"},
+		{"missing", nil, "resume needs an id prefix"},
+		{"exec without prefix", []string{"--exec"}, "resume needs an id prefix"},
 		{"not found", []string{"nope"}, `no session matches "nope"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

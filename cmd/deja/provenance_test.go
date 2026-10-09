@@ -66,7 +66,7 @@ func TestRecentSourcesAreLocalOnly(t *testing.T) {
 }
 
 func TestUsageMentionsTheFromFlag(t *testing.T) {
-	if !strings.Contains(usageText(), "--from") {
-		t.Error("`deja help` does not mention --from, so nobody will find it")
+	if !strings.Contains(helpForCommand("last"), "--from") {
+		t.Error("`deja last --help` does not mention --from, so nobody will find it")
 	}
 }

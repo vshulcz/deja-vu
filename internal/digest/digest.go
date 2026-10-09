@@ -109,14 +109,14 @@ func Share(s model.Session, budget int) string {
 	conclusions := dedupeStatus(selectConclusions(assistants))
 	if len(conclusions) > 0 {
 		if reserved := budget / 2; reserved > 0 {
-			appendSectionWithin("User problem statement(s)", dedupeStatus(users), budget-reserved)
+			appendSectionWithin("What was asked", dedupeStatus(users), budget-reserved)
 		} else {
-			appendSection("User problem statement(s)", dedupeStatus(users))
+			appendSection("What was asked", dedupeStatus(users))
 		}
 	} else {
-		appendSection("User problem statement(s)", dedupeStatus(users))
+		appendSection("What was asked", dedupeStatus(users))
 	}
-	appendSection("Key assistant conclusions / code blocks", conclusions)
+	appendSection("What the assistant concluded", conclusions)
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
@@ -1325,7 +1325,7 @@ func dedupeStatus(ms []model.Message) []model.Message {
 // under its best hit. A recall answer used to be excerpts alone — the passages
 // where the query words appeared — so an agent had to open the session to learn
 // what came of it. These are the assistant's decision-carrying sentences, the
-// same ones `share` puts under "Key assistant conclusions", trimmed to one or
+// same ones `share` puts under "What the assistant concluded", trimmed to one or
 // two lines each so the whole block costs a few hundred bytes.
 func Conclusions(s model.Session, budget int, max int) []string {
 	return conclusions(s, budget, max, false)

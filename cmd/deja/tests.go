@@ -101,6 +101,12 @@ func runTests(dir string, args []string, stdout io.Writer) error {
 		}
 		return enc.Encode(out)
 	}
+	if h.Runs == 0 {
+		if line, ok := emptyStoreLine(dir, "no build or test runs"); ok {
+			fmt.Fprintln(stdout, line)
+			return nil
+		}
+	}
 	printTests(stdout, h, limit)
 	return nil
 }

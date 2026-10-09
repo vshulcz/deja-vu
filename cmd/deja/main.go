@@ -205,9 +205,9 @@ type command func(dir string, rest []string) error
 
 var commands = map[string]command{
 	"version":   cmdVersion,
-	"help":      func(_ string, _ []string) error { printUsage(); return nil },
-	"--help":    func(_ string, _ []string) error { printUsage(); return nil },
-	"-h":        func(_ string, _ []string) error { printUsage(); return nil },
+	"help":      cmdHelp,
+	"--help":    cmdHelp,
+	"-h":        cmdHelp,
 	"--version": cmdVersion,
 	"-version":  cmdVersion,
 	"sources": func(dir string, rest []string) error {
@@ -227,13 +227,15 @@ var commands = map[string]command{
 	"index":         cmdIndex,
 	"embed":         runEmbed,
 	"bench":         func(_ string, rest []string) error { return runBench(rest) },
-	"statusline":    func(dir string, _ []string) error { return runStatusline(dir, os.Stdin, os.Stdout) },
-	"stats":         runStats,
-	"remember":      runRemember,
-	"promote":       func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
-	"rules":         runRules,
-	"forget":        runForget,
-	"mcp":           func(dir string, _ []string) error { return serveMCPProcess(dir, os.Stdin, os.Stdout) },
+	"statusline": func(dir string, _ []string) error {
+		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runStatusline(dir, os.Stdin, w) })
+	},
+	"stats":    runStats,
+	"remember": runRemember,
+	"promote":  func(dir string, rest []string) error { return runPromote(dir, rest, os.Stdout) },
+	"rules":    runRules,
+	"forget":   runForget,
+	"mcp":      func(dir string, _ []string) error { return serveMCPProcess(dir, os.Stdin, os.Stdout) },
 	"hook-prompt": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-prompt") {
 			return nil
@@ -243,7 +245,7 @@ var commands = map[string]command{
 		if len(rest) > 0 && (rest[0] == "--copilot" || rest[0] == "-copilot") {
 			copilotHookOutput = true
 		}
-		return runHookPromptMode(dir, os.Stdin, os.Stdout, plain)
+		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runHookPromptMode(dir, os.Stdin, w, plain) })
 	},
 	"hook-antigravity": func(dir string, _ []string) error {
 		return runHookAntigravity(dir, os.Stdin, os.Stdout)
@@ -277,7 +279,9 @@ var commands = map[string]command{
 		if sayIfTypedByHand("hook-tool") {
 			return nil
 		}
-		return runHookToolMode(dir, os.Stdin, os.Stdout, hookToolShapeOf(rest))
+		return endLineOnTerminal(os.Stdout, func(w io.Writer) error {
+			return runHookToolMode(dir, os.Stdin, w, hookToolShapeOf(rest))
+		})
 	},
 	"hook-tool-after": func(dir string, rest []string) error {
 		if sayIfTypedByHand("hook-tool-after") {
@@ -288,7 +292,7 @@ var commands = map[string]command{
 		if len(rest) > 0 && (rest[0] == "--copilot" || rest[0] == "-copilot") {
 			copilotHookOutput = true
 		}
-		return runHookToolAfterMode(dir, os.Stdin, os.Stdout, plain)
+		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runHookToolAfterMode(dir, os.Stdin, w, plain) })
 	},
 	"check": func(dir string, rest []string) error {
 		return runCheck(dir, rest, os.Stdin, os.Stdout)
@@ -377,7 +381,10 @@ func run(args []string) error {
 		if briefWanted(os.Stdout) {
 			return runBrief(dir, os.Stdout)
 		}
-		printUsage()
+		// Piped, the full page was 106 lines nobody asked for. Nothing deja
+		// installs runs a bare deja, and the brief would build an index into a
+		// pipe, so the reader gets where to go next instead.
+		fmt.Print(bareDejaPointer())
 		return nil
 	}
 	sourceInstance := os.Getenv("DEJA_SOURCE_INSTANCE")
@@ -729,7 +736,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		// nothing to show, not that an argument is missing. parseShow has no
 		// dir to ask, so the store-aware phrasing is applied here (#1063).
 		if err.Error() == showNeedsID {
-			return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
+			return idPrefixNeeded(dir, "show needs an id prefix", showNeedsID)
 		}
 		return err
 	}
@@ -737,7 +744,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	// harness deja itself printed in front of it (#921).
 	o.id = index.PastedSelector(o.id)
 	if o.id == "" {
-		return idPrefixNeeded(dir, "show needs an id-prefix", showNeedsID)
+		return idPrefixNeeded(dir, "show needs an id prefix", showNeedsID)
 	}
 	// A harness that does not exist matches nothing, and the refusal then
 	// blamed the id the reader typed correctly (#2251). search, last, blame
@@ -774,7 +781,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		if n, cerr := index.SessionCount(dir); cerr == nil && n == 0 {
 			return errors.New(strings.TrimPrefix(emptyIndexHint(fmt.Sprintf("no session matches %q", o.id)), "deja: "))
 		}
-		return fmt.Errorf("no session matches %q%s", o.id, movedBucketHint(dir, o.id))
+		return noSessionMatches(dir, o.id)
 	}
 	if err := denyPolicyHidden(o.id, s, os.Stderr); err != nil {
 		return err
@@ -2579,6 +2586,8 @@ func recentMatchingCounted(dir string, n int, o search.Options) ([]model.Session
 	return search.Recent(ss, n), len(ss), nil
 }
 
+var lastFlags = []string{"--json", "--project", "--harness", "--from", "--since", "--role", "--limit"}
+
 func parseLast(args []string) (int, search.Options, string, error) {
 	sinceRaw := ""
 	n := 10
@@ -2628,7 +2637,7 @@ func parseLast(args []string) (int, search.Options, string, error) {
 					// count last takes is a bare argument (#3405).
 					return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q — the count is a bare argument, `deja last 3`", a)
 				}
-				return n, o, sinceRaw, fmt.Errorf("last: unknown flag %q", a)
+				return n, o, sinceRaw, unknownFlag("last", a, lastFlags)
 			}
 			// The only bare argument last takes is the count. Dropping anything
 			// else in silence answered `deja last api-gateway` — the filter the
@@ -2944,7 +2953,7 @@ func parseBlame(args []string) (string, search.BlameOptions, blameMode, error) {
 		}
 	}
 	if path == "" {
-		return "", o, mode, fmt.Errorf("blame needs a path — `deja blame internal/index/sync.go` says who last worked on it")
+		return "", o, mode, fmt.Errorf("blame needs a path — `deja blame <file>` or `deja blame <file>:<line>`")
 	}
 	return path, o, mode, nil
 }
@@ -3884,11 +3893,11 @@ func runForget(dir string, args []string) error {
 		}
 		if scope != nil {
 			fmt.Fprintln(os.Stdout, scope.Error())
-			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nas it stands this run drops nothing; with --all-matches it would drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
-				result.Sessions, result.Messages, result.Tombstones)
+			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nas it stands this run drops nothing; with --all-matches it would drop: %s\nwould add: %s\n",
+				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
 		} else {
-			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %d session(s), %d message(s)\nwould add: %d tombstone(s)\n",
-				result.Sessions, result.Messages, result.Tombstones)
+			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %s\nwould add: %s\n",
+				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
 		}
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
@@ -4168,106 +4177,7 @@ func printUsage() {
 	fmt.Print(wrapUsage(usageText(), printableWidth(os.Stdout)))
 }
 
-// usageText renders the usage block so `--help` on a single command can quote
-// the lines that belong to it instead of the whole page.
-func usageText() string {
-	return fmt.Sprintf(`deja - persistent memory for coding agents
-
-Usage:
-  deja [flags] <query>
-  deja search [flags] <query>   (same, but a query may start with a dash)
-  deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]
-  deja share <id-prefix>
-  deja resume <id-prefix> [--write-back] [--exec]
-  deja wip [--json]
-  deja handoff [--to <agent>] [id-prefix] [--exec]
-  deja hook-prompt [--plain] [--junie]  (UserPromptSubmit hook: relevance recall per prompt)
-  deja hook-context [--plain] [--once] [--strict] [--copilot] [--notes] [--junie]  (session start: the project digest, once per session)
-  deja hook-antigravity (Antigravity PreInvocation hook: inject on first turn)
-  deja hook-plan     (PreToolUse ExitPlanMode hook: factual plan/history co-occurrences)
-  deja hook-tool [--plain] [--crush] [--junie]  (PreToolUse Bash/Edit hook: one line on what this command or file already has)
-  deja hook-tool-after  (PostToolUse Bash hook: the command that followed this error before)
-  deja check -       (read a plan from stdin and print factual co-occurrences)
-  deja view [--no-open]  (browse your memory: sessions, recalls, notes — one local HTML)
-  deja ctx <query|id-prefix>
-  deja recall <words> [--project name] [--harness name] [--limit n]
-             (what the MCP recall tool answers an agent: about 4 KB, this project first)
-  deja blame <path>[:line] [--all] [--json] [--project name] [--harness name] [--since 30d]
-  deja blame <path>:<line> --attribution [--json] [--git-note]  (the line answer alone)
-  deja files <topic> [--project name] [--all-projects] [--limit n] [--json]
-  deja restore <path> [--span n] [-o|--out file] [--force]
-  deja friction [--limit n] [--json]
-  deja secrets [--limit n] [--json] [--scrub [--dry-run]]  (credentials your agent transcripts are carrying; --scrub rewrites the files that hold one)
-  deja tests [--limit n] [--json]    (your build and test runs, week by week)
-  deja recap [--since 7d] [--limit n] [--json]  (what the week settled, with the session behind each line)
-  deja fix "<error text>" [--limit n] [--json]  (what was run after this error before)
-  deja how <what> [--project name] [--all-projects] [--limit n] [--json]
-             (commands this project actually ran; --all-projects for the machine)
-  deja sync export <dir> [--full] [--include-imported] [--peer name]
-  deja sync import <dir>
-  deja sync                       (exchange with every machine deja knows, both ways)
-  deja sync ssh <host> [--pull] [--both] [--full]
-  deja sync forget <host>
-  deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit|summary]
-  deja sources
-  deja completion <bash|zsh|fish|powershell>
-  deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]
-  deja forget --list | --unforget <id>
-  deja doctor [--json] [--deep] [--offline] [--all]
-  deja warmup
-  deja index [--rebuild] [--quiet]
-  deja embed
-  deja bench recall|context|prompt|block|ingest|read [--json] [--seed n]
-  deja brief         (the screen a bare deja prints on a terminal)
-  deja log [n] [--last] [--json]
-  deja statusline
-  deja stats [--json] [--impact] [--year] [--redaction] [--card [path]] [--html [path]]
-             [--project name] [--harness name] [--since 30d] [--role name]
-  deja remember "text" [--project name] [--tag name]
-  deja promote <id-prefix> [--state accepted|rejected|superseded|stale] [--note "text"] [--tag name] [--to path]
-  deja rules [sync]  (copy ~/.config/deja/rules.md into every agent's global rules file)
-  deja rules candidates [--json] [--limit n] [--since 90d]  (turns where you corrected an agent, for your agent to group into rules)
-  deja mcp
-  deja version
-  deja <command> --help
-  deja update [--force]
-  deja install <target>... | --all | --auto  [--no-guidance] [--no-index] [--force]
-  deja uninstall <target>... | --all | --auto
-    targets:
-%s
-
-Search flags (the bare "deja [flags] <query>" form above):
-  --harness <name>              only sessions from one harness (claude, codex, ...)
-  --project <name>              only sessions from one project
-  --since <duration>            only sessions newer than e.g. 30d, 12h
-  --role <name>                 only match turns from one role: user, assistant,
-                                tool (tool output), files, command, edit
-  --session <id>                only one session, by the id a hit prints
-  --limit <1-100>               max sessions to return (default 15)
-  --all                         return every match, no cap
-  --re                          treat the query as a regular expression
-  --json                        machine-readable output
-  --no-embed                    skip the semantic (embedding) tier
-
-Examples:
-  deja "jwt refresh token bug"
-  deja '"connection pool exhausted"'
-  deja "exhaustd"  # a typo: with no exact hit, close spellings are tried
-  deja --harness claude --since 30d "panic in indexer"
-  deja --all "connection pool"  # every match, not just the first 15
-  deja last 20 --harness codex
-  deja last --project api-gateway
-  deja last --since 7d --role user
-  deja --session 01a00feb --role tool "go build"   (what ran inside one session)
-  deja --re "timeout|deadline exceeded"
-  deja ctx "schema migration rollback" > deja-context.md
-  deja install --all
-
-See README.md for the full CLI reference.
-`, wrapTargets(installTargetNames(), "      ", usageWidth()))
-}
-
-// usageWidth is the column budget for the one block in help that is laid out
+// usageWidth is the column budget for the parts of help that are laid out
 // rather than typed. It follows the terminal, as the brief, files, restore and
 // search already do — the list was computed to a fixed 76 and so came out the
 // same six lines on a 30-column pane and a 120-column one (#1660).
@@ -4279,47 +4189,6 @@ func usageWidth() int {
 		return w
 	}
 	return 76
-}
-
-// helpForCommand answers `deja <cmd> --help`. Every command rejected it as an
-// unknown flag, and a couple did worse: `deja statusline --help` printed a
-// statusline and `deja mcp --help` started the server and hung the terminal
-// (#1111).
-func helpForCommand(name string) string {
-	var out []string
-	usage := usageText()
-	if i := strings.Index(usage, "\nUsage:\n"); i >= 0 {
-		usage = usage[i+len("\nUsage:\n"):]
-	}
-	if i := strings.Index(usage, "\nExamples:\n"); i >= 0 {
-		usage = usage[:i]
-	}
-	// A usage line can carry indented continuations under it — the install
-	// target list sits under the install/uninstall pair — so a match keeps
-	// collecting until the next "deja …" line that does not match.
-	matched := false
-	for _, line := range strings.Split(usage, "\n") {
-		t := strings.TrimSpace(line)
-		switch {
-		case t == "deja "+name || strings.HasPrefix(t, "deja "+name+" "):
-			out = append(out, line)
-			matched = true
-		case matched && t != "" && strings.HasPrefix(line, "    ") && !strings.HasPrefix(t, "deja "):
-			out = append(out, line)
-		case matched && strings.HasPrefix(t, "deja "):
-			// install and uninstall share one target list, printed under the
-			// second of the pair; every other command's help ends at the next
-			// command line.
-			pair := name == "install" || name == "uninstall"
-			matched = pair && (strings.HasPrefix(t, "deja install ") || strings.HasPrefix(t, "deja uninstall "))
-		default:
-			matched = false
-		}
-	}
-	if len(out) == 0 {
-		return ""
-	}
-	return strings.Join(out, "\n") + "\nSee `deja help` for every command and flag.\n"
 }
 
 // wantsHelp reports whether a command line asks for help rather than work.
@@ -4375,7 +4244,16 @@ func movedBucketHint(dir, id string) string {
 // thing the reader has no way to produce on their own; promote has pointed at
 // `deja last` all along, and show, share and resume are the three commands
 // reached for right after a search result (#1063).
-const showNeedsID = "show needs id-prefix (see `deja last`)"
+const showNeedsID = "show needs an id prefix (see `deja last`)"
+
+// noSessionMatches is the refusal for an id that names no session: the bucket
+// that moved when there is one, otherwise where the ids are listed (#1063).
+func noSessionMatches(dir, id string) error {
+	if hint := movedBucketHint(dir, id); hint != "" {
+		return fmt.Errorf("no session matches %q%s", id, hint)
+	}
+	return fmt.Errorf("no session matches %q — `deja last` lists recent ones", id)
+}
 
 // idPrefixNeeded is the refusal for a command that needs a session named on the
 // command line. "see `deja last`" is a step the reader can take and learn
@@ -4443,6 +4321,72 @@ func emptyIndexHint(what string) string {
 		return "deja: " + what + " — no agent history was found on this machine; `deja sources` shows where deja looked"
 	}
 	return "deja: " + what + " — run `deja index`, or `deja doctor` to see which agent stores were found"
+}
+
+// emptyStoreLine is emptyIndexHint for a command whose answer goes to stdout
+// without deja's prefix, when the index holds no session at all. tests,
+// secrets, recap and rules candidates each said their own nothing there —
+// "no provider keys … in your agent history" read as an all-clear on a machine
+// with no history to check.
+func emptyStoreLine(dir, what string) (string, bool) {
+	if n, err := index.SessionCount(dir); err != nil || n > 0 {
+		return "", false
+	}
+	// At a terminal, at its width and between words; piped, as one line.
+	return fitLine(os.Stdout, strings.TrimPrefix(emptyIndexHint(what), "deja: ")), true
+}
+
+// newestSessionNote is the tail of an empty windowed answer: when the newest
+// session it may show is older than the window, the date and the --since that
+// reaches it. The demo store of a machine idle for three months answered
+// `deja recap` with "nothing in the last 7d" and nothing else.
+func newestSessionNote(dir, command string, window time.Duration) string {
+	metas, err := index.AllMeta(dir)
+	if err != nil {
+		return ""
+	}
+	pol := policy.Load()
+	var newest time.Time
+	for _, m := range metas {
+		if m.Updated.After(newest) && pol.Allows(policy.ActivationSearch, m.Project) {
+			newest = m.Updated
+		}
+	}
+	if newest.IsZero() || time.Since(newest) <= window {
+		return ""
+	}
+	days := int(time.Since(newest).Hours()/24) + 1
+	return fmt.Sprintf(" — the newest session is from %s; `deja %s --since %dd` reaches it",
+		newest.Local().Format("2006-01-02"), command, days)
+}
+
+// fitLine wraps a sentence between words at the width of the terminal w is,
+// and leaves it whole for a pipe.
+func fitLine(w io.Writer, line string) string {
+	if n := printableWidth(w); n > 0 {
+		return wrapProse(line, n)
+	}
+	return line
+}
+
+// sinceArg is the --since value as the reader typed it.
+func sinceArg(args []string) string {
+	for i, a := range args {
+		if a == "--since" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+// countNoun is "1 session" or "3 sessions"; the forget dry run printed
+// "1 session(s)".
+func countNoun(n int, noun string) string {
+	return fmt.Sprintf("%d %s%s", n, noun, pluralS(n))
+}
+
+func forgetCounts(sessions, messages int) string {
+	return countNoun(sessions, "session") + ", " + countNoun(messages, "message")
 }
 
 // deniedStoreCount reports how many harness stores exist but cannot be opened.

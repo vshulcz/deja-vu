@@ -23,6 +23,8 @@ import (
 // It matches on the error rather than on words: the text can be a whole pasted
 // stack trace, and every line of it is checked against the mined pairs.
 
+var fixFlags = []string{"--limit", "--json"}
+
 func runFix(dir string, args []string, stdout io.Writer) error {
 	limit := 3
 	asJSON := false
@@ -60,7 +62,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 			// left the reader with a command deja itself had printed and
 			// nothing that would run it (#2799).
 			if strings.HasPrefix(args[i], "-") && args[i] != "-" && !looksLikeAPastedLine(args[i]) {
-				return fmt.Errorf("fix: unknown flag %q", args[i])
+				return unknownFlag("fix", args[i], fixFlags)
 			}
 			parts = append(parts, args[i])
 		}

@@ -81,7 +81,8 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 		want    string
 		wantErr string
 	}{
-		{"usage", nil, "Usage:", ""},
+		{"usage", nil, "deja help", ""},
+		{"help", []string{"help"}, "Usage:", ""},
 		{"version", []string{"version"}, "deja dev", ""},
 		{"search", []string{"frobnicator"}, "frobnicator bug", ""},
 		{"search json", []string{"--json", "frobnicator"}, `"count"`, ""},
@@ -93,7 +94,7 @@ func TestRunDispatcherSyntheticFixtures(t *testing.T) {
 		{"sources", []string{"sources"}, "opencode", ""},
 		{"stats", []string{"stats"}, "deja stats", ""},
 		{"ctx missing", []string{"ctx"}, "", "ctx needs query"},
-		{"show missing", []string{"show"}, "", "show needs id-prefix"},
+		{"show missing", []string{"show"}, "", "show needs an id prefix"},
 		{"bad duration", []string{"--since", "nope", "needle"}, "", "not a duration deja understands"},
 	}
 	for _, tc := range cases {
@@ -411,7 +412,7 @@ func TestShareOutputsRedactedMarkdown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"# deja share:", "## User problem statement", "## Key assistant conclusions", "conclusion: sanitize"} {
+	for _, want := range []string{"# deja share:", "## What was asked", "## What the assistant concluded", "conclusion: sanitize"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("share output missing %q: %s", want, out)
 		}
@@ -585,7 +586,7 @@ func TestParseSearchAndSmallHelpers(t *testing.T) {
 	if err := runShare(index.DefaultDir(), nil, io.Discard); err == nil || !strings.Contains(err.Error(), "share needs") {
 		t.Fatalf("runShare missing args err=%v", err)
 	}
-	if err := runSync(index.DefaultDir(), []string{"export"}); err == nil || !strings.Contains(err.Error(), "sync needs") {
+	if err := runSync(index.DefaultDir(), []string{"export"}); err == nil || !strings.Contains(err.Error(), "sync export needs a directory") {
 		t.Fatalf("runSync missing args err=%v", err)
 	}
 	if err := runSync(index.DefaultDir(), []string{"bogus", t.TempDir()}); err == nil || !strings.Contains(err.Error(), "unknown sync") {

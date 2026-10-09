@@ -315,7 +315,7 @@ func TestRunSyncImportAndExportBranches(t *testing.T) {
 	if err := runSync(index.DefaultDir(), []string{"export", out}); err != nil {
 		t.Fatalf("sync export: %v", err)
 	}
-	if err := runSync(index.DefaultDir(), []string{"export", "--full"}); err == nil || !strings.Contains(err.Error(), "target dir") {
+	if err := runSync(index.DefaultDir(), []string{"export", "--full"}); err == nil || !strings.Contains(err.Error(), "needs a directory") {
 		t.Fatalf("sync export missing target err=%v", err)
 	}
 }
@@ -619,7 +619,7 @@ func TestShareStatsResumeAndSyncEdgeBranches(t *testing.T) {
 		t.Fatal("closed file reported color")
 	}
 	var b bytes.Buffer
-	printStats(&b, stats.Report{Harnesses: []stats.HarnessStats{{Harness: strings.Repeat("h", 20), Sessions: 1}}, TopProjects: []stats.ProjectStats{{Project: "p", Sessions: 0}}, Monthly: []stats.MonthStats{{Month: "bad"}}})
+	printStats(&b, stats.Report{TotalSessions: 1, Harnesses: []stats.HarnessStats{{Harness: strings.Repeat("h", 20), Sessions: 1}}, TopProjects: []stats.ProjectStats{{Project: "p", Sessions: 0}}, Monthly: []stats.MonthStats{{Month: "bad"}}})
 	if !strings.Contains(b.String(), "deja stats") {
 		t.Fatalf("stats output = %q", b.String())
 	}
