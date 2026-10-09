@@ -228,9 +228,11 @@ The existing positional count remains the bound, for example
 
 ## `deja show <exact-id> --harness <name> --json`
 
-Machine reads require the composite harness plus exact native session ID. They
-return redacted index content in a bounded message window; the default limit is
-50 and the maximum is 200.
+The harness plus the exact native session ID is the stable form for a script,
+since ids can collide across harnesses. Without `--harness`, an id prefix that
+names one session is read; one that names more than one is refused with what
+separates them. Reads return redacted index content in a bounded message window;
+the default limit is 50 and the maximum is 200.
 
 ```json
 {

@@ -18,7 +18,7 @@ func TestCardPunchlineCountsOne(t *testing.T) {
 	}{
 		{"sessions", stats.Report{TotalSessions: 1}, "1 session of agent history, all searchable."},
 		{"week recalls", stats.Report{WeekRecalls: 1}, "deja handed your agents memory 1 time this week."},
-		{"repeat questions", stats.Report{RepeatQuestions: 1}, "You asked the same thing 1 time — deja remembered."},
+		{"repeat questions", stats.Report{RepeatQuestions: 1}, "You asked 1 question more than once — deja remembered."},
 		{"recalls", stats.Report{Recall: usage.Summary{Recalls: 1}}, "deja handed your agents memory 1 time."},
 	}
 	for _, c := range cases {

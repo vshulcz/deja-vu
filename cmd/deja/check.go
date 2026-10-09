@@ -54,7 +54,9 @@ func runCheckTo(dir string, args []string, stdin io.Reader, stdout, stderr io.Wr
 	case !planIndexReady(dir):
 		fmt.Fprintln(stderr, "deja: no index to check against yet — `deja index` builds one")
 	default:
-		fmt.Fprintln(stderr, "deja: nothing found for this plan")
+		// check reports walls, not decisions, and a reader whose plan reverses
+		// a recorded decision read the silence as "no history here".
+		fmt.Fprintln(stderr, "deja: nothing found for this plan — it checks repeated errors, not decisions (`deja \"<words>\"` finds those)")
 	}
 	return nil
 }

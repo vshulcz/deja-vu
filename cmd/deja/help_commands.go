@@ -48,9 +48,9 @@ var helpEntries = []helpEntry{
 		desc:     "same as deja <query>, for a query that starts with -",
 		examples: []string{`deja search -- "--force-with-lease"`, `deja search --harness codex --since 30d "stale connection"`}},
 	{name: "show", group: groupSearch,
-		usage:    []string{"deja show <id-prefix> [--json --harness name] [--offset n] [--limit n]"},
+		usage:    []string{"deja show <id-prefix> [--json] [--harness name] [--offset n] [--limit n]"},
 		desc:     "read one session, message by message",
-		more:     "The id is the one a search hit, deja last or deja log prints; a unique prefix is enough. --json needs --harness, so a script names exactly one session.",
+		more:     "The id is the one a search hit, deja last or deja log prints; a unique prefix is enough. --harness picks one when the prefix matches sessions from two agents.",
 		examples: []string{"deja show 01a00feb", "deja show 01a00feb --offset 40 --limit 20"}},
 	{name: "last", group: groupSearch,
 		usage:    []string{"deja last [n] [--json] [--project name] [--harness name] [--from machine|local] [--since duration] [--role user|assistant|tool|files|command|edit|summary]"},
@@ -89,7 +89,7 @@ var helpEntries = []helpEntry{
 
 	{name: "blame", group: groupAsk,
 		usage: []string{
-			"deja blame <path>[:line] [--all] [--json] [--project name] [--harness name] [--since 30d]",
+			"deja blame <path>[:line] [--all] [--all-projects] [--json] [--project name] [--harness name] [--since 30d]",
 			"deja blame <path>:<line> --attribution [--json] [--git-note]",
 		},
 		desc:     "the sessions behind a file, or behind one line of it",

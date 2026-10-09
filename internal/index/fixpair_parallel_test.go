@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -48,7 +49,7 @@ func TestMinedPairsAreTheSameOnOneCoreAndMany(t *testing.T) {
 		t.Fatalf("one core mined %d pairs, eight mined %d", len(one), len(many))
 	}
 	for i := range one {
-		if one[i] != many[i] {
+		if !reflect.DeepEqual(one[i], many[i]) {
 			t.Fatalf("row %d differs:\n one core: %+v\n eight:    %+v", i, one[i], many[i])
 		}
 	}

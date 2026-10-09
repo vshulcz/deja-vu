@@ -218,11 +218,23 @@ func runStats(dir string, args []string) error {
 	}
 	// Replaced spans are kept out of ordinary retrieval, so they are not in
 	// the sessions above and take a pass of their own.
-	if spans, files, err := index.SpanInventory(dir); err == nil {
+	// Under a filter, the spans of the sessions the report kept: `--project
+	// payments` printed the machine's 29 spans beside payments' 53 sessions.
+	var keep func(index.SessionMeta) bool
+	filtered := options.Harness != "" || options.Project != "" || options.Since > 0 || options.Role != ""
+	if filtered {
+		kept := map[string]bool{}
+		for _, s := range stats.Filter(ss, options) {
+			kept[s.Harness+":"+s.ID] = true
+		}
+		keep = func(m index.SessionMeta) bool { return kept[m.Harness+":"+m.ID] }
+	}
+	if spans, files, err := index.SpanInventoryWhere(dir, keep); err == nil {
 		report.Spans, report.SpanFiles = spans, files
 	}
 	sshTip := sshSyncTip(dir, ss)
 	report.Recall = usage.Totals(dir)
+	report.RecallMachineWide = filtered
 	report.WeekRecalls, report.WeekBytes, report.WeekInjected, _ = usage.Week(dir)
 	if fi, e := os.Stat(embed.Path(dir)); e == nil {
 		report.SidecarSize = fi.Size()
@@ -429,7 +441,11 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Longest session  %d message%s · %s · %s", r.Longest.Messages, pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), statLongestTitle(r, width))))
 	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Busiest day      %s · %d message%s", valueOrDash(statDay(r.BusiestDay.Date)), r.BusiestDay.Messages, pluralS(r.BusiestDay.Messages))))
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
+	if r.RecallMachineWide {
+		fmt.Fprintf(w, "%sRecall%s    whole machine — filters do not reach the recall log\n", bold, reset)
+	} else {
+		fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
+	}
 	// The log keeps the last 14 days once it passes 1MB, so the count is not a
 	// lifetime total — saying since when keeps it from reading like one (#763).
 	//

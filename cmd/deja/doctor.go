@@ -2665,7 +2665,13 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 		// "run `deja warmup`" points at a path that is not there. doctor is
 		// what someone runs when memory looks broken (#931).
 		if parent := filepath.Dir(dir); !dirExists(parent) {
-			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", parent)
+			// A new home has no ~/.cache yet, and a build creates it: that
+			// is an index not built, not a disk that went away.
+			if freshHomePath(parent) {
+				fmt.Fprintln(w, "  status   not built (run `deja warmup`)")
+				return
+			}
+			fmt.Fprintf(w, "  status   not reachable — %s is not there; the disk it lives on may have been unmounted\n", reportPath(parent))
 			return
 		}
 		// The index directory is there but cannot be read — a permissions
@@ -2917,6 +2923,15 @@ func reportPath(p string) string {
 		parts[i] = search.SafePath(underHome(part))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// freshHomePath says whether a missing path lies inside the home directory
+// below a directory deja can write, so a build would simply create it. A
+// mount point that went away leaves its path outside the home, or under a
+// directory nothing here can write.
+func freshHomePath(p string) bool {
+	a := nearestExistingDir(p)
+	return a != "" && underHome(a) != a && dirWritable(a)
 }
 
 // underHome contracts a home-prefixed path to ~, and leaves everything else
