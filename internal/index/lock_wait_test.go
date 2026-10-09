@@ -18,10 +18,11 @@ func TestWaitingForAnotherBuildIsReportedOnce(t *testing.T) {
 		t.Skip("two locks in one process do not model contention on windows")
 	}
 	dir := filepath.Join(t.TempDir(), "index.db")
-	notices := 0
-	old := LockWaitNotice
+	notices, ends := 0, 0
+	old, oldDone := LockWaitNotice, LockWaitDone
 	LockWaitNotice = func() { notices++ }
-	t.Cleanup(func() { LockWaitNotice = old; lockWaitNoted = false })
+	LockWaitDone = func() { ends++ }
+	t.Cleanup(func() { LockWaitNotice, LockWaitDone = old, oldDone; lockWaitNoted = false })
 
 	// A free lock is the ordinary case and must stay quiet.
 	unlock, err := lockDir(dir)
@@ -48,11 +49,15 @@ func TestWaitingForAnotherBuildIsReportedOnce(t *testing.T) {
 	if notices != 1 {
 		t.Errorf("the wait was not reported exactly once: %d", notices)
 	}
+	// Its end is reported too, so a moving notice can stop.
+	if ends != 1 {
+		t.Errorf("the end of the wait was reported %d times", ends)
+	}
 
 	// A command takes several locks; the reader is told once, not per lock.
 	lockWaitNoted = true
-	noteLockWait()
-	if notices != 1 {
-		t.Errorf("the notice repeated itself: %d", notices)
+	noteLockWait()()
+	if notices != 1 || ends != 1 {
+		t.Errorf("the notice repeated itself: %d %d", notices, ends)
 	}
 }

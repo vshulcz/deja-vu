@@ -1251,14 +1251,24 @@ type bucketEntry struct {
 // about to sit still for the length of someone else's build.
 var LockWaitNotice func()
 
+// LockWaitDone is called when the wait LockWaitNotice announced is over, so
+// a notice that keeps moving while it waits knows when to stop.
+var LockWaitDone func()
+
 // noteLockWait reports the wait at most once per process, so a command that
-// takes several locks does not repeat itself.
-func noteLockWait() {
+// takes several locks does not repeat itself. The caller runs what it returns
+// once it holds the lock.
+func noteLockWait() (ended func()) {
 	if LockWaitNotice == nil || lockWaitNoted {
-		return
+		return func() {}
 	}
 	lockWaitNoted = true
 	LockWaitNotice()
+	return func() {
+		if LockWaitDone != nil {
+			LockWaitDone()
+		}
+	}
 }
 
 var lockWaitNoted bool

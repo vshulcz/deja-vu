@@ -46,9 +46,8 @@ func main() {
 	}
 	// A command that lands mid-rebuild waits for the whole of it, and silence
 	// there reads as a hang rather than as a queue (#994).
-	index.LockWaitNotice = func() {
-		fmt.Fprintln(os.Stderr, "deja: another deja is building the index — waiting for it to finish")
-	}
+	wait := &waitLine{w: os.Stderr, live: briefWanted(os.Stderr)}
+	index.LockWaitNotice, index.LockWaitDone = wait.begin, wait.end
 	// A detached warmup is index work nobody asked for at a moment somebody is
 	// working, so it takes less than a foreground run would (#3500).
 	takeWarmupBudget()

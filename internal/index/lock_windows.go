@@ -45,16 +45,19 @@ func lockDir(dir string) (func(), error) {
 	// the handle we are about to block with leaves the lock state on it
 	// ambiguous, and the blocking call that follows never returned. Only to
 	// learn whether there is a wait worth reporting — see lock_unix.go (#994).
+	ended := func() {}
 	if probe, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600); err == nil {
 		var pol syscall.Overlapped
 		if lockFileEx(syscall.Handle(probe.Fd()), lockfileExclusiveLock|lockfileFailImmediately, 0, 1, 0, &pol) != nil {
-			noteLockWait()
+			ended = noteLockWait()
 		} else {
 			_ = unlockFileEx(syscall.Handle(probe.Fd()), 0, 1, 0, &pol)
 		}
 		_ = probe.Close()
 	}
-	if err := lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol); err != nil {
+	err = lockFileEx(h, lockfileExclusiveLock, 0, 1, 0, &ol)
+	ended()
+	if err != nil {
 		f.Close()
 		return nil, fmt.Errorf("lock index: %w", err)
 	}

@@ -574,8 +574,8 @@ func TestAdditionalDispatchAndHelperBranches(t *testing.T) {
 	// races with it, which is what `go test -race` caught on Go 1.25
 	// (TestForgetAgainstARebuildDropsOnlyWhatItNamed). The global belongs to
 	// the process main() would own, so it is put back here.
-	oldNotice := index.LockWaitNotice
-	t.Cleanup(func() { index.LockWaitNotice = oldNotice })
+	oldNotice, oldDone := index.LockWaitNotice, index.LockWaitDone
+	t.Cleanup(func() { index.LockWaitNotice, index.LockWaitDone = oldNotice, oldDone })
 	os.Args = []string{"deja", "version"}
 	os.Stdout = w
 	drained := drainPipe(r)
