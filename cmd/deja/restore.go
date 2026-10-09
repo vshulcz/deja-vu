@@ -30,6 +30,9 @@ import (
 // over live work is the same class of mistake this is meant to undo.
 const restoreMaxSessions = 400
 
+// restoreListMax is how many spans the listing shows without --all.
+const restoreListMax = 30
+
 type restoreSpan struct {
 	when    time.Time
 	session string
@@ -45,11 +48,13 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	path := ""
 	want := 0
 	out := ""
-	force := false
+	force, all := false, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--force":
 			force = true
+		case "--all":
+			all = true
 		case "--span":
 			// A missing value used to be ignored, which for -o meant the file
 			// went to stdout while the reader believed it had been written
@@ -79,7 +84,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		}
 	}
 	if path == "" {
-		return fmt.Errorf("usage: deja restore <path> [--span n] [-o file] [--force]")
+		return fmt.Errorf("usage: deja restore <path> [--span n] [-o file] [--force] [--all]")
 	}
 
 	spans, err := findRestoreSpans(dir, path)
@@ -104,8 +109,15 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 		want = 1
 	}
 	if want == 0 {
-		fmt.Fprintf(stdout, "%d replaced spans recorded for %s\n", len(spans), path)
-		printRestoreRows(stdout, spans)
+		fmt.Fprintf(stdout, "%s replaced span%s recorded for %s\n", grouped(len(spans)), pluralS(len(spans)), path)
+		// The newest are what a recovery is after; a file an agent rewrote
+		// hundreds of times printed every one of them.
+		if shown := spans; all || len(shown) <= restoreListMax {
+			printRestoreRows(stdout, shown)
+		} else {
+			printRestoreRows(stdout, shown[:restoreListMax])
+			fmt.Fprintf(stdout, "  the newest %d of %s, --all lists every one\n", restoreListMax, grouped(len(spans)))
+		}
 		if out != "" {
 			// The flag was given and could not be honoured. Silence here read
 			// as a file written (#2417).

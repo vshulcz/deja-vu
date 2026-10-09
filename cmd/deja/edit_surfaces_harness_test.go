@@ -44,7 +44,7 @@ func assertEditSurfaces(t *testing.T, harness, id, file, span, topic string) {
 		t.Fatalf("restore: %v", err)
 	}
 	listing := out.String()
-	if !strings.Contains(listing, "replaced spans recorded") || !strings.Contains(listing, harness) {
+	if !strings.Contains(listing, "replaced span") || strings.HasPrefix(listing, "no ") || !strings.Contains(listing, harness) {
 		t.Fatalf("restore lists no %s span for %s:\n%s", harness, base, listing)
 	}
 	found := false

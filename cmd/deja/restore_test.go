@@ -241,3 +241,30 @@ func TestRestoreFindsSpansInACrowdedSession(t *testing.T) {
 		t.Fatalf("inventory = %d spans / %d files, want 401 each", total, files)
 	}
 }
+
+// A file rewritten many times lists the newest spans, --all every one.
+func TestRestoreListsTheNewestUnlessAll(t *testing.T) {
+	tmp := hermeticEnv(t)
+	proj := filepath.Join(tmp, "claude", "project")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	fmt.Fprintln(&b, `{"type":"user","sessionId":"claude-many","cwd":"/w","timestamp":"2026-01-02T03:04:05Z","message":{"role":"user","content":"keep tuning the pool"}}`)
+	for i := 0; i < restoreListMax+5; i++ {
+		fmt.Fprintf(&b, `{"type":"assistant","sessionId":"claude-many","cwd":"/w","timestamp":"2026-01-02T03:%02d:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/w/pool.go","old_string":"const size = %d"}}]}}`+"\n", 5+i, i)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "s.jsonl"), []byte(b.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := captureRun(t, "restore", "pool.go")
+	if err != nil || !strings.Contains(out, "35 replaced spans") || !strings.Contains(out, "the newest 30 of 35, --all lists every one") {
+		t.Fatalf("restore: %v\n%s", err, out)
+	}
+	if strings.Contains(out, "const size = 0") {
+		t.Errorf("the oldest span is listed without --all:\n%s", out)
+	}
+	if out, _ := captureRun(t, "restore", "pool.go", "--all"); !strings.Contains(out, "const size = 0") || strings.Contains(out, "--all lists") {
+		t.Errorf("--all:\n%s", out)
+	}
+}

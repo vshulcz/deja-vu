@@ -3048,7 +3048,7 @@ var (
 	viewFlags     = []string{"--out", "--no-open"}
 	logFlags      = []string{"--json", "--last"}
 	rememberFlags = []string{"--project", "--tag"}
-	restoreFlags  = []string{"--force", "--span", "--out"}
+	restoreFlags  = []string{"--force", "--span", "--out", "--all"}
 	promoteFlags  = []string{"--state", "--note", "--to", "--tag"}
 	handoffFlags  = []string{"--to", "--exec"}
 )

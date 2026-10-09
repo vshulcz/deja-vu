@@ -71,7 +71,7 @@ func TestAPrintedPathFindsItsOwnSpan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "1 replaced spans recorded") {
+	if !strings.Contains(out, "1 replaced span recorded") {
 		t.Errorf("restoring the path blame printed (%q) found nothing:\n%s", printed, out)
 	}
 }

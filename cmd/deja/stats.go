@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -362,8 +361,8 @@ func printStats(w io.Writer, r stats.Report) {
 	if headline := statsHeadline(r); headline != "" {
 		fmt.Fprintf(w, "%s%s%s\n\n", bold, termwidth.Indent(headline, width, "", ""), reset)
 	}
-	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
-	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
+	fmt.Fprintf(w, "Sessions  %s%s%s\n", bold, grouped(r.TotalSessions), reset)
+	fmt.Fprintf(w, "Messages  %s%s%s\n", bold, grouped(r.TotalMessages), reset)
 	fmt.Fprintf(w, "Range     %s\n\n", statRange(r.DateRange.Start, r.DateRange.End))
 	// `deja restore` matters entirely at one moment — an agent replaced a
 	// function with something worse and the work was not committed — and
@@ -371,8 +370,8 @@ func printStats(w io.Writer, r stats.Report) {
 	// here, where someone reads calmly, and it is their own: the spans deja
 	// holds are the part of a transcript every other tool discards (#577).
 	if r.Spans > 0 {
-		fmt.Fprintf(w, "Recover   %s%d%s span%s your agents replaced, across %d file%s\n",
-			bold, r.Spans, reset, pluralS(r.Spans), r.SpanFiles, pluralS(r.SpanFiles))
+		fmt.Fprintf(w, "Recover   %s%s%s span%s your agents replaced, across %s file%s\n",
+			bold, grouped(r.Spans), reset, pluralS(r.Spans), grouped(r.SpanFiles), pluralS(r.SpanFiles))
 		fmt.Fprintf(w, "          %sif something got clobbered:%s deja restore <file>\n\n", faint, reset)
 	}
 	if r.SidecarSize > 0 {
@@ -389,8 +388,8 @@ func printStats(w io.Writer, r stats.Report) {
 		// The counts are padded columns, but the nouns are prose: a machine
 		// with one session read "1 sessions  1 messages" eight lines above the
 		// Highlights block that says "1 message" (#1598).
-		fmt.Fprintf(w, "  %s%s %4d session%-2s %5d message%s\n", tag, strings.Repeat(" ", pad),
-			h.Sessions, pluralS(h.Sessions), h.Messages, pluralS(h.Messages))
+		fmt.Fprintf(w, "  %s%s %5s session%-2s %6s message%s\n", tag, strings.Repeat(" ", pad),
+			grouped(h.Sessions), pluralS(h.Sessions), grouped(h.Messages), pluralS(h.Messages))
 	}
 	fmt.Fprintln(w)
 
@@ -403,13 +402,13 @@ func printStats(w io.Writer, r stats.Report) {
 	}
 	// Name, count, bar: the count sits in its own right-aligned column, so the
 	// numbers read down the list instead of floating at the end of each bar.
-	wName, wCount := 0, len(strconv.Itoa(maxProject))
+	wName, wCount := 0, len(grouped(maxProject))
 	for _, p := range r.TopProjects {
 		wName = max(wName, termwidth.Columns(stats.TrimRunes(search.SafeLine(p.Project), 18)))
 	}
 	for _, p := range r.TopProjects {
 		name := stats.TrimRunes(search.SafeLine(p.Project), 18)
-		fmt.Fprintf(w, "  %s%s  %*d  %s\n", name, strings.Repeat(" ", wName-termwidth.Columns(name)), wCount, p.Sessions,
+		fmt.Fprintf(w, "  %s%s  %*s  %s\n", name, strings.Repeat(" ", wName-termwidth.Columns(name)), wCount, grouped(p.Sessions),
 			strings.Repeat(barGlyph, stats.ScaledBar(p.Sessions, maxProject, 18)))
 	}
 	fmt.Fprintln(w)
@@ -432,14 +431,14 @@ func printStats(w io.Writer, r stats.Report) {
 		// if the visible bar were the whole shape — while Range, two lines
 		// above, names months the chart never draws (#854).
 		if shown, total := monthlyTotal(r.Monthly), r.TotalMessages; total > shown && shown*2 < total {
-			fmt.Fprintf(w, "  %d of %d message%s are older than the chart — see the range above\n", total-shown, total, pluralS(total))
+			fmt.Fprintf(w, "  %s of %s message%s are older than the chart — see the range above\n", grouped(total-shown), grouped(total), pluralS(total))
 		}
 	}
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)
-	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Longest session  %d message%s · %s · %s", r.Longest.Messages, pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), statLongestTitle(r, width))))
-	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Busiest day      %s · %d message%s", valueOrDash(statDay(r.BusiestDay.Date)), r.BusiestDay.Messages, pluralS(r.BusiestDay.Messages))))
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Longest session  %s message%s · %s · %s", grouped(r.Longest.Messages), pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), statLongestTitle(r, width))))
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Busiest day      %s · %s message%s", valueOrDash(statDay(r.BusiestDay.Date)), grouped(r.BusiestDay.Messages), pluralS(r.BusiestDay.Messages))))
 	fmt.Fprintln(w)
 	if r.RecallMachineWide {
 		fmt.Fprintf(w, "%sRecall%s    whole machine — filters do not reach the recall log\n", bold, reset)
@@ -453,7 +452,7 @@ func printStats(w io.Writer, r stats.Report) {
 	// together; this line used to count recalls alone under nearly the same
 	// words, so the two read as a contradiction ("served 4 times", "Recalls
 	// served 0"). It now gives the same total and says how it splits.
-	served := fmt.Sprintf("  Memory served    %d", r.Recall.Recalls+r.Recall.Injections)
+	served := fmt.Sprintf("  Memory served    %s", grouped(r.Recall.Recalls+r.Recall.Injections))
 	if since := r.Recall.Since; !since.IsZero() {
 		served += " since " + search.DisplayDate(since)
 	}
