@@ -45,6 +45,7 @@ func TestTheHintStillAnswersTheGuessesItAlreadyKnew(t *testing.T) {
 		{"serch pool", "deja search"},
 		{"unpromote", "promote <id> --state rejected"},
 		{"unforget", "forget --unforget"},
+		{"upgrade", "deja update"},
 	} {
 		if got := commandHint(c.query); !strings.Contains(got, c.want) {
 			t.Errorf("%q -> %q, want it to name %q", c.query, got, c.want)

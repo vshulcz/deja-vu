@@ -2341,6 +2341,12 @@ func commandHint(q string) string {
 	// The same shape for the other undo nobody can guess: removing a note is
 	// `forget` on the note's own id, and the reader who typed this has no way
 	// to know a note has an id at all (#1085).
+	// brew and npm call it upgrade, and three edits is too far for the
+	// nearest-name match to reach `update`. The search still runs: "upgrade"
+	// is also something people search their history for.
+	if strings.EqualFold(first, "upgrade") {
+		return "deja: \"upgrade\" is not a command — `deja update` updates deja itself\n"
+	}
 	if strings.EqualFold(first, "unpromote") || strings.EqualFold(first, "demote") {
 		return "deja: \"" + first + "\" is not a command — `deja promote <id> --state rejected` takes a decision back, and `deja forget --session deja-note-<harness>-<id>` removes the note itself\n"
 	}
