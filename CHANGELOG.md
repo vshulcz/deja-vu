@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-09
+
+Bare `deja` at a terminal now opens a search screen over every agent's
+history: type to search, read a session at the hit, resume it, or carry it
+into another agent. It opens on the sessions behind your uncommitted change.
+Junie and JetBrains AI Assistant are read, `deja rules sync` writes to 42
+agents instead of 8, and recall called by an agent puts the project it works
+in first, which took a planted answer from 20 to 43 of 56 real queries. A
+transcript its agent deleted no longer makes every search answer stale. The
+index version is now 69, so the store rebuilds once on the first run after
+upgrading.
+
 ### Added
 
 - Bare `deja` at a terminal opens a search screen over every agent's history. Type to search, read a session at the hit, resume it, or carry it into another agent with `ctrl-o`. It opens on the sessions behind your uncommitted change, and on a first run it builds the index behind the screen instead of before it. Pipes, `TERM=dumb` and `DEJA_TUI=0` keep the text summary.
@@ -25,14 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New targets `kimchi-auto`, `codewhale`, `codewhale-auto` and `cherrystudio-auto`. `kiro-auto` also writes `~/.kiro/hooks/deja.json`, which the IDE and `kiro-cli --v3` run in every chat, and `deja install kiro` the skill. ZCode gets the shared skill and `/deja` (#4802).
 - A hook whose answer the host drops now hands it to the next hook of that session that reaches the model, once: Grok's session start and prompt ride its next tool hook, and Kimi's and Kiro's fix pair for a failed command rides the next prompt. goose gets the fix pair through a `Stop` hook that blocks once, the one hook answer it shows the model.
 - Antigravity, Crush and goose, which have no compaction event, get the compaction packet on the next hook that reaches the model, read from the turns their stores keep before the summary. Antigravity also gets the pre-edit line for the file a planner step edited.
-- Crush's one hook carries the per-prompt recall and the previous command's fix pair, since Crush fires no per-prompt hook.
 - Command Code, ZCode, CodeWhale and Amp get the compaction packet. None of them has a compaction hook; each keeps the turns before the summary (the transcript, the CLI database, a saved history, the full thread), and the next hook that reaches the model catches it up.
 - `commandcode-auto` writes a mod: the question's recall goes into its model calls, the session's end clears its live stamp, and the footer shows `deja statusline`. Amp's plugin writes each thread it runs to the thread store so deja can read it, and shows a status item.
 - `deja aider` recalls on every message on macOS and Linux. aider has no hooks, but it reads its read-only files right after it logs a message, so the wrapper serves one of them from a named pipe and answers with the recall for that message (#4801).
 - Crush's one hook carries the per-prompt recall and the previous command's fix pair, and Command Code's tool hook answers the newest question, since neither host fires a per-prompt hook.
 - `deja statusline` in the status line of Cursor CLI, Copilot CLI, Qwen Code, CodeBuddy Code, Grok Build, Kimi Code (0.30 and later) and TRAE CLI, from their `-auto` targets. opencode and Kilo CLI get it through a TUI plugin, VS Code through a local extension `vscode-auto` adds to the status bar, dsh under the web composer, and OpenClaw as a deja tab in the Control UI. A status line already set up there is left alone and install prints the line that runs both. The line finds the session from a `session_id` or `sessionId` when the host sends no transcript path.
 - goose's `Stop` block also carries the pre-edit line for each file the turn edited, and its `SessionStart` hook prints deja's status line as the banner goose shows when an interactive session opens. `antigravity-auto` puts `deja statusline` in agy's `statusLine`, stacked under agy's own line; the line finds an agy session by `session_id`, since every agy transcript is named `transcript.jsonl`.
-- `deja statusline` in the status line of Cursor CLI, Copilot CLI, Qwen Code, CodeBuddy Code, Grok Build and Kimi Code (0.30 and later), from their `-auto` targets. opencode and Kilo CLI get it through a TUI plugin. A status line already set up there is left alone and install prints the line that runs both. The line finds the session from a `session_id` or `sessionId` when the host sends no transcript path.
 
 ### Changed
 
@@ -72,7 +82,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - recall asked inside a project no longer drops the project's own answer when the question also carries words only other projects use. Those words counted as typos under the project scope, so the project pass found nothing and the machine-wide answer stood. On the bench's 56 agent queries the project's session now comes first in 55, up from 51 (#4789).
 - recall called by an agent puts the sessions of the project it works in first, the way the prompt hook ranks, then the rest of the machine. On a stand with ~1800 real sessions behind one project, the planted answer reached the recall page for 43 of 56 real agent queries, up from 20 (#4778). A `project` passed to recall now filters it; it was accepted and ignored (#4779). A `project` given as a directory path, a git worktree included, scopes to that repository; a worktree path used to answer with nothing (#4784).
 - opencode keeps the per-prompt recall for the rest of the session. It reached the model only on the first call of a turn: opencode rebuilds every call from its store, and deja does not send a block twice, so after the agent's first tool call the recall was gone. Fixed in the generated plugin for 1.x and 2.x and in the `opencode-deja` package (#4786).
-- recall called by an agent puts the sessions of the project it works in first, the way the prompt hook ranks, then the rest of the machine. On a stand with ~1800 real sessions behind one project, the planted answer reached the recall page for 43 of 56 real agent queries, up from 20 (#4778). A `project` passed to recall now filters it; it was accepted and ignored (#4779).
 - `deja blame` no longer quotes a JSON dump or a long file listing from tool output as a session's excerpt, or counts each path in it as a mention. deja's own `--json` output and web search results were the usual source (#4776).
 - `deja doctor` on Windows says when the CodeBuddy plugin is on but CodeBuddy finds no Git Bash to run its shell scripts, and points at `deja install codebuddy-auto` (#4753).
 - A word with ä, ö, ü or ß is found by its ASCII spelling and the other way round: `mueller` finds `Müller`, `strasse` finds `Straße`. Only `muller` did before (#4690).
