@@ -42,7 +42,7 @@ jobs:
       - if: steps.changed.outputs.run == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
 
       # goreleaser catalogs an SBOM per archive and shells out to syft to do
