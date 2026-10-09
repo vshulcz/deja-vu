@@ -15,9 +15,7 @@ deja महीनों पुराने समेत सब कुछ इं�
 
 <p align="center"><sub><em>किसी ने खोजा नहीं — एजेंट ने deja को खुद बुलाया। असली मॉडल और असली टूल कॉल्स के साथ दो असली रन, एक सिंथेटिक कॉर्पस पर: किसी का इतिहास सार्वजनिक नहीं किया जाता।</em></sub></p>
 
-<p align="center"><b>deja पहले ही मिनट से भरी हुई है: वह इतिहास जो 38 एजेंट पहले ही लिख चुके हैं, कुछ सेकंड में इंडेक्स, न कोई मॉडल, न कोई अलग कैप्चर स्टेप।</b></p>
-
-<p align="center"><b>जितनी कोडिंग-एजेंट मेमोरी हम माप सके, उनमें सबसे सटीक, चलाने में सबसे सस्ती और सबसे तेज़।</b></p>
+<p align="center"><b>deja पहले ही मिनट से भरी हुई है: वह इतिहास जो 41 एजेंट पहले ही लिख चुके हैं, कुछ सेकंड में इंडेक्स, न कोई मॉडल, न कोई अलग कैप्चर स्टेप।</b></p>
 
 <table align="center">
 <tr>
@@ -59,9 +57,9 @@ deja install --auto
 > क्या हमने पहले jwt refresh rotation पर काम किया था? अपनी मेमोरी में देखो
 
 पूछने की ज़रूरत भी नहीं: ऑटोमैटिक रिकॉल चालू हो तो सेशन खुलते ही एजेंट को पता होता है कि इस प्रोजेक्ट में क्या हल
-हो चुका है।
+हो चुका है। खुद देखना हो तो `deja` चलाइए।
 
-opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw और pi के लिए उनके अपने
+opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi और Hermes के लिए उनके अपने
 इकोसिस्टम में पैकेज भी हैं, उन लोगों के लिए जो एक्सटेंशन वहीं से लगाते हैं:
 
 ```sh
@@ -73,6 +71,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
 ```
 
 `deja install --auto` ऊपर वाला सब कुछ पहले ही जोड़ देता है, इसलिए दोनों में से कोई एक रास्ता काफ़ी है। दोनों साथ
@@ -99,9 +98,24 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 नहीं चाहिए। `deja install` का काम है MCP को आपके एजेंट्स से जोड़ना और सेशन शुरू होने पर रिकॉल चालू करना — उपयोगी,
 पर वैकल्पिक।
 
+## खुद खोजिए
+
+टर्मिनल में बिना आर्ग्युमेंट के `deja` सभी एजेंट्स के इतिहास पर एक खोज स्क्रीन खोलता है। सबसे ऊपर वे सेशन होते हैं
+जो आपके बिना commit किए बदलाव के पीछे हैं, फिर इस प्रोजेक्ट के हाल के सेशन, और टाइप करते-करते सूची छोटी होती जाती है।
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="deja स्क्रीन में खोज टाइप करना, मिला हुआ सेशन पढ़ना और उसे दूसरे एजेंट में आगे बढ़ाना"></p>
+
+- `↑↓` सेशन चुनता है, `↵` उसे मिलान वाली जगह पर खोलता है, `n` और `N` मिलानों के बीच चलते हैं, `esc` वापस ले जाता है।
+- `r` सेशन को उसी एजेंट में फिर से शुरू करता है जिसने उसे लिखा। `o` उसे किसी भी दूसरे एजेंट में आगे बढ़ाता है, जो इससे शुरू करता है कि सेशन ने क्या पूछा, क्या तय किया और क्या खुला छोड़ा।
+- `tab` इस प्रोजेक्ट, सभी प्रोजेक्ट्स और Kept के बीच बदलता है — Kept वे सेशन हैं जिन्हें उनके एजेंट ने मिटा दिया पर deja के पास अब भी हैं; `R` किसी एक को वापस रख देता है।
+- `?` सारी कुंजियाँ दिखाता है, `q` बाहर निकलता है।
+
+`DEJA_TUI=0` के साथ यह स्क्रीन की जगह सादा टेक्स्ट सारांश छापता है, जो `deja brief` भी देता है। पाइप में यह छापता है
+कि क्या इंडेक्स हुआ है और आगे कौन-सी कमांड चलानी है।
+
 ## इससे क्या मिलता है
 
-**Codex में हल हुआ, Claude को याद है।** अड़तीस कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
+**Codex में हल हुआ, Claude को याद है।** इकतालीस कोडिंग एजेंट हर बातचीत को लोकल फ़ाइलों में लिखते हैं, और deja उन
 फ़ाइलों को एक ऐसी मेमोरी परत में बदल देता है जिसे वे सब पढ़ सकते हैं।
 
 | | |
@@ -131,8 +145,10 @@ skill आपके इंस्टॉल किए हुए `deja` बाइन
 
 ## निजता
 
-इंडेक्सिंग और खोज लोकल हैं। नेटवर्क सिर्फ़ `deja update`, `deja sync ssh`, `deja doctor` के भीतर वर्शन जाँच, और
-`deja embed` इस्तेमाल करते हैं — जो आपके तय किए एंडपॉइंट पर जाता है।
+इंडेक्सिंग और खोज लोकल हैं। नेटवर्क सिर्फ़ `deja update`, `deja sync ssh`, `deja doctor` के भीतर वर्शन जाँच,
+`deja embed` (जो आपके तय किए एंडपॉइंट पर जाता है), और किसी इंटरैक्टिव कमांड से दिन में एक बार नवीनतम रिलीज़ की
+जाँच इस्तेमाल करते हैं। वह जाँच कोई सेशन डेटा नहीं भेजती; `DEJA_OFFLINE=1` या `DEJA_NO_UPDATE_NOTICE=1` उसे बंद
+कर देता है।
 
 क्रेडेंशियल इंडेक्सिंग के समय हटा दिए जाते हैं: AWS कुंजियाँ, `api_key=` और `token=` असाइनमेंट, bearer टोकन और नंगे
 JWT, PEM प्राइवेट की ब्लॉक, अलग-अलग प्रदाताओं के टोकन, `scheme://user:pass@host` रूप वाले URL, ऐसे
@@ -147,6 +163,9 @@ JWT, PEM प्राइवेट की ब्लॉक, अलग-अलग �
 
 ## कमांड लाइन
 
+टर्मिनल में अकेला `deja` ऊपर बताई गई खोज स्क्रीन खोलता है। क्वेरी के साथ, या नीचे की किसी भी कमांड के साथ, यह
+नतीजा छापकर बाहर निकल जाता है:
+
 ```text
 $ deja "jwt refresh token"
 [claude] api        · Jul 8 · 8f31c0a9 — 2 matches
@@ -159,13 +178,14 @@ $ deja "jwt refresh token"
 | कमांड | क्या करता है |
 | --- | --- |
 | `deja <क्वेरी>` | पूरे इतिहास में खोजता है। कई शब्द AND हैं, उद्धरण चिह्न लगातार पाठ माँगते हैं; सटीक मिलान न होने पर शब्द-रूप और मिलती-जुलती वर्तनी आज़माता है। |
+| `deja` | टर्मिनल में, ऊपर वाली फ़ुल-स्क्रीन खोज। `deja brief` उसकी जगह टेक्स्ट सारांश छापता है: आज के सेशन, deja ने क्या दिया, हाल का काम और आज़माने लायक एक खोज। |
 | `deja wip` | इस डायरेक्टरी में पिछला सेशन क्या कर रहा था: काम, क्या तय हुआ, हाथ में कौन-सी फ़ाइलें थीं, आख़िरी कमांड और वह फ़ेल हुआ या नहीं। सब रिकॉर्ड से निकाला गया, किसी के नोट्स पर निर्भर नहीं। |
 | `deja blame <पथ>[:पंक्ति]` | किन सेशन्स ने इस फ़ाइल पर बात की, क्या तय हुआ और क्यों। पंक्ति संख्या देने पर: वह commit जिसने उसे आख़िरी बार बदला, और वह सेशन जिसने वह पंक्ति लिखी, या वह पाठ जिसे उस commit ने बदला। |
 | `deja files <विषय>` | उलटी दिशा: किसी विषय पर हुए काम ने असल में किन फ़ाइलों को छुआ। |
 | `deja how <टूल>` | इस मशीन पर यह असल में कैसे चलाया जाता है, असली आर्ग्युमेंट्स के साथ, उन कमांड्स से जो एजेंट पहले चला चुके हैं। |
 | `deja fix <एरर>` | इस मशीन पर उसी एरर के बाद क्या चलाया गया, और जिसके बाद एरर दोबारा नहीं आया। कभी merge, force push या डिलीट नहीं। |
 | `deja friction` | वे एरर जो तीन या उससे ज़्यादा अलग सेशन्स में मिलते हैं, और वे किन टूल्स से आए। |
-| `deja ctx <क्वेरी>` | सबसे अच्छे नतीजों का Markdown सारांश, सीधे प्रॉम्प्ट में डालने लायक। |
+| `deja ctx <क्वेरी>` | सबसे अच्छे नतीजे का Markdown सारांश, सीधे प्रॉम्प्ट में डालने लायक। |
 | `deja resume <id>` | मिले हुए सेशन को उसी टूल में दोबारा खोलता है जिसका वह है। |
 | `deja view` | पूरी मेमोरी को एक लोकल HTML फ़ाइल में निर्यात करता है। कोई सर्वर नहीं, कुछ भी मशीन से बाहर नहीं जाता। |
 | `deja doctor [--deep]` | स्व-जाँच; `--deep` के साथ इंडेक्स को स्रोत फ़ाइलों से मिलाकर सत्यापित करता है। |
@@ -176,12 +196,12 @@ $ deja "jwt refresh token"
 ### MCP टूल्स
 
 सर्वर सिर्फ़ एक टूल `deja` देता है, और `mode` पैरामीटर क्षमता चुनता है: `recall`, `context`, `blame`, `fix`,
-`how`, `orient`, `remember`। `deja install` इसे खुद जोड़ देता है, इसलिए यह सिर्फ़ तब मायने रखता है जब आप किसी एजेंट को हाथ
+`how`, `orient`, `remember`, `handoff`। `deja install` इसे खुद जोड़ देता है, इसलिए यह सिर्फ़ तब मायने रखता है जब आप किसी एजेंट को हाथ
 से कॉन्फ़िगर करें। पुराने छह टूल नाम पहले से जुड़े क्लाइंट्स में चलते रहते हैं।
 
 सात के बजाय एक टूल होना लागत का मामला है, शैली का नहीं। जुड़ा हुआ MCP सर्वर अपने टूल्स की परिभाषाएँ हर अनुरोध के
 साथ भेजता है, इसलिए एजेंट ने कुछ बुलाया हो या नहीं, हर टर्न में उनका दाम चुकाया जाता है: यहाँ 477 टोकन, जबकि मापे
-गए आठ सर्वरों में सबसे बड़े का 8,283। deja का अपना आँकड़ा भी 828 था, जब तक स्कीमा को मोड वाले एक टूल तक नहीं
+गए सात सर्वरों में सबसे बड़े का 8,283। deja का अपना आँकड़ा भी 828 था, जब तक स्कीमा को मोड वाले एक टूल तक नहीं
 घटाया गया।
 
 ## समर्थित टूल्स
@@ -219,6 +239,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Zed.
 | Grok Build | प्लगइन `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`, फिर `grok plugin install deja` |
 | OpenClaw | ClawHub और npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (और omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | Hermes प्लगइन कैटलॉग में मेमोरी प्रोवाइडर `deja-memory` | `hermes plugins install deja-vu`, या GitHub से: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 दोनों में से कोई एक रास्ता काफ़ी है और दोनों साथ में भी कुछ नहीं तोड़ते: हर पैकेज पहले वही पढ़ता है जो
 `deja install` ने लिखा। opencode, dsh और OpenClaw सिर्फ़ छूटा हुआ भरते हैं; Kimi, Grok, Codex और pi हट जाते हैं
@@ -266,12 +287,12 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 सामान्य, पढ़ने लायक Go कोड हैं। किसी भी आँकड़े पर भरोसा करने से पहले देखिए कि वहाँ «प्रासंगिक» की परिभाषा क्या है —
 हमारे आँकड़ों समेत।
 
-एक असली रिपॉज़िटरी पर मापा गया: 2,419 सेशन, 179k संदेश, 1.9 GB रिकॉर्ड।
+एक असली स्टोर पर मापा गया: 2,419 सेशन, 179k संदेश, 1.9 GB रिकॉर्ड।
 
 | माप | नतीजा |
 | --- | --- |
 | प्रोसेस के भीतर क्वेरी | माध्यिका **0.7–0.8 ms**, LongMemEval-S के हेस्टैक पर करीब 15 ms |
-| पूरा `deja <क्वेरी>` | उस रिपॉज़िटरी पर माध्यिका करीब 0.2 s: प्रोसेस शुरू, सारे स्टोर की ताज़गी जाँच, रैंकिंग, आउटपुट |
+| पूरा `deja <क्वेरी>` | उस स्टोर पर माध्यिका करीब 0.2 s: प्रोसेस शुरू, सारे स्टोर की ताज़गी जाँच, रैंकिंग, आउटपुट |
 | सिर्फ़ ताज़गी जाँच | कुछ न बदला हो तो करीब 50 ms |
 | इंडेक्स का आकार | 200 MB, कॉर्पस का करीब 10% |
 
@@ -297,8 +318,10 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 <details>
 <summary><b>लॉग में जो सीक्रेट पहले से हैं उनका क्या?</b></summary>
 
-वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है। वे deja
-के इंडेक्स, सारांश, share या sync निर्यात में नहीं जाते।
+वे मूल टूल की फ़ाइलों में ही रहते हैं, वह आपके एजेंट का डेटा है; `deja secrets` उन सेशन्स के नाम बताता है जिनमें वे
+हैं, ताकि आप उन्हें बदल और मिटा सकें, और `--scrub` जिन रिकॉर्ड तक पहुँच पाता है उन्हें दोबारा लिखता है। जानी-पहचानी
+शक्लें इंडेक्सिंग के समय हटा दी जाती हैं और सारांश, share या sync निर्यात तक नहीं पहुँचतीं। पैटर्न मिलाना सीक्रेट
+पहचानना नहीं है: कोई अनजानी शक्ल निकल सकती है। [सुरक्षा मॉडल](../../docs/SECURITY-MODEL.md#redaction-boundary) देखिए।
 
 </details>
 
@@ -306,7 +329,7 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 <summary><b>क्या इससे मेरा एजेंट धीमा होगा?</b></summary>
 
 एक रिकॉल लोकल इंडेक्स पर शाब्दिक क्वेरी है: माध्यिका 0.7–0.8 ms, और कुछ भी
-मॉडल का इंतज़ार नहीं करता। हुक प्रोसेस शुरू होने और स्टोर की ताज़गी जाँच जोड़ता है — कई गीगाबाइट की रिपॉज़िटरी पर
+मॉडल का इंतज़ार नहीं करता। हुक प्रोसेस शुरू होने और स्टोर की ताज़गी जाँच जोड़ता है — कई गीगाबाइट के स्टोर पर
 कुछ दर्जन मिलीसेकंड।
 
 </details>
@@ -337,7 +360,7 @@ deja bench read       # डेटाबेस वाले स्टोर क�
 <summary><b>Claude Code का सेशन इतिहास कहाँ है और क्या उसे खोजा जा सकता है?</b></summary>
 
 `~/.claude/projects` के नीचे, हर सेशन की एक
-JSONL फ़ाइल; Codex `~/.codex/sessions` में, Cursor SQLite `state.vscdb` में। `deja search` उन्हें वहीं पढ़ता है,
+JSONL फ़ाइल; Codex `~/.codex/sessions` में, Cursor SQLite `state.vscdb` में। deja उन्हें वहीं पढ़ता है: अकेला `deja` उन्हें खोजने और पढ़ने की स्क्रीन खोलता है, `deja search` यही स्क्रिप्ट से करता है,
 `deja last` सभी एजेंट्स के हाल के सेशन दिखाता है, और `deja view` पूरे इतिहास को एक लोकल पेज के रूप में खोलता है।
 हर एजेंट के पथ
 [सेशन कहाँ रखे जाते हैं](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html) में हैं।
@@ -378,7 +401,7 @@ rm -rf ~/.cache/deja
 - [एजेंट सेशन्स के बीच क्यों भूलते हैं](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [हर एजेंट इतिहास कहाँ रखता है](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [कॉम्पैक्शन क्या खोता है](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [एजेंट बदलना](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [एजेंट्स ने क्या किया इसका ऑडिट](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [बातचीत निर्यात करना](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [मशीनों के बीच](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [मेमोरी की टोकन लागत](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-टूल के हिसाब से: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+टूल के हिसाब से: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi और omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## अपने इतिहास पर आज़माइए
 

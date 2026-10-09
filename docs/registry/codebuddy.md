@@ -47,8 +47,9 @@ MCP servers go into the first of `<config>/.mcp.json`, `<config>/mcp.json` and
 `~/.codebuddy.json` that exists, else `<config>/.mcp.json` — the one file
 CodeBuddy reads for user scope. Hooks go into `<config>/settings.json` in the
 Claude Code shape, `timeout` in seconds: `SessionStart`, `UserPromptSubmit`,
-`PostToolUse` and `PostToolUseFailure` on `Bash|PowerShell`, `PreCompact` and
-`SessionEnd`. CodeBuddy reads `hookSpecificOutput.additionalContext` from all
+`PostToolUse` and `PostToolUseFailure` on `Bash|PowerShell`, `PostToolUse` on
+`Read|Edit|Write|MultiEdit` (the line deja keeps for that file), `PreCompact`
+and `SessionEnd`. CodeBuddy reads `hookSpecificOutput.additionalContext` from all
 of them the way Claude Code does.
 
 WorkBuddy is a desktop app that runs this agent with `CODEBUDDY_CONFIG_DIR`

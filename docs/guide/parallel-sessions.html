@@ -151,6 +151,7 @@
 <pre>deja "pool size"            # what the other session concluded, in your session
 deja blame internal/pool.go # what has been decided about this file today
 deja last --project api     # what has been running here, newest first</pre>
+<p>Run <code>deja</code> with no arguments in the repository and the interactive screen opens on the sessions that touched the files your working tree has changed, then the recent ones in this project, whichever agent ran them.</p>
 <p>With recall wired in, a fresh session opens already knowing the project's recent decisions, whichever agent made them. That covers most of what people build an inter-agent channel for.</p>
 
 <h2>When you do want to hand work over</h2>

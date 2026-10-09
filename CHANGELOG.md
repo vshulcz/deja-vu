@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The screen's first run shows the index being built: the stage, a bar, each agent ticking in with its session count and the seconds so far, and it lets you in once the newest sessions are searchable. The first open after an upgrade shows what the new version brings, leaving for an agent names where you are going, and a command waiting out another deja's rebuild shows a live line with the seconds, then says the index is ready. Resume and continue picked on the screen use that exact session and no longer wait for a rebuild, so an id that prefixed another no longer hands off the wrong one. `deja upgrade` points at `deja update` instead of searching for the word (#4898).
+- `deja sources` takes 2.1 s instead of 28.6 s and a full rebuild 5.7 s instead of 37 s on 27k sessions: a Claude Code folder whose transcripts record no fitting working directory was listed again for every transcript. Everyday commands run about twice as fast, `deja last` 0.34 s instead of 0.65 s, since they no longer stat the store roots for each file (#4902).
+- `deja stats` groups its counts (27,262), and `deja restore` lists the newest 30 replaced spans, `--all` every one, and says `1 replaced span` (#4904).
+
+### Fixed
+
+- Typing on a large history no longer stalls the screen: it ran one search per letter, and now searches when you pause. A refresh keeps the selected session, a search typed during the first build survives the build ending, a session that grew is read again, a session put back leaves Kept, the reader's ctrl keys no longer edit the list behind it, `?` on an empty search box opens help instead of becoming the query, and the wait line no longer draws over the screen (#4900).
+
 ## [0.22.0] - 2026-10-09
 
 Bare `deja` at a terminal now opens a search screen over every agent's

@@ -78,13 +78,15 @@ deja stats</pre>
 <p><code>sources</code> 列出它在每个工具下找到的路径和会话数；<code>stats</code> 给出索引里有多少会话、来自哪些项目、活跃度如何。如果某个工具没被认出来，<a href="../../guide/harnesses.html">支持矩阵</a>里有它期望的路径和对应的环境变量。</p>
 
 <h2>自己搜一下</h2>
-<pre>$ deja "connection pool exhausted"
+<p>在终端里直接运行 <code>deja</code>，不带参数。第一次运行时它先建索引，进度界面会逐个列出正在读取的智能体，最新的会话能搜了就让你先进去。之后打开的是一个搜索界面：最上面是跟你未提交改动有关的会话，下面是这个项目最近的会话。</p>
+<p>边打字边出结果。<code>↵</code> 在匹配处打开会话阅读，<code>r</code> 回到写下它的那个智能体里恢复，<code>o</code> 换一个智能体接着做，<code>?</code> 列出其余按键，<code>esc</code> 或 <code>q</code> 退出。同样的搜索也能当普通命令用，方便脚本和管道：</p>
+<pre>$ deja "refresh token"
 [claude] api   · Jul 8 · 8f31c0a9 — 2 matches
   login started failing after refresh token rotation; jwt kid mismatch in tests
   fixed by reloading jwks cache after rotateKey and adding a clock-skew test
 [codex]  web   · Jul 1 · b77d91e2 — 1 match
   refresh token cookie needed SameSite=Lax in local callback flow</pre>
-<p>几条常用的：</p>
+<p>想要文字摘要而不是界面，用 <code>deja brief</code>；设置 <code>DEJA_TUI=0</code> 后，单独运行 <code>deja</code> 也打印这份摘要。几条常用的命令：</p>
 <ul>
 <li><code>deja "报错原文"</code> —— 跨所有工具搜历史。</li>
 <li><code>deja fix "报错原文"</code> —— 上次这个报错之后，真正跑通的是哪条命令。</li>
@@ -98,7 +100,7 @@ deja stats</pre>
 <p>只想手动用也完全可以：不接自动召回，deja 就只是一个命令行搜索工具。</p>
 
 <h2>关于隐私</h2>
-<p>索引和检索都在本地，默认不需要网络、账号或 API key。建索引时凭据会被脱敏。除非你显式配置了远程 embedding 端点，否则没有任何内容离开这台机器——细节见<a href="../../guide/privacy.html">隐私说明</a>。</p>
+<p>索引和检索都在本地，没有网络路径，也不需要账号或 API key。建索引时凭据会被脱敏。会联网的只有你自己运行的 <code>deja update</code>、<code>deja sync ssh</code>、<code>doctor</code> 的版本检查和 <code>deja embed</code>（把文本发给你自己配置的嵌入服务），以及终端里敲的命令每天最多一次在后台查最新版本号，<code>DEJA_NO_UPDATE_NOTICE=1</code> 可以关掉——细节见<a href="privacy.html">隐私说明</a>。</p>
 
 <h2>不想要了</h2>
 <pre>deja uninstall --all

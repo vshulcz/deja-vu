@@ -46,7 +46,7 @@
 <tr><td><strong>Last verified</strong></td><td>2026-09-06</td></tr>
 </table></div>
 <h2 id="discovery">Discovery</h2>
-<p>pi stores session transcripts under <code>~/.pi/agent/sessions/</code>. Each project directory uses the same <code>--</code>-encoded path scheme as Claude Code, e.g. <code>--Users-max-code-deja-vu--</code> for <code>/Users/max/code/deja-vu</code>. Within each project directory, session files are named <code>&lt;ISO-timestamp&gt;_&lt;UUID&gt;.jsonl</code>. The encoding is lossy (<code>my-app</code> and <code>my/app</code> give the same name), so the header&#39;s <code>cwd</code> names the project and the directory is the fallback for a header without one (#4427).</p>
+<p>pi stores session transcripts under <code>~/.pi/agent/sessions/</code>. Each project directory uses the same <code>--</code>-encoded path scheme as Claude Code, e.g. <code>--home-you-code-deja-vu--</code> for <code>/home/you/code/deja-vu</code>. Within each project directory, session files are named <code>&lt;ISO-timestamp&gt;_&lt;UUID&gt;.jsonl</code>. The encoding is lossy (<code>my-app</code> and <code>my/app</code> give the same name), so the header&#39;s <code>cwd</code> names the project and the directory is the fallback for a header without one (#4427).</p>
 <h2 id="file-layout">File layout</h2>
 <p>Each <code>.jsonl</code> file is a single session. The first line is always a session header:</p>
 <pre><code class="language-json">{&#34;type&#34;:&#34;session&#34;,&#34;version&#34;:3,&#34;id&#34;:&#34;&lt;uuid&gt;&#34;,&#34;timestamp&#34;:&#34;&lt;ISO-8601&gt;&#34;,&#34;cwd&#34;:&#34;&lt;absolute-path&gt;&#34;}</code></pre>
@@ -96,7 +96,7 @@
 <h2 id="session-identity">Session identity</h2>
 <p>The <code>id</code> field from the session header line is used as the session ID. The UUID also appears in the filename.</p>
 <h2 id="package">Package</h2>
-<p><code>pi install npm:@vshulcz/pi-deja</code> installs the recall extension as a pi package (<code>pi-package</code> keyword, <code>pi.extensions</code>); it wires the same four handlers the installer writes — session start, prompt, <code>tool_result</code> and <code>session_compact</code> — and stands down when <code>deja install pi-auto</code> already wrote <code>~/.pi/agent/extensions/deja.ts</code>, or when the omp counterpart is in place.</p>
+<p><code>pi install npm:@vshulcz/pi-deja</code> installs the recall extension as a pi package (<code>pi-package</code> keyword, <code>pi.extensions</code>); it wires the same handlers the installer writes — session start, prompt, <code>tool_result</code>, <code>session_compact</code> and <code>session_shutdown</code> — and stands down when <code>deja install pi-auto</code> already wrote <code>~/.pi/agent/extensions/deja.ts</code>, or when the omp counterpart is in place.</p>
 <h2 id="mcp">MCP</h2>
 <p>pi does not include built-in MCP but supports it via the <code>pi-mcp-adapter</code> package (<code>pi install npm:pi-mcp-adapter</code>). The adapter reads <code>~/.pi/agent/mcp.json</code> with the standard <code>mcpServers</code> shape. <code>deja install pi</code> writes to that file and says when the adapter is not in pi&#39;s packages; <code>deja doctor</code> then reports the row as <code>no adapter</code> (#4583).</p>
 <h2 id="skill-auto-recall-command">Skill, auto-recall, command</h2>
@@ -105,7 +105,7 @@
 <p><code>deja resume</code> prints <code>pi --session &lt;id&gt;</code>, run in the <code>cwd</code> the session header records; the folder name folds <code>/</code> into <code>-</code>, so <code>my-app</code> and <code>my/app</code> share it. With that directory gone the <code>cd</code> is left out and deja notes that pi, run from another project, offers to fork the session (#4456).</p>
 <h2 id="known-quirks-and-drift">Known quirks and drift</h2>
 <ul>
-<li>Project directory encoding uses <code>--</code> prefix and suffix (e.g. <code>--Users-max-code-foo--</code>) compared to Claude Code&#39;s single <code>-</code> prefix. The <code>resolveEncodedPath</code> function handles both.</li>
+<li>Project directory encoding uses <code>--</code> prefix and suffix (e.g. <code>--home-you-code-foo--</code>) compared to Claude Code&#39;s single <code>-</code> prefix. The <code>resolveEncodedPath</code> function handles both.</li>
 <li>Version field observed: <code>3</code>. No version migration behavior is known.</li>
 <li>The <code>parentId</code> chain forms a tree, not a flat list; deja ignores the tree structure and processes messages in file order.</li>
 </ul>

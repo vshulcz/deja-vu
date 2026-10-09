@@ -40,8 +40,10 @@ block, which deja has no use for and ignores.
 - Wiring: `deja install zcode` writes the server into `mcp.servers` in
   `~/.zcode/cli/setting.json` — one level deeper than the `mcpServers` every
   other client here uses — and `deja install zcode-auto` adds the hooks to the
-  same file, under `hooks.events.SessionStart` and
-  `hooks.events.UserPromptSubmit`. The runtime (3.14.4) writes that file on
+  same file, under `hooks.events`: `SessionStart`, `UserPromptSubmit`,
+  `PreToolUse` on `Bash|Edit|Write` (the line deja keeps for a file or
+  command) and `PostToolUse` on `Bash`, which a failed command fires with its
+  exit code (the earlier fix). The runtime (3.14.4) writes that file on
   its first launch and reads it from then on. deja used to write
   `config.json`, which the runtime reads once, as the source of that
   first-launch migration, so nothing reached the agent on a machine where

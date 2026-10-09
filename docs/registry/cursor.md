@@ -61,7 +61,9 @@ directory is gone, is not recorded, or is no longer in cursor-agent's store is
 refused with `deja show` instead — `cursor-agent --resume` with no id lists
 chats from every directory. Live-verified: the resumed chat answered from its own
 history. IDE chats carry a composer id from `state.vscdb` that the CLI does not
-take, so those still reopen only in the editor.
+take, so those still reopen only in the editor. On the screen bare `deja`
+opens, `r` on a CLI chat runs this command for you, and `o` continues any chat
+in another agent.
 
 ## Status line
 

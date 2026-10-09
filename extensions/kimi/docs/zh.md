@@ -26,19 +26,19 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 Kimi 只会提示从它自己市场安装的插件有更新。对于从仓库安装的情况，再跑一次 `/plugins install` 就会拉取当前的发布版；而当你手上这份落后于这个 deja 附带的版本时，`deja doctor` 会说明：
 
 ```
-kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
+kimi  plugin  ~/.kimi-code/config.toml  (v0.21.2 installed, v0.22.0 ships with this deja — reinstall it in Kimi to update)
 ```
 
 ## 提供的能力
 
 - **`deja install kimi-auto` 写入的那些钩子。** 会话的第一条提问带上这个项目定下的事（`deja hook-context --once`）。每条提问都按刚问的内容召回（`deja hook-prompt`），Kimi 把它附加到本回合，没有匹配时保持沉默。压缩之前，从会话里读出要被折叠的回合，下一条提问就带上智能体正在做的事（`deja hook-precompact`）。`SessionEnd` 时撤掉会话的在线标记（`deja hook-session-end`）。
-- **工具。** 插件把 `deja mcp` 声明为 MCP 服务端：一个 `deja` 工具，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient` 或 `remember`。
+- **工具。** 插件把 `deja mcp` 声明为 MCP 服务端：一个 `deja` 工具，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember` 或 `handoff`。
 - **`/deja:recall <要查什么>`**，直接检索历史。
 - **`deja-history` 技能**，会话开始时加载，让智能体知道在重新调试之前先去查一查。
 
 ## 用哪个可执行文件
 
-顺序是：`DEJA_BIN`、你自己装的 deja（`~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin`），然后是 `PATH` 上的 `deja`。你自己的 `deja update` 或 `brew upgrade deja` 会盖过插件发布时锁定的版本。
+顺序是：`DEJA_BIN`、你自己装的 deja（`~/.local/bin`、`/usr/local/bin`、`/opt/homebrew/bin`、`/usr/bin`），然后是 `PATH` 上的 `deja`。你自己的 `deja update` 或 `brew upgrade deja-vu` 会盖过插件发布时锁定的版本。
 
 ## 如果你也跑过 `deja install kimi`
 

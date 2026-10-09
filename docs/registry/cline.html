@@ -76,16 +76,18 @@
 <p>(flattened command/args shape, accepted by current Cline; existing entries</p>
 <p>preserved).</p>
 <ul>
-<li><strong>Auto, skill, command</strong>: <code>deja install cline</code> also writes a plugin to</li>
+<li><strong>Auto, skill, command</strong>: <code>deja install cline-auto</code> writes the MCP entry</li>
 </ul>
-<p><code>${CLINE_DIR:-~/.cline}/plugins/deja/</code>. It registers a rule whose content is</p>
-<p>session-start recall, a message builder that adds recall for each prompt and</p>
-<p>a repair after a failed command, the <code>/deja</code> command, and the</p>
-<p><code>deja-history</code> skill bundled in the plugin. A <code>package.json</code> listing</p>
-<p><code>index.js</code> under <code>cline.plugins</code> makes the directory a plugin package, which</p>
-<p>is the only way Cline loads its <code>skills/</code> (#4316). Cline&#39;s own hooks cannot</p>
-<p>carry context back, so the plugin is the channel. Its <code>afterRun</code> hook runs</p>
-<p><code>deja hook-session-end</code> for the session setup was handed.</p>
+<p>above and a plugin to <code>${CLINE_DIR:-~/.cline}/plugins/deja/</code>. It registers a</p>
+<p>rule whose content is session-start recall, a message builder that adds</p>
+<p>recall for each prompt and a repair after a failed command, a <code>beforeTool</code></p>
+<p>hook that appends the line deja keeps for a file being read or edited, the</p>
+<p><code>/deja</code> command, and the <code>deja-history</code> skill bundled in the plugin. A</p>
+<p><code>package.json</code> listing <code>index.js</code> under <code>cline.plugins</code> makes the directory a</p>
+<p>plugin package, which is the only way Cline loads its <code>skills/</code> (#4316).</p>
+<p>Cline&#39;s own hooks cannot carry context back, so the plugin is the channel. An</p>
+<p>auto-compaction&#39;s start notice runs <code>deja hook-precompact</code>, and its</p>
+<p><code>afterRun</code> hook runs <code>deja hook-session-end</code> for the session setup was handed.</p>
 <ul>
 <li><strong>Resume</strong>: <code>cd &lt;cwd&gt; &amp;&amp; cline --id &lt;sessionId&gt;</code> for modern sessions only;</li>
 </ul>

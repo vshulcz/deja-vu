@@ -55,7 +55,9 @@
 <h2 id="handoff">Handoff</h2>
 <p>Antigravity&#39;s terminal client is <code>agy</code>, and <code>agy -i &lt;prompt&gt;</code> opens an</p>
 <p>interactive session on it, so <code>deja handoff --to agy</code> — or <code>--to antigravity</code>,</p>
-<p>the same target — starts it directly. Verified on agy 1.1.7.</p>
+<p>the same target — starts it directly. Verified on agy 1.1.7. On the screen</p>
+<p>bare <code>deja</code> opens, <code>o</code> on any session hands it to Antigravity the same way, and</p>
+<p><code>r</code> on an Antigravity session runs <code>agy --conversation &lt;id&gt;</code>.</p>
 <h2 id="hooks">Hooks</h2>
 <p><code>PreInvocation</code> is the one hook whose answer reaches the model, so it carries</p>
 <p>what other hosts split across events. After the first invocation it reads the</p>
@@ -64,6 +66,10 @@
 <p>the line deja keeps for that file, and a <code>CHECKPOINT</code> step, which is how a</p>
 <p>compaction shows, gets the session as it stood before it, once. Antigravity</p>
 <p>keeps the steps before a checkpoint, so nothing else is needed.</p>
+<p>Antigravity has no session-end event. <code>PreInvocation</code> marks the conversation</p>
+<p>live, and a <code>Stop</code> hook, fired when the execution loop ends, runs</p>
+<p><code>deja hook-session-end</code> so another conversation&#39;s MCP recall can answer with</p>
+<p>it between turns.</p>
 <h2 id="status-line">Status line</h2>
 <p>agy runs a command for its status line, set by <code>/statusline &lt;command&gt;</code> or the</p>
 <p><code>statusLine</code> key in <code>~/.gemini/antigravity-cli/settings.json</code> (agy 1.3.1).</p>

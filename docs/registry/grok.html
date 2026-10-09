@@ -114,6 +114,12 @@
 <p>the result. The output is read from <code>toolResult.output_for_prompt</code>; <code>output</code></p>
 <p>there is the raw bytes as a number array (#4499).</p>
 <ul>
+<li><code>PreToolUse</code> runs <code>deja hook-tool</code> on <code>Bash</code>, the file tools and the spawn</li>
+</ul>
+<p>tools. On 1.0.41 its <code>additionalContext</code> reaches the model as a reminder</p>
+<p>after the tool&#39;s result, so the line deja keeps for a file arrives at the</p>
+<p>read before an edit as well as at the edit.</p>
+<ul>
 <li>On 1.0.41 session start and the prompt are still passive: grok shows a</li>
 </ul>
 <p>hook&#39;s <code>systemMessage</code> and drops its <code>additionalContext</code>, and the session&#39;s</p>

@@ -15,12 +15,17 @@ nothing to configure before the first answer — it reads the session files the
 agents on the machine have already written. The index lives in
 `~/.cache/deja/index.db` (or `$DEJA_INDEX_DIR`) and building it is idempotent.
 
+A bare `deja` opens a full-screen interactive search only when stdin and stdout
+are both a terminal. From a subprocess, a pipe or CI it prints a few lines on
+what is indexed and which command to run next, and `DEJA_TUI=0` gives the text
+brief in a terminal instead, so a wrapper never gets the screen by accident.
+
 Three ways in, in order of how little work they are:
 
 | way | what it gives | cost to you |
 |---|---|---|
 | `deja install --auto` | wires MCP and session-start recall into every agent found on the machine | one command |
-| `deja mcp` | an MCP server on stdio: one tool, seven modes | one config entry |
+| `deja mcp` | an MCP server on stdio: one tool, eight modes | one config entry |
 | `deja <command> --json` | search, blame, fix, how, files, wip, friction, secrets, tests, recap as JSON | a subprocess |
 
 ## Detecting it, and installing it if missing
@@ -41,7 +46,7 @@ npm i -g @vshulcz/deja-vu --registry=https://registry.npmmirror.com
 `deja install --auto` wires everything it finds. If your tool owns the agent's
 configuration and would rather write one entry at a time, `deja install
 <target>` takes named targets — `deja install --help` prints the list, which is
-sixty-odd of them — and `--all` wires the MCP entry for every agent found, without the hooks and plugins `--auto` adds (targets already wired with `--auto` keep theirs).
+eighty-odd of them — and `--all` wires the MCP entry for every agent found, without the hooks and plugins `--auto` adds (targets already wired with `--auto` keep theirs).
 
 ## The MCP server
 
@@ -50,7 +55,7 @@ deja mcp        # stdio
 ```
 
 One tool, `deja`, with a `mode` argument: `recall`, `context`, `blame`, `fix`,
-`how`, `orient`, `remember`. The older per-capability tool names still work, so a client
+`how`, `orient`, `remember`, `handoff`. The older per-capability tool names still work, so a client
 wired to them keeps working.
 
 Whatever writes the config, **name the server `deja`**. Every manifest we ship
@@ -102,7 +107,7 @@ in the format registry and on this page.
 
 **Not stable, do not read:** `index.db` and everything in it — `manifest.gob`,
 `sessions.gob`, `records.bin`, the buckets, the sidecars. The format has moved
-fifty-odd times and will keep moving; that is why the version lives in the
+sixty-odd times and will keep moving; that is why the version lives in the
 manifest. If you find yourself wanting to read it, the surface you want is
 probably missing and worth an issue.
 

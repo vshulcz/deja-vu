@@ -10,7 +10,7 @@
 
 ## Discovery
 
-pi stores session transcripts under `~/.pi/agent/sessions/`. Each project directory uses the same `--`-encoded path scheme as Claude Code, e.g. `--Users-max-code-deja-vu--` for `/Users/max/code/deja-vu`. Within each project directory, session files are named `<ISO-timestamp>_<UUID>.jsonl`. The encoding is lossy (`my-app` and `my/app` give the same name), so the header's `cwd` names the project and the directory is the fallback for a header without one (#4427).
+pi stores session transcripts under `~/.pi/agent/sessions/`. Each project directory uses the same `--`-encoded path scheme as Claude Code, e.g. `--home-you-code-deja-vu--` for `/home/you/code/deja-vu`. Within each project directory, session files are named `<ISO-timestamp>_<UUID>.jsonl`. The encoding is lossy (`my-app` and `my/app` give the same name), so the header's `cwd` names the project and the directory is the fallback for a header without one (#4427).
 
 ## File layout
 
@@ -83,7 +83,7 @@ The `id` field from the session header line is used as the session ID. The UUID 
 
 ## Package
 
-`pi install npm:@vshulcz/pi-deja` installs the recall extension as a pi package (`pi-package` keyword, `pi.extensions`); it wires the same four handlers the installer writes — session start, prompt, `tool_result` and `session_compact` — and stands down when `deja install pi-auto` already wrote `~/.pi/agent/extensions/deja.ts`, or when the omp counterpart is in place.
+`pi install npm:@vshulcz/pi-deja` installs the recall extension as a pi package (`pi-package` keyword, `pi.extensions`); it wires the same handlers the installer writes — session start, prompt, `tool_result`, `session_compact` and `session_shutdown` — and stands down when `deja install pi-auto` already wrote `~/.pi/agent/extensions/deja.ts`, or when the omp counterpart is in place.
 
 ## MCP
 
@@ -99,7 +99,7 @@ The skill is the shared `~/.agents/skills/deja-history/SKILL.md`; pi scans that 
 
 ## Known quirks and drift
 
-- Project directory encoding uses `--` prefix and suffix (e.g. `--Users-max-code-foo--`) compared to Claude Code's single `-` prefix. The `resolveEncodedPath` function handles both.
+- Project directory encoding uses `--` prefix and suffix (e.g. `--home-you-code-foo--`) compared to Claude Code's single `-` prefix. The `resolveEncodedPath` function handles both.
 - Version field observed: `3`. No version migration behavior is known.
 - The `parentId` chain forms a tree, not a flat list; deja ignores the tree structure and processes messages in file order.
 

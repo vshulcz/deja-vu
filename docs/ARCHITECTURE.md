@@ -241,6 +241,41 @@ cost nothing per session.
 
 The MCP server calls the same index/search code as the CLI. It writes protocol responses to stdout and keeps logs/progress off stdout so agents receive valid JSON-RPC.
 
+## Interactive screen
+
+A bare `deja` with a terminal on stdin and stdout opens the screen (`tuiWanted` in
+`cmd/deja/tui.go`); `DEJA_TUI=0`, `TERM=dumb` or a platform without a raw mode gets
+`deja brief` instead, and a pipe gets a few lines pointing at the commands. The module has no dependencies, so the terminal layer is its
+own package:
+
+- `internal/tui` sets raw mode (termios on unix, console modes on Windows), enters the
+  alternate screen with mouse and bracketed paste on, decodes input into key, mouse,
+  paste and resize events, and draws a cell `Canvas`. `Term.Draw` compares each row with
+  the last frame and writes only the rows that changed, inside a synchronized update.
+  Colour is truecolor, the 256 palette or none (`NO_COLOR`), from the environment. The
+  reader returns every ~100 ms so `Close` can stop it before an agent takes the
+  terminal; otherwise it would swallow that agent's first key.
+- `cmd/deja/tui*.go` is the screen itself: list, reader, modals (continue in, agent
+  filter, help, palette, what's new) and the first-run progress view.
+
+`tuiApp.run` is one loop that owns all state. It renders, then waits on a terminal
+event, a posted update, or a 100 ms tick. Slow work runs in goroutines and hands its
+result back with `post(func())`, which the loop runs, so nothing outside the loop
+touches state:
+
+- the index refresh (`ensureForCLISearch`) after the first frame, which is drawn from
+  the index as it was; on a first run `index.Ensure` instead, reporting into the
+  progress view, with the newest sessions searchable before the build ends;
+- search, 60 ms after a keystroke and skipped if a newer one arrived, through the same
+  tier ladder and trust policy as `deja search` without the rerank and semantic tier;
+- whole-session reads for the preview and reader, queued to one worker;
+- the Kept list (sessions whose transcript is gone, which stats every file) and the
+  "behind your uncommitted change" rows.
+
+Stderr goes to `/dev/null` while the screen is up so index output cannot land inside a
+frame. A resume or handoff picked on the screen is stored as a closure and runs after
+`Close`, with the exact session picked and no index refresh.
+
 ## Claude SessionStart hook
 
 `deja install --auto` installs the Claude MCP entry and adds a matcher-less command hook to `~/.claude/settings.json`:

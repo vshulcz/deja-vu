@@ -156,7 +156,7 @@
 <p><a href="getting-started.html">Install deja</a> to search Zed's saved conversations without clearing them:</p>
 <pre>deja index
 deja "Zed thread about the parser"</pre>
-<p>The Zed reader needs both <code>sqlite3</code> and <code>zstd</code>, because current thread bodies are compressed. <code>deja doctor</code> reports missing tools. <a href="privacy.html">Indexing and search stay local</a>; <code>deja forget</code> removes a session from the index. Keep a database backup if you need to restore native Zed history.</p>
+<p>The Zed reader needs both <code>sqlite3</code> and <code>zstd</code>, because current thread bodies are compressed. <code>deja doctor</code> reports missing tools. <a href="privacy.html">Indexing and search stay local</a>; <code>deja forget</code> removes a session from the index. Threads deja indexed stay searchable after the database goes, but deja cannot write them back into Zed. Keep a database backup if you need to restore native Zed history.</p>
 <h2>Sources</h2>
 <p>Checked against Zed's <a href="https://github.com/zed-industries/zed/blob/12f79c0aeb86c49750d2f60f816506675641b1ab/crates/paths/src/paths.rs">data-directory resolution</a>, <a href="https://github.com/zed-industries/zed/blob/12f79c0aeb86c49750d2f60f816506675641b1ab/crates/agent/src/db.rs">thread database</a> and <a href="https://github.com/zed-industries/zed/blob/12f79c0aeb86c49750d2f60f816506675641b1ab/crates/agent_ui/src/threads_archive_view.rs">thread deletion UI</a>. See the <a href="../registry/zed.html">Zed format registry</a> for deja's reader details.</p>
 <p><a href="where-sessions-are-stored.html">Where history lives</a> | <a href="memory-for-zed.html">Memory for Zed</a></p>

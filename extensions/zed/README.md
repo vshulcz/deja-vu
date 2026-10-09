@@ -25,10 +25,12 @@ One tool, `deja`, called with a `mode`:
 
 ## Install
 
-Install the extension from Zed's extension list. On first use it downloads a
-release build of the `deja` binary into its own directory — it cannot use a deja
-you already have unless you name it, because an extension runs sandboxed and the
-usual install paths are not reachable from inside it:
+Install the extension from Zed's extension list. On first use it asks Zed to
+run `deja --version`, and when that works it runs the `deja` on Zed's PATH.
+Otherwise it downloads a release build of the `deja` binary into its own
+directory. An extension runs sandboxed and cannot look in the usual install
+paths itself, so a deja that is not on the PATH Zed was started with has to be
+named:
 
 ```json
 {

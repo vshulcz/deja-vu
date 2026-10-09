@@ -36,15 +36,17 @@ not indexed.
   `${CLINE_MCP_SETTINGS_PATH:-$CLINE_DATA_DIR/settings/cline_mcp_settings.json}`
   (flattened command/args shape, accepted by current Cline; existing entries
   preserved).
-- **Auto, skill, command**: `deja install cline` also writes a plugin to
-  `${CLINE_DIR:-~/.cline}/plugins/deja/`. It registers a rule whose content is
-  session-start recall, a message builder that adds recall for each prompt and
-  a repair after a failed command, the `/deja` command, and the
-  `deja-history` skill bundled in the plugin. A `package.json` listing
-  `index.js` under `cline.plugins` makes the directory a plugin package, which
-  is the only way Cline loads its `skills/` (#4316). Cline's own hooks cannot
-  carry context back, so the plugin is the channel. Its `afterRun` hook runs
-  `deja hook-session-end` for the session setup was handed.
+- **Auto, skill, command**: `deja install cline-auto` writes the MCP entry
+  above and a plugin to `${CLINE_DIR:-~/.cline}/plugins/deja/`. It registers a
+  rule whose content is session-start recall, a message builder that adds
+  recall for each prompt and a repair after a failed command, a `beforeTool`
+  hook that appends the line deja keeps for a file being read or edited, the
+  `/deja` command, and the `deja-history` skill bundled in the plugin. A
+  `package.json` listing `index.js` under `cline.plugins` makes the directory a
+  plugin package, which is the only way Cline loads its `skills/` (#4316).
+  Cline's own hooks cannot carry context back, so the plugin is the channel. An
+  auto-compaction's start notice runs `deja hook-precompact`, and its
+  `afterRun` hook runs `deja hook-session-end` for the session setup was handed.
 - **Resume**: `cd <cwd> && cline --id <sessionId>` for modern sessions only;
   `cline --id` reopens the transcript from anywhere but runs its tools in the
   current directory, so the command runs in the manifest's `cwd` (#4318).

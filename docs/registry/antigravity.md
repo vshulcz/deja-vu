@@ -30,7 +30,9 @@ skipped.
 
 Antigravity's terminal client is `agy`, and `agy -i <prompt>` opens an
 interactive session on it, so `deja handoff --to agy` — or `--to antigravity`,
-the same target — starts it directly. Verified on agy 1.1.7.
+the same target — starts it directly. Verified on agy 1.1.7. On the screen
+bare `deja` opens, `o` on any session hands it to Antigravity the same way, and
+`r` on an Antigravity session runs `agy --conversation <id>`.
 
 ## Hooks
 
@@ -41,6 +43,11 @@ transcript the payload names: a planner step that called
 the line deja keeps for that file, and a `CHECKPOINT` step, which is how a
 compaction shows, gets the session as it stood before it, once. Antigravity
 keeps the steps before a checkpoint, so nothing else is needed.
+
+Antigravity has no session-end event. `PreInvocation` marks the conversation
+live, and a `Stop` hook, fired when the execution loop ends, runs
+`deja hook-session-end` so another conversation's MCP recall can answer with
+it between turns.
 
 ## Status line
 

@@ -155,6 +155,9 @@
   refresh token cookie needed SameSite=Lax in local callback flow</pre>
 <p>Several words are ANDed, quotes require the exact phrase, and when nothing matches exactly the search falls back to word forms and close spellings rather than returning nothing. The harness column matters more than it looks: the session you want is often in the tool you were <em>not</em> thinking of.</p>
 
+<h2>Or search as you type</h2>
+<p>Bare <code>deja</code> in a terminal opens the same search as a full screen. Results update with each letter, the agent chips along the top count the hits per agent, and <code>a</code> narrows to one. <code>tab</code> moves between this project, all projects and Kept, the sessions whose agent has since deleted them. When the box is empty, <code>↑</code> brings back what you searched before.</p>
+
 <h2>Narrowing without guessing</h2>
 <ul>
 <li><code>--harness claude</code>, <code>--project api-gateway</code> — when you are sure, and only then.</li>
@@ -169,7 +172,7 @@
 deja ctx  8f31c0a9      # a Markdown digest to paste into whatever you are doing now
 deja resume 8f31c0a9    # reopen it in the agent that ran it</pre>
 <p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for thirty-five of the forty-one harnesses deja reads. The remaining six — aider, Cherry Studio, DeepSeek Harness, JetBrains AI Assistant, VS Code Copilot Chat and Zed — have no resume path deja prints, and deja says so rather than pretending. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
-<p>Ids are matched by prefix, so the eight characters a result prints are enough to type.</p>
+<p>Ids are matched by prefix, so the eight characters a result prints are enough to type. On the screen there is nothing to type: <code>↵</code> opens the session at the match, <code>r</code> resumes it in its agent, and <code>o</code> continues it in a different one.</p>
 
 <h2>When the answer is a command rather than a session</h2>
 <p>Often what you actually want is not the conversation but one line out of it:</p>

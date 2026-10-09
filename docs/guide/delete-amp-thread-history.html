@@ -152,7 +152,7 @@ rm ~/.local/share/amp/threads/&lt;file&gt;.json</pre>
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Amp's thread files, alongside the other agents' histories, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Amp thread about the rate limiter"</pre>
-<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a thread from the index when you do want it gone.</p>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a thread from the index when you do want it gone. A thread whose file you deleted stays readable under the Kept tab of the screen bare <code>deja</code> opens; deja does not write Amp threads back, since Amp loads them from ampcode.com.</p>
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-amp.html">Memory for Amp</a> · <a href="../registry/amp.html">The Amp format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>

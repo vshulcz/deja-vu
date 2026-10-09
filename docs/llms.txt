@@ -1,10 +1,12 @@
 # deja-vu
 
-> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and thirty-five more agents wrote on this machine — including the months before it was installed — and answers from them over MCP or the command line. BM25 over the transcripts: no model, no embeddings, and no network path besides a daily release check, which DEJA_OFFLINE=1 turns off.
+> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and thirty-five more agents wrote on this machine — including the months before it was installed — and answers from them over MCP, the command line, or a full-screen search in the terminal. BM25 over the transcripts: no model, no embeddings unless you point `deja embed` at an endpoint, and no network path besides a daily release check, which DEJA_OFFLINE=1 turns off.
 
 Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, after a command fails, and on the way back from a compaction, where deja keeps the task, files and commands the summary drops. Credentials are stripped as the index is built.
 
 Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh`, or `brew install deja-vu`), followed by `deja install --auto` to wire the agents found on the machine.
+
+Run `deja` with no arguments in a terminal and it opens a full-screen search over every agent's history: results as you type, the session read at the match, then `r` to resume it in its own agent or `o` to continue it in another with what it asked, decided and left open. A Kept tab holds sessions their agent deleted that deja still has, and puts one back where the agent can reopen it. With `DEJA_TUI=0` or `TERM=dumb` a bare `deja` prints a text brief instead, and `deja <query>` searches from the shell.
 
 ## Start here
 

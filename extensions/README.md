@@ -16,16 +16,18 @@ same local index.
 | [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
-Two more integrations live outside this directory because their registries read
-a fixed path in this repository: `claude-plugin/` (Claude Code marketplace) and
-`codex-plugin/` (Codex). Moving them would break manifests that are already
-submitted.
+Four more integrations live outside this directory because their registries or
+install commands read a fixed path in this repository: `claude-plugin/` (Claude
+Code marketplace), `codex-plugin/` (Codex), `codebuddy-plugin/` (CodeBuddy
+marketplace) and `devin-plugin/` (`devin plugins install
+vshulcz/deja-vu#devin-plugin`). Moving them would break manifests and install
+commands that are already out.
 
 ## Publishing
 
 The release publishes the four npm packages (opencode, dsh, openclaw, pi) at
-the release's own version, so `opencode-deja@0.21.2` and `dsh-deja@0.21.2` are
-the ones built against `deja 0.21.2` — `scripts/release-npm.mjs` sets the
+the release's own version, so `opencode-deja@0.22.0` and `dsh-deja@0.22.0` are
+the ones built against `deja 0.22.0` — `scripts/release-npm.mjs` sets the
 version and the `@vshulcz/deja-vu` dependency together, and the release
 workflow publishes the OpenClaw package to ClawHub at the same version. Each
 package keeps its own `LICENSE` and `repository.directory` because npm
@@ -138,6 +140,7 @@ clawhub skill publish skills/deja-search
 ```
 
 Its frontmatter declares the `deja` binary and how to install it, which is what
-ClawHub's security analysis checks. The version is given at publish time; the
-file is the same one `deja warmup` writes to `~/.agents/skills`, and a test
-keeps the two identical.
+ClawHub's security analysis checks. The version is given at publish time. Apart
+from that `metadata.openclaw` block, which only the registry copy carries, the
+file is the one `deja warmup` writes to `~/.agents/skills`, and a test keeps the
+two in step.

@@ -155,6 +155,7 @@
 <tr><td><a href="../registry/cherrystudio.html">Cherry Studio</a></td><td><code>&lt;app data&gt;/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl</code></td><td>JSONL, in Claude Code's own shape</td></tr>
 <tr><td><a href="../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code></td><td>JSON files</td></tr>
+<tr><td><a href="../registry/codebuddy.html">CodeBuddy Code</a></td><td><code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/*/*.jsonl</code>; WorkBuddy writes <code>~/.workbuddy/projects/*/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/codewhale.html">CodeWhale</a></td><td><code>${CODEWHALE_HOME:-~/.codewhale}/sessions/&lt;id&gt;.json</code></td><td>JSON, one file per session</td></tr>
 <tr><td><a href="../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollouts plus a history file</td></tr>
 <tr><td><a href="../registry/commandcode.html">Command Code</a></td><td><code>~/.commandcode/projects/*/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
@@ -163,15 +164,19 @@
 <tr><td><a href="../registry/crush.html">Crush</a></td><td><code>&lt;project&gt;/.crush/crush.db</code></td><td>SQLite database, one per project</td></tr>
 <tr><td><a href="../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code>; the CLI writes <code>~/.cursor/projects/**/agent-transcripts/**/*.jsonl</code></td><td>SQLite key-value store, or JSONL</td></tr>
 <tr><td><a href="../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.v4.jsonl.zstd</code></td><td>zstd-compressed JSONL</td></tr>
+<tr><td><a href="../registry/devin.html">Devin CLI</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/devin/cli/sessions.db</code></td><td>SQLite database</td></tr>
 <tr><td><a href="../registry/gjc.html">gajae-code</a></td><td><code>${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code></td><td>JSON or JSONL</td></tr>
 <tr><td><a href="../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code></td><td>SQLite database; older builds JSONL</td></tr>
 <tr><td><a href="../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code></td><td>JSONL events with JSON metadata</td></tr>
 <tr><td><a href="../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/state.db</code> and <code>~/.hermes/profiles/*/state.db</code></td><td>SQLite database</td></tr>
+<tr><td><a href="../registry/jetbrains.html">JetBrains AI Assistant</a></td><td><code>&lt;JetBrains config&gt;/&lt;Product&gt;&lt;version&gt;/workspace/*.xml</code>; agent chats also <code>…/aia-task-history/*.events</code></td><td>XML, plus base64 JSON event logs</td></tr>
+<tr><td><a href="../registry/junie.html">Junie</a></td><td><code>${JUNIE_HOME:-~/.junie}/sessions/*/events.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/kilocode.html">Kilo Code</a></td><td><code>&lt;vscode-globalStorage&gt;/kilocode.kilo-code/tasks/*/api_conversation_history.json</code></td><td>JSON files, plus the CLI's own SQLite store</td></tr>
 <tr><td><a href="../registry/kimchi.html">Kimchi Coding</a></td><td><code>~/.config/kimchi/harness/sessions/--&lt;encoded-cwd&gt;--/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/kiro.html">Kiro</a></td><td><code>~/.kiro/sessions/cli/*.jsonl</code> and <code>~/.kiro/sessions/*/sess_*/messages.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/muse.html">Muse Code</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/*/session.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/agent/sessions/**/*.jsonl</code> and <code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
 <tr><td><a href="../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/agent/openclaw-agent.sqlite</code> and <code>…/agents/*/sessions/*.jsonl</code></td><td>SQLite database, or JSONL in older builds</td></tr>
 <tr><td><a href="../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>SQLite database</td></tr>
@@ -181,6 +186,7 @@
 <tr><td><a href="../registry/reasonix.html">Reasonix</a></td><td><code>${REASONIX_STATE_HOME:-~/.reasonix}/projects/&lt;workspace-slug&gt;/sessions-v4/&lt;id&gt;/events.frames</code> and <code>${REASONIX_STATE_HOME:-~/.reasonix}/sessions/&lt;id&gt;.jsonl</code></td><td>zstd-framed event log (1.x), or JSONL</td></tr>
 <tr><td><a href="../registry/roo.html">Roo Code</a></td><td><code>&lt;vscode-globalStorage&gt;/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code></td><td>JSON files</td></tr>
 <tr><td><a href="../registry/senpi.html">Senpi</a></td><td><code>${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl</code></td><td>JSONL, one record per line</td></tr>
+<tr><td><a href="../registry/trae.html">TRAE CLI</a></td><td><code>${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollouts plus a history file</td></tr>
 <tr><td><a href="../registry/copilot-chat.html">VS Code Copilot Chat</a></td><td><code>&lt;vscode-User&gt;/workspaceStorage/*/chatSessions/*.{json,jsonl}</code></td><td>JSON or JSONL</td></tr>
 <tr><td><a href="../registry/zcode.html">ZCode</a></td><td><code>~/.zcode/projects/*/*.jsonl</code></td><td>JSONL, plus the CLI's own SQLite store</td></tr>
 <tr><td><a href="../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code></td><td>SQLite database</td></tr>
@@ -191,11 +197,11 @@
 <h2>Reading them yourself</h2>
 <p>Most are JSONL — one JSON object per line, appended as the session runs:</p>
 <pre>ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs tail -5 | jq -r '.message.content'</pre>
-<p>Some are databases rather than files. opencode keeps <code>opencode.db</code>, Hermes a <code>state.db</code> plus one per profile, Goose a <code>sessions.db</code>, Crush a <code>crush.db</code> per project, and Zed one SQLite store for every thread with each body compressed as a zstd frame — so <code>sqlite3</code> alone will show you rows of binary, and you need <code>zstd</code> to read a thread. Reasonix 1.x and DeepSeek Harness also need <code>zstd</code>. Cursor is the awkward one: the IDE keeps its chats as key-value rows inside <code>state.vscdb</code>, while Cursor CLI writes JSONL transcripts per project.</p>
+<p>Some are databases rather than files. opencode keeps <code>opencode.db</code>, Hermes a <code>state.db</code> plus one per profile, Goose a <code>sessions.db</code>, Crush a <code>crush.db</code> per project, Devin CLI a <code>sessions.db</code>, and Zed one SQLite store for every thread with each body compressed as a zstd frame — so <code>sqlite3</code> alone will show you rows of binary, and you need <code>zstd</code> to read a thread. Reasonix 1.x and DeepSeek Harness also need <code>zstd</code>. Cursor is the awkward one: the IDE keeps its chats as key-value rows inside <code>state.vscdb</code>, while Cursor CLI writes JSONL transcripts per project.</p>
 <p>Two practical notes. Paths move: Claude Code honours <code>CLAUDE_CONFIG_DIR</code>, Codex <code>CODEX_HOME</code>, Kimi <code>KIMI_CODE_HOME</code>, Goose and opencode follow <code>XDG_DATA_HOME</code>. And these files hold whatever your session held, including any secret that was pasted or printed — treat them like the logs they are.</p>
 
 <h2>What to do with them</h2>
-<p>Reading one file answers "what did I do in that session". The useful question is usually the other one — "which session was it" — and that needs an index across all of them. That is what <a href="https://github.com/vshulcz/deja-vu">deja</a> builds: one local index over every store above, searchable from the command line and readable by the agents themselves over MCP.</p>
+<p>Reading one file answers "what did I do in that session". The useful question is usually the other one — "which session was it" — and that needs an index across all of them. That is what <a href="https://github.com/vshulcz/deja-vu">deja</a> builds: one local index over every store above, searchable from the command line and readable by the agents themselves over MCP. <code>deja</code> with no arguments opens it as a full-screen search, results as you type.</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "connection pool exhausted"</pre>
 <p>No capture step and nothing to switch on first: the files are already there, including the months before you installed anything. <a href="privacy.html">Indexing and search stay local</a>, and credentials are stripped as the index is built.</p>

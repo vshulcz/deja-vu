@@ -13,6 +13,12 @@ The plugin that `deja install amp-auto` writes fills that directory itself: on
 `threads/<id>.json` in the shape below. Threads from before the plugin was
 installed are still not read.
 
+The plugin is also how recall reaches Amp. `agent.start` returns the session
+digest and the prompt's recall, which Amp appends to the user message;
+`tool.result` adds the line deja keeps for a file after `Read`, `edit_file` or
+`create_file`, and the earlier fix after a failed shell command; `agent.end`
+runs `deja hook-session-end` for the thread.
+
 The same plugin catches compactions up. Amp has no compaction event, but
 after one, `thread.messages()` opens with the summary while `{full: true}`
 still starts at the first turn. On `agent.start` the plugin compares the two,

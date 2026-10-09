@@ -4,7 +4,7 @@
 
 Grok 记得自己的会话。这个插件回答的是另一个问题：你在这台机器上的 Claude Code、Codex、Cursor、opencode、Zed 等其他四十个智能体里做过什么——包括你安装任何东西之前的那几个月。
 
-插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除非你主动要求，否则不走网络。
+插件运行 [deja](https://github.com/vshulcz/deja-vu)，一个本地 Go 可执行文件，索引这些智能体本来就写在磁盘上的会话记录。不用大模型，不用向量嵌入，除了每天一次的版本检查之外不走网络，`DEJA_OFFLINE=1` 可以关掉它。
 
 ## 安装
 
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 ## 提供的能力
 
-MCP 服务端，带着 deja 在各处提供的那一个工具：`deja`，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient` 或 `remember`。
+MCP 服务端，带着 deja 在各处提供的那一个工具：`deja`，模式可以是 `recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember` 或 `handoff`。
 
 `deja-history` 技能，让智能体在够不着工具时仍然知道 CLI 的用法。
 

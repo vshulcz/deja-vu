@@ -172,7 +172,7 @@ deja: records were redacted at index time (566 masked). pattern redaction is a f
 
 <h2>Browsing rather than exporting</h2>
 <pre>deja view</pre>
-<p>Writes one local HTML file with the sessions, the recalls served and the notes, and opens it. No server, nothing uploaded — the page is a file on your disk. This is usually what people actually wanted when they went looking for an export: a way to look through what is there.</p>
+<p>Writes one local HTML file with the sessions, the recalls served and the notes, and opens it. No server, nothing uploaded — the page is a file on your disk. This is usually what people actually wanted when they went looking for an export: a way to look through what is there. In a terminal, bare <code>deja</code> opens a search screen over the same sessions, and <code>c</code> copies the selected one's context to the clipboard.</p>
 
 <h2>Before you clear history</h2>
 <p>Deleting a harness's transcripts is not the same as removing them from an index that already read them. If you keep an index, <code>deja forget --session &lt;id&gt;</code> removes that session and writes a tombstone so a later <code>deja index</code> cannot resurrect them from the source; <code>--list</code> shows the tombstones and <code>--unforget</code> reverses one. <a href="privacy.html">Privacy</a> covers the rest: what is indexed, what is stripped, and what never leaves the machine.</p>

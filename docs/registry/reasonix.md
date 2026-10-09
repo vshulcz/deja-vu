@@ -106,7 +106,9 @@ Reasonix takes everything as one plugin package (`reasonix-plugin.json`,
   what the person typed rather than the recall appended to it, to the
   summarizer's guidance, and holds the same packet for the next turn, which
   carries it in place of that turn's recall. It publishes a status line while the first index
-  builds and one "recalled N prior sessions" notice per session. Every answer
+  builds and one "recalled N prior sessions" notice per session. When a
+  session ends (a `session.rotate`, or another session starting) its live
+  stamp goes, so the next session's MCP recall can answer with it. Every answer
   has a budget under the host's timeout (4 s per prompt, 2 s per tool call,
   10 s for compaction); an error, a timeout or nothing to say leaves the turn
   as the host built it.

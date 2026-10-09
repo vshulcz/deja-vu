@@ -16,8 +16,9 @@ and no embeddings. Credentials are redacted as the index is built.
   build and test commands this machine runs.
 - The `deja-history` skill, which tells the agent when to use it.
 - Hooks: a digest of recent related work at session start, recall on each
-  prompt, the fix that worked last time after a failed `Bash` command, a
-  capture before compaction, and a marker when the session ends.
+  prompt, what past sessions settled about a file after it is read or edited,
+  the fix that worked last time after a failed `Bash` or `PowerShell` command,
+  a capture before compaction, and a marker when the session ends.
 
 ## Install
 

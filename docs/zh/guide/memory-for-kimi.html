@@ -81,17 +81,17 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 
 <h2>装完多了什么</h2>
 <ul>
-<li>MCP 服务器，带 <code>deja</code> 工具和它在各处都提供的六种模式。</li>
+<li>MCP 服务器，带 <code>deja</code> 工具和它在各处都提供的八种模式。</li>
 <li><code>deja-history</code> 技能，这样在工具不可达时智能体也知道 CLI 的用法。</li>
 <li><code>/deja:recall &lt;查询&gt;</code>，用来直接提问。</li>
 <li>会话第一次提问时的项目摘要，之后每次提问时的召回——都走 <code>UserPromptSubmit</code> 钩子。Kimi 会把钩子的 stdout 追加到这一轮的上下文里，并且会把该事件上的每个钩子都跑一遍，所以两者并存；摘要限制为每个会话一次。历史给不出答案时，召回保持沉默。</li>
 <li>压缩恢复，走 <code>PreCompact</code> 钩子：Kimi 压缩前会等这个钩子，deja 从 <code>wire.jsonl</code> 读出会话，下一次提问时交还任务、跑过的命令及其成败、还没做完的事。已经给它看过的块列表也一起丢掉，这样召回可以再说一遍。</li>
 </ul>
-<p>在 Kimi Code 0.28.1 上靠读它实际发出的请求量过：<code>UserPromptSubmit</code> 是唯一一个输出能到达模型的事件。<code>SessionStart</code> 钩子会跑，但输出无处可去，所以摘要改成搭第一次提问的车；<code>PreToolUse</code> 能拦住一个工具，却不能往里加东西；<code>PostToolUse</code> 和 <code>PostToolUseFailure</code> 是发出即忘，所以命令失败之后的那次修复——Claude Code 和 Codex 有的那一份——在这里没有落点。</p>
+<p>在 Kimi Code 0.28.1 上靠读它实际发出的请求量过：<code>UserPromptSubmit</code> 是唯一一个输出能到达模型的事件。<code>SessionStart</code> 钩子会跑，但输出无处可去，所以摘要改成搭第一次提问的车；<code>PreToolUse</code> 能拦住一个工具，却不能往里加东西；<code>PostToolUse</code> 和 <code>PostToolUseFailure</code> 是发出即忘，Kimi 不等它们，也不用它们的输出。所以 <code>deja install kimi-auto</code> 在 <code>Bash</code> 上接的这两个钩子带 <code>--defer</code>：命令失败之后的那次修复先存着，到这个会话的下一次提问时交出一次。<code>Edit</code>、<code>Write</code> 上的 <code>PreToolUse</code> 也一样，关于被改文件的那一行随下一次提问到达，那时改动已经做完了。插件本身不带这几个工具钩子。</p>
 
 <h2>和这个 harness 无关的那一半</h2>
 <p>索引覆盖这台机器上每个智能体的转录——今天是四十一个，<a href="../../guide/where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
-<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
 
 <p><a href="getting-started.html">快速开始</a> · <a href="../../guide/repeated-mistakes.html">同一面墙又撞上来</a> · <a href="https://github.com/vshulcz/deja-vu/tree/main/extensions/kimi">插件源码</a></p>
 </article>

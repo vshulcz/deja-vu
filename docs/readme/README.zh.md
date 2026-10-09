@@ -14,9 +14,7 @@
 
 <p align="center"><sub><em>没有人去搜索——是智能体自己调用了 deja。两次真实运行，真实模型、真实工具调用，跑在合成语料上：不会公开任何人的历史。</em></sub></p>
 
-<p align="center"><b>deja 一开始就是满的：38 个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
-
-<p align="center"><b>我们能测到的编码代理记忆里，最准、最省、最快。</b></p>
+<p align="center"><b>deja 一开始就是满的：四十一个智能体早已写下的历史，几秒建好索引，不需要模型，也不需要额外的采集步骤。</b></p>
 
 <table align="center">
 <tr>
@@ -56,9 +54,9 @@ deja install --auto
 
 > 我们以前处理过 jwt refresh rotation 吗？查一下你的记忆
 
-也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。
+也不必特意去问——开启自动召回后，会话一打开，智能体就已经知道你在这个项目里解决过什么。想自己翻一翻，运行 `deja`。
 
-opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw 和 pi 也有各自生态里的包，习惯在那边装扩展的人
+opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw、pi 和 Hermes 也有各自生态里的包，习惯在那边装扩展的人
 可以直接用：
 
 ```sh
@@ -70,7 +68,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
-hermes plugins install vshulcz/deja-vu/extensions/hermes
+hermes plugins install deja-vu
 ```
 
 `deja install --auto` 已经把上面这些都接好了，两条路走哪条都够。两边都装也没问题：包会看
@@ -96,6 +94,20 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 
 只有二进制文件也是一次完整安装：索引、搜索、`show`、`ctx`、`blame`、`--json`
 和脱敏都不需要别的东西。`deja install` 负责的是把 MCP 接进你的智能体、打开会话启动召回——值得有，但可选。
+
+## 自己搜索
+
+在终端里不带参数运行 `deja`，会打开一个覆盖所有智能体历史的搜索界面。最先列出的是你尚未提交的改动背后的会话，
+然后是这个项目最近的会话，边输入列表边收窄。
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="在 deja 界面里输入搜索、阅读找到的会话，并在另一个智能体里接着做"></p>
+
+- `↑↓` 选会话，`↵` 在命中处打开，`n` 和 `N` 在命中之间跳转，`esc` 返回。
+- `r` 在写下这个会话的智能体里恢复它。`o` 在任意其他智能体里接着做，新智能体一开始就带着这个会话问过什么、定下了什么、还有什么没解决。
+- `tab` 在本项目、所有项目和 Kept 之间切换；Kept 是智能体已经删掉、deja 仍然保留的会话，`R` 把其中一个放回原处。
+- `?` 列出所有按键，`q` 退出。
+
+设置 `DEJA_TUI=0` 时改为打印文本摘要，也就是 `deja brief` 的输出。输出到管道时，它打印已经索引了什么、下一步该运行哪条命令。
 
 ## 能得到什么
 
@@ -126,7 +138,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 
 ## 隐私
 
-建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查，以及指向你所配置端点的 `deja embed` 会用到网络。
+建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查、指向你所配置端点的 `deja embed`，以及交互式命令每天一次查看最新发布，会用到网络。这次查看不发送任何会话数据；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以关掉它。
 
 凭据在建索引时脱敏：AWS 密钥、`api_key=` 与 `token=` 赋值、bearer 令牌与裸 JWT、PEM 私钥块、
 各家提供商的令牌、`scheme://user:pass@host` 形式的 URL、没有规则能匹配的高熵值，
@@ -137,6 +149,8 @@ deja 把这些文件变成一层它们都能读的记忆。
 [安全模型](../../docs/SECURITY-MODEL.md)记录了数据流向、脱敏的边界、信任假设与发布验证。
 
 ## 命令行
+
+在终端里单独运行 `deja` 会打开[搜索界面](#自己搜索)。带上查询词或下面任意一条命令时，它打印结果后退出：
 
 ```text
 $ deja "jwt refresh token"
@@ -150,6 +164,7 @@ $ deja "jwt refresh token"
 | 命令 | 作用 |
 | --- | --- |
 | `deja <查询词>` | 搜索所有历史。多个词是 AND，引号内要求连续文本；没有精确命中时会尝试词形与近似拼写。 |
+| `deja` | 在终端里是上面那个全屏搜索。`deja brief` 改为打印文本摘要：今天的会话、deja 交出了什么、最近的工作和一条可以试试的搜索。 |
 | `deja wip` | 这个目录里上一个会话在做什么：任务、定下来的结论、手上的文件、最后一条命令以及它是否失败。全部从记录里推出来，不依赖谁记得写笔记。 |
 | `deja blame <路径>[:行号]` | 哪些会话讨论过这个文件、当时决定了什么、为什么。给出行号时：最后改动这一行的提交，以及写下这一行、或写下被这次提交替换的那段文本的会话。 |
 | `deja files <主题>` | 反方向：某个主题的工作实际动过哪些文件。 |
@@ -166,7 +181,7 @@ $ deja "jwt refresh token"
 
 ### MCP 工具
 
-服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`。
+服务端只暴露一个工具 `deja`，用 `mode` 参数选择能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`、`handoff`。
 `deja install` 会自动接好，只有手工配置智能体时才需要关心它。原来的六个工具名对已经接好的客户端仍然有效。
 
 ## 支持的工具
@@ -203,7 +218,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Zed。
 | Grok Build | 插件 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`，然后 `grok plugin install deja` |
 | OpenClaw | ClawHub 与 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
-| Hermes | 记忆提供者 `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| Hermes | 记忆提供者 `deja-memory`，在 Hermes 插件目录里 | `hermes plugins install deja-vu`，或从 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 两条路各自都够用，两条都走也不会出问题：每个包都会先读 `deja install` 写下的配置。
 opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 pi 在安装器已经接好时
@@ -248,12 +263,12 @@ deja bench read       # 读取一个数据库存储的代价，以及一个超�
 在没有相关历史的链条上则什么都不注入。语料生成器和相关性标注是普通的、可审阅的 Go 代码。
 在相信任何数字之前，先审清「相关」是怎么定义的——包括我们的数字。
 
-在一份真实的仓库上测得：2,419 个会话、179k 条消息，共 1.9 GB 的记录。
+在一份真实的存储上测得：2,419 个会话、179k 条消息，共 1.9 GB 的记录。
 
 | 指标 | 结果 |
 | --- | --- |
 | 进程内查询 | 中位数 **0.7–0.8 ms**，LongMemEval-S 干草堆上约 15 ms |
-| `deja <查询词>` 端到端 | 该仓库上中位数约 0.2 s：进程启动、对所有存储做新鲜度检查、排序、打印 |
+| `deja <查询词>` 端到端 | 该存储上中位数约 0.2 s：进程启动、对所有存储做新鲜度检查、排序、打印 |
 | 仅新鲜度检查 | 没有变化时约 50 ms |
 | 索引大小 | 200 MB，约为语料的 10% |
 
@@ -278,8 +293,9 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <details>
 <summary><b>日志里已经有的密钥怎么办？</b></summary>
 
-它们留在原本的工具文件里，那是你的智能体的数据。
-它们不会进入 deja 的索引、摘要、分享或同步导出。
+它们留在原本的工具文件里，那是你的智能体的数据；`deja secrets` 会指出带有密钥的会话，方便你轮换和删除，
+`--scrub` 会重写它能触及的记录。已知形态在建索引时剥掉，不会进入摘要、分享或同步导出。模式匹配不是密钥检测，
+未知形态可能漏过。见[安全模型](../../docs/SECURITY-MODEL.md#redaction-boundary)。
 
 </details>
 
@@ -287,7 +303,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <summary><b>会拖慢我的智能体吗？</b></summary>
 
 一次召回是对本地索引的词法查询：中位数 0.7–0.8 ms，没有任何东西在等模型。
-钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的仓库上是几十毫秒。
+钩子会额外加上进程启动和对存储的新鲜度检查——几个 GB 的存储上是几十毫秒。
 
 </details>
 
@@ -316,7 +332,7 @@ MCP 服务端、统计、分享和同步都读这一份索引。细节见
 <details>
 <summary><b>Claude Code 的会话历史存在哪里，能搜索吗？</b></summary>
 
-在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地读取它们，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+在 `~/.claude/projects` 下，每个会话一个 JSONL 文件；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。deja 就地读取它们：单独运行 `deja` 会打开一个搜索和阅读它们的界面，`deja search` 在脚本里做同样的事，`deja last` 列出每个智能体最近的会话，`deja view` 把全部历史打开成一个本地页面。各智能体的路径见[会话存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
 
 </details>
 
@@ -354,7 +370,7 @@ rm -rf ~/.cache/deja
 - [为什么智能体在会话之间会忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每个智能体把历史存在哪里](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [压缩会丢掉什么](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [换一个智能体](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [审计智能体做过什么](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [导出一次对话](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨机器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [记忆要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html) · [Kimi Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [DeepSeek Harness（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html) · [Kimi Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [Qwen Code（中文）](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## 在你自己的历史上试一次
 

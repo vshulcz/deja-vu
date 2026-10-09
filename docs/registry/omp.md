@@ -12,7 +12,7 @@
 
 omp (Oh My Pi, `github.com/can1357/oh-my-pi`) stores session transcripts under
 `~/.omp/agent/sessions/`. Each project directory uses Claude Code's single-dash
-path encoding, e.g. `-Code-pleasure-course` for `/Users/halo/Code/pleasure-course`.
+path encoding, e.g. `-Code-pleasure-course` for `~/Code/pleasure-course`.
 Within each project directory, session files are named
 `<ISO-timestamp>_<uuid>.jsonl`.
 

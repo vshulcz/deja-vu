@@ -44,7 +44,7 @@ harness falls back to the first prompt.
   bare row is rejected with `entry "mcp-deja" not found`, because a patch entry
   addresses a row that already exists. After it dsh lists one tool, `deja`,
   called with a `mode` of `recall`, `context`, `blame`, `fix`, `how`,
-  `orient` or `remember`.
+  `orient`, `remember` or `handoff`.
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. dsh splices a
   skill catalogue into the turn and reads that directory, so it needs no file of
   its own — checked by asking a running dsh to list its skills.
@@ -84,7 +84,9 @@ harness falls back to the first prompt.
   command that fixed it. `tools/execute`, the seam before the call, has no
   channel to the model (#4293). A session the plugin saw created is ended
   with `deja hook-session-end` at `session/disposed`, or at process exit,
-  since headless 0.1.1-rc.2 exits without disposing it.
+  since headless 0.1.1-rc.2 exits without disposing it. A `compaction/start`
+  session event runs `deja hook-precompact` on the flushed log, and the packet
+  rides the recall of the next step.
   The workspace deja is asked about is the session's, read from the session
   header (`agent.session.header.cwd`). One `dsh web` process serves sessions
   from every workspace and never changes directory, so `process.cwd()` is only

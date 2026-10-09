@@ -48,6 +48,11 @@
 <p>(<code>thread.messages({full: true})</code>, 20 at a time) and writes it to</p>
 <p><code>threads/&lt;id&gt;.json</code> in the shape below. Threads from before the plugin was</p>
 <p>installed are still not read.</p>
+<p>The plugin is also how recall reaches Amp. <code>agent.start</code> returns the session</p>
+<p>digest and the prompt&#39;s recall, which Amp appends to the user message;</p>
+<p><code>tool.result</code> adds the line deja keeps for a file after <code>Read</code>, <code>edit_file</code> or</p>
+<p><code>create_file</code>, and the earlier fix after a failed shell command; <code>agent.end</code></p>
+<p>runs <code>deja hook-session-end</code> for the thread.</p>
 <p>The same plugin catches compactions up. Amp has no compaction event, but</p>
 <p>after one, <code>thread.messages()</code> opens with the summary while <code>{full: true}</code></p>
 <p>still starts at the first turn. On <code>agent.start</code> the plugin compares the two,</p>

@@ -153,7 +153,7 @@
 deja "the thing you were doing"</pre>
 <p><code>deja wip</code> answers the first question a stranded session has — what was I doing — from the last session's own transcript in this directory: the task, what it settled, the files in flight, the last command and whether it failed. Nothing was stored for it; it is derived each time.</p>
 <p>Search runs over every agent's history on the machine, so it does not matter which tool held the lost context — or whether that tool still exists. <code>deja ctx &lt;query&gt;</code> gives the single best-matching session as a digest rather than a wall of transcript, which is what you want to paste back into a fresh window.</p>
-<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — thirty-five of the forty-one do.</p>
+<p>If the tool you lost supports it, <code>deja resume &lt;id&gt;</code> prints the exact command that reopens that conversation, in the directory it belongs to — thirty-five of the forty-one do. Bare <code>deja</code> opens a screen that starts on the sessions behind your uncommitted change, which is usually the one you lost: <code>r</code> reopens it, or <code>o</code> hands what it asked, settled and left open to whichever agent you pick.</p>
 
 <h2>Not losing it the next time</h2>
 <pre>deja install --auto</pre>

@@ -182,7 +182,7 @@ WHERE key = 'composerData:&lt;chat id&gt;';"</pre>
 <p><a href="https://github.com/vshulcz/deja-vu">deja-vu</a> indexes Cursor's chats, reading the database through <code>sqlite3</code> without writing to it, together with the history of Claude Code, Codex and the other agents on the machine. A chat that is in its index stays searchable after it leaves <code>state.vscdb</code>, including when the whole database is moved aside, so run it once before you delete anything:</p>
 <pre>deja index
 deja "pgbouncer"          # finds the chat after it is gone from Cursor</pre>
-<p><code>deja forget &lt;id&gt;</code> drops one for good.</p>
+<p>In the screen bare <code>deja</code> opens, you can still read such a chat or press <code>o</code> to carry it into another agent. deja cannot write a chat back into <code>state.vscdb</code>. <code>deja forget --session &lt;id&gt;</code> drops one for good.</p>
 
 <p><a href="delete-cursor-chat-history.html">Deleting Cursor chat history</a> · <a href="where-sessions-are-stored.html">Where every agent stores history</a> · <a href="memory-for-cursor.html">Giving Cursor recall over the rest</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

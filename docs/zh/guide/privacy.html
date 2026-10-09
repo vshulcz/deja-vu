@@ -36,7 +36,7 @@
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "隐私：索引什么、脱敏什么、什么都不外传", "description": "deja 索引的是可能含有凭据的会话历史：索引和检索都在本地，凭据在写入前就被脱敏，排除、遗忘与信任范围决定留下什么。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "隐私", "item": "https://vshulcz.github.io/deja-vu/zh/guide/privacy.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "deja 会把我的会话上传到别处吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。建索引和检索都没有网络路径，索引和它的使用日志不离开这台机器。只有 deja update、deja sync ssh、doctor 的版本检查会联网，后者可以用 --offline 关掉；另外在终端里敲的命令每天最多一次在后台查一下最新版本号，不发送任何会话数据，DEJA_OFFLINE=1 或 DEJA_NO_UPDATE_NOTICE=1 可以关掉。"}}, {"@type": "Question", "name": "凭据会被写进索引吗？", "acceptedAnswer": {"@type": "Answer", "text": "会先脱敏再写：API key、JWT、PEM/PGP 私钥块、bearer 与 HTTP Basic、各家提供商的令牌、scheme://user:pass@host 形式的 URL、处在密钥位置上的高熵值，以及写在散文里的口令。脱敏在任何长度截断之前进行，所以跨过截断点的密钥也不会漏过。"}}, {"@type": "Question", "name": "怎么让某个项目完全不进索引？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.config/deja/exclude 里写模式，或者用 DEJA_EXCLUDE_PROJECTS；sync export 也遵守它。整个工具的历史可以用 harness: 前缀排除，例如 harness:opencode。"}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "deja 会把我的会话上传到别处吗？", "acceptedAnswer": {"@type": "Answer", "text": "不会。建索引和检索都没有网络路径，索引和它的使用日志不离开这台机器。只有 deja update、deja sync ssh、doctor 的版本检查（可以用 --offline 关掉）和 deja embed（把文本发给你自己配置的嵌入服务）会联网；另外在终端里敲的命令每天最多一次在后台查一下最新版本号，不发送任何会话数据，DEJA_OFFLINE=1 或 DEJA_NO_UPDATE_NOTICE=1 可以关掉。"}}, {"@type": "Question", "name": "凭据会被写进索引吗？", "acceptedAnswer": {"@type": "Answer", "text": "会先脱敏再写：API key、JWT、PEM/PGP 私钥块、bearer 与 HTTP Basic、各家提供商的令牌、scheme://user:pass@host 形式的 URL、处在密钥位置上的高熵值，以及写在散文里的口令。脱敏在任何长度截断之前进行，所以跨过截断点的密钥也不会漏过。"}}, {"@type": "Question", "name": "怎么让某个项目完全不进索引？", "acceptedAnswer": {"@type": "Answer", "text": "在 ~/.config/deja/exclude 里写模式，或者用 DEJA_EXCLUDE_PROJECTS；sync export 也遵守它。整个工具的历史可以用 harness: 前缀排除，例如 harness:opencode。"}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -53,7 +53,7 @@
 <a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
 <a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
 <div class="grp">English</div>
-<a href="../../guide/privacy.html">Session files on disk</a>
+<a href="../../guide/privacy.html">Privacy</a>
 <a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
 <a href="../../guide/delete-copilot-chat-history.html">Delete Copilot Chat history</a>
 <a href="../../guide/commands.html">CLI reference</a>
@@ -67,7 +67,7 @@
 <p>deja 索引的正是可能带着凭据的会话历史，所以隐私在这里是第一顺位的问题，不是事后补的。</p>
 <h2>索引了什么</h2>
 <p>对话本身，以及智能体在对话期间做过的事：工具调用提到的文件路径、执行过的命令、每次改动替换掉的那段原文，以及工具打印出来的内容。最后这一项正是脱敏重要的原因——命令输出里的凭据远多于散文——这些内容和对话本身走同一条脱敏流程。被替换掉的原文是你自己文件里的代码，存下来是为了让 <code>deja restore</code> 能把工作还给你，它和其他一切一样留在本机。</p>
-<p>在 Claude Code 和 Codex 上，索引还会保留压缩前那一刻的一小包工作上下文——任务、结论、涉及的文件和命令，同样脱敏，最多 32 个会话/工作区组合。它放在索引清单里，不进 sync 导出，遵守被排除的项目和 <code>DEJA_RECALL=off</code>，而且即使那个会话还没被索引，<code>deja forget</code> 也能把它删掉。</p>
+<p>在 deja 能接住压缩的智能体上（Claude Code、Codex、Qwen、Kimi、Grok、Cursor CLI、opencode、pi 等，完整列表见<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/compaction.md">压缩参考</a>），索引还会保留压缩前那一刻的一小包工作上下文——任务、结论、涉及的文件和命令，同样脱敏，最多 32 个会话/工作区组合。它放在索引清单里，不进 sync 导出，遵守被排除的项目和 <code>DEJA_RECALL=off</code>，而且即使那个会话还没被索引，<code>deja forget</code> 也能把它删掉。</p>
 
 <h2>默认只在本地</h2>
 <p>建索引和检索没有网络路径，索引及其使用日志不离开这台机器。只有五种情况会联网：<code>deja update</code>、<code>deja sync ssh</code>，<code>doctor</code> 里的版本检查（用 <code>--offline</code> 可以关掉），<code>deja embed</code>——它会把文本发给你自己配置的嵌入服务，下面有详细说明——以及每天最多一次的新版本检查：在终端里敲的命令会在后台向 GitHub 查最新版本号，有新版本时在 stderr 上说一行。它不发送任何会话数据，钩子和 MCP 服务器从不触发它，设 <code>DEJA_OFFLINE=1</code> 或 <code>DEJA_NO_UPDATE_NOTICE=1</code> 即可关掉。</p>

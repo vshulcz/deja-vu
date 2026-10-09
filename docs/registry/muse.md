@@ -75,8 +75,8 @@ refuses a file that has both.
 `deja install muse-auto` adds hooks to the same file in Claude Code's shape,
 `{"hooks": {Event: [{matcher, hooks: [{type, command, timeout}]}]}}`, timeout
 in seconds: SessionStart, UserPromptSubmit, PreToolUse on
-`bash|edit_file|write_file`, PostToolUse and PostToolUseFailure on `bash`, and
-SessionEnd. They fire in an untrusted workspace too, the payload is Claude
+`bash|edit_file|write_file`, PostToolUse and PostToolUseFailure on `bash`,
+PreCompact and SessionEnd. They fire in an untrusted workspace too, the payload is Claude
 Code's with `transcript_path: null`, and what a hook returns, as
 `hookSpecificOutput.additionalContext` or plain stdout, reaches the model as a
 developer message. `edit_file` and `write_file` name the file under

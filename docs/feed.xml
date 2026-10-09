@@ -25,6 +25,20 @@
     <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 39 more agents, built from the sessions already on your disk.</summary>
   </entry>
   <entry>
+    <title>Auditing what a coding agent actually did — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>How to review agent changes after the fact: the diff says what changed, the transcript says what was tried and why.</summary>
+  </entry>
+  <entry>
+    <title>Codex CLI history: view, search and sync it — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/codex-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.</summary>
+  </entry>
+  <entry>
     <title>deja CLI reference: search, recall, blame, stats — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/commands.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/commands.html"></link>
@@ -46,6 +60,13 @@
     <summary>Agents write every command output to plaintext transcripts. One machine held 84 credentials in 42 sessions. How to find yours, and what to do about them.</summary>
   </entry>
   <entry>
+    <title>Cursor state.vscdb too large: shrink it safely — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/cursor-state-vscdb-too-large.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Cursor&#39;s state.vscdb at 30–125 GB: two read-only queries that show which chats fill it, how to shrink it safest first, and how to keep the chats you delete.</summary>
+  </entry>
+  <entry>
     <title>What each memory tool knows the day you install it — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/day-zero.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/day-zero.html"></link>
@@ -53,11 +74,46 @@
     <summary>Eight tools on a machine with 19,195 sessions already on disk, asked 100 questions only that history answers: build time, first answer, hit@1.</summary>
   </entry>
   <entry>
+    <title>Delete Amp thread history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-amp-thread-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Amp keeps each thread as its own JSON file, so deleting a conversation is deleting one file. Where the files are, how to remove one or all, and what you lose.</summary>
+  </entry>
+  <entry>
+    <title>Delete Cline task history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cline-task-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Cline has separate CLI and VS Code extension histories. Find the right store and remove one conversation without deleting unrelated task state.</summary>
+  </entry>
+  <entry>
+    <title>How to delete Codex CLI sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.</summary>
+  </entry>
+  <entry>
+    <title>Delete Continue session history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-continue-session-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Continue keeps one JSON file per session plus a sessions.json list the history view reads. How to remove one session or all, and why the list has to go too.</summary>
+  </entry>
+  <entry>
     <title>Delete VS Code Copilot Chat history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"></link>
     <updated>2026-10-09T00:00:00Z</updated>
     <summary>Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.</summary>
+  </entry>
+  <entry>
+    <title>How to delete Cursor chat history — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.</summary>
   </entry>
   <entry>
     <title>Delete Gemini CLI chat history — deja-vu</title>
@@ -81,11 +137,32 @@
     <summary>Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.</summary>
   </entry>
   <entry>
+    <title>How to delete old Claude Code sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>find ~/.claude/projects -mtime +30 -delete drops them, cleanupPeriodDays does it on a timer — and why age frees far less disk than size.</summary>
+  </entry>
+  <entry>
     <title>Delete opencode session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-opencode-session-history.html"></link>
     <updated>2026-10-09T00:00:00Z</updated>
     <summary>opencode keeps every session in one SQLite database. What the tables hold, how to remove a session, and why deleting rows does not free the space.</summary>
+  </entry>
+  <entry>
+    <title>Delete Roo Code task history</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-roo-task-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Find Roo Code history across editor hosts and custom storage. Delete one task or all tasks, understand what is lost, or keep the history searchable.</summary>
+  </entry>
+  <entry>
+    <title>Delete Zed agent thread history</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html"></link>
+    <updated>2026-10-09T00:00:00Z</updated>
+    <summary>Find Zed agent threads in threads.db, delete one through the history view, or remove the built-in agent database with Zed closed. Know what is lost.</summary>
   </entry>
   <entry>
     <title>Does Claude Code remember previous conversations? — deja-vu</title>
@@ -212,82 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html"></link>
     <updated>2026-10-09T00:00:00Z</updated>
     <summary>How to give Codex CLI recall over every coding agent&#39;s sessions on this machine — the MCP server, the hook it has to approve, and the plugin marketplace.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Command Code: past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>Command Code logs a session per project and starts each one cold. deja wires its MCP server, hooks, skill and command, and indexes every agent here.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Continue: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-continue.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>Continue has no hook that fires yet, so deja arrives as an MCP server in its assistant config, a skill it names on every turn, and a /deja command.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to VS Code Copilot Chat — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot-chat.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give VS Code Copilot Chat recall over every agent&#39;s sessions on the machine, the mcp.json shape VS Code reads, and its hooks.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Copilot CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-copilot.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give GitHub Copilot CLI recall over every coding agent&#39;s sessions on this machine — where its events live, and the MCP entry it needs.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Crush: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-crush.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>Crush keeps one history store per project and reads none of the others. deja adds an MCP server, a skill, a /user:deja command and a PreToolUse hook.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Cursor: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cursor.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give Cursor recall over every coding agent&#39;s sessions on this machine — where its SQLite chat store lives, and what deja install cursor-auto writes.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to DeepSeek Harness: all agents — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Gemini CLI: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give Gemini CLI recall over every coding agent&#39;s sessions on this machine — one extension install, and what the CLI install adds on top.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to gjc: recall past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its extension, server, skill and command, and indexes every agent.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Goose: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>Goose keeps sessions in a local database and reads .goosehints at start. deja adds MCP recall, a session-start hook and a per-turn channel through a wrapper.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Grok Build: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give Grok Build recall over every coding agent&#39;s sessions on the machine — the hooks it reads, the marketplace plugin, and the name that is not it.</summary>
   </entry>
 </feed>

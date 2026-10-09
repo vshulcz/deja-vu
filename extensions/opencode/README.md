@@ -92,7 +92,7 @@ On 2.x:
 In order: `bin` from the options, `DEJA_BIN`, a `deja` on `PATH`, the usual
 install locations (`~/.local/bin`, `/usr/local/bin`, `/opt/homebrew/bin`), and
 only then the copy npm installed with this package. Your own `deja update` or
-`brew upgrade deja` wins over whatever version this package shipped with.
+`brew upgrade deja-vu` wins over whatever version this package shipped with.
 
 Without deja anywhere, the tools say so instead of reporting an empty history,
 and the hooks stay quiet.

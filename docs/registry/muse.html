@@ -100,8 +100,8 @@
 <p><code>deja install muse-auto</code> adds hooks to the same file in Claude Code&#39;s shape,</p>
 <p><code>{&#34;hooks&#34;: {Event: [{matcher, hooks: [{type, command, timeout}]}]}}</code>, timeout</p>
 <p>in seconds: SessionStart, UserPromptSubmit, PreToolUse on</p>
-<p><code>bash|edit_file|write_file</code>, PostToolUse and PostToolUseFailure on <code>bash</code>, and</p>
-<p>SessionEnd. They fire in an untrusted workspace too, the payload is Claude</p>
+<p><code>bash|edit_file|write_file</code>, PostToolUse and PostToolUseFailure on <code>bash</code>,</p>
+<p>PreCompact and SessionEnd. They fire in an untrusted workspace too, the payload is Claude</p>
 <p>Code&#39;s with <code>transcript_path: null</code>, and what a hook returns, as</p>
 <p><code>hookSpecificOutput.additionalContext</code> or plain stdout, reaches the model as a</p>
 <p>developer message. <code>edit_file</code> and <code>write_file</code> name the file under</p>

@@ -99,6 +99,7 @@ h2{font:700 12px/1 var(--mono);letter-spacing:.18em;color:var(--faint);
   text-transform:uppercase;margin-bottom:18px}
 .big{font:400 clamp(23px,3vw,33px)/1.35 var(--sans);color:var(--ink);letter-spacing:-.02em;max-width:26ch}
 .big em{font-style:normal;color:var(--coat-hi)}
+.big code{font:.88em var(--mono);color:var(--amber)}
 .note{margin-top:16px;max-width:62ch;color:var(--body)}
 
 .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:26px}
@@ -168,6 +169,7 @@ footer .sp{flex:1}
 
 .cardshot{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
 .cardshot img{display:block;width:100%;height:auto}
+.cardshot.tui{max-width:720px}
 .note b{color:var(--coat-hi);font-weight:400;font-family:var(--mono);font-size:14px}
 
 
@@ -272,7 +274,7 @@ footer .who img{width:34px;height:34px;border-radius:9px}
 footer .col b{display:block;color:var(--body);font-weight:400;text-transform:uppercase;
   letter-spacing:.14em;font-size:10.5px;margin-bottom:8px;opacity:.75}
 footer a{display:block;color:var(--faint)}
-footer a:hover{color:var(--ph-hi)}
+footer a:hover{color:var(--ink)}
 @media(max-width:860px){
   .split{grid-template-columns:minmax(0,1fr);gap:26px}
   .band{padding:56px 0;margin-bottom:72px}
@@ -316,7 +318,7 @@ footer a:hover{color:var(--ph-hi)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      40 of your coding agents already wrote to disk — months of history from before you
+      41 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
     <div class="cmdline">
       <span class="p">$</span>
@@ -372,6 +374,19 @@ footer a:hover{color:var(--ph-hi)}
   </div>
 </section>
 
+<section class="reveal" id="screen">
+  <h2>Run it bare</h2>
+  <p class="big" style="margin-bottom:26px"><code>deja</code> with no arguments opens a search over every
+    agent's history, <em>in the terminal you already have open.</em></p>
+  <div class="cardshot tui"><img src="assets/tui.gif" width="720" height="442" alt="The deja screen: typing a search, reading the session it found, and continuing it in another agent" loading="lazy"></div>
+  <p class="note">It opens on the sessions behind your uncommitted change, then the recent
+    ones in this project, and the list answers as you type. <b>↵</b> reads a session at the
+    match, <b>r</b> resumes it in its own agent, <b>o</b> continues it in any other agent with
+    what it asked, decided and left open. <b>tab</b> switches between this project, all
+    projects and Kept, the sessions an agent deleted that deja still holds; <b>?</b> lists
+    every key. <b>DEJA_TUI=0</b> keeps a bare <b>deja</b> to the text brief.</p>
+</section>
+
 <section class="reveal band" id="demo">
   <h2>Try it — a live search over a fake history</h2>
   <p class="big" style="margin-bottom:26px">Type what you half-remember.
@@ -400,7 +415,7 @@ footer a:hover{color:var(--ph-hi)}
   <div class="steps">
     <div class="step"><span class="n">01</span><h3>It reads what is already there</h3>
       <p>Every coding agent writes its sessions to disk. deja parses those stores in place —
-        nothing is copied, nothing is uploaded.</p></div>
+        nothing is uploaded.</p></div>
     <div class="step"><span class="n">02</span><h3>It builds a local index</h3>
       <p>Credentials are stripped on the way in. Tens of seconds for a couple of gigabytes,
         and the index is about a tenth of the corpus.</p></div>

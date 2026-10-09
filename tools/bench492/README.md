@@ -6,10 +6,10 @@ against isolated `DEJA_INDEX_DIR` / `DEJA_CLAUDE_ROOT` paths and a fake HOME,
 so a real store on the machine is neither read nor touched.
 
 ```
-python gen_corpus.py --out /tmp/bench --sessions 5000 --projects 50
+python tools/bench492/gen_corpus.py --out /tmp/bench --sessions 5000 --projects 50
 go build -o deja-a ./cmd/deja        # baseline commit
 go build -o deja-b ./cmd/deja        # comparison commit (or a stubbed build)
-python run_bench.py --out-root /tmp/bench --bin base=./deja-a --bin opt=./deja-b --rounds 7
+python tools/bench492/run_bench.py --out-root /tmp/bench --bin base=./deja-a --bin opt=./deja-b --rounds 7
 ```
 
 `--bin LABEL=PATH` is repeatable, so more than two builds can share one

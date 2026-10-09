@@ -158,7 +158,7 @@ ${XDG_DATA_HOME}/opencode/opencode.db</pre>
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads this database through <code>sqlite3</code> — along with the other forty agents' histories on the machine — into one local index, searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "opencode session about the retry budget"</pre>
-<p>Nothing to switch on first: the database is already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>
+<p>Nothing to switch on first: the database is already there, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A session you deleted in opencode stays readable under the Kept tab of the screen bare <code>deja</code> opens, where <code>o</code> carries it into another agent; deja does not write rows back into <code>opencode.db</code>.</p>
 
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-opencode.html">Memory for opencode</a> · <a href="../registry/opencode.html">The opencode format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

@@ -162,11 +162,12 @@
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
 
 <h2>What gets wired</h2>
-<p><code>deja install qwen-auto</code> writes five hooks into <code>~/.qwen/settings.json</code>, next to whatever else is in it:</p>
+<p><code>deja install qwen-auto</code> writes six hooks into <code>~/.qwen/settings.json</code>, next to whatever else is in it:</p>
 <ul>
 <li>The project digest at <code>SessionStart</code>: what this project's past sessions settled, before you type anything.</li>
 <li>Recall on <code>UserPromptSubmit</code>, silent when the history has no answer.</li>
 <li>The repair on <code>PostToolUseFailure</code>, for <code>run_shell_command</code> only: when a command fails with an error that has been solved here before, what followed it last time arrives on the failing tool result itself.</li>
+<li>A line about the file on <code>PostToolUse</code> after <code>read_file</code>, <code>edit</code> or <code>write_file</code>: which past sessions worked on it and what they decided, beside the tool's result.</li>
 <li>Compaction recovery on <code>PreCompact</code>: deja reads the transcript the hook names and the next turn gets the task, the commands with whether they passed, and what was still open. The blocks a compacted thread just lost can be said again.</li>
 <li><code>SessionEnd</code>, so the session you just quit is one the next session's MCP recall can answer with. Qwen fires it on an interactive exit, not after a one-shot <code>qwen -p</code>; that session comes back to recall 20 minutes after its last hook.</li>
 </ul>

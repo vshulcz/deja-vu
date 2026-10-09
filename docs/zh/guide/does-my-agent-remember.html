@@ -88,7 +88,7 @@
 <tr><td>Cursor</td><td>否</td><td>是</td><td><code>state.vscdb</code>（SQLite）与 <code>~/.cursor</code></td></tr>
 <tr><td>Gemini CLI</td><td>否</td><td>是</td><td><code>~/.gemini/tmp/*/chats/</code></td></tr>
 <tr><td>Copilot CLI</td><td>否</td><td>是</td><td><code>~/.copilot/session-state/*/events.jsonl</code></td></tr>
-<tr><td>DeepSeek Harness（dsh）</td><td>否</td><td>否</td><td><code>~/.dsh/sessions/*/session-*/session.jsonl.zstd</code></td></tr>
+<tr><td>DeepSeek Harness（dsh）</td><td>否</td><td>否</td><td><code>~/.dsh/sessions/*/session-*/session*.jsonl.zstd</code></td></tr>
 <tr><td>Kimi Code</td><td>否</td><td>是</td><td><code>~/.kimi-code/sessions/*/*/agents/main/wire.jsonl</code></td></tr>
 <tr><td>Qwen Code</td><td>否</td><td>是</td><td><code>~/.qwen/projects/*/chats/*.jsonl</code></td></tr>
 </table>
@@ -112,7 +112,7 @@
 <p>不需要提前记录，因为记录早就发生了。在这些文件上建一个索引，就能回答「这个我是不是遇到过」——包括你装任何工具之前的每一个会话。<a href="https://github.com/vshulcz/deja-vu">deja</a> 做的就是这件事：</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
-<pre>$ deja "connection pool exhausted"
+<pre>$ deja "refresh token"
 [claude] api   · Jul 8 · 8f31c0a9 — 2 matches
   login started failing after refresh token rotation; jwt kid mismatch in tests
   fixed by reloading jwks cache after rotateKey and adding a clock-skew test

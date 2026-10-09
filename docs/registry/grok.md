@@ -84,6 +84,10 @@ alone. Rendered live on 1.0.41.
   command that exited non-zero and hands `additionalContext` to the model with
   the result. The output is read from `toolResult.output_for_prompt`; `output`
   there is the raw bytes as a number array (#4499).
+- `PreToolUse` runs `deja hook-tool` on `Bash`, the file tools and the spawn
+  tools. On 1.0.41 its `additionalContext` reaches the model as a reminder
+  after the tool's result, so the line deja keeps for a file arrives at the
+  read before an edit as well as at the edit.
 - On 1.0.41 session start and the prompt are still passive: grok shows a
   hook's `systemMessage` and drops its `additionalContext`, and the session's
   `chat_history.jsonl` carries no deja-recall from either. Under grok, which

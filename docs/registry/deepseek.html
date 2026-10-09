@@ -92,7 +92,7 @@
 <p>bare row is rejected with <code>entry &#34;mcp-deja&#34; not found</code>, because a patch entry</p>
 <p>addresses a row that already exists. After it dsh lists one tool, <code>deja</code>,</p>
 <p>called with a <code>mode</code> of <code>recall</code>, <code>context</code>, <code>blame</code>, <code>fix</code>, <code>how</code>,</p>
-<p><code>orient</code> or <code>remember</code>.</p>
+<p><code>orient</code>, <code>remember</code> or <code>handoff</code>.</p>
 <ul>
 <li><strong>Skill</strong>: the shared <code>~/.agents/skills/deja-history/SKILL.md</code>. dsh splices a</li>
 </ul>
@@ -138,7 +138,9 @@
 <p>command that fixed it. <code>tools/execute</code>, the seam before the call, has no</p>
 <p>channel to the model (#4293). A session the plugin saw created is ended</p>
 <p>with <code>deja hook-session-end</code> at <code>session/disposed</code>, or at process exit,</p>
-<p>since headless 0.1.1-rc.2 exits without disposing it.</p>
+<p>since headless 0.1.1-rc.2 exits without disposing it. A <code>compaction/start</code></p>
+<p>session event runs <code>deja hook-precompact</code> on the flushed log, and the packet</p>
+<p>rides the recall of the next step.</p>
 <p>The workspace deja is asked about is the session&#39;s, read from the session</p>
 <p>header (<code>agent.session.header.cwd</code>). One <code>dsh web</code> process serves sessions</p>
 <p>from every workspace and never changes directory, so <code>process.cwd()</code> is only</p>

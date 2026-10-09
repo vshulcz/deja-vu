@@ -85,8 +85,10 @@
 </ul>
 <p><code>~/.zcode/cli/setting.json</code> — one level deeper than the <code>mcpServers</code> every</p>
 <p>other client here uses — and <code>deja install zcode-auto</code> adds the hooks to the</p>
-<p>same file, under <code>hooks.events.SessionStart</code> and</p>
-<p><code>hooks.events.UserPromptSubmit</code>. The runtime (3.14.4) writes that file on</p>
+<p>same file, under <code>hooks.events</code>: <code>SessionStart</code>, <code>UserPromptSubmit</code>,</p>
+<p><code>PreToolUse</code> on <code>Bash|Edit|Write</code> (the line deja keeps for a file or</p>
+<p>command) and <code>PostToolUse</code> on <code>Bash</code>, which a failed command fires with its</p>
+<p>exit code (the earlier fix). The runtime (3.14.4) writes that file on</p>
 <p>its first launch and reads it from then on. deja used to write</p>
 <p><code>config.json</code>, which the runtime reads once, as the source of that</p>
 <p>first-launch migration, so nothing reached the agent on a machine where</p>

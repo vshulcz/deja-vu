@@ -78,8 +78,9 @@
 <p><code>~/.codebuddy.json</code> that exists, else <code>&lt;config&gt;/.mcp.json</code> — the one file</p>
 <p>CodeBuddy reads for user scope. Hooks go into <code>&lt;config&gt;/settings.json</code> in the</p>
 <p>Claude Code shape, <code>timeout</code> in seconds: <code>SessionStart</code>, <code>UserPromptSubmit</code>,</p>
-<p><code>PostToolUse</code> and <code>PostToolUseFailure</code> on <code>Bash|PowerShell</code>, <code>PreCompact</code> and</p>
-<p><code>SessionEnd</code>. CodeBuddy reads <code>hookSpecificOutput.additionalContext</code> from all</p>
+<p><code>PostToolUse</code> and <code>PostToolUseFailure</code> on <code>Bash|PowerShell</code>, <code>PostToolUse</code> on</p>
+<p><code>Read|Edit|Write|MultiEdit</code> (the line deja keeps for that file), <code>PreCompact</code></p>
+<p>and <code>SessionEnd</code>. CodeBuddy reads <code>hookSpecificOutput.additionalContext</code> from all</p>
 <p>of them the way Claude Code does.</p>
 <p>WorkBuddy is a desktop app that runs this agent with <code>CODEBUDDY_CONFIG_DIR</code></p>
 <p>set to its own home, so <code>~/.codebuddy</code> wiring never reaches it.</p>

@@ -48,9 +48,11 @@ against a 2026.8.2 store and openclaw source
   `openclaw.json`) and a hook pack at `<state>/hooks/deja-recall` (with
   `hooks.internal.enabled` set). The plugin puts the session digest in front
   of the first turn at `agent_turn_prepare`, per-prompt recall at
-  `before_prompt_build`, and at `before_compaction` clears the list of blocks
-  already shown so recall can send them again; `session_end` runs
-  `deja hook-session-end`. The hook pack
+  `before_prompt_build`, and at `before_compaction` runs
+  `deja hook-precompact`, so the next prompt's recall carries what the agent
+  was in the middle of; `session_end` runs `deja hook-session-end`. A tool
+  result middleware adds a file's history after a read, edit or patch and the
+  earlier fix after a failed command. The hook pack
   adds the digest at `agent:bootstrap`, which fires only in gateway mode.
 - **Resume**: `openclaw chat --session <key>`. OpenClaw addresses a
   conversation by key (`agent:<id>:<name>`); the uuid its transcript is named

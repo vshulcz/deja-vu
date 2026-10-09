@@ -164,7 +164,7 @@
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other forty agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Kiro session about the migration"</pre>
-<p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good.</p>
+<p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A CLI session you deleted stays under the Kept tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>kiro-cli</code> can resume it; IDE sessions are not written back.</p>
 
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-kiro.html">Memory for Kiro</a> · <a href="../registry/kiro.html">The Kiro format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

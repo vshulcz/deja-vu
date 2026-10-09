@@ -3,13 +3,14 @@ Claude Code, Codex, Cursor, opencode and more — and answers from them over MCP
 including sessions from before it was installed. No LLM, no embeddings, and no
 network path besides a daily release check, which DEJA_OFFLINE=1 turns off.
 
-If deja is already installed — the install script, Homebrew, `go install` — name
-it under `binary` below and the extension runs that one, which you keep current
-the way you always did. It cannot find it on its own: a Zed extension runs
-sandboxed, and a path like `/opt/homebrew/bin/deja` is not reachable from inside
-that sandbox whatever is on disk. Without the setting the first start downloads a
-release build into the extension's own directory, about 6 MB. On a slow connection that download
-can outlast the sixty seconds Zed allows a context server to answer, and the
+If deja is already installed — the install script, Homebrew, `go install` — and
+on the PATH Zed was started with, the extension runs that one, which you keep
+current the way you always did. A deja that is not on that PATH has to be named
+under `binary` below: a Zed extension runs sandboxed, and a path like
+`/opt/homebrew/bin/deja` is not reachable from inside that sandbox whatever is
+on disk. With neither, the first start downloads a release build into the
+extension's own directory, about 7 MB. On a slow connection that download can
+outlast the sixty seconds Zed allows a context server to answer, and the
 server is reported as timed out; starting it again uses the downloaded copy and
 connects immediately.
 
@@ -32,5 +33,5 @@ To name a specific binary:
 ```
 
 The first query builds the index over whatever history is already on the
-machine — seconds on a fresh one, about a minute on a large history; later
-queries answer in about a millisecond.
+machine — seconds on a fresh one, longer on a large history; later queries
+answer in about a millisecond.

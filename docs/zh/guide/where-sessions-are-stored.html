@@ -77,30 +77,38 @@
 <tr><td><a href="../../registry/cherrystudio.html">Cherry Studio</a></td><td><code>&lt;app data&gt;/CherryStudio/Data/Agents/.claude/projects/*/*.jsonl</code></td><td>JSONL，用的是 Claude Code 的格式</td></tr>
 <tr><td><a href="../../registry/claude-code.html">Claude Code</a></td><td><code>${CLAUDE_CONFIG_DIR:-~/.claude}/projects/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/cline.html">Cline</a></td><td><code>${CLINE_SESSION_DATA_DIR:-${CLINE_DATA_DIR:-${CLINE_DIR:-~/.cline}/data}/sessions}/*/*.messages.json</code></td><td>JSON 文件</td></tr>
+<tr><td><a href="../../registry/codebuddy.html">CodeBuddy Code</a></td><td><code>${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/*/*.jsonl</code>；WorkBuddy 写在 <code>~/.workbuddy/projects/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/codewhale.html">CodeWhale</a></td><td><code>${CODEWHALE_HOME:-~/.codewhale}/sessions/&lt;id&gt;.json</code></td><td>JSON，一个会话一个文件</td></tr>
 <tr><td><a href="../../registry/codex.html">Codex CLI</a></td><td><code>${CODEX_HOME:-~/.codex}/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollout，外加一个 history 文件</td></tr>
 <tr><td><a href="../../registry/commandcode.html">Command Code</a></td><td><code>~/.commandcode/projects/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/continue.html">Continue</a></td><td><code>${CONTINUE_GLOBAL_DIR:-~/.continue}/sessions/*.json</code></td><td>JSON 文件，每次整份重写</td></tr>
 <tr><td><a href="../../registry/copilot.html">Copilot CLI</a></td><td><code>${DEJA_COPILOT_ROOT:-${COPILOT_HOME:-~/.copilot}/session-state}/*/events.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/crush.html">Crush</a></td><td><code>&lt;project&gt;/.crush/crush.db</code></td><td>SQLite 数据库，每个项目一个</td></tr>
-<tr><td><a href="../../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code></td><td>SQLite 键值库，或 JSONL</td></tr>
-<tr><td><a href="../../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.jsonl.zstd</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/cursor.html">Cursor</a></td><td><code>~/Library/Application Support/Cursor/User/{globalStorage,workspaceStorage/*}/state.vscdb</code>；命令行版写在 <code>~/.cursor/projects/**/agent-transcripts/**/*.jsonl</code></td><td>SQLite 键值库，或 JSONL</td></tr>
+<tr><td><a href="../../registry/deepseek.html">DeepSeek Harness</a></td><td><code>${DSH_HOME:-~/.dsh}/sessions/*/session-*/session.v4.jsonl.zstd</code></td><td>zstd 压缩的 JSONL</td></tr>
+<tr><td><a href="../../registry/devin.html">Devin CLI</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/devin/cli/sessions.db</code></td><td>SQLite 数据库</td></tr>
 <tr><td><a href="../../registry/gjc.html">gajae-code</a></td><td><code>${GJC_CODING_AGENT_DIR:-~/.gjc/agent}/sessions/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/gemini.html">Gemini CLI</a></td><td><code>${GEMINI_CLI_HOME:-~}/.gemini/tmp/*/chats/**/*.{json,jsonl}</code></td><td>JSON 或 JSONL</td></tr>
-<tr><td><a href="../../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code></td><td>JSONL，另有一个 SQLite 索引</td></tr>
+<tr><td><a href="../../registry/goose.html">Goose</a></td><td><code>${GOOSE_PATH_ROOT}/data/sessions/sessions.db</code></td><td>SQLite 数据库；旧版本是 JSONL</td></tr>
 <tr><td><a href="../../registry/grok.html">Grok Build</a></td><td><code>${GROK_HOME:-~/.grok}/sessions/**/updates.jsonl</code></td><td>JSONL 事件流，外加 JSON 元数据</td></tr>
-<tr><td><a href="../../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/profiles/*/state.db</code></td><td>SQLite 数据库</td></tr>
+<tr><td><a href="../../registry/hermes.html">Hermes</a></td><td><code>~/.hermes/state.db</code> 和 <code>~/.hermes/profiles/*/state.db</code></td><td>SQLite 数据库</td></tr>
+<tr><td><a href="../../registry/jetbrains.html">JetBrains AI Assistant</a></td><td><code>&lt;JetBrains config&gt;/&lt;Product&gt;&lt;version&gt;/workspace/*.xml</code>；智能体对话另有 <code>…/aia-task-history/*.events</code></td><td>XML，外加 base64 JSON 事件日志</td></tr>
+<tr><td><a href="../../registry/junie.html">Junie</a></td><td><code>${JUNIE_HOME:-~/.junie}/sessions/*/events.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/kilocode.html">Kilo Code</a></td><td><code>&lt;vscode-globalStorage&gt;/kilocode.kilo-code/tasks/*/api_conversation_history.json</code></td><td>JSON 文件，外加命令行版自己的 SQLite 库</td></tr>
 <tr><td><a href="../../registry/kimchi.html">Kimchi Coding</a></td><td><code>~/.config/kimchi/harness/sessions/--&lt;encoded-cwd&gt;--/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/kimi.html">Kimi Code</a></td><td><code>${KIMI_CODE_HOME:-~/.kimi-code}/sessions/*/*/agents/main/wire.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
-<tr><td><a href="../../registry/kiro.html">Kiro</a></td><td><code>~/.kiro/sessions/cli/*.jsonl</code> and <code>~/.kiro/sessions/*/sess_*/messages.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
-<tr><td><a href="../../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
-<tr><td><a href="../../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/sessions/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/kiro.html">Kiro</a></td><td><code>~/.kiro/sessions/cli/*.jsonl</code> 和 <code>~/.kiro/sessions/*/sess_*/messages.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/muse.html">Muse Code</a></td><td><code>${XDG_DATA_HOME:-~/.local/share}/muse/sessions/YYYY/MM/DD/*/session.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/omp.html">omp (Oh My Pi)</a></td><td><code>~/.omp/agent/sessions/**/*.jsonl</code> 和 <code>~/.omp/profiles/*/agent/sessions/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/openclaw.html">OpenClaw</a></td><td><code>${OPENCLAW_STATE_DIR:-~/.openclaw}/agents/*/agent/openclaw-agent.sqlite</code> 和 <code>…/agents/*/sessions/*.jsonl</code></td><td>SQLite 数据库，旧版本是 JSONL</td></tr>
 <tr><td><a href="../../registry/opencode.html">opencode</a></td><td><code>~/.local/share/opencode/opencode.db</code></td><td>SQLite 数据库</td></tr>
 <tr><td><a href="../../registry/pi.html">pi</a></td><td><code>${DEJA_PI_ROOT:-~/.pi/agent/sessions}/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/prime.html">prime-agent (PrimeIntellect)</a></td><td><code>${DEJA_PRIME_ROOT:-~/.prime/agent/sessions}/**/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
 <tr><td><a href="../../registry/qwen.html">Qwen Code</a></td><td><code>${DEJA_QWEN_ROOT:-~/.qwen}/projects/*/chats/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
-<tr><td><a href="../../registry/roo.html">Roo Code</a></td><td><code><vscode-globalStorage>/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code></td><td>JSON 文件</td></tr>
+<tr><td><a href="../../registry/reasonix.html">Reasonix</a></td><td><code>${REASONIX_STATE_HOME:-~/.reasonix}/projects/&lt;workspace-slug&gt;/sessions-v4/&lt;id&gt;/events.frames</code> 和 <code>${REASONIX_STATE_HOME:-~/.reasonix}/sessions/&lt;id&gt;.jsonl</code></td><td>zstd 分帧的事件日志（1.x），或 JSONL</td></tr>
+<tr><td><a href="../../registry/roo.html">Roo Code</a></td><td><code>&lt;vscode-globalStorage&gt;/rooveterinaryinc.roo-cline/tasks/*/api_conversation_history.json</code></td><td>JSON 文件</td></tr>
 <tr><td><a href="../../registry/senpi.html">Senpi</a></td><td><code>${SENPI_CODING_AGENT_DIR:-~/.senpi/agent}/sessions/*/*.jsonl</code></td><td>JSONL，一行一条记录</td></tr>
+<tr><td><a href="../../registry/trae.html">TRAE CLI</a></td><td><code>${TRAE_HOME:-~/.trae}/cli/sessions/**/rollout-*.jsonl</code></td><td>JSONL rollout，外加一个 history 文件</td></tr>
 <tr><td><a href="../../registry/copilot-chat.html">VS Code Copilot Chat</a></td><td><code>&lt;vscode-User&gt;/workspaceStorage/*/chatSessions/*.{json,jsonl}</code></td><td>JSON 或 JSONL</td></tr>
 <tr><td><a href="../../registry/zcode.html">ZCode</a></td><td><code>~/.zcode/projects/*/*.jsonl</code></td><td>JSONL，外加命令行版自己的 SQLite 库</td></tr>
 <tr><td><a href="../../registry/zed.html">Zed</a></td><td><code>~/Library/Application Support/Zed/threads/threads.db</code></td><td>SQLite 数据库</td></tr>
@@ -111,11 +119,11 @@
 <h2>自己读它们</h2>
 <p>多数是 JSONL —— 一行一个 JSON 对象，会话进行时不断追加：</p>
 <pre>ls -t ~/.claude/projects/*/*.jsonl | head -1 | xargs tail -5 | jq -r '.message.content'</pre>
-<p>有几个是数据库而不是文件。opencode 用 <code>opencode.db</code>，Hermes 每个 profile 一个 <code>state.db</code>，Zed 把所有会话放进一个 SQLite 库、并把每条正文压成 zstd 帧——所以光用 <code>sqlite3</code> 看到的是一堆二进制，要读正文还需要 <code>zstd</code>。Cursor 最别扭：旧版本把内容塞进 <code>state.vscdb</code> 的键值里，命令行版写的才是 JSONL。</p>
+<p>有几个是数据库而不是文件。opencode 用 <code>opencode.db</code>，Hermes 用 <code>~/.hermes/state.db</code>（旧版本每个 profile 一个），Zed 把所有会话放进一个 SQLite 库、并把每条正文压成 zstd 帧——所以光用 <code>sqlite3</code> 看到的是一堆二进制，要读正文还需要 <code>zstd</code>。Cursor 最别扭：旧版本把内容塞进 <code>state.vscdb</code> 的键值里，命令行版写的才是 JSONL。</p>
 <p>两点实用提醒。路径是会变的：Claude Code 认 <code>CLAUDE_CONFIG_DIR</code>，Codex 认 <code>CODEX_HOME</code>，Kimi 认 <code>KIMI_CODE_HOME</code>，Goose 和 opencode 跟随 <code>XDG_DATA_HOME</code>。另外，这些文件里有什么，取决于当时会话里有什么——包括粘贴进去或打印出来的密钥，所以请把它们当日志对待。</p>
 
 <h2>然后能拿它们做什么</h2>
-<p>读一个文件回答的是「那次会话我做了什么」。真正常问的是另一个问题——「是哪一次会话」——而这需要一份跨越全部存储的索引。<a href="https://github.com/vshulcz/deja-vu">deja</a> 建的就是这个：在本机为上面每一个存储建一份索引，命令行能查，智能体也能通过 MCP 自己查。</p>
+<p>读一个文件回答的是「那次会话我做了什么」。真正常问的是另一个问题——「是哪一次会话」——而这需要一份跨越全部存储的索引。<a href="https://github.com/vshulcz/deja-vu">deja</a> 建的就是这个：在本机为上面每一个存储建一份索引，命令行能查，智能体也能通过 MCP 自己查。不带参数运行 <code>deja</code>，打开的是它的全屏搜索，边打字边出结果。</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "connection pool exhausted"</pre>
 <p>没有需要提前打开的记录开关：文件本来就在那里，包括你装任何东西之前的那几个月。<a href="getting-started.html">索引和检索都在本地</a>，凭据在建索引时就被脱敏。</p>

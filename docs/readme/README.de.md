@@ -15,9 +15,7 @@ der gerade arbeitet, den Teil, der zählt.</p>
 
 <p align="center"><sub><em>Niemand hat gesucht — der Agent hat deja von sich aus aufgerufen. Zwei echte Läufe, echtes Modell, echte Tool-Aufrufe, auf einem synthetischen Korpus: es wird niemandes Historie veröffentlicht.</em></sub></p>
 
-<p align="center"><b>deja ist von der ersten Minute an voll: die Historie, die 38 Agents längst geschrieben haben, in Sekunden indiziert, ohne Modell und ohne eigenen Erfassungsschritt.</b></p>
-
-<p align="center"><b>Das genaueste, im Betrieb günstigste und schnellste Gedächtnis für Coding-Agents, das wir messen konnten.</b></p>
+<p align="center"><b>deja ist von der ersten Minute an voll: die Historie, die 41 Agents längst geschrieben haben, in Sekunden indiziert, ohne Modell und ohne eigenen Erfassungsschritt.</b></p>
 
 <table align="center">
 <tr>
@@ -59,9 +57,9 @@ ersten Index, damit die nächste Session auf nichts warten muss.
 > hatten wir schon mal was mit jwt refresh rotation? schau in deinem Gedächtnis nach
 
 Fragen musst du nicht einmal: mit automatischem Recall weiß der Agent schon beim Öffnen der Session, was in
-diesem Projekt gelöst wurde.
+diesem Projekt gelöst wurde. Um selbst nachzusehen, starte `deja`.
 
-opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw und pi haben zusätzlich ein Paket
+opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi und Hermes haben zusätzlich ein Paket
 im eigenen Ökosystem, für alle, die Erweiterungen von dort installieren:
 
 ```sh
@@ -73,6 +71,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
 ```
 
 `deja install --auto` bindet all das ohnehin an, einer der beiden Wege genügt also. Beide zusammen stören auch
@@ -99,9 +98,25 @@ Das Binary allein ist bereits eine vollständige Installation: Indizieren, Suche
 `--json` und das Entfernen von Zugangsdaten brauchen nichts weiter. Was `deja install` macht, ist MCP an deine
 Agents anzubinden und den Recall beim Session-Start einzuschalten — sinnvoll, aber optional.
 
+## Selbst suchen
+
+`deja` ohne Argumente öffnet im Terminal eine Suche über die Historie aller Agents. Sie beginnt bei den
+Sessions hinter deiner noch nicht committeten Änderung, dann kommen die letzten in diesem Projekt, und die
+Liste wird beim Tippen kürzer.
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="Im deja-Bildschirm wird eine Suche getippt, die gefundene Session gelesen und in einem anderen Agenten fortgesetzt"></p>
+
+- `↑↓` wählt eine Session, `↵` öffnet sie am Treffer, `n` und `N` springen zwischen den Treffern, `esc` geht zurück.
+- `r` setzt die Session in dem Agenten fort, der sie geschrieben hat. `o` setzt sie in einem beliebigen anderen Agenten fort, der mit dem beginnt, was die Session gefragt, entschieden und offen gelassen hat.
+- `tab` wechselt zwischen diesem Projekt, allen Projekten und Kept, den Sessions, die ihr Agent gelöscht hat und die deja noch hält; `R` legt eine davon zurück.
+- `?` zeigt alle Tasten, `q` beendet.
+
+Mit `DEJA_TUI=0` kommt stattdessen die Textübersicht, die auch `deja brief` ausgibt. In einer Pipe
+zeigt es, was indiziert ist und welcher Befehl als Nächstes dran ist.
+
 ## Was du davon hast
 
-**In Codex gelöst, von Claude erinnert.** Achtunddreißig Coding-Agents schreiben jedes Gespräch in lokale
+**In Codex gelöst, von Claude erinnert.** Einundvierzig Coding-Agents schreiben jedes Gespräch in lokale
 Dateien, und deja macht aus diesen Dateien eine Gedächtnisschicht, die sie alle lesen können.
 
 | | |
@@ -134,7 +149,9 @@ Die vollständige Referenz steht auf der [Dokumentationsseite](https://vshulcz.g
 ## Privatsphäre
 
 Indizieren und Suchen laufen lokal. Das Netz brauchen nur `deja update`, `deja sync ssh`, die Versionsprüfung
-in `deja doctor` und `deja embed`, das an den von dir konfigurierten Endpunkt geht.
+in `deja doctor`, `deja embed`, das an den von dir konfigurierten Endpunkt geht, und ein interaktiver
+Befehl, der einmal am Tag nach dem neuesten Release schaut. Dieser Blick sendet keine Session-Daten;
+`DEJA_OFFLINE=1` oder `DEJA_NO_UPDATE_NOTICE=1` schaltet ihn ab.
 
 Zugangsdaten werden beim Indizieren entfernt: AWS-Schlüssel, Zuweisungen mit `api_key=` und `token=`,
 Bearer-Tokens und nackte JWTs, PEM-Blöcke privater Schlüssel, Tokens verschiedener Anbieter, URLs der Form
@@ -151,6 +168,9 @@ Vertrauensannahmen und die Release-Verifikation.
 
 ## Kommandozeile
 
+Ein nacktes `deja` im Terminal öffnet den [Suchbildschirm](#selbst-suchen). Mit einem Suchbegriff oder einem
+der Befehle unten gibt es aus und beendet sich:
+
 ```text
 $ deja "jwt refresh token"
 [claude] api        · Jul 8 · 8f31c0a9 — 2 matches
@@ -163,13 +183,14 @@ $ deja "jwt refresh token"
 | Befehl | Was er tut |
 | --- | --- |
 | `deja <suchbegriff>` | Durchsucht die gesamte Historie. Mehrere Wörter sind UND, Anführungszeichen verlangen zusammenhängenden Text; ohne exakten Treffer werden Wortformen und ähnliche Schreibweisen probiert. |
+| `deja` | Im Terminal der Suchbildschirm von oben. `deja brief` gibt stattdessen die Textübersicht aus: heutige Sessions, was deja geliefert hat, letzte Arbeit und eine Suche zum Ausprobieren. |
 | `deja wip` | Woran die letzte Session in diesem Verzeichnis gearbeitet hat: die Aufgabe, was entschieden wurde, die offenen Dateien, der letzte Befehl und ob er fehlschlug. Alles aus den Aufzeichnungen abgeleitet, ohne auf Notizen angewiesen zu sein. |
 | `deja blame <pfad>[:zeile]` | Welche Sessions diese Datei besprochen haben, was entschieden wurde und warum. Mit Zeilennummer: der Commit, der sie zuletzt geändert hat, und die Session, die diese Zeile geschrieben hat oder den Text, den dieser Commit ersetzt hat. |
 | `deja files <thema>` | Die Gegenrichtung: welche Dateien die Arbeit an einem Thema tatsächlich angefasst hat. |
 | `deja how <werkzeug>` | Wie das auf dieser Maschine wirklich ausgeführt wird, mit echten Argumenten, aus Befehlen, die Agents bereits ausgeführt haben. |
 | `deja fix <fehler>` | Was auf dieser Maschine nach demselben Fehler ausgeführt wurde und wonach der Fehler nicht wieder auftrat. Niemals ein Merge, ein Force-Push oder eine Löschung. |
 | `deja friction` | Fehler, die in drei oder mehr verschiedenen Sessions auftauchen, mit Angabe der Werkzeuge. |
-| `deja ctx <suchbegriff>` | Markdown-Zusammenfassung der besten Treffer, direkt in einen Prompt einsetzbar. |
+| `deja ctx <suchbegriff>` | Markdown-Zusammenfassung des besten Treffers, direkt in einen Prompt einsetzbar. |
 | `deja resume <id>` | Öffnet die gefundene Session wieder in dem Werkzeug, zu dem sie gehört. |
 | `deja view` | Exportiert das gesamte Gedächtnis in eine einzelne lokale HTML-Datei. Kein Server, nichts verlässt die Maschine. |
 | `deja doctor [--deep]` | Selbstprüfung; mit `--deep` wird der Index gegen die Quelldateien verifiziert. |
@@ -180,13 +201,13 @@ Die vollständige Referenz steht in der [Befehlsdokumentation](https://vshulcz.g
 ### MCP-Tools
 
 Der Server stellt ein einziges Tool `deja` bereit, der Parameter `mode` wählt die Fähigkeit: `recall`,
-`context`, `blame`, `fix`, `how`, `orient`, `remember`. `deja install` bindet es selbst an, das ist also nur bei
+`context`, `blame`, `fix`, `how`, `orient`, `remember`, `handoff`. `deja install` bindet es selbst an, das ist also nur bei
 manueller Konfiguration eines Agenten relevant. Die früheren sechs Tool-Namen funktionieren bei bereits
 angebundenen Clients weiter.
 
 Ein Tool statt sieben ist eine Kostenfrage, keine Stilfrage. Ein angebundener MCP-Server schickt die
 Definitionen seiner Tools mit jeder Anfrage mit, sie werden also in jedem Zug bezahlt, ob der Agent etwas
-aufgerufen hat oder nicht: 477 Tokens hier, gegenüber 8,283 beim größten der acht gemessenen Server. dejas
+aufgerufen hat oder nicht: 477 Tokens hier, gegenüber 8,283 beim größten der sieben gemessenen Server. dejas
 eigener Wert lag bei 828, bis das Schema auf ein Tool mit Modi reduziert wurde.
 
 ## Unterstützte Werkzeuge
@@ -226,6 +247,7 @@ hat jeder ein Paket im eigenen Ökosystem, praktisch für alle, die Erweiterunge
 | Grok Build | Plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`, dann `grok plugin install deja` |
 | OpenClaw | ClawHub und npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (und omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | Memory-Provider `deja-memory` im Plugin-Katalog von Hermes | `hermes plugins install deja-vu`, oder von GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Jeder der beiden Wege reicht, beide zusammen gehen auch: jedes Paket liest zuerst, was `deja install`
 hinterlassen hat. opencode, dsh und OpenClaw ergänzen nur das Fehlende; Kimi, Grok, Codex und pi treten zurück,
@@ -274,12 +296,12 @@ Sessions, die durch vollständiges Abspielen gefunden werden; und nichts injizie
 Historie. Der Korpusgenerator und die Relevanzannotation sind gewöhnlicher, lesbarer Go-Code. Bevor du
 irgendeiner Zahl glaubst, sieh nach, wie sie „relevant“ definiert — auch bei unseren.
 
-Gemessen an einem echten Repository: 2,419 Sessions, 179k Nachrichten, 1.9 GB an Aufzeichnungen.
+Gemessen an einem echten Speicher: 2,419 Sessions, 179k Nachrichten, 1.9 GB an Aufzeichnungen.
 
 | Kennzahl | Ergebnis |
 | --- | --- |
 | Abfrage im Prozess | Median **0.7–0.8 ms**, etwa 15 ms auf den Heuhaufen von LongMemEval-S |
-| `deja <suchbegriff>` Ende zu Ende | Median etwa 0.2 s auf diesem Repository: Prozessstart, Aktualitätsprüfung aller Speicher, Ranking, Ausgabe |
+| `deja <suchbegriff>` Ende zu Ende | Median etwa 0.2 s auf diesem Speicher: Prozessstart, Aktualitätsprüfung aller Speicher, Ranking, Ausgabe |
 | Nur die Aktualitätsprüfung | etwa 50 ms, wenn sich nichts geändert hat |
 | Indexgröße | 200 MB, rund 10 % des Korpus |
 
@@ -306,8 +328,11 @@ Nein, außer du verlangst es. Siehe
 <summary><b>Und die Secrets, die schon in den Logs stehen?</b></summary>
 
 Die bleiben in den Dateien des jeweiligen Werkzeugs, das
-sind die Daten deines Agenten. In dejas Index, in Zusammenfassungen, in Share und in den Sync-Export kommen sie
-nicht.
+sind die Daten deines Agenten; `deja secrets` nennt die Sessions, in denen sie stehen, damit du sie rotieren
+und löschen kannst, und `--scrub` schreibt die Aufzeichnungen um, an die es herankommt. Bekannte Formen werden
+beim Indizieren entfernt und landen nicht in Zusammenfassungen, Share oder Sync-Export. Mustererkennung ist
+keine Secret-Erkennung: eine unbekannte Form kann durchrutschen. Siehe
+[Sicherheitsmodell](../../docs/SECURITY-MODEL.md#redaction-boundary).
 
 </details>
 
@@ -316,7 +341,7 @@ nicht.
 
 Ein Recall ist eine lexikalische Abfrage auf einen lokalen Index: Median
 0.7–0.8 ms, und nichts wartet auf ein Modell. Der Hook fügt Prozessstart und Aktualitätsprüfung der Speicher
-hinzu — einige Dutzend Millisekunden bei einem mehrere Gigabyte großen Repository.
+hinzu — einige Dutzend Millisekunden bei einem mehrere Gigabyte großen Speicher.
 
 </details>
 
@@ -347,7 +372,8 @@ Der [vollständige Vergleich](https://vshulcz.github.io/deja-vu/guide/compare.ht
 
 Unter `~/.claude/projects`,
 eine JSONL-Datei je Session; Codex unter `~/.codex/sessions`, Cursor in der SQLite-Datei `state.vscdb`.
-`deja search` liest sie an Ort und Stelle, `deja last` listet die jüngsten Sessions aller Agenten, und
+deja liest sie an Ort und Stelle: ein nacktes `deja` öffnet einen Bildschirm zum Suchen und Lesen,
+`deja search` macht dasselbe aus einem Skript, `deja last` listet die jüngsten Sessions aller Agenten, und
 `deja view` öffnet die gesamte Historie als lokale Seite. Die Pfade je Agent stehen unter
 [wo Sessions gespeichert werden](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html).
 
@@ -388,7 +414,7 @@ Nach Situationen geschrieben, nicht nach Funktionen:
 - [Warum Agents zwischen Sessions vergessen](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [wo jeder Agent seine Historie ablegt](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [Was die Kompaktierung verliert](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [den Agenten wechseln](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [prüfen, was Agents getan haben](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [ein Gespräch exportieren](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [zwischen Maschinen](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [was Gedächtnis an Tokens kostet](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Nach Werkzeug: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+Nach Werkzeug: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi und omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## Probier es an deiner eigenen Historie
 

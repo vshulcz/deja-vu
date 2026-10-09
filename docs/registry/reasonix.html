@@ -138,7 +138,9 @@
 <p>what the person typed rather than the recall appended to it, to the</p>
 <p>summarizer&#39;s guidance, and holds the same packet for the next turn, which</p>
 <p>carries it in place of that turn&#39;s recall. It publishes a status line while the first index</p>
-<p>builds and one &#34;recalled N prior sessions&#34; notice per session. Every answer</p>
+<p>builds and one &#34;recalled N prior sessions&#34; notice per session. When a</p>
+<p>session ends (a <code>session.rotate</code>, or another session starting) its live</p>
+<p>stamp goes, so the next session&#39;s MCP recall can answer with it. Every answer</p>
 <p>has a budget under the host&#39;s timeout (4 s per prompt, 2 s per tool call,</p>
 <p>10 s for compaction); an error, a timeout or nothing to say leaves the turn</p>
 <p>as the host built it.</p>

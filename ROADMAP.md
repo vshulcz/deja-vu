@@ -34,12 +34,13 @@ the place to discuss design.
 
 ## Next
 
-- **Compaction recovery past three hosts.** Claude Code and Codex hand a hook the
-  transcript before they shorten it, which is what makes the capture possible,
-  and Reasonix hands its extension the turns it is folding, where deja's packet
-  goes to the summarizer instead. Every other harness that compacts keeps the
-  summary to itself, so the packet stops at those three until a host exposes the
-  same seam — and each one that does is work the day it lands.
+- **Compaction recovery on the last hosts.** The packet after a compaction now
+  reaches 34 of the 41 harnesses: from the transcript a hook is handed where the
+  host offers one, and elsewhere from the turns the store keeps before the
+  summary, delivered on the next hook that reaches the model. Devin CLI is next,
+  once its `sessions.db` catch-up has a capture to ride. aider, Continue, Kiro,
+  Roo Code, Zed and JetBrains AI Assistant have no hook that runs at that point,
+  and the registry records why for each.
 - **The plan, before it is executed.** `deja check` answers a plan with what this
   machine already knows about it, and `hook-plan` delivers the same thing at
   `ExitPlanMode`. No installer wires it yet: the measurement that would justify
@@ -48,21 +49,21 @@ the place to discuss design.
   session pulled for one query is lifted for every query. A per-query signal —
   recording what a recall was for, not only that it happened — would let reuse be
   both stronger and precise without lifting an off-topic session.
-- **Point-of-action in the harnesses that still refuse it.** The repair beside a
-  failed command and the file's prior decision now reach Claude Code, Codex,
-  Cursor, opencode, Gemini, Qwen, Cline, Amp, Antigravity, Crush,
-  Command Code, Reasonix, omp, and pi with its descendants. What is left is
-  where the harness itself drops what a hook returns — Grok's tool events, Kimi's
-  post-tool events, prime-agent's tool events, Roo until its hooks ship — and each is recorded in
-  the registry with the measurement behind it.
+- **Point-of-action in the harnesses that still refuse it.** The file's prior
+  decision before an edit reaches 31 of the 41 harnesses and the repair beside a
+  failed command 30. Where a host drops what a hook returns — Kimi, Kiro, goose,
+  CodeWhale, Antigravity, Junie — the line is parked and arrives with the next
+  hook that reaches the model, a step late. What is left is the hosts with no
+  tool hook that runs: aider, Continue's CLI, Roo Code, Zed and JetBrains AI
+  Assistant, each recorded in the registry with the measurement behind it.
 - **Follow the work an agent handed off.** A subagent's run is its own session
   now, and where a harness records the edge — Grok's `summary.json`, Claude's
   sidechain files — recall can name the parent and the children. Cursor writes
   subagent transcripts too and their shape is unread; the rest of the harnesses
   that spawn agents are the same question.
 - **Close the matrix from upstream.** What is left in the support table is
-  someone else's to ship: aider has no MCP client and no custom commands, Roo's
-  hooks are in flight, Zed exposes no lifecycle hook. Each becomes work the day
+  someone else's to ship: aider has no MCP client and no custom commands, Roo
+  Code was archived with no hook events, Zed exposes no lifecycle hook. Each becomes work the day
   it lands, and the registry records the source so the claim can be rechecked
   rather than assumed.
 

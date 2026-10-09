@@ -36,7 +36,7 @@ current release, and `deja doctor` says when the copy you have is behind the
 one this deja ships:
 
 ```
-kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with this deja — reinstall it in Kimi to update)
+kimi  plugin  ~/.kimi-code/config.toml  (v0.21.2 installed, v0.22.0 ships with this deja — reinstall it in Kimi to update)
 ```
 
 ## What you get
@@ -57,8 +57,8 @@ kimi  plugin  ~/.kimi-code/config.toml  (v0.1.0 installed, v0.2.0 ships with thi
 ## Which binary
 
 In order: `DEJA_BIN`, then the deja you installed yourself (`~/.local/bin`,
-`/usr/local/bin`, `/opt/homebrew/bin`), then `deja` on `PATH`. Your own
-`deja update` or `brew upgrade deja` wins over anything a plugin release
+`/usr/local/bin`, `/opt/homebrew/bin`, `/usr/bin`), then `deja` on `PATH`. Your
+own `deja update` or `brew upgrade deja-vu` wins over anything a plugin release
 pinned.
 
 ## If you also ran `deja install kimi`

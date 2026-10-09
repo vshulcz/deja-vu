@@ -14,9 +14,7 @@
 
 <p align="center"><sub><em>沒有人去搜尋——是代理自己呼叫了 deja。兩次真實執行，真實模型、真實工具呼叫，跑在合成語料上：不會公開任何人的歷史。</em></sub></p>
 
-<p align="center"><b>deja 一開始就是滿的：38 個代理早已寫下的歷史，幾秒建好索引，不需要模型，也不需要額外的蒐集步驟。</b></p>
-
-<p align="center"><b>我們能測到的編碼代理記憶裡，最準、最省、最快。</b></p>
+<p align="center"><b>deja 一開始就是滿的：四十一個代理早已寫下的歷史，幾秒建好索引，不需要模型，也不需要額外的蒐集步驟。</b></p>
 
 <table align="center">
 <tr>
@@ -56,9 +54,9 @@ deja install --auto
 
 > 我們以前處理過 jwt refresh rotation 嗎？查一下你的記憶
 
-也不必特意去問——開啟自動召回後，會話一打開，代理就已經知道你在這個專案裡解決過什麼。
+也不必特意去問——開啟自動召回後，會話一打開，代理就已經知道你在這個專案裡解決過什麼。想自己翻一翻，執行 `deja`。
 
-opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw 和 pi 也有各自生態裡的套件，習慣在那邊裝擴充的人
+opencode、DeepSeek Harness、Zed、Kimi Code、Codex CLI、Grok Build、OpenClaw、pi 和 Hermes 也有各自生態裡的套件，習慣在那邊裝擴充的人
 可以直接用：
 
 ```sh
@@ -70,6 +68,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build：grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
 ```
 
 `deja install --auto` 已經把上面這些都接好了，兩條路走哪條都夠。兩邊都裝也沒問題：套件會看
@@ -96,9 +95,23 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 只有執行檔也是一次完整安裝：索引、搜尋、`show`、`ctx`、`blame`、`--json`
 和遮蔽都不需要別的東西。`deja install` 負責的是把 MCP 接進你的代理、開啟會話啟動召回——值得有，但可選。
 
+## 自己搜尋
+
+在終端機裡不帶參數執行 `deja`，會開啟一個涵蓋所有代理歷史的搜尋畫面。最先列出的是你尚未提交的變更背後的會話，
+接著是這個專案最近的會話，邊輸入清單邊收窄。
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="在 deja 畫面裡輸入搜尋、閱讀找到的會話，並在另一個代理裡接著做"></p>
+
+- `↑↓` 選會話，`↵` 在命中處開啟，`n` 和 `N` 在命中之間跳轉，`esc` 返回。
+- `r` 在寫下這個會話的代理裡恢復它。`o` 在任意其他代理裡接著做，新代理一開始就帶著這個會話問過什麼、定下了什麼、還有什麼沒解決。
+- `tab` 在本專案、所有專案和 Kept 之間切換；Kept 是代理已經刪掉、deja 仍然保留的會話，`R` 把其中一個放回原處。
+- `?` 列出所有按鍵，`q` 離開。
+
+設定 `DEJA_TUI=0` 時改為印出文字摘要，也就是 `deja brief` 的輸出。輸出到管線時，它印出已經索引了什麼、下一步該執行哪條指令。
+
 ## 能得到什麼
 
-**在 Codex 裡解決，Claude 記得。** 四十個編碼代理把每一次對話都寫進本機檔案，
+**在 Codex 裡解決，Claude 記得。** 四十一個編碼代理把每一次對話都寫進本機檔案，
 deja 把這些檔案變成一層它們都能讀的記憶。
 
 | | |
@@ -125,7 +138,7 @@ deja 把這些檔案變成一層它們都能讀的記憶。
 
 ## 隱私
 
-建索引和搜尋都在本機。只有 `deja update`、`deja sync ssh`、`deja doctor` 裡的版本檢查，以及指向你所設定端點的 `deja embed` 會用到網路。
+建索引和搜尋都在本機。只有 `deja update`、`deja sync ssh`、`deja doctor` 裡的版本檢查、指向你所設定端點的 `deja embed`，以及互動式指令每天一次查看最新發行版，會用到網路。這次查看不傳送任何會話資料；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以關掉它。
 
 憑證在建索引時遮蔽：AWS 金鑰、`api_key=` 與 `token=` 賦值、bearer token 與裸 JWT、PEM 私鑰區塊、
 各家供應商的 token、`scheme://user:pass@host` 形式的 URL、沒有規則能比對的高熵值，
@@ -136,6 +149,8 @@ deja 把這些檔案變成一層它們都能讀的記憶。
 [安全模型](../../docs/SECURITY-MODEL.md)記錄了資料流向、遮蔽的邊界、信任假設與發行版驗證。
 
 ## 命令列
+
+在終端機裡單獨執行 `deja` 會開啟[搜尋畫面](#自己搜尋)。帶上查詢詞或下面任一條指令時，它印出結果後結束：
 
 ```text
 $ deja "jwt refresh token"
@@ -149,6 +164,7 @@ $ deja "jwt refresh token"
 | 指令 | 作用 |
 | --- | --- |
 | `deja <查詢詞>` | 搜尋所有歷史。多個詞是 AND，引號內要求連續文字；沒有精確命中時會嘗試詞形與近似拼寫。 |
+| `deja` | 在終端機裡是上面那個全螢幕搜尋。`deja brief` 改為印出文字摘要：今天的會話、deja 交出了什麼、最近的工作和一條可以試試的搜尋。 |
 | `deja wip` | 這個目錄裡上一個會話在做什麼：任務、定下來的結論、手上的檔案、最後一條指令以及它是否失敗。全部從記錄裡推出來，不依賴誰記得寫筆記。 |
 | `deja blame <路徑>[:行號]` | 哪些會話討論過這個檔案、當時決定了什麼、為什麼。給出行號時：最後改動這一行的 commit，以及寫下這一行、或寫下被這次 commit 替換的那段文字的會話。 |
 | `deja files <主題>` | 反方向：某個主題的工作實際動過哪些檔案。 |
@@ -165,11 +181,11 @@ $ deja "jwt refresh token"
 
 ### MCP 工具
 
-伺服器只暴露一個工具 `deja`，用 `mode` 參數選擇能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`。
+伺服器只暴露一個工具 `deja`，用 `mode` 參數選擇能力：`recall`、`context`、`blame`、`fix`、`how`、`orient`、`remember`、`handoff`。
 `deja install` 會自動接好，只有手動設定代理時才需要在意它。原來的六個工具名對已經接好的客戶端仍然有效。
 
 一個工具而不是七個，是成本問題，不是風格問題。接上的 MCP 伺服器會把工具定義隨每一次請求一起送出，
-所以無論代理有沒有呼叫，每一輪都在付這筆錢：這裡是 477 token，實測的八個伺服器裡最大的那個是 8,283。
+所以無論代理有沒有呼叫，每一輪都在付這筆錢：這裡是 477 token，實測的七個伺服器裡最大的那個是 8,283。
 deja 自己在把結構縮成一個帶模式的工具之前，也是 828。
 
 ## 支援的工具
@@ -206,6 +222,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Zed。
 | Grok Build | 外掛 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`，然後 `grok plugin install deja` |
 | OpenClaw | ClawHub 與 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（以及 omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | 記憶提供者 `deja-memory`，在 Hermes 外掛目錄裡 | `hermes plugins install deja-vu`，或從 GitHub：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 兩條路各自都夠用，兩條都走也不會出問題：每個套件都會先讀 `deja install` 寫下的設定。
 opencode、dsh 和 OpenClaw 只補上缺的那部分；Kimi、Grok、Codex 和 pi 在安裝器已經接好時
@@ -250,12 +267,12 @@ deja bench read       # 讀取一個資料庫儲存的代價，以及一個超�
 在沒有相關歷史的鏈條上則什麼都不注入。語料產生器和相關性標註是普通的、可審閱的 Go 程式碼。
 在相信任何數字之前，先審清「相關」是怎麼定義的——包括我們的數字。
 
-在一份真實的儲存庫上測得：2,419 個會話、179k 條訊息，共 1.9 GB 的記錄。
+在一份真實的儲存上測得：2,419 個會話、179k 條訊息，共 1.9 GB 的記錄。
 
 | 指標 | 結果 |
 | --- | --- |
 | 行程內查詢 | 中位數 **0.7–0.8 ms**，LongMemEval-S 乾草堆上約 15 ms |
-| `deja <查詢詞>` 端到端 | 該儲存庫上中位數約 0.2 s：行程啟動、對所有儲存做新鮮度檢查、排序、輸出 |
+| `deja <查詢詞>` 端到端 | 該儲存上中位數約 0.2 s：行程啟動、對所有儲存做新鮮度檢查、排序、輸出 |
 | 僅新鮮度檢查 | 沒有變化時約 50 ms |
 | 索引大小 | 200 MB，約為語料的 10% |
 
@@ -280,8 +297,9 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 <details>
 <summary><b>日誌裡已經有的金鑰怎麼辦？</b></summary>
 
-它們留在原本的工具檔案裡，那是你的代理的資料。
-它們不會進入 deja 的索引、摘要、分享或同步匯出。
+它們留在原本的工具檔案裡，那是你的代理的資料；`deja secrets` 會指出帶有金鑰的會話，方便你輪替和刪除，
+`--scrub` 會重寫它能觸及的記錄。已知形態在建索引時剝掉，不會進入摘要、分享或同步匯出。樣式比對不是金鑰偵測，
+未知形態可能漏過。見[安全模型](../../docs/SECURITY-MODEL.md#redaction-boundary)。
 
 </details>
 
@@ -289,7 +307,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 <summary><b>會拖慢我的代理嗎？</b></summary>
 
 一次召回是對本機索引的詞彙查詢：中位數 0.7–0.8 ms，沒有任何東西在等模型。
-掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——數 GB 的儲存庫上是幾十毫秒。
+掛鉤會額外加上行程啟動和對儲存的新鮮度檢查——數 GB 的儲存上是幾十毫秒。
 
 </details>
 
@@ -318,7 +336,7 @@ MCP 伺服器、統計、分享和同步都讀這一份索引。細節見
 <details>
 <summary><b>Claude Code 的會話歷史存在哪裡，能搜尋嗎？</b></summary>
 
-在 `~/.claude/projects` 下，每個會話一個 JSONL 檔；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。`deja search` 就地讀取它們，`deja last` 列出每個代理最近的會話，`deja view` 把全部歷史開成一個本機頁面。各代理的路徑見[會話存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
+在 `~/.claude/projects` 下，每個會話一個 JSONL 檔；Codex 存在 `~/.codex/sessions`，Cursor 存在 SQLite 的 `state.vscdb`。deja 就地讀取它們：單獨執行 `deja` 會開啟一個搜尋和閱讀它們的畫面，`deja search` 在腳本裡做同樣的事，`deja last` 列出每個代理最近的會話，`deja view` 把全部歷史開成一個本機頁面。各代理的路徑見[會話存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)。
 
 </details>
 
@@ -353,7 +371,7 @@ rm -rf ~/.cache/deja
 - [為什麼代理在會話之間會忘事](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [每個代理把歷史存在哪裡](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [壓縮會丟掉什麼](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [換一個代理](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [稽核代理做過什麼](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [匯出一次對話](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [跨機器](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [記憶要花多少 token](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+按工具：[opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi 和 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## 在你自己的歷史上試一次
 

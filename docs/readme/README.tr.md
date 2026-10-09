@@ -15,9 +15,7 @@ deja aylar öncesi dahil hepsini indeksler ve önemli kısmı
 
 <p align="center"><sub><em>Kimse arama yapmadı; ajan deja'yı kendisi çağırdı. Gerçek model ve gerçek araç çağrılarıyla iki gerçek çalıştırma, sentetik bir külliyat üzerinde: kimsenin geçmişi yayımlanmıyor.</em></sub></p>
 
-<p align="center"><b>deja ilk dakikadan itibaren dolu: 38 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
-
-<p align="center"><b>Ölçebildiğimiz kodlama ajanı hafızaları arasında en isabetlisi, çalıştırması en ucuzu ve en hızlısı.</b></p>
+<p align="center"><b>deja ilk dakikadan itibaren dolu: 41 ajanın çoktan yazdığı geçmiş, saniyeler içinde indekslenir, model de ayrı bir toplama adımı da gerekmez.</b></p>
 
 <table align="center">
 <tr>
@@ -59,9 +57,9 @@ Yeni bir ajan oturumu açın ve aylar önce yaptığınız bir şeyi sorun:
 > daha önce jwt refresh rotation ile uğraşmış mıydık? belleğine bak
 
 Sormanız da gerekmiyor: otomatik geri çağırma açıkken ajan, oturum açılır açılmaz bu projede neyin çözüldüğünü
-zaten biliyor.
+zaten biliyor. Kendiniz bakmak için `deja` çalıştırın.
 
-opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw ve pi için kendi ekosistemlerinde
+opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi ve Hermes için kendi ekosistemlerinde
 birer paket de var; eklentilerini oradan kurmaya alışkın olanlar için:
 
 ```sh
@@ -73,6 +71,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
 ```
 
 `deja install --auto` yukarıdakilerin hepsini zaten bağlıyor, yani iki yoldan biri yeter. İkisi birden de
@@ -99,9 +98,25 @@ Yalnızca ikili dosya bile tam bir kurulumdur: indeksleme, arama, `show`, `ctx`,
 bilgisi temizliği başka hiçbir şeye ihtiyaç duymaz. `deja install`'ın yaptığı, MCP'yi ajanlarınıza bağlamak ve
 oturum başlangıcında geri çağırmayı açmaktır; değerli ama isteğe bağlı.
 
+## Kendiniz arayın
+
+Terminalde argümansız `deja`, tüm ajanların geçmişinde bir arama ekranı açar. Önce commit edilmemiş
+değişikliğinizin arkasındaki oturumları, sonra bu projedeki son oturumları gösterir; siz yazdıkça liste
+daralır.
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="deja ekranında bir arama yazmak, bulunan oturumu okumak ve o oturuma başka bir ajanda devam etmek"></p>
+
+- `↑↓` bir oturum seçer, `↵` onu eşleşmenin olduğu yerde açar, `n` ve `N` eşleşmeler arasında gezer, `esc` geri döner.
+- `r` oturumu onu yazan ajanda sürdürür. `o` başka herhangi bir ajanda devam ettirir; o ajan, oturumun ne sorduğu, neye karar verdiği ve neyi açık bıraktığıyla başlar.
+- `tab` bu proje, tüm projeler ve Kept arasında geçiş yapar; Kept, ajanının sildiği ama deja'nın hâlâ tuttuğu oturumlardır. `R` birini yerine koyar.
+- `?` tüm tuşları listeler, `q` çıkar.
+
+`DEJA_TUI=0` ile bunun yerine düz metin özeti yazdırır; bu, `deja brief` çıktısıyla aynıdır. Bir pipe'a
+bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağını yazdırır.
+
 ## Ne kazandırıyor
 
-**Codex'te çözüldü, Claude hatırlıyor.** Otuz sekiz kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
+**Codex'te çözüldü, Claude hatırlıyor.** Kırk bir kodlama ajanı her konuşmayı yerel dosyalara yazıyor; deja
 bu dosyaları hepsinin okuyabildiği bir bellek katmanına dönüştürüyor.
 
 | | |
@@ -132,7 +147,9 @@ Tam başvuru [belge sitesinde](https://vshulcz.github.io/deja-vu/).
 ## Gizlilik
 
 İndeksleme ve arama yereldir. Ağı yalnızca `deja update`, `deja sync ssh`, `deja doctor` içindeki sürüm
-denetimi ve sizin yapılandırdığınız uç noktaya giden `deja embed` kullanır.
+denetimi, sizin yapılandırdığınız uç noktaya giden `deja embed` ve etkileşimli bir komutun günde bir kez son
+sürüme bakması kullanır. Bu bakış oturum verisi göndermez; `DEJA_OFFLINE=1` ya da `DEJA_NO_UPDATE_NOTICE=1`
+onu kapatır.
 
 Kimlik bilgileri indeksleme sırasında temizlenir: AWS anahtarları, `api_key=` ve `token=` atamaları, bearer
 token'lar ve çıplak JWT'ler, PEM özel anahtar blokları, çeşitli sağlayıcıların token'ları,
@@ -149,6 +166,9 @@ sürüm doğrulamasını belgeler.
 
 ## Komut satırı
 
+Terminalde yalın `deja` [arama ekranını](#kendiniz-arayın) açar. Bir sorguyla ya da aşağıdaki komutlardan
+biriyle çalıştırıldığında çıktıyı yazdırıp çıkar:
+
 ```text
 $ deja "jwt refresh token"
 [claude] api        · Jul 8 · 8f31c0a9 — 2 matches
@@ -161,13 +181,14 @@ $ deja "jwt refresh token"
 | Komut | Ne yapar |
 | --- | --- |
 | `deja <sorgu>` | Tüm geçmişte arar. Birden çok sözcük VE anlamına gelir, tırnak bitişik metin ister; tam eşleşme yoksa sözcük biçimlerini ve yakın yazımları dener. |
+| `deja` | Terminalde, yukarıdaki tam ekran arama. `deja brief` bunun yerine metin özetini yazdırır: bugünün oturumları, deja'nın neler sunduğu, son çalışmalar ve denenecek bir arama. |
 | `deja wip` | Bu dizindeki son oturum ne yapıyordu: görev, varılan sonuç, elde olan dosyalar, son komut ve başarısız olup olmadığı. Hepsi kayıtlardan çıkarılır, kimsenin not tutmuş olmasına bağlı değildir. |
 | `deja blame <yol>[:satır]` | Bu dosyayı hangi oturumlar konuştu, ne karar verildi ve neden. Satır numarası verilirse: o satırı en son değiştiren commit ve o satırı ya da o commit'in değiştirdiği metni yazan oturum. |
 | `deja files <konu>` | Ters yön: bir konudaki çalışmanın gerçekte hangi dosyalara dokunduğu. |
 | `deja how <araç>` | Bu makinede bu iş gerçekte nasıl çalıştırılıyor — ajanların daha önce çalıştırdığı komutlardan alınmış gerçek argümanlarla. |
 | `deja fix <hata>` | Bu makinede aynı hatadan sonra ne çalıştırıldı ve ondan sonra hata bir daha çıkmadı. Asla bir merge, force push ya da silme değil. |
 | `deja friction` | Üç veya daha fazla farklı oturuma isabet eden hatalar ve hangi araçlardan geldikleri. |
-| `deja ctx <sorgu>` | En iyi sonuçların Markdown özeti, doğrudan bir prompt'a girecek biçimde. |
+| `deja ctx <sorgu>` | En iyi sonucun Markdown özeti, doğrudan bir prompt'a girecek biçimde. |
 | `deja resume <id>` | Bulunan oturumu ait olduğu araçta yeniden açar. |
 | `deja view` | Tüm belleği tek bir yerel HTML dosyasına aktarır. Sunucu yok, veri makineden çıkmaz. |
 | `deja doctor [--deep]` | Kendi kendine denetim; `--deep` ile indeksi kaynak dosyalara karşı doğrular. |
@@ -178,12 +199,12 @@ Tam başvuru [komut belgelerinde](https://vshulcz.github.io/deja-vu/guide/comman
 ### MCP araçları
 
 Sunucu tek bir `deja` aracı sunar, yeteneği `mode` parametresi seçer: `recall`, `context`, `blame`, `fix`,
-`how`, `orient`, `remember`. `deja install` bunu kendiliğinden bağlar, yani yalnızca bir ajanı elle yapılandırırken
+`how`, `orient`, `remember`, `handoff`. `deja install` bunu kendiliğinden bağlar, yani yalnızca bir ajanı elle yapılandırırken
 önemlidir. Eski altı araç adı, hâlihazırda bağlı istemcilerde çalışmaya devam eder.
 
 Yedi yerine tek araç bir maliyet meselesidir, üslup meselesi değil. Bağlı bir MCP sunucusu araç tanımlarını
 her istekle birlikte gönderir, dolayısıyla ajan bir şey çağırsa da çağırmasa da her turda bedeli ödenir:
-burada 477 token, ölçülen sekiz sunucunun en büyüğünde ise 8,283. deja'nınki de, şema kipleri olan tek bir
+burada 477 token, ölçülen yedi sunucunun en büyüğünde ise 8,283. deja'nınki de, şema kipleri olan tek bir
 araca indirilene kadar 828'di.
 
 ## Desteklenen araçlar
@@ -221,6 +242,7 @@ kendi ekosisteminde bir paketi var; eklentilerini oradan kuranlar için:
 | Grok Build | eklenti `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`, sonra `grok plugin install deja` |
 | OpenClaw | ClawHub ve npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (ve omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | Hermes eklenti kataloğunda `deja-memory` bellek sağlayıcısı | `hermes plugins install deja-vu` ya da GitHub'dan: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 İki yoldan biri yeter, ikisi birden de bir şey bozmaz: her paket önce `deja install`'ın yazdığını okur.
 opencode, dsh ve OpenClaw yalnızca eksiği tamamlar; Kimi, Grok, Codex ve pi kurucu zaten bağladıysa geri
@@ -300,7 +322,10 @@ Siz istemedikçe hayır.
 <summary><b>Günlüklerde zaten duran sırlar ne olacak?</b></summary>
 
 Onlar özgün aracın dosyalarında kalır, sizin ajanınızın
-verisidir. deja'nın indeksine, özetlerine, share'ine veya sync dışa aktarımına girmezler.
+verisidir; `deja secrets` onları taşıyan oturumları adlarıyla verir ki anahtarları yenileyip silebilesiniz,
+`--scrub` da erişebildiği kayıtları yeniden yazar. Bilinen biçimler indeksleme sırasında çıkarılır ve
+özetlere, share'e ya da sync dışa aktarımına ulaşmaz. Örüntü eşleştirme sır tespiti değildir: bilinmeyen bir
+biçim geçebilir. [Güvenlik modeline](../../docs/SECURITY-MODEL.md#redaction-boundary) bakın.
 
 </details>
 
@@ -339,8 +364,8 @@ açıkken oturum açılır açılmaz bu projede daha önce nelerin kararlaştır
 <summary><b>Claude Code oturum geçmişi nerede ve aranabilir mi?</b></summary>
 
 `~/.claude/projects` altında, oturum başına bir JSONL
-dosyası; Codex `~/.codex/sessions` altında, Cursor ise SQLite `state.vscdb` içinde. `deja search` bunları
-yerinde okur, `deja last` tüm ajanların son oturumlarını listeler, `deja view` ise tüm geçmişi yerel bir sayfa
+dosyası; Codex `~/.codex/sessions` altında, Cursor ise SQLite `state.vscdb` içinde. deja bunları
+yerinde okur: yalın `deja` onları aramak ve okumak için bir ekran açar, `deja search` aynısını bir betikten yapar, `deja last` tüm ajanların son oturumlarını listeler, `deja view` ise tüm geçmişi yerel bir sayfa
 olarak açar. Ajan başına yollar
 [oturumların saklandığı yer](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 sayfasında.
@@ -381,7 +406,7 @@ rm -rf ~/.cache/deja
 - [Ajanlar oturumlar arasında neden unutur](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [her ajan geçmişini nerede tutar](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [Sıkıştırmanın kaybettikleri](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [ajan değiştirmek](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [ajanların ne yaptığını denetlemek](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [bir konuşmayı dışa aktarmak](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [makineler arasında](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [belleğin token maliyeti](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-Araca göre: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+Araca göre: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi ve omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## Kendi geçmişinizde deneyin
 

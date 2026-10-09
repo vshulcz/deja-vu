@@ -185,6 +185,7 @@ deja last 20 --harness codex                           # recent sessions, any di
 deja show &lt;id&gt;                                         # the conversation
 deja resume &lt;id&gt;                                       # the command that reopens it in Codex
 deja view                                              # all of it as one local HTML page</pre>
+<p>Bare <code>deja</code> opens the same search as a screen that updates as you type: <code>a</code> narrows it to Codex, <code>↵</code> reads a session at the match, <code>r</code> reopens it in Codex.</p>
 <p>Drop <code>--harness codex</code> and the same search covers Claude Code, Cursor, opencode and the rest, which is usually where the answer turns out to be. Credentials are stripped as the index is built. A session deja has indexed stays searchable after <code>codex delete</code> or a cleanup; <code>deja forget</code> removes it on purpose.</p>
 <p>To have Codex look this up itself at the start of a session, rather than you running the search, see <a href="memory-for-codex.html">memory for Codex</a>.</p>
 

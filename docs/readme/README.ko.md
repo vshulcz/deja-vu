@@ -14,9 +14,7 @@ deja는 몇 달 전 기록까지 전부 색인하고, 지금 일하는 에이전
 
 <p align="center"><sub><em>아무도 검색하지 않았습니다. 에이전트가 스스로 deja를 호출했습니다. 실제 모델과 실제 도구 호출로 진행한 두 번의 실제 실행이며, 합성 코퍼스 위에서 돌렸기 때문에 누구의 기록도 공개되지 않습니다.</em></sub></p>
 
-<p align="center"><b>deja는 처음부터 가득 차 있습니다. 38개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
-
-<p align="center"><b>우리가 측정할 수 있었던 코딩 에이전트 메모리 중 가장 정확하고, 가장 저렴하고, 가장 빠릅니다.</b></p>
+<p align="center"><b>deja는 처음부터 가득 차 있습니다. 41개 에이전트가 이미 남긴 기록, 몇 초 만에 끝나는 색인, 모델도 별도의 수집 단계도 없습니다.</b></p>
 
 <table align="center">
 <tr>
@@ -57,9 +55,9 @@ deja install --auto
 > jwt refresh rotation 전에 다뤄본 적 있나? 기억을 찾아봐
 
 굳이 묻지 않아도 됩니다. 자동 회상을 켜 두면 세션이 열리는 순간 에이전트는 이 프로젝트에서 무엇을
-해결했는지 이미 알고 있습니다.
+해결했는지 이미 알고 있습니다. 직접 찾아보려면 `deja`를 실행하세요.
 
-opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi는 각자의 생태계에
+opencode, DeepSeek Harness, Zed, Kimi Code, Codex CLI, Grok Build, OpenClaw, pi, Hermes는 각자의 생태계에
 패키지가 있습니다. 확장을 그쪽에서 설치하는 데 익숙하다면:
 
 ```sh
@@ -71,6 +69,7 @@ dsh plugin --profile web add dsh-deja
 # Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
+hermes plugins install deja-vu
 ```
 
 `deja install --auto`가 위의 것들을 알아서 연결하므로 두 경로 중 하나면 충분합니다. 둘 다 써도
@@ -97,9 +96,24 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 다른 무엇도 필요로 하지 않습니다. `deja install`이 하는 일은 MCP를 에이전트에 연결하고 세션 시작 회상을
 켜는 것입니다. 있으면 좋지만 선택 사항입니다.
 
+## 직접 검색하기
+
+터미널에서 인자 없이 `deja`를 실행하면 모든 에이전트의 기록을 검색하는 화면이 열립니다. 아직 커밋하지 않은
+변경 뒤에 있는 세션부터 보여 주고, 그다음 이 프로젝트의 최근 세션이 이어지며, 입력할수록 목록이 좁혀집니다.
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="deja 화면에서 검색어를 입력하고, 찾은 세션을 읽고, 그 세션을 다른 에이전트에서 이어가는 모습"></p>
+
+- `↑↓`로 세션을 고르고, `↵`로 일치한 곳에서 열고, `n`과 `N`으로 일치 항목 사이를 오가며, `esc`로 돌아갑니다.
+- `r`은 세션을 작성한 에이전트에서 재개합니다. `o`는 다른 아무 에이전트에서 이어가며, 그 에이전트는 세션이 무엇을 물었고 무엇을 결정했고 무엇을 남겨 두었는지를 갖고 시작합니다.
+- `tab`은 이 프로젝트, 모든 프로젝트, Kept 사이를 전환합니다. Kept는 에이전트가 지웠지만 deja가 아직 가진 세션이고, `R`로 하나를 되돌려 놓습니다.
+- `?`는 모든 키를 보여 주고, `q`는 종료합니다.
+
+`DEJA_TUI=0`이면 화면 대신 텍스트 요약을 출력하며, `deja brief`와 같은 내용입니다. 파이프로 연결하면 무엇이
+색인되었는지와 다음에 실행할 명령을 출력합니다.
+
 ## 무엇을 얻나
 
-**Codex에서 해결하면 Claude가 기억합니다.** 서른여덟 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
+**Codex에서 해결하면 Claude가 기억합니다.** 마흔한 개의 코딩 에이전트가 모든 대화를 로컬 파일에 쓰고,
 deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으로 바꿉니다.
 
 | | |
@@ -130,7 +144,9 @@ deja는 그 파일들을 모두가 읽을 수 있는 하나의 기억 계층으�
 ## 프라이버시
 
 색인과 검색은 로컬에서 일어납니다. 네트워크를 쓰는 것은 `deja update`, `deja sync ssh`,
-`deja doctor` 안의 버전 확인, 그리고 여러분이 지정한 엔드포인트로 가는 `deja embed`뿐입니다.
+`deja doctor` 안의 버전 확인, 여러분이 지정한 엔드포인트로 가는 `deja embed`, 그리고 대화형 명령이 하루
+한 번 최신 릴리스를 확인하는 것뿐입니다. 이 확인은 세션 데이터를 보내지 않으며, `DEJA_OFFLINE=1` 또는
+`DEJA_NO_UPDATE_NOTICE=1`로 끌 수 있습니다.
 
 자격 증명은 색인 시점에 제거됩니다. AWS 키, `api_key=`와 `token=` 대입, bearer 토큰과 맨 JWT,
 PEM 개인 키 블록, 각 제공자의 토큰, `scheme://user:pass@host` 형태의 URL, 어떤 규칙에도 걸리지 않는
@@ -145,6 +161,9 @@ PEM 개인 키 블록, 각 제공자의 토큰, `scheme://user:pass@host` 형태
 
 ## 명령줄
 
+터미널에서 인자 없는 `deja`는 [검색 화면](#직접-검색하기)을 엽니다. 검색어나 아래 명령을 주면 결과를 출력하고
+끝납니다:
+
 ```text
 $ deja "jwt refresh token"
 [claude] api        · Jul 8 · 8f31c0a9 — 2 matches
@@ -157,13 +176,14 @@ $ deja "jwt refresh token"
 | 명령 | 하는 일 |
 | --- | --- |
 | `deja <검색어>` | 전체 기록을 검색합니다. 여러 단어는 AND이고 따옴표는 연속된 문구를 요구하며, 정확히 맞는 것이 없으면 어형과 비슷한 철자를 시도합니다. |
+| `deja` | 터미널에서는 위의 전체 화면 검색. `deja brief`는 대신 텍스트 요약을 출력합니다: 오늘의 세션, deja가 건넨 것, 최근 작업, 시도해 볼 검색어. |
 | `deja wip` | 이 디렉터리의 지난 세션이 무엇을 하고 있었는지: 작업, 결론, 손에 들고 있던 파일, 마지막 명령과 그것이 실패했는지. 전부 기록에서 도출하며 누가 메모를 남겼는지에 기대지 않습니다. |
 | `deja blame <경로>[:줄]` | 어떤 세션이 이 파일을 논의했고 무엇을 왜 결정했는지. 줄 번호를 주면 그 줄을 마지막으로 바꾼 커밋과, 그 줄이나 그 커밋이 바꾼 텍스트를 쓴 세션을 보여 줍니다. |
 | `deja files <주제>` | 반대 방향: 어떤 주제의 작업이 실제로 건드린 파일들. |
 | `deja how <도구>` | 이 컴퓨터에서 그 일을 실제로 어떻게 실행하는지, 에이전트가 이전에 돌린 명령에서 가져온 진짜 인자와 함께. |
 | `deja fix <오류>` | 이 컴퓨터에서 같은 오류 뒤에 무엇을 실행했고, 그 뒤 오류가 다시 나타나지 않았는지. merge, force push, 삭제는 내놓지 않습니다. |
 | `deja friction` | 서로 다른 세션 셋 이상에서 나온 오류와, 어느 도구에서 왔는지. |
-| `deja ctx <검색어>` | 최상위 결과의 Markdown 요약. 프롬프트에 바로 넣을 수 있습니다. |
+| `deja ctx <검색어>` | 가장 잘 맞는 결과의 Markdown 요약. 프롬프트에 바로 넣을 수 있습니다. |
 | `deja resume <id>` | 찾은 세션을 원래의 도구에서 다시 엽니다. |
 | `deja view` | 기억 전체를 로컬 HTML 파일 하나로 내보냅니다. 서버가 없고 데이터는 기계를 떠나지 않습니다. |
 | `deja doctor [--deep]` | 자가 점검. `--deep`이면 원본 파일로 색인을 검증합니다. |
@@ -174,11 +194,11 @@ $ deja "jwt refresh token"
 ### MCP 도구
 
 서버는 `deja` 하나만 노출하고 `mode` 인자로 기능을 고릅니다: `recall`, `context`, `blame`, `fix`,
-`how`, `orient`, `remember`. `deja install`이 알아서 연결하므로 에이전트를 수동으로 설정할 때만 신경 쓰면 됩니다.
+`how`, `orient`, `remember`, `handoff`. `deja install`이 알아서 연결하므로 에이전트를 수동으로 설정할 때만 신경 쓰면 됩니다.
 이전의 여섯 도구 이름은 이미 연결된 클라이언트에서 계속 동작합니다.
 
 일곱이 아니라 하나인 것은 취향이 아니라 비용 문제입니다. 연결된 MCP 서버는 요청마다 도구 정의를 함께
-보내므로, 에이전트가 무엇을 호출했든 안 했든 매 턴 그 값을 냅니다. 여기서는 477 토큰이고, 측정한 여덟 개
+보내므로, 에이전트가 무엇을 호출했든 안 했든 매 턴 그 값을 냅니다. 여기서는 477 토큰이고, 측정한 일곱 개
 서버 중 가장 큰 것은 8,283입니다. deja 자신도 스키마를 모드가 있는 하나의 도구로 줄이기 전에는 828이었습니다.
 
 ## 지원하는 도구
@@ -215,6 +235,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Zed.
 | Grok Build | 플러그인 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` 다음 `grok plugin install deja` |
 | OpenClaw | ClawHub와 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (그리고 omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | Hermes 플러그인 카탈로그의 메모리 공급자 `deja-memory` | `hermes plugins install deja-vu`, 또는 GitHub에서: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 어느 쪽이든 하나면 충분하고 둘 다 해도 탈이 없습니다. 각 패키지는 먼저 `deja install`이 써 둔 설정을
 읽습니다. opencode, dsh, OpenClaw는 빠진 부분만 채우고, Kimi, Grok, Codex, pi는 설치기가 이미 연결했다면
@@ -292,7 +313,10 @@ deja bench read       # 데이터베이스 기반 저장소를 읽는 비용과,
 <summary><b>이미 로그에 있는 비밀정보는요?</b></summary>
 
 그건 원래 도구의 파일에 남습니다. 여러분 에이전트의 데이터니까요.
-deja의 색인, 요약, share, sync 내보내기에는 들어가지 않습니다.
+`deja secrets`는 그런 비밀정보가 든 세션을 알려 주므로 교체하고 지울 수 있고, `--scrub`은 손이 닿는 기록을
+다시 씁니다. 알려진 형태는 색인 시점에 제거되어 요약, share, sync 내보내기에 들어가지 않습니다. 패턴 매칭은
+비밀정보 탐지기가 아니라서 모르는 형태는 지나갈 수 있습니다.
+[보안 모델](../../docs/SECURITY-MODEL.md#redaction-boundary)을 참고하세요.
 
 </details>
 
@@ -331,8 +355,8 @@ deja의 색인, 요약, share, sync 내보내기에는 들어가지 않습니다
 <summary><b>Claude Code 세션 기록은 어디 있고 검색할 수 있나요?</b></summary>
 
 `~/.claude/projects` 아래, 세션마다 JSONL 파일
-하나입니다. Codex는 `~/.codex/sessions`, Cursor는 SQLite의 `state.vscdb`입니다. `deja search`는 그것들을
-제자리에서 읽고, `deja last`는 에이전트별 최근 세션을 보여 주며, `deja view`는 전체 기록을 로컬 페이지
+하나입니다. Codex는 `~/.codex/sessions`, Cursor는 SQLite의 `state.vscdb`입니다. deja는 그것들을
+제자리에서 읽습니다. 인자 없는 `deja`는 검색하고 읽는 화면을 열고, `deja search`는 스크립트에서 같은 일을 하며, `deja last`는 에이전트별 최근 세션을 보여 주며, `deja view`는 전체 기록을 로컬 페이지
 하나로 엽니다. 도구별 경로는
 [세션이 저장되는 곳](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)에 있습니다.
 
@@ -372,7 +396,7 @@ rm -rf ~/.cache/deja
 - [에이전트가 세션 사이에 잊는 이유](https://vshulcz.github.io/deja-vu/guide/forgetting.html) · [각 에이전트가 기록을 두는 곳](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)
 - [압축이 잃는 것](https://vshulcz.github.io/deja-vu/guide/after-compaction.html) · [에이전트 바꾸기](https://vshulcz.github.io/deja-vu/guide/switching-agents.html) · [에이전트가 한 일 감사하기](https://vshulcz.github.io/deja-vu/guide/auditing-agents.html) · [대화 내보내기](https://vshulcz.github.io/deja-vu/guide/export-conversations.html) · [기계 사이에서](https://vshulcz.github.io/deja-vu/guide/sync-across-machines.html) · [기억에 드는 토큰 비용](https://vshulcz.github.io/deja-vu/guide/token-cost.html)
 
-도구별: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi and omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
+도구별: [opencode](https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html) · [Zed](https://vshulcz.github.io/deja-vu/guide/memory-for-zed.html) · [Grok Build](https://vshulcz.github.io/deja-vu/guide/memory-for-grok.html) · [Gemini CLI](https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html) · [OpenClaw](https://vshulcz.github.io/deja-vu/guide/memory-for-openclaw.html) · [Goose](https://vshulcz.github.io/deja-vu/guide/memory-for-goose.html) · [Cline](https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html) · [pi와 omp](https://vshulcz.github.io/deja-vu/guide/memory-for-pi.html) · [Hermes](https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html)
 
 ## 자기 기록에서 한번 해 보기
 

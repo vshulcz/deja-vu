@@ -21,8 +21,6 @@ deja はそれを数か月前の分まで丸ごとインデックス化し、
 ファイルが編集される前やコマンドが実行される前、そしてコマンドが失敗した後に届きます。キーやトークンはインデックス作成時に取り除かれます。
 何が取り除かれ、何は取り除けないのかは<a href="../../docs/SECURITY-MODEL.md">セキュリティモデル</a>に書いてあります。</p>
 
-<p align="center"><b>私たちが測定できたコーディングエージェント向けメモリの中で、最も正確で、最も安く、最も速い。</b></p>
-
 <table align="center">
 <tr>
 <td align="center" width="33%">再現率<br>LongMemEval-S で <b>97.2% R@5</b><br><sub>全 500 問 · MemPalace 96.6%、agentmemory 95.2%<br>同じ 19,195 セッションで 1 位正解 19/100、次点は 14</sub></td>
@@ -36,7 +34,7 @@ deja はそれを数か月前の分まで丸ごとインデックス化し、
 <a href="https://vshulcz.github.io/deja-vu/guide/benchmarks.html">LongMemEval と LoCoMo の実行結果</a></sub></p>
 
 <p align="center">
-  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml"><img src="https://github.com/vshulcz/deja-vu/actions/workflows/ci.yml/badge.svg?branch=main&event=push" alt="CI"></a>
   <a href="https://github.com/vshulcz/deja-vu/releases"><img src="https://img.shields.io/github/v/release/vshulcz/deja-vu" alt="Release"></a>
   <a href="https://mcptoplist.com/server/io.github.vshulcz%2Fdeja-vu"><img src="https://mcptoplist.com/badge/io.github.vshulcz%2Fdeja-vu.svg" alt="MCP Toplist"></a>
   <a href="../../LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
@@ -65,7 +63,7 @@ deja install --auto
 > have we dealt with jwt refresh rotation before? check your memory
 
 頼む必要すらありません——自動リコールを有効にしていれば、セッションを開いた時点で、
-エージェントはそのプロジェクトで解決済みのことをすでに知っています。
+エージェントはそのプロジェクトで解決済みのことをすでに知っています。自分で探すなら `deja` を実行してください。
 
 <details>
 <summary>その他のインストール方法と、すべては不要な場合の設定</summary>
@@ -75,9 +73,10 @@ deja install --auto
 受け付けるデスクトップアプリでは、[最新リリース](https://github.com/vshulcz/deja-vu/releases/latest)の
 `.mcpb` を開けます。バイナリも同梱されています。
 
-Claude Code、Cursor、Qwen、OpenClaw、Copilot では、それぞれのマーケットプレイスから
+Claude Code、Cursor、Qwen、OpenClaw では、それぞれのマーケットプレイスから
 同じプラグインバンドルを入れることもできます（Codex には専用のバンドルがあります。下の
-[独自パッケージを持つハーネス](#独自パッケージを持つハーネス)を参照）：
+[独自パッケージを持つハーネス](#独自パッケージを持つハーネス)を参照）。Copilot CLI もこれを
+インストールできますが、取り込むのはスキルだけなので、そちらでは `deja install copilot-auto` を使ってください：
 
 ```sh
 claude plugin marketplace add vshulcz/deja-vu && claude plugin install deja-vu@deja-vu
@@ -114,9 +113,25 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 <details>
 <summary>各エージェント自身のガイダンスファイルに書き込まれる内容</summary>
 
-インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、Zed、Junie は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build には、それが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。Kilo Code、gajae-code、Command Code、Cherry Studio、Reasonix にはスキルが、Kiro にはステアリングファイルが、それぞれ専用のインストールターゲットから書き込まれます。
+インストール時には、検出したハーネス向けにユーザーレベルのガイダンスも書き込みます。Claude Code、Codex、opencode、Gemini CLI、Antigravity、Qwen、Kimi Code、pi、Senpi、Copilot、VS Code Copilot Chat、Cursor、Goose、OpenClaw、Hermes、Roo Code、omp、Amp、prime-agent、DeepSeek Harness、Continue、Crush、CodeBuddy Code、WorkBuddy、Zed、TRAE CLI、TRAE IDE、Muse Code、CodeWhale、ZCode、Junie は、それぞれ自身のガイダンスファイル（または設定された `XDG_CONFIG_HOME` 配下）に書き込まれます。再実行すると、周囲のユーザー記述はそのままに、deja のスキルまたはマーク付きブロックだけを書き換えます。オプトアウトするには `deja install --all --no-guidance` を使ってください。Grok Build と Devin CLI には、それらが読み込む `~/.agents/skills` に共有スキルが置かれます。その横に書かれる `~/.grok/GROK.md` は、同じディレクトリを使う無関係なコミュニティ製 CLI 向けです。Cursor にはユーザーレベルの指示ファイルがないため、Cursor がスキルを読み込む 4 か所のひとつである `~/.agents/skills` に共有スキルが置かれます——毎セッションではなく、関連がありそうなときにだけ読み込まれます。Kilo Code、gajae-code、Kimchi、Command Code、Cherry Studio、Reasonix にはスキルが、Kiro にはスキルとステアリングファイルが、それぞれ専用のインストールターゲットから書き込まれます。
 
 </details>
+
+## 自分で検索する
+
+ターミナルで引数なしの `deja` を実行すると、全エージェントの履歴を検索する画面が開きます。最初に並ぶのは
+まだコミットしていない変更の背景にあるセッション、次にこのプロジェクトの最近のセッションで、入力するたびに
+一覧が絞り込まれます。
+
+<p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="deja の画面で検索を入力し、見つかったセッションを読み、そのセッションを別のエージェントで続ける"></p>
+
+- `↑↓` でセッションを選び、`↵` で一致箇所から開き、`n` と `N` で一致箇所を移動し、`esc` で戻ります。
+- `r` はセッションを書いたエージェントで再開します。`o` は別の任意のエージェントで続けます。そのエージェントは、セッションが何を尋ね、何を決め、何を未解決のまま残したかを持った状態で始まります。
+- `tab` で「このプロジェクト」「すべてのプロジェクト」「Kept」を切り替えます。Kept は、エージェントが削除したが deja がまだ保持しているセッションで、`R` でひとつを元に戻せます。
+- `?` ですべてのキーを表示し、`q` で終了します。
+
+`DEJA_TUI=0` を指定すると、画面の代わりにテキストの要約を表示します。これは `deja brief` と同じものです。
+パイプに出力した場合は、何がインデックス化されていて次にどのコマンドを実行すればよいかを表示します。
 
 ## できること
 
@@ -156,8 +171,10 @@ aider の読み取り専用コンテキストファイル、Windows の `cmd /c 
 ## プライバシー
 
 インデックス作成と検索はローカルで完結します。ネットワークを使うのは `deja update`、`deja sync ssh`、
-`deja doctor` のバージョンチェック、そして埋め込みエンドポイント（後述）に対する `deja embed`
-（ベクトルがあれば検索時のクエリ埋め込みも）だけです。
+`deja doctor` のバージョンチェック、埋め込みエンドポイント（後述）に対する `deja embed`
+（ベクトルがあれば検索時のクエリ埋め込みも）、そして対話的なコマンドが 1 日 1 回最新リリースを確認する
+ことだけです。この確認はセッションのデータを送りません。`DEJA_OFFLINE=1` または `DEJA_NO_UPDATE_NOTICE=1`
+で無効にできます。
 
 認証情報はインデックス作成時に秘匿化されます：AWS キー、`api_key=` や `token=` の代入、
 Bearer トークンや生の JWT、PEM 秘密鍵ブロック、各プロバイダーのトークン、`scheme://user:pass@host`
@@ -185,6 +202,9 @@ Bearer トークンや生の JWT、PEM 秘密鍵ブロック、各プロバイ�
 
 ## CLI
 
+ターミナルで引数なしの `deja` を実行すると[検索画面](#自分で検索する)が開きます。クエリや下のいずれかの
+コマンドを付けると、結果を出力して終了します：
+
 ```text
 $ deja "jwt refresh token"
 [claude] api        · Jul 8 · 8f31c0a9 — 2 matches
@@ -199,7 +219,7 @@ $ deja "jwt refresh token"
 | コマンド | 説明 |
 | --- | --- |
 | `deja <query>` | すべての履歴を検索します。複数語は AND、引用符で囲んだフレーズは連続したテキストを要求します。完全一致がない場合は語形変化や近い綴りを試すので、部分文字列から単語にたどり着けます（`code` で `opencode` が見つかります）。 |
-| `deja` | インデックスがありターミナルから実行した場合：今日のセッション、提供したリコール、複数のセッションで尋ねた質問、そしてエージェントが何度もぶつかっている壁を表示します。 |
+| `deja` | ターミナルでは上の全画面検索。`deja brief` は代わりにテキストの要約を表示します：今日のセッション、deja が提供したもの、最近の作業、試すとよい検索。 |
 | `deja wip` | このディレクトリで直前のセッションが何をしていたか：タスク、決着したこと、作業中のファイル、最後のコマンドとそれが失敗したかどうか——誰かが書き忘れなかったメモではなく、トランスクリプトから導き出します。 |
 | `deja blame <path>[:line]` | どのセッションがそのファイルについて議論し、何を決め、なぜそうしたか。行を指定すると：その行を最後に変更したコミットと、その行を書いた、あるいはコミットが置き換えたテキストを書いたセッション。`--attribution` は行についての答えだけを出力し、`--json` と併用すると JSON で、`--git-note` と併用すると `refs/notes/deja` に記録します。 |
 | `deja files <topic>` | 逆方向：あるテーマに関する作業が実際に触れたファイル。 |
@@ -245,7 +265,7 @@ $ deja "jwt refresh token"
 ツールを 7 つではなくひとつにしたのは、見た目ではなくコストの問題です。接続された MCP サーバーは
 リクエストのたびにツール定義を送るので、エージェントが何も呼ばなくても毎ターン費用がかかります。
 ここでは 477 token、[day zero](https://vshulcz.github.io/deja-vu/guide/day-zero.html) で測った
-8 つのサーバーのうち最大のものは 8,283 token でした。deja 自身も、スキーマをモード付きのツール
+7 つのサーバーのうち最大のものは 8,283 token でした。deja 自身も、スキーマをモード付きのツール
 ひとつに絞るまでは 828 token でした。
 
 <details>
@@ -267,6 +287,7 @@ $ deja "jwt refresh token"
 | `how` | ツールや対象（例：`go test`） | `project?`、`limit?` | ここでエージェントが実行した内容に基づく、実際の呼び出し方。 |
 | `orient` | なし（プロジェクトについて尋ねます） | `project?`、`limit?` | 過去のセッションがここで実行したコマンドと、作業したファイル。 |
 | `remember` | 恒久的な事実や決定をひとつ | `project?`、`tags?` | 後でリコールするために、恒久的な決定を保存します。 |
+| `handoff` | セッション ID またはハーネス名。空ならここでの最新セッション | `harness?` | 別のセッションの目標、継続中の指示、最新の結論、通ったチェック、止まった位置。そのセッションを続けるためのものです。 |
 
 </details>
 
@@ -281,7 +302,7 @@ $ deja "jwt refresh token"
 [自動コンパクション復旧](../../docs/compaction.md)を参照してください。
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
 
 <details>
 <summary>各ハーネスの対応状況</summary>
@@ -289,50 +310,55 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | ハーネス | MCP リコール | 自動リコール | スキル | コマンド | 再開 | 引き継ぎ | 必要なもの |
 | --- | :-: | :-: | :-: | :-: | :-: | :-: | --- |
 | aider | ⚠ | ✅ | ✕ | ⚠ | ✕ | ✅ | deja aider |
-| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| Amp | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 0.0.1774963753 以降のスレッドは ampcode.com 上にあり、deja はプラグインが書き出したものと、それ以前のローカルのものを読みます |
 | Antigravity | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Claude Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Cline | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Codex CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Copilot CLI | ✅ | ✕ | ✅ | ✅ | ✅ | ✅ | — |
-| VS Code Copilot Chat | ✅ | ✕ | ✅ | ✅ | ✕ | 貼り付け | — |
-| Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3（IDE チャット） |
-| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | 貼り付け | zstd |
+| Copilot CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| VS Code Copilot Chat | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | — |
+| Cursor | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3（IDE チャット、CLI のツール出力） |
+| DeepSeek Harness | ✅ | ✅ | ✅ | ✅ | ✕ | ✅ | zstd |
 | Gemini CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Goose | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | deja goose |
 | Grok Build | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3（grok-dev ストア） |
-| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | sqlite3 |
+| Hermes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | Kimi Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | omp (Oh My Pi) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | — |
+| OpenClaw | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3（2026.8 以降のストア）、.zst アーカイブと圧縮イベント（2026.9.9 以降）用の zstd |
 | opencode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
-| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | — |
+| Continue | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — |
 | Crush | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | sqlite3 |
 | pi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | prime-agent (PrimeIntellect) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | Qwen Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Cherry Studio | ✅ | ✕ | ✅ | ✕ | ✕ | 貼り付け | 設定 -> MCP でサーバーを一度インポートし、エージェントでスキルを有効化 |
+| Cherry Studio | ✅ | ✅ | ✅ | ✕ | ✕ | 貼り付け | 設定 -> MCP でサーバーを一度インポートし、エージェントでスキルを有効化 |
 | Senpi | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
-| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | なし |
-| Kimchi Coding | ✅ | ⚠ | ⚠ | ⚠ | ✅ | 貼り付け | なし |
-| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | なし |
-| ZCode | ✅ | ✅ | ? | ? | ✅ | 貼り付け | CLI データベース用の sqlite3 |
-| Kiro | ✅ | — | ✕ | ? | ✅ | 貼り付け | CLI データベース用の sqlite3 |
-| Kilo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | CLI ストア用の sqlite3 |
-| Roo Code | ✅ | ⚠ | ✅ | ✅ | ✅ | 貼り付け | roo CLI（エディターのタスクはエディターで再開） |
+| gajae-code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| Kimchi Coding | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| Command Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| ZCode | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CLI データベース用の sqlite3 |
+| Kiro | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CLI データベース用の sqlite3 |
+| Kilo Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | CLI ストア用の sqlite3 |
+| Roo Code | ✅ | ✕ | ✅ | ✅ | ✅ | 貼り付け | roo CLI（エディターのタスクはエディターで再開） |
 | Zed | ✅ | ✕ | ✅ | ✅ | ✕ | 貼り付け | sqlite3 + zstd |
-| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | 実行 | なし |
-| JetBrains AI Assistant | ✅ | ⚠ | ? | ⚠ | ✕ | 貼り付け | なし |
-| CodeWhale | — | — | ? | ? | ✅ | 貼り付け | なし |
-| CodeBuddy Code | ✅ | ✅ | — | — | — | 貼り付け | なし |
-| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | 貼り付け | 1.x セッション用の zstd |
-| TRAE CLI | — | — | ? | ? | ✅ | 貼り付け | なし |
-| Muse Code | ? | ⚠ | ? | ? | — | 貼り付け | なし |
+| Devin CLI | ✅ | ✅ | ✅ | ✕ | ✅ | ✅ | sqlite3 |
+| CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | 貼り付け | なし |
+| CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 1.x セッション用の zstd |
+| TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
+| Muse Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | なし |
 
-✅ 動作する &middot; — 可能だが未実装 &middot; ✕ ハーネス側にその仕組みがない &middot; ⚠ 上流のバグにより利用不可 &middot; ? 未調査
+✅ 動作する &middot; — 可能だが未実装 &middot; ✕ ハーネス側にその仕組みがない &middot; ⚠ ハーネス側の対応待ち &middot; ? 未調査
 
 </details>
 <!-- matrix:end -->
+
+TRAE IDE は接続はしますが、読み取りはしません。チャットが暗号化されたデータベースにあるためです。
+`deja install trae-ide` は MCP サーバーとスキルを追加し、`trae-ide-auto` はフックを追加します。TRAE IDE が
+フックを実行するのは、設定 > Hooks で有効にした後だけです。
 
 ストアの場所をカスタマイズするには `DEJA_*_ROOT` 変数を使います。各エージェント自身の移動用変数も
 尊重されます。[セッション形式レジストリ](https://vshulcz.github.io/deja-vu/registry/README.html)には、
@@ -341,7 +367,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 
 ### 独自パッケージを持つハーネス
 
-`deja install --auto` は、他のハーネスと同様にこの 8 つもすべて接続し、それが最短の方法であることに
+`deja install --auto` は、他のハーネスと同様にこれらもすべて接続し、それが最短の方法であることに
 変わりはありません。これらには各エコシステム内のパッケージもあり、CLI ではなくそこから拡張機能を
 インストールする人向けです：
 
@@ -355,6 +381,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | Grok Build | プラグイン `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` の後に `grok plugin install deja` |
 | OpenClaw | ClawHub と npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi（と omp） | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
+| Hermes | メモリプロバイダー `deja-memory`（Hermes のプラグインカタログ内） | `hermes plugins install deja-vu`、または GitHub から：`hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 どちらの方法も単独で十分で、両方を使っても問題ありません。どのパッケージもまず `deja install` が
 書き込んだ内容を読み取ります。opencode、dsh、OpenClaw は足りないものだけを追加し、Kimi、Grok、Codex、pi は
@@ -432,7 +459,7 @@ deja bench ingest     # what an update costs: unchanged, a turn, a new transcrip
 deja bench read       # what it costs to read a database-backed store, and what one long value does to it
 ```
 
-`bench block` は他の 3 つでは問えない問いを立てます：正しいセッションが手元にあるとき、そのブロックは
+`bench block` は他のベンチでは問えない問いを立てます：正しいセッションが手元にあるとき、そのブロックは
 そのセッションで決着した内容を運んでいるか。各テーマについて 8 つのセッションが議論し、そのうち 1 つが
 決着をつけます。それもトランスクリプトの最後ではなく途中で——そのため、上位ヒットの最新ターンを使う
 ベースラインは 0 点になり、0 点を超えるには選び取る必要があります。
@@ -543,8 +570,8 @@ deja bench read       # what it costs to read a database-backed store, and what 
 <summary><b>Claude Code のセッション履歴はどこに保存されていて、検索できますか？</b></summary>
 
 `~/.claude/projects` の下に、セッションごとに 1 つの JSONL ファイルとして保存されています。Codex は
-`~/.codex/sessions`、Cursor は SQLite の `state.vscdb` に保存します。`deja search` はそれらすべてをその場で
-読み取り、`deja last` は全エージェントの最近のセッションを一覧表示し、`deja view` は履歴全体をひとつの
+`~/.codex/sessions`、Cursor は SQLite の `state.vscdb` に保存します。deja はそれらすべてをその場で
+読み取ります。引数なしの `deja` はそれらを検索して読む画面を開き、`deja search` は同じことをスクリプトから行い、`deja last` は全エージェントの最近のセッションを一覧表示し、`deja view` は履歴全体をひとつの
 ローカルページとして開きます。各エージェントのパスは[セッションの保存場所](https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html)を参照してください。
 
 </details>

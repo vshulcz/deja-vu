@@ -22,7 +22,7 @@ The work sits in the same `parts` list as `functionCall` and `functionResponse`.
 
 - **MCP**: `deja install qwen` adds `mcpServers.deja` to `~/.qwen/settings.json`.
 - **Skill**: the shared `~/.agents/skills/deja-history/SKILL.md`. Qwen lists skills under `/skills`, so the skill is also the command.
-- **Auto-recall**: `deja install qwen-auto` adds hooks to the same `settings.json`: `SessionStart` (digest), `UserPromptSubmit` (per-prompt recall), `PostToolUseFailure` on `run_shell_command` (the earlier fix for a failed command), `PreCompact` and `SessionEnd` (the session you quit is back in the next one's MCP recall).
+- **Auto-recall**: `deja install qwen-auto` adds hooks to the same `settings.json`: `SessionStart` (digest), `UserPromptSubmit` (per-prompt recall), `PostToolUseFailure` on `run_shell_command` (the earlier fix for a failed command), `PostToolUse` on `read_file|edit|write_file` (the line deja keeps for that file), `PreCompact` and `SessionEnd` (the session you quit is back in the next one's MCP recall).
 
 ## Resume
 
@@ -34,7 +34,8 @@ anywhere else the id resolves to nothing. deja takes that directory from the
 that records none, and prints `cd <project> && qwen -r <id>`. When the recorded
 directory is gone, or deja cannot tell which directory the session ran in,
 resume refuses and points at `deja show <id>`: the bare command would only get
-"No saved session found".
+"No saved session found". On the screen bare `deja` opens, `r` runs the same
+command for the picked session and `o` continues it in another agent.
 
 ## Status line
 
