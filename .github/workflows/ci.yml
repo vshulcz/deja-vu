@@ -203,7 +203,7 @@ jobs:
           fetch-depth: 60
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
       - run: go mod verify
         if: env.FULL == 'true' && matrix.shard == 1
       - run: go vet ./...
@@ -377,7 +377,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.os == 'ubuntu-latest'
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       # Read from the run's jobs rather than from what the shards uploaded:
       # artifacts belong to the run, not the attempt, so after a re-run a
@@ -521,7 +521,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       - run: sh scripts/e2e.sh
 
@@ -532,7 +532,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       - name: Build all release targets
         run: |
@@ -550,7 +550,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       - name: Pack a bundle
         run: |
@@ -577,7 +577,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       # scoop and winget carry a version and two hashes that are updated after
       # a release. That step is invisible when skipped — v0.16.0 shipped with
@@ -610,7 +610,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       # A squash merge applies the branch's own diff, so a branch cut before
       # another PR landed silently restores that PR's old lines — mergeable,
@@ -634,7 +634,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       - name: Sitemap lastmod follows the pages
         run: go test ./cmd/deja -run TestSitemapLastmodFollowsThePages -count 1
@@ -651,7 +651,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       # The nav, the support matrix, the registry pages and the feed are
       # generated and committed. Nothing asserted the committed copy was what
@@ -684,10 +684,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
           # Without this, setup-go stops at whatever Go the runner image
-          # already carries, because it satisfies 1.25.x — and that is a
+          # already carries, because it satisfies 1.26.x — and that is a
           # patch or two behind. Every standard-library advisory then fails
           # this job on a fix that is already released: five of them, all
           # fixed in 1.25.13, against an image carrying 1.25.12. The other
@@ -706,7 +706,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25.x'
+          go-version: '1.26.x'
           cache: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:

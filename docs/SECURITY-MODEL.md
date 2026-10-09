@@ -214,7 +214,7 @@ On macOS, use `shasum -a 256 -c checksums.txt` instead.
 
 ## Rebuilding a release
 
-Release binaries are built with Go 1.25.x, `CGO_ENABLED=0`, and `-trimpath`.
+Release binaries are built with Go 1.26.x, `CGO_ENABLED=0`, and `-trimpath`.
 To compare one target, check out its tag, use the exact Go patch version shown
 in the release workflow logs, and set the version embedded by GoReleaser:
 
