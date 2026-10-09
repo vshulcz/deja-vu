@@ -203,12 +203,16 @@ func (a *tuiApp) drawStrip(l layout, y int) {
 
 func (a *tuiApp) drawFooter() {
 	p := a.p
+	if a.view == viewReader && a.reader.finding {
+		a.drawFind()
+		return
+	}
 	y := p.H - 1
 	p.Fill(0, y, p.W, 1, cMantle)
 	var keys [][2]string
 	switch {
 	case a.view == viewReader:
-		keys = [][2]string{{"↑↓", "scroll"}, {"n N", "next hit"}, {"t", "full messages"}, {"r", "resume"}, {"o", "continue in…"}, {"c", "copy"}, {"esc", "back"}}
+		keys = [][2]string{{"↑↓", "scroll"}, {"/", "find"}, {"n N", "next hit"}, {"[ ]", "turns"}, {"r", "resume"}, {"o", "continue in…"}, {"t", "full messages"}, {"c", "copy"}, {"esc", "back"}}
 	case a.listFocus && len(a.rows) > 0:
 		keys = [][2]string{{"↵", "read"}, {"r", "resume"}, {"o", "continue in…"}, {"c", "copy context"}, {"a", "agents"}, {"/", "search"}, {"?", "help"}}
 	case len(a.query) > 0:

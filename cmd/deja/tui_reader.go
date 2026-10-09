@@ -22,6 +22,7 @@ type readerLine struct {
 	when   string    // beside the role, on a header line
 	block  bool      // drawn on a block, like output in a terminal
 	hit    bool
+	turn   bool // the header of something the reader asked
 }
 
 type readerState struct {
@@ -35,6 +36,12 @@ type readerState struct {
 	expand  bool
 	layoutW int
 	placed  bool
+
+	turns   []int // the header line of each user turn
+	turn    int   // the turn on screen, -1 above the first
+	turnTop int   // the top the turn was worked out for
+	finding bool  // the / line is open
+	find    []rune
 }
 
 const (
@@ -88,7 +95,8 @@ func roleLook(role, harness string) (readerRole, bool) {
 
 func (r *readerState) layout(width int, now func(model.Message) string) {
 	r.layoutW = width
-	r.lines, r.hits = nil, nil
+	r.lines, r.hits, r.turns = nil, nil, nil
+	r.turnTop = -1
 	tw := width - 8
 	if tw < 20 {
 		tw = 20
@@ -120,7 +128,10 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 				body = append(body, readerLine{text: ln, st: base, indent: 4, hit: hit, block: look.block})
 			}
 		}
-		head := readerLine{text: look.label, st: bold(look.color), indent: 2, role: look.color, when: now(m)}
+		head := readerLine{text: look.label, st: bold(look.color), indent: 2, role: look.color, when: now(m), turn: m.Role == "user"}
+		if head.turn {
+			r.turns = append(r.turns, len(r.lines))
+		}
 		r.lines = append(r.lines, head)
 		fold := look.fold
 		if r.expand || matched {
@@ -150,6 +161,13 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 	}
 }
 
+func readerWhen(m model.Message) string {
+	if m.Time.IsZero() {
+		return ""
+	}
+	return m.Time.Local().Format("Jan 2 15:04")
+}
+
 func anyMarked(m []bool) bool {
 	for _, b := range m {
 		if b {
@@ -170,7 +188,8 @@ func (a *tuiApp) drawReader() {
 	x := p.Put(1, 0, "◆ deja", boldOn(cAcc, cMantle), p.W)
 	x = p.Put(x+3, 0, "●", on(agentColor(s.Harness), cMantle), p.W)
 	x = p.Put(x+1, 0, agentName(s.Harness), boldOn(cText, cMantle), p.W)
-	p.PutClip(x+2, 0, tuiProject(s)+" · "+tuiAgo(s.Updated, a.now)+" · "+search.ShortID(s.ID), on(cSub, cMantle), p.W-18)
+	where := r.position()
+	p.PutClip(x+2, 0, tuiProject(s)+" · "+tuiAgo(s.Updated, a.now)+" · "+search.ShortID(s.ID), on(cSub, cMantle), p.W-termwidth.Columns(where)-5)
 	top, height := 2, p.H-3
 	if r.d == nil {
 		for b := 0; b < 3 && top+1+b*5 < p.H-2; b++ {
@@ -180,23 +199,18 @@ func (a *tuiApp) drawReader() {
 		return
 	}
 	if r.layoutW != p.W {
-		r.layout(p.W, func(m model.Message) string {
-			if m.Time.IsZero() {
-				return ""
-			}
-			return m.Time.Local().Format("Jan 2 15:04")
-		})
+		r.layout(p.W, readerWhen)
 	}
 	if !r.placed {
 		r.placed = true
 		if len(r.hits) > 0 {
-			r.top = r.hits[0] - height/3
+			r.jump(0, height)
 		}
 	}
 	r.clamp(height)
-	if len(r.hits) > 0 {
-		label := "hit " + num(r.hit+1) + " of " + num(len(r.hits))
-		p.Put(p.W-termwidth.Columns(label)-2, 0, label, on(cMuted, cMantle), p.W)
+	r.syncTurn(height)
+	if where = r.position(); where != "" {
+		p.Put(p.W-termwidth.Columns(where)-2, 0, where, on(cMuted, cMantle), p.W)
 	}
 	for i := 0; i < height; i++ {
 		n := r.top + i
@@ -240,6 +254,10 @@ func (r *readerState) clamp(height int) {
 func (a *tuiApp) handleReader(ev tui.Event) {
 	r := &a.reader
 	page := a.p.H - 4
+	if r.finding {
+		a.handleFind(ev)
+		return
+	}
 	if ev.Kind == tui.EvMouse {
 		switch ev.Button {
 		case tui.MouseWheelUp:
@@ -300,6 +318,12 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 			r.jump(1, a.p.H-3)
 		case 'N':
 			r.jump(-1, a.p.H-3)
+		case '/':
+			r.finding, r.find = true, nil
+		case ']':
+			r.jumpTurn(1, a.p.H-3)
+		case '[':
+			r.jumpTurn(-1, a.p.H-3)
 		case 't':
 			r.expand = !r.expand
 			r.layoutW = 0
@@ -325,4 +349,6 @@ func (r *readerState) jump(d, height int) {
 	}
 	r.hit = (r.hit + d + len(r.hits)) % len(r.hits)
 	r.top = r.hits[r.hit] - height/3
+	r.clamp(height)
+	r.pinTurn(r.hits[r.hit])
 }

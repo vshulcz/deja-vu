@@ -275,10 +275,10 @@ func (a *tuiApp) drawHelp() {
 		keys  [][2]string
 	}{
 		{"FIND", [][2]string{{"type", "search as you type"}, {"tab", "this project / all / kept"}, {"↑↓ 1-9", "pick a session"}, {"↑ on empty", "past searches"}, {"a", "filter by agent"}}},
-		{"READ", [][2]string{{"↵", "open at the match"}, {"n N", "next / previous match"}, {"t", "unfold long messages"}, {"g G", "top / bottom"}, {"esc", "back to the list"}}},
+		{"READ", [][2]string{{"↵", "open at the match"}, {"/", "find in the session"}, {"n N", "next / previous match"}, {"] [", "next / previous turn"}, {"t", "unfold long messages"}, {"g G", "top / bottom"}, {"esc", "back to the list"}}},
 		{"ACT", [][2]string{{"r", "resume in its agent"}, {"o", "continue in any agent"}, {"c", "copy the context"}, {"R", "put a deleted one back"}, {"^k", "every command by name"}}},
 	}
-	x, y, iw := a.modalBox(100, 12)
+	x, y, iw := a.modalBox(100, 14)
 	right := x + iw
 	cx := p.Put(x, y, "Keys", bold(cText), right)
 	p.Put(cx+3, y, "the three you need: type, ↵, o", fgs(cMuted), right)
@@ -292,5 +292,5 @@ func (a *tuiApp) drawHelp() {
 			p.PutClip(kx+1, y+1+i, k[1], fgs(cSub), cx+colW-1)
 		}
 	}
-	p.Put(x, y+7, "The mouse works too: click a card, double-click to open, scroll anywhere.", fgs(cMuted), right)
+	p.Put(x, y+9, "The mouse works too: click a card, double-click to open, scroll anywhere.", fgs(cMuted), right)
 }
