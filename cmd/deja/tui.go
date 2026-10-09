@@ -38,15 +38,17 @@ const (
 	modalHelp
 	modalPalette
 	modalNews
+	modalForget
 )
 
 type tuiApp struct {
-	dir   string
-	t     *tui.Term
-	p     painter
-	now   time.Time
-	clock func() time.Time   // nil: the wall clock; tests pin it
-	copy  func(string) error // nil: the clipboard; tests catch it
+	dir    string
+	t      *tui.Term
+	p      painter
+	now    time.Time
+	clock  func() time.Time      // nil: the wall clock; tests pin it
+	copy   func(string) error    // nil: the clipboard; tests catch it
+	forget func(id string) error // nil: `deja forget --session`; tests swap it
 
 	scope       int
 	projects    []string

@@ -171,6 +171,12 @@ func (a *tuiApp) listAction(r rune) bool {
 		a.openContinue()
 	case 'c':
 		a.copyContext()
+	case 'i':
+		a.copySessionID()
+	case 'p':
+		a.copyProjectPath()
+	case 'F':
+		a.askForget()
 	case 'a':
 		a.openModal(modalAgents)
 	case '?':

@@ -30,6 +30,11 @@ func (a *tuiApp) paletteItems() []paletteItem {
 		}
 		add("Continue in another agent…", "o", a.openContinue)
 		add("Copy the context for any agent", "c", a.copyContext)
+		add("Copy the session id", "i", a.copySessionID)
+		if s.Project != "" {
+			add("Copy the project path", "p", a.copyProjectPath)
+		}
+		add("Forget this session…", "F", a.askForget)
 	}
 	names := []string{"This project", "All projects", "Deleted sessions"}
 	for i, n := range names {
