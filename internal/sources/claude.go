@@ -145,13 +145,29 @@ func ClaudeSidecarFiles() []string {
 // UnderClaudeRoot reports whether a path is inside any of the roots above. The
 // registry matches a transcript to its harness by prefix, and with more than
 // one root that question is no longer "does it start with ClaudeRoot()".
+//
+// It is asked once per transcript, so it matches the roots as strings instead
+// of checking each exists on disk: a path under a root means the root is there,
+// and the stats and the cc-mirror listing per file were most of the time a
+// command spent on 27,000 sessions before it searched.
 func UnderClaudeRoot(p string) bool {
-	for _, root := range ClaudeRoots() {
-		if strings.HasPrefix(p, root) {
+	if r := os.Getenv("DEJA_CLAUDE_ROOT"); r != "" {
+		return strings.HasPrefix(p, r)
+	}
+	cfg := ClaudeConfigDir()
+	for _, r := range []string{filepath.Join(cfg, claudeProjectsDirName()), filepath.Join(cfg, "transcripts"), XcodeClaudeRoot()} {
+		if strings.HasPrefix(p, filepath.Clean(r)) {
 			return true
 		}
 	}
-	return false
+	// ~/.cc-mirror/<variant>/.claude/<projects>
+	base := filepath.Clean(EnvPath("DEJA_CC_MIRROR_ROOT", filepath.Join(Home(), ".cc-mirror"))) + string(filepath.Separator)
+	rest, ok := strings.CutPrefix(p, base)
+	if !ok {
+		return false
+	}
+	i := strings.IndexRune(rest, filepath.Separator)
+	return i > 0 && strings.HasPrefix(rest[i+1:], filepath.Join(".claude", claudeProjectsDirName()))
 }
 
 // ClaudeFileWanted reports whether a path under the Claude root belongs in

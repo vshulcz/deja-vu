@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Claude Code names a project folder by writing every character outside
@@ -156,5 +157,38 @@ func TestAClaudeFolderReadBeforeItsCWDLandsIsNamedOnceItDoes(t *testing.T) {
 	}
 	if got := claudeProjectNameFor(path); got != "w/проект" {
 		t.Errorf("after cwd landed the folder is %q, want w/проект", got)
+	}
+}
+
+// A folder that named nothing is not listed again for every older transcript
+// in it, and is once a transcript is written after the miss.
+func TestAClaudeFolderMissIsKeptForOlderTranscripts(t *testing.T) {
+	home := t.TempDir()
+	work := filepath.Join(home, "w", "проект")
+	dir := filepath.Join(home, "projects", claudeEncodePath(work))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	claudeCWDNameCache = sync.Map{}
+	path := filepath.Join(dir, "aaaa.jsonl")
+	snap := `{"type":"file-history-snapshot","messageId":"m0","snapshot":{"trackedFileBackups":{}}}` + "\n"
+	if err := os.WriteFile(path, []byte(snap), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-time.Hour)
+	_ = os.Chtimes(path, old, old)
+	missed := claudeProjectNameFor(path)
+	user := `{"type":"user","cwd":` + jsonString(work) + `,"message":{"role":"user","content":"x"}}` + "\n"
+	if err := os.WriteFile(path, []byte(snap+user), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Chtimes(path, old, old)
+	if got := claudeProjectNameFor(path); got != missed {
+		t.Errorf("an older transcript read the folder again: %q", got)
+	}
+	now := time.Now().Add(time.Second)
+	_ = os.Chtimes(path, now, now)
+	if got := claudeProjectNameFor(path); got != "w/проект" {
+		t.Errorf("a transcript written after the miss is %q, want w/проект", got)
 	}
 }

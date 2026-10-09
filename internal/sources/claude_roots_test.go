@@ -56,6 +56,16 @@ func TestClaudeReadsXcodeCCMirrorVariantsAndTranscripts(t *testing.T) {
 			t.Fatalf("%s is attributed to %q, not claude", want, kind)
 		}
 	}
+	// Outside a variant's Claude store is not Claude's.
+	for _, not := range []string{
+		filepath.Join(home, ".cc-mirror", "work", "notes", "x.jsonl"),
+		filepath.Join(home, ".cc-mirror", "x.jsonl"),
+		filepath.Join(home, ".codex", "sessions", "x.jsonl"),
+	} {
+		if UnderClaudeRoot(not) {
+			t.Errorf("%s is taken for a claude root", not)
+		}
+	}
 }
 
 func TestClaudeDoesNotReadAnXcodeRootTwice(t *testing.T) {

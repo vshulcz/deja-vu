@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Claude Code names a project folder by writing every character of the
@@ -101,18 +102,32 @@ func claudeProjectNameFor(path string) string {
 	if v, ok := claudeCWDNameCache.Load(dir); ok {
 		return v.(string)
 	}
+	// A folder that named nothing is not read again for each older transcript
+	// in it: with thousands in one folder that was a directory listing per
+	// file, and `deja sources` took half a minute. A transcript written since
+	// is where a cwd can have landed (#4225), so it reads the folder again.
+	if at, ok := claudeCWDMiss.Load(dir); ok {
+		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.(time.Time)) {
+			return claudeProjectName(dir)
+		}
+	}
+	start := time.Now()
 	name := cwdProjectName(claudeFolderCWD(dir))
 	if name == "" {
-		// Not cached: a new transcript's first line can be a snapshot with no
-		// cwd, and the decoded name kept for it would outlive the cwd landing
-		// in a long-lived process such as deja mcp (#4225).
+		// Not cached as a name: a new transcript's first line can be a
+		// snapshot with no cwd, and the decoded name kept for it would
+		// outlive the cwd landing in a long-lived process such as deja mcp.
+		claudeCWDMiss.Store(dir, start)
 		return claudeProjectName(dir)
 	}
 	claudeCWDNameCache.Store(dir, name)
 	return name
 }
 
-var claudeCWDNameCache sync.Map // project folder -> display name
+var (
+	claudeCWDNameCache sync.Map // project folder -> display name
+	claudeCWDMiss      sync.Map // project folder -> when it last named nothing
+)
 
 // cwdProjectName is the project named by a recorded working directory: its
 // last two segments, as a decoded folder name would give them. A file:// URI
