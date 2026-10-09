@@ -7,14 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/embed"
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -263,7 +266,7 @@ func runStats(dir string, args []string) error {
 	// SVG with a path — and nobody finds a flag they were not told about.
 	// Only where there is something worth a picture.
 	if report.TotalSessions > 0 {
-		fmt.Fprintln(os.Stdout, "\n  As a card       deja stats --card  ·  deja stats --card deja-stats.svg")
+		fmt.Fprintln(os.Stdout, "\n  As a card        deja stats --card")
 	}
 	if sshTip != "" {
 		fmt.Fprintln(os.Stdout, sshTip)
@@ -310,6 +313,7 @@ func printRedactionReport(dir string, jsonOut bool) error {
 
 func printStats(w io.Writer, r stats.Report) {
 	color := statColorOK(w)
+	width := printableWidth(w)
 	barGlyph := "#"
 	if color {
 		barGlyph = "█"
@@ -344,11 +348,11 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintf(w, "%sdeja stats%s\n", bold, reset)
 	fmt.Fprintf(w, "%sindexed agent work, wrapped for sharing%s\n\n", faint, reset)
 	if headline := statsHeadline(r); headline != "" {
-		fmt.Fprintf(w, "%s%s%s\n\n", bold, headline, reset)
+		fmt.Fprintf(w, "%s%s%s\n\n", bold, termwidth.Indent(headline, width, "", ""), reset)
 	}
 	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
 	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
-	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(r.DateRange.Start), valueOrDash(r.DateRange.End))
+	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(statDay(r.DateRange.Start)), valueOrDash(statDay(r.DateRange.End)))
 	// `deja restore` matters entirely at one moment — an agent replaced a
 	// function with something worse and the work was not committed — and
 	// nobody reads a command list while panicking. So the number is stated
@@ -385,8 +389,16 @@ func printStats(w io.Writer, r stats.Report) {
 			maxProject = p.Sessions
 		}
 	}
+	// Name, count, bar: the count sits in its own right-aligned column, so the
+	// numbers read down the list instead of floating at the end of each bar.
+	wName, wCount := 0, len(strconv.Itoa(maxProject))
 	for _, p := range r.TopProjects {
-		fmt.Fprintf(w, "  %-18s %s %d\n", stats.TrimRunes(search.SafeLine(p.Project), 18), strings.Repeat(barGlyph, stats.ScaledBar(p.Sessions, maxProject, 18)), p.Sessions)
+		wName = max(wName, termwidth.Columns(stats.TrimRunes(search.SafeLine(p.Project), 18)))
+	}
+	for _, p := range r.TopProjects {
+		name := stats.TrimRunes(search.SafeLine(p.Project), 18)
+		fmt.Fprintf(w, "  %s%s  %*d  %s\n", name, strings.Repeat(" ", wName-termwidth.Columns(name)), wCount, p.Sessions,
+			strings.Repeat(barGlyph, stats.ScaledBar(p.Sessions, maxProject, 18)))
 	}
 	fmt.Fprintln(w)
 
@@ -396,12 +408,14 @@ func printStats(w io.Writer, r stats.Report) {
 	// already answers this case with the range it does cover (#703).
 	if monthlyTotal(r.Monthly) == 0 {
 		if r.DateRange.Start != "" {
-			fmt.Fprintf(w, "  none — this store covers %s → %s\n", r.DateRange.Start, r.DateRange.End)
+			fmt.Fprintf(w, "  none — this store covers %s → %s\n", statDay(r.DateRange.Start), statDay(r.DateRange.End))
 		} else {
 			fmt.Fprintln(w, "  none")
 		}
 	} else {
-		fmt.Fprintf(w, "  %s  %s\n", r.Sparkline, monthLabels(r.Monthly))
+		for _, line := range monthChart(r.Monthly, color) {
+			fmt.Fprintln(w, "  "+line)
+		}
 		// The chart is a window, and a store that mostly predates it reads as
 		// if the visible bar were the whole shape — while Range, two lines
 		// above, names months the chart never draws (#854).
@@ -412,52 +426,116 @@ func printStats(w io.Writer, r stats.Report) {
 	fmt.Fprintln(w)
 
 	fmt.Fprintf(w, "%sHighlights%s\n", bold, reset)
-	fmt.Fprintf(w, "  Longest session  %d message%s · %s · %s\n", r.Longest.Messages, pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), valueOrDash(search.SafeNoteTitle(r.Longest.Title)))
-	fmt.Fprintf(w, "  Busiest day      %s · %d message%s\n", valueOrDash(r.BusiestDay.Date), r.BusiestDay.Messages, pluralS(r.BusiestDay.Messages))
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Longest session  %d message%s · %s · %s", r.Longest.Messages, pluralS(r.Longest.Messages), statHarnessTag(r.Longest.Harness, color), statLongestTitle(r, width))))
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Busiest day      %s · %d message%s", valueOrDash(statDay(r.BusiestDay.Date)), r.BusiestDay.Messages, pluralS(r.BusiestDay.Messages))))
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "%sRecall%s\n", bold, reset)
 	// The log keeps the last 14 days once it passes 1MB, so the count is not a
 	// lifetime total — saying since when keeps it from reading like one (#763).
+	//
+	// The headline's "memory served N times" counts recalls and injections
+	// together; this line used to count recalls alone under nearly the same
+	// words, so the two read as a contradiction ("served 4 times", "Recalls
+	// served 0"). It now gives the same total and says how it splits.
+	served := fmt.Sprintf("  Memory served    %d", r.Recall.Recalls+r.Recall.Injections)
 	if since := r.Recall.Since; !since.IsZero() {
-		fmt.Fprintf(w, "  Recalls served   %d since %s\n", r.Recall.Recalls, since.Local().Format("Jan 2"))
-	} else {
-		fmt.Fprintf(w, "  Recalls served   %d\n", r.Recall.Recalls)
+		served += " since " + search.DisplayDate(since)
 	}
+	if r.Recall.Recalls+r.Recall.Injections > 0 {
+		served += fmt.Sprintf(" · %d asked for by agents, %d injected by hooks", r.Recall.Recalls, r.Recall.Injections)
+	}
+	fmt.Fprintln(w, fitStatRow(width, served))
 	if r.Recall.RawBytes > 0 && r.Recall.Bytes > 0 {
 		ratio := r.Recall.RawBytes / int64(r.Recall.Bytes)
 		if ratio >= 2 {
-			fmt.Fprintf(w, "  Distilled        %s served from %s of transcripts — ~%d× less context\n", humanBytes(int64(r.Recall.Bytes)), humanBytes(r.Recall.RawBytes), ratio)
+			fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Distilled        %s served from %s of transcripts — ~%d× less context", humanBytes(int64(r.Recall.Bytes)), humanBytes(r.Recall.RawBytes), ratio)))
 		}
 	}
-	fmt.Fprintf(w, "  This week        %d recall%s by your agents · %s re-used (plus %d auto-injection%s)\n",
-		r.WeekRecalls, pluralS(r.WeekRecalls), humanBytes(int64(r.WeekBytes)), r.WeekInjected, pluralS(r.WeekInjected))
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  This week        %d recall%s by your agents · %s re-used (plus %d auto-injection%s)",
+		r.WeekRecalls, pluralS(r.WeekRecalls), humanBytes(int64(r.WeekBytes)), r.WeekInjected, pluralS(r.WeekInjected))))
 	if r.Recall.DejaVuMoments > 0 {
-		fmt.Fprintf(w, "  Déjà vu          %d prompt%s your own history already answered\n", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Déjà vu          %d prompt%s your own history already answered", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))))
 	}
 	if c := r.Recall.Compaction; c != nil {
 		if c.Measured > 0 {
-			fmt.Fprintf(w, "  After compaction %d first edit%s · median %g raw actions before edit · p75 %d\n",
-				c.Measured, pluralS(c.Measured), c.MedianActions, c.P75Actions)
+			fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  After compaction %d first edit%s · median %g raw actions before edit · p75 %d",
+				c.Measured, pluralS(c.Measured), c.MedianActions, c.P75Actions)))
 		}
 		if c.Pending > 0 || c.Unmeasured > 0 {
-			fmt.Fprintf(w, "  Compact samples   %d pending · %d unmeasured\n", c.Pending, c.Unmeasured)
+			fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Compact samples   %d pending · %d unmeasured", c.Pending, c.Unmeasured)))
 		}
 	}
 	if r.AgentCredits > 0 {
-		fmt.Fprintf(w, "  Credited aloud   agents said \"déjà vu\" %d time%s (%d this week)\n", r.AgentCredits, pluralS(r.AgentCredits), r.WeekCredits)
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Credited aloud   agents said \"déjà vu\" %d time%s (%d this week)", r.AgentCredits, pluralS(r.AgentCredits), r.WeekCredits)))
 	}
 	if r.UsedNotCredited > 0 {
 		// The other half of the credit rate: a reply that names a recalled
 		// session and does not say the line. At most — a session about deja
 		// quotes ids in prose too (#3079).
-		fmt.Fprintf(w, "  Used, not said   at most %d repl%s named a recalled session without the line (%d this week)\n",
-			r.UsedNotCredited, map[bool]string{true: "y", false: "ies"}[r.UsedNotCredited == 1], r.WeekUsedNotCredited)
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Used, not said   at most %d repl%s named a recalled session without the line (%d this week)",
+			r.UsedNotCredited, map[bool]string{true: "y", false: "ies"}[r.UsedNotCredited == 1], r.WeekUsedNotCredited)))
 	}
 	if r.HandoffsIn > 0 {
-		fmt.Fprintf(w, "  Handoffs         %d session%s started from a handoff\n", r.HandoffsIn, pluralS(r.HandoffsIn))
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Handoffs         %d session%s started from a handoff", r.HandoffsIn, pluralS(r.HandoffsIn))))
 	}
-	fmt.Fprintf(w, "  Injections       %d · %d session%s · %s\n", r.Recall.Injections, r.Recall.InjectedSessions, pluralS(r.Recall.InjectedSessions), humanBytes(int64(r.Recall.InjectedBytes)))
-	fmt.Fprintf(w, "  Empty results    %.1f%%\n", r.Recall.EmptyResultRate*100)
+	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Injections       %d · %d session%s · %s", r.Recall.Injections, r.Recall.InjectedSessions, pluralS(r.Recall.InjectedSessions), humanBytes(int64(r.Recall.InjectedBytes)))))
+	// A rate of zero says nothing a reader can act on; it is printed when some
+	// recalls did come back empty.
+	if r.Recall.EmptyResultRate > 0 {
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Empty results    %.1f%%", r.Recall.EmptyResultRate*100)))
+	}
+}
+
+// fitStatRow wraps a "  Label    value" row to the screen with the rest of the
+// value under the value column, so a long row does not fold mid-word under
+// the label. A pipe gets the row as it was.
+func fitStatRow(width int, row string) string {
+	if width <= 0 || termwidth.Columns(visibleText(row)) <= width || strings.Contains(row, "\x1b") {
+		return row
+	}
+	hang := statRowValueColumn(row)
+	return termwidth.Indent(strings.TrimLeft(row[hang:], " "), width, row[:hang], strings.Repeat(" ", termwidth.Columns(row[:hang])))
+}
+
+// statRowValueColumn is where a row's value starts: after the label and the
+// run of two or more spaces that pads it.
+func statRowValueColumn(row string) int {
+	i := 2
+	for i < len(row) {
+		if row[i] == ' ' && i+1 < len(row) && row[i+1] == ' ' {
+			j := i
+			for j < len(row) && row[j] == ' ' {
+				j++
+			}
+			return j
+		}
+		i++
+	}
+	return 2
+}
+
+// statLongestTitle is the longest session's title, cut to what is left of the
+// screen after the rest of its row.
+func statLongestTitle(r stats.Report, width int) string {
+	title := valueOrDash(search.SafeNoteTitle(r.Longest.Title))
+	if width <= 0 {
+		return title
+	}
+	used := termwidth.Columns(fmt.Sprintf("  Longest session  %d message%s · [%s] · ", r.Longest.Messages, pluralS(r.Longest.Messages), r.Longest.Harness))
+	return cutToWidth(title, width-used)
+}
+
+// statDay prints a "2006-01-02" day the way the other screens do: "Mar 27"
+// this year, "Nov 29 2025" otherwise. Anything else is printed as it came.
+func statDay(day string) string {
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	if t.Year() == time.Now().Year() {
+		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2 2006")
 }
 
 func statColorOK(w io.Writer) bool {
@@ -479,27 +557,7 @@ func statColorOK(w io.Writer) bool {
 // the reset, which no stats caller wants: the "By harness" counts and the whole
 // "Busiest day" line below it rendered bold because that escape had no closer.
 func statHarnessTag(h string, color bool) string {
-	tag := "[" + h + "]"
-	if !color {
-		return tag
-	}
-	switch h {
-	case "claude":
-		return statOrange + tag + statReset
-	case "codex":
-		return statGreen + tag + statReset
-	case "opencode":
-		return statBlue + tag + statReset
-	case "cursor":
-		return "\x1b[36m" + tag + statReset
-	case "gemini":
-		return "\x1b[35m" + tag + statReset
-	case "aider":
-		return "\x1b[33m" + tag + statReset
-	case "antigravity":
-		return "\x1b[94m" + tag + statReset
-	}
-	return tag
+	return harnesscolor.Tag(h, color)
 }
 
 // cardFileName keeps the card's name honest. The card is an SVG document, and

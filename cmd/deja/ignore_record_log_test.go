@@ -48,7 +48,7 @@ func TestTheRecordLogSurfacesObeyTheIgnoreRule(t *testing.T) {
 		leaks string
 	}{
 		{"how", []string{"how", "make widget"}, "make widget-pipeline"},
-		{"restore", []string{"restore", "/w/scratch/widget/pipeline.go"}, "B replaced"},
+		{"restore", []string{"restore", "/w/scratch/widget/pipeline.go"}, "replaced spans recorded for /w"},
 		{"friction", []string{"friction"}, "widget-pipeline"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

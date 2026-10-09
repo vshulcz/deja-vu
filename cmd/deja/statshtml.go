@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
@@ -35,8 +36,11 @@ type statsHTMLPage struct {
 	PeakMonth     string
 	PeakMessages  int
 	SessionsJSON  template.JS
-	SessionCount  int
-	Truncated     bool
+	// HarnessColorsJSON is the shared palette for the harnesses on the page,
+	// the colours the terminal prints them in.
+	HarnessColorsJSON template.JS
+	SessionCount      int
+	Truncated         bool
 	// The sentence worth sharing, the same one the card prints. A page that
 	// calls itself wrapped for sharing needs one line someone would quote.
 	Punchline string
@@ -104,6 +108,14 @@ func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLP
 	if err != nil {
 		return statsHTMLPage{}, fmt.Errorf("encode stats html data: %w", err)
 	}
+	names := make([]string, 0, len(rows))
+	for _, r := range rows {
+		names = append(names, r.Harness)
+	}
+	hc, err := json.Marshal(harnesscolor.Map(names))
+	if err != nil {
+		return statsHTMLPage{}, fmt.Errorf("encode stats html colours: %w", err)
+	}
 	// the busiest month, so the heading carries a number instead of a range
 	var peak stats.MonthStats
 	for _, m := range report.Monthly {
@@ -116,7 +128,7 @@ func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLP
 		Harnesses: len(report.Harnesses), DateStart: report.DateRange.Start,
 		DateEnd: report.DateRange.End, Heatmap: report.Heatmap,
 		PeakMonth: peak.Month, PeakMessages: peak.Messages,
-		SessionsJSON: template.JS(data), SessionCount: len(rows), Truncated: truncated,
+		SessionsJSON: template.JS(data), HarnessColorsJSON: template.JS(hc), SessionCount: len(rows), Truncated: truncated,
 		Punchline: cardPunchline(report),
 	}, nil
 }
@@ -139,13 +151,13 @@ const statsHTMLSource = `<!doctype html>
 <h2>SESSIONS</h2><div class="controls"><input id="filter" type="search" placeholder="Filter sessions by harness, project, or title" aria-label="Filter sessions"></div><div class="table-wrap"><table><thead><tr><th>DATE</th><th>HARNESS</th><th>PROJECT</th><th>TITLE</th><th>MESSAGES</th></tr></thead><tbody id="sessions"></tbody></table><div id="empty" class="empty" hidden>No matching sessions.</div></div>
 <footer>{{.SessionCount}} sessions embedded: dates, agents, projects, message counts, and each session's title or its opening line, redacted and shortened. No other message text is in this file.{{if .Truncated}} The embedded list is capped at the 5,000 most recent sessions.{{end}}</footer></main><script>
 // Only metadata is embedded below: dates, harnesses, projects, counts, and redacted first-user titles. No message text.
-const sessions={{.SessionsJSON}};const tbody=document.getElementById('sessions'),empty=document.getElementById('empty'),input=document.getElementById('filter');
+const sessions={{.SessionsJSON}},HC={{.HarnessColorsJSON}};const tbody=document.getElementById('sessions'),empty=document.getElementById('empty'),input=document.getElementById('filter');
 // textContent leaves quotes alone, and two of the values below land inside a
 // double-quoted attribute — a project name carrying a quote closed it and the
 // rest of the name parsed as attributes, event handlers included. Project
 // names arrive from "deja remember --project", from a directory name, and
 // across "sync import" from another machine.
-function esc(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}function render(){const q=input.value.toLowerCase().trim();tbody.innerHTML='';let n=0;sessions.forEach((s,i)=>{const hay=[s.date,s.harness,s.project,s.title].join(' ').toLowerCase();if(q&&!hay.includes(q))return;n++;const row=document.createElement('tr');row.innerHTML='<td>'+esc(s.date)+'</td><td><span class="badge clickable" data-value="'+esc(s.harness)+'">'+esc(s.harness)+'</span></td><td><span class="clickable" data-value="'+esc(s.project)+'">'+esc(s.project)+'</span></td><td class="title">'+esc(s.title||'-')+'</td><td>'+s.messages+'</td>';row.querySelectorAll('.clickable').forEach(e=>e.onclick=()=>{input.value=e.dataset.value;render()});tbody.appendChild(row)});empty.hidden=n!==0}input.oninput=render;render();
+function esc(value){const node=document.createElement('span');node.textContent=value;return node.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}function render(){const q=input.value.toLowerCase().trim();tbody.innerHTML='';let n=0;sessions.forEach((s,i)=>{const hay=[s.date,s.harness,s.project,s.title].join(' ').toLowerCase();if(q&&!hay.includes(q))return;n++;const row=document.createElement('tr');row.innerHTML='<td>'+esc(s.date)+'</td><td><span class="badge clickable" style="color:'+esc(HC[s.harness]||'')+'" data-value="'+esc(s.harness)+'">'+esc(s.harness)+'</span></td><td><span class="clickable" data-value="'+esc(s.project)+'">'+esc(s.project)+'</span></td><td class="title">'+esc(s.title||'-')+'</td><td>'+s.messages+'</td>';row.querySelectorAll('.clickable').forEach(e=>e.onclick=()=>{input.value=e.dataset.value;render()});tbody.appendChild(row)});empty.hidden=n!==0}input.oninput=render;render();
 </script></body></html>`
 
 // heatOpacity maps a day's count onto four visible steps. A linear ramp

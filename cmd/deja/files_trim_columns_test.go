@@ -122,7 +122,7 @@ func TestFilesTableAlignsCJKPaths(t *testing.T) {
 	// And each row still names a real file: padding to a column budget must
 	// not be reached by cutting through a character.
 	for _, row := range rows {
-		shown := strings.TrimPrefix(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(row), "1")), "…")
+		shown := strings.TrimPrefix(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(row), "1 session")), "…")
 		var named bool
 		for _, p := range paths {
 			if strings.HasSuffix(filepath.ToSlash(p), shown) {

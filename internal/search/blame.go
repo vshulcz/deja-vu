@@ -15,6 +15,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 
 	"github.com/vshulcz/deja-vu/internal/query"
 )
@@ -586,12 +587,38 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		_ = json.NewEncoder(w).Encode(out)
 		return
 	}
-	color := colorOK(w)
-	for _, hit := range hits {
-		date := "-"
-		if !hit.Session.Updated.IsZero() {
-			date = hit.Session.Updated.Format("2006-01-02")
+	PrintBlameWidth(w, hits, 0)
+}
+
+// PrintBlameWidth prints the blame rows in the search result header's form —
+// harness, project, day, short id, then the session's question — so the two
+// lists read alike. width is the terminal's (0 for a pipe): the question is
+// cut to it and the quoted lines under a row wrap at spaces.
+func PrintBlameWidth(w io.Writer, hits []BlameHit, width int) {
+	for i := range hits {
+		if hits[i].Tier == "" {
+			hits[i].Tier = TierExact
 		}
+	}
+	color := colorOK(w)
+	// One layout for the whole list: when the widest header leaves too little
+	// room for the question beside it, every question goes on the line under
+	// its header rather than some rows one way and some the other.
+	questionUnder := false
+	if width > 0 {
+		for _, hit := range hits {
+			if hit.Title == "" {
+				continue
+			}
+			plain := fmt.Sprintf("[%s] %s · %s · %s", hit.Session.Harness, SafeLine(hit.Session.Project), blameDate(hit), SafeLine(short(hit.Session.ID)))
+			if width-termwidth.Columns(plain)-3 < 32 {
+				questionUnder = true
+				break
+			}
+		}
+	}
+	for _, hit := range hits {
+		date := blameDate(hit)
 		// id, project and title reach a terminal here and the agent through the
 		// MCP blame tool. All three are free text from the transcript — an
 		// imported peer's title especially — so a bare escape or bidi run would
@@ -600,34 +627,55 @@ func PrintBlame(w io.Writer, hits []BlameHit, jsonOutput bool) {
 		id := SafeLine(short(hit.Session.ID))
 		project := SafeLine(hit.Session.Project)
 		title := SafeLine(hit.Title)
+		plain := fmt.Sprintf("[%s] %s · %s · %s", hit.Session.Harness, project, date, id)
+		// Too little room beside the header and the question goes on the line
+		// under it rather than being cut to three words.
+		under := ""
+		if title != "" && width > 0 {
+			if questionUnder {
+				under, title = "  "+fitLine(title, width-2), ""
+			} else {
+				title = fitLine(title, width-termwidth.Columns(plain)-3)
+			}
+		}
 		if color {
-			sep := cDim + " · " + cReset
-			fmt.Fprintf(w, "%s%s%s %s%s%s%s", harnessTag(hit.Session.Harness, true), sep, date, cBold+id+cReset, sep, project, "")
+			sep := cDim + "·" + cReset + cBold
+			fmt.Fprintf(w, "%s%s %s %s %s %s %s%s", cBold, harnessTag(hit.Session.Harness, true), project, sep, date, sep, id, cReset)
 			if title != "" {
-				fmt.Fprintf(w, "%s%s", sep, cBold+title+cReset)
+				fmt.Fprintf(w, " %s %s", cDim+"—"+cReset, title)
 			}
 		} else {
-			fmt.Fprintf(w, "%s · %s · %s · %s", date, hit.Session.Harness, id, project)
+			fmt.Fprint(w, plain)
 			if title != "" {
-				fmt.Fprintf(w, " · %s", title)
+				fmt.Fprintf(w, " — %s", title)
 			}
 		}
 		fmt.Fprintln(w)
+		if under != "" {
+			fmt.Fprintln(w, under)
+		}
 		if line := BlameLifecycleLine(hit); line != "" {
+			line = termwidth.Indent(line, width, "  ", "    ")
 			if color {
-				fmt.Fprintf(w, "  %s%s%s\n", cDim, line, cReset)
-			} else {
-				fmt.Fprintf(w, "  %s\n", line)
+				line = cDim + line + cReset
 			}
+			fmt.Fprintln(w, line)
 		}
 		for _, text := range hit.Snippets {
+			text = termwidth.Indent(text, width, "  ", "    ")
 			if color {
-				fmt.Fprintf(w, "  %s%s%s\n", cDim, text, cReset)
-			} else {
-				fmt.Fprintf(w, "  %s\n", text)
+				text = cDim + text + cReset
 			}
+			fmt.Fprintln(w, text)
 		}
 	}
+}
+
+func blameDate(hit BlameHit) string {
+	if hit.Session.Updated.IsZero() {
+		return "-"
+	}
+	return absoluteDate(hit.Session.Updated)
 }
 
 // blameSnippet renders one mention. The prose path collapses runs of whitespace

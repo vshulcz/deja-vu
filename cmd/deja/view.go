@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/digest"
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -75,7 +76,10 @@ type viewPage struct {
 	SessionsJSON  template.JS
 	RecallsJSON   template.JS
 	NotesJSON     template.JS
-	PreviewCount  int
+	// HarnessColorsJSON maps each harness on the page to its colour from the
+	// shared palette, so a row reads the same colour the terminal prints.
+	HarnessColorsJSON template.JS
+	PreviewCount      int
 	// PolicyRule names the rule that held things back, as the CLI note names
 	// it — the activation and what it allows. Not the file it lives in: that
 	// path sits under the reader's home directory and this page is meant to be
@@ -319,6 +323,15 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	page.SessionsJSON = jsonForScript(sj)
 	page.RecallsJSON = jsonForScript(rj)
 	page.NotesJSON = jsonForScript(nj)
+	names := make([]string, 0, len(sessions))
+	for _, v := range sessions {
+		names = append(names, v.Harness)
+	}
+	hc, err := json.Marshal(harnesscolor.Map(names))
+	if err != nil {
+		return "", 0, err
+	}
+	page.HarnessColorsJSON = jsonForScript(hc)
 	var b strings.Builder
 	if err := viewTemplate.Execute(&b, page); err != nil {
 		return "", 0, fmt.Errorf("render view: %w", err)

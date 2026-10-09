@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -40,7 +41,7 @@ func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	}
 	// The date on the line is the date in the id, not the reader's rendering
 	// of a moment inside it.
-	if !strings.Contains(out, "2026-07-17 · deja-2026-07-17-edge") {
+	if !regexp.MustCompile(`Jul 17\s+deja-2026-07-17-edge`).MatchString(out) {
 		t.Errorf("line and id disagree:\n%s", out)
 	}
 
@@ -63,7 +64,7 @@ func TestANoteBucketShowsTheDayItsIdNames(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "2026-07-17 · deja-2026-07-16-lookalike") {
+	if !regexp.MustCompile(`Jul 17\s+deja-2026…-lookalike`).MatchString(out) {
 		t.Errorf("a transcript stopped following the reader's zone:\n%s", out)
 	}
 }
@@ -101,11 +102,15 @@ func TestTheDateColumnRunsOneWayDownTheScreen(t *testing.T) {
 	}
 	dates := []string{}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		parts := strings.Split(line, " · ")
+		parts := regexp.MustCompile(`\s{2,}`).Split(line, -1)
 		if len(parts) < 3 {
 			continue
 		}
-		dates = append(dates, parts[2])
+		day, err := time.Parse("Jan 2", parts[1])
+		if err != nil {
+			t.Fatalf("no day in %q", line)
+		}
+		dates = append(dates, day.Format("01-02"))
 	}
 	if len(dates) < 2 {
 		t.Fatalf("expected at least two rows to compare:\n%s", out)

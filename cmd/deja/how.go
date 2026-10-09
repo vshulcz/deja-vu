@@ -174,14 +174,12 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "no command on this machine mentions %q\n", strings.Join(terms, " "))
 		return nil
 	}
-	writeHowEntries(stdout, entries, limit, " · last ")
+	writeHowEntriesFor(stdout, entries, limit, " · last ", true)
 	// Which project answered. An agent that reads the rows and not this line
 	// still gets the right commands; one that reads both knows whether the
 	// answer is about the repository it is standing in (#3705).
-	if name := howScopeName(scope); name != "" {
-		fmt.Fprintf(stdout, "  — in %s; `--all-projects` asks the whole machine\n", name)
-	} else if widened {
-		fmt.Fprintln(stdout, "  — nothing in this project; these ran elsewhere on this machine")
+	if line := projectScopeHint(scope, widened); line != "" {
+		fmt.Fprintln(stdout, dimFor(stdout, line))
 	}
 	// The cap said nothing, so eight of thirteen ways to run the tests read as
 	// thirteen — the misread the search screen already avoids (#1632). On
@@ -197,19 +195,44 @@ func runHow(dir string, args []string, stdout io.Writer) error {
 // never heard — and the cap note was the drift showing (#1634). The one
 // difference that is real stays a parameter: the separator before the date.
 func writeHowEntries(w io.Writer, entries []howEntry, limit int, lastSep string) {
+	writeHowEntriesFor(w, entries, limit, lastSep, false)
+}
+
+// writeHowEntriesFor is writeHowEntries with the person at a terminal in mind
+// when human is set: on a terminal the command without the "$ " the record
+// carries — under the shell's own prompt it read as a second one — and bold,
+// and the day in the form the other screens print. The MCP answer keeps its
+// shape.
+func writeHowEntriesFor(w io.Writer, entries []howEntry, limit int, lastSep string, human bool) {
+	color := human && search.ColorOK(w)
 	for i, e := range entries {
 		if i >= limit {
 			break
 		}
 		when := ""
 		if !e.Last.IsZero() {
-			when = lastSep + e.Last.Local().Format("2006-01-02")
+			if human {
+				when = lastSep + search.DisplayDate(e.Last)
+			} else {
+				when = lastSep + e.Last.Local().Format("2006-01-02")
+			}
 		}
 		// The command itself, kept the way a person would copy it, folded onto
 		// one line so a newline in it cannot forge a row of deja's (#1863).
-		fmt.Fprintf(w, "%s\n", search.SafeCommand(e.Command))
-		fmt.Fprintf(w, "  ran %s in %s%s%s\n",
-			pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when, e.failureNote())
+		// A pipe keeps the "$ " that marks each row: scripts split on it.
+		cmd := search.SafeCommand(e.Command)
+		if human && printableWidth(w) > 0 {
+			cmd = strings.TrimPrefix(cmd, "$ ")
+		}
+		if color {
+			cmd = statBold + cmd + statReset
+		}
+		fmt.Fprintf(w, "%s\n", cmd)
+		ran := fmt.Sprintf("  ran %s in %s%s%s", pluralRuns(e.Runs), pluralSessions(len(e.Sessions)), when, e.failureNote())
+		if color {
+			ran = statDim + ran + statReset
+		}
+		fmt.Fprintln(w, ran)
 	}
 }
 

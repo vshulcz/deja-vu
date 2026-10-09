@@ -70,7 +70,7 @@ func TestFilesFitsTheTerminal(t *testing.T) {
 		if len([]rune(line)) > 50 {
 			t.Errorf("a row ran to %d runes at COLUMNS=50: %q", len([]rune(line)), line)
 		}
-		if !strings.HasSuffix(strings.TrimSpace(line), "1") {
+		if !strings.HasSuffix(strings.TrimSpace(line), "1 session") {
 			t.Errorf("the count fell off the row: %q", line)
 		}
 	}

@@ -72,11 +72,12 @@ input[type=search]:focus{outline:none;border-color:var(--ph)}
 </div>
 <script>
 const S={{.SessionsJSON}},R={{.RecallsJSON}},N={{.NotesJSON}};
+const HC={{.HarnessColorsJSON}};
 // Quotes included: rowN puts a value inside a double-quoted class attribute,
 // and every row here is built by concatenation, so an escaper that stops at
 // &<> is one attribute away from letting a project or note field close it.
 const esc=s=>(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function rowS(s){return '<div class="row" onclick="this.classList.toggle(\'open\')"><span class="h">['+esc(s.harness)+']</span> <span class="t">'+esc(s.title||s.id)+'</span> <span class="m">'+esc(s.project)+' · '+esc(s.updated)+'</span>'+(s.preview?'<pre>'+esc(s.preview)+'</pre>':'')+'</div>'}
+function rowS(s){return '<div class="row" onclick="this.classList.toggle(\'open\')"><span class="h" style="color:'+esc(HC[s.harness]||'')+'">['+esc(s.harness)+']</span> <span class="t">'+esc(s.title||s.id)+'</span> <span class="m">'+esc(s.project)+' · '+esc(s.updated)+'</span>'+(s.preview?'<pre>'+esc(s.preview)+'</pre>':'')+'</div>'}
 function rowR(r){return '<div class="row" onclick="this.classList.toggle(\'open\')"><span class="h">['+esc(r.kind)+']</span> <span class="t">'+r.sessions+' sessions · '+r.bytes+' B</span> <span class="m">'+esc(r.time)+(r.policy?' · '+esc(r.policy):'')+(r.terms&&r.terms.length?' · via: '+esc(r.terms.join(', ')):'')+'</span><pre>'+esc(r.digest)+'</pre></div>'}
 // The decision heads the row. A note's title is the session's own opening line
 // — the question — so leading with it put an "accepted" badge on the question

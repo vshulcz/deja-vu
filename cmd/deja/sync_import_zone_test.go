@@ -51,7 +51,7 @@ func TestImportReceiptDatesArrivalsInTheReadersZone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "2026-08-06") {
+	if !strings.Contains(out, "Aug 6") {
 		t.Fatalf("last disagrees about the day:\n%s", out)
 	}
 }

@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja restore <path>` hands back a span an agent replaced.
@@ -103,24 +105,7 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 	}
 	if want == 0 {
 		fmt.Fprintf(stdout, "%d replaced spans recorded for %s\n", len(spans), path)
-		// The row carries a date, a harness, a session id and a size, and on a
-		// narrow pane it wrapped between them (#604). The id is what the reader
-		// copies into the next command, so the harness gives way first.
-		width := printableWidth(stdout)
-		for i, s := range spans {
-			harness := s.harness
-			if width > 0 {
-				fixed := len(fmt.Sprintf("  %d  %s   %s  %d B replaced%s", i+1, s.when.Format("Jan 02 15:04"), shortID(s.session), len(s.body), redactionNote(s.body)))
-				// Runes, not bytes: a harness name is ASCII today and a
-				// byte cut would produce invalid UTF-8 the day one is not.
-				if r := []rune(harness); width-fixed < len(r) && width-fixed >= 3 {
-					harness = string(r[:width-fixed-1]) + "…"
-				}
-			}
-			fmt.Fprintf(stdout, "  %d  %s  %s %s  %d B replaced%s\n",
-				i+1, s.when.Format("Jan 02 15:04"), harness, shortID(s.session),
-				len(s.body), redactionNote(s.body))
-		}
+		printRestoreRows(stdout, spans)
 		if out != "" {
 			// The flag was given and could not be honoured. Silence here read
 			// as a file written (#2417).
@@ -262,6 +247,79 @@ func resolvedPath(p string) string {
 		rest = filepath.Join(filepath.Base(dir), rest)
 		dir = parent
 	}
+}
+
+// printRestoreRows lists the spans in columns that line up past nine — index,
+// day and time, harness, session id, size — and the start of what each span
+// held, so picking --span n is not a guess. The day is the form search prints,
+// with the year when it is not this one; the id is the short form search
+// prints and `deja show` takes back. On a narrow terminal the preview gives
+// way first, then the harness: the id is what the reader copies.
+func printRestoreRows(w io.Writer, spans []restoreSpan) {
+	color, width := search.ColorOK(w), printableWidth(w)
+	type row struct{ n, when, harness, id, size, preview, note string }
+	rows := make([]row, len(spans))
+	var wN, wWhen, wHarness, wID, wSize int
+	for i, s := range spans {
+		r := row{
+			n:       strconv.Itoa(i + 1),
+			when:    search.DisplayDate(s.when) + " " + s.when.Local().Format("15:04"),
+			harness: s.harness,
+			id:      search.SafeLine(search.ShortID(s.session)),
+			size:    fmt.Sprintf("%d B", len(s.body)),
+			preview: restorePreview(s.body),
+			note:    redactionNote(s.body),
+		}
+		wN, wWhen, wHarness = max(wN, len(r.n)), max(wWhen, termwidth.Columns(r.when)), max(wHarness, termwidth.Columns(r.harness))
+		wID, wSize = max(wID, termwidth.Columns(r.id)), max(wSize, len(r.size))
+		rows[i] = r
+	}
+	pad := func(s string, n int) string { return s + strings.Repeat(" ", max(0, n-termwidth.Columns(s))) }
+	for _, r := range rows {
+		harness := r.harness
+		if width > 0 {
+			fixed := 2 + wN + 2 + wWhen + 2 + 2 + wID + 2 + wSize + termwidth.Columns(r.note)
+			// Runes, not bytes: a harness name is ASCII today and a byte cut
+			// would produce invalid UTF-8 the day one is not.
+			if rr := []rune(harness); width-fixed < len(rr) && width-fixed >= 3 {
+				harness = string(rr[:width-fixed-1]) + "…"
+			}
+		}
+		when, shown := pad(r.when, wWhen), pad(harness, wHarness)
+		if color {
+			when = statDim + when + statReset
+			shown = harnesscolor.Paint(r.harness, shown, true)
+		}
+		line := fmt.Sprintf("  %*s  %s  %s  %s  %*s", wN, r.n, when, shown, pad(r.id, wID), wSize, r.size)
+		if r.preview != "" {
+			lead := termwidth.Columns(fmt.Sprintf("  %*s  %s  %s  %s  %*s  ", wN, r.n, pad(r.when, wWhen), pad(harness, wHarness), pad(r.id, wID), wSize, r.size))
+			preview := r.preview
+			if width > 0 {
+				preview = cutToWidth(preview, width-lead-termwidth.Columns(r.note))
+				if width-lead-termwidth.Columns(r.note) < 12 {
+					preview = ""
+				}
+			}
+			if preview != "" {
+				if color {
+					preview = statDim + preview + statReset
+				}
+				line += "  " + preview
+			}
+		}
+		fmt.Fprintln(w, line+r.note)
+	}
+}
+
+// restorePreview is the first line of a span with something on it, folded to
+// one line and kept short: enough to tell the spans apart.
+func restorePreview(body string) string {
+	for _, l := range strings.Split(body, "\n") {
+		if l = strings.Join(strings.Fields(l), " "); l != "" {
+			return cutToWidth(search.SafeLine(l), 60)
+		}
+	}
+	return ""
 }
 
 // redactionNote flags a span that passed through redaction, because restoring

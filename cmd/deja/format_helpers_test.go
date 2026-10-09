@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/stats"
 )
@@ -38,13 +39,13 @@ func TestStatsFormattingHelpers(t *testing.T) {
 	if got := statHarnessTag("claude", true); !strings.Contains(got, "[claude]") || !strings.Contains(got, statOrange) {
 		t.Fatalf("claude tag = %q", got)
 	}
-	if got := statHarnessTag("codex", true); !strings.Contains(got, statGreen) {
+	if got := statHarnessTag("codex", true); !strings.Contains(got, harnesscolor.ANSI("codex")) {
 		t.Fatalf("codex tag = %q", got)
 	}
-	if got := statHarnessTag("opencode", true); !strings.Contains(got, statBlue) {
+	if got := statHarnessTag("opencode", true); !strings.Contains(got, harnesscolor.ANSI("opencode")) {
 		t.Fatalf("opencode tag = %q", got)
 	}
-	if got := statHarnessTag("other", true); got != "[other]" {
+	if got := statHarnessTag("other", true); got != harnesscolor.Tag("other", true) {
 		t.Fatalf("other tag = %q", got)
 	}
 	t.Setenv("NO_COLOR", "1")

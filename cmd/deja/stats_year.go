@@ -16,6 +16,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // `deja stats --year` is the twelve months of somebody's own work with agents,
@@ -129,6 +130,26 @@ func runStatsYear(w io.Writer, dir string, asJSON bool) error {
 		}
 		return enc.Encode(out)
 	}
+	// On a terminal each row wraps under its own value column instead of
+	// folding mid-word; a pipe gets the rows whole, since this screen is
+	// written to be pasted.
+	if width := printableWidth(w); width > 0 {
+		var b strings.Builder
+		printYear(&b, r)
+		for _, line := range strings.SplitAfter(b.String(), "\n") {
+			body, nl := strings.CutSuffix(line, "\n")
+			if strings.HasPrefix(body, "  ") {
+				body = fitStatRow(width, body)
+			} else {
+				body = termwidth.Indent(body, width, "", "")
+			}
+			fmt.Fprint(w, body)
+			if nl {
+				fmt.Fprintln(w)
+			}
+		}
+		return nil
+	}
 	printYear(w, r)
 	return nil
 }
@@ -202,7 +223,7 @@ func addMasked(into map[string]int, c redact.Counts) {
 
 func printYear(w io.Writer, r yearReport) {
 	fmt.Fprintf(w, "your year with coding agents\n%s to %s, from the sessions on this machine\n\n",
-		r.from.Format("2006-01-02"), r.to.Format("2006-01-02"))
+		statDay(r.from.Format("2006-01-02")), statDay(r.to.Format("2006-01-02")))
 	if r.sessions == 0 {
 		fmt.Fprintln(w, "no sessions in the last twelve months — `deja index` reads what is on disk, and `deja sources` says where it looked")
 		return
@@ -213,7 +234,7 @@ func printYear(w io.Writer, r yearReport) {
 		fmt.Fprintf(w, "  busiest project        %s, %s sessions\n", r.projects[0].Project, plainCount(r.projects[0].Sessions))
 	}
 	if r.busiestCount > 0 {
-		fmt.Fprintf(w, "  busiest day            %s, %s turns\n", r.busiestDay, plainCount(r.busiestCount))
+		fmt.Fprintf(w, "  busiest day            %s, %s turns\n", statDay(r.busiestDay), plainCount(r.busiestCount))
 	}
 	if r.longestTurns > 0 {
 		fmt.Fprintf(w, "  longest session        %s turns — %s\n", plainCount(r.longestTurns), r.longestTitle)

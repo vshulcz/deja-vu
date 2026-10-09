@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -261,7 +262,7 @@ func TestLastFiltersProjectAndHarness(t *testing.T) {
 	// No user turn: the assistant's first sentence is the title, because the
 	// alternative is a row that says nothing at all (#692) — marked as the
 	// agent's words since #1100, so it does not read as the reader's question.
-	if !strings.Contains(out, "[claude · gamma · 2026-01-05 · claude-gamma] agent: assistant-only memory") {
+	if !regexp.MustCompile(`\[claude\] gamma\s+Jan 5\s+claude-gamma\s+agent: assistant-only memory`).MatchString(out) {
 		t.Fatalf("title-less last output = %q", out)
 	}
 
@@ -525,7 +526,7 @@ func TestStatsCommandJSONAndNoColor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") || !strings.Contains(out, "Recalls served   2") ||
+	if strings.Contains(out, "\x1b[") || strings.Contains(out, "█") || !strings.Contains(out, "##") || !strings.Contains(out, "[claude]") || !strings.Contains(out, "Memory served    3") ||
 		// The headline is about memory handed over at all, so it still sums
 		// the two agent recalls and the one injection.
 		!strings.Contains(out, "memory served 3 times") {
