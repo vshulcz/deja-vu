@@ -42,7 +42,18 @@ func TestTUISessionActions(t *testing.T) {
 	if a.modal != modalForget {
 		t.Fatal("F asks first")
 	}
-	wantOnScreen(t, screen(a.frame(80, 24)), "Forget this session?", "deja forget --unforget "+s.ID)
+	sc := screen(a.frame(80, 24))
+	wantOnScreen(t, sc, "Forget this session?", "own file stays", "Keep it", "▀")
+	// The help names the three only under ^k; the keys still work.
+	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEsc})
+	a.openModal(modalHelp)
+	help := screen(a.frame(120, 36))
+	wantOnScreen(t, help, "copy id, path, forget…")
+	if strings.Contains(help, "copy the session id") || strings.Contains(help, "forget it") {
+		t.Errorf("help lists the small actions as keys:\n%s", help)
+	}
+	a.modal = modalNone
+	key('F')
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEsc})
 	if a.modal != modalNone || len(a.rows) != 3 {
 		t.Fatalf("esc cancels: modal %d rows %d", a.modal, len(a.rows))

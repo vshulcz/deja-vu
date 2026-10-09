@@ -6,13 +6,15 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/vshulcz/deja-vu/internal/mark"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
 // The smaller actions on one session: its id and its project's path for the
-// clipboard, and forgetting it, which asks first.
+// clipboard, and forgetting it, which asks first. Their keys (i, p, F) work
+// everywhere but are shown only in ^k, so the help and footer stay short.
 
 // clip puts text on the clipboard, or on the test's catch.
 func (a *tuiApp) clip(text string) error {
@@ -126,23 +128,27 @@ func forgetInChild(dir string) func(string) error {
 	}
 }
 
+// drawForget asks before forgetting, beside the cat with its ears down when
+// the box is wide enough to hold it.
 func (a *tuiApp) drawForget() {
 	p := a.p
 	s := a.m.src
-	x, y, iw := a.modalBox(72, 10)
+	x, y, iw := a.modalBox(80, 10)
 	right := x + iw
-	cx := p.Put(x, y, "Forget this session?", bold(cText), right)
-	p.PutClip(cx+3, y, agentName(s.Harness)+" · "+tuiProject(s)+" · "+search.ShortID(s.ID), fgs(cMuted), right)
-	y += 2
+	tx := x
+	if iw >= 64 {
+		a.drawCatPart(x, y+1, mark.Nothing, catHead(mark.Nothing))
+		tx = x + 23
+	}
+	p.PutClip(tx, y, "Forget this session?", bold(cText), right)
 	asked := strings.Join(strings.Fields(s.Title), " ")
 	if asked == "" {
 		asked = "(no prompt recorded)"
 	}
-	p.PutClip(x, y, asked, fgs(cText), right)
-	y += 2
-	p.PutClip(x, y, "Drops it from deja's search. "+agentName(s.Harness)+"'s own file stays.", fgs(cSub), right)
-	p.PutClip(x, y+1, "deja forget --unforget "+s.ID+" brings it back.", fgs(cMuted), right)
-	y += 3
-	bx := p.button(x, y, "↵", "Forget", true, right)
-	p.button(bx+2, y, "esc", "Cancel", false, right)
+	p.PutClip(tx, y+1, asked, fgs(cText), right)
+	p.PutClip(tx, y+2, agentName(s.Harness)+" · "+tuiProject(s)+" · "+tuiAgo(s.Updated, a.now), fgs(cMuted), right)
+	p.PutClip(tx, y+4, "deja stops finding it.", fgs(cSub), right)
+	p.PutClip(tx, y+5, agentName(s.Harness)+"'s own file stays.", fgs(cSub), right)
+	bx := p.button(tx, y+7, "↵", "Forget", true, right)
+	p.button(bx+2, y+7, "esc", "Keep it", false, right)
 }
