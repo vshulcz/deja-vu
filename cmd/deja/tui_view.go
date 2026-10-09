@@ -115,7 +115,9 @@ func (a *tuiApp) drawTop(l layout) {
 func (a *tuiApp) status() string {
 	switch {
 	case a.indexing:
-		return "◐ reading new sessions…"
+		// Turns with the 250 ms tick, so a long read does not look stuck.
+		spin := []string{"◐", "◓", "◑", "◒"}[int(a.now.UnixMilli()/250)%4]
+		return spin + " reading new sessions…"
 	case len(a.query) > 0 && !a.searching:
 		return "searched " + num(len(a.allMeta)) + " sessions in " + formatMS(a.tookMS)
 	}

@@ -405,6 +405,7 @@ func (a *tuiApp) resumeSelected() {
 	}
 	a.after = func() error {
 		fmt.Fprintf(os.Stderr, "deja: resuming in %s\n", agentName(s.Harness))
+		indexInHand = true
 		return runResume(a.dir, []string{s.ID, "--exec"}, os.Stdout)
 	}
 	a.quit = true

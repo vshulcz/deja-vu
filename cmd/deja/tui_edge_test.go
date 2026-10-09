@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
@@ -52,6 +55,31 @@ func TestTUIReaderHitAfterResize(t *testing.T) {
 	s := screen(a.frame(160, 30))
 	if strings.Contains(s, "hit 8") {
 		t.Errorf("the hit counter ran past the hits:\n%s", s)
+	}
+}
+
+// A session picked on the screen is handed on from the index as it is. A
+// refresh there waited out a whole rebuild after an upgrade, under a closed
+// screen, before the agent opened.
+func TestTUIHandsOnWithoutARefresh(t *testing.T) {
+	dir, root := tuiStore(t)
+	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "d4444444-new", "cwd": "/work/payments", "timestamp": "2026-03-04T10:00:00Z",
+		"message": map[string]any{"role": "user", "content": "a session that arrived after the screen opened"}})
+	writeClaudeFixture(t, filepath.Join(root, "payments", "d4444444-new.jsonl"), "d4444444-new", []string{string(user)})
+	indexInHand = true
+	t.Cleanup(func() { indexInHand = false })
+	if s, ok, err := findByPrefix(dir, "c3333333-hook"); err != nil || !ok || s.ID != "c3333333-hook" {
+		t.Fatalf("findByPrefix = %v %v %v", s.ID, ok, err)
+	}
+	if _, err := handoffSource(dir, "c3333333-hook"); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := index.FindByPrefix(dir, "d4444444"); ok {
+		t.Error("handing on a picked session refreshed the index first")
+	}
+	indexInHand = false
+	if _, ok, _ := findByPrefix(dir, "d4444444"); !ok {
+		t.Error("from a shell the lookup no longer brings the index up to date")
 	}
 }
 

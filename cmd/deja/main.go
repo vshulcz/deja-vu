@@ -2700,7 +2700,19 @@ func ambiguousJSONPrefix(dir, id string) error {
 	return fmt.Errorf("%d sessions match %q — --json reads one; use a longer prefix (`deja last` prints ids whole)", n, id)
 }
 
+// indexInHand says the caller already read the session out of the index and
+// a refresh can only delay it. The interactive screen sets it before it hands
+// a session to resume or handoff: after an upgrade the refresh is a full
+// rebuild, and the person who picked a session watched "waiting for it to
+// finish" under a closed screen instead of their agent opening.
+var indexInHand bool
+
 func findByPrefix(dir, p string) (model.Session, bool, error) {
+	if indexInHand {
+		if s, ok, err := index.FindByPrefix(dir, p); err == nil && ok {
+			return s, true, nil
+		}
+	}
 	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
 		if s, ok, err := index.FindByPrefix(dir, p); err == nil {
 			if ok {

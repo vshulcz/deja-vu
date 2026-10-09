@@ -193,8 +193,10 @@ func prefixArg(prefix string) string {
 // handoffSource resolves the session being handed off: an explicit id-prefix,
 // or the newest indexed session for the project in the current directory.
 func handoffSource(dir, prefix string) (model.Session, error) {
-	if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
-		return model.Session{}, err
+	if !indexInHand || prefix == "" {
+		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
+			return model.Session{}, err
+		}
 	}
 	if prefix != "" {
 		s, ok, err := findByPrefix(dir, prefix)

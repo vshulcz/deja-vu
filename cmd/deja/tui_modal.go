@@ -128,6 +128,7 @@ func (a *tuiApp) continueIn(t continueTarget) {
 	}
 	a.after = func() error {
 		fmt.Fprintf(os.Stderr, "deja: continuing in %s\n", agentName(t.id))
+		indexInHand = true
 		return runHandoff(a.dir, []string{"--to", t.id, s.ID, "--exec"}, os.Stdout)
 	}
 	a.quit = true
