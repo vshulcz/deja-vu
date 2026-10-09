@@ -40,6 +40,7 @@ func TestWaitLine(t *testing.T) {
 	index.LockWaitNotice()
 	index.LockWaitDone()
 	os.Stderr = oldErr
+	_ = f.Close()
 	if got, _ := os.ReadFile(f.Name()); !strings.Contains(string(got), "building the index") {
 		t.Errorf("the notice went past the swapped stderr: %q", got)
 	}
