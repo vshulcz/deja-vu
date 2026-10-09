@@ -299,6 +299,15 @@ func (a *tuiApp) drawEmpty(l layout) {
 		mood = mark.Asleep
 		title, line = "No sessions here yet", "tab shows every project."
 	}
+	if b := a.wayOut(); b.others > 0 {
+		here := "this project"
+		if ps := a.box().projects; len(ps) > 0 {
+			here = strings.Join(ps, ", ")
+		}
+		line = "Not in " + here + ", but other projects have it."
+	} else if b.suggest != "" {
+		line = "Did you mean “" + b.suggest + "”? It finds " + tuiCount(b.found, "session") + "."
+	}
 	cw, ch := 24, 11
 	x := (l.w - cw - 6 - 50) / 2
 	if x < 2 {
@@ -321,11 +330,31 @@ func (a *tuiApp) drawEmpty(l layout) {
 		p.PutClip(tx, ty+2+i, s, fgs(cSub), l.w-2)
 	}
 	by := ty + 3 + len(lines)
-	if len(a.query) > 0 {
-		bx := tx
-		if a.scope == scopeHere {
-			bx = p.button(bx, by, "tab", "All projects", false, l.w-2) + 2
+	if len(a.query) == 0 {
+		return
+	}
+	bx, right := tx, l.w-2
+	button := func(k, label string, primary bool, do func()) {
+		x0 := bx
+		bx = p.button(bx, by, k, label, primary, right)
+		a.addZone(x0, by, bx, by+1, do)
+		bx += 2
+	}
+	b := a.wayOut()
+	switch {
+	case b.others > 0:
+		k := "tab"
+		if len(a.box().projects) > 0 {
+			k = "↵"
 		}
-		p.button(bx, by, "^w", "Drop a word", false, l.w-2)
+		button(k, tuiCount(b.others, "session")+" in other projects", true, func() { a.takeWayOut() })
+	case b.suggest != "":
+		button("↵", "Search “"+b.suggest+"”", true, func() { a.takeWayOut() })
+		button("^w", "Drop a word", false, func() { a.ctrlKey('w') })
+	default:
+		if a.scope == scopeHere {
+			button("tab", "All projects", false, func() { a.setScope(scopeAll) })
+		}
+		button("^w", "Drop a word", false, func() { a.ctrlKey('w') })
 	}
 }

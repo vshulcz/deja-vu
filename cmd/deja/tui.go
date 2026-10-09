@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"sync/atomic"
 	"time"
@@ -95,6 +96,7 @@ type tuiApp struct {
 	history    []string // past searches, oldest first
 	histAt     int      // where ↑ is in history, -1 when not browsing
 	firstShown int      // the first card on screen, for 1-9
+	beyond     beyond   // where an empty answer can go next
 
 	after func() error
 	quit  bool
@@ -404,8 +406,9 @@ func (a *tuiApp) startSearch() {
 		// A project named with in: is what was asked for; only the tab's
 		// scope widens on its own.
 		if err == nil && len(hits) == 0 && scope == scopeHere && len(o.Projects) > 0 && len(box.projects) == 0 && !stale() {
-			o.Projects = nil
-			hits, err = tuiSearch(a.dir, o)
+			wide := o
+			wide.Projects = nil
+			hits, err = tuiSearch(a.dir, wide)
 			widened = len(hits) > 0
 		}
 		took := float64(time.Since(start).Microseconds()) / 1000
@@ -421,6 +424,9 @@ func (a *tuiApp) startSearch() {
 			a.tookMS, a.widened = took, widened
 			refresh := a.listed == num(a.scope)+"\x00"+q
 			a.setRows(nil, hits, len(hits))
+			if len(a.rows) == 0 && scope != scopeKept {
+				go a.lookBeyond(a.listed, o, box, maps.Clone(a.filter))
+			}
 			// The banner offers the newest answer under ↵, so it is the
 			// one selected, on a new query only: a refresh of the same one
 			// keeps the reader's pick, which r or o is about to act on.

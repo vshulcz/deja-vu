@@ -81,6 +81,9 @@ func (a *tuiApp) handleList(ev tui.Event) {
 	case tui.KeyBackTab:
 		a.setScope((a.scope + 2) % 3)
 	case tui.KeyEnter:
+		if len(a.rows) == 0 && a.takeWayOut() {
+			return
+		}
 		a.openReader()
 	case tui.KeyEsc:
 		switch {
