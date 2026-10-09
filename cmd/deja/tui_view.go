@@ -53,9 +53,12 @@ func (a *tuiApp) frame(w, h int) *tui.Canvas {
 	}
 	a.zones = a.zones[:0]
 	c.Fill(0, 0, w, h, cBase)
-	if a.view == viewReader {
+	switch a.view {
+	case viewReader:
 		a.drawReader()
-	} else {
+	case viewWelcome:
+		a.drawWelcome()
+	default:
 		a.drawList()
 	}
 	if a.modal != modalNone {

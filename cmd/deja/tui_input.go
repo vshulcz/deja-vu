@@ -31,6 +31,8 @@ func (a *tuiApp) handle(ev tui.Event) {
 		a.handleModal(ev)
 	case a.view == viewReader:
 		a.handleReader(ev)
+	case a.view == viewWelcome:
+		a.handleWelcome(ev)
 	default:
 		a.handleList(ev)
 	}

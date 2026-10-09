@@ -26,6 +26,7 @@ const (
 const (
 	viewList = iota
 	viewReader
+	viewWelcome
 )
 
 const (
@@ -46,6 +47,8 @@ type tuiApp struct {
 
 	scope       int
 	projects    []string
+	cwd         string
+	behind      []behindRow
 	allMeta     []model.Session
 	agentsAll   []agentCount
 	filter      map[string]bool
@@ -81,6 +84,7 @@ type tuiApp struct {
 
 	zones     []zone
 	lastClick time.Time
+	welcome   welcomeState
 
 	history    []string // past searches, oldest first
 	histAt     int      // where ↑ is in history, -1 when not browsing
@@ -102,16 +106,15 @@ func tuiWanted() bool {
 // runTUI opens the screen and, once it closes, runs whatever the reader
 // picked on the way out (a resume, a handoff), with the terminal theirs again.
 func runTUI(dir string) error {
-	if !index.HasManifest(dir) {
-		if _, err := buildForFirstRun(dir); err != nil {
-			return err
-		}
-	}
+	first := !index.HasManifest(dir)
 	t, err := tui.Open()
 	if err != nil {
 		return runBrief(dir, os.Stdout)
 	}
 	a := newTUIApp(dir, t)
+	if first {
+		a.view = viewWelcome
+	}
 	// Anything the index writes to stderr while the screen is up would land
 	// in the middle of a frame.
 	stderr := os.Stderr
@@ -148,7 +151,8 @@ func newTUIApp(dir string, t *tui.Term) *tuiApp {
 	}
 	a.p.mono = t != nil && t.Mode == tui.ModeMono
 	setTheme(lightTerminal())
-	a.projects = howScope(howCwd(), "", false)
+	a.cwd = howCwd()
+	a.projects = howScope(a.cwd, "", false)
 	a.history, a.histAt = loadTUIHistory(dir), -1
 	return a
 }
@@ -168,8 +172,13 @@ func (a *tuiApp) run() {
 		a.loadHome()
 	}
 	go a.detailWorker()
-	go a.refreshIndex()
-	go a.loadKept()
+	if a.view == viewWelcome {
+		go a.firstBuild()
+	} else {
+		go a.refreshIndex()
+		go a.loadKept()
+		go a.loadBehind()
+	}
 	tick := time.NewTicker(250 * time.Millisecond)
 	defer tick.Stop()
 	for !a.quit {
@@ -195,6 +204,7 @@ func (a *tuiApp) refreshIndex() {
 			a.say("Index not updated: "+err.Error(), false)
 			return
 		}
+		go a.loadBehind()
 		a.reload()
 	})
 }
@@ -303,6 +313,16 @@ func (a *tuiApp) setRows(ss []model.Session, hits []search.Hit, total int) {
 	} else {
 		for _, s := range ss {
 			add(s, nil)
+		}
+		if a.scope != scopeKept {
+			var behind []behindRow
+			for _, b := range a.behind {
+				if len(a.filter) == 0 || a.filter[b.s.Harness] {
+					behind = append(behind, b)
+				}
+			}
+			label, _ := a.sectionLabel()
+			rows = withBehind(behind, rows, label)
 		}
 	}
 	a.rows, a.total = rows, total

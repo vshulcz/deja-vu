@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -76,10 +77,36 @@ func (a *tuiApp) snippet(r tuiRow) string {
 // third row even when the quote turns out empty, so cards do not jump as
 // their sessions finish loading.
 func (a *tuiApp) cardHeight(r tuiRow) int {
+	h := 3
 	if len(r.snips) > 0 {
-		return 4
+		h = 4
 	}
-	return 3
+	if r.section != "" {
+		h += 2
+	}
+	return h
+}
+
+// groupHeading draws the heading a card starts its group with, and the count
+// or file beside it.
+func (a *tuiApp) groupHeading(l layout, r tuiRow, y int) {
+	p := a.p
+	x1 := l.listX + l.listW
+	nx := p.Put(l.listX+1, y, strings.ToUpper(r.section), fgs(cMuted), x1)
+	note := ""
+	switch {
+	case r.file != "":
+		n := 0
+		for _, b := range a.rows {
+			if b.file != "" {
+				n++
+			}
+		}
+		note = tuiCount(n, "session")
+	case a.total > 0:
+		note = num(a.total)
+	}
+	p.PutClip(nx+2, y, note, fgs(cFaint), x1)
 }
 
 func (a *tuiApp) drawCards(l layout) {
@@ -89,10 +116,14 @@ func (a *tuiApp) drawCards(l layout) {
 		a.drawDejaVu(l, n, s)
 		top += 4
 	}
-	label, note := a.sectionLabel()
-	nx := p.Put(l.listX+1, top, strings.ToUpper(label), fgs(cMuted), l.listX+l.listW)
-	p.PutClip(nx+2, top, note, fgs(cFaint), l.listX+l.listW)
-	top += 2
+	// A list made of groups draws each heading with its group, so the
+	// headings scroll with the cards; a single list keeps one fixed label.
+	if a.rows[0].section == "" {
+		label, note := a.sectionLabel()
+		nx := p.Put(l.listX+1, top, strings.ToUpper(label), fgs(cMuted), l.listX+l.listW)
+		p.PutClip(nx+2, top, note, fgs(cFaint), l.listX+l.listW)
+		top += 2
+	}
 	height := l.bodyTop + l.bodyH - top
 	// Scroll so the selected card is whole on screen.
 	y0 := 0
@@ -158,6 +189,13 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 		surf = cSurf
 	}
 	lines := a.cardHeight(r) - 1
+	if r.section != "" {
+		if y >= minY && y < maxY {
+			a.groupHeading(l, r, y)
+		}
+		y += 2
+		lines -= 2
+	}
 	for k := 0; k < lines; k++ {
 		yy := y + k
 		if yy < minY || yy >= maxY {
@@ -188,7 +226,11 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 		}
 		meta += " · " + tuiAgo(r.s.Updated, a.now)
 		x = p.PutClip(x+1, yy, meta, fgs(cSub), x1-1)
-		if concluded && len(r.snips) == 0 && strings.TrimSpace(r.s.Title) != "" {
+		switch {
+		case r.file != "":
+			x = p.Put(x, yy, " · touched ", fgs(cMuted), x1-1)
+			p.PutClip(x, yy, filepath.ToSlash(r.file), fgs(cPeach), x1-1)
+		case concluded && len(r.snips) == 0 && strings.TrimSpace(r.s.Title) != "":
 			p.PutClip(x, yy, " · "+strings.Join(strings.Fields(r.s.Title), " "), fgs(cMuted), x1-1)
 		}
 	}

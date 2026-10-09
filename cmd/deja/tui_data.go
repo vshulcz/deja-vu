@@ -17,6 +17,9 @@ import (
 type tuiRow struct {
 	s     model.Session
 	snips []string // the matched lines, best first
+
+	section string // a heading drawn over this card, when it starts a group
+	file    string // the changed file a card behind the diff was found through
 }
 
 // tuiDetail is what the preview and the reader need beyond the index row:
