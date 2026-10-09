@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -63,19 +62,22 @@ func writeReleaseStamp(path string, s releaseStamp) error {
 // detached process, so the command never waits on the network and an answer
 // that comes back after the command ends is kept for the next one.
 type releaseNotice struct {
+	dir     string
 	stamp   string
 	current string
 	now     time.Time
+	offline bool // no look and no line, but what changed still shows
 }
 
 // startReleaseNotice decides whether this run may show the line and, once a
 // day, starts a look in the background. Only an interactive run qualifies:
 // both stdout and stderr a terminal, which a hook or the MCP server never has.
-// DEJA_OFFLINE=1 and DEJA_NO_UPDATE_NOTICE=1 turn the whole thing off, so no
-// request is made. The look time is written before the look, so a failed or
-// offline look waits a day instead of retrying on every command.
+// DEJA_NO_UPDATE_NOTICE=1 turns the whole thing off. DEJA_OFFLINE=1 turns off
+// the look, so no request is made; what a new version brings comes from the
+// binary and still shows. The look time is written before the look, so a
+// failed or offline look waits a day instead of retrying on every command.
 func startReleaseNotice(args []string, interactive bool, dir string, now time.Time, spawn func(stamp string) error) *releaseNotice {
-	if !interactive || os.Getenv(releaseNoticeOff) != "" || os.Getenv("DEJA_OFFLINE") == "1" {
+	if !interactive || os.Getenv(releaseNoticeOff) != "" {
 		return nil
 	}
 	if len(args) > 0 && releaseNoticeSkips[args[0]] {
@@ -91,6 +93,9 @@ func startReleaseNotice(args []string, interactive bool, dir string, now time.Ti
 		return nil // a dev build has nothing to be behind
 	}
 	stamp := dir + ".release"
+	if os.Getenv("DEJA_OFFLINE") == "1" {
+		return &releaseNotice{dir: dir, stamp: stamp, current: current, now: now, offline: true}
+	}
 	s := readReleaseStamp(stamp)
 	if now.Sub(time.Unix(s.Looked, 0)) >= releaseNoticeInterval {
 		s.Looked = now.Unix()
@@ -99,7 +104,7 @@ func startReleaseNotice(args []string, interactive bool, dir string, now time.Ti
 		}
 		_ = spawn(stamp)
 	}
-	return &releaseNotice{stamp: stamp, current: current, now: now}
+	return &releaseNotice{dir: dir, stamp: stamp, current: current, now: now}
 }
 
 // finish prints the line when the last look found a newer release and the
@@ -109,10 +114,12 @@ func (n *releaseNotice) finish(w io.Writer, exe string) {
 	if n == nil {
 		return
 	}
-	// The first run of a new version says once what it brings (#4619). The
-	// stamp is `<dir>.release`, so the dir is the stamp without the suffix.
-	if msg := whatChangedTerminal(strings.TrimSuffix(n.stamp, ".release")); msg != "" {
+	// The first run of a new version says once what it brings (#4619).
+	if msg := whatChangedTerminal(n.dir); msg != "" {
 		fmt.Fprint(w, msg)
+	}
+	if n.offline {
+		return
 	}
 	s := readReleaseStamp(n.stamp)
 	if n.now.Sub(time.Unix(s.Shown, 0)) < releaseNoticeInterval {

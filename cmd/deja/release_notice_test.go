@@ -103,7 +103,13 @@ func TestReleaseNoticeNeverStartsALookWhereItMayNotSpeak(t *testing.T) {
 	t.Setenv(releaseNoticeOff, "")
 
 	t.Setenv("DEJA_OFFLINE", "1")
-	refuse("DEJA_OFFLINE=1", startReleaseNotice(nil, true, dir, now, spawn))
+	// Offline there is no look and no line, only what a new version brings.
+	if n := startReleaseNotice(nil, true, dir, now, spawn); n == nil || !n.offline || spawns.Load() != 0 {
+		t.Errorf("DEJA_OFFLINE=1: notice %+v, spawns %d", n, spawns.Load())
+	}
+	if _, err := os.Stat(dir + ".release"); err == nil {
+		t.Error("DEJA_OFFLINE=1 wrote a stamp")
+	}
 	t.Setenv("DEJA_OFFLINE", "")
 
 	withVersion(t, "dev")
@@ -179,8 +185,9 @@ func TestReleaseLookMakesNoRequestOffline(t *testing.T) {
 	if _, err := os.Stat(stamp); err == nil {
 		t.Error("DEJA_OFFLINE=1 wrote a stamp")
 	}
-	if startReleaseNotice([]string{"search", "x"}, true, dir, time.Now(), spawnReleaseLook) != nil {
-		t.Error("DEJA_OFFLINE=1 started a look")
+	started := false
+	if n := startReleaseNotice([]string{"search", "x"}, true, dir, time.Now(), func(string) error { started = true; return nil }); n == nil || started {
+		t.Error("DEJA_OFFLINE=1 started a look or dropped what changed")
 	}
 
 	// The same look without it reaches the transport, so the zero above is
@@ -210,5 +217,23 @@ func TestReleaseLookRequestedOnlyForThisIndex(t *testing.T) {
 	t.Setenv(releaseLookEnv, filepath.Join(t.TempDir(), "elsewhere.release"))
 	if _, ok := releaseLookRequested([]string{"version"}, dir); ok {
 		t.Error("a stamp outside the index was accepted")
+	}
+}
+
+// What a new version brings is in the binary, so offline still says it.
+func TestWhatChangedShowsOffline(t *testing.T) {
+	withVersion(t, "0.21.7")
+	dir := releaseNoticeEnv(t)
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir+".lastversion", []byte("0.21.5\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("DEJA_OFFLINE", "1")
+	var out bytes.Buffer
+	startReleaseNotice([]string{"last"}, true, dir, time.Now(), func(string) error { return nil }).finish(&out, "/usr/local/bin/deja")
+	if !strings.Contains(out.String(), "what changed") {
+		t.Errorf("offline first run printed %q", out.String())
 	}
 }
