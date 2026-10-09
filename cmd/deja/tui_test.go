@@ -105,7 +105,7 @@ func TestTUIHomeLeadsWithWhatWasAsked(t *testing.T) {
 	}
 	s := screen(a.frame(120, 36))
 	wantOnScreen(t, s, "◆ deja", "All projects", "YESTERDAY  1", "THIS WEEK  2", "3 sessions · 1 agents",
-		"Claude Code · payments · 1d ago",
+		"Claude Code · payments · yesterday", "payments · 2d ago",
 		"ASKED", "CONCLUDED", "Read", "Resume", "Continue in")
 	lines, found := strings.Split(s, "\n"), false
 	for i, ln := range lines {

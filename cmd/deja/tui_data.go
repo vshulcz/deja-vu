@@ -180,24 +180,32 @@ func dayGroup(t, now time.Time) string {
 	return "Earlier"
 }
 
-// tuiAgo is a card's date: relative while it is recent, a date after.
+// tuiAgo is a session's date on the cards, the preview and the reader:
+// relative within the week, a short date after. Past the first hour it counts
+// calendar days, the way the home list's day headings do, so a card under
+// Yesterday says yesterday.
 func tuiAgo(t, now time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
 	d := now.Sub(t)
-	switch {
-	case d < 0:
-		return t.Format("Jan 2")
+	if d < 0 {
+		return t.In(now.Location()).Format("Jan 2")
+	}
+	switch days := daysBefore(t, now); {
 	case d < time.Minute:
 		return "just now"
 	case d < time.Hour:
 		return num(int(d.Minutes())) + "m ago"
-	case d < 24*time.Hour:
+	case days == 0:
 		return num(int(d.Hours())) + "h ago"
-	case d < 14*24*time.Hour:
-		return num(int(d.Hours()/24)) + "d ago"
-	case t.Year() == now.Year():
+	case days == 1:
+		return "yesterday"
+	case days < 7:
+		return num(days) + "d ago"
+	}
+	t = t.In(now.Location())
+	if t.Year() == now.Year() {
 		return t.Format("Jan 2")
 	}
 	return t.Format("Jan 2 2006")

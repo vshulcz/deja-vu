@@ -20,7 +20,10 @@ func TestTUIDataHelpers(t *testing.T) {
 		now.Add(-30 * time.Second): "just now",
 		now.Add(-5 * time.Minute):  "5m ago",
 		now.Add(-3 * time.Hour):    "3h ago",
+		now.Add(-13 * time.Hour):   "yesterday",
+		now.Add(-40 * time.Hour):   "2d ago",
 		now.Add(-72 * time.Hour):   "3d ago",
+		now.AddDate(0, 0, -7):      "Feb 25",
 		now.AddDate(0, -1, 0):      "Feb 4",
 		now.AddDate(-1, 0, 0):      "Mar 4 2025",
 	} {
