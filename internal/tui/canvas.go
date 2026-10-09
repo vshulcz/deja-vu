@@ -54,9 +54,31 @@ func (c *Canvas) at(x, y int) *cell {
 	return &c.cells[y*c.W+x]
 }
 
+// unpair blanks the other half of a wide rune about to lose one of its two
+// cells. Left whole, the row came out a column longer or shorter than the
+// screen and everything after it shifted.
+func (c *Canvas) unpair(x, y int) {
+	p := c.at(x, y)
+	if p == nil {
+		return
+	}
+	if p.s == "" {
+		if l := c.at(x-1, y); l != nil {
+			l.s = " "
+		}
+	} else if r := c.at(x+1, y); r != nil && r.s == "" {
+		r.s = " "
+	}
+}
+
 // Fill paints a rectangle with a background and clears its text.
 func (c *Canvas) Fill(x, y, w, h int, bg Color) {
+	if w <= 0 {
+		return
+	}
 	for yy := y; yy < y+h; yy++ {
+		c.unpair(x, yy)
+		c.unpair(x+w-1, yy)
 		for xx := x; xx < x+w; xx++ {
 			if p := c.at(xx, yy); p != nil {
 				*p = cell{s: " ", bg: bg}
@@ -86,6 +108,10 @@ func (c *Canvas) Put(x, y int, s string, st Style, max int) int {
 		w := termwidth.RuneColumns(r)
 		if x+w > max {
 			break
+		}
+		c.unpair(x, y)
+		if w == 2 {
+			c.unpair(x+1, y)
 		}
 		prev = c.at(x, y)
 		if prev != nil {

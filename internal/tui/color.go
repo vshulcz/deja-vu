@@ -78,7 +78,7 @@ func to256(c Color) int {
 	cube := 16 + 36*ri + 6*gi + bi
 	cr, cg, cb := cubeLevels[ri], cubeLevels[gi], cubeLevels[bi]
 	avg := (r + g + b) / 3
-	gi2 := (avg - 8) / 10
+	gi2 := (avg - 3) / 10 // the nearest step of 8, 18, ... 238
 	if gi2 < 0 {
 		gi2 = 0
 	}

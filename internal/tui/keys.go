@@ -61,7 +61,10 @@ type Event struct {
 	W, H int    // resize
 }
 
-const pasteEnd = "\x1b[201~"
+const (
+	pasteStart = "\x1b[200~"
+	pasteEnd   = "\x1b[201~"
+)
 
 // Decode turns raw terminal input into events. rest is a trailing sequence
 // that has not finished arriving; the caller prepends it to the next read.
@@ -82,12 +85,25 @@ func Decode(b []byte) (evs []Event, rest []byte) {
 }
 
 // Flush is what a lone trailing sequence means once nothing more is coming: a
-// bare ESC is the Esc key, anything else is dropped.
+// bare ESC is the Esc key, ESC [ is alt-[, a paste that never closed is the
+// paste so far, anything else is dropped.
 func Flush(rest []byte) []Event {
-	if len(rest) == 1 && rest[0] == 0x1b {
+	switch {
+	case len(rest) == 1 && rest[0] == 0x1b:
 		return []Event{{Kind: EvKey, Key: KeyEsc}}
+	case string(rest) == "\x1b[":
+		return []Event{{Kind: EvKey, Key: KeyRune, Rune: '[', Alt: true}}
+	case PasteOpen(rest):
+		return []Event{{Kind: EvPaste, Text: string(rest[len(pasteStart):])}}
 	}
 	return nil
+}
+
+// PasteOpen says whether rest is a paste whose end has not arrived yet. A
+// paste over ssh comes in pieces with pauses between them, and the reader
+// waits longer for one than for a key.
+func PasteOpen(rest []byte) bool {
+	return strings.HasPrefix(string(rest), pasteStart)
 }
 
 func key(k Key) *Event { return &Event{Kind: EvKey, Key: k} }
@@ -105,8 +121,11 @@ func decodeOne(b []byte) (*Event, int, bool) {
 		return key(KeyBackspace), 1, true
 	case c == 0:
 		return &Event{Kind: EvKey, Key: KeyCtrl, Rune: ' '}, 1, true
-	case c < 0x20:
+	case c < 0x1b:
 		return &Event{Kind: EvKey, Key: KeyCtrl, Rune: rune('a' + c - 1)}, 1, true
+	case c < 0x20:
+		// ctrl-\ ] ^ _
+		return &Event{Kind: EvKey, Key: KeyCtrl, Rune: rune(c + 0x40)}, 1, true
 	}
 	if !utf8.FullRune(b) {
 		return nil, 0, false
@@ -165,6 +184,13 @@ func finalKey(c byte) (Key, bool) {
 }
 
 func decodeCSI(b []byte) (*Event, int, bool) {
+	// The Linux console sends F1-F5 as ESC [ [ A..E.
+	if len(b) > 2 && b[2] == '[' {
+		if len(b) < 4 {
+			return nil, 0, false
+		}
+		return nil, 4, true
+	}
 	// Parameters run until a final byte in 0x40..0x7e.
 	i := 2
 	for i < len(b) && (b[i] < 0x40 || b[i] > 0x7e) {
@@ -184,28 +210,31 @@ func decodeCSI(b []byte) (*Event, int, bool) {
 		}
 		return &Event{Kind: EvPaste, Text: string(b[n : n+end])}, n + end + len(pasteEnd), true
 	}
+	var ev *Event
 	if final == '~' {
 		first, _, _ := strings.Cut(params, ";")
 		switch first {
 		case "1", "7":
-			return key(KeyHome), n, true
+			ev = key(KeyHome)
 		case "4", "8":
-			return key(KeyEnd), n, true
+			ev = key(KeyEnd)
 		case "3":
-			return key(KeyDelete), n, true
+			ev = key(KeyDelete)
 		case "5":
-			return key(KeyPgUp), n, true
+			ev = key(KeyPgUp)
 		case "6":
-			return key(KeyPgDn), n, true
+			ev = key(KeyPgDn)
+		default:
+			return nil, n, true
 		}
-		return nil, n, true
+	} else {
+		k, ok := finalKey(final)
+		if !ok {
+			return nil, n, true
+		}
+		ev = key(k)
 	}
-	k, ok := finalKey(final)
-	if !ok {
-		return nil, n, true
-	}
-	ev := key(k)
-	// 1;5A is ctrl-up, 1;3A alt-up.
+	// 1;5A is ctrl-up, 1;3A alt-up, 3;5~ ctrl-delete.
 	if _, mod, found := strings.Cut(params, ";"); found {
 		if m, err := strconv.Atoi(mod); err == nil {
 			m--

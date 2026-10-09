@@ -15,6 +15,8 @@ var (
 	procSetMode      = kernel32.NewProc("SetConsoleMode")
 	procBufferInfo   = kernel32.NewProc("GetConsoleScreenBufferInfo")
 	procWaitForInput = kernel32.NewProc("WaitForSingleObject")
+	procPeekInput    = kernel32.NewProc("PeekConsoleInputW")
+	procReadInput    = kernel32.NewProc("ReadConsoleInputW")
 )
 
 const (
@@ -84,13 +86,62 @@ func size(f *os.File) (int, int, bool) {
 	return w, h, true
 }
 
+// inputRecord is INPUT_RECORD with the KEY_EVENT_RECORD arm of its union.
+type inputRecord struct {
+	eventType uint16
+	_         uint16
+	keyDown   int32
+	repeat    uint16
+	vk        uint16
+	scan      uint16
+	char      uint16
+	state     uint32
+}
+
+const keyEvent = 0x1
+
 // readTimeout waits on the console handle before reading, so the reader can
 // see a stop instead of blocking until the next key.
+//
+// The handle is signalled by key-ups, focus and mouse records too, and a
+// read on those blocks until a character is typed: Close then hung until the
+// next key, and that key was lost. Records without a character are taken
+// off the queue here, and the read happens only when one is waiting.
 func readTimeout(f *os.File, buf []byte, d time.Duration) (int, error) {
 	const waitObject0 = 0
 	r, _, _ := procWaitForInput.Call(f.Fd(), uintptr(d.Milliseconds()))
 	if r != waitObject0 {
 		return 0, errTimeout
+	}
+	var recs [64]inputRecord
+	var n uint32
+	if ok, _, _ := procPeekInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(len(recs)), uintptr(unsafe.Pointer(&n))); ok == 0 {
+		return f.Read(buf)
+	}
+	first := -1
+	for i := 0; i < int(n); i++ {
+		if recs[i].eventType == keyEvent && recs[i].keyDown != 0 && recs[i].char != 0 {
+			first = i
+			break
+		}
+	}
+	drop := func(k int) {
+		if k > 0 {
+			var got uint32
+			_, _, _ = procReadInput.Call(f.Fd(), uintptr(unsafe.Pointer(&recs[0])), uintptr(k), uintptr(unsafe.Pointer(&got)))
+		}
+	}
+	if first < 0 {
+		drop(int(n))
+		return 0, errTimeout
+	}
+	drop(first)
+	// The runtime's console read takes ctrl-z for end of input and returns
+	// nothing, so the key is read here.
+	if recs[first].char == 0x1a {
+		drop(1)
+		buf[0] = 0x1a
+		return 1, nil
 	}
 	return f.Read(buf)
 }

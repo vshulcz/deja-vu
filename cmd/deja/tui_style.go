@@ -86,6 +86,9 @@ func (p painter) button(x, y int, k, label string, primary bool, max int) int {
 // keep what is under them: filled, their corners showed as a lighter frame
 // outside the line.
 func (p painter) box(x, y, w, h int, fill tui.Color) {
+	if w < 2 || h < 2 {
+		return
+	}
 	p.Fill(x+1, y+1, w-2, h-2, fill)
 	st := fgs(cOver)
 	p.Put(x, y, "╭"+strings.Repeat("─", w-2)+"╮", st, x+w)

@@ -74,6 +74,32 @@ func TestReadLoopAndClose(t *testing.T) {
 	}
 }
 
+// A paste that arrives in two pieces with a pause between them, as it does
+// over ssh, is still one paste: its tail must not run as keystrokes.
+func TestReadLoopWaitsForASlowPaste(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := os.CreateTemp(t.TempDir(), "out")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer out.Close()
+	term := &Term{in: r, out: out, events: make(chan Event, 8), stop: make(chan struct{}), restore: func() {}}
+	term.wg.Add(1)
+	go term.readLoop()
+	_, _ = w.Write([]byte("\x1b[200~line one\r"))
+	time.Sleep(450 * time.Millisecond)
+	_, _ = w.Write([]byte("rm -rf x\r\x1b[201~"))
+	if ev := next(t, term); ev.Kind != EvPaste || ev.Text != "line one\rrm -rf x\r" {
+		t.Errorf("slow paste = %+v", ev)
+	}
+	w.Close()
+	close(term.stop)
+	term.wg.Wait()
+}
+
 func TestOpenRefusesAFile(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "in")
 	if err != nil {

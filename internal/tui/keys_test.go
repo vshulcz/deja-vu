@@ -41,6 +41,9 @@ func TestDecode(t *testing.T) {
 		{"\x1b[<0;2;99999999999999999999M", nil, ""},
 		{"\x1b[200~hi there\x1b[201~x", []Event{{Kind: EvPaste, Text: "hi there"}, keyEv(KeyRune, 'x')}, ""},
 		{"\x1b[200~half", nil, "\x1b[200~half"},
+		{"\x1c\x1d\x1f", []Event{keyEv(KeyCtrl, '\\'), keyEv(KeyCtrl, ']'), keyEv(KeyCtrl, '_')}, ""},
+		{"\x1b[[A\x1b[[", nil, "\x1b[["},
+		{"\x1b[3;5~\x1b[5;3~", []Event{{Kind: EvKey, Key: KeyDelete, Ctrl: true}, {Kind: EvKey, Key: KeyPgUp, Alt: true}}, ""},
 	}
 	for _, c := range cases {
 		got, rest := Decode([]byte(c.in))
@@ -56,5 +59,11 @@ func TestFlush(t *testing.T) {
 	}
 	if got := Flush([]byte("\x1b[1")); got != nil {
 		t.Errorf("a cut sequence is dropped, got %+v", got)
+	}
+	if got := Flush([]byte("\x1b[")); len(got) != 1 || got[0].Rune != '[' || !got[0].Alt {
+		t.Errorf("ESC [ left over is alt-[, got %+v", got)
+	}
+	if got := Flush([]byte("\x1b[200~half")); len(got) != 1 || got[0].Kind != EvPaste || got[0].Text != "half" {
+		t.Errorf("a paste that never closed is the paste so far, got %+v", got)
 	}
 }

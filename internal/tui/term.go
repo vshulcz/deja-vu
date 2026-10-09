@@ -117,6 +117,7 @@ func (t *Term) readLoop() {
 	defer t.wg.Done()
 	buf := make([]byte, 4096)
 	var rest []byte
+	idle := 0
 	for {
 		select {
 		case <-t.stop:
@@ -125,7 +126,15 @@ func (t *Term) readLoop() {
 		}
 		n, err := readTimeout(t.in, buf, 100*time.Millisecond)
 		if n == 0 {
-			if len(rest) > 0 {
+			// A sequence cut by a pause gets a moment to finish; a paste
+			// over ssh arrives in pieces and gets seconds, or its tail
+			// would run as keystrokes.
+			idle++
+			wait := 3
+			if PasteOpen(rest) {
+				wait = 30
+			}
+			if len(rest) > 0 && idle >= wait {
 				for _, ev := range Flush(rest) {
 					t.send(ev)
 				}
@@ -136,6 +145,7 @@ func (t *Term) readLoop() {
 			}
 			continue
 		}
+		idle = 0
 		data := append(rest, buf[:n]...)
 		evs, r := Decode(data)
 		rest = append([]byte(nil), r...)

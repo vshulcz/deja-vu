@@ -64,6 +64,8 @@ func (a *tuiApp) handleList(ev tui.Event) {
 		a.move(-1)
 		a.listFocus = true
 	case tui.KeyDown:
+		// Down goes into the list even from a recalled search: the results
+		// are what the reader came back for.
 		a.move(1)
 		a.listFocus = true
 	case tui.KeyPgUp:

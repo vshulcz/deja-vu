@@ -270,6 +270,9 @@ func (a *tuiApp) scopeProjects() []string {
 }
 
 func (a *tuiApp) loadHome() {
+	// A search still running answers a box that is empty now.
+	a.seq++
+	a.searching = false
 	all, _, err := index.RecentMatchingCounted(a.dir, 0, search.Options{})
 	if err == nil {
 		a.allMeta = all

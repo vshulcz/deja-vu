@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 func TestPutClipsAndKeepsTheSurface(t *testing.T) {
@@ -43,6 +45,27 @@ func TestPutWideAndCombining(t *testing.T) {
 	c.Put(0, 0, string(rune(0x301))+"a\x01", Style{}, 4)
 	if got := c.Text(0); got != "a   " {
 		t.Errorf("a leading mark and control bytes draw nothing, got %q", got)
+	}
+	// Writing over half of a wide rune blanks the other half, so the row
+	// keeps the screen's width.
+	for _, c := range []struct {
+		put  func(c *Canvas)
+		want string
+	}{
+		{func(c *Canvas) { c.Put(1, 0, "a", Style{}, 6) }, " ax   "},
+		{func(c *Canvas) { c.Put(0, 0, "a", Style{}, 6) }, "a x   "},
+		{func(c *Canvas) { c.Put(1, 0, "本", Style{}, 6) }, " 本   "},
+		{func(c *Canvas) { c.Fill(1, 0, 2, 1, 0) }, "      "},
+	} {
+		cv := NewCanvas(6, 1)
+		cv.Put(0, 0, "日x", Style{}, 6)
+		c.put(cv)
+		if got := cv.Text(0); got != c.want {
+			t.Errorf("got %q, want %q", got, c.want)
+		}
+		if w := termwidth.Columns(cv.Text(0)); w != 6 {
+			t.Errorf("%q is %d columns wide", cv.Text(0), w)
+		}
 	}
 }
 
@@ -89,7 +112,7 @@ func TestColors(t *testing.T) {
 	if Hex("#zzzzzz") != 0 || Hex("#123") != 0 {
 		t.Error("a malformed colour is no colour")
 	}
-	for in, want := range map[string]int{"#ff0000": 196, "#000000": 16, "#ffffff": 231, "#808080": 244, "#1e1e2e": 234} {
+	for in, want := range map[string]int{"#ff0000": 196, "#000000": 16, "#ffffff": 231, "#808080": 244, "#1e1e2e": 235, "#111111": 233} {
 		if got := to256(Hex(in)); got != want {
 			t.Errorf("to256(%s) = %d, want %d", in, got, want)
 		}

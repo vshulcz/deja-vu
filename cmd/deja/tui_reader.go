@@ -144,6 +144,10 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 		}
 		r.lines = append(r.lines, readerLine{})
 	}
+	// A new width wraps the hits into a different count.
+	if r.hit >= len(r.hits) {
+		r.hit = max(0, len(r.hits)-1)
+	}
 }
 
 func anyMarked(m []bool) bool {

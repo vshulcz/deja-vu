@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
@@ -34,6 +35,11 @@ func (a *tuiApp) openModal(m int) {
 }
 
 func (a *tuiApp) handleModal(ev tui.Event) {
+	if ev.Kind == tui.EvPaste && (a.modal == modalContinue || a.modal == modalPalette) {
+		a.m.filter = append(a.m.filter, []rune(strings.Join(strings.Fields(ev.Text), " "))...)
+		a.m.sel = 0
+		return
+	}
 	if ev.Kind != tui.EvKey {
 		return
 	}
