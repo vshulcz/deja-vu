@@ -252,10 +252,13 @@ func throwawayPath(p string) bool {
 // newestFirst keeps the last few distinct paths in the order they were last
 // touched, newest first — which is the order an agent picking the work back up
 // cares about.
-func newestFirst(files []string) []string {
+func newestFirst(files []string) []string { return lastDistinct(files, resumeFileCap) }
+
+// lastDistinct keeps up to n distinct entries, newest first.
+func lastDistinct(files []string, n int) []string {
 	seen := map[string]bool{}
 	var out []string
-	for i := len(files) - 1; i >= 0 && len(out) < resumeFileCap; i-- {
+	for i := len(files) - 1; i >= 0 && len(out) < n; i-- {
 		f := files[i]
 		if seen[f] {
 			continue

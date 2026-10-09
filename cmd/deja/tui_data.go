@@ -28,6 +28,7 @@ type tuiRow struct {
 type tuiDetail struct {
 	full        model.Session
 	conclusions []string
+	story       tuiStory
 	gone        bool
 	err         error
 }
@@ -100,6 +101,7 @@ func tuiLoadDetail(dir string, s model.Session) *tuiDetail {
 		d.full = full
 	}
 	d.conclusions = tuiConclusions(d.full, 3)
+	d.story = tuiStoryOf(d.full)
 	d.gone = !strings.HasPrefix(s.Project, "imported:") && transcriptGone(d.full)
 	return d
 }
