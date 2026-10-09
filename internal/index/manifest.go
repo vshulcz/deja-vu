@@ -413,8 +413,24 @@ func Redactions(dir string) (RedactionStats, error) {
 }
 
 func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
-	if m.Version != version || len(m.Files) != len(files) {
+	if m.Version != version || len(m.Files) < len(files) {
 		return false
+	}
+	if len(m.Files) > len(files) {
+		for p, f := range m.Files {
+			// The records a sync brought in have no transcript to list.
+			if _, ok := files[p]; ok || p == syncImportPath {
+				continue
+			}
+			// Still gone, from a store that is still there: nothing for a
+			// pass to do. A store that went whole is a change.
+			if !f.Kept || !deletedFromLiveStore(p) {
+				return false
+			}
+			if _, err := os.Lstat(p); err == nil {
+				return false
+			}
+		}
 	}
 	// A store skipped for a missing CLI leaves the transcripts untouched, so
 	// nothing here would notice that the tool has since been installed (#1760).
@@ -425,7 +441,7 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 		return false
 	}
 	for p, f := range files {
-		if !sameFile(m.Files[p], f) {
+		if !sameFile(m.Files[p], f) || m.Files[p].Kept {
 			return false
 		}
 	}

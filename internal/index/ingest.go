@@ -596,6 +596,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = filterTombstonedSet(ss, dead)
 	for p, st := range orphans.files {
+		st.Kept = true
 		files[p] = st
 	}
 	if progress != nil && len(orphans.files) > 0 {
@@ -3760,7 +3761,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	changed := map[string]FileState{}
 	removed := map[string]bool{}
 	for p, f := range files {
-		if of, ok := old.Files[p]; !ok || !sameFile(of, f) {
+		if of, ok := old.Files[p]; !ok || !sameFile(of, f) || of.Kept { // a kept one put back is read again
 			changed[p] = f
 		}
 	}
@@ -3826,6 +3827,9 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	kept := map[string]bool{}
 	// Kept while still on disk: a store this run cannot see, so not deleted.
 	unseen := map[string]bool{}
+	// Kept for the first time in this pass: the mark that lets the next run
+	// read the index as fresh has to be written even when nothing else is.
+	newlyKept := map[string]bool{}
 	var view *listedView
 	for p := range removed {
 		if superseded[p] {
@@ -3862,6 +3866,10 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			continue
 		}
 		if of, ok := old.Files[p]; ok {
+			if !of.Kept {
+				newlyKept[p] = true
+			}
+			of.Kept = true
 			files[p] = of
 			delete(removed, p)
 			kept[p] = true
@@ -3914,6 +3922,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if len(changed) == 0 && len(removed) == 0 {
 		sayKept()
 		lastIngestFiles = 0
+		// Nothing to read, but the kept mark has to land, or the next run
+		// takes the same file for a fresh deletion.
+		if len(newlyKept) > 0 {
+			for p := range newlyKept {
+				old.Files[p] = files[p]
+			}
+			return writeManifestOnly(dir, old)
+		}
 		return nil
 	}
 	if len(removed) == 0 && !rewritten && canAppendIncremental(changed, old.Files) {

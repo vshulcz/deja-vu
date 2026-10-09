@@ -64,9 +64,14 @@ func TestADeletedTranscriptStaysInTheIndex(t *testing.T) {
 	if !strings.Contains(log.String(), "still searchable") {
 		t.Errorf("the pass kept the session and said nothing about it:\n%s", log.String())
 	}
-	// And it stays kept on the pass after that, when there is nothing else to do.
-	if err := Ensure(dir, "claude", false, nil); err != nil {
+	// And it stays kept on the pass after that, when there is nothing else to
+	// do. That run is the fast one: the index reads as fresh and says nothing.
+	log.Reset()
+	if err := Ensure(dir, "claude", false, &log); err != nil {
 		t.Fatal(err)
+	}
+	if log.Len() > 0 {
+		t.Errorf("a run with nothing new repeated itself:\n%s", log.String())
 	}
 	if ss, _ := Search(dir, search.Options{Query: "zorblax"}); len(ss) != 1 {
 		t.Fatalf("the kept session went away on the following pass: %#v", ss)

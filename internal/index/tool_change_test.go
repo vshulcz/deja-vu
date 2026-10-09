@@ -2,10 +2,44 @@ package index
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
+
+// A transcript its agent deleted is kept in the manifest and missing from the
+// listing on every run after. Once a pass has kept it, that alone is not a
+// change to index.
+func TestManifestFreshWithAKeptTranscript(t *testing.T) {
+	store := t.TempDir()
+	live := filepath.Join(store, "live.jsonl")
+	gone := filepath.Join(store, "gone.jsonl")
+	if err := os.WriteFile(live, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	st := FileState{Size: 3}
+	m := Manifest{Version: version, ToolFingerprint: toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable()),
+		Files: map[string]FileState{live: st, gone: st, syncImportPath: {}}}
+	listed := map[string]FileState{live: st}
+	if manifestFresh(m, listed, "") {
+		t.Error("a deletion no pass has seen read as fresh")
+	}
+	m.Files[gone] = FileState{Size: 3, Kept: true}
+	if !manifestFresh(m, listed, "") {
+		t.Error("a kept transcript made the index stale")
+	}
+	if manifestFresh(m, map[string]FileState{live: st, filepath.Join(store, "new.jsonl"): st}, "") {
+		t.Error("a new file beside a kept one counted as fresh")
+	}
+	// Put back, it is read again so the mark comes off.
+	if err := os.WriteFile(gone, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if manifestFresh(m, listed, "") || manifestFresh(m, map[string]FileState{live: st, gone: st}, "") {
+		t.Error("a kept transcript back on disk counted as fresh")
+	}
+}
 
 // A store skipped because an external CLI was missing is not stale by its file
 // state — the transcripts did not change — so the next run said "index is up to

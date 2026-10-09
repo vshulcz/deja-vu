@@ -786,6 +786,11 @@ type FileState struct {
 	CWDMTime      int64  `json:"cwd_mtime,omitempty"`
 	LastUpdated   int64  `json:"last_updated,omitempty"`
 	Redactions    int    `json:"redactions,omitempty"`
+	// Kept marks a transcript its agent deleted and the index kept on
+	// purpose. Without it the listing came up one short on every run, the
+	// index never read as fresh, and every search served stale while a
+	// background pass found nothing to do.
+	Kept bool `json:"kept,omitempty"`
 	// SafeSize is the offset just past the last complete line at index time.
 	// A session file caught mid-write ends in a torn line; parsing skips it,
 	// and the next append must resume from here or that message is lost.
