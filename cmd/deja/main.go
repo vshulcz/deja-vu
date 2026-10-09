@@ -3194,7 +3194,7 @@ func runBlame(dir string, args []string) error {
 		fmt.Fprintf(os.Stderr, "deja: showing %d of %d — add --all to see the rest\n", len(hits), total)
 	}
 	if elsewhere > 0 && !onlyElsewhere {
-		fmt.Fprintf(os.Stderr, "deja: %d session%s in other projects mention their own %s — --all-projects lists them\n", elsewhere, pluralS(elsewhere), target.Base)
+		fmt.Fprintln(os.Stderr, fitLine(os.Stderr, fmt.Sprintf("deja: %d session%s in other projects mention their own %s — --all-projects lists them", elsewhere, pluralS(elsewhere), target.Base)))
 	}
 	return nil
 }

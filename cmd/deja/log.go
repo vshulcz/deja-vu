@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/index"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -90,6 +91,9 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		fmt.Fprintln(w, "deja: no usage recorded yet — events appear when agents search, recall, or receive injected context")
 		return nil
 	}
+	// On a terminal the session id takes the short form the other screens
+	// print; the full uuid pushed every line past 80 columns.
+	tty := printableWidth(w) > 0
 	for _, e := range events {
 		mark := ""
 		if e.FoundNothing() {
@@ -101,6 +105,8 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		}
 		into := ""
 		switch {
+		case e.Into != "" && tty:
+			into = " · into: " + search.ShortID(e.Into)
 		case e.Into != "":
 			into = " · into: " + e.Into
 		case e.Unreadable:

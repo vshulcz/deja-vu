@@ -364,7 +364,7 @@ func printStats(w io.Writer, r stats.Report) {
 	}
 	fmt.Fprintf(w, "Sessions  %s%d%s\n", bold, r.TotalSessions, reset)
 	fmt.Fprintf(w, "Messages  %s%d%s\n", bold, r.TotalMessages, reset)
-	fmt.Fprintf(w, "Range     %s → %s\n\n", valueOrDash(statDay(r.DateRange.Start)), valueOrDash(statDay(r.DateRange.End)))
+	fmt.Fprintf(w, "Range     %s\n\n", statRange(r.DateRange.Start, r.DateRange.End))
 	// `deja restore` matters entirely at one moment — an agent replaced a
 	// function with something worse and the work was not committed — and
 	// nobody reads a command list while panicking. So the number is stated
@@ -467,8 +467,11 @@ func printStats(w io.Writer, r stats.Report) {
 			fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Distilled        %s served from %s of transcripts — ~%d× less context", humanBytes(int64(r.Recall.Bytes)), humanBytes(r.Recall.RawBytes), ratio)))
 		}
 	}
-	fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  This week        %d recall%s by your agents · %s re-used (plus %d auto-injection%s)",
-		r.WeekRecalls, pluralS(r.WeekRecalls), humanBytes(int64(r.WeekBytes)), r.WeekInjected, pluralS(r.WeekInjected))))
+	// When the whole log falls inside the week the line repeated Memory served.
+	if r.WeekRecalls != r.Recall.Recalls || r.WeekInjected != r.Recall.Injections {
+		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  This week        %d recall%s by your agents · %s re-used (plus %d auto-injection%s)",
+			r.WeekRecalls, pluralS(r.WeekRecalls), humanBytes(int64(r.WeekBytes)), r.WeekInjected, pluralS(r.WeekInjected))))
+	}
 	if r.Recall.DejaVuMoments > 0 {
 		fmt.Fprintln(w, fitStatRow(width, fmt.Sprintf("  Déjà vu          %d prompt%s your own history already answered", r.Recall.DejaVuMoments, pluralS(r.Recall.DejaVuMoments))))
 	}
@@ -539,6 +542,18 @@ func statLongestTitle(r stats.Report, width int) string {
 	}
 	used := termwidth.Columns(fmt.Sprintf("  Longest session  %d message%s · [%s] · ", r.Longest.Messages, pluralS(r.Longest.Messages), r.Longest.Harness))
 	return cutToWidth(title, width-used)
+}
+
+// statRange gives both ends the year once they fall in different years:
+// "Jul 8 2025 → Jun 29" read as a range inside one year.
+func statRange(start, end string) string {
+	a, b := statDay(start), statDay(end)
+	if s, err := time.Parse("2006-01-02", start); err == nil {
+		if e, err := time.Parse("2006-01-02", end); err == nil && s.Year() != e.Year() {
+			a, b = s.Format("Jan 2 2006"), e.Format("Jan 2 2006")
+		}
+	}
+	return valueOrDash(a) + " → " + valueOrDash(b)
 }
 
 // statDay prints a "2006-01-02" day the way the other screens do: "Mar 27"

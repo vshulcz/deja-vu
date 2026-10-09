@@ -90,3 +90,20 @@ func TestThePlainTextStatsPrintsTheWeekItWasHanded(t *testing.T) {
 			"so make them agree deliberately rather than by accident")
 	}
 }
+
+// A log that holds only this week made the week line a copy of Memory served.
+func TestThePlainTextStatsDropsAWeekThatRepeatsTheTotal(t *testing.T) {
+	var out strings.Builder
+	r := stats.Report{TotalSessions: 40, TotalMessages: 400, WeekRecalls: 3, WeekInjected: 4}
+	r.Recall.Recalls, r.Recall.Injections = 3, 4
+	printStats(&out, r)
+	if strings.Contains(out.String(), "This week") {
+		t.Errorf("the week line repeats the total:\n%s", out.String())
+	}
+}
+
+func TestStatRangeNamesBothYears(t *testing.T) {
+	if got := statRange("2025-07-08", "2026-06-29"); got != "Jul 8 2025 → Jun 29 2026" {
+		t.Errorf("statRange across years = %q", got)
+	}
+}
