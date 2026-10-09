@@ -266,7 +266,7 @@ func TestTUIReader(t *testing.T) {
 	a.query = []rune("proxy")
 	a.openReader()
 	s := screen(a.frame(120, 36))
-	wantOnScreen(t, s, "Claude Code", "user", "assistant", "webhook signature")
+	wantOnScreen(t, s, "Claude Code", "you", "webhook signature")
 	a.view = viewList
 	a.sel = 2
 	a.openReader()

@@ -37,6 +37,10 @@ func (a *tuiApp) handleModal(ev tui.Event) {
 	if ev.Kind != tui.EvKey {
 		return
 	}
+	if a.modal == modalPalette {
+		a.handlePalette(ev)
+		return
+	}
 	if ev.Key == tui.KeyEsc || (ev.Key == tui.KeyRune && ev.Rune == 'q' && a.modal == modalHelp) {
 		a.modal = modalNone
 		return
@@ -124,6 +128,7 @@ func (a *tuiApp) continueIn(t continueTarget) {
 }
 
 func (a *tuiApp) copyContext() {
+	a.remember()
 	s, ok := a.current()
 	if !ok {
 		return
@@ -168,6 +173,8 @@ func (a *tuiApp) drawModal() {
 		a.drawAgents()
 	case modalHelp:
 		a.drawHelp()
+	case modalPalette:
+		a.drawPalette()
 	}
 }
 
@@ -253,9 +260,9 @@ func (a *tuiApp) drawHelp() {
 		title string
 		keys  [][2]string
 	}{
-		{"FIND", [][2]string{{"type", "search as you type"}, {"tab", "this project / all / kept"}, {"↑↓", "pick a session"}, {"a", "filter by agent"}, {"esc", "clear, then quit"}}},
+		{"FIND", [][2]string{{"type", "search as you type"}, {"tab", "this project / all / kept"}, {"↑↓ 1-9", "pick a session"}, {"↑ on empty", "past searches"}, {"a", "filter by agent"}}},
 		{"READ", [][2]string{{"↵", "open at the match"}, {"n N", "next / previous match"}, {"t", "unfold long messages"}, {"g G", "top / bottom"}, {"esc", "back to the list"}}},
-		{"ACT", [][2]string{{"r", "resume in its agent"}, {"o", "continue in any agent"}, {"c", "copy the context"}, {"R", "put a deleted one back"}, {"^r ^o", "the same, while typing"}}},
+		{"ACT", [][2]string{{"r", "resume in its agent"}, {"o", "continue in any agent"}, {"c", "copy the context"}, {"R", "put a deleted one back"}, {"^k", "every command by name"}}},
 	}
 	x, y, iw := a.modalBox(100, 12)
 	right := x + iw

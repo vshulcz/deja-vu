@@ -84,12 +84,16 @@ func (a *tuiApp) cardHeight(r tuiRow) int {
 
 func (a *tuiApp) drawCards(l layout) {
 	p := a.p
+	top := l.bodyTop
+	if n, s := dejaVu(string(a.query), a.rows); n > 0 && l.bodyH > 16 {
+		a.drawDejaVu(l, n, s)
+		top += 4
+	}
 	label, note := a.sectionLabel()
-	x := l.listX + 1
-	nx := p.Put(x, l.bodyTop, strings.ToUpper(label), fgs(cMuted), l.listX+l.listW)
-	p.PutClip(nx+2, l.bodyTop, note, fgs(cFaint), l.listX+l.listW)
-	top := l.bodyTop + 2
-	height := l.bodyH - 2
+	nx := p.Put(l.listX+1, top, strings.ToUpper(label), fgs(cMuted), l.listX+l.listW)
+	p.PutClip(nx+2, top, note, fgs(cFaint), l.listX+l.listW)
+	top += 2
+	height := l.bodyTop + l.bodyH - top
 	// Scroll so the selected card is whole on screen.
 	y0 := 0
 	selY, selH := 0, 0
@@ -106,9 +110,13 @@ func (a *tuiApp) drawCards(l layout) {
 		a.scroll = selY + selH - height
 	}
 	y := top - a.scroll
+	a.firstShown = -1
 	for i, r := range a.rows {
 		h := a.cardHeight(r)
 		if y+h > top && y < top+height {
+			if a.firstShown < 0 && y >= top {
+				a.firstShown = i
+			}
 			a.drawCard(l, i, r, y, top, top+height)
 			idx := i
 			a.addZone(l.listX, max(y, top), l.listX+l.listW, min(y+h-1, top+height), func() { a.clickCard(idx) })
@@ -116,6 +124,29 @@ func (a *tuiApp) drawCards(l layout) {
 		}
 		y += h
 	}
+	a.firstShown = max(a.firstShown, 0)
+}
+
+// drawDejaVu is the banner over a search that was asked before: how many
+// sessions opened with this question, and what the newest one concluded.
+func (a *tuiApp) drawDejaVu(l layout, n int, s model.Session) {
+	p := a.p
+	x0, x1 := l.listX+1, l.listX+l.listW
+	y := l.bodyTop
+	p.Fill(x0, y, x1-x0, 3, cSurf2)
+	x := p.Put(x0+1, y, "✦", fgs(cMark), x1)
+	x = p.Put(x+1, y, "Déjà vu.", bold(cText), x1)
+	p.PutClip(x+1, y, "Asked in "+num(n)+" sessions before. Newest answer, "+tuiAgo(s.Updated, a.now)+":", fgs(cSub), x1-1)
+	head, concluded := a.headline(s)
+	if !concluded {
+		head = "reading…"
+	}
+	p.PutClip(x0+3, y+1, head, bold(cText), x1-1)
+	bx := p.Put(x0+3, y+2, "↵", bold(cAcc), x1)
+	bx = p.Put(bx+1, y+2, "open it   ", fgs(cSub), x1)
+	bx = p.Put(bx, y+2, "o", bold(cAcc), x1)
+	p.Put(bx+1, y+2, "hand it to an agent", fgs(cSub), x1)
+	a.want(s)
 }
 
 func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {

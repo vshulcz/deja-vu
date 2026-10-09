@@ -80,6 +80,9 @@ func TestMain(m *testing.M) {
 		"SSH_TTY":         "",
 		"SSH_CONNECTION":  "",
 		"WAYLAND_DISPLAY": "",
+		"COLORFGBG":       "",
+		"DEJA_THEME":      "",
+		"DEJA_TUI":        "",
 	}
 	// The version lookup is the one thing in this package that talks to the
 	// internet, and only one test ever replaced it — so a full run asked

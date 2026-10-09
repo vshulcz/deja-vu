@@ -7,6 +7,7 @@ import "strings"
 // rest get it on the clipboard.
 
 func (a *tuiApp) openContinue() {
+	a.remember()
 	s, ok := a.current()
 	if !ok {
 		return

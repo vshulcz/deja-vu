@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"unicode"
 
@@ -9,23 +10,46 @@ import (
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
-// The interactive screen's palette. Dark only for now; every colour is named
-// for its job so a light set can replace the values without touching layout.
+// The interactive screen's palette. Every colour is named for its job, so the
+// light set replaces the values without touching layout.
 var (
-	cBase   = tui.Hex("#1e1e2e")
-	cMantle = tui.Hex("#181825")
-	cSurf   = tui.Hex("#26263a")
-	cSurf2  = tui.Hex("#313244")
-	cOver   = tui.Hex("#45475a")
-	cText   = tui.Hex("#cdd6f4")
-	cSub    = tui.Hex("#a6adc8")
-	cMuted  = tui.Hex("#7f849c")
-	cFaint  = tui.Hex("#585b70")
-	cAcc    = tui.Hex("#cba6f7")
-	cYel    = tui.Hex("#f9e2af")
-	cGrn    = tui.Hex("#a6e3a1")
-	cPeach  = tui.Hex("#fab387")
+	cBase, cMantle, cSurf, cSurf2, cOver tui.Color
+	cText, cSub, cMuted, cFaint          tui.Color
+	cAcc, cYel, cGrn, cPeach, cRed       tui.Color
+	// cMark is what a match is picked out in: yellow reads on dark and
+	// vanishes on light.
+	cMark tui.Color
 )
+
+func init() { setTheme(false) }
+
+func setTheme(light bool) {
+	p := []string{"#1e1e2e", "#181825", "#26263a", "#313244", "#45475a", "#cdd6f4", "#a6adc8", "#7f849c", "#585b70",
+		"#cba6f7", "#f9e2af", "#a6e3a1", "#fab387", "#f38ba8", "#f9e2af"}
+	if light {
+		p = []string{"#eff1f5", "#e6e9ef", "#e4e6ee", "#dce0e8", "#bcc0cc", "#4c4f69", "#5c5f77", "#7c7f93", "#9ca0b0",
+			"#8839ef", "#df8e1d", "#40a02b", "#fe640b", "#d20f39", "#fe640b"}
+	}
+	for i, c := range []*tui.Color{&cBase, &cMantle, &cSurf, &cSurf2, &cOver, &cText, &cSub, &cMuted, &cFaint,
+		&cAcc, &cYel, &cGrn, &cPeach, &cRed, &cMark} {
+		*c = tui.Hex(p[i])
+	}
+}
+
+// lightTerminal reads the theme the reader asked for, then the background
+// the terminal reports through COLORFGBG ("fg;bg", 7 and 15 being light).
+// Unknown is dark, which is what most terminals are.
+func lightTerminal() bool {
+	switch strings.ToLower(os.Getenv("DEJA_THEME")) {
+	case "light":
+		return true
+	case "dark":
+		return false
+	}
+	parts := strings.Split(os.Getenv("COLORFGBG"), ";")
+	bg := parts[len(parts)-1]
+	return bg == "7" || bg == "15"
+}
 
 func agentColor(h string) tui.Color { return tui.Index256(harnesscolor.Index(h)) }
 
@@ -99,7 +123,7 @@ func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, ma
 	rs := []rune(text)
 	mark := highlightMask(rs, terms)
 	hl := base
-	hl.FG, hl.Bold = cYel, true
+	hl.FG, hl.Bold = cMark, true
 	if p.mono {
 		hl.Reverse = true
 	}

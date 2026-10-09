@@ -33,6 +33,7 @@ const (
 	modalContinue
 	modalAgents
 	modalHelp
+	modalPalette
 )
 
 type tuiApp struct {
@@ -80,6 +81,10 @@ type tuiApp struct {
 
 	zones     []zone
 	lastClick time.Time
+
+	history    []string // past searches, oldest first
+	histAt     int      // where ↑ is in history, -1 when not browsing
+	firstShown int      // the first card on screen, for 1-9
 
 	after func() error
 	quit  bool
@@ -142,7 +147,9 @@ func newTUIApp(dir string, t *tui.Term) *tuiApp {
 		keptIDs: map[string]bool{},
 	}
 	a.p.mono = t != nil && t.Mode == tui.ModeMono
+	setTheme(lightTerminal())
 	a.projects = howScope(howCwd(), "", false)
+	a.history, a.histAt = loadTUIHistory(dir), -1
 	return a
 }
 
@@ -342,6 +349,15 @@ func (a *tuiApp) startSearch() {
 			}
 			a.tookMS, a.widened = took, widened
 			a.setRows(nil, hits, len(hits))
+			// The banner offers the newest answer under ↵, so it is the
+			// one selected.
+			if n, s := dejaVu(q, a.rows); n > 0 {
+				for i, r := range a.rows {
+					if sessionKey(r.s) == sessionKey(s) {
+						a.sel = i
+					}
+				}
+			}
 		})
 	})
 }
@@ -355,6 +371,7 @@ func (a *tuiApp) selected() (model.Session, bool) {
 
 // resumeSelected leaves the screen and reopens the session in its own agent.
 func (a *tuiApp) resumeSelected() {
+	a.remember()
 	s, ok := a.current()
 	if !ok {
 		return

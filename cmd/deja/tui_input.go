@@ -48,8 +48,17 @@ func (a *tuiApp) handleList(ev tui.Event) {
 		a.clickList(ev)
 		return
 	}
+	if ev.Key != tui.KeyUp {
+		a.histAt = -1
+	}
 	switch ev.Key {
 	case tui.KeyUp:
+		// At the top of the box, ↑ walks back through past searches, the
+		// way a shell does.
+		if !a.listFocus && a.sel == 0 && (len(a.query) == 0 || a.histAt >= 0) && len(a.history) > 0 {
+			a.recall(-1)
+			return
+		}
 		a.move(-1)
 		a.listFocus = true
 	case tui.KeyDown:
@@ -120,7 +129,7 @@ func (a *tuiApp) ctrlKey(r rune) {
 	case 'y':
 		a.copyContext()
 	case 'k':
-		a.openModal(modalHelp)
+		a.openPalette()
 	case 'n':
 		a.move(1)
 	case 'p':
@@ -130,6 +139,12 @@ func (a *tuiApp) ctrlKey(r rune) {
 
 // listAction runs a letter as an action and reports whether it was one.
 func (a *tuiApp) listAction(r rune) bool {
+	if r >= '1' && r <= '9' && len(a.rows) > 0 {
+		// The nth card on screen, so the number matches what the eye counts.
+		a.sel = min(a.firstShown+int(r-'1'), len(a.rows)-1)
+		a.want(a.rows[a.sel].s)
+		return true
+	}
 	switch r {
 	case 'j':
 		a.move(1)

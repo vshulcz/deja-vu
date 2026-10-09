@@ -3,8 +3,8 @@ package main
 import (
 	"strings"
 
-	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/tui"
@@ -20,6 +20,7 @@ type readerLine struct {
 	indent int
 	role   tui.Color // non-zero on a message's header line
 	when   string    // beside the role, on a header line
+	block  bool      // drawn on a block, like output in a terminal
 	hit    bool
 }
 
@@ -36,9 +37,13 @@ type readerState struct {
 	placed  bool
 }
 
-const readerFold = 10
+const (
+	readerFold     = 10
+	readerMaxLines = 400
+)
 
 func (a *tuiApp) openReader() {
+	a.remember()
 	s, ok := a.selected()
 	if !ok {
 		return
@@ -48,54 +53,88 @@ func (a *tuiApp) openReader() {
 	a.want(s)
 }
 
-func roleColor(role string) tui.Color {
+// readerRole is how one kind of message reads: its label, its colour, whether
+// its body sits on a block like output does, and how many lines it shows
+// before folding.
+type readerRole struct {
+	label string
+	color tui.Color
+	block bool
+	fold  int
+}
+
+func roleLook(role, harness string) (readerRole, bool) {
 	switch role {
 	case "user":
-		return cAcc
+		return readerRole{"you", cAcc, false, readerFold}, true
 	case "assistant":
-		return cGrn
+		return readerRole{agentName(harness), cGrn, false, readerFold}, true
+	case "command":
+		return readerRole{"ran", cPeach, true, 4}, true
+	case "tool-output":
+		return readerRole{"output", cSub, true, 6}, true
+	case "edit":
+		return readerRole{"edited", cYel, true, 8}, true
+	case "files":
+		return readerRole{"files", cMuted, false, 3}, true
+	case "summary":
+		return readerRole{"summary", cMuted, false, 4}, true
+	case "wrote":
+		// Hashes of written lines: an index for blame, not something to read.
+		return readerRole{}, false
 	}
-	return cPeach
+	return readerRole{role, cPeach, false, readerFold}, true
 }
 
 func (r *readerState) layout(width int, now func(model.Message) string) {
 	r.layoutW = width
 	r.lines, r.hits = nil, nil
-	tw := width - 6
+	tw := width - 8
 	if tw < 20 {
 		tw = 20
 	}
 	for _, m := range r.d.full.Messages {
-		text := digest.MessageText(m.Text)
-		if text == "" {
+		look, ok := roleLook(m.Role, r.s.Harness)
+		// As written, line breaks and all: the digest form joins a message into
+		// one line and drops what looks like output, which is what a reader
+		// opened the session to see.
+		text := strings.Trim(redact.SafeForDisplay(strings.ReplaceAll(m.Text, "\t", "    ")), "\n ")
+		if !ok || text == "" {
 			continue
+		}
+		base := fgs(cText)
+		if look.block || look.color == cMuted {
+			base = fgs(cSub)
 		}
 		var body []readerLine
 		matched := false
 		for _, raw := range strings.Split(text, "\n") {
 			raw = strings.TrimRight(raw, " \t\r")
 			wrapped := []string{raw}
-			if !strings.HasPrefix(raw, "    ") && !strings.HasPrefix(raw, "\t") {
+			if !look.block && !strings.HasPrefix(raw, "    ") && !strings.HasPrefix(raw, "\t") {
 				wrapped = termwidth.Wrap(raw, tw)
 			}
 			for _, ln := range wrapped {
 				hit := len(r.terms) > 0 && anyMarked(highlightMask([]rune(ln), r.terms))
 				matched = matched || hit
-				body = append(body, readerLine{text: ln, st: fgs(cText), indent: 4, hit: hit})
+				body = append(body, readerLine{text: ln, st: base, indent: 4, hit: hit, block: look.block})
 			}
 		}
-		if m.Role != "user" && m.Role != "assistant" {
-			for i := range body {
-				body[i].st = fgs(cSub)
+		head := readerLine{text: look.label, st: bold(look.color), indent: 2, role: look.color, when: now(m)}
+		r.lines = append(r.lines, head)
+		fold := look.fold
+		if r.expand || matched {
+			// Unfolded still has an end: one test log can run to thousands
+			// of lines, and the screen is for reading, not for the log.
+			fold = readerMaxLines
+		}
+		if len(body) > fold+1 {
+			more := len(body) - fold
+			note := " · t shows all"
+			if fold == readerMaxLines {
+				note = " · deja show has the whole session"
 			}
-		}
-		r.lines = append(r.lines, readerLine{text: m.Role, st: bold(roleColor(m.Role)), indent: 2, role: roleColor(m.Role)})
-		if t := now(m); t != "" {
-			r.lines[len(r.lines)-1].when = t
-		}
-		if !r.expand && !matched && len(body) > readerFold+2 {
-			more := len(body) - readerFold
-			body = append(body[:readerFold], readerLine{text: "… " + tuiCount(more, "more line") + " · t shows all", st: fgs(cFaint), indent: 4})
+			body = append(body[:fold], readerLine{text: "… " + tuiCount(more, "more line") + note, st: fgs(cFaint), indent: 4, block: look.block})
 		}
 		for _, b := range body {
 			if b.hit {
@@ -166,13 +205,18 @@ func (a *tuiApp) drawReader() {
 			p.Put(x+2, y, ln.when, fgs(cMuted), p.W-2)
 			continue
 		}
+		if ln.block {
+			p.Fill(ln.indent, y, p.W-ln.indent-3, 1, cMantle)
+			p.putHL(ln.indent+1, y, ln.text, r.terms, ln.st, p.W-4)
+			continue
+		}
 		p.putHL(ln.indent, y, ln.text, r.terms, ln.st, p.W-2)
 	}
 	// Where the matches are in the whole session, down the right edge.
 	if len(r.lines) > height {
 		for _, h := range r.hits {
 			y := top + h*height/len(r.lines)
-			p.Put(p.W-1, y, "▐", fgs(cYel), p.W)
+			p.Put(p.W-1, y, "▐", fgs(cMark), p.W)
 		}
 	}
 	a.drawFooter()
