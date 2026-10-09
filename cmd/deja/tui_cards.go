@@ -41,18 +41,18 @@ func (a *tuiApp) sectionLabel() (string, string) {
 	}
 	switch a.scope {
 	case scopeHere:
-		return "Recent in this project", num(a.total)
+		return "Recent in this project", grouped(a.total)
 	case scopeKept:
-		return "Kept after their agent deleted them", num(a.total)
+		return "Kept after their agent deleted them", grouped(a.total)
 	}
-	return "Recent", num(a.total)
+	return "Recent", grouped(a.total)
 }
 
 func tuiCount(n int, word string) string {
 	if n == 1 {
 		return "1 " + word
 	}
-	return num(n) + " " + word + "s"
+	return grouped(n) + " " + word + "s"
 }
 
 // snippet is the matched line a card quotes: the first that does not repeat
@@ -104,7 +104,7 @@ func (a *tuiApp) groupHeading(l layout, r tuiRow, y int) {
 		}
 		note = tuiCount(n, "session")
 	case a.total > 0:
-		note = num(a.total)
+		note = grouped(a.total)
 	}
 	p.PutClip(nx+2, y, note, fgs(cFaint), x1)
 }
@@ -310,7 +310,11 @@ func (a *tuiApp) drawPreview(l layout) {
 	}
 	switch {
 	case d == nil:
-		section("CONCLUDED", []string{"reading…"}, plain(cFaint))
+		if room(4) {
+			p.Put(ix, cy, "CONCLUDED", fgs(cMuted), right)
+			a.drawSkeleton(ix, cy+1, iw-2, 3)
+			cy += 5
+		}
 	case len(d.conclusions) == 0:
 		section("CONCLUDED", []string{"Nothing the session settled on."}, plain(cFaint))
 	default:

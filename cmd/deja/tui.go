@@ -35,6 +35,7 @@ const (
 	modalAgents
 	modalHelp
 	modalPalette
+	modalNews
 )
 
 type tuiApp struct {
@@ -85,6 +86,9 @@ type tuiApp struct {
 	zones     []zone
 	lastClick time.Time
 	welcome   welcomeState
+	news      []string // what a new version brings, shown once
+	newsVer   string
+	leaving   string // the agent the screen is handing over to
 
 	history    []string // past searches, oldest first
 	histAt     int      // where ↑ is in history, -1 when not browsing
@@ -114,6 +118,8 @@ func runTUI(dir string) error {
 	a := newTUIApp(dir, t)
 	if first {
 		a.view = viewWelcome
+	} else {
+		a.loadNews()
 	}
 	// Anything the index writes to stderr while the screen is up would land
 	// in the middle of a frame.
@@ -179,7 +185,9 @@ func (a *tuiApp) run() {
 		go a.loadKept()
 		go a.loadBehind()
 	}
-	tick := time.NewTicker(250 * time.Millisecond)
+	// Fast enough for the tail and the spinners to move smoothly; rows that
+	// did not change are not written, so an idle screen costs nothing.
+	tick := time.NewTicker(100 * time.Millisecond)
 	defer tick.Stop()
 	for !a.quit {
 		a.render()
@@ -190,6 +198,11 @@ func (a *tuiApp) run() {
 			f()
 		case <-tick.C:
 		}
+	}
+	// A last frame says where the reader is going before the screen closes.
+	if a.leaving != "" {
+		a.render()
+		time.Sleep(450 * time.Millisecond)
 	}
 }
 
@@ -405,9 +418,10 @@ func (a *tuiApp) resumeSelected() {
 	}
 	a.after = func() error {
 		fmt.Fprintf(os.Stderr, "deja: resuming in %s\n", agentName(s.Harness))
-		indexInHand = true
+		pickedOnScreen = &s
 		return runResume(a.dir, []string{s.ID, "--exec"}, os.Stdout)
 	}
+	a.leaving = "Resuming in " + agentName(s.Harness) + "…"
 	a.quit = true
 }
 

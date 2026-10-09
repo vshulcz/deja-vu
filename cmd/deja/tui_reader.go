@@ -173,7 +173,9 @@ func (a *tuiApp) drawReader() {
 	p.PutClip(x+2, 0, tuiProject(s)+" · "+tuiAgo(s.Updated, a.now)+" · "+search.ShortID(s.ID), on(cSub, cMantle), p.W-18)
 	top, height := 2, p.H-3
 	if r.d == nil {
-		p.Put(4, top+1, "reading…", fgs(cFaint), p.W)
+		for b := 0; b < 3 && top+1+b*5 < p.H-2; b++ {
+			a.drawSkeleton(4, top+1+b*5, min(p.W-8, 90), min(3, p.H-3-(top+1+b*5)))
+		}
 		a.drawFooter()
 		return
 	}

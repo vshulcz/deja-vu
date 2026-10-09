@@ -289,10 +289,10 @@ func TestTUIReader(t *testing.T) {
 	if a.view != viewList {
 		t.Error("esc leaves the reader")
 	}
-	// A session not read yet says so instead of drawing nothing.
+	// A session not read yet draws its placeholder instead of nothing.
 	a.details = map[string]*tuiDetail{}
 	a.openReader()
-	wantOnScreen(t, screen(a.frame(120, 36)), "reading…")
+	wantOnScreen(t, screen(a.frame(120, 36)), "▀▀▀▀")
 }
 
 func TestTUIContinueIn(t *testing.T) {

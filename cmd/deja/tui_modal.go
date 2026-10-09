@@ -35,6 +35,10 @@ func (a *tuiApp) openModal(m int) {
 }
 
 func (a *tuiApp) handleModal(ev tui.Event) {
+	if a.modal == modalNews {
+		a.handleNews(ev)
+		return
+	}
 	if ev.Kind == tui.EvPaste && (a.modal == modalContinue || a.modal == modalPalette) {
 		a.m.filter = append(a.m.filter, []rune(strings.Join(strings.Fields(ev.Text), " "))...)
 		a.m.sel = 0
@@ -128,9 +132,10 @@ func (a *tuiApp) continueIn(t continueTarget) {
 	}
 	a.after = func() error {
 		fmt.Fprintf(os.Stderr, "deja: continuing in %s\n", agentName(t.id))
-		indexInHand = true
+		pickedOnScreen = &s
 		return runHandoff(a.dir, []string{"--to", t.id, s.ID, "--exec"}, os.Stdout)
 	}
+	a.leaving = "Continuing in " + agentName(t.id) + "…"
 	a.quit = true
 }
 
@@ -182,6 +187,8 @@ func (a *tuiApp) drawModal() {
 		a.drawHelp()
 	case modalPalette:
 		a.drawPalette()
+	case modalNews:
+		a.drawNews()
 	}
 }
 

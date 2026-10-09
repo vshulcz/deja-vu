@@ -20,7 +20,9 @@ func TestTUIFirstRunBuildsBehindTheCat(t *testing.T) {
 	a.view = viewWelcome
 	a.now = time.Now()
 	s := screen(a.frame(120, 30))
-	wantOnScreen(t, s, "Reading your agents' history", "First time only")
+	wantOnScreen(t, s, "Reading your agents' history")
+	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'x'})
+	wantOnScreen(t, screen(a.frame(120, 30)), "Still reading")
 	// Keys wait while it reads; esc still leaves.
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEnter})
 	if a.view != viewWelcome {
@@ -121,4 +123,38 @@ func TestTUIBehindTheUncommittedChange(t *testing.T) {
 	if len(a.rows) != 3 {
 		t.Errorf("home after an empty block: %d rows", len(a.rows))
 	}
+}
+
+func TestTUIBuildProgressAndNews(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	a.view = viewWelcome
+	prog := &tuiProgress{}
+	prog.Phase("reading sessions", 200)
+	prog.Advance(50)
+	prog.Harness("codex", 1200, 9)
+	prog.Harness("cursor", 0, 0)
+	a.welcome = welcomeState{started: a.clock().Add(-12 * time.Second), prog: prog}
+	wantOnScreen(t, screen(a.frame(120, 30)), "Reading sessions", "25%", "Codex CLI", "1,200", "12s")
+	if strings.Contains(screen(a.frame(120, 30)), "Cursor") {
+		t.Error("a store with no sessions was listed")
+	}
+	prog.Phase("finding transcripts", 0)
+	a.frame(120, 30) // a stage of unknown length draws the sliding bead
+	wantOnScreen(t, screen(a.frame(70, 32)), "Finding your agents' transcripts")
+	if grouped(27262) != "27,262" || grouped(999) != "999" || grouped(-1500) != "-1,500" {
+		t.Error(grouped(27262), grouped(999), grouped(-1500))
+	}
+
+	a.view = viewList
+	a.news, a.newsVer, a.modal = []string{"Bare `deja` opens a screen."}, "9.9.9", modalNews
+	s := screen(a.frame(120, 30))
+	wantOnScreen(t, s, "New in deja 9.9.9", "Bare deja opens a screen.", "any key")
+	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'x'})
+	if a.modal != modalNone || len(a.query) != 0 {
+		t.Errorf("the key that closes the news also did something: modal %d query %q", a.modal, string(a.query))
+	}
+
+	a.leaving = "Continuing in Codex CLI…"
+	wantOnScreen(t, screen(a.frame(120, 30)), "Continuing in Codex CLI", "Claude Code")
 }

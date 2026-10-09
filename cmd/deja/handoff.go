@@ -99,9 +99,9 @@ func runHandoff(dir string, args []string, stdout io.Writer) error {
 		age = humanAge(time.Since(s.Updated))
 	}
 	fmt.Fprintf(os.Stderr, "deja: handing off %s · %s · %s · %s\n", s.Harness, s.Project, digest.Short(s.ID), age)
-	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour {
+	if !s.Updated.IsZero() && time.Since(s.Updated) > 7*24*time.Hour && pickedOnScreen == nil {
 		// The line above already says how old; saying it again here read as
-		// two warnings.
+		// two warnings. One picked on the screen was picked knowing its age.
 		fmt.Fprintln(os.Stderr, "deja: older than a week — `deja last` lists newer sessions to hand off")
 	}
 	// The quoted half carries the same frame recall does: this text becomes
@@ -193,14 +193,17 @@ func prefixArg(prefix string) string {
 // handoffSource resolves the session being handed off: an explicit id-prefix,
 // or the newest indexed session for the project in the current directory.
 func handoffSource(dir, prefix string) (model.Session, error) {
-	if !indexInHand || prefix == "" {
+	picked := pickedOnScreen != nil && prefix == pickedOnScreen.ID
+	if !picked {
 		if err := index.Ensure(dir, "", false, os.Stderr); err != nil {
 			return model.Session{}, err
 		}
 	}
 	if prefix != "" {
 		s, ok, err := findByPrefix(dir, prefix)
-		noteAmbiguousPrefix(dir, prefix, "handing off")
+		if !picked {
+			noteAmbiguousPrefix(dir, prefix, "handing off")
+		}
 		if err != nil {
 			return model.Session{}, err
 		}

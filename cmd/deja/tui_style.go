@@ -109,7 +109,7 @@ func (p painter) chip(x, y int, h string, n int, sel bool, max int) int {
 	x = p.Put(x, y, "●", on(agentColor(h), bg), max)
 	x = p.Put(x, y, " "+agentName(h), on(cText, bg), max)
 	if n > 0 {
-		x = p.Put(x, y, " "+num(n), on(cMuted, bg), max)
+		x = p.Put(x, y, " "+grouped(n), on(cMuted, bg), max)
 	}
 	return p.Put(x, y, " ", on(cText, bg), max)
 }

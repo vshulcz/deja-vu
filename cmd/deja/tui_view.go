@@ -53,6 +53,10 @@ func (a *tuiApp) frame(w, h int) *tui.Canvas {
 	}
 	a.zones = a.zones[:0]
 	c.Fill(0, 0, w, h, cBase)
+	if a.leaving != "" {
+		a.drawLeaving()
+		return c
+	}
 	switch a.view {
 	case viewReader:
 		a.drawReader()
@@ -119,9 +123,9 @@ func (a *tuiApp) status() string {
 		spin := []string{"◐", "◓", "◑", "◒"}[int(a.now.UnixMilli()/250)%4]
 		return spin + " reading new sessions…"
 	case len(a.query) > 0 && !a.searching:
-		return "searched " + num(len(a.allMeta)) + " sessions in " + formatMS(a.tookMS)
+		return "searched " + grouped(len(a.allMeta)) + " sessions in " + formatMS(a.tookMS)
 	}
-	return num(len(a.allMeta)) + " sessions · " + num(len(a.agentsAll)) + " agents"
+	return grouped(len(a.allMeta)) + " sessions · " + num(len(a.agentsAll)) + " agents"
 }
 
 func formatMS(ms float64) string {
@@ -182,7 +186,7 @@ func (a *tuiApp) drawStrip(l layout, y int) {
 	limit := l.w - termwidth.Columns(tail) - 12
 	shown := 0
 	for _, ac := range counts {
-		label := 4 + termwidth.Columns(agentName(ac.h)) + len(num(ac.n))
+		label := 4 + termwidth.Columns(agentName(ac.h)) + len(grouped(ac.n))
 		if x+label > limit {
 			break
 		}
@@ -271,7 +275,7 @@ func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
 func (a *tuiApp) drawEmpty(l layout) {
 	p := a.p
 	mood := mark.Nothing
-	title, line := "Nothing for “"+string(a.query)+"”", "Not in "+num(len(a.allMeta))+" sessions from "+num(len(a.agentsAll))+" agents on this machine."
+	title, line := "Nothing for “"+string(a.query)+"”", "Not in "+grouped(len(a.allMeta))+" sessions from "+num(len(a.agentsAll))+" agents on this machine."
 	switch {
 	case a.searching:
 		return
@@ -280,6 +284,7 @@ func (a *tuiApp) drawEmpty(l layout) {
 		title, line = "Nothing deleted yet", "When an agent cleans up its old sessions, deja keeps them here."
 		if !a.keptLoaded {
 			title, line = "Checking…", "Looking for sessions their agents deleted."
+			mood = wagFrame(a.now)
 		}
 	case len(a.query) == 0:
 		mood = mark.Asleep
@@ -302,12 +307,16 @@ func (a *tuiApp) drawEmpty(l layout) {
 	}
 	ty := y + 3
 	p.PutClip(tx, ty, title, bold(cText), l.w-2)
-	p.PutClip(tx, ty+2, line, fgs(cSub), l.w-2)
+	lines := wrapLines(line, l.w-2-tx, 3)
+	for i, s := range lines {
+		p.PutClip(tx, ty+2+i, s, fgs(cSub), l.w-2)
+	}
+	by := ty + 3 + len(lines)
 	if len(a.query) > 0 {
 		bx := tx
 		if a.scope == scopeHere {
-			bx = p.button(bx, ty+4, "tab", "All projects", false, l.w-2) + 2
+			bx = p.button(bx, by, "tab", "All projects", false, l.w-2) + 2
 		}
-		p.button(bx, ty+4, "^w", "Drop a word", false, l.w-2)
+		p.button(bx, by, "^w", "Drop a word", false, l.w-2)
 	}
 }
