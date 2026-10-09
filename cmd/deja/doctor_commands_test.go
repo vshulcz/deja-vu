@@ -95,9 +95,23 @@ func TestDoctorPrintsTheCommandsSection(t *testing.T) {
 			t.Errorf("no row for %s:\n%s", name, text)
 		}
 	}
-	// And what `skill` means, or the word is a state nobody can read.
-	if !strings.Contains(text, "the skill is the command there") {
-		t.Errorf("the skill state is never explained:\n%s", text)
+	// No row says `skill`, so there is nothing to explain.
+	if strings.Contains(text, "the skill is the command there") {
+		t.Errorf("the note explains a state no row shows:\n%s", text)
+	}
+	// Once one does, what it means is said, or the word is a state nobody
+	// can read.
+	skill := commandSkillPath("codex")
+	if err := os.MkdirAll(filepath.Dir(skill), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(skill, []byte("---\nname: deja-history\n---\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	doctorCommands(&out)
+	if !strings.Contains(out.String(), "the skill is the command there") {
+		t.Errorf("the skill state is never explained:\n%s", out.String())
 	}
 }
 

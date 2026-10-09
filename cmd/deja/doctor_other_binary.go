@@ -83,6 +83,6 @@ func otherBinaryNote(path, target string) string {
 	if other == "" {
 		return ""
 	}
-	return "runs " + other + ", a build in a temporary directory — it works until that directory is " +
+	return "runs " + reportPath(other) + ", a build in a temporary directory — it works until that directory is " +
 		"cleaned; `deja install " + target + "` points the entry at this binary"
 }

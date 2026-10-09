@@ -110,6 +110,24 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		}
 		return deepDriftErr(deepReport)
 	}
+	// A terminal gets the screen laid out for reading: a verdict first, agents
+	// that are not on this machine folded into one line, columns aligned and
+	// wrapped to the width. A pipe keeps every row as it always printed.
+	if f, ok := w.(*os.File); ok && briefWanted(f) {
+		var buf bytes.Buffer
+		printDoctorText(&buf, report, deepReport, dir, all, offline)
+		_, err := io.WriteString(w, doctorScreen(buf.String(), report, all, statColorOK(w), briefWidth()))
+		if err != nil {
+			return err
+		}
+		return deepDriftErr(deepReport)
+	}
+	printDoctorText(w, report, deepReport, dir, all, offline)
+	return deepDriftErr(deepReport)
+}
+
+// printDoctorText is the report as every row prints it.
+func printDoctorText(w io.Writer, report doctorReport, deepReport *index.DeepReport, dir string, all, offline bool) {
 	doctorHarnessStores(w, dir, all)
 	printDoctorStoreWarnings(w, report.Stores)
 	// The third cause of a files-to-sessions gap, after a parse failure (#861)
@@ -158,7 +176,6 @@ func runDoctor(w io.Writer, args []string, lookup doctorVersionLookup, dir strin
 		fmt.Fprintln(w)
 		doctorDeep(w, *deepReport)
 	}
-	return deepDriftErr(deepReport)
 }
 
 // doctorDeep prints the source-vs-index proof. Everything above it is deja
@@ -232,11 +249,11 @@ func doctorHooks(w io.Writer) {
 	defer doctorCodexHook(w)
 	st := claudeHookWiringState()
 	if st.absent {
-		fmt.Fprintf(w, "  %-12s missing      %s\n", "claude-code", reportPath(st.path))
+		fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", "missing", reportPath(st.path))
 		return
 	}
 	if st.state == "unreadable" {
-		fmt.Fprintf(w, "  %-12s unreadable   %s\n", "claude-code", reportPath(st.path))
+		fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", "unreadable", reportPath(st.path))
 		return
 	}
 	fmt.Fprintf(w, "  %-12s %-11s %s\n", "claude-code", st.state, reportPath(st.path))
@@ -308,18 +325,18 @@ func doctorCodexHook(w io.Writer) {
 		// missing either.
 		if status == "plugin" {
 			fmt.Fprintf(w, "  %-12s %-11s %s  (the Codex plugin carries the hooks; codex asks once to trust them)\n",
-				"codex-hook", "plugin", hooksPath)
+				"codex-hook", "plugin", reportPath(hooksPath))
 			return
 		}
-		fmt.Fprintf(w, "  %-12s missing      %s\n", "codex-hook", reportPath(hooksPath))
+		fmt.Fprintf(w, "  %-12s %-11s %s\n", "codex-hook", "missing", reportPath(hooksPath))
 		return
 	}
 	if st.trustUnknown {
 		fmt.Fprintf(w, "  %-12s %-11s %s  (cannot read %s, so whether codex trusts the hook is unknown)\n",
-			"codex-hook", "wired", hooksPath, filepath.Join(sources.CodexHome(), "config.toml"))
+			"codex-hook", "wired", reportPath(hooksPath), reportPath(filepath.Join(sources.CodexHome(), "config.toml")))
 		return
 	}
-	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, hooksPath)
+	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, reportPath(hooksPath))
 	if len(missing) > 0 {
 		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install`",
 			len(codexHookWiring)-len(missing), len(codexHookWiring), strings.Join(missing, ", "))
@@ -2893,12 +2910,13 @@ func reportPath(p string) string {
 	// Some rows carry several paths in one string — a store deja looks for in
 	// two places, or a root list from the environment. Contracting the whole
 	// string would only reach the first, which is how the cursor row came out
-	// half in ~ and half in /Users/… .
+	// half in ~ and half in /Users/… . Joined back with ", ", the separator
+	// the cursor row already used, so every multi-path row reads the same.
 	parts := strings.Split(p, string(os.PathListSeparator))
 	for i, part := range parts {
 		parts[i] = search.SafePath(underHome(part))
 	}
-	return strings.Join(parts, string(os.PathListSeparator))
+	return strings.Join(parts, ", ")
 }
 
 // underHome contracts a home-prefixed path to ~, and leaves everything else

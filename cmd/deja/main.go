@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -3315,6 +3316,18 @@ func projectExcludePatterns() int {
 }
 
 func printSources(dir string) {
+	// A terminal gets a table; a pipe gets the tab-separated rows scripts
+	// read, exactly as before.
+	if briefWanted(os.Stdout) {
+		var buf bytes.Buffer
+		printSourcesTo(&buf, dir)
+		fmt.Print(sourcesScreen(buf.String(), statColorOK(os.Stdout), briefWidth()))
+		return
+	}
+	printSourcesTo(os.Stdout, dir)
+}
+
+func printSourcesTo(w io.Writer, dir string) {
 	redactions := map[string]int{}
 	if red, err := index.Redactions(dir); err == nil {
 		redactions = red.Files
@@ -3405,7 +3418,7 @@ func printSources(dir string) {
 		// just been told never to open, which is the opposite of what this
 		// screen is for (#3499).
 		if skipStore[it.name] {
-			fmt.Printf("%s\t%s\texcluded — `harness:%s` is in %s\n",
+			fmt.Fprintf(w, "%s\t%s\texcluded — `harness:%s` is in %s\n",
 				it.name, it.location, it.name, sources.ExcludePath())
 			continue
 		}
@@ -3456,7 +3469,7 @@ func printSources(dir string) {
 			note += fmt.Sprintf("\texcluded-sessions=%d", excluded)
 		}
 		note += unreadNote(it.name)
-		fmt.Printf("%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
+		fmt.Fprintf(w, "%s\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", it.name, location, sources.CountSessions(ss), msg, humanBytes(size), redacted, note)
 	}
 	// The two rows below are written by hand rather than driven by the table
 	// above, and the exclusion has to reach them too: the store #3499 named is
@@ -3466,7 +3479,7 @@ func printSources(dir string) {
 		if !skipStore[name] {
 			return false
 		}
-		fmt.Printf("%s\t%s\texcluded — `harness:%s` is in %s\n",
+		fmt.Fprintf(w, "%s\t%s\texcluded — `harness:%s` is in %s\n",
 			name, location, name, sources.ExcludePath())
 		return true
 	}
@@ -3506,7 +3519,7 @@ func printSources(dir string) {
 		note += "\tnote=" + aiderNoHistoryHint
 	}
 	if !skipAider {
-		fmt.Printf("aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
+		fmt.Fprintf(w, "aider\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", aiderLocation, sources.CountSessions(aiderSessions), aiderMessages, humanBytes(aiderSize), aiderRedactions, note)
 	}
 	if excludedRow("opencode", sources.OpencodeDB()) {
 		return
@@ -3564,7 +3577,7 @@ func printSources(dir string) {
 		note = "\t(cannot be read — " + reason + ")" + note
 	}
 	note += unreadNote("opencode")
-	fmt.Printf("opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
+	fmt.Fprintf(w, "opencode\t%s\tsessions=%d messages=%d size=%s redacted=%d%s\n", sources.OpencodeDB(), s, m, humanBytes(size), redactions[sources.OpencodeDB()], note)
 }
 
 // orphanedTombstones reports which tombstones name a session that exists

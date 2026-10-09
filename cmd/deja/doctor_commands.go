@@ -22,8 +22,11 @@ func doctorCommands(w io.Writer) {
 	fmt.Fprintln(w, "Commands:")
 	skills := false
 	for _, c := range doctorCommandFiles() {
-		fmt.Fprintf(w, "  %-12s %-14s %s\n", c.name, c.state(), reportPath(c.path))
-		skills = skills || c.skill
+		state := c.state()
+		fmt.Fprintf(w, "  %-12s %-14s %s\n", c.name, state, reportPath(c.path))
+		// Only when a row says it: under a list of missing files the note
+		// explained a word nobody could see.
+		skills = skills || state == "skill"
 	}
 	// Ten harnesses have no file, and an omitted row reads as "deja has no
 	// command here" when the truth is that the command is the skill and it is
