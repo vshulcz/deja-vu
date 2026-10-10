@@ -19,6 +19,9 @@ import (
 // Both are off unless the variable is set, so this costs a nil check per run.
 func startProfiling() func() {
 	var stops []func()
+	// Read once and cleared: a child this run starts (the background index a
+	// recall hands off) would otherwise write the same file over this one.
+	defer func() { _ = os.Unsetenv("DEJA_CPUPROFILE"); _ = os.Unsetenv("DEJA_MEMPROFILE") }()
 
 	if path := os.Getenv("DEJA_CPUPROFILE"); path != "" {
 		f, err := os.Create(path)
