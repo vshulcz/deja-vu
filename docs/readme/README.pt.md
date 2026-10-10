@@ -110,7 +110,7 @@ enquanto você digita.
 - A caixa aceita filtros: um agente com dois-pontos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<projeto>`.
 - `r` retoma a sessão no agente que a escreveu. `o` continua em qualquer outro agente, que começa com o que a sessão perguntou, decidiu e deixou em aberto.
 - `tab` alterna entre este projeto, todos os projetos e Deleted, as sessões que o próprio agente apagou e que o deja ainda guarda; `R` devolve uma ao lugar.
-- `?` lista todas as teclas, `^k` tem o resto (copiar o id da sessão ou o caminho do projeto, esquecer uma sessão), `q` sai.
+- `?` lista todas as teclas, `^k` tem o resto (copiar o id da sessão ou o caminho do projeto, esquecer uma sessão), na lista, `q` sai.
 
 Com `DEJA_TUI=0` ele imprime o resumo em texto, que também é o `deja brief`. Num pipe, imprime o que está
 indexado e qual comando rodar em seguida.

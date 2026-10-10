@@ -110,7 +110,7 @@ Liste wird beim Tippen kürzer.
 - Das Suchfeld nimmt Filter: einen Agenten mit Doppelpunkt (`codex:`), `today`, `yesterday`, `week`, `month` und `in:<projekt>`.
 - `r` setzt die Session in dem Agenten fort, der sie geschrieben hat. `o` setzt sie in einem beliebigen anderen Agenten fort, der mit dem beginnt, was die Session gefragt, entschieden und offen gelassen hat.
 - `tab` wechselt zwischen diesem Projekt, allen Projekten und Deleted, den Sessions, die ihr Agent gelöscht hat und die deja noch hält; `R` legt eine davon zurück.
-- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), `q` beendet.
+- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), in der Liste beendet `q`.
 
 Mit `DEJA_TUI=0` kommt stattdessen die Textübersicht, die auch `deja brief` ausgibt. In einer Pipe
 zeigt es, was indiziert ist und welcher Befehl als Nächstes dran ist.

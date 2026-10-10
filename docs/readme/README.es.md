@@ -110,7 +110,7 @@ mientras escribes.
 - La caja acepta filtros: un agente con dos puntos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<proyecto>`.
 - `r` reanuda la sesión en el agente que la escribió. `o` la continúa en cualquier otro agente, que empieza con lo que la sesión preguntó, decidió y dejó pendiente.
 - `tab` cambia entre este proyecto, todos los proyectos y Deleted, las sesiones que su agente borró y que deja aún guarda; `R` devuelve una a su sitio.
-- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), `q` sale.
+- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), en la lista, `q` sale.
 
 Con `DEJA_TUI=0` imprime en su lugar el resumen en texto, que también es `deja brief`. Por una tubería,
 imprime qué está indexado y qué comando ejecutar a continuación.

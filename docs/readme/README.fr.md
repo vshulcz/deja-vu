@@ -110,7 +110,7 @@ resserre à mesure que vous tapez.
 - La zone de recherche accepte des filtres : un agent suivi de deux-points (`codex:`), `today`, `yesterday`, `week`, `month` et `in:<projet>`.
 - `r` reprend la session dans l'agent qui l'a écrite. `o` la poursuit dans n'importe quel autre agent, qui démarre avec ce que la session a demandé, décidé et laissé en suspens.
 - `tab` bascule entre ce projet, tous les projets et Deleted, les sessions que leur agent a supprimées et que deja garde encore ; `R` en remet une en place.
-- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), `q` quitte.
+- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), dans la liste, `q` quitte.
 
 Avec `DEJA_TUI=0`, il affiche à la place le résumé texte, qui est aussi `deja brief`. Dans un pipe, il affiche
 ce qui est indexé et quelle commande lancer ensuite.
