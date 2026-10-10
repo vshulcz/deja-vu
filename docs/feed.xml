@@ -25,6 +25,13 @@
     <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 39 more agents, built from the sessions already on your disk.</summary>
   </entry>
   <entry>
+    <title>Persistent memory for coding agents over MCP — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/agents.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/agents.html"></link>
+    <updated>2026-10-10T00:00:00Z</updated>
+    <summary>How deja gives coding agents a searchable memory over MCP: one tool with recall, context, blame, fix, how, orient, remember and handoff modes.</summary>
+  </entry>
+  <entry>
     <title>Auditing what a coding agent actually did — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/auditing-agents.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/auditing-agents.html"></link>
@@ -186,6 +193,13 @@
     <summary>Install deja and index your coding-agent history in one command, then search it and wire it into your agents over MCP.</summary>
   </entry>
   <entry>
+    <title>Claude Code, Codex, Cursor and 38 more agents — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/harnesses.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/harnesses.html"></link>
+    <updated>2026-10-10T00:00:00Z</updated>
+    <summary>The forty-one coding agents deja indexes today, where each stores its history, and how to add a new one.</summary>
+  </entry>
+  <entry>
     <title>Claude Code lost your context: how to get it back — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/lost-context.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/lost-context.html"></link>
@@ -239,7 +253,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
     <updated>2026-10-10T00:00:00Z</updated>
-    <summary>deja is local by design: no network path in indexing or search, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.</summary>
+    <summary>deja is local by design: no network path in indexing or search unless you turn on semantic search, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.</summary>
   </entry>
   <entry>
     <title>How to recover a deleted Claude Code session — deja-vu</title>
@@ -275,19 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/switching-agents.html"></link>
     <updated>2026-10-10T00:00:00Z</updated>
     <summary>How to switch between agents — Claude Code, Codex, Cursor — without re-explaining the project to each one.</summary>
-  </entry>
-  <entry>
-    <title>What memory costs in tokens — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/token-cost.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/token-cost.html"></link>
-    <updated>2026-10-10T00:00:00Z</updated>
-    <summary>What memory costs in tokens, measured — and why recall is the answer to too many tokens rather than another source of them.</summary>
-  </entry>
-  <entry>
-    <title>Where Claude Code and Codex store sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/where-sessions-are-stored.html"></link>
-    <updated>2026-10-10T00:00:00Z</updated>
-    <summary>Where each coding agent keeps its conversation history file, in forty-one formats, and how to read them without the tool that wrote them.</summary>
   </entry>
 </feed>

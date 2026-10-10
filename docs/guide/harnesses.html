@@ -193,12 +193,12 @@
 <li>Cherry Studio <code>command</code> — No slash-command surface for a third party: commands are the app&#39;s own and an MCP server cannot register one (#3644).</li>
 <li>Roo Code <code>auto</code> — Roo Code is archived: RooCodeInc/Roo-Code was archived on 2026-05-15, the hooks PRs (#10785, #11128, #11663) never merged, @roo-code/cli is gone from npm, and the last extension, 3.54.0, has no hook event in its bundle. Recall arrives when the model calls the tool. (https://github.com/RooCodeInc/Roo-Code)</li>
 <li>Zed <code>auto</code> — Zed&#39;s agent exposes no lifecycle hook: nothing runs before a prompt is sent, and the extension API covers language servers, slash commands, context servers and debuggers only, so there is no point at which recall could be injected. Becomes work the day Zed ships one (no hook API in Zed 1.22.0 (#52729 closed unmerged) or extension API 0.7)</li>
-<li>Devin CLI <code>command</code> — Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so `deja lookup` has no file to live in. (bundled docs at share/devin/docs/extensibility (3000.11.3))</li>
+<li>Devin CLI <code>command</code> — Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so a `/deja` command has no file to live in. (bundled docs at share/devin/docs/extensibility (3000.11.3))</li>
 <li>JetBrains AI Assistant <code>auto</code> — AI Assistant 262.10968.170 runs no user hooks: no hook configuration or hook runner is in the plugin, so nothing can put recall in front of its chat. (https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant)</li>
 <li>JetBrains AI Assistant <code>skill</code> — AI Assistant 262.10968.170&#39;s own chat reads no SKILL.md. Its skill folders (IdeManagedSkillsLayout, ~/.claude/skills, ~/.codex/skills) are handed only to the ACP agents it hosts (AgentSkillsAdditionalRootsProvider: junie, claude-acp, codex), and the chat&#39;s skill picker opens only for a Claude or Codex agent (AgentSkillsContextPopupContributor). Those agents already get deja&#39;s skill from their own directories. (https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant)</li>
 <li>JetBrains AI Assistant <code>command</code> — AI Assistant 262.10968.170 reads custom chat commands only from a project&#39;s .aiassistant/commands (CustomUserCommandsService); there is no user-level directory to write one to. (https://plugins.jetbrains.com/plugin/22282-jetbrains-ai-assistant)</li>
 </ul><!-- matrix:end -->
-<h2>Hook surfaces</h2>
+<h2 id="hook-surfaces">Hook surfaces</h2>
 <p>What reaches the agent in each harness, surface by surface. A test installs every target into a temporary home and fails when a target wires a surface this table does not claim, or the other way round.</p>
 <!-- parity:start -->
 <table>
