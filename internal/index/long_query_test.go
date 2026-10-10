@@ -15,6 +15,14 @@ import (
 // that is the same bug: every extra word it happened to hold was paid in full,
 // and nothing charged it for its length.
 func TestPastedIssueFindsTheSameBugOverALongSession(t *testing.T) {
+	// Past bestMessageStore sessions the result is re-read by its best
+	// message, which must not undo what the long query ranked.
+	for _, filler := range []int{80, bestMessageStore} {
+		t.Run(fmt.Sprint(filler), func(t *testing.T) { pastedIssue(t, filler) })
+	}
+}
+
+func pastedIssue(t *testing.T, filler int) {
 	tmp := t.TempDir()
 	root := filepath.Join(tmp, "claude")
 	setHome(t, filepath.Join(tmp, "home"))
@@ -45,7 +53,7 @@ fixed in the writer buffering refactor: flush the quote state before the gzip st
 		fmt.Fprintf(&day, "step %d checked %s then %s while tidying unrelated module %d notes\n", i, a, b, i)
 	}
 	writeMessages(t, proj, "long-day", day.String())
-	seedFiller(t, proj, 80)
+	seedFiller(t, proj, filler)
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -59,5 +67,18 @@ fixed in the writer buffering refactor: flush the quote state before the gzip st
 			ids = append(ids, s.ID)
 		}
 		t.Fatalf("pasted issue ranked %v, want same-bug first", ids)
+	}
+}
+
+func TestShortCJKQuestionIsNotADocument(t *testing.T) {
+	q := "我们上周在支付服务里把对账任务的超时时间改成了多少秒以及为什么要这样改动配置文件还有重试次数和告警阈值"
+	if n := len(RelevanceTerms(q)); n < longQueryTerms {
+		t.Fatalf("only %d terms, the question no longer shows the inflation", n)
+	}
+	if isLongQuery(RelevanceTerms(q)) {
+		t.Fatal("a one-sentence Chinese question was taken for a pasted document")
+	}
+	if !isLongQuery(strings.Fields(strings.Repeat("word ", longQueryTerms))) {
+		t.Fatal("forty plain words are a document")
 	}
 }

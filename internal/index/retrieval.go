@@ -585,7 +585,10 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	keep = append(keep, weak...)
 	ss, err := sessionsAtOffsets(dir, m, o, keep, rank.offsets)
-	if err == nil && (len(m.Sessions) >= bestMessageStore || rankingIsDoubtful(rank)) {
+	// A long query was ranked by its sessions, not by their best message, and
+	// re-reading the best message would put that ranking back: forced on, it
+	// takes the SWE-ContextBench R@1 above from 51.9% to 47.0%.
+	if err == nil && !isLongQuery(terms) && (len(m.Sessions) >= bestMessageStore || rankingIsDoubtful(rank)) {
 		ss = rerankByBestMessage(ss, terms, rank.idf)
 	}
 	if err != nil {
@@ -661,11 +664,26 @@ const subjectShare = 0.5
 // 69. Past it, scoring is BM25-shaped: summed over the session and divided by
 // its length against the average with longQueryLengthB. On 362 SWE-ContextBench
 // tasks searching the same repo's past tasks by issue text, R@1 goes from 42.5%
-// to 50.8% and R@10 from 78.2% to 83.4% (#4925). Applied to every query
+// to 51.9% and R@10 from 78.2% to 83.7% (#4925). Applied to every query
 // instead, LongMemEval hit@1 fell from 87.4% to 82.8%.
 const longQueryTerms = 40
 
 const longQueryLengthB = 0.75
+
+// isLongQuery counts the query in words: a CJK bigram is half of one, since a
+// run of n characters expands to n-1 bigrams over about n/2 words, and a
+// forty-character Chinese question is not a pasted document.
+func isLongQuery(terms []string) bool {
+	n := 0.0
+	for _, t := range terms {
+		if r := []rune(t); len(r) > 0 && cjkfold.Unspaced(r[0]) {
+			n += 0.5
+		} else {
+			n++
+		}
+	}
+	return n >= longQueryTerms
+}
 
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
@@ -1499,7 +1517,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// ranking it is finding the documents most like it, so a session's score
 	// pays for its length the way BM25 does and is summed over the session
 	// rather than read off its best message.
-	long := len(terms) >= longQueryTerms
+	long := isLongQuery(terms)
 	var sumWords, nWords float64
 	if long {
 		for _, meta := range inProject {
@@ -1579,8 +1597,14 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		if queryBest <= 0 || bestMatched[ord] >= queryBest*subjectShare {
 			named = 1
 		}
-		if w := inProject[ord].Words; long && w > 0 && sumWords > 0 {
-			norm := 1 - longQueryLengthB + longQueryLengthB*float64(w)/(sumWords/nWords)
+		if long && sumWords > 0 {
+			// A session indexed before lengths were counted is taken as
+			// average: neither paid nor charged for a length nobody knows.
+			w := float64(inProject[ord].Words)
+			if w == 0 {
+				w = sumWords / nWords
+			}
+			norm := 1 - longQueryLengthB + longQueryLengthB*w/(sumWords/nWords)
 			sc /= norm
 			focus[ord] /= norm
 		}
