@@ -267,7 +267,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-10-10T00:00:00Z</updated>
-    <summary>One session: delete its .jsonl under ~/.claude/projects. A whole project: claude project purge. Old ones on a timer: cleanupPeriodDays. What /clear and --resume do.</summary>
+    <summary>One session: delete its .jsonl under ~/.claude/projects. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear and --resume do.</summary>
   </entry>
   <entry>
     <title>Switch from Claude Code to Codex or Cursor — deja-vu</title>
