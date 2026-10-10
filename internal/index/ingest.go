@@ -3856,6 +3856,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	// read the index as fresh has to be written even when nothing else is.
 	newlyKept := map[string]bool{}
 	var view *listedView
+	var held map[string]bool
 	for p := range removed {
 		if superseded[p] {
 			continue
@@ -3888,6 +3889,17 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			continue
 		}
 		if d := goneSessionDir(p); d != "" && arrivedDirs[filepath.Base(d)] {
+			continue
+		}
+		// Kept for the sessions it holds, as a rebuild keeps it for its
+		// records: a file whose sessions were all forgotten holds nothing.
+		if held == nil {
+			held = map[string]bool{}
+			for _, meta := range old.Sessions {
+				held[meta.Path] = true
+			}
+		}
+		if !held[p] {
 			continue
 		}
 		if of, ok := old.Files[p]; ok {
