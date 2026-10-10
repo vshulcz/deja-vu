@@ -28,6 +28,9 @@ import (
 // already masked. A rule that fired on every dotted name would mask half the
 // Go import paths in a week's work and the output would be unreadable.
 
+// homeName is one path segment: anything but a separator, a space or a quote.
+const homeName = `[^/\\\s"'<>:]+`
+
 const (
 	// OutboundIP and the rest are the marker kinds this pass adds.
 	OutboundIP    = "ip"
@@ -45,7 +48,15 @@ var (
 	// A user@host pair, which is how an email and an ssh target are both
 	// written. Both are worth masking in outbound text.
 	outEmailRE = regexp.MustCompile(`(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b`)
-	outHomeRE  = regexp.MustCompile(`(?i)(/Users/|/home/|[A-Z]:\\Users\\)([a-z0-9._-]+)`)
+	// The account name is whatever the system allowed: a letter outside ASCII,
+	// and on macOS a full name with spaces ("Alice Smith"), taken only when a
+	// path goes on after it so prose after a bare home directory stays. The
+	// Windows form may be JSON-escaped, `C:\\Users\\name`.
+	outHomeRE = regexp.MustCompile(`(/Users/|/home/|(?i:[A-Z]:\\+Users\\+))(` + homeName + `(?: \p{Lu}[^/\\\s"'<>:]*){1,2}/|` + homeName + `)`)
+	// Claude Code names a project folder after the path, slashes as dashes:
+	// ~/.claude/projects/-Users-name-src-app. Only the name is taken; one that
+	// holds a dash of its own keeps the part after it, there is no telling.
+	outEncodedHomeRE = regexp.MustCompile(`(^|[/\s"'=])(?:-Users-|-home-|(?i:[A-Z]--Users-))([^-/\\\s"']+)`)
 )
 
 // Outbound masks what identifies a machine or a network and reports what it
@@ -60,10 +71,16 @@ func Outbound(s string) (string, Counts) {
 	// hostname inside a path deja is about to shorten anyway.
 	s = outHomeRE.ReplaceAllStringFunc(s, func(m string) string {
 		c.Add(OutboundHome, 1)
-		if strings.HasPrefix(strings.ToLower(m), "/users/") || strings.HasPrefix(strings.ToLower(m), "/home/") {
-			return "~"
+		// A full name with spaces was taken with the slash after it.
+		if strings.HasSuffix(m, "/") {
+			return "~/"
 		}
-		return `~`
+		return "~"
+	})
+	s = outEncodedHomeRE.ReplaceAllStringFunc(s, func(m string) string {
+		c.Add(OutboundHome, 1)
+		lead := outEncodedHomeRE.FindStringSubmatch(m)[1]
+		return lead + "~"
 	})
 	s = outEmailRE.ReplaceAllStringFunc(s, func(m string) string {
 		c.Add(OutboundEmail, 1)

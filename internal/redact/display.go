@@ -84,6 +84,25 @@ func SafeForDisplay(s string) string {
 	return b.String()
 }
 
+// StripEscapes removes terminal escape sequences and leaves every other
+// character as it is.
+func StripEscapes(s string) string {
+	if strings.IndexByte(s, 0x1b) < 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		if runes[i] == 0x1b {
+			i = skipEscape(runes, i)
+			continue
+		}
+		b.WriteRune(runes[i])
+	}
+	return b.String()
+}
+
 // skipEscape returns the index of the last rune belonging to the escape
 // sequence that starts at i, so the caller's loop resumes after it.
 func skipEscape(runes []rune, i int) int {

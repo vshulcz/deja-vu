@@ -126,7 +126,7 @@ var ampDialect = toolDialect{
 // tool results, takes the time of the turn before it, and the first one the
 // thread's created time.
 func ParseAmpFile(path string) ([]model.Session, error) {
-	body, err := os.ReadFile(path)
+	body, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}

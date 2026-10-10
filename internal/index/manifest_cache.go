@@ -26,12 +26,14 @@ import (
 // Contract: the cached Manifest is shared — read-only paths must not mutate
 // it. Ingestion keeps using readManifest directly.
 var manifestCache struct {
-	mu    sync.Mutex
-	dir   string
-	mtime time.Time
-	size  int64
-	m     Manifest
-	ok    bool
+	mu sync.Mutex
+	// dir and fi are what the entry was read from: fi carries the file's
+	// identity as well as its time and size, so a manifest swapped in by a
+	// rebuild never reuses the entry of the one it replaced.
+	dir string
+	fi  os.FileInfo
+	m   Manifest
+	ok  bool
 }
 
 func readManifestCached(dir string) (Manifest, error) {
@@ -42,8 +44,7 @@ func readManifestCached(dir string) (Manifest, error) {
 		return readManifest(dir)
 	}
 	manifestCache.mu.Lock()
-	if manifestCache.ok && manifestCache.dir == dir &&
-		manifestCache.mtime.Equal(fi.ModTime()) && manifestCache.size == fi.Size() {
+	if manifestCache.ok && manifestCache.dir == dir && sameGeneration(manifestCache.fi, fi) {
 		m := manifestCache.m
 		manifestCache.mu.Unlock()
 		return m, nil
@@ -54,10 +55,30 @@ func readManifestCached(dir string) (Manifest, error) {
 		return m, err
 	}
 	manifestCache.mu.Lock()
-	manifestCache.dir, manifestCache.mtime, manifestCache.size = dir, fi.ModTime(), fi.Size()
+	manifestCache.dir, manifestCache.fi = dir, fi
 	manifestCache.m, manifestCache.ok = m, true
 	manifestCache.mu.Unlock()
 	return m, nil
+}
+
+// manifestGeneration is the manifest file as one stat sees it, nil when there
+// is none. Every write of the manifest replaces the file by rename, so two of
+// these name the same generation only if they are the same file.
+func manifestGeneration(dir string) os.FileInfo {
+	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
+	if err != nil {
+		return nil
+	}
+	return fi
+}
+
+// sameGeneration reports whether two stats of the manifest saw the same file,
+// unchanged.
+func sameGeneration(a, b os.FileInfo) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return os.SameFile(a, b) && a.ModTime().Equal(b.ModTime()) && a.Size() == b.Size()
 }
 
 // Stamp changes whenever the index is written: the manifest file's time and

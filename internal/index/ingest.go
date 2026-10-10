@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -321,7 +322,7 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 		// still answer every question asked of it. Failing here made deja
 		// unusable on those, while the hook path in the same situation simply
 		// stays quiet. Serve what is on disk and skip the freshness check.
-		if errors.Is(err, fs.ErrPermission) && HasManifest(dir) {
+		if Unwritable(err) && HasManifest(dir) {
 			return nil
 		}
 		return err
@@ -364,10 +365,18 @@ func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (bus
 func lockUnwritable(dir string) bool {
 	f, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return errors.Is(err, fs.ErrPermission)
+		return Unwritable(err)
 	}
 	_ = f.Close()
 	return false
+}
+
+// Unwritable reports an error that says the index cannot be written here at
+// all: a denied permission, or a filesystem mounted read-only. The second
+// comes back as EROFS, not as a permission error, so a real read-only mount
+// failed every search while a chmod'ed directory answered from its snapshot.
+func Unwritable(err error) bool {
+	return errors.Is(err, fs.ErrPermission) || errors.Is(err, syscall.EROFS)
 }
 
 // ensureLocked is the body of an Ensure, with the lock already held.
@@ -381,6 +390,10 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 		force = true
 	}
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
+		return nil
+	}
+	if !force && err == nil && newerIndex(m) && recordsIntact(dir, m) {
+		sayNewerIndex(progress, dir, m)
 		return nil
 	}
 	damaged := !force && (priorErr != nil && !errors.Is(priorErr, fs.ErrNotExist) || priorErr == nil && !recordsIntact(dir, prior))
@@ -445,6 +458,11 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
 		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	if newerIndex(m) {
+		// Left alone, and current as far as this build can tell: calling it
+		// stale handed it to a warmup that would not touch it either.
+		return false, nil
 	}
 	if m.Version != version {
 		// A content-version bump that this build can still read: the store
@@ -523,9 +541,27 @@ const redactionFloor = 46
 //
 // Two reasons, and only two: a layout this build cannot read answers nothing —
 // that is what onDiskFormat is for — and text written before deja knew how to
-// redact something must not be quoted while it is being re-read.
+// redact something must not be quoted while it is being re-read. An index a
+// newer deja wrote in the same layout is neither: see newerIndex.
 func mustRebuildBeforeAnswering(m Manifest, build int) bool {
-	return m.Format != onDiskFormat || m.Version < redactionFloor || m.Version > build
+	return m.Format != onDiskFormat || m.Version < redactionFloor
+}
+
+// newerIndex reports an index a newer deja wrote in a layout this build reads:
+// a binary rolled back, or two installs side by side. It answers as it is and
+// is left alone. Rebuilding it down to this build's version had the two
+// installs rebuild the whole store back and forth, each in turn, and the line
+// printed for it said this build was the newer one. Only an explicit
+// `deja index --rebuild` rebuilds it for this build.
+func newerIndex(m Manifest) bool {
+	return m.Format == onDiskFormat && m.Version > version
+}
+
+// sayNewerIndex is the line a pass prints when it leaves a newer index alone.
+func sayNewerIndex(progress io.Writer, dir string, m Manifest) {
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: the index in %s was written by a newer deja (version %d, this one writes %d) — answering from it as it is; `deja index --rebuild` rebuilds it for this deja\n", displayPath(dir), m.Version, version)
+	}
 }
 
 // searchTrace returns a stage marker that prints when DEJA_TRACE=1, and costs a
@@ -3653,6 +3689,21 @@ func parsedThisPass(files map[string]FileState) {
 }
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	err := updateIndexOnce(dir, harness, scope, files, force, progress)
+	// A pass that met a hole in the record log stops there rather than
+	// committing what it carried before it, and the store is rebuilt from the
+	// sources instead. Carrying on dropped every record after the hole and
+	// wrote a manifest that called the loss clean.
+	if IsCorrupt(err) {
+		if progress != nil {
+			fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
+		}
+		return rebuild(dir, harness, scope, files, progress)
+	}
+	return err
+}
+
+func updateIndexOnce(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
 	defer readTo(files)()
 	// Cleared here rather than beside the other two: this build counts what
 	// went away further down, before the incremental paths reset theirs, so a
@@ -3664,6 +3715,10 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
 	}
+	if err == nil && !force && newerIndex(old) {
+		sayNewerIndex(progress, dir, old)
+		return nil
+	}
 	// A transcript under a new name is not a new transcript. Settled before the
 	// diff below, so the file is neither read again nor left behind as a row
 	// pointing at a path that is gone: twenty renames of one 4 KB log left the
@@ -3674,7 +3729,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			reprojected := applyRenamedFiles(&old, pairs)
 			// Failing to record it costs the duplicate this exists to avoid,
 			// not correctness: the pass below then treats the file as new.
-			werr := writeManifest(dir, old)
+			werr := writeManifestMeta(dir, old)
 			if werr == nil && len(reprojected) > 0 {
 				reprojectSidecars(dir, old.Sessions, reprojected)
 			}
@@ -3696,7 +3751,7 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 			// install prints. Every other reason for a full pass names itself:
 			// damage says it is damage, a changed exclude list says so, and
 			// `--rebuild` was asked for (#3500).
-			if err == nil && !force && old.Version != version && old.Version != 0 {
+			if err == nil && !force && old.Version < version && old.Version != 0 {
 				fmt.Fprintf(progress, "deja: this build reads a newer index than the one on disk (%d, was %d) — re-reading your sources once\n", version, old.Version)
 			}
 			if !hasProgressSink() {
@@ -4410,12 +4465,13 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 		if rereadsWholeSessions(p) {
 			return false
 		}
-		// A prior pass that indexed no complete line (a torn first line, or a lone
-		// line with no trailing newline) leaves SafeSize==0 with bytes on disk.
-		// Resuming an append from that ambiguous 0 would either re-read mid-line
-		// (dropping the first message) or duplicate an already-indexed lone line,
-		// so route these files through the full re-index path instead (#appendloss).
-		if of.SafeSize == 0 && of.Size > 0 {
+		// A prior pass that saw bytes past the last newline leaves SafeSize
+		// short of Size. The readers index a last line that parses even with no
+		// newline yet, so resuming from SafeSize read that line a second time
+		// once the writer finished it; and a torn first line with SafeSize 0
+		// would be re-read mid-line. Either way the tail is ambiguous, so these
+		// files go through the full re-index path instead (#appendloss).
+		if of.SafeSize < of.Size {
 			return false
 		}
 		// Growth is not proof that the earlier bytes are untouched: a rewind
@@ -4626,7 +4682,10 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				collisions.Add(1)
 				meta.Shared = true
 			}
-			if s.Project != "" && s.Project != "-" && owns {
+			// A tail with no files of its own names only the directory the
+			// session started in; the row already holds what the whole file
+			// said, which a rebuild also takes.
+			if s.Project != "" && s.Project != "-" && owns && (!known || !named || !s.ProjectFromDir) {
 				meta.Project = s.Project
 			}
 			if s.Path != "" && owns {
@@ -5021,6 +5080,12 @@ func setStoreLastUpdated(files map[string]FileState, sessions map[string]Session
 		if s.Updated.UnixNano() > latest {
 			latest = s.Updated.UnixNano()
 		}
+	}
+	// Never past the clock: one session stamped ahead of it (a skewed
+	// machine, a store synced from one) put the mark a day out, and every
+	// turn written in the meantime sat below it unread.
+	if now := time.Now().UnixNano(); latest > now {
+		latest = now
 	}
 	f.LastUpdated = latest
 	files[db] = f

@@ -398,7 +398,9 @@ var piResumes = resumesUnlessAnswering(`"toolCall`, func(m map[string]any) ([]st
 		if piDialect.shellTools[name] && !piCommandFailed(msg) {
 			return nil, ""
 		}
-		if name == "" || piDialect.shellTools[name] || piDialect.editTools[name] {
+		// apply_patch holds its edit and wrote records for its result like
+		// edit and write, so a result in the tail keeps or drops them.
+		if name == "" || piDialect.shellTools[name] || piDialect.editTools[name] || name == "apply_patch" {
 			id, _ := msg["toolCallId"].(string)
 			return nil, id
 		}

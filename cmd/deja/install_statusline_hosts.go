@@ -65,9 +65,18 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 	if err != nil {
 		return installResult{}, err
 	}
+	// Read with comments blanked, the way the hook writer beside it reads the
+	// same file: a status line it has nothing to change in is "unchanged",
+	// and refusing there failed the uninstall of a file install had just
+	// edited.
+	jsonc := configIsJSONC(old)
+	source := old
+	if jsonc {
+		source = []byte(jsoncToJSON(string(old)))
+	}
 	root := map[string]any{}
-	if len(bytes.TrimSpace(old)) > 0 {
-		if err := json.Unmarshal(old, &root); err != nil {
+	if len(bytes.TrimSpace(source)) > 0 {
+		if err := json.Unmarshal(source, &root); err != nil {
 			return installResult{}, configParseError(path, err)
 		}
 	}
@@ -106,6 +115,9 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 		return installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, false)}, nil
 	default:
 		parent[last] = entry
+	}
+	if jsonc {
+		return installResult{}, fmt.Errorf("%s: deja cannot edit the status line in a file that carries comments — set it by hand, or take the comments out", path)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
@@ -168,9 +180,22 @@ func installTOMLStatusline(path, table, block, cmd string, uninstall bool) (inst
 		return installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, true)}, nil
 	}
 	var out []string
-	if start >= 0 {
+	switch {
+	case start >= 0 && !uninstall:
+		// Rewritten where it stands. Moved to the end, it traded places with
+		// the MCP block the same target writes, which also goes to the end, so
+		// every repeat install rewrote the file twice and reported a change.
+		keep := end
+		for keep > start+1 && strings.TrimSpace(lines[keep-1]) == "" {
+			keep--
+		}
+		out = append(append(append(out, lines[:start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
+		s := strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+		a, err := writeIfChanged(path, old, []byte(s))
+		return installResult{Path: path, Action: a}, err
+	case start >= 0:
 		out = append(append(out, lines[:start]...), lines[end:]...)
-	} else {
+	default:
 		out = lines
 	}
 	s := strings.TrimRight(strings.Join(out, "\n"), "\n")

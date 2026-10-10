@@ -1,6 +1,7 @@
 package index
 
 import (
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -735,7 +736,15 @@ func mergeFixPairs(kept, fresh []FixPair) []FixPair {
 // build judges them, counting a match against a carried pair as the repeat it
 // is.
 func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[string]bool) {
-	carried := ReadFixes(dir)
+	carried, torn := readFixesChecked(dir)
+	if torn {
+		// A file that will not decode is not an empty table. Carrying "no
+		// pairs" forward and writing back only this update's lost every pair
+		// mined before, for good and without a word. The records in tmp are the
+		// whole corpus by now, so the table is mined again from them.
+		remineFixes(tmp)
+		return
+	}
 	kept := make([]FixPair, 0, len(carried))
 	dirty := false
 	for _, p := range carried {
@@ -774,6 +783,50 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 	// ship an undecodable file, which ReadFixes reports as no pairs at all —
 	// silence until the next full rebuild.
 	_ = writeGobAtomic(fixesPath(tmp), out)
+}
+
+// readFixesChecked is ReadFixes that tells a missing table from a torn one:
+// torn is a file that is there and will not decode.
+func readFixesChecked(dir string) (pairs []FixPair, torn bool) {
+	if err := readGob(fixesPath(dir), &pairs); err != nil {
+		_, statErr := os.Stat(fixesPath(dir))
+		return nil, statErr == nil
+	}
+	return pairs, false
+}
+
+// remineFixes mines the pair table of the store in dir from its records, the
+// way a full build mines it from the sessions it read. Records of one session
+// sit in the log in the order they happened, which is the order mining reads.
+func remineFixes(dir string) {
+	m, err := readManifest(dir)
+	if err != nil {
+		return
+	}
+	by := map[string]*model.Session{}
+	var order []string
+	if err := eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
+		meta, ok := m.Sessions[r.Key]
+		if !ok {
+			return
+		}
+		s := by[r.Key]
+		if s == nil {
+			cp := sessionFromMeta(meta)
+			s = &cp
+			by[r.Key] = s
+			order = append(order, r.Key)
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	}); err != nil {
+		return
+	}
+	ss := make([]model.Session, 0, len(order))
+	for _, k := range order {
+		ss = append(ss, *by[k])
+	}
+	_ = os.Remove(fixesPath(dir))
+	buildFixes(dir, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
 }
 
 // ReadFixes loads the mined pairs. An index built before they existed simply

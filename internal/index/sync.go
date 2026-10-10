@@ -480,6 +480,12 @@ func Import(dir, inDir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// An import appends to the record log and then stamps its size, so on a
+	// log longer than the manifest committed it would commit a killed pass's
+	// uncommitted tail along with the batch. That store is rebuilt first.
+	if !recordsIntact(dir, m) {
+		return 0, fmt.Errorf("%w: records.bin does not match the manifest — run `deja index` and import again", errCorruptIndex)
+	}
 	if m.ImportedRecords == nil {
 		m.ImportedRecords = map[string]bool{}
 	}
@@ -575,6 +581,12 @@ func Import(dir, inDir string) (int, error) {
 			// they came back in as blank lines in `last` and rows in every
 			// counter (#896).
 			if strings.TrimSpace(sr.Text) == "" {
+				// A record with no text at all is not an empty message: it is
+				// a shape this build does not read, a field renamed by a newer
+				// one. Counted, or the batch it empties reads as up to date.
+				if sr.Text == "" {
+					incompleteSkipped++
+				}
 				return nil
 			}
 			importID := ImportedSessionID(sr.Harness, origID)
@@ -600,32 +612,47 @@ func Import(dir, inDir string) (int, error) {
 			// The legacy time-only key is still honored so batches imported by
 			// older versions stay idempotent.
 			legacy := sr.Harness + ":" + origID + ":" + sr.Time.UTC().Format(time.RFC3339Nano)
+			// Keyed on the text as this machine stores it, redacted here. A
+			// peer whose rules widened re-sends the same record with a marker
+			// where the value was, and keyed on what it sent the record landed
+			// twice. The key on the sent text is what older builds wrote, and
+			// is still honoured.
+			text, cnt := redact.Text(sr.Text)
 			th := fnv.New64a()
-			_, _ = th.Write([]byte(sr.Text))
+			_, _ = th.Write([]byte(text))
+			rawHash := th.Sum64()
+			if text != sr.Text {
+				rh := fnv.New64a()
+				_, _ = rh.Write([]byte(sr.Text))
+				rawHash = rh.Sum64()
+			}
 			dedupe := legacy + ":" + sr.Role + ":" + strconv.FormatUint(th.Sum64(), 16)
+			sent := legacy + ":" + sr.Role + ":" + strconv.FormatUint(rawHash, 16)
 			// A day bucket's id is the sending machine's rendering of a date,
 			// not the identity of what it holds: after that machine changes
 			// zone the same note arrives under a new bucket and every peer
 			// grew a second copy (#977). Key those on what does not move.
 			if localSessions[sr.Harness+":"+sr.SessionID] {
 				loadLocalContent()
-				if localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, th.Sum64())] {
+				if localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, th.Sum64())] ||
+					localContent[recordContentKey(sr.Harness, sr.SessionID, sr.Role, sr.Time, rawHash)] {
 					ownSkipped++
 					return nil
 				}
 			}
 			if bucket := dayBucketKey(sr, th.Sum64()); bucket != "" {
-				if m.ImportedRecords[bucket] {
+				sentBucket := dayBucketKey(sr, rawHash)
+				if m.ImportedRecords[bucket] || m.ImportedRecords[sentBucket] {
 					return nil
 				}
 				// Forgotten as text: the sending machine renders the day its
 				// own way, so a note this machine dropped arrives under a
 				// bucket id no tombstone here has ever named (#985).
-				if deadContent[bucket] {
+				if deadContent[bucket] || deadContent[sentBucket] {
 					forgottenSkipped++
 					return nil
 				}
-				dedupe = bucket
+				dedupe, sent = bucket, sentBucket
 			}
 			// The ledger is an optimisation over the manifest, not authority
 			// over it: it says a record already arrived, so re-importing the
@@ -636,7 +663,7 @@ func Import(dir, inDir string) (int, error) {
 			// unforget tells the user to run, and the "only copy" was
 			// unrecoverable. Skip only while the session it belongs to still
 			// lives; a ledger row whose session is gone is stale, not a dupe.
-			if m.ImportedRecords[dedupe] || m.ImportedRecords[legacy] {
+			if m.ImportedRecords[dedupe] || m.ImportedRecords[sent] || m.ImportedRecords[legacy] {
 				if _, live := m.Sessions[sr.Harness+":"+importID]; live {
 					return nil
 				}
@@ -649,7 +676,6 @@ func Import(dir, inDir string) (int, error) {
 				return nil
 			}
 			key := sr.Harness + ":" + importID
-			text, cnt := redact.Text(sr.Text)
 			// Count what redaction removed, the way local ingest does — the
 			// import path redacted the text but threw the count away, so
 			// `stats --redaction` under-reported protection on an imported

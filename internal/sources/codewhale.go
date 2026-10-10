@@ -168,7 +168,7 @@ type codeWhaleMessage struct {
 // CodeWhaleWorkspace is the workspace a saved session was worked in, from its
 // metadata. "" when the file names none (#4362).
 func CodeWhaleWorkspace(path string) string {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return ""
 	}
@@ -189,7 +189,7 @@ func LoadCodeWhale() []model.Session {
 
 // ParseCodeWhaleFile reads one saved session.
 func ParseCodeWhaleFile(path string) ([]model.Session, error) {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}

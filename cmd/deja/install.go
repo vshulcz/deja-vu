@@ -1597,9 +1597,57 @@ func dropOwnBackup(path string) {
 	if err != nil {
 		return
 	}
-	if mentionsDeja(b) {
+	if mentionsDeja(b) && !holdsForeignDejaEntry(b) {
 		_ = os.Remove(bak)
 	}
+}
+
+// holdsForeignDejaEntry reports whether a JSON snapshot keeps an entry named
+// "deja" that runs some other program. Its name is the marker mentionsDeja
+// goes by, and install replaces such an entry with deja's own, so the snapshot
+// is the only copy of it left.
+func holdsForeignDejaEntry(b []byte) bool {
+	v, ok := decodeJSONCExact(bytes.TrimPrefix(b, utf8BOM))
+	if !ok {
+		return false
+	}
+	var walk func(any) bool
+	walk = func(v any) bool {
+		switch t := v.(type) {
+		case map[string]any:
+			for k, c := range t {
+				if e, ok := c.(map[string]any); ok && k == "deja" && foreignEntry(e) {
+					return true
+				}
+				if walk(c) {
+					return true
+				}
+			}
+		case []any:
+			for _, c := range t {
+				if walk(c) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(v)
+}
+
+// foreignEntry reports whether an MCP entry launches something other than
+// deja: deja's own always runs its `mcp` subcommand, whatever the binary is
+// called, and a remote server has a url and no command at all.
+func foreignEntry(e map[string]any) bool {
+	if e["url"] != nil && e["command"] == nil {
+		return true
+	}
+	if entryCommandName(e) == "" || entryRunsDeja(e) {
+		return false
+	}
+	words, _ := e["command"].([]any)
+	args, _ := e["args"].([]any)
+	return !commandListRunsMCP(append(append([]any{}, words...), args...))
 }
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
@@ -2962,6 +3010,25 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 			note = switchedOffNote
 		}
 		s += block
+		// One block of deja's is rewritten where it stands. Moved to the end
+		// it traded places with the status line grok-auto and trae-auto write
+		// to the same file, which also goes last, and every repeat install
+		// rewrote the file and reported a change.
+		var own []tomlMCPBlock
+		for _, b := range blocks {
+			if b.key == "deja" {
+				own = append(own, b)
+			}
+		}
+		if len(own) == 1 {
+			lines := strings.Split(text, "\n")
+			keep := own[0].end
+			for keep > own[0].start+1 && strings.TrimSpace(lines[keep-1]) == "" {
+				keep--
+			}
+			out := append(append(append([]string{}, lines[:own[0].start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
+			s = strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+		}
 	} else {
 		note = leftNamedDejaEntriesNote(foreignTOMLDejaKeys(s))
 		if s != "" {
@@ -4077,8 +4144,15 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 		return nil, "", err
 	}
 	if m == nil {
+		// The same guard as every other MCP writer: nothing to take out of a
+		// block deja never wrote, and adding it on the way out rewrote a config
+		// that never mentioned deja (#676).
+		if uninstall {
+			return old, "", nil
+		}
 		m = map[string]any{}
 		root["mcp"] = m
+		noteBlockAdded(path, "mcp")
 	}
 	// OpenCode 2.x accepts the MCP servers one level below the 1.x `mcp`
 	// block. Keep the entry in the shape the reader already uses instead of
@@ -4093,6 +4167,11 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 		delete(servers, "deja")
 		removeAdoptedDejaEntries(path, blockKey, servers)
 		note = leftDejaEntriesNote(servers)
+		// And the block, when deja is what put it there (#2604).
+		if len(m) == 0 && blockWasAdded(path, "mcp") {
+			delete(root, "mcp")
+			forgetBlockAdded(path, "mcp")
+		}
 	} else {
 		key := dejaEntryKey(servers)
 		if key != "deja" {

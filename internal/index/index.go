@@ -699,6 +699,12 @@ import (
 // ranked tool output as speech; only a rebuild takes those postings out.
 // 70: the append-only pass posts the same way. Appended records had no date
 // keys and no tool bit, and an edit's replaced span was tokenized whole.
+// 70: readers that dropped a store behind a byte order mark, stored a Copilot
+// agent command twice or replayed a Command Code prompt on resume are read
+// again, since only a rebuild takes the copies out.
+// 70: redaction reads past terminal escapes and masks more shapes (key tails,
+// cut-short keys, the Token scheme, webhook URLs); stored text holding them is
+// only redacted again by a rebuild.
 const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

@@ -50,7 +50,7 @@ func IsCurrentVersion(dir string) bool {
 	// pure waste. The cache is keyed on manifest.gob's mtime+size, so a changed
 	// or corrupt store still forces a fresh read.
 	m, err := readManifestCached(dir)
-	return err == nil && m.Version == version
+	return err == nil && (m.Version == version || newerIndex(m))
 }
 
 // OlderFormat reports that the index on disk reads, and was written by a
@@ -462,16 +462,32 @@ func readManifest(dir string) (Manifest, error) {
 
 // writeManifestOnly persists manifest.gob without rewriting sessions.gob —
 // for updates that change only core fields (e.g. export watermarks) where the
-// caller has not loaded sessions and must not clobber them.
+// caller has not loaded sessions and must not clobber them. It wrote no
+// records, so it keeps the sizes the manifest committed: see stampStore.
 func writeManifestOnly(dir string, m Manifest) error {
 	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions}
+	stampStore(dir, &core, m, false)
+	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
+	invalidateManifestCache(dir)
+	return err
+}
+
+// stampStore sets the record log size and bucket count the manifest commits.
+//
+// A pass that wrote records takes them from the files: what it wrote is what
+// is there. A writer that only changed metadata keeps what the manifest it read
+// committed. Taking the files' sizes there too adopted whatever a killed pass
+// had appended without committing, and the next pass appended the same turns
+// again, so a session held its last turns twice.
+func stampStore(dir string, core *manifestCore, m Manifest, wroteRecords bool) {
+	if !wroteRecords && m.RecordsSize > 0 {
+		core.RecordsSize, core.BucketFiles = m.RecordsSize, m.BucketFiles
+		return
+	}
 	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
 		core.RecordsSize = fi.Size()
 	}
 	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
-	err := writeGobAtomic(filepath.Join(dir, "manifest.gob"), core)
-	invalidateManifestCache(dir)
-	return err
 }
 
 // writeManifest commits the two-file manifest crash-safely. sessions.gob is
@@ -481,12 +497,19 @@ func writeManifestOnly(dir string, m Manifest) error {
 // leaves the old manifest pointing at old data, and the next run reindexes
 // rather than serving a fresh-looking index whose sessions are stale.
 func writeManifest(dir string, m Manifest) error {
+	return commitManifest(dir, m, true)
+}
+
+// writeManifestMeta is writeManifest for a writer that changed sessions or
+// files but appended no records, such as a followed rename.
+func writeManifestMeta(dir string, m Manifest) error {
+	return commitManifest(dir, m, false)
+}
+
+func commitManifest(dir string, m Manifest, wroteRecords bool) error {
 	mergeIngestDiag(&m)
 	core := manifestCore{Version: m.Version, Format: m.Format, Files: m.Files, BuiltAt: m.BuiltAt, SourcesReadAt: m.SourcesReadAt, Generation: m.Generation, Scope: m.Scope, Redacted: m.Redacted, RedactionRules: m.RedactionRules, ExportWatermarks: m.ExportWatermarks, ExportBoundary: m.ExportBoundary, ImportedRecords: m.ImportedRecords, RecordStrings: m.RecordStrings, IngestHealth: m.IngestHealth, IngestFiles: m.IngestFiles, ExcludeFingerprint: m.ExcludeFingerprint, ToolFingerprint: m.ToolFingerprint, Compactions: m.Compactions}
-	if fi, err := os.Stat(filepath.Join(dir, "records.bin")); err == nil {
-		core.RecordsSize = fi.Size()
-	}
-	core.BucketFiles = countBucketFiles(filepath.Join(dir, "buckets"))
+	stampStore(dir, &core, m, wroteRecords)
 	if err := writeGobAtomic(filepath.Join(dir, "sessions.gob"), m.Sessions); err != nil {
 		return err
 	}

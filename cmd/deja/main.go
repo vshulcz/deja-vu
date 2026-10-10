@@ -4807,7 +4807,7 @@ func pluralWhich(n int) string {
 // two, and it took every answer with it — empty stdout and exit 1 while a
 // complete index sat in the store.
 func staleUnwritableIndex(dir string, err error) bool {
-	if !errors.Is(err, fs.ErrPermission) && !errors.Is(err, syscall.ENOSPC) {
+	if !index.Unwritable(err) && !errors.Is(err, syscall.ENOSPC) {
 		return false
 	}
 	return index.HasManifest(dir)

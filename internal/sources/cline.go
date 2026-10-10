@@ -171,7 +171,7 @@ func ParseClineFile(path string) ([]model.Session, error) {
 // wherever deja runs (#4318).
 func ClineSessionDir(path string) string {
 	sessionDir := filepath.Dir(path)
-	b, err := os.ReadFile(filepath.Join(sessionDir, filepath.Base(sessionDir)+".json"))
+	b, err := readJSONFile(filepath.Join(sessionDir, filepath.Base(sessionDir)+".json"))
 	if err != nil {
 		return ""
 	}
@@ -209,7 +209,7 @@ type clineMessages struct {
 }
 
 func parseClineModernSession(path string) ([]model.Session, error) {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 	s := model.Session{Harness: "cline", ID: id, Path: path, Project: "cline"}
 	var man clineManifest
 	cwd := ""
-	if mb, err := os.ReadFile(filepath.Join(sessionDir, id+".json")); err == nil {
+	if mb, err := readJSONFile(filepath.Join(sessionDir, id+".json")); err == nil {
 		if json.Unmarshal(mb, &man) == nil {
 			cwd = man.CWD
 			if cwd == "" {
@@ -298,7 +298,7 @@ func parseClineModernSession(path string) ([]model.Session, error) {
 // metadata.kind "compaction_summary" (@cline/core, observed on CLI 3.0.69 and
 // extension 4.1.23). Filed under the summary role, as Claude's is (#4795).
 func clineCompactionSummaries(path string, fallback time.Time) []model.Message {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil
 	}
@@ -353,7 +353,7 @@ type clineTaskMeta struct {
 }
 
 func parseClineLegacyTask(path string) ([]model.Session, error) {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -371,7 +371,7 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 	s := model.Session{Harness: "cline", ID: "cline-task-" + taskID, Path: path, Project: "cline"}
 	base := time.Time{}
 	workspace := ""
-	if hb, err := os.ReadFile(filepath.Join(root, "state", "taskHistory.json")); err == nil {
+	if hb, err := readJSONFile(filepath.Join(root, "state", "taskHistory.json")); err == nil {
 		var metas []clineTaskMeta
 		if json.Unmarshal(hb, &metas) == nil {
 			for _, m := range metas {

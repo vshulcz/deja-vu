@@ -174,27 +174,3 @@ func TestOmpKeepsItsIdentityWhenTheTitleSlotComesFirst(t *testing.T) {
 		t.Errorf("resumed messages = %#v, want only the appended turn", resumed[0].Messages)
 	}
 }
-
-// A format with its header on line 1 still calls the three-argument form, and
-// gets line 1 and nothing past it: the lookahead is for a reader that names
-// its header, so a stray metadata line further down is not re-read as one.
-func TestHeaderScanWithoutAPredicateTakesLineOne(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "s.jsonl")
-	body := `{"type":"turn","text":"first"}` + "\n" + `{"type":"session","id":"later"}` + "\n" + `{"type":"turn","text":"appended"}` + "\n"
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	offset := int64(strings.LastIndex(body, `{"type":"turn","text":"appended"}`))
-	var got []string
-	err := scanJSONLWithHeaderFromOffset(path, offset, func(m map[string]any) {
-		typ, _ := m["type"].(string)
-		text, _ := m["text"].(string)
-		got = append(got, typ+":"+text)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(got, ",") != "turn:first,turn:appended" {
-		t.Errorf("records = %v, want line 1 then the appended line", got)
-	}
-}

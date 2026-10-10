@@ -27,9 +27,7 @@ create table if not exists messages (id integer primary key autoincrement, sessi
 				"insert into messages (session_id,role,content_json,created_timestamp) values ('%[1]s','%[2]s',json_array(json_object('type','text','text','%[4]s')),%[3]d);\n",
 			turn.Session, turn.Role, turn.At, turn.Text)
 	}
-	if out, err := exec.Command("sqlite3", db, stmts).CombinedOutput(); err != nil {
-		t.Fatalf("sqlite3 seed: %v %s", err, out)
-	}
+	readerSQLite(t, db, stmts)
 }
 
 // A turn goose stored without a timestamp of its own is reachable only through

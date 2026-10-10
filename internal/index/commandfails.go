@@ -492,7 +492,10 @@ func eachCommandAndOutputFrom(path string, m Manifest, from int64, redo map[stri
 		at := off
 		off += int64(len(hdr)) + int64(size)
 		key, role, ok := recordRoleIn(payload, t)
-		if !ok || (at < from && !redo[key]) {
+		if !ok {
+			return off, errShortRecord
+		}
+		if at < from && !redo[key] {
 			continue
 		}
 		if _, ok := m.Sessions[key]; !ok {

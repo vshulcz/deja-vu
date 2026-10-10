@@ -76,7 +76,9 @@ func ParseCommandCodeFile(path string) ([]model.Session, error) {
 // ParseCommandCodeFileFromOffset is the incremental read.
 func ParseCommandCodeFileFromOffset(path string, offset int64) ([]model.Session, error) {
 	return parseCommandCodeWith(path, func(fn func(map[string]any)) error {
-		return scanJSONLWithHeaderFromOffset(path, offset, fn)
+		// Only a session record is a header: a flat transcript opens on its
+		// first prompt, and handing that over again stored it twice.
+		return scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isPiHeader, fn)
 	})
 }
 

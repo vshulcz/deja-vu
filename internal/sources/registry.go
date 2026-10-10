@@ -386,6 +386,7 @@ func allHarnesses() []Harness {
 				},
 				Parse:     fullParse(ParseQwenFile),
 				ParseFrom: offsetParse(ParseQwenFileFromOffset),
+				Resumes:   qwenExitResumes,
 			}},
 		},
 		{

@@ -38,10 +38,11 @@ func TestOnlyALayoutOrARedactionBumpStopsAnIndexFromAnswering(t *testing.T) {
 			must:  true,
 		},
 		{
-			name:  "an index from a newer build",
+			// Left alone and answered from: rebuilding it down had two installs
+			// rebuild the store back and forth.
+			name:  "an index from a newer build in the same layout",
 			m:     Manifest{Version: version + 1, Format: onDiskFormat},
 			build: version,
-			must:  true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

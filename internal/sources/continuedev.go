@@ -68,7 +68,7 @@ type continueListEntry struct {
 // only date Continue records and the workspace a session ran in, both of which
 // the session file itself omits.
 func continueList(dir string) map[string]continueListEntry {
-	b, err := os.ReadFile(filepath.Join(dir, "sessions.json"))
+	b, err := readJSONFile(filepath.Join(dir, "sessions.json"))
 	if err != nil {
 		return nil
 	}
@@ -93,7 +93,7 @@ func ContinueSessionDir(path string) string {
 		SessionID          string `json:"sessionId"`
 		WorkspaceDirectory string `json:"workspaceDirectory"`
 	}
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil || json.Unmarshal(b, &doc) != nil {
 		return ""
 	}
@@ -163,12 +163,12 @@ type continueMessage struct {
 }
 
 func ParseContinueFile(path string) ([]model.Session, error) {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}
 	var doc continueSession
-	if json.Unmarshal(b, &doc) != nil {
+	if err := json.Unmarshal(b, &doc); err != nil {
 		// One document per session, as in cline and roo: a file that will not
 		// parse is a path deja could not read, not a line.
 		diagFileError(path, err)

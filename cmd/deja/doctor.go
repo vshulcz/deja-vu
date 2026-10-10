@@ -264,7 +264,7 @@ func doctorHooks(w io.Writer) {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
 		// lacks everything added since.
-		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
+		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install claude-auto`\n",
 			st.want-len(st.missing), st.want, strings.Join(st.missing, ", "))
 	}
 	if note := doctorHookRepeats(st.hooks, claudeHookWiring, "claude-auto"); note != "" {
@@ -338,7 +338,7 @@ func doctorCodexHook(w io.Writer) {
 	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, reportPath(hooksPath))
 	if len(missing) > 0 {
-		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install`",
+		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install codex-auto`",
 			len(codexHookWiring)-len(missing), len(codexHookWiring), strings.Join(missing, ", "))
 	}
 	if status == "untrusted" {
@@ -2732,7 +2732,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	case index.ReadStateNewer:
 		// The binary was rolled back, not the index. Saying "older" here sent
 		// that reader looking in the wrong direction (#890).
-		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build rebuilds it in its own format; upgrading again rebuilds it back")
+		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build answers from it as it is and leaves it alone; `deja index --rebuild` rebuilds it for this one")
 	}
 	// A store whose postings vanished or whose record log was truncated cannot
 	// answer anything, and said "up to date" until #735. The next search

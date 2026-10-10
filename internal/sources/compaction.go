@@ -305,7 +305,7 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 	case "codex":
 		sessions, err = parseCodexRolloutWithScanner(model.Session{
 			Harness: "codex", Project: filepath.Base(filepath.Dir(originalPath)), Path: originalPath,
-		}, false, "", compactionMapScanner(originalPath, data))
+		}, false, "", compactionMapScanner(originalPath, data), nil)
 	case "codebuddy":
 		sessions, err = parseCodeBuddy(originalPath, compactionMapScanner(originalPath, data))
 	default:

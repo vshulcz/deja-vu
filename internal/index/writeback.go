@@ -54,5 +54,5 @@ func AdoptWriteBack(dir, kept, path string) (ok bool, err error) {
 			m.Sessions[key] = meta
 		}
 	}
-	return true, writeManifest(dir, m)
+	return true, writeManifestMeta(dir, m)
 }

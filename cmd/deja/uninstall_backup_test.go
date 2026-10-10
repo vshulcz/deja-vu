@@ -20,7 +20,7 @@ func TestUninstallTakesBackItsOwnBackupForEveryHarness(t *testing.T) {
 	}{
 		{"zed", `{"context_servers":{"` + zedServerID + `":{"command":"/opt/bin/dj","args":["mcp"]}}}`},
 		{"deepseek", dshBlockStart + "\n- insert:\n    - id: mcp-deja\n      config:\n        serverName: deja\n"},
-		{"claude", `{"mcpServers":{"deja":{"command":"/opt/bin/dj"}}}`},
+		{"claude", `{"mcpServers":{"deja":{"command":"/opt/bin/dj","args":["mcp"]}}}`},
 		{"a config of the reader's own", "theme: One Dark\nfont: 15\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

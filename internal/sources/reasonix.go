@@ -117,10 +117,18 @@ func reasonixConfiguredState(path string) string {
 			continue
 		}
 		val = strings.TrimSpace(val)
-		if len(val) < 2 || (val[0] != '"' && val[0] != '\'') || val[len(val)-1] != val[0] {
+		if len(val) < 2 || (val[0] != '"' && val[0] != '\'') {
 			return ""
 		}
-		return expandReasonixDir(val[1 : len(val)-1])
+		// The value ends at its closing quote; a comment may follow it.
+		end := strings.IndexByte(val[1:], val[0]) + 1
+		if end == 0 {
+			return ""
+		}
+		if rest := strings.TrimSpace(val[end+1:]); rest != "" && rest[0] != '#' {
+			return ""
+		}
+		return expandReasonixDir(val[1:end])
 	}
 	return ""
 }

@@ -57,6 +57,10 @@ func printSanitized(w io.Writer, text string) {
 	// Redact the whole document at once: multiline secrets (PEM private key
 	// blocks) never match when scanned line-by-line.
 	redacted, _ := redact.Text(text)
+	masked := strings.Count(redacted, redact.Marker)
+	// The second pass recap runs, for text leaving the machine: the account
+	// name in a home path, emails, private addresses and hosts.
+	redacted, _ = redact.Outbound(redacted)
 	redacted = stripBidiAndInvisible(redacted)
 	fmt.Fprint(w, redacted)
 	if !strings.HasSuffix(redacted, "\n") {
@@ -71,7 +75,6 @@ func printSanitized(w io.Writer, text string) {
 	// line is for.
 	// One count, of the markers in what is being shared: adding the pass's own
 	// tally on top counted a secret this pass caught twice (#2061).
-	masked := strings.Count(redacted, redact.Marker)
 	fmt.Fprintf(os.Stderr, "\ndeja: %d secret%s masked in this share. pattern redaction is a floor — review before sending; rotate anything that leaked.\n", masked, pluralS(masked))
 }
 
