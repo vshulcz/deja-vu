@@ -6,7 +6,7 @@ Two things distinguish it from memory tools that record forward: it starts full,
 
 Install is one command (`curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh`, or `brew install deja-vu`), followed by `deja install --auto` to wire the agents found on the machine.
 
-Run `deja` with no arguments in a terminal and it opens a full-screen search over every agent's history: results as you type, the session read at the match, then `r` to resume it in its own agent or `o` to continue it in another with what it asked, decided and left open. A Kept tab holds sessions their agent deleted that deja still has, and puts one back where the agent can reopen it. With `DEJA_TUI=0` or `TERM=dumb` a bare `deja` prints a text brief instead, and `deja <query>` searches from the shell.
+Run `deja` with no arguments in a terminal and it opens a full-screen search over every agent's history: results as you type, the session read at the match, then `r` to resume it in its own agent or `o` to continue it in another with what it asked, decided and left open. The box takes filters (`codex:`, `yesterday`, `in:<project>`), `/` finds a word inside an open session, and a Deleted tab holds sessions their agent deleted that deja still has, and puts one back where the agent can reopen it. With `DEJA_TUI=0` or `TERM=dumb` a bare `deja` prints a text brief instead, and `deja <query>` searches from the shell.
 
 ## Start here
 

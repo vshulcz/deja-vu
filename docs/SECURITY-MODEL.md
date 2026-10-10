@@ -88,7 +88,7 @@ and re-checks size and mtime between the read and the rename. A store with no
 per-session file is not rewritten at all, and the count of what it could not
 reach is printed rather than dropped. Without `--scrub` the command only reports.
 
-The other is `deja resume <id> --write-back` (`R` on the screen's Kept tab). It
+The other is `deja resume <id> --write-back` (`R` on the screen's Deleted tab). It
 recreates a session whose agent deleted it, rebuilt from the index and so
 redacted, only at the path the session was read from, only when nothing is there,
 and only inside that agent's store directory.

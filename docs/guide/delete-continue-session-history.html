@@ -157,7 +157,7 @@ jq 'map(select(.sessionId != "&lt;sessionId&gt;"))' sessions.json &gt; sessions.
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads Continue's session files, alongside the other agents' histories, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Continue session about the flaky test"</pre>
-<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A session whose file you deleted stays under the Kept tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>cn --fork</code> can pick it up again.</p>
+<p>Indexing and search stay local, credentials are stripped, and <code>deja forget</code> removes a session from the index when you do want it gone. A session whose file you deleted stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>cn --fork</code> can pick it up again.</p>
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-continue.html">Memory for Continue</a> · <a href="../registry/continue.html">The Continue format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
 </article></div></div>

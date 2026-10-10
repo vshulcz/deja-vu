@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The screen's cards lead with the question asked, the home list is grouped by day, and dates count calendar days. The preview shows how the session went, turn by turn, with the commands and the files it edited. In the reader `/` finds a word in the session, `n` and `N` step through the matches, `]` and `[` jump between the turns you asked, and `t` unfolds long messages. The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month` and `in:<project>`. A search that finds nothing names the other projects that have it, or the spelling your history uses. The Kept tab is now Deleted, headed "Deleted by their agent, kept by deja", and `tab` cycles this project, all projects and Deleted. The continue picker preselects and marks the agent used last and folds agents not installed into one line. `^k` also copies the session id or project path and forgets a session, after asking, and `?` lists every key (#TBD).
+
 ### Changed
 
 - The screen's first run shows the index being built: the stage, a bar, each agent ticking in with its session count and the seconds so far, and it lets you in once the newest sessions are searchable. The first open after an upgrade shows what the new version brings, leaving for an agent names where you are going, and a command waiting out another deja's rebuild shows a live line with the seconds, then says the index is ready. Resume and continue picked on the screen use that exact session and no longer wait for a rebuild, so an id that prefixed another no longer hands off the wrong one. `deja upgrade` points at `deja update` instead of searching for the word (#4898).

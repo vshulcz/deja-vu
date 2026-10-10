@@ -139,16 +139,16 @@
 <h1>CLI reference</h1>
 <p class="pagelede">every command, with the flags that matter<span class="mins" data-mins></span></p>
 <h2 id="the-screen">The screen</h2>
-<p>Bare <code>deja</code> in a terminal opens a full-screen search over every agent's history. It starts on the sessions behind your uncommitted change, then recent ones in this project. Type and the list updates as you type; <code>tab</code> switches between this project, all projects and Kept (sessions their agent deleted that deja still holds). Press <code>?</code> for the keys:</p>
+<p>Bare <code>deja</code> in a terminal opens a full-screen search over every agent's history. It starts on the sessions behind your uncommitted change, then recent ones in this project grouped by day, each card led by the question asked. Type and the list updates as you type; <code>tab</code> switches between this project, all projects and Deleted (sessions their agent deleted that deja still holds). The preview shows how the session went, turn by turn, and the files it edited. A search that finds nothing names the other projects that have it, or the spelling your history uses. Press <code>?</code> for the keys:</p>
 <table><thead><tr><th>Key</th><th>Does</th></tr></thead><tbody>
 <tr><td><code>↑↓</code>, <code>1</code>-<code>9</code></td><td>Pick a session. <code>↑</code> in an empty box brings back past searches.</td></tr>
-<tr><td><code>a</code></td><td>Filter by agent.</td></tr>
-<tr><td><code>↵</code></td><td>Open the session at the match. Inside: <code>n</code> / <code>N</code> next and previous match, <code>t</code> unfolds long messages, <code>g</code> / <code>G</code> top and bottom, <code>esc</code> back to the list.</td></tr>
+<tr><td><code>a</code></td><td>Filter by agent. The box takes filters too: an agent with a colon (<code>codex:</code>), <code>today</code>, <code>yesterday</code>, <code>week</code>, <code>month</code>, and <code>in:&lt;project&gt;</code>.</td></tr>
+<tr><td><code>↵</code></td><td>Open the session at the match. Inside: <code>/</code> finds a word in the session, <code>n</code> / <code>N</code> next and previous match, <code>]</code> / <code>[</code> next and previous turn you asked, <code>t</code> unfolds long messages, <code>g</code> / <code>G</code> top and bottom, <code>esc</code> back to the list.</td></tr>
 <tr><td><code>r</code></td><td>Resume in the agent that wrote it.</td></tr>
-<tr><td><code>o</code> or <code>ctrl-o</code></td><td>Continue in any agent: the session's context goes to the agent you pick and it starts.</td></tr>
+<tr><td><code>o</code> or <code>ctrl-o</code></td><td>Continue in any agent: the session's context goes to the agent you pick and it starts. The agent you used last is picked and marked; agents not installed fold into one line.</td></tr>
 <tr><td><code>c</code> or <code>ctrl-y</code></td><td>Copy the context.</td></tr>
 <tr><td><code>R</code></td><td>Put a deleted session back where its agent can reopen it (<code>deja resume &lt;id&gt; --write-back</code>).</td></tr>
-<tr><td><code>ctrl-k</code></td><td>Every command by name.</td></tr>
+<tr><td><code>ctrl-k</code></td><td>Every command by name, including copy the session id (<code>i</code>), copy the project path (<code>p</code>) and forget the session (<code>F</code>), which asks first.</td></tr>
 <tr><td><code>ctrl-u</code>, <code>ctrl-w</code></td><td>Clear the box, drop a word. <code>esc</code> clears or goes back; <code>q</code> quits from the list.</td></tr>
 </tbody></table>
 <p>The mouse works too: click a card, double-click to open, scroll. <code>DEJA_THEME=light</code> or <code>dark</code> picks the palette when the terminal does not say. <code>DEJA_TUI=0</code> or <code>TERM=dumb</code> prints the text brief instead.</p>

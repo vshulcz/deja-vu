@@ -106,10 +106,11 @@ enquanto você digita.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="Digitando uma busca na tela do deja, lendo a sessão encontrada e continuando essa sessão em outro agente"></p>
 
-- `↑↓` escolhe uma sessão, `↵` abre no trecho encontrado, `n` e `N` passam pelas ocorrências, `esc` volta.
+- `↑↓` escolhe uma sessão, `↵` abre no trecho encontrado, `n` e `N` passam pelas ocorrências, `esc` volta. Dentro de uma sessão, `/` procura uma palavra e `]` `[` pulam entre as perguntas que você fez.
+- A caixa aceita filtros: um agente com dois-pontos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<projeto>`.
 - `r` retoma a sessão no agente que a escreveu. `o` continua em qualquer outro agente, que começa com o que a sessão perguntou, decidiu e deixou em aberto.
-- `tab` alterna entre este projeto, todos os projetos e Kept, as sessões que o próprio agente apagou e que o deja ainda guarda; `R` devolve uma ao lugar.
-- `?` lista todas as teclas, `q` sai.
+- `tab` alterna entre este projeto, todos os projetos e Deleted, as sessões que o próprio agente apagou e que o deja ainda guarda; `R` devolve uma ao lugar.
+- `?` lista todas as teclas, `^k` tem o resto (copiar o id da sessão ou o caminho do projeto, esquecer uma sessão), `q` sai.
 
 Com `DEJA_TUI=0` ele imprime o resumo em texto, que também é o `deja brief`. Num pipe, imprime o que está
 indexado e qual comando rodar em seguida.

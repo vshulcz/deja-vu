@@ -160,7 +160,7 @@ rm -rf &lt;globalStorage&gt;/kilocode.kilo-code/tasks</pre>
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kilo stores — the extension's task JSON and the CLI database — and the other forty agents on the machine, into one local index:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "kilo task about the migration"</pre>
-<p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone. A task you deleted stays readable under the Kept tab of the screen bare <code>deja</code> opens, where <code>o</code> carries it into another agent; deja does not write Kilo tasks back.</p>
+<p><a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session for good when you do want it gone. A task you deleted stays readable under the Deleted tab of the screen bare <code>deja</code> opens, where <code>o</code> carries it into another agent; deja does not write Kilo tasks back.</p>
 
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-kilocode.html">Memory for Kilo Code</a> · <a href="../registry/kilocode.html">The Kilo Code format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

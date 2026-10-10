@@ -267,9 +267,15 @@ touches state:
   the index as it was; on a first run `index.Ensure` instead, reporting into the
   progress view, with the newest sessions searchable before the build ends;
 - search, 60 ms after a keystroke and skipped if a newer one arrived, through the same
-  tier ladder and trust policy as `deja search` without the rerank and semantic tier;
-- whole-session reads for the preview and reader, queued to one worker;
-- the Kept list (sessions whose transcript is gone, which stats every file) and the
+  tier ladder and trust policy as `deja search` without the rerank and semantic tier.
+  Filter words in the box (`codex:`, `today`/`yesterday`/`week`/`month`,
+  `in:<project>`) are parsed out first (`tui_filters.go`) and become search options;
+- after an empty answer, the same search across every project and then
+  `index.DidYouMean`, which respells unknown words to the nearest word the index has;
+- whole-session reads for the preview and reader, queued to one worker, which also
+  builds the preview's story: the turns, the commands with how they ended, the files
+  edited (`tui_story.go`);
+- the Deleted list (sessions whose transcript is gone, which stats every file) and the
   "behind your uncommitted change" rows.
 
 Stderr goes to `/dev/null` while the screen is up so index output cannot land inside a

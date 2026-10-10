@@ -56,10 +56,11 @@ the list narrows as you type.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="Typing a search in the deja screen, reading the session it found, and continuing that session in another agent"></p>
 
-- `↑↓` picks a session, `↵` opens it at the match, `n` and `N` step through the matches, `esc` goes back.
+- `↑↓` picks a session, `↵` opens it at the match, `n` and `N` step through the matches, `esc` goes back. Inside a session, `/` finds a word and `]` `[` jump between the turns you asked.
+- The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month`, and `in:<project>`.
 - `r` resumes the session in the agent that wrote it. `o` continues it in any other agent, which starts with what the session asked, decided and left open.
-- `tab` switches between this project, all projects and Kept, the sessions their agent deleted that deja still holds; `R` puts one back.
-- `?` lists every key, `q` quits.
+- `tab` switches between this project, all projects and Deleted, the sessions their agent deleted that deja still holds; `R` puts one back.
+- `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits.
 
 With `DEJA_TUI=0` it prints the text summary instead, which is also `deja brief`. Piped, it
 prints what is indexed and which command to run next.

@@ -106,10 +106,11 @@ mientras escribes.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="Escribir una búsqueda en la pantalla de deja, leer la sesión encontrada y continuarla en otro agente"></p>
 
-- `↑↓` elige una sesión, `↵` la abre en la coincidencia, `n` y `N` recorren las coincidencias, `esc` vuelve atrás.
+- `↑↓` elige una sesión, `↵` la abre en la coincidencia, `n` y `N` recorren las coincidencias, `esc` vuelve atrás. Dentro de una sesión, `/` busca una palabra y `]` `[` saltan entre las preguntas que hiciste.
+- La caja acepta filtros: un agente con dos puntos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<proyecto>`.
 - `r` reanuda la sesión en el agente que la escribió. `o` la continúa en cualquier otro agente, que empieza con lo que la sesión preguntó, decidió y dejó pendiente.
-- `tab` cambia entre este proyecto, todos los proyectos y Kept, las sesiones que su agente borró y que deja aún guarda; `R` devuelve una a su sitio.
-- `?` lista todas las teclas, `q` sale.
+- `tab` cambia entre este proyecto, todos los proyectos y Deleted, las sesiones que su agente borró y que deja aún guarda; `R` devuelve una a su sitio.
+- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), `q` sale.
 
 Con `DEJA_TUI=0` imprime en su lugar el resumen en texto, que también es `deja brief`. Por una tubería,
 imprime qué está indexado y qué comando ejecutar a continuación.

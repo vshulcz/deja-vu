@@ -88,7 +88,7 @@ grep -rl '&lt;session-id&gt;' ~/.claude 2&gt;/dev/null</pre>
 
 <h2>真正能找回的是什么</h2>
 <p>文件确实没了的话，诚实的清单很短。文件还在时拍下的文件系统快照或备份。从访达里删掉（而不是用 <code>rm</code>）时进的废纸篓。以及任何在文件消失之前读过它的东西。</p>
-<p>最后一种是唯一可靠的答案，而且它必须在事前就已经就位。deja 给这台机器上每个智能体写下的会话记录建索引，所以它已经读过的会话，在原件被清理或删除之后仍然可以搜索——先用 <code>deja "那次会话在做什么"</code> 搜到它，再用 <code>deja show &lt;id&gt;</code> 打开它留下的记录，或者用 <code>deja resume &lt;id&gt; --write-back</code> 把这段对话写回 <code>~/.claude/projects</code>，让 <code>claude --resume</code> 能再找到它。不带参数运行 <code>deja</code>，界面里的 Kept 标签列出所有被智能体删掉、deja 还留着的会话，在其中一条上按 <code>R</code> 就把它写回去。只有 <code>deja forget</code> 会主动丢掉一个会话。从来没有被任何东西读过的会话，没有任何办法找回。</p>
+<p>最后一种是唯一可靠的答案，而且它必须在事前就已经就位。deja 给这台机器上每个智能体写下的会话记录建索引，所以它已经读过的会话，在原件被清理或删除之后仍然可以搜索——先用 <code>deja "那次会话在做什么"</code> 搜到它，再用 <code>deja show &lt;id&gt;</code> 打开它留下的记录，或者用 <code>deja resume &lt;id&gt; --write-back</code> 把这段对话写回 <code>~/.claude/projects</code>，让 <code>claude --resume</code> 能再找到它。不带参数运行 <code>deja</code>，界面里的 Deleted 标签列出所有被智能体删掉、deja 还留着的会话，在其中一条上按 <code>R</code> 就把它写回去。只有 <code>deja forget</code> 会主动丢掉一个会话。从来没有被任何东西读过的会话，没有任何办法找回。</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
 <p>第一次建索引读的就是磁盘上已有的历史，所以它覆盖的是你现在拥有的那些会话，而不是从今天才开始。</p>

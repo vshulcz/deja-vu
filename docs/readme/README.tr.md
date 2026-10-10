@@ -106,10 +106,11 @@ daralır.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/tui.gif" width="720" alt="deja ekranında bir arama yazmak, bulunan oturumu okumak ve o oturuma başka bir ajanda devam etmek"></p>
 
-- `↑↓` bir oturum seçer, `↵` onu eşleşmenin olduğu yerde açar, `n` ve `N` eşleşmeler arasında gezer, `esc` geri döner.
+- `↑↓` bir oturum seçer, `↵` onu eşleşmenin olduğu yerde açar, `n` ve `N` eşleşmeler arasında gezer, `esc` geri döner. Oturumun içinde `/` bir kelime arar, `]` ve `[` sorduğun sorular arasında atlar.
+- Arama kutusu filtre de alır: iki nokta üst üsteli bir ajan (`codex:`), `today`, `yesterday`, `week`, `month` ve `in:<proje>`.
 - `r` oturumu onu yazan ajanda sürdürür. `o` başka herhangi bir ajanda devam ettirir; o ajan, oturumun ne sorduğu, neye karar verdiği ve neyi açık bıraktığıyla başlar.
-- `tab` bu proje, tüm projeler ve Kept arasında geçiş yapar; Kept, ajanının sildiği ama deja'nın hâlâ tuttuğu oturumlardır. `R` birini yerine koyar.
-- `?` tüm tuşları listeler, `q` çıkar.
+- `tab` bu proje, tüm projeler ve Deleted arasında geçiş yapar; Deleted, ajanının sildiği ama deja'nın hâlâ tuttuğu oturumlardır. `R` birini yerine koyar.
+- `?` tüm tuşları listeler, geri kalanı `^k` içindedir (oturum id'sini veya proje yolunu kopyalamak, bir oturumu unutmak), `q` çıkar.
 
 `DEJA_TUI=0` ile bunun yerine düz metin özeti yazdırır; bu, `deja brief` çıktısıyla aynıdır. Bir pipe'a
 bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağını yazdırır.

@@ -109,7 +109,7 @@ find ~/.claude/projects -name '*.jsonl' -size +50M</pre>
 <h2>Claude Code 会替你删</h2>
 <p>默认情况下，Claude Code 只保留 <b>30 天</b>，之后自行删除——设置项是 <code>~/.claude/settings.json</code> 里的 <code>cleanupPeriodDays</code>。清理时不会有任何提示；人们通常是在 <code>--resume</code> 里找不到六月那次会话时才发现。想让文件留下来，就在这个月过去之前把数字调大：</p>
 <pre>{ "cleanupPeriodDays": 3650 }</pre>
-<p>deja 索引过的内容会留下：被清理掉的记录仍然可以搜到，因为索引不跟着某一个文件一起消失——只有 <code>deja forget</code> 会有意地把一个会话丢掉。但文件本身确实没了，<code>--resume</code> 也跟着没了，除非你把它放回去：交互界面（不带参数运行 <code>deja</code>）的 Kept 标签列出 deja 还留着的会话，按 <code>R</code> 就把一个会话写回 <code>--resume</code> 能找到的地方，<code>deja resume &lt;id&gt; --write-back</code> 也一样。</p>
+<p>deja 索引过的内容会留下：被清理掉的记录仍然可以搜到，因为索引不跟着某一个文件一起消失——只有 <code>deja forget</code> 会有意地把一个会话丢掉。但文件本身确实没了，<code>--resume</code> 也跟着没了，除非你把它放回去：交互界面（不带参数运行 <code>deja</code>）的 Deleted 标签列出 deja 还留着的会话，按 <code>R</code> 就把一个会话写回 <code>--resume</code> 能找到的地方，<code>deja resume &lt;id&gt; --write-back</code> 也一样。</p>
 <p>这个清理是 Claude Code 自己做的，不是 cron，而且在客户端无法确定保留期时会暂停——这就是为什么上面那台按默认设置的机器上，仍然留着 69 个超过 31 天的文件。别把这当成安全：文档写的行为是 30 天后删除，清理真正跑起来的那天，六月那次会话就没了。</p>
 
 <h2>自己删可以吗</h2>
