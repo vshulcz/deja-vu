@@ -24,6 +24,11 @@ func TestHandoffIntentReadsOnlyAnExplicitAsk(t *testing.T) {
 		{"у меня где то была сессия claude про дистрибуцию, найди где она находится, мне нужно в нее зайти и потом через какое-то время продолжить", false, "", ""},
 		// A package deja already wrote.
 		{"You are picking up work handed off from a opencode session (project app). Continue from there.", false, "", ""},
+		{"continue the session we had in cursor on the parser", true, "", "cursor"},
+		{"resume cursor's session about the parser", true, "", "cursor"},
+		// A harness name that is an ordinary word, away from the session word.
+		{"resume work on session pagination: the cursor is lost after page 2", false, "", ""},
+		{"continue the session cleanup, the hermes build kept failing", false, "", ""},
 		// A date and a version are not ids.
 		{"continue the release 2026-09-19 v0.21.5", false, "", ""},
 	} {

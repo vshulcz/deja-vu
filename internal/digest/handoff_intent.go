@@ -80,7 +80,7 @@ func HandoffIntent(text string) (HandoffAsk, bool) {
 	// opencode сессию claude" moves a claude session into opencode.
 	best, bestDist := "", 1<<30
 	for i, w := range words {
-		if !handoffHarnessWord(w) {
+		if !handoffHarnessWord(w) || !handoffHarnessPlaced(words, nounAt, i) {
 			continue
 		}
 		d := i - near
@@ -107,6 +107,32 @@ func handoffHarnessWord(w string) bool {
 		return false
 	}
 	return len(w) > 2 && sources.IsKnownHarness(w)
+}
+
+// handoffPrepositions put a harness name in the sentence as the place a
+// session lives: "the session we had in cursor", "из codex".
+var handoffPrepositions = map[string]bool{
+	"in": true, "from": true, "on": true, "into": true, "to": true, "with": true,
+	"в": true, "во": true, "из": true, "с": true, "со": true, "на": true,
+}
+
+// handoffHarnessPlaced reports whether the harness word at i names a session:
+// beside a session word ("the codex session", "сессию claude",
+// "OpenCode-сессии", "cursor's session") or after a preposition. A harness
+// name that is also an ordinary word reads as that word anywhere else:
+// "resume work on session pagination: the cursor is lost" is about a cursor.
+func handoffHarnessPlaced(words []string, nounAt []int, i int) bool {
+	for _, n := range nounAt {
+		switch abs(n - i) {
+		case 1:
+			return true
+		case 2:
+			if words[(n+i)/2] == "s" {
+				return true
+			}
+		}
+	}
+	return i > 0 && handoffPrepositions[words[i-1]]
 }
 
 // wordIndexes is where in the word list each stem or phrase starts.
