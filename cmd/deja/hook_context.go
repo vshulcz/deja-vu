@@ -124,6 +124,12 @@ func readBounded(r io.Reader, wait time.Duration, stopAtValue bool) []byte {
 			if n > 0 {
 				mu.Lock()
 				buf = append(buf, chunk[:n]...)
+				// A host on Windows can write its payload with a UTF-8 byte
+				// order mark, which no JSON decoder takes, and the hook went
+				// quiet on it.
+				if len(buf) >= len(utf8BOM) {
+					buf = bytes.TrimPrefix(buf, utf8BOM)
+				}
 				whole := stopAtValue && endsAValue(buf) && json.Valid(buf)
 				mu.Unlock()
 				if whole {

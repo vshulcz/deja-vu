@@ -584,6 +584,22 @@ func TestReadHookPayloadReturnsAsSoonAsTheValueIsWhole(t *testing.T) {
 	}
 }
 
+// A payload written with a UTF-8 byte order mark was waited out to the
+// deadline and then dropped, because no JSON decoder takes the mark.
+func TestReadHookPayloadDropsAByteOrderMark(t *testing.T) {
+	stop := make(chan struct{})
+	defer close(stop)
+	payload := `{"session_id":"s","prompt":"gateway_timeout"}`
+	start := time.Now()
+	got := readHookPayload(&heldPipe{head: append(append([]byte(nil), utf8BOM...), payload...), stop: stop}, 2*time.Second)
+	if string(got) != payload {
+		t.Fatalf("payload = %q, want %q", got, payload)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("waited %v for a payload that had already arrived", elapsed)
+	}
+}
+
 // Kept reading past a brace that closes nothing, or the deadline would fire on
 // every payload with a nested object in it.
 func TestReadHookPayloadWaitsOutAnInnerBrace(t *testing.T) {
