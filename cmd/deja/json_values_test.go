@@ -30,6 +30,8 @@ func fixtureStore(t *testing.T, sessions map[string][]string) {
 	}
 }
 
+var nonAlnum = regexp.MustCompile(`[^A-Za-z0-9]`)
+
 // fixtureProjectDir is the Claude project directory named after the fixture cwd.
 var fixtureProjectDir = "-repo-app"
 
@@ -41,7 +43,9 @@ func fixtureEnv(t *testing.T) string {
 	if err := os.MkdirAll(cwd, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { fixtureProjectDir = strings.ReplaceAll(cwd, "/", "-") }()
+	// Claude names the folder after the cwd with every other character a dash,
+	// which on Windows also takes the drive's colon and the backslashes.
+	defer func() { fixtureProjectDir = nonAlnum.ReplaceAllString(cwd, "-") }()
 	if real, err := filepath.EvalSymlinks(cwd); err == nil {
 		cwd = real
 	}
@@ -238,11 +242,11 @@ func TestWipAndRecapJSONFilterBidiAndTags(t *testing.T) {
 	cwd := fixtureEnv(t)
 	ts := timeNowRFC3339(t)
 	fixtureStore(t, map[string][]string{"bidi1": {
-		fixtureRow("bidi1", "user", ts, cwd, "fix the ‮evil‬ importer and the \U000E0041hidden\U000E0042 tag"),
-		fixtureRow("bidi1", "assistant", ts, cwd, "root cause: the ‮reversed‬ parser dropped the BOM. Fixed by stripping it first."),
+		fixtureRow("bidi1", "user", ts, cwd, "fix the \u202eevil\u202c importer and the \U000E0041hidden\U000E0042 tag"),
+		fixtureRow("bidi1", "assistant", ts, cwd, "root cause: the \u202ereversed\u202c parser dropped the BOM. Fixed by stripping it first."),
 	}})
 	t.Chdir(cwd)
-	bad := regexp.MustCompile("[‪-‮⁦-⁩\U000E0000-\U000E007F]")
+	bad := regexp.MustCompile("[\u202a-\u202e\u2066-\u2069\U000E0000-\U000E007F]")
 	for _, args := range [][]string{{"wip", "--json"}, {"recap", "--json"}, {"search", "importer", "--json"}} {
 		out := runJSONOut(t, args...)
 		if bad.MatchString(out) {
