@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"maps"
 	"os"
@@ -450,62 +449,6 @@ func (a *tuiApp) selected() (model.Session, bool) {
 		return model.Session{}, false
 	}
 	return a.rows[a.sel].s, true
-}
-
-// resumeSelected leaves the screen and reopens the session in its own agent.
-func (a *tuiApp) resumeSelected() {
-	a.remember()
-	s, ok := a.current()
-	if !ok {
-		return
-	}
-	if d := a.details[sessionKey(s)]; d != nil && d.gone {
-		a.say(agentName(s.Harness)+" deleted this one. R puts it back first.", false)
-		return
-	}
-	a.after = func() error {
-		fmt.Fprintf(os.Stderr, "deja: resuming in %s\n", agentName(s.Harness))
-		pickedOnScreen = &s
-		return runResume(a.dir, []string{s.ID, "--exec"}, os.Stdout)
-	}
-	a.leaving = "Resuming in " + agentName(s.Harness) + "…"
-	a.quit = true
-}
-
-// putBack writes a session the agent deleted back where it reads it.
-func (a *tuiApp) putBack() {
-	s, ok := a.current()
-	if !ok {
-		return
-	}
-	d := a.details[sessionKey(s)]
-	if d == nil || !d.gone {
-		a.say("Still in "+agentName(s.Harness)+", nothing to put back.", false)
-		return
-	}
-	go func() {
-		err := writeBackSession(a.dir, d.full, io.Discard)
-		a.post(func() {
-			if err != nil {
-				a.say("Could not put it back: "+err.Error(), false)
-				return
-			}
-			d.gone = false
-			// Back where its agent reads it, it is no longer a kept one.
-			k := sessionKey(s)
-			delete(a.keptIDs, k)
-			for i, ks := range a.kept {
-				if sessionKey(ks) == k {
-					a.kept = append(a.kept[:i:i], a.kept[i+1:]...)
-					break
-				}
-			}
-			if a.scope == scopeKept && a.view != viewReader {
-				a.reload()
-			}
-			a.say("Put back. r resumes it in "+agentName(s.Harness)+".", true)
-		})
-	}()
 }
 
 // current is the session the actions apply to: the open one in the reader,

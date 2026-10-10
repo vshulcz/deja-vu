@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,9 +14,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
-// The smaller actions on one session: its id and its project's path for the
-// clipboard, and forgetting it, which asks first. Their keys (i, p, F) work
-// everywhere but are shown only in ^k, so the help and footer stay short.
+// Actions on one session: resuming it, putting a deleted one back, its id
+// and its project's path for the clipboard, and forgetting it, which asks
+// first. The keys i, p and F work everywhere but are shown only in ^k, so the
+// help and footer stay short.
 
 // clip puts text on the clipboard, or on the test's catch.
 func (a *tuiApp) clip(text string) error {
@@ -151,4 +154,60 @@ func (a *tuiApp) drawForget() {
 	p.PutClip(tx, ty+5, agentName(s.Harness)+"'s own file stays.", fgs(cSub), right)
 	bx := p.button(tx, ty+7, "↵", "Forget", true, right)
 	p.button(bx+2, ty+7, "esc", "Keep it", false, right)
+}
+
+// resumeSelected leaves the screen and reopens the session in its own agent.
+func (a *tuiApp) resumeSelected() {
+	a.remember()
+	s, ok := a.current()
+	if !ok {
+		return
+	}
+	if d := a.details[sessionKey(s)]; d != nil && d.gone {
+		a.say(agentName(s.Harness)+" deleted this one. R puts it back first.", false)
+		return
+	}
+	a.after = func() error {
+		fmt.Fprintf(os.Stderr, "deja: resuming in %s\n", agentName(s.Harness))
+		pickedOnScreen = &s
+		return runResume(a.dir, []string{s.ID, "--exec"}, os.Stdout)
+	}
+	a.leaving = "Resuming in " + agentName(s.Harness) + "…"
+	a.quit = true
+}
+
+// putBack writes a session the agent deleted back where it reads it.
+func (a *tuiApp) putBack() {
+	s, ok := a.current()
+	if !ok {
+		return
+	}
+	d := a.details[sessionKey(s)]
+	if d == nil || !d.gone {
+		a.say("Still in "+agentName(s.Harness)+", nothing to put back.", false)
+		return
+	}
+	go func() {
+		err := writeBackSession(a.dir, d.full, io.Discard)
+		a.post(func() {
+			if err != nil {
+				a.say("Could not put it back: "+err.Error(), false)
+				return
+			}
+			d.gone = false
+			// Back where its agent reads it, it is no longer a kept one.
+			k := sessionKey(s)
+			delete(a.keptIDs, k)
+			for i, ks := range a.kept {
+				if sessionKey(ks) == k {
+					a.kept = append(a.kept[:i:i], a.kept[i+1:]...)
+					break
+				}
+			}
+			if a.scope == scopeKept && a.view != viewReader {
+				a.reload()
+			}
+			a.say("Put back. r resumes it in "+agentName(s.Harness)+".", true)
+		})
+	}()
 }
