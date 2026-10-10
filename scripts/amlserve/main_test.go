@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func post(t *testing.T, h http.Handler, path, auth string, body any) (int, map[string]any) {
@@ -90,5 +91,27 @@ func TestAddThenSearchFollowsTheContract(t *testing.T) {
 	}
 	if code, _ := post(t, h, "/add", "Bearer k", map[string]any{"request_id": "x", "user_id": "u1", "session_id": "s", "messages": []any{}}); code != http.StatusUnprocessableEntity {
 		t.Fatalf("empty messages answered %d", code)
+	}
+}
+
+// A session longer than the budget is cut on a character, not inside one.
+func TestLongSessionIsCutOnARune(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	s := &server{store: t.TempDir(), maxItems: 5}
+	h := s.routes()
+	add(t, h, "r1", "u", "ru", "миграция индекса падает на шарде "+strings.Repeat("ёжик ", 200), "поправил шард")
+	// Cyrillic is two bytes a letter, so one of two neighbouring budgets lands
+	// inside a letter whatever the excerpts before it weigh.
+	for _, budget := range []int{900, 901} {
+		s.maxChars = budget
+		_, out := post(t, h, "/search", "", map[string]any{"query": "миграция индекса шард", "user_id": "u", "top_k": 5})
+		data, _ := out["data"].([]any)
+		if len(data) == 0 {
+			t.Fatalf("no result: %v", out)
+		}
+		c := data[0].(map[string]any)["content"].(string)
+		if !utf8.ValidString(c) || strings.ContainsRune(c, utf8.RuneError) {
+			t.Fatalf("budget %d cut inside a character: %q", budget, c[len(c)-20:])
+		}
 	}
 }

@@ -14,7 +14,9 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -27,6 +29,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -58,6 +61,9 @@ type item struct {
 	Score     float64 `json:"score,omitempty"`
 	CreatedAt string  `json:"created_at,omitempty"`
 }
+
+// maxBody is above the largest Add the contract allows: 30 MiB of images.
+const maxBody = 64 << 20
 
 type server struct {
 	store    string
@@ -102,11 +108,12 @@ func (s *server) authed(h http.HandlerFunc) http.HandlerFunc {
 					}
 				}
 			}
-			if got != s.token {
+			if subtle.ConstantTimeCompare([]byte(got), []byte(s.token)) != 1 {
 				fail(w, http.StatusUnauthorized, "invalid key")
 				return
 			}
 		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxBody)
 		h(w, r)
 	}
 }
@@ -160,7 +167,7 @@ func (s *server) add(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	root, proj, idx := s.userDir(req.UserID)
-	if err := s.write(root, proj, req); err != nil {
+	if err := s.write(proj, req); err != nil {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -172,31 +179,30 @@ func (s *server) add(w http.ResponseWriter, r *http.Request) {
 	reply(w, map[string]any{"success": true, "request_id": req.RequestID, "user_id": req.UserID, "session_id": req.SessionID})
 }
 
-// write appends the chunk to its session's transcript. A retried request_id
-// is already on disk and is not written twice.
-func (s *server) write(root, proj string, req addRequest) error {
+// write adds the chunk to its session's transcript. Each line carries the
+// request_id it came in, and the file is replaced whole, so a retried
+// request_id either finds every line of its chunk on disk or none of them.
+func (s *server) write(proj string, req addRequest) error {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		return err
 	}
-	seen := filepath.Join(root, "requests")
-	if b, err := os.ReadFile(seen); err == nil {
-		for _, l := range strings.Split(string(b), "\n") {
-			if l == req.RequestID {
-				return nil
-			}
-		}
-	}
 	sid := hash(req.SessionID)
+	path := filepath.Join(proj, sid+".jsonl")
+	old, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	mark, _ := json.Marshal(req.RequestID)
+	if bytes.Contains(old, append([]byte(`"amlRequest":`), mark...)) {
+		return nil
+	}
 	if err := os.WriteFile(filepath.Join(proj, sid+".sid"), []byte(req.SessionID), 0o644); err != nil {
 		return err
 	}
-	path := filepath.Join(proj, sid+".jsonl")
-	n := lines(path)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	enc := json.NewEncoder(f)
+	n := bytes.Count(old, []byte("\n"))
+	var b bytes.Buffer
+	b.Write(old)
+	enc := json.NewEncoder(&b)
 	for i, m := range req.Messages {
 		// Messages without a time keep their order: a second apart from the
 		// session's first line.
@@ -209,31 +215,18 @@ func (s *server) write(root, proj string, req addRequest) error {
 			content = []any{map[string]any{"type": "text", "text": m.Content}}
 		}
 		if err := enc.Encode(map[string]any{
-			"type": m.Role, "sessionId": sid,
+			"type": m.Role, "sessionId": sid, "amlRequest": req.RequestID,
 			"timestamp": ts.UTC().Format(time.RFC3339),
 			"message":   map[string]any{"role": m.Role, "content": content},
 		}); err != nil {
-			_ = f.Close()
 			return err
 		}
 	}
-	if err := f.Close(); err != nil {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b.Bytes(), 0o644); err != nil {
 		return err
 	}
-	g, err := os.OpenFile(seen, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(g, req.RequestID)
-	return errors.Join(err, g.Close())
-}
-
-func lines(path string) int {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return 0
-	}
-	return strings.Count(string(b), "\n")
+	return os.Rename(tmp, path)
 }
 
 func (s *server) search(w http.ResponseWriter, r *http.Request) {
@@ -341,6 +334,9 @@ func (s *server) render(proj, sid string, snippets []string) (string, string) {
 	}
 	out.WriteString("\n")
 	if rest := s.maxChars - out.Len(); rest > 0 {
+		for rest > 0 && !utf8.RuneStart(full[rest]) {
+			rest--
+		}
 		out.WriteString(full[:rest])
 	}
 	return out.String(), string(orig)
