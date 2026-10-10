@@ -263,11 +263,11 @@
     <summary>deja search syntax: exact and phrase queries, natural language with stop words, fuzzy typo tolerance, confidence tiers, and optional local semantic recall.</summary>
   </entry>
   <entry>
-    <title>Delete Claude Code sessions: claude project purge — deja-vu</title>
+    <title>How to delete Claude Code sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
     <updated>2026-10-10T00:00:00Z</updated>
-    <summary>A whole project: claude project purge. One session: rm its .jsonl under ~/.claude/projects. On a timer: cleanupPeriodDays. What you lose either way.</summary>
+    <summary>One session: delete its .jsonl under ~/.claude/projects. A whole project: claude project purge. Old ones on a timer: cleanupPeriodDays. What /clear and --resume do.</summary>
   </entry>
   <entry>
     <title>Switch from Claude Code to Codex or Cursor — deja-vu</title>
