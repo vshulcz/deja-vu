@@ -534,6 +534,13 @@ const commandExitMarker = "  → exit "
 // the record log and split the same command the same way.
 func CommandWithoutExitStatus(s string) string { return withoutExitStatus(s) }
 
+// BareCommand is a recorded command as a person would type it: without the
+// "$ " the record carries and the exit status a source appended. The JSON
+// surfaces hand it to callers that run it.
+func BareCommand(s string) string {
+	return strings.TrimSpace(withoutExitStatus(strings.TrimPrefix(strings.TrimSpace(s), "$ ")))
+}
+
 // CommandExitStatus reads the outcome withoutExitStatus strips, for the
 // surfaces that group commands themselves and then have to say what those runs
 // did. The same strict shape: two spaces, the marker, digits to the end.

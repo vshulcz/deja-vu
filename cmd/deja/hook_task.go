@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -67,7 +68,7 @@ func changedTaskFiles(cwd string) []string {
 			out = append(out, base)
 		}
 	}
-	if b, err := exec.CommandContext(ctx, "git", "-C", cwd, "status", "--porcelain").Output(); err == nil {
+	if b, err := gitReadOnly(ctx, "-C", cwd, "status", "--porcelain").Output(); err == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			if len(line) < 4 {
 				continue
@@ -87,6 +88,15 @@ func changedTaskFiles(cwd string) []string {
 	return out
 }
 
+// gitReadOnly is a git command that leaves the repository alone. status and
+// diff refresh the index and take its lock when they can; a hook doing that in
+// the background holds index.lock under the user's own git commands.
+func gitReadOnly(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
+	return cmd
+}
+
 // taskScores counts, per session, how many of the changed files it mentions.
 // The returned matched list holds the files that drove the ranking, most
 // mentioned first, for the receipt line.
@@ -97,16 +107,10 @@ func taskScores(ss []model.Session, files []string) (map[string]int, []string) {
 	scores := map[string]int{}
 	fileHits := map[string]int{}
 	for _, s := range ss {
-		var text strings.Builder
-		text.WriteString(strings.ToLower(s.Title))
-		for _, m := range s.Messages {
-			text.WriteString(" ")
-			text.WriteString(strings.ToLower(m.Text))
-		}
-		low := text.String()
+		found := sessionMentions(s, files)
 		n := 0
-		for _, f := range files {
-			if strings.Contains(low, f) {
+		for i, f := range files {
+			if found[i] {
 				n++
 				fileHits[f]++
 			}
@@ -132,4 +136,44 @@ func taskScores(ss []model.Session, files []string) (map[string]int, []string) {
 		matched = matched[:3]
 	}
 	return scores, matched
+}
+
+// sessionMentions reports, per file, whether the session's lowered title and
+// messages joined by spaces contain it. A name without a space cannot match
+// across a join, so each message is searched on its own and on every core: the
+// joined copy of a marathon session was most of a session start's time.
+func sessionMentions(s model.Session, files []string) []bool {
+	found := make([]bool, len(files))
+	for _, f := range files {
+		if strings.Contains(f, " ") {
+			var text strings.Builder
+			text.WriteString(strings.ToLower(s.Title))
+			for _, m := range s.Messages {
+				text.WriteString(" ")
+				text.WriteString(strings.ToLower(m.Text))
+			}
+			low := text.String()
+			for i, f := range files {
+				found[i] = strings.Contains(low, f)
+			}
+			return found
+		}
+	}
+	mark := func(low string, into []bool) {
+		for i, f := range files {
+			if !into[i] && strings.Contains(low, f) {
+				into[i] = true
+			}
+		}
+	}
+	mark(strings.ToLower(s.Title), found)
+	k := len(files)
+	per := make([]bool, len(s.Messages)*k)
+	parallelChunks(len(s.Messages), func(i int) {
+		mark(strings.ToLower(s.Messages[i].Text), per[i*k:(i+1)*k])
+	})
+	for i, h := range per {
+		found[i%k] = found[i%k] || h
+	}
+	return found
 }

@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Betik ikili dosyayı `~/.local/bin` içine koyar. Bu dizin henüz `PATH` içinde değilse ikinci komut aynı kabukta bulunmaz: betiğin yazdırdığı, tam yolu içeren `next:` satırını çalıştırın ya da `PATH` satırı eklendikten sonra yeni bir kabuk açın.
+
 `raw.githubusercontent.com` erişilemiyorsa aynı sürümü sunan bir npm aynası var:
 
 ```sh
@@ -110,7 +112,7 @@ daralır.
 - Arama kutusu filtre de alır: iki nokta üst üsteli bir ajan (`codex:`), `today`, `yesterday`, `week`, `month` ve `in:<proje>`.
 - `r` oturumu onu yazan ajanda sürdürür. `o` başka herhangi bir ajanda devam ettirir; o ajan, oturumun ne sorduğu, neye karar verdiği ve neyi açık bıraktığıyla başlar.
 - `tab` bu proje, tüm projeler ve Deleted arasında geçiş yapar; Deleted, ajanının sildiği ama deja'nın hâlâ tuttuğu oturumlardır. `R` birini yerine koyar.
-- `?` tüm tuşları listeler, geri kalanı `^k` içindedir (oturum id'sini veya proje yolunu kopyalamak, bir oturumu unutmak), `q` çıkar.
+- `?` tüm tuşları listeler, geri kalanı `^k` içindedir (oturum id'sini veya proje yolunu kopyalamak, bir oturumu unutmak), listede `q` çıkar.
 
 `DEJA_TUI=0` ile bunun yerine düz metin özeti yazdırır; bu, `deja brief` çıktısıyla aynıdır. Bir pipe'a
 bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağını yazdırır.
@@ -388,7 +390,7 @@ deja'nın temizlikten önce indekslediği oturumlar, dosya kaybolduktan sonra da
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

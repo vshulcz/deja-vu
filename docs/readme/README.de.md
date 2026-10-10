@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Das Skript legt die Binärdatei in `~/.local/bin` ab. Steht dieses Verzeichnis noch nicht im `PATH`, findet dieselbe Shell den zweiten Befehl nicht: Führe die `next:`-Zeile aus, die das Skript mit vollem Pfad ausgibt, oder öffne eine neue Shell, sobald die `PATH`-Zeile eingetragen ist.
+
 Falls `raw.githubusercontent.com` nicht erreichbar ist, gibt es einen npm-Spiegel mit derselben Version:
 
 ```sh
@@ -110,7 +112,7 @@ Liste wird beim Tippen kürzer.
 - Das Suchfeld nimmt Filter: einen Agenten mit Doppelpunkt (`codex:`), `today`, `yesterday`, `week`, `month` und `in:<projekt>`.
 - `r` setzt die Session in dem Agenten fort, der sie geschrieben hat. `o` setzt sie in einem beliebigen anderen Agenten fort, der mit dem beginnt, was die Session gefragt, entschieden und offen gelassen hat.
 - `tab` wechselt zwischen diesem Projekt, allen Projekten und Deleted, den Sessions, die ihr Agent gelöscht hat und die deja noch hält; `R` legt eine davon zurück.
-- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), `q` beendet.
+- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), in der Liste beendet `q`.
 
 Mit `DEJA_TUI=0` kommt stattdessen die Textübersicht, die auch `deja brief` ausgibt. In einer Pipe
 zeigt es, was indiziert ist und welcher Befehl als Nächstes dran ist.
@@ -396,7 +398,7 @@ verschwunden ist. Die Details stehen unter
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

@@ -631,7 +631,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	vanished := sources.FilterSessions(vanishedFromStores(dir, harness, files, ss))
 	ss = append(ss, vanished...)
 	if progress != nil && len(vanished) > 0 {
-		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n",
+		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n",
 			len(vanished), pluralS(len(vanished)), map[bool]string{true: "its", false: "their"}[len(vanished) == 1])
 	}
 	ss = filterTombstonedSet(ss, dead)
@@ -640,7 +640,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		files[p] = st
 	}
 	if progress != nil && len(orphans.files) > 0 {
-		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n",
+		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n",
 			len(orphans.files), pluralS(len(orphans.files)))
 	}
 	if progress != nil && orphans.unreadable > 0 {
@@ -3001,6 +3001,25 @@ func titlePlaceholder(t string) bool {
 	return t == "" || strings.HasPrefix(t, harnessOutputTitlePrefix)
 }
 
+// titleRankOfRow is where a row's title sits in sessionTitleFrom's order: a
+// question (4), a turn too thin to name anything (3), the agent's words (2),
+// tool output (1), plumbing or nothing (0). A pass that sees only part of a
+// session keeps a title unless what it read outranks it, as a rebuild of the
+// whole session would: a thin opening gives way to the first real question.
+func titleRankOfRow(title string, fromAgent bool) int {
+	switch {
+	case titlePlaceholder(title):
+		return 0
+	case strings.HasPrefix(title, toolOutputTitlePrefix):
+		return 1
+	case fromAgent:
+		return 2
+	case thinTitle(title):
+		return 3
+	}
+	return 4
+}
+
 func harnessOutputTitle(t string) string {
 	return harnessOutputTitlePrefix + truncateTitle(stripPlumbingTag(t), 60-len([]rune(harnessOutputTitlePrefix)))
 }
@@ -3587,14 +3606,15 @@ func inOpencodeSchemaDB(h, p string) bool {
 	if !ok {
 		return false
 	}
-	if p == db() {
-		return true
-	}
 	// opencode's diff files, Kilo's task files and ZCode's transcripts and
 	// snapshots carry the same harness name; anything else is a project directory. A diff
 	// record still counts as the database's through storeHarness, which files
 	// the diff path under that store.
-	return !opencodeSchemaOwnFile(h, p)
+	//
+	// Asked before the database path: resolving it can stat two files (with
+	// XDG_DATA_HOME set, opencode's), and fromDatabase asks this of every
+	// record an incremental pass holds.
+	return !opencodeSchemaOwnFile(h, p) || p == db()
 }
 
 // opencodeSchemaOwnFile reports whether p is one of harness h's own files
@@ -3855,6 +3875,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	// read the index as fresh has to be written even when nothing else is.
 	newlyKept := map[string]bool{}
 	var view *listedView
+	var held map[string]bool
 	for p := range removed {
 		if superseded[p] {
 			continue
@@ -3889,6 +3910,17 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		if d := goneSessionDir(p); d != "" && arrivedDirs[filepath.Base(d)] {
 			continue
 		}
+		// Kept for the sessions it holds, as a rebuild keeps it for its
+		// records: a file whose sessions were all forgotten holds nothing.
+		if held == nil {
+			held = map[string]bool{}
+			for _, meta := range old.Sessions {
+				held[meta.Path] = true
+			}
+		}
+		if !held[p] {
+			continue
+		}
 		if of, ok := old.Files[p]; ok {
 			if !of.Kept {
 				newlyKept[p] = true
@@ -3913,7 +3945,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 		if n := len(kept) - out; n > 0 {
-			fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n", n, pluralS(n))
+			fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n", n, pluralS(n))
 		}
 		if out > 0 {
 			fmt.Fprintf(progress, "deja: %d transcript%s outside the stores this run reads — still searchable\n", out, pluralS(out))
@@ -4713,7 +4745,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			if s.Path != "" && owns {
 				meta.Path = s.Path
 			}
-			if titlePlaceholder(meta.Title) {
+			// A row named from the agent's words or tool output takes the
+			// first question that arrives later, as a rebuild names it.
+			outranked := false
+			if s.Title == "" && !titlePlaceholder(meta.Title) {
+				t, agent := sessionTitleFrom(s)
+				outranked = titleRankOfRow(t, agent) > titleRankOfRow(meta.Title, meta.AgentTitle)
+			}
+			if titlePlaceholder(meta.Title) || outranked {
 				// The incremental fallback redacted nothing at all before; keep
 				// sessionTitleFrom's correct fromAgent bit and redact before the
 				// cut, as the full rebuild does.

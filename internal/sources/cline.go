@@ -360,6 +360,9 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 	var turns []struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
+		// Epoch milliseconds, on the user turns and completed assistant turns
+		// of a recent extension. A float for the reason roo's is.
+		TS float64 `json:"ts"`
 	}
 	if err := json.Unmarshal(b, &turns); err != nil {
 		diagFileError(path, err)
@@ -404,7 +407,13 @@ func parseClineLegacyTask(path string) ([]model.Session, error) {
 		if m.Role != "user" && m.Role != "assistant" {
 			continue
 		}
+		// A turn's own ts first: taskHistory's is when the task was last
+		// touched, so counting seconds from it put the task at its end, as in
+		// roo (#4420). A turn without one keeps that scheme.
 		ts := base.Add(time.Duration(ti) * time.Second)
+		if m.TS > 0 {
+			ts = time.UnixMilli(int64(m.TS))
+		}
 		text := clineContentText(m.Content)
 		if m.Role == "user" {
 			// A result of the XML era is a text block, not a tool_result

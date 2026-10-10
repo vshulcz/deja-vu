@@ -117,9 +117,10 @@ func PlanFrictionMatches(dir string, steps [][]string, keep func(SessionMeta) bo
 	}
 	var hits []wallHit
 	candidateMetas := map[string]SessionMeta{}
+	rd := newFrictionReader(dir, manifest)
 	for _, cluster := range eligible {
 		wanted := map[uint64]string{cluster.hash: ""}
-		frictionTexts(dir, manifest, cluster.metas, wanted, cluster.hash)
+		frictionTexts(rd, cluster.metas, wanted, cluster.hash)
 		text := wanted[cluster.hash]
 		if text == "" || !planWallSharesTerm(text, indexedSteps) {
 			continue

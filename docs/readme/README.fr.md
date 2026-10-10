@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Le script place le binaire dans `~/.local/bin`. Si ce dossier n'est pas encore dans votre `PATH`, le même shell ne trouve pas la deuxième commande : lancez la ligne `next:` que le script affiche, avec le chemin complet, ou ouvrez un nouveau shell une fois la ligne `PATH` ajoutée.
+
 Si `raw.githubusercontent.com` n'est pas joignable, il existe un miroir npm dans la même version :
 
 ```sh
@@ -110,7 +112,7 @@ resserre à mesure que vous tapez.
 - La zone de recherche accepte des filtres : un agent suivi de deux-points (`codex:`), `today`, `yesterday`, `week`, `month` et `in:<projet>`.
 - `r` reprend la session dans l'agent qui l'a écrite. `o` la poursuit dans n'importe quel autre agent, qui démarre avec ce que la session a demandé, décidé et laissé en suspens.
 - `tab` bascule entre ce projet, tous les projets et Deleted, les sessions que leur agent a supprimées et que deja garde encore ; `R` en remet une en place.
-- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), `q` quitte.
+- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), dans la liste, `q` quitte.
 
 Avec `DEJA_TUI=0`, il affiche à la place le résumé texte, qui est aussi `deja brief`. Dans un pipe, il affiche
 ce qui est indexé et quelle commande lancer ensuite.
@@ -394,7 +396,7 @@ détails sont dans
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

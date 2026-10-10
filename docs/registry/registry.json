@@ -2893,7 +2893,7 @@
       "gaps": {
         "command": {
           "state": "impossible",
-          "why": "Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so `deja lookup` has no file to live in.",
+          "why": "Devin CLI has no user-registered slash-command file: its plugin manifest and skills directories are the only extension surfaces the docs describe, so a `/deja` command has no file to live in.",
           "source": "bundled docs at share/devin/docs/extensibility (3000.11.3)"
         }
       }

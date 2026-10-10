@@ -170,11 +170,12 @@ var helpEntries = []helpEntry{
 		examples: []string{`deja promote 01a00feb --state accepted --note "pgx v5 fixed the pool leak"`}},
 	{name: "forget", group: groupNotes,
 		usage: []string{
-			"deja forget --session <id-prefix> [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]",
+			"deja forget [--session <id-prefix>] [--project <substring>] [--before <duration|date>] [--dry-run] [--all-matches]",
 			"deja forget --list | --unforget <id>",
 		},
 		desc:     "remove sessions from the index",
-		examples: []string{"deja forget --session 01a00feb --dry-run", "deja forget --list"}},
+		more:     "Give at least one of --session, --project or --before; together they narrow each other.",
+		examples: []string{"deja forget --session 01a00feb --dry-run", "deja forget --project billing --before 90d --dry-run", "deja forget --list"}},
 	{name: "rules", group: groupNotes,
 		usage: []string{
 			"deja rules [sync]",
@@ -274,7 +275,7 @@ var helpEntries = []helpEntry{
 		examples: []string{"deja install statusline"}},
 	{name: "check", group: groupAgents,
 		usage:    []string{"deja check -"},
-		desc:     "what history says about a plan read from stdin",
+		desc:     "repeated errors on the things a plan from stdin names",
 		examples: []string{"deja check - < plan.md"}},
 	{name: "hook-prompt", group: groupAgents,
 		usage:    []string{"deja hook-prompt [--plain] [--junie]"},

@@ -227,7 +227,9 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 	// work in this project rather than handing over older work in silence.
 	var hiddenNewest time.Time
 	for _, name := range digest.ProjectNameCandidates(cwd) {
-		ss, err := index.RecentInProject(dir, name, 3)
+		// More than the three handed on: notes are skipped below, and a few
+		// `deja remember` calls in a row outnumbered them.
+		ss, err := index.RecentInProject(dir, name, 10)
 		if err != nil || len(ss) == 0 {
 			continue
 		}
@@ -239,8 +241,14 @@ func handoffSource(dir, prefix string) (model.Session, error) {
 		// it to another agent on a directory-name match is a different act:
 		// from a directory named api, the newest match was a teammate's
 		// clients/acme/api (#2347).
+		// A note from `deja remember` or `promote` is filed under the project
+		// too, and is newer than the work it records: picked here, it was
+		// handed off as the session, with the note as its objective.
 		var own []model.Session
 		for _, s := range ss {
+			if s.Harness == "deja" {
+				continue
+			}
 			if index.ProjectInScopeStrict(s.Project, name) {
 				own = append(own, s)
 			}

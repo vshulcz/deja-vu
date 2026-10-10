@@ -41,6 +41,19 @@ func sampleReport() stats.Report {
 	return r
 }
 
+// Into a pipe the card is plain text, as every other stats surface is: `deja
+// stats --card | cat` carried the escape codes.
+func TestCardIsPlainIntoAPipe(t *testing.T) {
+	var b strings.Builder
+	printStatsCard(&b, sampleReport())
+	if strings.Contains(b.String(), "\x1b[") {
+		t.Fatalf("card written to a non-terminal carries escape codes:\n%q", b.String())
+	}
+	if !strings.Contains(b.String(), "WHERE IT CAME FROM") {
+		t.Fatal("plain card lost its text")
+	}
+}
+
 func TestCardDrawsTheFiguresAndTheAgents(t *testing.T) {
 	out := strings.Join(statsCardLines(sampleReport()), "\n")
 	for _, want := range []string{"deja-vu", "1,225", "139,970", "sessions", "messages",

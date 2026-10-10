@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+스크립트는 바이너리를 `~/.local/bin`에 둡니다. 이 디렉터리가 아직 `PATH`에 없으면 같은 셸에서 두 번째 명령을 찾지 못합니다. 스크립트가 출력하는 전체 경로가 담긴 `next:` 줄을 실행하거나, `PATH` 줄을 추가한 뒤 새 셸을 여세요.
+
 `raw.githubusercontent.com`에 연결되지 않으면 npm 미러를 쓰세요. 버전은 같습니다:
 
 ```sh
@@ -107,7 +109,7 @@ skill은 이미 설치된 `deja` 바이너리를 호출하며, 자체 바이너�
 - 검색창은 필터도 받습니다. 콜론을 붙인 에이전트(`codex:`), `today`, `yesterday`, `week`, `month`, `in:<project>`입니다.
 - `r`은 세션을 작성한 에이전트에서 재개합니다. `o`는 다른 아무 에이전트에서 이어가며, 그 에이전트는 세션이 무엇을 물었고 무엇을 결정했고 무엇을 남겨 두었는지를 갖고 시작합니다.
 - `tab`은 이 프로젝트, 모든 프로젝트, Deleted 사이를 전환합니다. Deleted는 에이전트가 지웠지만 deja가 아직 가진 세션이고, `R`로 하나를 되돌려 놓습니다.
-- `?`는 모든 키를 보여 주고, `^k`에는 나머지(세션 id나 프로젝트 경로 복사, 세션 잊기)가 있으며, `q`는 종료합니다.
+- `?`는 모든 키를 보여 주고, `^k`에는 나머지(세션 id나 프로젝트 경로 복사, 세션 잊기)가 있으며, 목록에서 `q`는 종료합니다.
 
 `DEJA_TUI=0`이면 화면 대신 텍스트 요약을 출력하며, `deja brief`와 같은 내용입니다. 파이프로 연결하면 무엇이
 색인되었는지와 다음에 실행할 명령을 출력합니다.
@@ -378,7 +380,7 @@ deja가 색인한 세션은 파일이 사라진 뒤에도 검색됩니다. 자�
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

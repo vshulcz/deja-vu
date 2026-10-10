@@ -104,7 +104,7 @@ func compactionFreshness(root string) model.RepositoryFreshness {
 }
 
 func hashGitStream(ctx context.Context, h io.Writer, root string, args ...string) bool {
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...)
+	cmd := gitReadOnly(ctx, append([]string{"-C", root}, args...)...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return false

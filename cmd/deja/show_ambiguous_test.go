@@ -57,9 +57,8 @@ func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 		t.Errorf("still advised a longer prefix: %q", shared)
 	}
 
-	// An ordinary ambiguous prefix keeps the advice that works there — even
-	// when that prefix is itself one session's whole id.
-	prefix, err := captureRunStderr(t, "show", "abc")
+	// An ordinary ambiguous prefix keeps the advice that works there.
+	prefix, err := captureRunStderr(t, "show", "ab")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,6 +67,19 @@ func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 	}
 	if strings.Contains(prefix, "share the id") {
 		t.Errorf("a unique id was reported as shared: %q", prefix)
+	}
+
+	// A complete id that also starts other ids is that session: no longer
+	// prefix reaches it, so it is read, and without the ambiguity note.
+	whole, err := captureRunStderr(t, "show", "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(whole, "sessions match") {
+		t.Errorf("a complete id was reported as ambiguous: %q", whole)
+	}
+	if out, err := captureRun(t, "show", "abc"); err != nil || !strings.Contains(out, "the short one") {
+		t.Errorf("show abc read another session: %v\n%s", err, out)
 	}
 
 	// One match, no chatter.

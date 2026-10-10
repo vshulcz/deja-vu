@@ -42,6 +42,17 @@ var historyWords = strings.Fields(`pool queue cache webhook retry ledger outbox 
 
 var historyProjects = []string{"app", "svc", "infra"}
 
+// Openings too thin to name a session: the title waits for a later question.
+var historyThin = []string{"hi", "ok", "continue", "fix it", "pgbouncer?"}
+
+// prompt is a question, or now and then a thin turn.
+func (r *historyRun) prompt(thinOdds int) string {
+	if r.rng.Intn(thinOdds) == 0 {
+		return historyThin[r.rng.Intn(len(historyThin))]
+	}
+	return "why does the " + r.words(4) + " fail"
+}
+
 type historySession struct {
 	project, sid string
 	day, min     int
@@ -58,18 +69,20 @@ type historyRun struct {
 	next  int
 	log   []string
 	index string
+	more  historyStores
 }
 
 func runRandomHistory(t *testing.T, seed int64) {
 	h := newTwoWayEnv(t)
 	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db")}
-	steps := 30
+	r.openStores()
+	steps := 24
 	for i := 0; i < steps; i++ {
-		r.step()
-		if err := Ensure(r.index, "claude", false, nil); err != nil {
+		r.anyStep()
+		if err := Ensure(r.index, "", false, nil); err != nil {
 			t.Fatalf("seed %d, pass after %q: %v", seed, r.log[len(r.log)-1], err)
 		}
-		if i%10 == 9 || i == steps-1 {
+		if i%12 == 11 || i == steps-1 {
 			r.compare(seed, i)
 		}
 	}
@@ -82,7 +95,7 @@ func (r *historyRun) compare(seed int64, step int) {
 	t.Helper()
 	b := filepath.Join(r.h.tmp, fmt.Sprintf("rebuild-%d.db", step))
 	copyDir(t, r.index, b)
-	if err := Ensure(b, "claude", true, nil); err != nil {
+	if err := Ensure(b, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	label := fmt.Sprintf("seed %d after step %d", seed, step)
@@ -111,7 +124,7 @@ func (r *historyRun) turns(s *historySession) string {
 		id := fmt.Sprintf("%s-%d", s.sid, s.calls)
 		switch r.rng.Intn(5) {
 		case 0:
-			b.WriteString(hPrompt(s.project, s.sid, s.day, s.min, "why does the "+r.words(4)+" fail"))
+			b.WriteString(hPrompt(s.project, s.sid, s.day, s.min, r.prompt(4)))
 		case 1:
 			b.WriteString(hSay(s.project, s.sid, s.day, s.min, "The "+r.words(5)+" needs a fix."))
 		case 2:
@@ -152,7 +165,11 @@ func (r *historyRun) step() {
 	case 0, 1:
 		r.next++
 		s = &historySession{project: historyProjects[r.rng.Intn(len(historyProjects))], sid: fmt.Sprintf("s%d", r.next), day: 1 + r.rng.Intn(20)}
-		h.put(s.project, s.sid, hPrompt(s.project, s.sid, s.day, 0, "start: "+r.words(5))+r.turns(s))
+		first := "start: " + r.words(5)
+		if r.rng.Intn(3) == 0 {
+			first = historyThin[r.rng.Intn(len(historyThin))]
+		}
+		h.put(s.project, s.sid, hPrompt(s.project, s.sid, s.day, 0, first)+r.turns(s))
 		r.live = append(r.live, s)
 		r.log = append(r.log, "new "+s.sid+" in "+s.project)
 	case 2, 3, 4:

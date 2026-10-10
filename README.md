@@ -60,7 +60,7 @@ the list narrows as you type.
 - The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month`, and `in:<project>`.
 - `r` resumes the session in the agent that wrote it. `o` continues it in any other agent, which starts with what the session asked, decided and left open.
 - `tab` switches between this project, all projects and Deleted, the sessions their agent deleted that deja still holds; `R` puts one back.
-- `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits.
+- `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits from the list; `esc` steps back and quits from an empty search box.
 
 With `DEJA_TUI=0` it prints the text summary instead, which is also `deja brief`. Piped, it
 prints what is indexed and which command to run next.
@@ -97,6 +97,8 @@ The two commands at the top are the whole install on macOS and Linux:
 curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto
 ```
+
+The script puts the binary in `~/.local/bin`. If that directory is not on your `PATH` yet, the second command is not found in the same shell: run the `next:` line the script prints, which has the full path, or open a new shell once the `PATH` line is added.
 
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/banner.png" width="700" alt="What deja prints after the first index: the mark, the agents it found, and a query taken from your own history"></p>
 
@@ -143,8 +145,8 @@ your `PATH`, e.g. in `%USERPROFILE%\.local\bin`.
 The binary alone is a complete install for searching: index, search, `show`, `ctx`, `blame`,
 `--json` and redaction need nothing else. `deja install` is what wires MCP into your agents
 and turns on session-start recall — worth having, and optional. On a binary-only setup
-`deja doctor` reports every MCP target as `not-wired`, which is that setup working as
-intended. `deja warmup` also leaves a skill at `~/.agents/skills/deja-search/SKILL.md`
+`deja doctor` reports every MCP target as `config missing`, or `not-wired` where the agent
+is installed, which is that setup working as intended. `deja warmup` also leaves a skill at `~/.agents/skills/deja-search/SKILL.md`
 that teaches an agent the CLI contract — `deja search --json`, `ctx`, `blame`, how to read
 `tier` and `total` — so it knows history is searchable without MCP. The copy in the repo is
 [`skills/deja-search/SKILL.md`](skills/deja-search/SKILL.md).
@@ -159,15 +161,16 @@ harness supports, aider's read-only context file, and the Windows `cmd /c deja m
 <details>
 <summary>What gets written into each agent's own guidance file</summary>
 
-Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Cursor, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale, ZCode and Junie each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build and Devin CLI get the shared skill in `~/.agents/skills`, which is what they read; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, and Kiro the skill and a steering file, from their own install target.
+Install also writes user-level guidance for the harnesses it detects: Claude Code, Codex, opencode, Gemini CLI, Antigravity, Qwen, Kimi Code, pi, Senpi, Copilot, VS Code Copilot Chat, Goose, OpenClaw, Hermes, Roo Code, omp, Amp, prime-agent, DeepSeek Harness, Continue, Crush, CodeBuddy Code, WorkBuddy, Zed, TRAE CLI, TRAE IDE, Muse Code, CodeWhale, ZCode and Junie each get it in their own guidance file (or under the configured `XDG_CONFIG_HOME`). Re-run rewrites deja's skill or marked block without changing surrounding user content. Use `deja install --all --no-guidance` to opt out; Grok Build and Devin CLI get the shared skill in `~/.agents/skills`, which is what they read; the `~/.grok/GROK.md` written beside it is for the unrelated community CLI that shares that directory. Cursor has no user-level instructions file, so it gets the shared skill in `~/.agents/skills` — one of the four places Cursor reads skills from — read only when something looks relevant rather than every session. Kilo Code, gajae-code, Kimchi, Command Code, Cherry Studio and Reasonix get the skill, and Kiro the skill and a steering file, from their own install target.
 
 </details>
 
 ## Privacy
 
 Indexing and search are local. The network is used only by `deja update`, `deja sync ssh`,
-the version check in `deja doctor`, `deja embed` against an endpoint you configure, and a
-once-a-day look at the latest release from an interactive command. That look sends no
+the version check in `deja doctor`, `deja embed` against an endpoint you configure (and,
+once it has built the semantic sidecar, each search, which sends the query to that
+endpoint), and a once-a-day look at the latest release from an interactive command. That look sends no
 session data; `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1` turns it off.
 
 Credentials are stripped as the index is built: cloud and provider keys, tokens and JWTs,
@@ -585,8 +588,13 @@ battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/de
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+The index is under `~/.cache/deja`, your `remember` and `promote` notes in
+`~/.local/share/deja`, and the rules, exclude list and hook launcher in
+`~/.config/deja` (or under `XDG_DATA_HOME` and `XDG_CONFIG_HOME` when set; on
+Windows the notes are in `%AppData%\deja`).
 
 </details>
 

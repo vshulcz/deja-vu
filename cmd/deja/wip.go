@@ -58,14 +58,17 @@ func runWIP(dir string, args []string, stdout io.Writer) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(wipJSON{
 			SchemaVersion: jsonout.Version,
-			Session:       s.ID,
-			Harness:       s.Harness,
-			Asked:         r.Asked,
-			Decision:      r.Decision,
-			Files:         r.Files,
-			Command:       r.Command,
-			Failed:        r.Failed,
-			Lines:         r.Lines(),
+			// Filtered the way search and show filter what a transcript
+			// supplied: the encoder escapes control bytes but passes the bidi
+			// overrides and the invisible tag block (#3616).
+			Session:  search.SafeLine(s.ID),
+			Harness:  s.Harness,
+			Asked:    search.SafeText(r.Asked),
+			Decision: search.SafeText(r.Decision),
+			Files:    safePaths(r.Files),
+			Command:  search.SafeCommand(index.BareCommand(r.Command)),
+			Failed:   r.Failed,
+			Lines:    search.SafeStrings(r.Lines()),
 		})
 	}
 	if !ok {
@@ -188,6 +191,17 @@ func wipFacts(r digest.Resume) int {
 // project. A handful: the answer is the newest, and reading further only costs
 // the reader time.
 const wipScan = 25
+
+func safePaths(in []string) []string {
+	if len(in) == 0 {
+		return in
+	}
+	out := make([]string, len(in))
+	for i, p := range in {
+		out[i] = search.SafePath(p)
+	}
+	return out
+}
 
 // safeWIPLine is what reaches a terminal: the text came out of a transcript,
 // so an escape byte in it would reach the screen.

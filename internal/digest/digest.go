@@ -500,11 +500,7 @@ func UTF8SafeCut(s string, n int) string {
 }
 
 func ProjectNameCandidates(cwd string) []string {
-	// A WorkBuddy chat folder is named for the workspace root it sits in,
-	// as the session recorded there is (#4735).
-	if root, ok := sources.ChatWorkspaceRoot(cwd); ok {
-		cwd = root
-	}
+	cwd = projectRoot(cwd)
 	names := []string{sources.ClaudeProjectName(cwd)}
 	add := func(name string) {
 		for _, n := range names {
@@ -531,6 +527,22 @@ func ProjectNameCandidates(cwd string) []string {
 		}
 	}
 	return names
+}
+
+// PrimaryProjectName is the first of ProjectNameCandidates, the one a caller
+// keys on, without listing the worktrees that only add names after it.
+func PrimaryProjectName(cwd string) string {
+	return sources.ClaudeProjectName(projectRoot(cwd))
+}
+
+// projectRoot is where the names are taken from: a WorkBuddy chat folder is
+// named for the workspace root it sits in, as the session recorded there is
+// (#4735).
+func projectRoot(cwd string) string {
+	if root, ok := sources.ChatWorkspaceRoot(cwd); ok {
+		return root
+	}
+	return cwd
 }
 
 // worktreeListBudget is how long the root lookup may take before it gives up.

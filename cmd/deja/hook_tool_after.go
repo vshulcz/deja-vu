@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -447,8 +449,12 @@ func fixPairLine(dir, cwd, output string) string {
 	// 2 of 67 from another project addressed the error and 59 had nothing to
 	// do with it, against 109 of 324 from the project itself. A pair with no
 	// project is a machine fact and stays.
+	// The project's names are asked for once, and only if a pair needs them:
+	// each ask runs `git worktree list`, and the filter runs per candidate.
+	names := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
+	here := func(project string) bool { return project != "" && namesInclude(names(), project) }
 	others := func(project string) bool {
-		return cwd != "" && project != "" && !hookProjectIs(cwd, project)
+		return cwd != "" && project != "" && !here(project)
 	}
 	// A few, not one: the newest pair for an error can be a remedy that failed,
 	// and silence is the wrong answer when the one behind it worked.
@@ -464,7 +470,7 @@ func fixPairLine(dir, cwd, output string) string {
 	// checkout is missing in all of them, and the command that worked without
 	// it was learned wherever the agent happened to be.
 	elsewhere := index.FixesFor(dir, output, 4, func(project string) bool {
-		return pol.Allows(policy.ActivationAuto, project) && project != "" && !hookProjectIs(cwd, project)
+		return pol.Allows(policy.ActivationAuto, project) && project != "" && !here(project)
 	})
 	for _, p := range elsewhere {
 		if !p.MachineFact() {

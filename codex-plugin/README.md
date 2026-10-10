@@ -3,7 +3,7 @@
 The plugin bundle Codex installs from this repository's marketplace:
 
 ```sh
-codex plugin marketplace add vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
+codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
 ```
 
 It carries deja's MCP server, the `deja-history` skill and five hooks:

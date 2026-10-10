@@ -2,6 +2,7 @@ package index
 
 import (
 	"hash/fnv"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
@@ -686,9 +687,22 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		want[c.hash] = ""
 	}
 	var out []Friction
-	for _, c := range cs {
+	rd := newFrictionReader(dir, m)
+	for i, c := range cs {
 		if want[c.hash] == "" {
-			frictionTexts(dir, m, c.metas, want, c.hash)
+			// The walls after this one that are still unread, newest carrier
+			// first: what the next calls will most likely read, so one pass
+			// over the log can serve them too.
+			rd.ahead = rd.ahead[:0]
+			for _, next := range cs[i+1:] {
+				if n > 0 && len(rd.ahead) >= n-len(out)-1 {
+					break
+				}
+				if want[next.hash] == "" {
+					rd.ahead = append(rd.ahead, next.metas[0])
+				}
+			}
+			frictionTexts(rd, c.metas, want, c.hash)
 		}
 		if want[c.hash] == "" {
 			continue
@@ -715,17 +729,14 @@ func newestOf(ms []SessionMeta) time.Time {
 // sessions that carry one of them, filling in every hash a session yields —
 // one session usually carries several walls, and reading it once per wall was
 // the difference between one lookup and N.
-func frictionTexts(dir string, m Manifest, metas []SessionMeta, want map[uint64]string, target uint64) {
+func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]string, target uint64) {
 	for _, meta := range metas {
-		s, ok, err := loadSessionMeta(dir, m, meta)
-		if err != nil || !ok {
+		outputs, ok := rd.toolOutput(meta)
+		if !ok {
 			continue
 		}
-		for _, msg := range s.Messages {
-			if msg.Role != roleToolOutput {
-				continue
-			}
-			for _, line := range strings.Split(msg.Text, "\n") {
+		for _, text := range outputs {
+			for _, line := range strings.Split(text, "\n") {
 				line, ok := FrictionLine(line)
 				if !ok {
 					continue
@@ -742,6 +753,76 @@ func frictionTexts(dir string, m Manifest, metas []SessionMeta, want map[uint64]
 			return
 		}
 	}
+}
+
+// frictionReadBatch is how many sessions one pass over the record log reads
+// for frictionTexts. Each pass walks the whole log, and a session start read it
+// once per wall: six passes over 200 MB on a real store, most of the
+// environment block's time.
+const frictionReadBatch = 8
+
+// frictionReader hands frictionTexts the tool output of a session. A session
+// it has not read yet is read together with the ones in ahead, so the walls a
+// ranking walks next share the pass. Only tool-output records are decoded: the
+// rest of a session is skipped by its prefix.
+type frictionReader struct {
+	dir   string
+	m     Manifest
+	ahead []SessionMeta
+	read  map[string][]string
+}
+
+func newFrictionReader(dir string, m Manifest) *frictionReader {
+	return &frictionReader{dir: dir, m: m, read: map[string][]string{}}
+}
+
+func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
+	key := meta.Harness + ":" + meta.ID
+	if out, ok := rd.read[key]; ok {
+		return out, true
+	}
+	// A promoted note is reordered on load, so it keeps the one-session path.
+	if meta.Harness == "deja" {
+		return rd.loadOne(meta)
+	}
+	keys := map[string]bool{key: true}
+	for _, next := range rd.ahead {
+		if len(keys) >= frictionReadBatch {
+			break
+		}
+		k := next.Harness + ":" + next.ID
+		if _, done := rd.read[k]; done || next.Harness == "deja" {
+			continue
+		}
+		keys[k] = true
+	}
+	got := make(map[string][]string, len(keys))
+	err := eachRecordForKeysInRoles(filepath.Join(rd.dir, "records.bin"), tablesFromManifest(rd.m), keys,
+		map[string]bool{roleToolOutput: true}, func(r Record) {
+			got[r.Key] = append(got[r.Key], r.Text)
+		})
+	if err != nil {
+		// What one session's read would have said, session by session.
+		return rd.loadOne(meta)
+	}
+	for k := range keys {
+		rd.read[k] = got[k]
+	}
+	return rd.read[key], true
+}
+
+func (rd *frictionReader) loadOne(meta SessionMeta) ([]string, bool) {
+	s, ok, err := loadSessionMeta(rd.dir, rd.m, meta)
+	if err != nil || !ok {
+		return nil, false
+	}
+	var out []string
+	for _, msg := range s.Messages {
+		if msg.Role == roleToolOutput {
+			out = append(out, msg.Text)
+		}
+	}
+	return out, true
 }
 
 // goTestFailure matches the line `go test` prints for a failing test, with the

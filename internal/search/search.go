@@ -1380,17 +1380,27 @@ const jsonHitMessages = 20
 // unexported and a future one might not — keeps the newest messages, where a
 // session says what it settled.
 func boundedHit(h Hit) Hit {
-	total := len(h.Session.Messages)
-	if total == 0 {
-		return h
-	}
-	h.MessagesTotal = total
-	kept, capped := boundedMessages(h.Session.Messages, h.matched)
-	if len(kept) != total {
-		h.Session.Messages = kept
-		h.MessagesCapped = capped
+	var total int
+	h.Session.Messages, total = boundedSelection(h.Session, h.matched)
+	if total > 0 {
+		h.MessagesTotal, h.MessagesCapped = total, true
 	}
 	return h
+}
+
+// boundedSelection is a session's messages bounded to the matched passages,
+// and the session's whole count when what is kept is a selection of it; zero
+// when the whole session fits.
+func boundedSelection(s model.Session, matched []int) ([]model.Message, int) {
+	if len(s.Messages) == 0 {
+		return s.Messages, 0
+	}
+	whole := max(len(s.Messages), s.Held)
+	kept, _ := boundedMessages(s.Messages, matched)
+	if len(kept) < whole {
+		return kept, whole
+	}
+	return kept, 0
 }
 
 // boundedMessages keeps the messages at the given indices, in message order,

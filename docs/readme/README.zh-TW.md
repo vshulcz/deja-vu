@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+腳本把執行檔放在 `~/.local/bin`。如果這個目錄還不在 `PATH` 裡，同一個 shell 找不到第二條指令：執行腳本印出的 `next:` 那一行（帶完整路徑），或是在加上 `PATH` 那一行之後開一個新的 shell。
+
 連不上 `raw.githubusercontent.com` 時走 npm 鏡像，版本是同一個：
 
 ```sh
@@ -106,7 +108,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 - 搜尋框也認篩選詞：帶冒號的代理名（`codex:`）、`today`、`yesterday`、`week`、`month`，以及 `in:<專案>`。
 - `r` 在寫下這個會話的代理裡恢復它。`o` 在任意其他代理裡接著做，新代理一開始就帶著這個會話問過什麼、定下了什麼、還有什麼沒解決。
 - `tab` 在本專案、所有專案和 Deleted 之間切換；Deleted 是代理已經刪掉、deja 仍然保留的會話，`R` 把其中一個放回原處。
-- `?` 列出所有按鍵，其餘操作在 `^k` 裡（複製會話 id 或專案路徑、忘掉一個會話），`q` 離開。
+- `?` 列出所有按鍵，其餘操作在 `^k` 裡（複製會話 id 或專案路徑、忘掉一個會話），在列表裡 `q` 離開。
 
 設定 `DEJA_TUI=0` 時改為印出文字摘要，也就是 `deja brief` 的輸出。輸出到管線時，它印出已經索引了什麼、下一步該執行哪條指令。
 
@@ -353,7 +355,7 @@ Claude Code 會刪除 30 天以前的記錄（`~/.claude/settings.json` 裡的 `
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

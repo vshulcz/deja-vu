@@ -45,6 +45,40 @@ type ForgetResult struct {
 	// "it is gone everywhere" (#788).
 	Peers    []string
 	Exported bool
+	// Copies are sessions left alone that open with a copy of a matched one's
+	// turns: a fork, or the source a forgotten fork copied. Claude Code writes
+	// the copied lines under the fork's own id, so the text forgotten here is
+	// still in them. Named rather than taken, since the fork's own work would
+	// go with it.
+	Copies []string
+}
+
+// copiesOf is the sessions outside matched that open on a matched session's
+// first turn, or that a harness marked as its fork.
+func copiesOf(m Manifest, matched map[string]bool) []string {
+	openings := map[uint64]bool{}
+	ids := map[string]bool{}
+	for key := range matched {
+		meta, ok := m.Sessions[key]
+		if !ok {
+			continue
+		}
+		ids[meta.ID] = true
+		if meta.Opening != 0 {
+			openings[meta.Opening] = true
+		}
+	}
+	var out []string
+	for key, meta := range m.Sessions {
+		if matched[key] {
+			continue
+		}
+		if (meta.Opening != 0 && openings[meta.Opening]) || (meta.Kind == "fork" && ids[meta.Parent]) {
+			out = append(out, key)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // pushedTo reports where records from the matched sessions have already gone.
@@ -486,6 +520,7 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	}
 	sort.Strings(result.Keys)
 	result.Peers, result.Exported = pushedTo(m, matched)
+	result.Copies = copiesOf(m, matched)
 	// Count the messages on the dry run too. It is the same single pass over
 	// records, and without it `--dry-run` answers "0 messages" to the only
 	// question it exists to answer: how much am I about to lose.

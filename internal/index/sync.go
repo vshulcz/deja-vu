@@ -1040,6 +1040,29 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	// walks every manifest entry, so importing n sessions cost O(n²) and a
 	// 100k batch took 306s against 1.9s for forgetting the same 100k (#1024).
 	nextOrd := nextSessionOrd(m.Sessions)
+	// A session whose first command arrives in this batch: how it settled can
+	// come from what it said in an earlier batch, which this one does not
+	// carry. Read once for all of them.
+	firstRun := map[string]bool{}
+	for _, key := range keys {
+		if old := m.Sessions[key]; old.ID != "" && !old.RanCommand {
+			for _, r := range recsByKey[key] {
+				if r.Role == roleCommand {
+					firstRun[key] = true
+					break
+				}
+			}
+		}
+	}
+	earlier := map[string][]model.Message{}
+	if len(firstRun) > 0 {
+		if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
+			earlier[r.Key] = append(earlier[r.Key], model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}); err != nil {
+			_ = rw.Close()
+			return err
+		}
+	}
 	for _, key := range keys {
 		meta := metas[key]
 		// The derived fields are folded the way local ingest folds an append,
@@ -1068,6 +1091,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = old.Counted, old.Words, old.LastMsg, old.Opening
 			meta.Asked, meta.Hit, meta.GaveUp, meta.NoText = old.Asked, old.Hit, old.GaveUp, old.NoText
 			meta.Touched, meta.TouchHits, meta.Settled, meta.RanCommand = old.Touched, old.TouchHits, old.Settled, old.RanCommand
+			// The title is derived from this batch alone, and the turn that
+			// named the row came in an earlier one.
+			if titleRankOfRow(old.Title, old.AgentTitle) >= titleRankOfRow(meta.Title, meta.AgentTitle) {
+				meta.Title, meta.AgentTitle = old.Title, old.AgentTitle
+			}
 		} else {
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = 0, 0, 0, 0
 			meta.Asked, meta.Hit, meta.GaveUp = nil, nil, false
@@ -1077,8 +1105,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			nextOrd++
 		}
 		extendDerived(&meta, ms)
-		if settled := sessionSettled(batch); settled != "" {
-			meta.Settled = settled
+		if firstRun[key] {
+			meta.Settled = sessionSettled(model.Session{Harness: meta.Harness, Messages: append(earlier[key], ms...)})
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {

@@ -56,6 +56,11 @@ type Session struct {
 	// fills it from what it counted at build time, and it is zero for a store
 	// indexed before it existed.
 	Words int `json:"words,omitempty"`
+	// Held is how many messages the session holds when Messages carries only
+	// some of them: a search that reads the matching records alone hands over
+	// a part, and a count taken from that part says the session is as short
+	// as its matches. Zero when Messages is the whole session.
+	Held int `json:"-"`
 	// Touched lists the few files this session worked on most. Parsers do not
 	// set it; the index fills it from what it stored, so a caller holding a
 	// search result can ask a cheap question about those files without reading

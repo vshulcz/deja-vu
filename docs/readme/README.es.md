@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+El script deja el binario en `~/.local/bin`. Si ese directorio todavía no está en tu `PATH`, la misma shell no encuentra el segundo comando: ejecuta la línea `next:` que imprime el script, con la ruta completa, o abre una shell nueva cuando la línea de `PATH` ya esté añadida.
+
 Si `raw.githubusercontent.com` no está accesible, hay un espejo en npm con la misma versión:
 
 ```sh
@@ -110,7 +112,7 @@ mientras escribes.
 - La caja acepta filtros: un agente con dos puntos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<proyecto>`.
 - `r` reanuda la sesión en el agente que la escribió. `o` la continúa en cualquier otro agente, que empieza con lo que la sesión preguntó, decidió y dejó pendiente.
 - `tab` cambia entre este proyecto, todos los proyectos y Deleted, las sesiones que su agente borró y que deja aún guarda; `R` devuelve una a su sitio.
-- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), `q` sale.
+- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), en la lista, `q` sale.
 
 Con `DEJA_TUI=0` imprime en su lugar el resumen en texto, que también es `deja brief`. Por una tubería,
 imprime qué está indexado y qué comando ejecutar a continuación.
@@ -391,7 +393,7 @@ Los detalles están en
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

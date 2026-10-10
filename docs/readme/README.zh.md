@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+脚本把二进制放在 `~/.local/bin`。如果这个目录还不在 `PATH` 里，同一个 shell 找不到第二条命令：运行脚本打印的 `next:` 那一行（带完整路径），或者在加上 `PATH` 那一行之后开一个新 shell。
+
 连不上 `raw.githubusercontent.com` 时走 npm 镜像，版本是同一个：
 
 ```sh
@@ -106,7 +108,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 - 搜索框也认筛选词：带冒号的智能体名（`codex:`）、`today`、`yesterday`、`week`、`month`，以及 `in:<项目>`。
 - `r` 在写下这个会话的智能体里恢复它。`o` 在任意其他智能体里接着做，新智能体一开始就带着这个会话问过什么、定下了什么、还有什么没解决。
 - `tab` 在本项目、所有项目和 Deleted 之间切换；Deleted 是智能体已经删掉、deja 仍然保留的会话，`R` 把其中一个放回原处。
-- `?` 列出所有按键，其余操作在 `^k` 里（复制会话 id 或项目路径、忘掉一个会话），`q` 退出。
+- `?` 列出所有按键，其余操作在 `^k` 里（复制会话 id 或项目路径、忘掉一个会话），在列表里 `q` 退出。
 
 设置 `DEJA_TUI=0` 时改为打印文本摘要，也就是 `deja brief` 的输出。输出到管道时，它打印已经索引了什么、下一步该运行哪条命令。
 
@@ -349,7 +351,7 @@ Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

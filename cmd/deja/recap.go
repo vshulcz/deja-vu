@@ -100,7 +100,7 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 		out := recapJSON{
 			Kind: recapJSONKind, Schema: jsonout.Version, Since: sinceText,
 			Considered: r.Considered, Spoke: r.Spoke, Read: r.Read, Projects: r.Projects,
-			Sessions: r.Sessions, Masked: r.Masked, Withheld: r.Withheld,
+			Sessions: safeRecapSessions(r.Sessions), Masked: r.Masked, Withheld: r.Withheld,
 		}
 		if out.Projects == nil {
 			out.Projects = []string{}
@@ -118,6 +118,20 @@ func runRecap(dir string, args []string, stdout io.Writer) error {
 	}
 	printRecap(stdout, r, sinceText, limit, newestSessionNote(dir, "recap", since))
 	return nil
+}
+
+// safeRecapSessions filters what a transcript supplied the way search and
+// show filter it: the encoder escapes control bytes, not the bidi overrides
+// or the invisible tag block (#3616).
+func safeRecapSessions(in []index.RecapSession) []index.RecapSession {
+	out := make([]index.RecapSession, len(in))
+	for i, s := range in {
+		s.Project = search.SafeLine(s.Project)
+		s.Title = search.SafeText(s.Title)
+		s.Lines = search.SafeStrings(s.Lines)
+		out[i] = s
+	}
+	return out
 }
 
 // printRecap writes the recap screen. older is what newestSessionNote says

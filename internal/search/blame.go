@@ -603,15 +603,10 @@ func sessionTitle(s model.Session) string {
 // boundedBlameHit is boundedHit for a blame answer: the messages that mention
 // the file, bounded, with the session's real count beside them.
 func boundedBlameHit(h BlameHit) BlameHit {
-	total := len(h.Session.Messages)
-	if total == 0 {
-		return h
-	}
-	h.MessagesTotal = total
-	kept, capped := boundedMessages(h.Session.Messages, h.matched)
-	if len(kept) != total {
-		h.Session.Messages = kept
-		h.MessagesCapped = capped
+	var total int
+	h.Session.Messages, total = boundedSelection(h.Session, h.matched)
+	if total > 0 {
+		h.MessagesTotal, h.MessagesCapped = total, true
 	}
 	return h
 }

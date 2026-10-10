@@ -1602,14 +1602,15 @@ func dropOwnBackup(path string) {
 	}
 }
 
-// holdsForeignDejaEntry reports whether a JSON snapshot keeps an entry named
-// "deja" that runs some other program. Its name is the marker mentionsDeja
-// goes by, and install replaces such an entry with deja's own, so the snapshot
-// is the only copy of it left.
+// holdsForeignDejaEntry reports whether a snapshot keeps an entry named "deja"
+// that runs some other program. Its name is the marker mentionsDeja goes by,
+// and install replaces such an entry with deja's own, so the snapshot is the
+// only copy of it left. A TOML snapshot (codex, grok, trae) carries it as
+// [mcp_servers.deja].
 func holdsForeignDejaEntry(b []byte) bool {
 	v, ok := decodeJSONCExact(bytes.TrimPrefix(b, utf8BOM))
 	if !ok {
-		return false
+		return holdsForeignTOMLDejaEntry(lfText(b))
 	}
 	var walk func(any) bool
 	walk = func(v any) bool {
@@ -1648,6 +1649,37 @@ func foreignEntry(e map[string]any) bool {
 	words, _ := e["command"].([]any)
 	args, _ := e["args"].([]any)
 	return !commandListRunsMCP(append(append([]any{}, words...), args...))
+}
+
+// holdsForeignTOMLDejaEntry is foreignEntry for a [mcp_servers.deja] table.
+func holdsForeignTOMLDejaEntry(s string) bool {
+	lines := strings.Split(s, "\n")
+	for _, b := range tomlMCPBlocks(s) {
+		if b.key != "deja" || tomlBlockRunsDeja(lines, b) {
+			continue
+		}
+		command, url, mcp := false, false, false
+		for i := b.start + 1; i < b.end; i++ {
+			key, value, ok := tomlLineKeyValue(lines[i])
+			if !ok {
+				continue
+			}
+			switch key {
+			case "url":
+				url = true
+			case "command", "args":
+				command = command || key == "command"
+				value, i = tomlArrayValue(lines, i, b.end, value)
+				for _, w := range tomlStringValues(value) {
+					mcp = mcp || w == "mcp"
+				}
+			}
+		}
+		if (url && !command) || (command && !mcp) {
+			return true
+		}
+	}
+	return false
 }
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.

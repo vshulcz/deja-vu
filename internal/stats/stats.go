@@ -47,18 +47,19 @@ type Report struct {
 	// RecallMachineWide marks the recall figures as the whole machine's under
 	// a filter: the recall log does not record projects, so --project cannot
 	// narrow them, and the screen has to say so.
-	RecallMachineWide bool           `json:"-"`
-	Sparkline         string         `json:"sparkline"`
-	DateRange         DateRangeStats `json:"date_range"`
-	Longest           SessionStat    `json:"longest_session"`
-	BusiestDay        DayStat        `json:"busiest_day"`
-	Recall            usage.Summary  `json:"recall"`
-	WeekRecalls       int            `json:"week_recalls"`
-	WeekBytes         int            `json:"week_bytes"`
-	WeekInjected      int            `json:"week_injected"`
-	HandoffsIn        int            `json:"handoffs_received"`
-	AgentCredits      int            `json:"agent_credits"`
-	WeekCredits       int            `json:"week_agent_credits"`
+	RecallMachineWide bool   `json:"-"`
+	Sparkline         string `json:"sparkline"`
+	// Omitted on an empty store rather than written as hollow objects.
+	DateRange    DateRangeStats `json:"date_range,omitzero"`
+	Longest      SessionStat    `json:"longest_session,omitzero"`
+	BusiestDay   DayStat        `json:"busiest_day,omitzero"`
+	Recall       usage.Summary  `json:"recall"`
+	WeekRecalls  int            `json:"week_recalls"`
+	WeekBytes    int            `json:"week_bytes"`
+	WeekInjected int            `json:"week_injected"`
+	HandoffsIn   int            `json:"handoffs_received"`
+	AgentCredits int            `json:"agent_credits"`
+	WeekCredits  int            `json:"week_agent_credits"`
 	// UsedNotCredited is the other half of the 2% (#3079): a reply that names
 	// a recalled session and does not say the line. An upper bound — see
 	// UsedNotCredited.

@@ -19,11 +19,7 @@ import (
 // exports its own once per process, so a second payload in that process would
 // be keyed to the first one's project (#2182).
 func hookProjectKey(fromPayload string) string {
-	cands := digest.ProjectNameCandidates(hookCWD(fromPayload))
-	if len(cands) == 0 {
-		return ""
-	}
-	return sessionStartKeyPrefix + cands[0]
+	return sessionStartKeyPrefix + digest.PrimaryProjectName(hookCWD(fromPayload))
 }
 
 // sessionStartKeyPrefix separates what a session start was told from what a

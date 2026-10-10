@@ -18,13 +18,15 @@ import (
 // marker. What deja can say is that a session in a project on a date pasted
 // something of a recognisable shape, and which file still holds it.
 type SecretFinding struct {
-	Kind    string    `json:"kind"`
-	Harness string    `json:"harness"`
-	ID      string    `json:"id"`
-	Project string    `json:"project,omitempty"`
-	Path    string    `json:"path,omitempty"`
-	When    time.Time `json:"when"`
-	Count   int       `json:"count"`
+	Kind    string `json:"kind"`
+	Harness string `json:"harness"`
+	ID      string `json:"id"`
+	Project string `json:"project,omitempty"`
+	Path    string `json:"path,omitempty"`
+	// Omitted for an undated session: the zero time reads as a date in the
+	// year one.
+	When  time.Time `json:"when,omitzero"`
+	Count int       `json:"count"`
 }
 
 // databaseStorePath reports whether a session's path is a database holding

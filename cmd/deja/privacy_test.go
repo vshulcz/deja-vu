@@ -109,6 +109,26 @@ func TestRedactionReportRendersRulesAndSidecar(t *testing.T) {
 	}
 }
 
+// DEJA_STORES narrows sources the way it narrows index and doctor: a store left
+// out has no row and is not opened.
+func TestSourcesHonoursStoresSelection(t *testing.T) {
+	withTempStores(t)
+	t.Setenv("DEJA_STORES", "claude")
+	out, err := captureRun(t, "sources")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if name, _, ok := strings.Cut(line, "\t"); ok {
+			names = append(names, name)
+		}
+	}
+	if len(names) != 1 || names[0] != "claude" {
+		t.Fatalf("DEJA_STORES=claude listed %v:\n%s", names, out)
+	}
+}
+
 func TestSourcesReportsActiveExclusions(t *testing.T) {
 	withTempStores(t)
 	t.Setenv("DEJA_EXCLUDE_PROJECTS", "project")

@@ -3310,6 +3310,11 @@ func runBlame(dir string, args []string) error {
 		lineBlame(os.Stdout, dir, target, hits)
 	}
 	if jsonOutput {
+		// The session object search returns, source and all: a consumer
+		// telling local sessions from imported ones reads it on both.
+		for i := range hits {
+			hits[i].Session.SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
+		}
 		search.PrintBlame(os.Stdout, hits, true)
 		return nil
 	}
@@ -3739,6 +3744,11 @@ func printSourcesTo(w io.Writer, dir string) {
 	}
 	skipStore := sources.ExcludedHarnesses()
 	for _, it := range items {
+		// A store DEJA_STORES leaves out has no row, as in doctor: it is not
+		// read, so it has no count to report.
+		if sources.StoreSilenced(it.name) {
+			continue
+		}
 		// A store the reader excluded is named and not read. Walking it here
 		// reported three sessions and eighteen messages for a harness deja had
 		// just been told never to open, which is the opposite of what this
@@ -3799,6 +3809,9 @@ func printSourcesTo(w io.Writer, dir string) {
 	// one of them, and an excluded opencode kept being opened and kept printing
 	// the sqlite3 error the exclusion exists to silence.
 	excludedRow := func(name, location string) bool {
+		if sources.StoreSilenced(name) {
+			return true
+		}
 		if !skipStore[name] {
 			return false
 		}
@@ -4221,6 +4234,9 @@ func runForget(dir string, args []string) error {
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
 		}
+		if line := forgetCopiesLine(result.Copies); line != "" {
+			fmt.Fprintln(os.Stdout, line)
+		}
 		if n := usage.CountSnapshots(dir, forgetDigestMatcher(o, result.Keys)); n > 0 {
 			fmt.Fprintf(os.Stdout, "would remove: %d stored digest(s) from the injection log\n", n)
 		}
@@ -4350,6 +4366,9 @@ func runForget(dir string, args []string) error {
 	} else if result.Exported {
 		fmt.Fprintln(os.Stdout, "already exported once — forgetting here does not remove copies elsewhere")
 	}
+	if line := forgetCopiesLine(result.Copies); line != "" {
+		fmt.Fprintln(os.Stdout, line)
+	}
 	// The notes are decisions the reader deliberately kept, so folding them
 	// into the session count reads as "four conversations" when half of it is
 	// their own writing (#690).
@@ -4362,6 +4381,25 @@ func runForget(dir string, args []string) error {
 		fmt.Fprintln(os.Stdout, line)
 	}
 	return nil
+}
+
+// forgetCopiesLine names the sessions that still hold a copy of what was
+// forgotten: a fork opens with its source's turns under its own id. Named, not
+// taken: forgetting a fork whole drops the work it did after the copy.
+func forgetCopiesLine(keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	verb, cmd := "hold", "`deja forget --session <id>` drops each, with its own work"
+	if len(keys) == 1 {
+		id := keys[0]
+		if _, rest, ok := strings.Cut(id, ":"); ok {
+			id = rest
+		}
+		verb, cmd = "holds", "`deja forget --session "+id+"` drops it too, with its own work"
+	}
+	return fmt.Sprintf("%s still %s a copy of these turns (a fork or its source): %s — %s",
+		countNoun(len(keys), "other session"), verb, safeForStatusline(joinCapped(keys, 5), 400), cmd)
 }
 
 // verbShare keeps "1 session share" off the screen.

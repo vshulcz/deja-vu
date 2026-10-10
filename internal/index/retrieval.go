@@ -887,13 +887,10 @@ func bridgedRetry(dir string, m Manifest, projects, terms []string, n int, skip 
 		return nil, nil, nil, nil, false
 	}
 	inProject := map[uint32]bool{}
-	for key, meta := range m.Sessions {
-		_ = key
-		for _, want := range projects {
-			if projectInScope(meta.Project, want) {
-				inProject[meta.Ord] = true
-				break
-			}
+	scope := newProjectScope(projects...)
+	for _, meta := range m.Sessions {
+		if scope.has(meta.Project) {
+			inProject[meta.Ord] = true
 		}
 	}
 	have := make(map[string]bool, len(terms))
@@ -1102,7 +1099,48 @@ func projectInScope(project, want string) bool {
 	if want == "" {
 		return false
 	}
-	p, w := strings.ToLower(project), strings.ToLower(want)
+	return lowerInScope(strings.ToLower(project), strings.ToLower(want))
+}
+
+// projectScope is projectInScope for a walk over the whole manifest: the
+// candidates are lowered once, and the answer is kept per project name, since
+// a store holds tens of thousands of sessions under a few hundred names. The
+// per-call lowering and concatenation was a third of the per-prompt hook's
+// ranking time on a 19k-session store.
+type projectScope struct {
+	wants []string
+	memo  map[string]bool
+}
+
+func newProjectScope(wants ...string) *projectScope {
+	s := &projectScope{memo: map[string]bool{}}
+	for _, w := range wants {
+		if w != "" {
+			s.wants = append(s.wants, strings.ToLower(w))
+		}
+	}
+	return s
+}
+
+// has reports whether project is in scope for any of the candidates.
+func (s *projectScope) has(project string) bool {
+	if v, ok := s.memo[project]; ok {
+		return v
+	}
+	p := strings.ToLower(project)
+	v := false
+	for _, w := range s.wants {
+		if lowerInScope(p, w) {
+			v = true
+			break
+		}
+	}
+	s.memo[project] = v
+	return v
+}
+
+// lowerInScope is the rule of projectInScope on names already lowered.
+func lowerInScope(p, w string) bool {
 	imported := false
 	if rest, ok := strings.CutPrefix(p, "imported:"); ok {
 		// A synced session carries the peer's prefix and is otherwise the same
@@ -1131,7 +1169,14 @@ func projectInScope(project, want string) bool {
 	// windows return nothing — the substring rule this replaced happened not to
 	// care which separator it was, and taking the loose rule out took the
 	// platform's separator with it.
-	return strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
+	return endsWithSegment(p, w)
+}
+
+// endsWithSegment is strings.HasSuffix(p, "/"+w) || strings.HasSuffix(p, `\`+w)
+// without building either string.
+func endsWithSegment(p, w string) bool {
+	n := len(p) - len(w) - 1
+	return n >= 0 && (p[n] == '/' || p[n] == '\\') && p[n+1:] == w
 }
 
 // ProjectInScopeStrict is ProjectInScope without the allowance synced work
@@ -1183,6 +1228,7 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 	// the same self-heal the exact tier already does.
 	var readErr error
 	inProject := map[uint32]SessionMeta{}
+	scope := newProjectScope(projects...)
 	for _, meta := range m.Sessions {
 		if keep != nil && !keep(meta) {
 			continue
@@ -1191,11 +1237,8 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			inProject[meta.Ord] = meta
 			continue
 		}
-		for _, want := range projects {
-			if projectInScope(meta.Project, want) {
-				inProject[meta.Ord] = meta
-				break
-			}
+		if scope.has(meta.Project) {
+			inProject[meta.Ord] = meta
 		}
 	}
 	if len(inProject) == 0 {
@@ -1968,8 +2011,9 @@ func RecentInProject(dir, project string, n int) ([]model.Session, error) {
 	// helper's answer would drop this project's sessions whenever another
 	// project's newer ones filled it.
 	var metas []SessionMeta
+	scope := newProjectScope(project)
 	for _, meta := range m.Sessions {
-		if projectInScope(meta.Project, project) {
+		if scope.has(meta.Project) {
 			metas = append(metas, meta)
 		}
 	}
@@ -2189,7 +2233,10 @@ func IgnoredMatching(dir string, o query.Options) int {
 // of a project left `handoff` and the session-start block with nothing while
 // three real ones sat below the cut (#2541).
 func metasNotIgnored(metas []SessionMeta) []SessionMeta {
-	pol := policy.Load()
+	return metasNotIgnoredBy(policy.Load(), metas)
+}
+
+func metasNotIgnoredBy(pol policy.Policy, metas []SessionMeta) []SessionMeta {
 	out := metas[:0:0]
 	for _, meta := range metas {
 		if pol.Ignored(meta.Path, meta.Project) {
@@ -2294,18 +2341,35 @@ func RecentProjectMetasUnder(dir string, projects []string, root string, since t
 func recentProjectMetas(m Manifest, projects []string, root string, perName int) []SessionMeta {
 	seen := map[string]bool{}
 	var metas []SessionMeta
+	// Grouped by project once: a repository with many worktrees hands in a
+	// name for each, and walking the whole manifest per name was hundreds of
+	// passes over every session on the session-start hook.
+	byProject := map[string][]SessionMeta{}
+	if len(projects) > 0 {
+		for _, meta := range m.Sessions {
+			byProject[meta.Project] = append(byProject[meta.Project], meta)
+		}
+	}
+	lowered := make(map[string]string, len(byProject))
+	for name := range byProject {
+		lowered[name] = strings.ToLower(name)
+	}
+	pol := policy.Load()
 	for _, project := range projects {
 		project = strings.ToLower(project)
+		if project == "" {
+			continue
+		}
 		var mine []SessionMeta
-		for _, meta := range m.Sessions {
+		for name, group := range byProject {
 			// The same scope rule the ranked path uses. A substring test here
 			// put a client's acme/api into a session start in /work/api,
 			// injected under "sessions from this project" (#2333).
-			if projectInScope(meta.Project, project) {
-				mine = append(mine, meta)
+			if lowerInScope(lowered[name], project) {
+				mine = append(mine, group...)
 			}
 		}
-		mine = metasNotIgnored(mine)
+		mine = metasNotIgnoredBy(pol, mine)
 		sort.Slice(mine, func(i, j int) bool { return newestFirstMeta(mine[i], mine[j]) })
 		if perName > 0 && len(mine) > perName {
 			mine = mine[:perName]
@@ -2447,10 +2511,19 @@ func FindByPrefixIn(dir, p, harness string) (model.Session, bool, error) {
 	}
 	sessions := inHarness(m.Sessions, harness)
 	var matches []SessionMeta
+	var exact []SessionMeta
 	for _, meta := range sessions {
 		if strings.HasPrefix(meta.ID, p) {
 			matches = append(matches, meta)
+			if meta.ID == p {
+				exact = append(exact, meta)
+			}
 		}
+	}
+	// A complete id is that session, even when it also starts a newer one's:
+	// "abc" opened abc2, and --json refused it with advice to type more.
+	if len(exact) > 0 {
+		matches = exact
 	}
 	// The id the session came with, before the loose pass: import rewrites the
 	// id and OrigID keeps the old one (#1049), and a reader who typed that id in
@@ -2562,10 +2635,13 @@ func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) in
 	// imported under: #853 requires the count and the resolver to agree, and a
 	// selector that opens a session while the count says zero is that failure
 	// with the sign flipped.
-	n := 0
+	n, exact := 0, 0
 	for _, meta := range sessions {
 		if allow != nil && !allow(meta.Project) {
 			continue
+		}
+		if meta.ID == p {
+			exact++
 		}
 		if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
 			n++
@@ -2574,6 +2650,11 @@ func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) in
 		if strings.HasPrefix(meta.ID, p) {
 			n++
 		}
+	}
+	// A complete id resolves to its own session (FindByPrefixIn), so only
+	// sessions with that very id make it ambiguous.
+	if exact > 0 {
+		return exact
 	}
 	if n == 0 {
 		// The remote-control id, counted where the resolver tries it (#4667).
@@ -3035,6 +3116,8 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		s := by[r.Key]
 		if s == nil {
 			cp := sessionFromMeta(meta)
+			// Only the matching records are read here.
+			cp.Held = meta.Counted
 			s = &cp
 			by[r.Key] = s
 		}
