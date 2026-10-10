@@ -138,6 +138,10 @@ func autoWirings() []autoWiring {
 var autoInClientConfig = map[string]bool{
 	"cursor": true, "qwen": true, "codebuddy": true, "workbuddy": true, "trae": true, "trae-ide": true, "muse": true, "kimi": true, "crush": true, "zcode": true, "commandcode": true, "junie": true,
 	"copilot": true, "devin": true,
+	// CodeWhale's config.toml is the reader's own, and the plain MCP targets
+	// of both write the file the row reads, so it is there with no hook of
+	// deja's in it on a machine that never asked for auto-recall.
+	"codewhale": true, "reasonix": true,
 }
 
 // autoUnwired reports whether a row's file holds no deja wiring at all: it is
@@ -281,6 +285,11 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	case a.name == "aider" && aiderWiring(err == nil) != "":
 		state = aiderWiring(err == nil)
 	case autoUnwired(a, b, err):
+		state = "missing"
+	// Roo's guidance is the skill most targets share, so the file says
+	// nothing about Roo: without deja in Roo's own server list, Roo was never
+	// wired.
+	case a.name == "roo" && !doctorJSONWired("mcpServers")(doctorFirstExisting(rooMCPSettingsPaths(), vsCodeExtensionMCPPath(sources.RooExtensionID))):
 		state = "missing"
 	case a.marker != "" && !strings.Contains(string(b), a.marker):
 		state = "stale"
