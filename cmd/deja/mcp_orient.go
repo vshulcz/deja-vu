@@ -160,12 +160,6 @@ type orientFile struct {
 	Last     time.Time
 }
 
-// orientFiles ranks what this project's sessions worked on, from the manifest
-// rather than the record log. The manifest already keeps the few files each
-// session worked on most (SessionMeta.Touched, #3605 put it there for the
-// point-of-action hook), and it is read from a cache; walking the records for
-// the same answer cost a full pass over a 125 MB log on a surface that fires at
-// every session start.
 // orientSessionCount is how many sessions the trust policy shows in scope.
 func orientSessionCount(dir string, projects []string) int {
 	metas, err := index.AllMeta(dir)
@@ -182,6 +176,12 @@ func orientSessionCount(dir string, projects []string) int {
 	return n
 }
 
+// orientFiles ranks what this project's sessions worked on, from the manifest
+// rather than the record log. The manifest already keeps the few files each
+// session worked on most (SessionMeta.Touched, #3605 put it there for the
+// point-of-action hook), and it is read from a cache; walking the records for
+// the same answer cost a full pass over a 125 MB log on a surface that fires at
+// every session start.
 func orientFiles(dir string, projects []string, cwd string) []orientFile {
 	metas, err := index.AllMeta(dir)
 	if err != nil {
