@@ -585,7 +585,10 @@ func relevanceSearch(dir string, m Manifest, o query.Options) (SearchResult, err
 	}
 	keep = append(keep, weak...)
 	ss, err := sessionsAtOffsets(dir, m, o, keep, rank.offsets)
-	if err == nil && (len(m.Sessions) >= bestMessageStore || rankingIsDoubtful(rank)) {
+	// A long query was ranked by its sessions, not by their best message, and
+	// re-reading the best message would put that ranking back: forced on, it
+	// takes the SWE-ContextBench R@1 above from 51.9% to 47.0%.
+	if err == nil && !isLongQuery(terms) && (len(m.Sessions) >= bestMessageStore || rankingIsDoubtful(rank)) {
 		ss = rerankByBestMessage(ss, terms, rank.idf)
 	}
 	if err != nil {
@@ -654,6 +657,33 @@ const toolMatchWeight = 0.5
 // rewordings, four of five Russian questions and eighteen pasted-preamble
 // questions with it (#3351).
 const subjectShare = 0.5
+
+// longQueryTerms is where a query stops being a question and becomes a pasted
+// document, counted in informative terms. The longest LongMemEval question has
+// 32 and the agents' recall queries a handful; a GitHub issue has a median of
+// 69. Past it, scoring is BM25-shaped: summed over the session and divided by
+// its length against the average with longQueryLengthB. On 362 SWE-ContextBench
+// tasks searching the same repo's past tasks by issue text, R@1 goes from 42.5%
+// to 51.9% and R@10 from 78.2% to 83.7% (#4925). Applied to every query
+// instead, LongMemEval hit@1 fell from 87.4% to 82.8%.
+const longQueryTerms = 40
+
+const longQueryLengthB = 0.75
+
+// isLongQuery counts the query in words: a CJK bigram is half of one, since a
+// run of n characters expands to n-1 bigrams over about n/2 words, and a
+// forty-character Chinese question is not a pasted document.
+func isLongQuery(terms []string) bool {
+	n := 0.0
+	for _, t := range terms {
+		if r := []rune(t); len(r) > 0 && cjkfold.Unspaced(r[0]) {
+			n += 0.5
+		} else {
+			n++
+		}
+	}
+	return n >= longQueryTerms
+}
 
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
@@ -1483,6 +1513,20 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	matchedTerms = coverageCounts(matchedTerms, matchedIdentifying, identifyingTerms)
+	// A query this long is a pasted document — an issue, a log, a spec — and
+	// ranking it is finding the documents most like it, so a session's score
+	// pays for its length the way BM25 does and is summed over the session
+	// rather than read off its best message.
+	long := isLongQuery(terms)
+	var sumWords, nWords float64
+	if long {
+		for _, meta := range inProject {
+			if meta.Words > 0 {
+				sumWords += float64(meta.Words)
+				nWords++
+			}
+		}
+	}
 	ranked := make([]relevanceScored, 0, len(score))
 	for ord, sc := range score {
 		if sc <= 0 {
@@ -1522,7 +1566,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 		}
 		coocc := 1 + 0.2*(best-1)
-		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		if !long {
+			sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		}
 		// Coverage: distinct informative terms beat repetition.
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
@@ -1550,6 +1596,17 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		named := 0
 		if queryBest <= 0 || bestMatched[ord] >= queryBest*subjectShare {
 			named = 1
+		}
+		if long && sumWords > 0 {
+			// A session indexed before lengths were counted is taken as
+			// average: neither paid nor charged for a length nobody knows.
+			w := float64(inProject[ord].Words)
+			if w == 0 {
+				w = sumWords / nWords
+			}
+			norm := 1 - longQueryLengthB + longQueryLengthB*w/(sumWords/nWords)
+			sc /= norm
+			focus[ord] /= norm
 		}
 		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], named, focus[ord]})
 	}
