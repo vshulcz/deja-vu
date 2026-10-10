@@ -103,7 +103,7 @@ func (r *historyRun) codexTurns(c *codexRollout) string {
 		at := c.at()
 		switch r.rng.Intn(4) {
 		case 0:
-			text := "why does the " + r.words(4) + " fail"
+			text := r.prompt(4)
 			b.WriteString(codexLine(at, "response_item", map[string]any{"type": "message", "role": "user",
 				"content": []any{map[string]any{"type": "input_text", "text": text}}}))
 			if r.rng.Intn(2) == 0 {
@@ -147,7 +147,12 @@ func (r *historyRun) codexStep() {
 	case 0:
 		r.next++
 		c = &codexRollout{id: fmt.Sprintf("cx%d", r.next), day: 1 + r.rng.Intn(20)}
-		body := codexLine(c.at(), "session_meta", map[string]any{"id": c.id, "cwd": "/w/" + historyProjects[r.rng.Intn(len(historyProjects))]}) + r.codexTurns(c)
+		body := codexLine(c.at(), "session_meta", map[string]any{"id": c.id, "cwd": "/w/" + historyProjects[r.rng.Intn(len(historyProjects))]})
+		if r.rng.Intn(3) == 0 {
+			body += codexLine(c.at(), "response_item", map[string]any{"type": "message", "role": "user",
+				"content": []any{map[string]any{"type": "input_text", "text": historyThin[r.rng.Intn(len(historyThin))]}}})
+		}
+		body += r.codexTurns(c)
 		writeHistoryFile(r, r.codexPath(c), body, false)
 		m.codex = append(m.codex, c)
 		r.log = append(r.log, "new codex "+c.id)
