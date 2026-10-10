@@ -75,6 +75,16 @@ type projAcc struct {
 	lastKey string
 }
 
+// newerRun reports whether a run at t in session key replaces the project's
+// newest. Two sessions running it in the same second are told apart by key,
+// so the answer does not depend on the order the records were read in.
+func newerRun(t time.Time, key string, pa *projAcc) bool {
+	if !t.Equal(pa.last) {
+		return t.After(pa.last)
+	}
+	return key > pa.lastKey
+}
+
 func commandsPath(dir string) string { return filepath.Join(dir, commandsFile) }
 
 // buildCommands writes the recurring-command table into the build directory.
@@ -114,7 +124,7 @@ func buildCommands(tmp string, ss []model.Session) {
 				a.byProject[s.Project] = pa
 			}
 			pa.sessions[key] = true
-			if m.Time.After(pa.last) {
+			if newerRun(m.Time, key, pa) {
 				pa.last, pa.lastKey = m.Time, key
 			}
 			if m.Time.After(a.use.Last) {
@@ -207,7 +217,7 @@ func buildCommandsFromIndex(tmp string) {
 			a.byProject[meta.Project] = pa
 		}
 		pa.sessions[r.Key] = true
-		if r.Time.After(pa.last) {
+		if newerRun(r.Time, r.Key, pa) {
 			pa.last, pa.lastKey = r.Time, r.Key
 		}
 		if r.Time.After(a.use.Last) {

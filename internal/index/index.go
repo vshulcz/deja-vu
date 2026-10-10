@@ -705,6 +705,8 @@ import (
 // 70: redaction reads past terminal escapes and masks more shapes (key tails,
 // cut-short keys, the Token scheme, webhook URLs); stored text holding them is
 // only redacted again by a rebuild.
+// 70: an append folds its tail into Settled, which it never updated, and the
+// row records whether the session ran a command.
 const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
@@ -855,6 +857,10 @@ type SessionMeta struct {
 	// and additive: a manifest written before it decodes with it empty and the
 	// caller falls back to the search it used to do.
 	Settled string `json:",omitempty"`
+	// RanCommand is whether the session ran a command, which is when Settled
+	// is worth extracting. An append sees only the new messages and needs to
+	// know the ones before them did.
+	RanCommand bool `json:",omitempty"`
 	// Shared marks a row that covers more than one conversation: two
 	// transcripts wrote the same harness:id, so one row holds both. The build
 	// says so once (#698); forget had no way to know, and dropping "1 session"
