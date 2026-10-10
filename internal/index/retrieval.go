@@ -3221,7 +3221,23 @@ func sortedUniquePostings(posts []posting) []posting {
 }
 
 func postingsFor(dir, tok string) ([]posting, error) {
-	return readBucketToken(filepath.Join(dir, "buckets", bucket(tok)+".bin"), tok)
+	p, ok := bucketPath(dir, tok)
+	if !ok {
+		return nil, nil
+	}
+	return readBucketToken(p, tok)
+}
+
+// bucketName is every name bucket can return. A query reaches a file name
+// through it, and saying so here is what lets a path checker see that.
+var bucketName = regexp.MustCompile(`^(x[0-9a-f]{2}|[a-z0-9_]{2})$`)
+
+func bucketPath(dir, tok string) (string, bool) {
+	b := bucket(tok)
+	if !bucketName.MatchString(b) {
+		return "", false
+	}
+	return filepath.Join(dir, "buckets", b+".bin"), true
 }
 
 // OtherWordForms lists, per query term, the other forms of that word the
