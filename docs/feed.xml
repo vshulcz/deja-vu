@@ -253,7 +253,7 @@
     <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
     <updated>2026-10-10T00:00:00Z</updated>
-    <summary>deja is local by design: no network path in indexing or search unless you turn on semantic search, credentials redacted at index time, and forget/exclude controls over what is indexed and kept.</summary>
+    <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
   </entry>
   <entry>
     <title>How to recover a deleted Claude Code session — deja-vu</title>
