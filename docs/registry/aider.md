@@ -39,6 +39,6 @@ already is. A skill here would be the same always-on text under another name.
 - Tool output terminates an assistant block but does not become a message.
 - Moving a history file changes deja's derived session IDs because the path is part of the ID.
 - aider loads none of the history back into a new chat unless started with `--restore-chat-history`, and that loads the whole file, every session in it. `deja resume` refuses the session and names that flag in its message rather than claiming to reopen one session.
-- A session that leaves the file — the file was deleted and aider started a new one, or someone cut it by hand — stays in the index, as a deleted transcript does; `deja forget <id>` drops it.
+- A session that leaves the file — the file was deleted and aider started a new one, or someone cut it by hand — stays in the index, as a deleted transcript does; `deja forget --session <id>` drops it.
 
 **Last verified:** 2026-07-27

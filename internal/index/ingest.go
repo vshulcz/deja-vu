@@ -631,7 +631,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	vanished := sources.FilterSessions(vanishedFromStores(dir, harness, files, ss))
 	ss = append(ss, vanished...)
 	if progress != nil && len(vanished) > 0 {
-		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n",
+		fmt.Fprintf(progress, "deja: %d session%s no longer in %s store — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n",
 			len(vanished), pluralS(len(vanished)), map[bool]string{true: "its", false: "their"}[len(vanished) == 1])
 	}
 	ss = filterTombstonedSet(ss, dead)
@@ -640,7 +640,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 		files[p] = st
 	}
 	if progress != nil && len(orphans.files) > 0 {
-		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n",
+		fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n",
 			len(orphans.files), pluralS(len(orphans.files)))
 	}
 	if progress != nil && orphans.unreadable > 0 {
@@ -3913,7 +3913,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			}
 		}
 		if n := len(kept) - out; n > 0 {
-			fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget <id>` drops one for good\n", n, pluralS(n))
+			fmt.Fprintf(progress, "deja: %d transcript%s no longer on disk — still searchable; `deja resume <id> --write-back` puts one back, `deja forget --session <id>` drops one for good\n", n, pluralS(n))
 		}
 		if out > 0 {
 			fmt.Fprintf(progress, "deja: %d transcript%s outside the stores this run reads — still searchable\n", out, pluralS(out))
