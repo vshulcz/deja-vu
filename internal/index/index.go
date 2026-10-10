@@ -697,6 +697,8 @@ import (
 // record the postings a full build does. It tokenized whole texts and dropped
 // the tool bit, so a long-lived index held twice the tokens of a rebuild and
 // ranked tool output as speech; only a rebuild takes those postings out.
+// 70: the append-only pass posts the same way. Appended records had no date
+// keys and no tool bit, and an edit's replaced span was tokenized whole.
 const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

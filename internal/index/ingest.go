@@ -1938,12 +1938,6 @@ func eachIndexKey(text string, when time.Time, fn func(tok string)) {
 	}
 }
 
-// eachTextKey is eachIndexKey without the date keys, for the caller that keys
-// text alone.
-func eachTextKey(text string, fn func(tok string)) {
-	textKeys(text, dedupe(fn))
-}
-
 // textKeys emits every key the text contributes, repeats included; the callers
 // above put one dedupe in front of it rather than one per source.
 func textKeys(text string, emit func(tok string)) {
@@ -4733,8 +4727,11 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 					return filesTouched, messages, 0, err
 				}
 				messages++
+				// Keyed the way a rebuild keys it: only the part that earns
+				// postings, its date keys, and the tool bit.
 				var keyErr error
-				eachTextKey(text, func(tok string) {
+				tool := isToolRole(msg.Role)
+				eachIndexKey(tokenizedPart(msg.Role, text), msg.Time, func(tok string) {
 					if keyErr != nil {
 						return
 					}
@@ -4743,7 +4740,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 						keyErr = err
 						return
 					}
-					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord})
+					data[tok] = append(data[tok], posting{Off: off, Sid: meta.Ord, Tool: tool})
 				})
 				if keyErr != nil {
 					return filesTouched, messages, 0, keyErr
