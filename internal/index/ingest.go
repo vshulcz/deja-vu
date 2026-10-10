@@ -3001,10 +3001,11 @@ func titlePlaceholder(t string) bool {
 	return t == "" || strings.HasPrefix(t, harnessOutputTitlePrefix)
 }
 
-// titleRankOfRow is where a row's title sits in sessionTitleFrom's order: what
-// the person asked (3), the agent's words (2), tool output (1), plumbing or
-// nothing (0). A pass that sees only part of a session keeps a title unless
-// what it read outranks it, as a rebuild of the whole session would.
+// titleRankOfRow is where a row's title sits in sessionTitleFrom's order: a
+// question (4), a turn too thin to name anything (3), the agent's words (2),
+// tool output (1), plumbing or nothing (0). A pass that sees only part of a
+// session keeps a title unless what it read outranks it, as a rebuild of the
+// whole session would: a thin opening gives way to the first real question.
 func titleRankOfRow(title string, fromAgent bool) int {
 	switch {
 	case titlePlaceholder(title):
@@ -3013,8 +3014,10 @@ func titleRankOfRow(title string, fromAgent bool) int {
 		return 1
 	case fromAgent:
 		return 2
+	case thinTitle(title):
+		return 3
 	}
-	return 3
+	return 4
 }
 
 func harnessOutputTitle(t string) string {
