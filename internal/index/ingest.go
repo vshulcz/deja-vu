@@ -5050,6 +5050,12 @@ func setStoreLastUpdated(files map[string]FileState, sessions map[string]Session
 			latest = s.Updated.UnixNano()
 		}
 	}
+	// Never past the clock: one session stamped ahead of it (a skewed
+	// machine, a store synced from one) put the mark a day out, and every
+	// turn written in the meantime sat below it unread.
+	if now := time.Now().UnixNano(); latest > now {
+		latest = now
+	}
 	f.LastUpdated = latest
 	files[db] = f
 }
