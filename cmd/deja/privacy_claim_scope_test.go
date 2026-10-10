@@ -138,3 +138,53 @@ func TestEveryNothingLeavesClaimCarriesItsScope(t *testing.T) {
 		t.Fatalf("found %d such claims — the pattern stopped matching, so this checks nothing", checked)
 	}
 }
+
+// "Search has no network path" is the scope the claim above leans on, and it
+// stopped being true when semantic search arrived: with a sidecar built, every
+// search and every MCP recall sends its query to the embedding endpoint. So a
+// sentence saying search makes no network calls has to name that exception.
+func TestNoNetworkSearchClaimNamesTheSemanticPath(t *testing.T) {
+	root := filepath.Join("..", "..")
+	claim := regexp.MustCompile(`(?i)(search (have|has) no network path|search make no network calls|no network path in indexing or search|search and every tool above are\s+local and make no network calls)`)
+	var checked int
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", "node_modules", ".claude", "fixtures", "dist":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		switch strings.ToLower(filepath.Ext(p)) {
+		case ".md", ".html", ".txt", ".json":
+		default:
+			return nil
+		}
+		if strings.Contains(p, "CHANGELOG.md") {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		text := proseOf(string(b))
+		for _, m := range claim.FindAllStringIndex(text, -1) {
+			checked++
+			s := strings.ToLower(sentenceAround(text, m[0], m[1]))
+			if !strings.Contains(s, "semantic") && !strings.Contains(s, "embed") {
+				rel, _ := filepath.Rel(root, p)
+				t.Errorf("%s says search makes no network calls without the semantic exception: %q", filepath.ToSlash(rel), strings.TrimSpace(s))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked < 3 {
+		t.Fatalf("found %d such claims — the pattern stopped matching", checked)
+	}
+}

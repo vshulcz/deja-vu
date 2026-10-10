@@ -84,6 +84,7 @@ install locations, and last the copy bundled through `@vshulcz/deja-vu`.
 
 deja reads session files where the agents wrote them and builds a local index
 under `~/.cache/deja` (or `DEJA_INDEX_DIR`). Keys and tokens are stripped as
-the index is built, and indexing and search make no network calls.
+the index is built, and without semantic search (`deja embed`) indexing and
+search make no network calls.
 
 Part of [deja-vu](https://github.com/vshulcz/deja-vu). MIT. Found it useful? [Star deja-vu on GitHub](https://github.com/vshulcz/deja-vu).

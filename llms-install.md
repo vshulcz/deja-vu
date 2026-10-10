@@ -56,9 +56,10 @@ One MCP tool, `deja`, with a `mode` argument (clients wired earlier can still ca
 - `remember` — store one durable decision for a later session to recall.
 - `handoff` — another session's state, to continue its work: the goal, standing instructions, latest conclusions and where it stopped.
 
-No API keys and no configuration. Indexing, search and every tool above are
-local and make no network calls; the exceptions are commands somebody runs on
-purpose — `deja update`, `deja doctor`'s version check, `deja sync ssh` and
-`deja embed` against a model endpoint you name — and a once-a-day release check
+No API keys and no configuration. Unless semantic search is set up with
+`deja embed`, which sends each query to the endpoint you name, indexing, search
+and every tool above are local and make no network calls; the other exceptions
+are commands somebody runs on purpose — `deja update`, `deja doctor`'s version
+check and `deja sync ssh` — and a once-a-day release check
 from a command typed at a terminal (`DEJA_OFFLINE=1` turns it off).
 SECURITY-MODEL.md lists them.
