@@ -58,18 +58,20 @@ type historyRun struct {
 	next  int
 	log   []string
 	index string
+	more  historyStores
 }
 
 func runRandomHistory(t *testing.T, seed int64) {
 	h := newTwoWayEnv(t)
 	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db")}
-	steps := 30
+	r.openStores()
+	steps := 24
 	for i := 0; i < steps; i++ {
-		r.step()
-		if err := Ensure(r.index, "claude", false, nil); err != nil {
+		r.anyStep()
+		if err := Ensure(r.index, "", false, nil); err != nil {
 			t.Fatalf("seed %d, pass after %q: %v", seed, r.log[len(r.log)-1], err)
 		}
-		if i%10 == 9 || i == steps-1 {
+		if i%8 == 7 || i == steps-1 {
 			r.compare(seed, i)
 		}
 	}
@@ -82,7 +84,7 @@ func (r *historyRun) compare(seed int64, step int) {
 	t.Helper()
 	b := filepath.Join(r.h.tmp, fmt.Sprintf("rebuild-%d.db", step))
 	copyDir(t, r.index, b)
-	if err := Ensure(b, "claude", true, nil); err != nil {
+	if err := Ensure(b, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
 	label := fmt.Sprintf("seed %d after step %d", seed, step)
