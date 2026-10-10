@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -129,6 +130,10 @@ func reply(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// hashName is the on-disk name for an id the caller sent: user_id and
+// session_id never reach a path as they came.
+var hashName = regexp.MustCompile(`^[0-9a-f]{24}$`)
+
 func hash(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:12])
@@ -137,7 +142,11 @@ func hash(s string) string {
 // userDir is the store of one user_id; the transcripts sit where the Claude
 // parser looks for them, under one project.
 func (s *server) userDir(user string) (root, proj, idx string) {
-	root = filepath.Join(s.store, hash(user))
+	name := hash(user)
+	if !hashName.MatchString(name) {
+		panic("amlserve: hash is not hex")
+	}
+	root = filepath.Join(s.store, name)
 	return root, filepath.Join(root, "claude", "-work-aml"), filepath.Join(root, "index.db")
 }
 
@@ -187,6 +196,9 @@ func (s *server) write(proj string, req addRequest) error {
 		return err
 	}
 	sid := hash(req.SessionID)
+	if !hashName.MatchString(sid) {
+		return errors.New("session hash is not hex")
+	}
 	path := filepath.Join(proj, sid+".jsonl")
 	old, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -257,7 +269,7 @@ func (s *server) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	limit := min(req.TopK, s.maxItems)
-	out := make([]item, 0, limit)
+	out := make([]item, 0, s.maxItems)
 	for _, h := range hits {
 		if len(out) == limit {
 			break
@@ -299,6 +311,9 @@ func rank(idx, q string) ([]search.Hit, error) {
 // transcript when it fits, otherwise the matched excerpts and then the
 // transcript from the top until the budget runs out.
 func (s *server) render(proj, sid string, snippets []string) (string, string) {
+	if !hashName.MatchString(sid) {
+		return "", ""
+	}
 	orig, err := os.ReadFile(filepath.Join(proj, sid+".sid"))
 	if err != nil {
 		return "", ""
