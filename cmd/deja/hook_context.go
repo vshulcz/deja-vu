@@ -1465,7 +1465,17 @@ func warmupJustRequested(dir string) bool {
 	if err != nil {
 		return false
 	}
-	return time.Since(time.Unix(0, stamp)) < warmupStatusStale
+	// Ahead of the clock is stale too, as it is for the status file (#889):
+	// a sentinel stamped hours ahead kept recall saying a build was on its way
+	// while nothing built.
+	return within(time.Since(time.Unix(0, stamp)), warmupStatusStale)
+}
+
+// within reports whether an age is inside limit either side of now. A stamp
+// from the future makes the age negative, and a bare "age < limit" took it
+// for fresh for as long as the clock stayed behind.
+func within(age, limit time.Duration) bool {
+	return age < limit && age > -limit
 }
 
 // warmupLooksDead reports whether the build the sentinel stands for has
@@ -1477,7 +1487,7 @@ func warmupLooksDead(dir string, now time.Time, stamp int64) bool {
 	if st := readWarmupStatus(dir); st != nil {
 		return false
 	}
-	return now.Sub(time.Unix(0, stamp)) > warmupDeadAfter
+	return !within(now.Sub(time.Unix(0, stamp)), warmupDeadAfter)
 }
 
 func requestWarmup(dir string) {
@@ -1507,7 +1517,7 @@ func requestWarmup(dir string) {
 				stamp, parseErr = fi.ModTime().UnixNano(), nil
 			}
 		}
-		if readErr == nil && parseErr == nil && now.Sub(time.Unix(0, stamp)) < warmupRetryAfter && !warmupLooksDead(dir, now, stamp) {
+		if readErr == nil && parseErr == nil && within(now.Sub(time.Unix(0, stamp)), warmupRetryAfter) && !warmupLooksDead(dir, now, stamp) {
 			return
 		}
 		if os.Remove(sentinel) != nil {
