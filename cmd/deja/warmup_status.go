@@ -230,7 +230,14 @@ func emptyRecallAnswer(dir, q string) string { return emptyRecallAnswerPolicy(di
 // work was never done and starts over (#680).
 func emptyRecallAnswerPolicy(dir, q string, hidden int) string {
 	q = clampEcho(q)
-	if st := readWarmupStatus(dir); st != nil {
+	st := readWarmupStatus(dir)
+	if st != nil && index.HasManifest(dir) && index.IsCurrentVersion(dir) && !index.Damaged(dir) {
+		// A refresh over an index that already answers: the search ran over
+		// every session indexed so far, and saying nothing can be recalled
+		// yet denied the history it had just searched.
+		return fmt.Sprintf("No prior deja sessions matched %q. The index is refreshing (%s), so the newest sessions may not be in this answer yet.", q, st.progress())
+	}
+	if st != nil {
 		// The instruction is the useful part — ask again rather than conclude
 		// there is no history — and it does not need a duration deja cannot
 		// know: the same build measured 59 seconds on a 177 MB index (#2598).

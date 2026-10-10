@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/index"
 )
 
 // The build reports from several goroutines at once — harness stores are
@@ -152,6 +154,24 @@ func TestMCPRecallDistinguishesEmptyFromStillBuilding(t *testing.T) {
 		if !strings.Contains(building, want) {
 			t.Errorf("answer %q is missing %q", building, want)
 		}
+	}
+}
+
+// A refresh over an index that already answers is not a first build: the
+// recall searched every session indexed so far, and "nothing can be recalled
+// yet" denied history it had just searched.
+func TestMCPRecallDuringARefreshIsAPlainMiss(t *testing.T) {
+	tmp := hermeticEnv(t)
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	p := newFileProgress(dir)
+	p.Phase("reading sessions", 10)
+	t.Cleanup(p.done)
+	got := emptyRecallAnswer(dir, "zzqqnomatchword")
+	if strings.Contains(got, "still building") || !strings.Contains(got, "No prior deja sessions matched") || !strings.Contains(got, "refreshing") {
+		t.Errorf("a miss during a refresh answered %q", got)
 	}
 }
 
