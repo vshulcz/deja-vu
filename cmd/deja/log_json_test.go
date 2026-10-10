@@ -42,10 +42,16 @@ func TestLogRejectsANonPositiveCountAsACount(t *testing.T) {
 	if err != nil && strings.Contains(err.Error(), "unknown flag") {
 		t.Errorf("log 0 still called a number a flag: %v", err)
 	}
-	// A word that is not a number is still an unknown flag.
+	// A word is not a flag either: it is a count that is not a number, which
+	// is how `last abc` has put it.
 	err = runLogTo(&buf, t.TempDir(), []string{"abc"})
-	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+	if err == nil || !strings.Contains(err.Error(), `"abc" is not a count`) {
 		t.Errorf("log abc: %v", err)
+	}
+	// A dashed word is still an unknown flag.
+	err = runLogTo(&buf, t.TempDir(), []string{"--abc"})
+	if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+		t.Errorf("log --abc: %v", err)
 	}
 	// A valid count still works.
 	buf.Reset()

@@ -33,6 +33,11 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 		default:
 			x, err := strconv.Atoi(a)
 			if err != nil {
+				// A word is not a flag either, and "unknown flag" sent the
+				// reader looking for one they never typed. `last` says this.
+				if !strings.HasPrefix(a, "-") {
+					return fmt.Errorf("log: %q is not a count — use `deja log 5`", a)
+				}
 				return unknownFlag("log", a, logFlags)
 			}
 			// A number is not a flag, and saying so sends the reader looking
