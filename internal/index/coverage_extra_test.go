@@ -289,7 +289,9 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 		t.Fatalf("corrupt bucket err=%v", err)
 	}
 	var progress bytes.Buffer
-	if ss, err := SearchWithRecovery(dir, search.Options{Query: "alpha"}, &progress); err != nil || ss != nil {
+	// The rebuild keeps the session whose transcript is gone, the way
+	// `deja index --force` does.
+	if ss, err := SearchWithRecovery(dir, search.Options{Query: "alpha"}, &progress); err != nil || len(ss) != 1 || ss[0].ID != "s1" {
 		t.Fatalf("recovery ss=%#v err=%v", ss, err)
 	}
 	if !strings.Contains(progress.String(), "index damaged") {

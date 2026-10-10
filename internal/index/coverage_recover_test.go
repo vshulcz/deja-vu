@@ -127,7 +127,7 @@ func TestRecentFamilyDefaultDirAndMissingManifest(t *testing.T) {
 }
 
 // A dir+".tmp" staging path blocked by a pre-existing regular file must fail
-// MkdirAll in both full-rebuild entry points; a records.bin path blocked by a
+// MkdirAll in the full rebuild; a records.bin path blocked by a
 // pre-existing directory must fail the subsequent os.Create.
 func TestRebuildStagingDirBlocked(t *testing.T) {
 	if runtime.GOOS == "windows" {
@@ -135,7 +135,7 @@ func TestRebuildStagingDirBlocked(t *testing.T) {
 	}
 	tmp := hermeticIndexEnv(t)
 
-	// rebuild/rebuildForSearch always os.RemoveAll(dir+".tmp") before
+	// rebuild always os.RemoveAll(dir+".tmp") before
 	// recreating it, so a pre-existing file or directory there gets wiped
 	// before MkdirAll runs. To make the staging MkdirAll itself fail, the
 	// dir's parent must be read-only: RemoveAll on the not-yet-existing
@@ -152,11 +152,6 @@ func TestRebuildStagingDirBlocked(t *testing.T) {
 	dir := filepath.Join(blocked, "idx-a")
 	if err := rebuild(dir, "", "", map[string]FileState{}, nil); err == nil {
 		t.Fatal("rebuild with read-only parent returned nil")
-	}
-
-	dir2 := filepath.Join(blocked, "idx-b")
-	if err := rebuildForSearch(dir2, search.Options{}, "", map[string]FileState{}, nil); err == nil {
-		t.Fatal("rebuildForSearch with read-only parent returned nil")
 	}
 }
 

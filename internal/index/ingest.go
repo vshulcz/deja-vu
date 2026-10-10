@@ -398,7 +398,11 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 				}
 			}
 		}
-		return rebuildForSearch(dir, o, scope, want, progress)
+		// The same full build `deja index --force` runs. One of its own
+		// skipped the deleted transcripts, the turns a harness compacted
+		// away and the chats gone from a database store, so the first
+		// search after an upgrade dropped what the index was keeping.
+		return rebuild(dir, "", scope, want, progress)
 	}
 	if err := updateIndex(dir, o.Harness, scope, want, force, progress); err != nil {
 		return fmt.Errorf("update: %w", err)
@@ -1458,33 +1462,6 @@ func forgetUnreadStores(files map[string]FileState) {
 	for p := range sources.DiagFailedPaths() {
 		delete(files, p)
 	}
-}
-
-func rebuildForSearch(dir string, o query.Options, scope string, files map[string]FileState, progress io.Writer) error {
-	defer readTo(files)()
-	beginPass()
-	tmp := dir + ".tmp"
-	_ = os.RemoveAll(tmp)
-	if err := os.MkdirAll(filepath.Join(tmp, "buckets"), 0o700); err != nil {
-		return err
-	}
-	// The same phase reporting rebuild() has. Without it the first run of a
-	// search — which is how almost everyone builds their index the first time,
-	// rather than by typing `deja index` — showed a spinner reading "starting"
-	// and a bar frozen at one notch for the whole build.
-	total := 0
-	progressWeights = filesPerHarness(files)
-	for _, n := range progressWeights {
-		total += n
-	}
-	reportPhase("reading sessions", total)
-	ss := sources.FilterSessions(filterTombstoned(loadProgress("", progress)))
-	forgetUnreadStores(files)
-	imported := importedSessions(dir)
-	imported.compactions = compactionsForRebuild(dir, readTombstones())
-	ss = append(ss, imported.sessions...)
-	ss = filterTombstoned(ss)
-	return writeSessionsWithSync(tmp, dir, ss, files, scope, imported)
 }
 
 // dropEmptySessions removes manifest rows that ended up with no records.
@@ -3665,10 +3642,10 @@ func copyIngestFiles(old map[string]FileIngest, reread map[string]FileState) map
 // before writing left its count for the next one to report: one bad line on
 // disk, "2 lines skipped" on screen, with the manifest agreeing (#2010).
 //
-// Called at every place a pass parses: this one, rebuildForSearch — which a
-// recall reaches directly once an index is found damaged, without passing
-// through updateIndex at all — and rebuildWithTombstones, which forget and
-// unforget call for themselves.
+// Called at every place a pass parses: this one and rebuildWithTombstones,
+// which a recall reaches directly once an index is found damaged, without
+// passing through updateIndex at all, and which forget and unforget call for
+// themselves.
 func beginPass() {
 	sources.DiagSnapshot()
 	passParsed = nil
