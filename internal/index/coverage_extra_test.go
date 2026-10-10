@@ -330,7 +330,7 @@ func TestBucketRecordGobAndRecoveryErrors(t *testing.T) {
 	if _, err := readRecord(&buf, newRecordTables()); !errors.Is(err, io.EOF) {
 		t.Fatalf("empty readRecord err=%v", err)
 	}
-	if _, err := decodeRecord([]byte{1, 'k'}, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord([]byte{1, 'k'}, newRecordTables()); !IsCorrupt(err) {
 		t.Fatalf("short decode err=%v", err)
 	}
 	gobPath := filepath.Join(tmp, "bad.gob")
@@ -561,24 +561,24 @@ func TestCurrentFilesAllHarnessesAndRecordEdgeCases(t *testing.T) {
 	// boundary must fail cleanly rather than return a half-built record.
 	rtbl := testTables(Record{Key: "k", SourcePath: "src"})
 	buf := binary.AppendUvarint(nil, rtbl.intern("k"))
-	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord(buf, rtbl); !IsCorrupt(err) {
 		t.Fatalf("decode missing source err=%v", err)
 	}
 	buf = binary.AppendUvarint(buf, rtbl.intern("src"))
-	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord(buf, rtbl); !IsCorrupt(err) {
 		t.Fatalf("decode missing role err=%v", err)
 	}
 	buf = binary.AppendUvarint(buf, rtbl.intern("role"))
-	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord(buf, rtbl); !IsCorrupt(err) {
 		t.Fatalf("decode missing encoding flag err=%v", err)
 	}
 	buf = append(buf, recordRaw)
-	if rec, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) ||
+	if rec, err := decodeRecord(buf, rtbl); !IsCorrupt(err) ||
 		rec.Key != "k" || rec.SourcePath != "src" || rec.Role != "role" {
 		t.Fatalf("decode missing time rec=%#v err=%v", rec, err)
 	}
 	buf = binary.LittleEndian.AppendUint64(buf, uint64(time.Now().UnixNano()))
-	if _, err := decodeRecord(buf, rtbl); !errors.Is(err, io.ErrUnexpectedEOF) {
+	if _, err := decodeRecord(buf, rtbl); !IsCorrupt(err) {
 		t.Fatalf("decode missing text err=%v", err)
 	}
 	if _, err := scanRecords(filepath.Join(tmp, "missing-index"), Manifest{}, search.Options{}, nil); err == nil {
@@ -863,7 +863,7 @@ func TestRequestedCodecLineAndSubstringBranches(t *testing.T) {
 		{1, 1, 1},
 		{1, 1, 1, recordRaw},
 	} {
-		if _, err := decodeRecord(data, newRecordTables()); !errors.Is(err, io.ErrUnexpectedEOF) {
+		if _, err := decodeRecord(data, newRecordTables()); !IsCorrupt(err) {
 			t.Fatalf("decodeRecord(%v) err=%v", data, err)
 		}
 	}

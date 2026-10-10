@@ -3653,6 +3653,21 @@ func parsedThisPass(files map[string]FileState) {
 }
 
 func updateIndex(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
+	err := updateIndexOnce(dir, harness, scope, files, force, progress)
+	// A pass that met a hole in the record log stops there rather than
+	// committing what it carried before it, and the store is rebuilt from the
+	// sources instead. Carrying on dropped every record after the hole and
+	// wrote a manifest that called the loss clean.
+	if IsCorrupt(err) {
+		if progress != nil {
+			fmt.Fprintf(progress, "deja: %s (%v), rebuilding ...\n", damagedOrOutdated(err), err)
+		}
+		return rebuild(dir, harness, scope, files, progress)
+	}
+	return err
+}
+
+func updateIndexOnce(dir, harness, scope string, files map[string]FileState, force bool, progress io.Writer) error {
 	defer readTo(files)()
 	// Cleared here rather than beside the other two: this build counts what
 	// went away further down, before the incremental paths reset theirs, so a

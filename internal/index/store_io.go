@@ -180,8 +180,12 @@ func readRecordAt(f *os.File, off int64, t *recordTables) (Record, error) {
 	}
 	// Too big for the read-ahead: take the payload on its own.
 	payload := make([]byte, size)
-	if _, err := f.ReadAt(payload, off+4); err != nil && !errors.Is(err, io.EOF) {
+	m, err := f.ReadAt(payload, off+4)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return Record{}, err
+	}
+	if m < int(size) {
+		return Record{}, io.ErrUnexpectedEOF
 	}
 	return decodeRecord(payload, t)
 }
@@ -264,7 +268,10 @@ func eachRecordInRoles(path string, t *recordTables, want map[string]bool, fn fu
 			return nil
 		}
 		_, role, ok := recordRoleIn(payload, t)
-		if !ok || !want[role] {
+		if !ok {
+			return errShortRecord
+		}
+		if !want[role] {
 			continue
 		}
 		rec, err := decodeRecord(payload, t)
@@ -348,7 +355,10 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 			return perr
 		}
 		kid, un := binary.Uvarint(head)
-		if un <= 0 || !want[t.lookup(kid)] {
+		if un <= 0 {
+			return errShortRecord
+		}
+		if !want[t.lookup(kid)] {
 			if _, derr := r.Discard(int(n)); derr != nil {
 				if derr == io.EOF || derr == io.ErrUnexpectedEOF {
 					return nil
@@ -530,29 +540,36 @@ func appendField(b []byte, s string) []byte {
 	return append(b, s...)
 }
 
+// errShortRecord is a framed record whose payload does not hold what every
+// record holds. The frame was read whole, so this is not a torn tail: it is a
+// hole in the log, such as a frame a crash left zeroed, and it is corruption.
+// It used to be io.ErrUnexpectedEOF, which every walker reads as the end of
+// the file, so a hole mid-log silently ended the walk there.
+var errShortRecord = fmt.Errorf("%w: a record ends before its fields do", errCorruptIndex)
+
 func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	var rec Record
 	var ok bool
 	kid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	b = b[n:]
 	pid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	b = b[n:]
 	rid, n := binary.Uvarint(b)
 	if n <= 0 {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	b = b[n:]
 	rec.Key = t.lookup(kid)
 	rec.SourcePath = t.lookup(pid)
 	rec.Role = t.lookup(rid)
 	if len(b) < 1 {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	flag := b[0]
 	b = b[1:]
@@ -572,7 +589,7 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 		return rec, fmt.Errorf("%w: unknown record encoding %d", errCorruptIndex, flag)
 	}
 	if len(b) < 8 {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	// time.Time{}.UnixNano() is a large negative number that time.Unix turns
 	// into the year 1754, so an unstamped message never satisfied IsZero()
@@ -585,7 +602,7 @@ func decodeRecord(b []byte, t *recordTables) (Record, error) {
 	}
 	b = b[8:]
 	if rec.Text, _, ok = consumeField(b); !ok {
-		return rec, io.ErrUnexpectedEOF
+		return rec, errShortRecord
 	}
 	return rec, nil
 }
