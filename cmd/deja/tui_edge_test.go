@@ -197,3 +197,26 @@ func TestTUIGrownSessionIsReadAgain(t *testing.T) {
 		t.Error("a session that grew keeps its first read")
 	}
 }
+
+// The count of every session is kept across tab switches and read again once
+// the index has been written.
+func TestTUIHeaderCountFollowsTheIndex(t *testing.T) {
+	dir, root := tuiStore(t)
+	a := newTestTUI(t, dir)
+	before := len(a.allMeta)
+	a.setScope(scopeHere)
+	a.setScope(scopeAll)
+	if len(a.allMeta) != before {
+		t.Fatalf("a tab switch changed the count: %d, was %d", len(a.allMeta), before)
+	}
+	user, _ := json.Marshal(map[string]any{"type": "user", "sessionId": "d4444444-new", "cwd": "/work/billing", "timestamp": "2026-03-04T10:00:00Z",
+		"message": map[string]any{"role": "user", "content": "invoices round to the wrong cent"}})
+	writeClaudeFixture(t, filepath.Join(root, "billing", "d4444444-new.jsonl"), "d4444444-new", []string{string(user)})
+	if err := index.Ensure(dir, "", false, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	a.loadHome()
+	if len(a.allMeta) != before+1 {
+		t.Fatalf("after the index grew the count is %d, want %d", len(a.allMeta), before+1)
+	}
+}

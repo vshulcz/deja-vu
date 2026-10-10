@@ -60,6 +60,20 @@ func readManifestCached(dir string) (Manifest, error) {
 	return m, nil
 }
 
+// Stamp changes whenever the index is written: the manifest file's time and
+// size, from one stat. A caller that derives something from the whole index,
+// such as the screen's count of every session, keeps it while the stamp holds.
+func Stamp(dir string) string {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	fi, err := os.Stat(filepath.Join(dir, "manifest.gob"))
+	if err != nil {
+		return ""
+	}
+	return fi.ModTime().UTC().Format(time.RFC3339Nano) + "+" + strconv.FormatInt(fi.Size(), 10)
+}
+
 // invalidateManifestCache drops this process's shared manifest snapshot after
 // a core-only write. Compaction packets deliberately update manifest.gob
 // without touching sessions.gob; a subsequent index writer must not reuse an

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -1816,12 +1817,45 @@ func RecentMatchingCounted(dir string, n int, o query.Options) ([]model.Session,
 	// background agents' own temp tree, 253 rows of 400 on a real store, while
 	// every ranked surface filtered it out (#2541).
 	out = ignoredByPolicy(out)
-	sort.Slice(out, func(i, j int) bool { return newestFirstSession(out[i], out[j]) })
 	total := len(out)
-	if n > 0 && len(out) > n {
-		out = out[:n]
+	return newestN(out, n), total, nil
+}
+
+// newestN orders sessions newest first and keeps the first n, or all of them
+// for n <= 0. The screen's home list asks for 60 of 27k on a large history:
+// sorting all of them to keep the top cost ~18 ms of every tab switch, so a
+// bounded list holds the newest n seen so far and most sessions are turned
+// away with one comparison against its oldest.
+func newestN(ss []model.Session, n int) []model.Session {
+	cmp := func(a, b model.Session) int {
+		if newestFirstSession(a, b) {
+			return -1
+		}
+		if newestFirstSession(b, a) {
+			return 1
+		}
+		return 0
 	}
-	return out, total, nil
+	if n <= 0 || len(ss) <= n*4 {
+		slices.SortFunc(ss, cmp)
+		if n > 0 && len(ss) > n {
+			ss = ss[:n]
+		}
+		return ss
+	}
+	top := make([]model.Session, 0, n)
+	for _, s := range ss {
+		if len(top) == n && !newestFirstSession(s, top[n-1]) {
+			continue
+		}
+		i, _ := slices.BinarySearchFunc(top, s, cmp)
+		if len(top) < n {
+			top = append(top, model.Session{})
+		}
+		copy(top[i+1:], top[i:len(top)-1])
+		top[i] = s
+	}
+	return top
 }
 
 // displayPath contracts the home directory to ~ in user-facing messages.

@@ -54,6 +54,7 @@ type tuiApp struct {
 	cwd         string
 	behind      []behindRow
 	allMeta     []model.Session
+	allStamp    string // the index write allMeta was read from
 	agentsAll   []agentCount
 	filter      map[string]bool
 	query       []rune
@@ -299,10 +300,15 @@ func (a *tuiApp) loadHome() {
 	a.seq++
 	a.latest.Store(int64(a.seq))
 	a.searching = false
-	all, _, err := index.RecentMatchingCounted(a.dir, 0, search.Options{})
-	if err == nil {
-		a.allMeta = all
-		a.agentsAll = tuiAgentCounts(all)
+	// Every session, for the counts in the header: read again only once the
+	// index has been written, not on each tab switch or cleared box, where on
+	// a large history it was most of the wait.
+	if st := index.Stamp(a.dir); st == "" || st != a.allStamp {
+		all, _, err := index.RecentMatchingCounted(a.dir, 0, search.Options{})
+		if err == nil {
+			a.allMeta, a.allStamp = all, st
+			a.agentsAll = tuiAgentCounts(all)
+		}
 	}
 	var ss []model.Session
 	total := 0
