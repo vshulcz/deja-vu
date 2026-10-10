@@ -19,7 +19,9 @@ func TestRememberCLIAndMCP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(result, "notes") {
+	// Filed where the CLI files it without --project: the working directory's
+	// project.
+	if !strings.HasPrefix(result, "Remembered under ") || strings.Contains(result, "under notes") {
 		t.Fatalf("mcp result=%q", result)
 	}
 	if err := index.EnsureForSearch(index.DefaultDir(), search.Options{All: true}, false, nil); err != nil {
