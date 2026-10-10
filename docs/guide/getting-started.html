@@ -169,7 +169,7 @@ deja "have we dealt with jwt refresh rotation before"</pre>
 deja install --auto     # same, plus session-start auto-recall where supported</pre>
 <p>These harnesses can pull deja straight from their own plugin registry instead — same wiring, no local step:</p>
 <pre>claude plugin marketplace add vshulcz/deja-vu &amp;&amp; claude plugin install deja-vu@deja-vu
-codex  plugin marketplace add vshulcz/deja-vu &amp;&amp; codex plugin add deja-vu@deja-vu
+codex  plugin marketplace add https://github.com/vshulcz/deja-vu &amp;&amp; codex plugin add deja-vu@deja-vu
 cursor-agent plugin marketplace add https://github.com/vshulcz/deja-vu
 qwen   extensions install https://github.com/vshulcz/deja-vu
 openclaw plugins install ./deja-vu/claude-plugin
