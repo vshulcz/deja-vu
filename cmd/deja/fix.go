@@ -246,9 +246,9 @@ func writeFixJSON(stdout io.Writer, pairs []index.FixPair) error {
 	for _, p := range pairs {
 		row := fixRowJSON{
 			Error:     search.SafeLine(p.Error),
-			Command:   search.SafeCommand(p.Command),
+			Command:   search.SafeCommand(index.BareCommand(p.Command)),
 			Edit:      search.SafePath(p.Edit),
-			Failed:    search.SafeCommand(p.Failed),
+			Failed:    search.SafeCommand(index.BareCommand(p.Failed)),
 			Candidate: p.Candidate,
 		}
 		if !p.When.IsZero() {

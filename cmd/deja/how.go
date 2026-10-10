@@ -32,14 +32,20 @@ import (
 
 const howCommandMax = 200
 
-// firstCommandLine is firstLine for a command: the first line, bounded, and
-// otherwise left alone. firstLine collapses runs of whitespace, which is right
-// for the note titles it was written for and wrong here — `-run "Pool  Size"`
-// came back as a different test filter (#2052).
+// firstCommandLine is firstLine for a command: the first line, otherwise left
+// alone. firstLine collapses runs of whitespace, which is right for the note
+// titles it was written for and wrong here — `-run "Pool  Size"` came back as a
+// different test filter (#2052). Not cut: two long commands that share a start
+// are two rows, and the JSON row is run as written. The screen cuts its copy.
 func firstCommandLine(s string) string {
 	if i := strings.IndexByte(s, '\n'); i > 0 {
 		s = s[:i]
 	}
+	return s
+}
+
+// howScreenCommand is a command bounded for one row of the screen.
+func howScreenCommand(s string) string {
 	r := []rune(s)
 	if len(r) <= 80 {
 		return s
@@ -220,7 +226,7 @@ func writeHowEntriesFor(w io.Writer, entries []howEntry, limit int, lastSep stri
 		// The command itself, kept the way a person would copy it, folded onto
 		// one line so a newline in it cannot forge a row of deja's (#1863).
 		// A pipe keeps the "$ " that marks each row: scripts split on it.
-		cmd := search.SafeCommand(e.Command)
+		cmd := search.SafeCommand(howScreenCommand(e.Command))
 		if human && printableWidth(w) > 0 {
 			cmd = strings.TrimPrefix(cmd, "$ ")
 		}
@@ -289,7 +295,10 @@ func howEntries(dir string, terms []string, projects []string, activation string
 		// one command on two rows of this screen (#2590).
 		line := strings.TrimSpace(firstCommandLine(r.Text))
 		cmd := index.CommandWithoutExitStatus(line)
-		if cmd == "" || len(cmd) > howCommandMax {
+		// Measured on the form the screen prints, as it always was: the whole
+		// command is what the row groups and the JSON hands over, and a long
+		// one-liner is still a row.
+		if cmd == "" || len(howScreenCommand(cmd)) > howCommandMax {
 			return
 		}
 		low := strings.ToLower(cmd)
@@ -534,7 +543,7 @@ func writeHowJSON(stdout io.Writer, entries []howEntry, limit, withheld, ignored
 		row := howRowJSON{
 			// The same sanitiser the prose path uses: a recorded command is untrusted
 			// text, and a JSON consumer pasting it into a shell is no safer than a human.
-			Command:         search.SafeCommand(e.Command),
+			Command:         search.SafeCommand(index.BareCommand(e.Command)),
 			Runs:            e.Runs,
 			Sessions:        len(e.Sessions),
 			FailedEveryTime: e.failedEveryTime(),
