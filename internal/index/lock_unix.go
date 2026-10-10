@@ -3,9 +3,7 @@
 package index
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -62,7 +60,7 @@ func tryLockDir(dir string) (func(), bool, error) {
 	}
 	_ = os.Chmod(dir, 0o700)
 	if err := os.MkdirAll(filepath.Dir(lockPath), 0o700); err != nil {
-		if errors.Is(err, fs.ErrPermission) {
+		if Unwritable(err) {
 			return nil, false, nil
 		}
 		return nil, false, err
@@ -74,7 +72,7 @@ func tryLockDir(dir string) (func(), bool, error) {
 		// it. Treat it the way a lock already held is treated — carry on
 		// without one. The directory swap is atomic, so the snapshot read
 		// stays safe.
-		if errors.Is(err, fs.ErrPermission) {
+		if Unwritable(err) {
 			return nil, false, nil
 		}
 		return nil, false, err

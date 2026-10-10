@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -321,7 +322,7 @@ func EnsureForSearch(dir string, o query.Options, force bool, progress io.Writer
 		// still answer every question asked of it. Failing here made deja
 		// unusable on those, while the hook path in the same situation simply
 		// stays quiet. Serve what is on disk and skip the freshness check.
-		if errors.Is(err, fs.ErrPermission) && HasManifest(dir) {
+		if Unwritable(err) && HasManifest(dir) {
 			return nil
 		}
 		return err
@@ -364,10 +365,18 @@ func EnsureForSearchNoWait(dir string, o query.Options, progress io.Writer) (bus
 func lockUnwritable(dir string) bool {
 	f, err := os.OpenFile(dir+".lock", os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
-		return errors.Is(err, fs.ErrPermission)
+		return Unwritable(err)
 	}
 	_ = f.Close()
 	return false
+}
+
+// Unwritable reports an error that says the index cannot be written here at
+// all: a denied permission, or a filesystem mounted read-only. The second
+// comes back as EROFS, not as a permission error, so a real read-only mount
+// failed every search while a chmod'ed directory answered from its snapshot.
+func Unwritable(err error) bool {
+	return errors.Is(err, fs.ErrPermission) || errors.Is(err, syscall.EROFS)
 }
 
 // ensureLocked is the body of an Ensure, with the lock already held.
