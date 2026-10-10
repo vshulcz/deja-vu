@@ -2732,7 +2732,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	case index.ReadStateNewer:
 		// The binary was rolled back, not the index. Saying "older" here sent
 		// that reader looking in the wrong direction (#890).
-		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build rebuilds it in its own format; upgrading again rebuilds it back")
+		fmt.Fprintln(w, "  format   written by a newer deja than this one — this build answers from it as it is and leaves it alone; `deja index --rebuild` rebuilds it for this one")
 	}
 	// A store whose postings vanished or whose record log was truncated cannot
 	// answer anything, and said "up to date" until #735. The next search

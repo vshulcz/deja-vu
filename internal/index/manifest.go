@@ -50,7 +50,7 @@ func IsCurrentVersion(dir string) bool {
 	// pure waste. The cache is keyed on manifest.gob's mtime+size, so a changed
 	// or corrupt store still forces a fresh read.
 	m, err := readManifestCached(dir)
-	return err == nil && m.Version == version
+	return err == nil && (m.Version == version || newerIndex(m))
 }
 
 // OlderFormat reports that the index on disk reads, and was written by a

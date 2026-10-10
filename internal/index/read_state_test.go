@@ -82,7 +82,7 @@ func TestReadStateAgreesWithMustRebuild(t *testing.T) {
 			t.Fatal(err)
 		}
 		state := ReadStateOf(dir)
-		quiet := state == ReadStateWithheld || state == ReadStateUnreadable || state == ReadStateNewer
+		quiet := state == ReadStateWithheld || state == ReadStateUnreadable
 		if blocks != quiet {
 			t.Errorf("version %d format %d: mustRebuild=%v but state=%v",
 				m.Version, m.Format, blocks, state)

@@ -392,6 +392,10 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
 		return nil
 	}
+	if !force && err == nil && newerIndex(m) && recordsIntact(dir, m) {
+		sayNewerIndex(progress, dir, m)
+		return nil
+	}
 	damaged := !force && (priorErr != nil && !errors.Is(priorErr, fs.ErrNotExist) || priorErr == nil && !recordsIntact(dir, prior))
 	if force || err != nil || m.Version != version || m.Scope != scope || !recordsIntact(dir, m) {
 		if progress != nil {
@@ -454,6 +458,11 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// No usable index yet (or a rebuild-grade problem): the caller cannot
 		// serve anything sensible stale, so build synchronously.
 		return false, updateIndex(dir, o.Harness, "", want, false, progress)
+	}
+	if newerIndex(m) {
+		// Left alone, and current as far as this build can tell: calling it
+		// stale handed it to a warmup that would not touch it either.
+		return false, nil
 	}
 	if m.Version != version {
 		// A content-version bump that this build can still read: the store
@@ -532,9 +541,27 @@ const redactionFloor = 46
 //
 // Two reasons, and only two: a layout this build cannot read answers nothing —
 // that is what onDiskFormat is for — and text written before deja knew how to
-// redact something must not be quoted while it is being re-read.
+// redact something must not be quoted while it is being re-read. An index a
+// newer deja wrote in the same layout is neither: see newerIndex.
 func mustRebuildBeforeAnswering(m Manifest, build int) bool {
-	return m.Format != onDiskFormat || m.Version < redactionFloor || m.Version > build
+	return m.Format != onDiskFormat || m.Version < redactionFloor
+}
+
+// newerIndex reports an index a newer deja wrote in a layout this build reads:
+// a binary rolled back, or two installs side by side. It answers as it is and
+// is left alone. Rebuilding it down to this build's version had the two
+// installs rebuild the whole store back and forth, each in turn, and the line
+// printed for it said this build was the newer one. Only an explicit
+// `deja index --rebuild` rebuilds it for this build.
+func newerIndex(m Manifest) bool {
+	return m.Format == onDiskFormat && m.Version > version
+}
+
+// sayNewerIndex is the line a pass prints when it leaves a newer index alone.
+func sayNewerIndex(progress io.Writer, dir string, m Manifest) {
+	if progress != nil {
+		fmt.Fprintf(progress, "deja: the index in %s was written by a newer deja (version %d, this one writes %d) — answering from it as it is; `deja index --rebuild` rebuilds it for this deja\n", displayPath(dir), m.Version, version)
+	}
 }
 
 // searchTrace returns a stage marker that prints when DEJA_TRACE=1, and costs a
@@ -3688,6 +3715,10 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	if err == nil && !recordsIntact(dir, old) {
 		force = true // records.bin lost its tail to a crash; only a rebuild is safe
 	}
+	if err == nil && !force && newerIndex(old) {
+		sayNewerIndex(progress, dir, old)
+		return nil
+	}
 	// A transcript under a new name is not a new transcript. Settled before the
 	// diff below, so the file is neither read again nor left behind as a row
 	// pointing at a path that is gone: twenty renames of one 4 KB log left the
@@ -3720,7 +3751,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			// install prints. Every other reason for a full pass names itself:
 			// damage says it is damage, a changed exclude list says so, and
 			// `--rebuild` was asked for (#3500).
-			if err == nil && !force && old.Version != version && old.Version != 0 {
+			if err == nil && !force && old.Version < version && old.Version != 0 {
 				fmt.Fprintf(progress, "deja: this build reads a newer index than the one on disk (%d, was %d) — re-reading your sources once\n", version, old.Version)
 			}
 			if !hasProgressSink() {
