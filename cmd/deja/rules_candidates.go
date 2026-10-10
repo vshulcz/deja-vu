@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/policy"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
@@ -194,13 +195,16 @@ func collectRuleCandidates(dir string, since time.Duration, limit int) ([]ruleCa
 		// without correcting anything, because nothing has been done yet.
 		if st.seenUser && st.afterTurn && isCorrection(x) && (cutoff.IsZero() || !r.Time.Before(cutoff)) {
 			out = append(out, ruleCandidate{
-				Harness:     meta.Harness,
-				Date:        r.Time.Local().Format("2006-01-02"),
-				Session:     shortID(meta.ID),
-				SessionID:   meta.ID,
-				Project:     meta.Project,
-				Correction:  squeezeTrim(x, candidateQuote),
-				AgentBefore: squeezeTrim(st.lastAgent, candidateBefore),
+				Harness:   meta.Harness,
+				Date:      r.Time.Local().Format("2006-01-02"),
+				Session:   search.SafeLine(shortID(meta.ID)),
+				SessionID: search.SafeLine(meta.ID),
+				Project:   search.SafeLine(meta.Project),
+				// Text a transcript supplied, printed on a terminal and handed
+				// to an agent as JSON: an escape byte or a bidi override in it
+				// would reach either one (#3616).
+				Correction:  search.SafeLine(squeezeTrim(x, candidateQuote)),
+				AgentBefore: search.SafeLine(squeezeTrim(st.lastAgent, candidateBefore)),
 				time:        r.Time,
 			})
 		}
