@@ -1786,7 +1786,13 @@ func searchWithOptions(dir string, args []string, sourceInstance string, bare bo
 	// the ranked order a script may rely on.
 	if o.All && !o.JSON && len(hits) > 1 {
 		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Session.Updated.After(hits[j].Session.Updated) })
-		fmt.Fprintf(os.Stderr, "deja: all %d matches, newest first\n", len(hits))
+		// Under --limit the list is the top of the ranking, and "all 5
+		// matches" sat under "showing 5 of 40".
+		if o.Total > len(hits) {
+			fmt.Fprintln(os.Stderr, "deja: newest first")
+		} else {
+			fmt.Fprintf(os.Stderr, "deja: all %d matches, newest first\n", len(hits))
+		}
 	}
 	// Through a counter, so the log records what actually went out rather than
 	// a guess at it. `deja log` is the audit of what deja did, and the search

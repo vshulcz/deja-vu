@@ -36,6 +36,10 @@ func TestCappedNoteDoesNotAdviseAllWhenAllIsAlreadyOn(t *testing.T) {
 	if strings.Contains(out, "add --all") {
 		t.Errorf("--all is already on and the note still advises it:\n%s", out)
 	}
+	// Three of six is not "all 3 matches".
+	if strings.Contains(out, "all 3 matches") || !strings.Contains(out, "newest first") {
+		t.Errorf("the order line contradicts the truncation note:\n%s", out)
+	}
 
 	// The control: without --all the advice is the whole point of the line.
 	out, err = captureRunStderr(t, "--no-embed", "--limit", "3", "retry")
