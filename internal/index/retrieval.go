@@ -2447,10 +2447,19 @@ func FindByPrefixIn(dir, p, harness string) (model.Session, bool, error) {
 	}
 	sessions := inHarness(m.Sessions, harness)
 	var matches []SessionMeta
+	var exact []SessionMeta
 	for _, meta := range sessions {
 		if strings.HasPrefix(meta.ID, p) {
 			matches = append(matches, meta)
+			if meta.ID == p {
+				exact = append(exact, meta)
+			}
 		}
+	}
+	// A complete id is that session, even when it also starts a newer one's:
+	// "abc" opened abc2, and --json refused it with advice to type more.
+	if len(exact) > 0 {
+		matches = exact
 	}
 	// The id the session came with, before the loose pass: import rewrites the
 	// id and OrigID keeps the old one (#1049), and a reader who typed that id in
@@ -2562,10 +2571,13 @@ func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) in
 	// imported under: #853 requires the count and the resolver to agree, and a
 	// selector that opens a session while the count says zero is that failure
 	// with the sign flipped.
-	n := 0
+	n, exact := 0, 0
 	for _, meta := range sessions {
 		if allow != nil && !allow(meta.Project) {
 			continue
+		}
+		if meta.ID == p {
+			exact++
 		}
 		if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
 			n++
@@ -2574,6 +2586,11 @@ func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) in
 		if strings.HasPrefix(meta.ID, p) {
 			n++
 		}
+	}
+	// A complete id resolves to its own session (FindByPrefixIn), so only
+	// sessions with that very id make it ambiguous.
+	if exact > 0 {
+		return exact
 	}
 	if n == 0 {
 		// The remote-control id, counted where the resolver tries it (#4667).
