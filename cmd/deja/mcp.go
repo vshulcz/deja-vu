@@ -42,6 +42,28 @@ func isNotification(id json.RawMessage) bool {
 	return len(id) == 0 || string(id) == "null"
 }
 
+// rpcIDProblem says what is wrong with a request's id, or nothing. MCP ids
+// are strings or numbers: an object or a bool echoed back is not one, and a
+// null id on a request (not a notification) went unanswered, which a client
+// waits on forever.
+func rpcIDProblem(req rpcRequest) string {
+	id := bytes.TrimSpace(req.ID)
+	if len(id) == 0 {
+		return ""
+	}
+	if string(id) == "null" {
+		if strings.HasPrefix(req.Method, "notifications/") {
+			return ""
+		}
+		return "id must be a string or a number, not null"
+	}
+	switch c := id[0]; {
+	case c == '"', c == '-', c >= '0' && c <= '9':
+		return ""
+	}
+	return "id must be a string or a number"
+}
+
 // parseBatch reports whether a frame is an array of requests, and returns them.
 // A frame that only starts like one — a truncated `[` — is not a batch and
 // keeps its parse error.
@@ -117,6 +139,10 @@ func serveMCP(dir string, r io.Reader, w io.Writer) error {
 				// the request is unambiguous — but "1.0" asks for a protocol
 				// this server does not speak and used to be answered anyway.
 				srv.refuse(req.ID, -32600, "unsupported jsonrpc version "+req.JSONRPC+" — this server speaks 2.0")
+			} else if msg := rpcIDProblem(req); msg != "" {
+				srv.refuse(nil, -32600, msg)
+			} else if !isNotification(req.ID) && req.Method == "" {
+				srv.refuse(req.ID, -32600, "request has no method")
 			} else if !isNotification(req.ID) {
 				srv.serve(req)
 			} else if req.Method == "notifications/cancelled" {
@@ -211,13 +237,39 @@ func handleMCP(dir string, req rpcRequest) (any, int, string) {
 			return nil, -32602, "invalid params"
 		}
 		text, err := callMCPTool(dir, p.Name, p.Arguments)
-		if err != nil {
+		// A call the agent got wrong is invalid params. A tool that ran and
+		// failed — a notes file it cannot write — is a result marked isError,
+		// which the client hands to the model rather than to its own logs.
+		var bad *mcpArgError
+		if errors.As(err, &bad) {
 			return nil, -32602, err.Error()
+		}
+		if err != nil {
+			out := toolText(err.Error())
+			out["isError"] = true
+			return out, 0, ""
 		}
 		return toolText(text), 0, ""
 	default:
 		return nil, -32601, "method not found"
 	}
+}
+
+// mcpArgError is a tool call the caller can correct: an argument missing, of
+// the wrong type, or naming something that is not there.
+type mcpArgError struct{ msg string }
+
+func (e *mcpArgError) Error() string { return e.msg }
+
+func argErrorf(format string, args ...any) error {
+	return &mcpArgError{fmt.Sprintf(format, args...)}
+}
+
+func asArgError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &mcpArgError{err.Error()}
 }
 
 func writeRPCError(enc *json.Encoder, id any, code int, msg string) {
@@ -243,16 +295,16 @@ func decodeToolArgs(tool string, raw json.RawMessage, into any) error {
 	}
 	var typeErr *json.UnmarshalTypeError
 	if errors.As(err, &typeErr) && typeErr.Field != "" {
-		return fmt.Errorf("%s: %q must be %s", tool, strings.TrimPrefix(typeErr.Field, "."), jsonTypeName(typeErr.Type.Kind()))
+		return argErrorf("%s: %q must be %s", tool, strings.TrimPrefix(typeErr.Field, "."), jsonTypeName(typeErr.Type.Kind()))
 	}
 	// A field's own decoder failing is not a malformed argument object, and
 	// saying "arguments must be an object" about `{"limit":"five"}` sent the
 	// agent to rewrite the one part of the call that was right. mcpNumber's
 	// message names what it wanted; carry it rather than replacing it.
 	if isJSONObject(raw) {
-		return fmt.Errorf("%s: %v", tool, err)
+		return argErrorf("%s: %v", tool, err)
 	}
-	return fmt.Errorf("%s: arguments must be an object", tool)
+	return argErrorf("%s: arguments must be an object", tool)
 }
 
 // isJSONObject reports whether the arguments really are a JSON object, so the
@@ -438,7 +490,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			// rather than an empty answer it will read as "no history".
 			// Named from what the tool declares rather than spelled out here:
 			// the seventh mode landed and this sentence still listed six.
-			return "", fmt.Errorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
+			return "", argErrorf("mode %q is not one of %s", a.Mode, strings.Join(declaredModes(), ", "))
 		}
 		return callMCPTool(dir, target, spreadQ(mode, raw))
 	}
@@ -455,10 +507,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			return "", err
 		}
 		if strings.TrimSpace(a.Query) == "" {
-			return "", fmt.Errorf("query required")
+			return "", argErrorf("query required")
 		}
 		if err := checkHarness(&a.Harness); err != nil {
-			return "", err
+			return "", asArgError(err)
 		}
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
@@ -484,10 +536,10 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			return "", err
 		}
 		if strings.TrimSpace(a.Query) == "" {
-			return "", fmt.Errorf("query required")
+			return "", argErrorf("query required")
 		}
 		if err := checkHarness(&a.Harness); err != nil {
-			return "", err
+			return "", asArgError(err)
 		}
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
@@ -522,17 +574,17 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			return "", err
 		}
 		if strings.TrimSpace(a.Path) == "" {
-			return "", fmt.Errorf("path required")
+			return "", argErrorf("path required")
 		}
 		if err := checkHarness(&a.Harness); err != nil {
-			return "", err
+			return "", asArgError(err)
 		}
 		var since time.Duration
 		if a.Since != "" {
 			var err error
 			since, err = parseDur(a.Since)
 			if err != nil {
-				return "", err
+				return "", asArgError(err)
 			}
 		}
 		// The agent-facing blame reads without waiting, the way recall does:
@@ -573,7 +625,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			return "", err
 		}
 		if strings.TrimSpace(a.Text) == "" {
-			return "", fmt.Errorf("text required")
+			return "", argErrorf("text required")
 		}
 		if strings.TrimSpace(a.Project) == "" {
 			// Filed where `deja remember` files it, under the project the
@@ -625,7 +677,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		}
 		return fmt.Sprintf("Remembered under %s.", projectForEcho(a.Project)), nil
 	default:
-		return "", fmt.Errorf("unknown tool %q", name)
+		return "", argErrorf("unknown tool %q", name)
 	}
 }
 
@@ -633,7 +685,7 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 func blameTextResult(dir string, o search.BlameOptions, path string, limit int) (string, int, error) {
 	target, err := search.ResolveBlamePath(path)
 	if err != nil {
-		return "", 0, err
+		return "", 0, asArgError(err)
 	}
 	hits, _, _, refreshing, err := findBlameHitsStale(dir, target, o, policy.ActivationMCP, mcpProgress())
 	if err != nil {
@@ -765,7 +817,7 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		return "", 0, err
 	}
 	if strings.TrimSpace(a.Error) == "" {
-		return "", 0, fmt.Errorf("error text required")
+		return "", 0, argErrorf("error text required")
 	}
 	// Before the read, not after: the rebuild used to happen first and the
 	// guard ran when there was nothing left to report (#1306, #1309).
@@ -867,7 +919,7 @@ func mcpHow(dir, name string, raw json.RawMessage) (string, int, error) {
 		return "", 0, err
 	}
 	if strings.TrimSpace(a.What) == "" {
-		return "", 0, fmt.Errorf("what required")
+		return "", 0, argErrorf("what required")
 	}
 	if line := buildingNowForAgent(dir); line != "" {
 		return line, 0, nil

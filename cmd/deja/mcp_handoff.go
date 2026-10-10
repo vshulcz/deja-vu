@@ -38,7 +38,7 @@ func mcpHandoff(dir, name string, raw json.RawMessage) (string, int, error) {
 		harness, sel = strings.ToLower(sel), ""
 	}
 	if err := checkHarness(&harness); err != nil {
-		return "", 0, err
+		return "", 0, asArgError(err)
 	}
 	if line := buildingNowForAgent(dir); line != "" {
 		return frameRecall(line), 0, nil
