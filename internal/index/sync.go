@@ -480,6 +480,12 @@ func Import(dir, inDir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// An import appends to the record log and then stamps its size, so on a
+	// log longer than the manifest committed it would commit a killed pass's
+	// uncommitted tail along with the batch. That store is rebuilt first.
+	if !recordsIntact(dir, m) {
+		return 0, fmt.Errorf("%w: records.bin does not match the manifest — run `deja index` and import again", errCorruptIndex)
+	}
 	if m.ImportedRecords == nil {
 		m.ImportedRecords = map[string]bool{}
 	}

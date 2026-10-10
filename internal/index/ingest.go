@@ -3689,7 +3689,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			reprojected := applyRenamedFiles(&old, pairs)
 			// Failing to record it costs the duplicate this exists to avoid,
 			// not correctness: the pass below then treats the file as new.
-			werr := writeManifest(dir, old)
+			werr := writeManifestMeta(dir, old)
 			if werr == nil && len(reprojected) > 0 {
 				reprojectSidecars(dir, old.Sessions, reprojected)
 			}
