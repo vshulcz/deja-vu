@@ -2,8 +2,10 @@ package sources
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -369,7 +371,7 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 	// it over (#3933).
 	ss, err := parseCodexRolloutWithScanner(s, offset > 0, head, func(fn func(map[string]any)) error {
 		return scanJSONLFromOffset(path, offset, fn)
-	})
+	}, func() bool { return offset > 0 && codexRoledBefore(path, offset) })
 	// A tail with no message carries only its time (below). Without the head's
 	// id it would land on a row named after the file, which holds nothing.
 	if len(ss) == 1 && len(ss[0].Messages) == 0 && headID == "" {
@@ -381,7 +383,10 @@ func parseCodexRolloutPath(path string, offset int64, id, project, harness strin
 // parseCodexRolloutWithScanner normalizes a rollout supplied by the ordinary
 // file scanner or by a bounded in-memory capture. Keeping the latter in memory
 // avoids writing raw transcript content to a temporary file on compaction.
-func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD string, scan func(func(map[string]any)) error) ([]model.Session, error) {
+//
+// roledBefore says whether the bytes before an appended tail already carry
+// the roled stream; nil when the scan covers the whole rollout.
+func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD string, scan func(func(map[string]any)) error, roledBefore func() bool) ([]model.Session, error) {
 	// A command and its exit code arrive in separate records joined by call_id,
 	// so the command line is annotated after the fact — the same shape opencode
 	// gets for free from a column.
@@ -523,7 +528,10 @@ func parseCodexRolloutWithScanner(s model.Session, idSettled bool, knownCWD stri
 	// Only when the roled stream said nothing: an older rollout that carries
 	// its turns as events alone still has to be readable.
 	// A compaction summary is not the roled stream speaking.
-	if onlySummaries(s.Messages) && len(events) > 0 {
+	// Decided for the rollout, not for the read: a tail written between an
+	// event and the response_item that repeats it holds only the event, and
+	// keeping it stored the turn twice once the response_item came in.
+	if onlySummaries(s.Messages) && len(events) > 0 && (roledBefore == nil || !roledBefore()) {
 		s.Messages = append(events, s.Messages...)
 		sort.SliceStable(s.Messages, func(i, j int) bool { return s.Messages[i].Time.Before(s.Messages[j].Time) })
 	}
@@ -698,6 +706,26 @@ func codexPatch(s *model.Session, payload map[string]any, cwd string, t time.Tim
 	}
 }
 
+// codexRoledBefore reports whether a rollout's first offset bytes hold a
+// roled response_item, which makes its event stream a copy.
+func codexRoledBefore(path string, offset int64) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }()
+	r := bufio.NewReaderSize(io.LimitReader(f, offset), 64*1024)
+	for {
+		line, err := r.ReadBytes('\n')
+		if bytes.Contains(line, []byte(`"response_item"`)) && bytes.Contains(line, []byte(`"role":`)) {
+			return true
+		}
+		if err != nil {
+			return false
+		}
+	}
+}
+
 // codexRolloutHead reads the identity a rollout declares in its first record.
 func codexRolloutHead(path string) (id, cwd string, payload map[string]any) {
 	f, err := os.Open(path)
@@ -705,16 +733,22 @@ func codexRolloutHead(path string) (id, cwd string, payload map[string]any) {
 		return "", "", nil
 	}
 	defer func() { _ = f.Close() }()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	// Read by line with no cap, as the parse itself reads: a session_meta
+	// carrying long instructions runs past a megabyte, and a capped scanner
+	// lost the id, so a resumed tail was filed as a session of its own.
+	r := bufio.NewReaderSize(f, 64*1024)
 	// The meta record is the first line in every rollout Codex writes; a few
 	// lines of slack costs nothing and covers a format that adds a preamble.
-	for i := 0; i < 8 && sc.Scan(); i++ {
+	for i := 0; i < 8; i++ {
+		line, err := r.ReadBytes('\n')
 		var rec struct {
 			Type    string         `json:"type"`
 			Payload map[string]any `json:"payload"`
 		}
-		if json.Unmarshal(sc.Bytes(), &rec) != nil || rec.Type != "session_meta" {
+		if json.Unmarshal(trimJSONSpace(line), &rec) != nil || rec.Type != "session_meta" {
+			if err != nil {
+				break
+			}
 			continue
 		}
 		cwd, _ = rec.Payload["cwd"].(string)

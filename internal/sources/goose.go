@@ -627,6 +627,10 @@ func ParseGooseDBSince(db string, t time.Time) ([]model.Session, error) {
 	if t.IsZero() {
 		return parseGooseDBWhere(db, "", 0)
 	}
+	// A second back, as crush, hermes, kiro and devin look: both sides are
+	// compared in whole seconds, and a turn stored in the watermark's own
+	// second fails a strict > for good.
+	t = t.Add(-time.Second)
 	sec := t.Unix()
 	rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
 	// Compared through datetime() because the two sides are written in
