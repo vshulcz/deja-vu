@@ -15,6 +15,9 @@ a `schema_version` field so consumers can detect breaking changes.
 - **`deja blame --json`** and **`deja log --json`** return a top-level JSON
   array rather than an envelope, so neither carries `schema_version`. Their
   element shapes are stable; only additive fields inside them are permitted.
+- **`deja rules candidates --json`** returns a top-level array too, on the
+  same terms as blame and log: it shipped that way, and wrapping it now would
+  break whoever reads it.
 - **`deja stats --impact --json`** and **`deja stats --redaction --json`**
   return one flat object of counters and carry no `schema_version` either, on
   the same terms.
@@ -116,7 +119,6 @@ Every search returns one envelope:
     "snippets": ["matched text …"],
     "score": 1.5,
     "tier": "exact",
-    "tier_detail": "",
     "superseded": "2026-07-19"
   }
   ]
@@ -136,6 +138,10 @@ written against version 1:
   "fuzzy": true
 }
 ```
+
+`capped` is omitted when false. On the `close` and `stemmed` tiers a hit may
+carry `tier_detail`, which word of the query matched which spelling in the
+session (`connection->conection`); it is omitted on every other tier.
 
 Stemmed search may also include `variants`; semantic search sets `semantic`.
 `superseded` (optional) carries the date of a newer same-project session whose
@@ -316,6 +322,9 @@ the end returns a session with no `messages` key and a `returned` count of zero.
 }
 ```
 
+`repeat_questions` is how many questions were asked in more than one session,
+and is omitted when none were.
+
 `spans` and `span_files` count the replaced spans `deja restore` can hand back
 and the files they belong to. Both are omitted when the index holds none.
 
@@ -328,7 +337,11 @@ the question rather than as an answer.
 
 Inside `recall`, `raw_bytes` is the size of the source transcripts the served
 digests distilled and `since` is the oldest non-compaction-measurement event still in the usage log; both
-are omitted when zero, so a store with no recall history yet shows neither.
+are omitted when zero. Any event counts toward `since`, a search the reader ran
+included, so it can be present while `recalls_served` and `injections` are 0.
+
+`date_range`, `longest_session` and `busiest_day` are omitted on a store with
+no sessions.
 
 `recall.compaction` is present when the retained usage log contains compaction
 observations. `captures` counts observed capture intervals, `measured` counts
@@ -484,8 +497,8 @@ appears only after `deja embed` has built a semantic sidecar. The heatmap grid u
 }
 ```
 
-`embed`, `ingest_health` and `deep` (present only under `--deep`) are omitted
-when unavailable; `policy` is always present. `embed.state` is the endpoint's,
+`embed`, `ingest_health`, `ingest_files` and `deep` (present only under
+`--deep`) are omitted when unavailable or empty; `policy` is always present. `embed.state` is the endpoint's,
 `unavailable` or `reachable`. `sidecar` is the file's own state and appears only
 when it is `unreadable` — the sidecar is on disk and deja cannot parse it —
 with an `error` saying why. A sidecar fault is reported whether or not an
@@ -596,6 +609,14 @@ one.
 `path` is worth reading rather than assuming: the file is not called `deja` in
 every harness.
 
+`deep` (under `--deep`) proves the index against the sources: `files_checked`
+source files were counted, `sessions_indexed` sessions are in the index,
+`sampled_files` of them were parsed again and `sampled_postings` postings were
+resolved to their records. `stale` lists sources changed since the last pass,
+which `deja index` absorbs. `findings` lists where the index disagrees with what
+it claims to hold, each a `kind` (`shrunk-file`, `orphan-file`, `parse-drift`,
+`dead-posting`, `torn-log`) and a `detail`; it is omitted when there are none.
+
 Under `deep`, `kept` lists indexed transcripts that are no longer on disk while
 their directory is — the client's own cleanup, kept on purpose. It is not a
 finding: nothing about the index is wrong, and a rebuild keeps them.
@@ -605,8 +626,9 @@ Version `state` is `ok`, `update-available`, `ahead`, `dev`, `offline` (under
 `unreadable` (which adds an `error`); `activations` keys are `search`, `mcp` and
 `auto`, each with the rule in force and how many sessions it withheld;
 `ignored` and `inert` list policy lines that matched no harness or no import.
-Per-harness `ingest_health` may also carry `clipped_messages` and `last_error`,
-which quotes one of that store's failures — the first failing path in order,
+Per-harness `ingest_health` may also carry `clipped_messages`, `failed_files`
+(how many of the store's files the last pass could not read at all) and
+`last_error`, which quotes one of that store's failures — the first failing path in order,
 so the same index reports the same error every run. `ingest_files` below has
 every one of them.
 
@@ -734,7 +756,7 @@ of a credential. `count` is how many turns of that session held that kind.
 `findings` holds only the rules that name a provider or a protocol shape —
 provider keys, `private-key`, `jwt`, `bearer-token`, `cookie`,
 `url-credentials`, `webhook-url`, the command and netrc password shapes.
-`counted` is every other rule as a number, because the assignment and entropy rules fire on the
+`counted` is every other rule as a number, omitted when none of them fired, because the assignment and entropy rules fire on the
 value side of `key=` as often for a digest or an identifier as for a secret: on
 the store this was measured against they were 3,465 markers against 82
 findings. A consumer that wants those has the counts and should not present
@@ -1131,9 +1153,11 @@ in none of the other counts rather than assumed recent.
 `masked` is what the outbound redaction pass removed on the way out, by class.
 This output is meant to be shown to other people, so quoted material — project
 names, the session title, the error lines — takes that pass whatever the index
-holds, the same rule `deja recap --json` follows. `sessions_outside_window`
-counts indexed sessions older than `from`, or carrying no date at all, so a
-small report over a large index says why.
+holds, the same rule `deja recap --json` follows; `masked` is omitted when
+nothing was masked. `sessions_outside_window` counts indexed sessions older
+than `from`, or carrying no date at all, so a small report over a large index
+says why. It is omitted when there are none: `sessions_outside_window` absent
+means every indexed session is inside the window.
 
 The window is the last twelve months ending now, not a calendar year, and the
 report takes no filters: `--harness`, `--project`, `--since` and `--role` are
@@ -1280,7 +1304,7 @@ them. A consumer that wants only the strong claim reads `rule == "replaced"`.
 attributed lines here, that turn existed for 40 of them and, read by eye, 16 of
 33 distinct turns carried a reason — a finding, a constraint, a diagnosis —
 while the rest said what was about to be done. Turns shorter than 60 characters
-are dropped, which is where most of that half sits; the field is absent when
+are dropped, which is where most of that half sits; `said_before` is absent when
 nothing clears it. A consumer must not present it as a rationale deja stands
 behind. (The session's conclusion was measured for the same purpose and
 overlapped the change 0 times in 81 lines, which is why it is not this field.)
@@ -1331,3 +1355,30 @@ not have to re-assemble it.
 
 Nothing is stored and nothing is asked of the agent; `deja wip` reads the
 transcript each time it runs.
+
+## `deja rules candidates --json`
+
+The turns where the user corrected an agent, oldest first, for the user's own
+agent to group into rules. A top-level array, `[]` when nothing was found:
+
+```json
+[
+  {
+    "n": 1,
+    "harness": "claude",
+    "date": "2026-09-14",
+    "session": "4f2c9a1e",
+    "session_id": "4f2c9a1e-7b3d-4c1a-9e2f-0a8b6c5d4e3f",
+    "project": "work/app",
+    "correction": "no, don't mock the database in these tests",
+    "agent_before": "I'll add a mock for the orders repository so the test runs without Postgres."
+  }
+]
+```
+
+`n` is the number the text output prints as `#n`, so an agent can cite a
+candidate. `session` is the short id the text output prints and `session_id`
+the whole one; `project` is omitted when the session has none. `correction` is
+the user's turn and `agent_before` what the agent said or did just before it,
+both on one line and cut to a bounded length. Text from the transcript is
+filtered the way every other surface filters it.
