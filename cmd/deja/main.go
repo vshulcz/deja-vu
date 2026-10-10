@@ -412,6 +412,12 @@ func run(args []string) error {
 			fmt.Print(wrapUsage(h, printableWidth(os.Stdout)))
 			return nil
 		}
+		// Not a command, so the words are a bare search, and --help after
+		// them was searched for along with them.
+		if !dispatchKnows(args[0]) && !strings.HasPrefix(args[0], "hook-") {
+			fmt.Print(wrapUsage(helpForCommand("search"), printableWidth(os.Stdout)))
+			return nil
+		}
 	}
 	switch args[0] {
 	case "show":
@@ -3027,6 +3033,14 @@ func parseSearch(args []string) (search.Options, error) {
 			if cmd := flagsOfOtherCommands[a]; cmd != "" {
 				return o, fmt.Errorf("%s is a flag of `deja %s`, not of search — put it after `--` to search for the text", a, cmd)
 			}
+			// A --word after the query is a flag deja does not have. Taken as
+			// a query term it turned `deja goroutines --bogus` into a search
+			// for both words that found nothing, where the word alone had 40
+			// hits. A query that starts with one (`--retry budget`), a phrase
+			// with a dash inside, or a single dash is still a query.
+			if len(q) > 0 && flagShaped(a) {
+				return o, fmt.Errorf("search: unknown flag %q — `deja search --help` lists its flags; put it after `--` to search for the text", a)
+			}
 			q = append(q, a)
 		}
 	}
@@ -3040,6 +3054,23 @@ func parseSearch(args []string) (search.Options, error) {
 		return o, fmt.Errorf("query required")
 	}
 	return o, nil
+}
+
+// flagShaped reports whether a token reads as a long flag: two dashes, then
+// letters, digits and inner dashes, nothing else.
+func flagShaped(a string) bool {
+	if len(a) < 3 || !strings.HasPrefix(a, "--") {
+		return false
+	}
+	for i, r := range a[2:] {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9', r == '-' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // flagsOfOtherCommands names the command each flag belongs to, for the tokens
