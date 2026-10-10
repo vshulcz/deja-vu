@@ -3310,6 +3310,11 @@ func runBlame(dir string, args []string) error {
 		lineBlame(os.Stdout, dir, target, hits)
 	}
 	if jsonOutput {
+		// The session object search returns, source and all: a consumer
+		// telling local sessions from imported ones reads it on both.
+		for i := range hits {
+			hits[i].Session.SetSource(os.Getenv("DEJA_SOURCE_INSTANCE"))
+		}
 		search.PrintBlame(os.Stdout, hits, true)
 		return nil
 	}
