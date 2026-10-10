@@ -527,7 +527,13 @@ func frame(body []string, foot string) []string {
 }
 
 func printStatsCard(w io.Writer, r stats.Report) {
+	// Plain into a pipe or under NO_COLOR, as the rest of stats prints: the
+	// layout is measured on the visible text, so it stays aligned.
+	color := statColorOK(w)
 	for _, line := range statsCardLines(r) {
+		if !color {
+			line = visibleText(line)
+		}
 		fmt.Fprintln(w, line)
 	}
 }
