@@ -4234,6 +4234,9 @@ func runForget(dir string, args []string) error {
 		if line := forgetNotesLine(result); line != "" {
 			fmt.Fprintln(os.Stdout, line)
 		}
+		if line := forgetCopiesLine(result.Copies); line != "" {
+			fmt.Fprintln(os.Stdout, line)
+		}
 		if n := usage.CountSnapshots(dir, forgetDigestMatcher(o, result.Keys)); n > 0 {
 			fmt.Fprintf(os.Stdout, "would remove: %d stored digest(s) from the injection log\n", n)
 		}
@@ -4363,6 +4366,9 @@ func runForget(dir string, args []string) error {
 	} else if result.Exported {
 		fmt.Fprintln(os.Stdout, "already exported once — forgetting here does not remove copies elsewhere")
 	}
+	if line := forgetCopiesLine(result.Copies); line != "" {
+		fmt.Fprintln(os.Stdout, line)
+	}
 	// The notes are decisions the reader deliberately kept, so folding them
 	// into the session count reads as "four conversations" when half of it is
 	// their own writing (#690).
@@ -4375,6 +4381,25 @@ func runForget(dir string, args []string) error {
 		fmt.Fprintln(os.Stdout, line)
 	}
 	return nil
+}
+
+// forgetCopiesLine names the sessions that still hold a copy of what was
+// forgotten: a fork opens with its source's turns under its own id. Named, not
+// taken: forgetting a fork whole drops the work it did after the copy.
+func forgetCopiesLine(keys []string) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	verb, cmd := "hold", "`deja forget --session <id>` drops each, with its own work"
+	if len(keys) == 1 {
+		id := keys[0]
+		if _, rest, ok := strings.Cut(id, ":"); ok {
+			id = rest
+		}
+		verb, cmd = "holds", "`deja forget --session "+id+"` drops it too, with its own work"
+	}
+	return fmt.Sprintf("%s still %s a copy of these turns (a fork or its source): %s — %s",
+		countNoun(len(keys), "other session"), verb, safeForStatusline(joinCapped(keys, 5), 400), cmd)
 }
 
 // verbShare keeps "1 session share" off the screen.
