@@ -288,9 +288,13 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// The same cooldown across agent sessions in this project. Without it the
 	// window reset every time a new agent session opened, which is how one
 	// marathon reached 110 servings (#2038).
+	//
+	// The names are asked for once: each ask runs `git worktree list`, and in a
+	// repository with hundreds of worktrees that is tens of milliseconds.
+	names := digest.ProjectNameCandidates(cwd)
 	projectKey := ""
-	if cands := digest.ProjectNameCandidates(cwd); len(cands) > 0 {
-		projectKey = cands[0]
+	if len(names) > 0 {
+		projectKey = names[0]
 	}
 	// Except for a spawned agent. The cooldown above counts servings across
 	// agent sessions, which is right for a reader working through a run of
@@ -318,7 +322,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	for id := range self {
 		skip[id] = true
 	}
-	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNaming(dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates, skip)
+	ranked, matched, strong, naming, idfOf, err := index.ProjectRelevantNaming(dir, names, terms, prompt.Candidates, skip)
 	// The rule every other surface applies: a promoted note goes in front of
 	// the transcript it was distilled from. This hook ranks sessions and never
 	// builds a search.Hit, so it had no note-over-source rule at all and the
@@ -464,7 +468,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	// further down than the window reached.
 	if len(ss) < 2 && crowdedOut > 0 {
 		wider, wmatched, wstrong, wnaming, _, werr := index.ProjectRelevantNaming(
-			dir, digest.ProjectNameCandidates(cwd), terms, prompt.Candidates*widerWindow, skip)
+			dir, names, terms, prompt.Candidates*widerWindow, skip)
 		if werr == nil {
 			pick(wider, wmatched, wstrong, wnaming)
 		}

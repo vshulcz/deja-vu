@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -529,7 +530,12 @@ func hookProjectIs(cwd, project string) bool {
 	if project == "" {
 		return false
 	}
-	for _, name := range digest.ProjectNameCandidates(cwd) {
+	return namesInclude(digest.ProjectNameCandidates(cwd), project)
+}
+
+// namesInclude is hookProjectIs over names already asked for.
+func namesInclude(names []string, project string) bool {
+	for _, name := range names {
 		if strings.EqualFold(name, project) {
 			return true
 		}
@@ -886,8 +892,10 @@ func fileHookLineOutside(dir, cwd, path, self string) string {
 	// or "README.md" collects every project's file of that name — the line then
 	// claims a history this file does not have and points `deja blame` at a
 	// pile of other repos. Count only sessions in the project being worked in,
-	// unless the stored path is the exact one (which cannot collide).
-	projects := digest.ProjectNameCandidates(cwd)
+	// unless the stored path is the exact one (which cannot collide). Asked
+	// for only when a session needs them: the names list the repository's
+	// worktrees, which is a subprocess on every edit.
+	projects := sync.OnceValue(func() []string { return digest.ProjectNameCandidates(cwd) })
 	// A hook that fires unasked is the auto activation, so a session the trust
 	// policy withholds must not even be counted here.
 	pol := policy.Load()
@@ -901,7 +909,7 @@ func fileHookLineOutside(dir, cwd, path, self string) string {
 		if !pol.Allows(policy.ActivationAuto, meta.Project) {
 			continue
 		}
-		if !fileMetaInScope(meta, path, projects) {
+		if !fileMetaInScope(meta, path, nil) && !fileMetaInScope(meta, path, projects()) {
 			continue
 		}
 		sessions++
