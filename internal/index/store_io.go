@@ -853,7 +853,11 @@ func readBucket(p string) (map[string][]posting, error) {
 		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
 			return nil, err
 		}
-		out[e.tok] = decodePostings(b)
+		posts, err := decodePostingBlock(b)
+		if err != nil {
+			return nil, err
+		}
+		out[e.tok] = posts
 	}
 	return out, nil
 }
@@ -878,7 +882,7 @@ func readBucketToken(p, tok string) ([]posting, error) {
 		if _, err := f.ReadAt(b, int64(e.off)); err != nil {
 			return nil, err
 		}
-		return decodePostings(b), nil
+		return decodePostingBlock(b)
 	}
 	return nil, nil
 }
@@ -1046,6 +1050,21 @@ func encodePostings(posts []posting) []byte {
 	return b
 }
 
+// decodePostingBlock decodes a block read from a bucket and checks the one
+// thing every block encodePostings writes holds: offsets that only rise, one
+// posting per record. A block whose bytes were zeroed decodes to offset 0 over
+// and over, which resolved to some other session's first record, was dropped
+// by the session check and left the search answering nothing without an error.
+func decodePostingBlock(b []byte) ([]posting, error) {
+	posts := decodePostings(b)
+	for i := 1; i < len(posts); i++ {
+		if posts[i].Off <= posts[i-1].Off {
+			return nil, fmt.Errorf("%w: a posting block repeats an offset", errCorruptIndex)
+		}
+	}
+	return posts, nil
+}
+
 // decodePostings mirrors encodePostings. A truncated varint ends the walk and
 // yields what was whole rather than panicking.
 //
@@ -1194,7 +1213,7 @@ func (b *bucketReader) postings(tok string) ([]posting, error) {
 		if err != nil {
 			return nil, err
 		}
-		return decodePostings(buf), nil
+		return decodePostingBlock(buf)
 	}
 	return nil, nil
 }

@@ -3469,7 +3469,12 @@ func intersectSubstringPostingsDetailed(dir string, bare []string) ([]posting, m
 					f.Close()
 					return nil, nil, fmt.Errorf("%w: %v", errCorruptIndex, err)
 				}
-				for _, p := range decodePostings(buf) {
+				posts, err := decodePostingBlock(buf)
+				if err != nil {
+					f.Close()
+					return nil, nil, err
+				}
+				for _, p := range posts {
 					perTok[i][p.Off] = p
 				}
 			}
