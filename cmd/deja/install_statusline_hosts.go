@@ -65,9 +65,18 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 	if err != nil {
 		return installResult{}, err
 	}
+	// Read with comments blanked, the way the hook writer beside it reads the
+	// same file: a status line it has nothing to change in is "unchanged",
+	// and refusing there failed the uninstall of a file install had just
+	// edited.
+	jsonc := configIsJSONC(old)
+	source := old
+	if jsonc {
+		source = []byte(jsoncToJSON(string(old)))
+	}
 	root := map[string]any{}
-	if len(bytes.TrimSpace(old)) > 0 {
-		if err := json.Unmarshal(old, &root); err != nil {
+	if len(bytes.TrimSpace(source)) > 0 {
+		if err := json.Unmarshal(source, &root); err != nil {
 			return installResult{}, configParseError(path, err)
 		}
 	}
@@ -106,6 +115,9 @@ func installJSONStatusline(path string, keys []string, entry map[string]any, uni
 		return installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, false)}, nil
 	default:
 		parent[last] = entry
+	}
+	if jsonc {
+		return installResult{}, fmt.Errorf("%s: deja cannot edit the status line in a file that carries comments — set it by hand, or take the comments out", path)
 	}
 	next, err := marshalConfigLike(old, root)
 	if err != nil {
