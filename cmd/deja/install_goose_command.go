@@ -240,7 +240,10 @@ func installGooseCommand(exe string, uninstall bool) (installResult, error) {
 			// it holds deja's own — the rules the skills and command files
 			// have since #2581 and #2600. Without it the reader's recipe was
 			// destroyed and their copy left as a .bak beside nothing (#2602).
-			if _, err := restoreReplacedFile(recipe, mentionsDeja); err != nil {
+			// The recipe is a command file in YAML: prose with deja's
+			// description, none of the config markers mentionsDeja reads, so
+			// deja's own earlier recipe was put back as if it were theirs.
+			if _, err := restoreReplacedFile(recipe, isOurCommandFile); err != nil {
 				return installResult{}, err
 			}
 		}
