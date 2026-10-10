@@ -4410,12 +4410,13 @@ func canAppendIncremental(changed map[string]FileState, old map[string]FileState
 		if rereadsWholeSessions(p) {
 			return false
 		}
-		// A prior pass that indexed no complete line (a torn first line, or a lone
-		// line with no trailing newline) leaves SafeSize==0 with bytes on disk.
-		// Resuming an append from that ambiguous 0 would either re-read mid-line
-		// (dropping the first message) or duplicate an already-indexed lone line,
-		// so route these files through the full re-index path instead (#appendloss).
-		if of.SafeSize == 0 && of.Size > 0 {
+		// A prior pass that saw bytes past the last newline leaves SafeSize
+		// short of Size. The readers index a last line that parses even with no
+		// newline yet, so resuming from SafeSize read that line a second time
+		// once the writer finished it; and a torn first line with SafeSize 0
+		// would be re-read mid-line. Either way the tail is ambiguous, so these
+		// files go through the full re-index path instead (#appendloss).
+		if of.SafeSize < of.Size {
 			return false
 		}
 		// Growth is not proof that the earlier bytes are untouched: a rewind
@@ -4626,7 +4627,10 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 				collisions.Add(1)
 				meta.Shared = true
 			}
-			if s.Project != "" && s.Project != "-" && owns {
+			// A tail with no files of its own names only the directory the
+			// session started in; the row already holds what the whole file
+			// said, which a rebuild also takes.
+			if s.Project != "" && s.Project != "-" && owns && !(known && named && s.ProjectFromDir) {
 				meta.Project = s.Project
 			}
 			if s.Path != "" && owns {

@@ -65,6 +65,11 @@ type Session struct {
 	// the session holds no user turn (#692). Surfaces that print titles in the
 	// place of the reader's own question need to say so (#1100).
 	AgentTitle bool `json:"agent_title,omitempty"`
+	// ProjectFromDir marks a Project that is only the directory the transcript
+	// was started from, with no files of the session's own to say otherwise.
+	// An appended tail with a few turns and no file activity says nothing about
+	// where the work was, so the index keeps the project it has.
+	ProjectFromDir bool `json:"-"`
 	// OrigID is the id this session had on the machine it came from, when it
 	// arrived by sync. Import renames sessions to imported-<hash>, so a
 	// promoted note stopped looking like one across a machine boundary and the
