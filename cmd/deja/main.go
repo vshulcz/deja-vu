@@ -768,7 +768,7 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		return err
 	}
 	var s model.Session
-	var ok bool
+	var ok, prefixed bool
 	if o.harness != "" {
 		// The same pass the prefix form runs. Without it the exact-identity
 		// path read whatever was on disk, and a store below the redaction
@@ -784,6 +784,10 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		s, ok, err = index.FindByIdentity(dir, o.harness, o.id)
 		if err == nil && !ok {
 			s, ok, err = findByPrefixHarness(dir, o.id, o.harness)
+			prefixed = true
+			if err == nil && ok && o.json {
+				err = ambiguousJSONPrefixIn(dir, o.id, o.harness)
+			}
 		}
 	} else {
 		s, ok, err = findByPrefix(dir, o.id)
@@ -825,6 +829,8 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 	}
 	if o.harness == "" {
 		noteAmbiguousPrefix(dir, o.id, "showing")
+	} else if prefixed {
+		noteAmbiguousPrefixIn(dir, o.id, o.harness, "showing")
 	}
 	// A day bucket's date is the day the index was built in, not the moment a
 	// line was written: read in another zone, `show` lists a record dated the
@@ -2698,6 +2704,29 @@ func ambiguousJSONPrefix(dir, id string) error {
 	return fmt.Errorf("%d sessions match %q — --json reads one; use a longer prefix (`deja last` prints ids whole)", n, id)
 }
 
+// searchAllows is the rule the ambiguity counts are taken under (#2401).
+func searchAllows() func(string) bool {
+	pol := policy.Load()
+	return func(project string) bool { return pol.Allows(policy.ActivationSearch, project) }
+}
+
+// ambiguousJSONPrefixIn is ambiguousJSONPrefix within one harness: --harness
+// narrows the prefix, and a prefix it still leaves ambiguous is refused the
+// same way.
+func ambiguousJSONPrefixIn(dir, id, harness string) error {
+	if n := index.PrefixMatchesIn(dir, id, harness, searchAllows()); n > 1 {
+		return fmt.Errorf("%d %s sessions match %q — --json reads one; use a longer prefix (`deja last` prints ids whole)", n, harness, id)
+	}
+	return nil
+}
+
+// noteAmbiguousPrefixIn is noteAmbiguousPrefix within one harness.
+func noteAmbiguousPrefixIn(dir, id, harness, action string) {
+	if n := index.PrefixMatchesIn(dir, id, harness, searchAllows()); n > 1 {
+		fmt.Fprintf(os.Stderr, "deja: %d %s sessions match %q — %s the most recent; use a longer prefix for another\n", n, harness, id, action)
+	}
+}
+
 // pickedOnScreen is the session the interactive screen handed to resume or
 // handoff. It is looked up by its exact identity, with no refresh first: after
 // an upgrade the refresh is a full rebuild, and the person who picked a
@@ -2728,15 +2757,26 @@ func findByPrefix(dir, p string) (model.Session, bool, error) {
 
 // findByPrefixHarness resolves an id prefix within one harness, so the
 // documented "deja show <id-prefix> --harness name" form works.
+// The prefix is resolved among that harness's sessions: picking the newest
+// across every harness and then refusing it said no session matches while one
+// in the named harness started with the prefix.
 func findByPrefixHarness(dir, p, harness string) (model.Session, bool, error) {
-	s, ok, err := findByPrefix(dir, p)
-	if err != nil || !ok {
-		return model.Session{}, false, err
+	if err := index.Ensure(dir, "", false, os.Stderr); err == nil {
+		if s, ok, err := index.FindByPrefixIn(dir, p, harness); err == nil {
+			if ok {
+				noteForgottenSource(s, p, true)
+			}
+			return s, ok, nil
+		}
 	}
-	if s.Harness != harness {
-		return model.Session{}, false, nil
+	var ss []model.Session
+	for _, s := range append(loadFileSources(), sources.LoadOpencodePrefix(p)...) {
+		if strings.EqualFold(s.Harness, harness) {
+			ss = append(ss, s)
+		}
 	}
-	return s, true, nil
+	s, ok := search.FindByPrefix(ss, p)
+	return s, ok, nil
 }
 
 func recent(dir string, n int) ([]model.Session, error) {

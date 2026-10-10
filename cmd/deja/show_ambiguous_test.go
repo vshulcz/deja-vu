@@ -79,3 +79,52 @@ func TestShowNamesHarnessWhenIDsAreShared(t *testing.T) {
 		t.Errorf("unambiguous id said %q", quiet)
 	}
 }
+
+// --harness narrows a prefix to that harness's sessions. The newest match
+// across every harness was picked first and then refused, so `show c --harness
+// codex` said no session matches while a codex session started with "c", and
+// --json answered a prefix that was still ambiguous within the harness.
+func TestShowHarnessNarrowsAPrefix(t *testing.T) {
+	tmp := hermeticEnv(t)
+	claude := filepath.Join(tmp, "claude", "proj-p")
+	qwen := filepath.Join(tmp, "qwen", "projects", "proj-z", "chats")
+	for _, d := range []string{claude, qwen} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("DEJA_CLAUDE_ROOT", filepath.Join(tmp, "claude"))
+	t.Setenv("DEJA_QWEN_ROOT", filepath.Join(tmp, "qwen"))
+	write := func(p, body string) {
+		if err := os.WriteFile(p, []byte(body+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(filepath.Join(qwen, "abq1.jsonl"),
+		`{"type":"user","sessionId":"abq1","timestamp":"2026-07-18T10:00:00Z","message":{"role":"user","parts":[{"text":"older qwen"}]}}`)
+	write(filepath.Join(qwen, "abq2.jsonl"),
+		`{"type":"user","sessionId":"abq2","timestamp":"2026-07-19T10:00:00Z","message":{"role":"user","parts":[{"text":"newer qwen"}]}}`)
+	write(filepath.Join(claude, "abc9.jsonl"),
+		`{"type":"user","sessionId":"abc9","cwd":"/w/p","timestamp":"2026-07-25T10:00:00Z","message":{"role":"user","content":"newest overall"}}`)
+	if err := index.Ensure(index.DefaultDir(), "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := captureRun(t, "show", "ab", "--harness", "qwen")
+	if err != nil {
+		t.Fatalf("a qwen session starts with the prefix: %v", err)
+	}
+	if !strings.Contains(out, "abq2") {
+		t.Fatalf("want the newest qwen match:\n%s", out)
+	}
+	note, _ := captureRunStderr(t, "show", "ab", "--harness", "qwen")
+	if !strings.Contains(note, "2 qwen sessions match") {
+		t.Errorf("no ambiguity note within the harness: %q", note)
+	}
+	if _, err := captureRun(t, "show", "ab", "--harness", "qwen", "--json"); err == nil || !strings.Contains(err.Error(), "--json reads one") {
+		t.Errorf("--json answered an ambiguous prefix: %v", err)
+	}
+	if _, err := captureRun(t, "show", "abq1", "--harness", "qwen", "--json"); err != nil {
+		t.Errorf("an exact id with --harness: %v", err)
+	}
+}

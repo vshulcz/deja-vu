@@ -2326,6 +2326,14 @@ func homeDir() string {
 }
 
 func FindByPrefix(dir, p string) (model.Session, bool, error) {
+	return FindByPrefixIn(dir, p, "")
+}
+
+// FindByPrefixIn resolves a prefix among one harness's sessions, or among all
+// of them when harness is empty. Filtering after the pick handed back the
+// newest match across every harness and then refused it, so `show c --harness
+// codex` said no session matches while a codex session started with "c".
+func FindByPrefixIn(dir, p, harness string) (model.Session, bool, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -2359,8 +2367,9 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	if err != nil {
 		return model.Session{}, false, err
 	}
+	sessions := inHarness(m.Sessions, harness)
 	var matches []SessionMeta
-	for _, meta := range m.Sessions {
+	for _, meta := range sessions {
 		if strings.HasPrefix(meta.ID, p) {
 			matches = append(matches, meta)
 		}
@@ -2371,7 +2380,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	// substring. Nothing consulted OrigID at all, so `show`/`resume`/`ctx` said
 	// no session matches about a session deja holds and prints that id for.
 	if len(matches) == 0 {
-		for _, meta := range m.Sessions {
+		for _, meta := range sessions {
 			if meta.OrigID != "" && strings.HasPrefix(meta.OrigID, p) {
 				matches = append(matches, meta)
 			}
@@ -2382,7 +2391,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	// continued from the phone or the browser was "no session matches" (#4667).
 	if len(matches) == 0 {
 		if rid := sources.RemoteSessionID(p); rid != "" {
-			for _, meta := range m.Sessions {
+			for _, meta := range sessions {
 				if meta.RemoteID != "" && strings.HasPrefix(meta.RemoteID, rid) {
 					matches = append(matches, meta)
 				}
@@ -2390,7 +2399,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 		}
 	}
 	if len(matches) == 0 {
-		for _, meta := range m.Sessions {
+		for _, meta := range sessions {
 			if idLooselyMatches(meta.ID, p) {
 				matches = append(matches, meta)
 			}
@@ -2406,7 +2415,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	// promote's receipts, which every reading command refused (#921).
 	if len(matches) == 0 {
 		if harness, id := splitSelector(p); harness != "" {
-			for _, meta := range m.Sessions {
+			for _, meta := range sessions {
 				if strings.EqualFold(meta.Harness, harness) && (strings.HasPrefix(meta.ID, id) || idLooselyMatches(meta.ID, id)) {
 					matches = append(matches, meta)
 				}
@@ -2419,7 +2428,7 @@ func FindByPrefix(dir, p string) (model.Session, bool, error) {
 	// session deja holds (#1620). Kept last because ids elsewhere are not all
 	// uuids — where case carries meaning, the exact match above has already won.
 	if len(matches) == 0 {
-		for _, meta := range m.Sessions {
+		for _, meta := range sessions {
 			if idFoldMatches(meta.ID, p) || (meta.OrigID != "" && idFoldMatches(meta.OrigID, p)) {
 				matches = append(matches, meta)
 			}
@@ -2455,6 +2464,11 @@ func PrefixMatches(dir, p string) int {
 // session that answers with the rule instead (#2401). A nil allow counts
 // everything, which is what a caller with no rules of its own wants.
 func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
+	return PrefixMatchesIn(dir, p, "", allow)
+}
+
+// PrefixMatchesIn counts within one harness, the way FindByPrefixIn resolves.
+func PrefixMatchesIn(dir, p, harness string, allow func(project string) bool) int {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -2465,12 +2479,13 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	if err != nil {
 		return 0
 	}
+	sessions := inHarness(m.Sessions, harness)
 	// Counted the same way FindByPrefix resolves, including the id a session was
 	// imported under: #853 requires the count and the resolver to agree, and a
 	// selector that opens a session while the count says zero is that failure
 	// with the sign flipped.
 	n := 0
-	for _, meta := range m.Sessions {
+	for _, meta := range sessions {
 		if allow != nil && !allow(meta.Project) {
 			continue
 		}
@@ -2485,7 +2500,7 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	if n == 0 {
 		// The remote-control id, counted where the resolver tries it (#4667).
 		if rid := sources.RemoteSessionID(p); rid != "" {
-			for _, meta := range m.Sessions {
+			for _, meta := range sessions {
 				if allow != nil && !allow(meta.Project) {
 					continue
 				}
@@ -2498,7 +2513,7 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	if n == 0 {
 		// The count and the resolver have to agree, or a reader is told an id
 		// matches nothing and then watches it open (#853).
-		for _, meta := range m.Sessions {
+		for _, meta := range sessions {
 			if allow != nil && !allow(meta.Project) {
 				continue
 			}
@@ -2509,7 +2524,7 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 	}
 	if n == 0 {
 		// Same last rung as the resolver: the id in the other case (#1620).
-		for _, meta := range m.Sessions {
+		for _, meta := range sessions {
 			if allow != nil && !allow(meta.Project) {
 				continue
 			}
@@ -2519,6 +2534,20 @@ func PrefixMatchesAllowed(dir, p string, allow func(project string) bool) int {
 		}
 	}
 	return n
+}
+
+// inHarness keeps one harness's sessions; an empty harness keeps all of them.
+func inHarness(ss map[string]SessionMeta, harness string) map[string]SessionMeta {
+	if harness == "" {
+		return ss
+	}
+	out := map[string]SessionMeta{}
+	for k, meta := range ss {
+		if strings.EqualFold(meta.Harness, harness) {
+			out[k] = meta
+		}
+	}
+	return out
 }
 
 // idLooselyMatches accepts what a reader can actually copy off the screen.
