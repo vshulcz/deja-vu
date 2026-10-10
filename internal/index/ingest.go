@@ -3587,14 +3587,15 @@ func inOpencodeSchemaDB(h, p string) bool {
 	if !ok {
 		return false
 	}
-	if p == db() {
-		return true
-	}
 	// opencode's diff files, Kilo's task files and ZCode's transcripts and
 	// snapshots carry the same harness name; anything else is a project directory. A diff
 	// record still counts as the database's through storeHarness, which files
 	// the diff path under that store.
-	return !opencodeSchemaOwnFile(h, p)
+	//
+	// Asked before the database path: resolving it can stat two files (with
+	// XDG_DATA_HOME set, opencode's), and fromDatabase asks this of every
+	// record an incremental pass holds.
+	return !opencodeSchemaOwnFile(h, p) || p == db()
 }
 
 // opencodeSchemaOwnFile reports whether p is one of harness h's own files
