@@ -4125,8 +4125,15 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 		return nil, "", err
 	}
 	if m == nil {
+		// The same guard as every other MCP writer: nothing to take out of a
+		// block deja never wrote, and adding it on the way out rewrote a config
+		// that never mentioned deja (#676).
+		if uninstall {
+			return old, "", nil
+		}
 		m = map[string]any{}
 		root["mcp"] = m
+		noteBlockAdded(path, "mcp")
 	}
 	// OpenCode 2.x accepts the MCP servers one level below the 1.x `mcp`
 	// block. Keep the entry in the shape the reader already uses instead of
@@ -4141,6 +4148,11 @@ func updateOpencodeJSON(old []byte, path, exe string, uninstall bool) ([]byte, s
 		delete(servers, "deja")
 		removeAdoptedDejaEntries(path, blockKey, servers)
 		note = leftDejaEntriesNote(servers)
+		// And the block, when deja is what put it there (#2604).
+		if len(m) == 0 && blockWasAdded(path, "mcp") {
+			delete(root, "mcp")
+			forgetBlockAdded(path, "mcp")
+		}
 	} else {
 		key := dejaEntryKey(servers)
 		if key != "deja" {
