@@ -254,20 +254,7 @@ func (a *tuiApp) drawToast() {
 // drawCat paints the mascot in half blocks: one cell holds two pixel rows,
 // the upper as foreground and the lower as background.
 func (a *tuiApp) drawCat(x, y int, m mark.Mood) (w, h int) {
-	return a.drawCatPart(x, y, m, mark.Grid(m))
-}
-
-// catHead is the sprite from the ears to the chin, for a box with no room for
-// the whole animal.
-func catHead(m mark.Mood) [][]byte {
-	g := mark.Grid(m)[2:16]
-	for i, row := range g {
-		g[i] = row[1:20]
-	}
-	return g
-}
-
-func (a *tuiApp) drawCatPart(x, y int, m mark.Mood, g [][]byte) (w, h int) {
+	g := mark.Grid(m)
 	for row := 0; row+1 < len(g); row += 2 {
 		for col := range g[row] {
 			top, okT := mark.Colour(g[row][col], m.CoatColour)

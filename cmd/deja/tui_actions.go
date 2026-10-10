@@ -129,26 +129,26 @@ func forgetInChild(dir string) func(string) error {
 }
 
 // drawForget asks before forgetting, beside the cat with its ears down when
-// the box is wide enough to hold it.
+// the box has room for the whole animal.
 func (a *tuiApp) drawForget() {
 	p := a.p
 	s := a.m.src
-	x, y, iw := a.modalBox(80, 10)
+	x, y, iw := a.modalBox(80, 15)
 	right := x + iw
-	tx := x
-	if iw >= 64 {
-		a.drawCatPart(x, y+1, mark.Nothing, catHead(mark.Nothing))
-		tx = x + 23
+	tx, ty := x, y
+	if iw >= 64 && p.H >= 17 {
+		a.drawCat(x+1, y+1, mark.Nothing)
+		tx, ty = x+28, y+3
 	}
-	p.PutClip(tx, y, "Forget this session?", bold(cText), right)
+	p.PutClip(tx, ty, "Forget this session?", bold(cText), right)
 	asked := strings.Join(strings.Fields(s.Title), " ")
 	if asked == "" {
 		asked = "(no prompt recorded)"
 	}
-	p.PutClip(tx, y+1, asked, fgs(cText), right)
-	p.PutClip(tx, y+2, agentName(s.Harness)+" · "+tuiProject(s)+" · "+tuiAgo(s.Updated, a.now), fgs(cMuted), right)
-	p.PutClip(tx, y+4, "deja stops finding it.", fgs(cSub), right)
-	p.PutClip(tx, y+5, agentName(s.Harness)+"'s own file stays.", fgs(cSub), right)
-	bx := p.button(tx, y+7, "↵", "Forget", true, right)
-	p.button(bx+2, y+7, "esc", "Keep it", false, right)
+	p.PutClip(tx, ty+1, asked, fgs(cText), right)
+	p.PutClip(tx, ty+2, agentName(s.Harness)+" · "+tuiProject(s)+" · "+tuiAgo(s.Updated, a.now), fgs(cMuted), right)
+	p.PutClip(tx, ty+4, "deja stops finding it.", fgs(cSub), right)
+	p.PutClip(tx, ty+5, agentName(s.Harness)+"'s own file stays.", fgs(cSub), right)
+	bx := p.button(tx, ty+7, "↵", "Forget", true, right)
+	p.button(bx+2, ty+7, "esc", "Keep it", false, right)
 }
