@@ -74,10 +74,31 @@ func SearchDetailed(dir string, o query.Options) (SearchResult, error) {
 
 var quotedSpanRE = regexp.MustCompile(`"[^"]*"`)
 
+// searchDetailedOnce answers from one generation of the index. A search that
+// runs without the lock, while a rebuild swaps the directory or a pass
+// rewrites the manifest under it, could take the manifest of one generation
+// and the postings and records of the next: interned ids then resolved
+// through the wrong table and a hit came back labelled with its neighbour's
+// session, or a record read across the swap looked corrupt and forced a
+// second rebuild. The manifest's identity before and after the read says
+// whether that happened; when it did, the read is simply done again.
 func searchDetailedOnce(dir string, o query.Options) (SearchResult, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
+	var r SearchResult
+	var err error
+	for attempt := 0; attempt < 3; attempt++ {
+		before := manifestGeneration(dir)
+		r, err = searchDetailedRead(dir, o)
+		if sameGeneration(before, manifestGeneration(dir)) {
+			return r, err
+		}
+	}
+	return r, err
+}
+
+func searchDetailedRead(dir string, o query.Options) (SearchResult, error) {
 	// Non-blocking: while a detached rebuild holds the lock, read the
 	// current snapshot lock-free — the directory swap is atomic and a torn
 	// read fails recordsIntact, which SearchWithRecoveryDetailed retries.
