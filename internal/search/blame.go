@@ -109,10 +109,18 @@ func allDigits(s string) bool {
 	return s != ""
 }
 
+// maxBlamePath is PATH_MAX on Linux, the longest of the common limits.
+const maxBlamePath = 4096
+
 func ResolveBlamePath(name string) (BlameTarget, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return BlameTarget{}, fmt.Errorf("path required")
+	}
+	// Longer than any file system allows, and every directory in it is a form
+	// matched against every message: a pasted 100 KB blob took over 20s.
+	if len(name) > maxBlamePath {
+		return BlameTarget{}, fmt.Errorf("path is %d bytes, longer than any file path (%d)", len(name), maxBlamePath)
 	}
 	name, line, lineNote := cutLineSuffix(name)
 	full, err := filepath.Abs(name)
@@ -201,6 +209,13 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 	}
 	base := strings.ToLower(filepath.ToSlash(target.Base))
 	forms := blameForms(target.FullPath)
+	// `scripts/load` and `bin/cache` are named by an ordinary word, and every
+	// session that said "under load" or "the cache layer" mentioned it. For
+	// such a name only the path counts: its directory and the name together.
+	inDir := ""
+	if ordinaryWordName(target.Base) {
+		inDir = strings.ToLower(filepath.ToSlash(filepath.Join(filepath.Base(filepath.Dir(target.FullPath)), target.Base)))
+	}
 	hits := make([]BlameHit, 0)
 	for _, session := range mergeSessions(ss) {
 		if o.Harness != "" && session.Harness != o.Harness {
@@ -255,6 +270,9 @@ func Blame(ss []model.Session, target BlameTarget, o BlameOptions) []BlameHit {
 				continue
 			}
 			count, level := mentionScore(text, base, forms)
+			if inDir != "" && count > 0 {
+				count = pathFormCount(strings.ToLower(filepath.ToSlash(text)), inDir)
+			}
 			if count == 0 {
 				continue
 			}
@@ -503,6 +521,21 @@ func pathFormCount(s, form string) int {
 		}
 		pos = i + len(form)
 	}
+}
+
+// ordinaryWordName is a file name that is also a plain word in a sentence:
+// no extension, no capital, not a dotfile. `Makefile`, `LICENSE` and
+// `.bashrc` are names nobody writes by accident; `load` and `cache` are not.
+func ordinaryWordName(name string) bool {
+	if name == "" || filepath.Ext(name) != "" {
+		return false
+	}
+	for _, r := range name {
+		if r < 'a' || r > 'z' {
+			return false
+		}
+	}
+	return true
 }
 
 func pathComponentOrWord(s string, start, end int) bool {
