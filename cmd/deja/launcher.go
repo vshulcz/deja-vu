@@ -116,11 +116,19 @@ func writeDejaLauncher(exe string) (string, error) {
 	}
 	old, err := os.ReadFile(path)
 	next := []byte(dejaLauncherScript(exe))
-	if err == nil && string(old) == string(next) {
-		return path, nil
+	if err != nil || string(old) != string(next) {
+		if err := os.WriteFile(path, next, 0o755); err != nil {
+			return "", err
+		}
 	}
-	if err := os.WriteFile(path, next, 0o755); err != nil {
-		return "", err
+	// WriteFile keeps the mode of a file that is already there, and the same
+	// bytes are not written at all: a launcher that lost its exec bit stayed
+	// that way through the reinstall doctor recommends, and every hook exited
+	// 126.
+	if fi, err := os.Stat(path); err == nil && fi.Mode()&0o111 == 0 {
+		if err := os.Chmod(path, 0o755); err != nil {
+			return "", err
+		}
 	}
 	return path, nil
 }
