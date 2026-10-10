@@ -95,6 +95,7 @@ var namedSecretKinds = map[string]bool{
 	"bearer-token":       true,
 	"cookie":             true,
 	"url-credentials":    true,
+	"webhook-url":        true,
 	"command-password":   true,
 	"password":           true,
 }

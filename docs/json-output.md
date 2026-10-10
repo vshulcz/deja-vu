@@ -733,8 +733,8 @@ of a credential. `count` is how many turns of that session held that kind.
 
 `findings` holds only the rules that name a provider or a protocol shape —
 provider keys, `private-key`, `jwt`, `bearer-token`, `cookie`,
-`url-credentials`, the command and netrc password shapes. `counted` is every
-other rule as a number, because the assignment and entropy rules fire on the
+`url-credentials`, `webhook-url`, the command and netrc password shapes.
+`counted` is every other rule as a number, because the assignment and entropy rules fire on the
 value side of `key=` as often for a digest or an identifier as for a secret: on
 the store this was measured against they were 3,465 markers against 82
 findings. A consumer that wants those has the counts and should not present

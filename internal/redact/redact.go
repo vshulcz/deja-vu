@@ -82,6 +82,12 @@ var (
 	// `[redacted:[redacted:credential]]`.
 	genericKVIntlFillerRE = regexp.MustCompile(`(?i)(^|[^\p{L}\p{N}_])(парол[ьяею]|токен[ауы]?|секрет[ауы]?|ключ[аеиуом]?|contraseña|senha|passwort|密码|密碼|パスワード|비밀번호)([^\p{L}\n:=\[][^\n:=\[]{0,32}[:=]\s*)(\\*['"]?)(` + kvValue + `)(\\*['"]?)`)
 	bearerRE              = regexp.MustCompile(`(?i)\b(Bearer|Basic)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	// The `Token` scheme (Django REST framework, GitHub's legacy `token`). Only
+	// behind an Authorization header: "token" alone is an ordinary word.
+	authTokenRE = regexp.MustCompile(`(?i)\b(authorization\\*["']?\s*[:=]\s*\\*["']?\s*token)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
+	// A webhook URL is a credential whole: whoever holds it can post. The path
+	// ids stay so the line still says which hook it was.
+	webhookURLRE = regexp.MustCompile(`(hooks\.slack\.com/(?:services|workflows|triggers)/[A-Za-z0-9]+/[A-Za-z0-9]+/|discord(?:app)?\.com/api/webhooks/[0-9]+/)([A-Za-z0-9_-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
 	// with password "S3cr3tP@ssw0rd!"` — and genericKVRE cannot reach it:
@@ -108,14 +114,25 @@ var (
 	// At least one body line: a bare header carries nothing, and eating it
 	// alone would hide the marker that lets the whole-block pattern pair it
 	// with a body that arrives in the next field.
-	pemPrivateOpenRE = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----(?:[ \t]*\r?\n[A-Za-z0-9+/=]{16,}[ \t]*)+`)
+	//
+	// A line break here is a real one or the two characters `\n` of a key
+	// printed inside JSON, a body line may be indented (a YAML block scalar),
+	// and armour headers (`Comment: …`) and the blank line after them may sit
+	// between the header and the body, as they do in a PGP key.
+	pemPrivateOpenRE = regexp.MustCompile(`-----BEGIN [A-Z0-9 ]*PRIVATE KEY[A-Z0-9 ]*-----` +
+		`(?:` + pemBreak + `[A-Za-z][A-Za-z-]*: [^\r\n\\]*)*(?:` + pemBreak + `)?` +
+		`(?:` + pemBreak + `[A-Za-z0-9+/=]{16,}[ \t]*)+`)
 	// Provider prefixes. sk- allows internal hyphens/underscores so modern
 	// hyphenated formats (sk-ant-…, sk-proj-…) are covered, not just legacy
 	// sk-<alnum> keys. xai- stays alphanumeric-only: real xAI keys have no
 	// internal hyphens, and allowing them makes every long kebab-case slug
 	// that happens to start with "xai-" (branch names, doc titles) a false
 	// positive.
-	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]*[A-Za-z0-9]{20,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
+	//
+	// The sk- form reads on past its last long run: `_` is a word character,
+	// so a key whose tail held one stopped at the last `-` before it, and the
+	// rest of the key went through (sk-proj-…-O1pQ…_tail).
+	providerRE = regexp.MustCompile(`\b(gh[opsur]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,}|(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}|sk-[A-Za-z0-9_-]*[A-Za-z0-9]{20,}[A-Za-z0-9_-]*|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{30,}|xox[bpcs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{30,})\b`)
 	jwtRE      = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b`)
 	// A Telegram bot token: the bot's numeric id, a colon, and 35 characters
 	// that open with "A". It has no prefix providerRE could key on, and the
@@ -474,7 +491,33 @@ func containsAnyFold(s string, hints []string) bool {
 }
 
 // Text applies every rule.
-func Text(s string) (string, Counts) { return textPass(s, nil) }
+//
+// Colored output splits a secret with terminal escapes
+// (`TOKEN\x1b[0m=\x1b[33m<value>`): no rule matched it, and the display pass,
+// which strips them, printed the value whole. So text holding an escape is
+// read again without them, and that reading wins when it finds more. Text
+// with nothing behind its escapes keeps them, as the index keeps a transcript
+// as it found it.
+func Text(s string) (string, Counts) {
+	out, counts := textPass(s, nil)
+	if strings.IndexByte(out, 0x1b) < 0 {
+		return out, counts
+	}
+	plain, more := textPass(StripEscapes(out), nil)
+	if len(more) == 0 {
+		return out, counts
+	}
+	for k, n := range more {
+		counts.Add(k, n)
+	}
+	return plain, counts
+}
+
+var authHints = []string{"authorization"}
+
+// pemBreak is a line break inside a key block: a real one, or `\n` written
+// out inside a JSON string, with the next line's indentation.
+const pemBreak = `(?:[ \t]*\r?\n|(?:\\+r)?\\+n)[ \t]*`
 
 // TextKinds applies only the rules named in allow, leaving every other shape as
 // written. `deja secrets --scrub` rewrites someone's own transcripts, and it may
@@ -501,6 +544,11 @@ func textPass(s string, allow map[string]bool) (string, Counts) {
 	if strings.Contains(s, "://") {
 		s = replaceSubmatch(s, connURLRE, "url-credentials", p, func(m []string) string {
 			return m[1] + m[2] + ":[redacted:url-credentials]@" + m[4]
+		})
+		// Under the URL gate: a webhook travels as https://…, and another
+		// scan of every message cost more than the rule.
+		s = replaceSubmatch(s, webhookURLRE, "webhook-url", p, func(m []string) string {
+			return m[1] + "[redacted:webhook-url]"
 		})
 	}
 	if strings.Contains(lower, "aws") {
@@ -546,6 +594,14 @@ func textPass(s string, allow map[string]bool) (string, Counts) {
 			strings.Contains(lower, "apikey")) {
 		s = replaceSubmatch(s, quotedSecretRE, "quoted-secret", p, func(m []string) string {
 			return m[1] + m[2] + m[3] + "[redacted:quoted-secret]" + m[5]
+		})
+	}
+	// The header, not the word: "the Authorization header" is ordinary prose.
+	// "uthoriz", not "authoriz": the scan stops on every first byte, and an
+	// 'a' is in every other hex digest.
+	if strings.Contains(lower, "uthoriz") && strings.Contains(lower, "token") && kvAssignmentNearbyHints(lower, authHints) {
+		s = replaceSubmatch(s, authTokenRE, "bearer-token", p, func(m []string) string {
+			return m[1] + m[2] + "[redacted:bearer-token]"
 		})
 	}
 	if strings.Contains(lower, "bearer") || strings.Contains(lower, "basic ") {
@@ -825,7 +881,7 @@ var kinds = map[string]bool{
 	"groq-key": true, "huggingface-token": true, "jwt": true, "npm-token": true,
 	"openai-key": true, "password": true, "private-key": true, "provider-token": true,
 	"quoted-secret": true, "slack-token": true, "stripe-key": true, "telegram-bot-token": true,
-	"url-credentials": true, "xai-key": true,
+	"url-credentials": true, "webhook-url": true, "xai-key": true,
 }
 
 // IsKind reports whether a name is a rule this package can write, so a caller
