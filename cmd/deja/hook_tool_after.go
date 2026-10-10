@@ -537,13 +537,13 @@ func fixLine(p index.FixPair, sessions int) string {
 		// `deja fix` uses for the same pair.
 		if p.Candidate {
 			return "this error came up" + how + " " + where + " before" + when +
-				" — one session changed this file after it, and nothing confirms it worked: " + edit
+				" — this file was changed after it, and nothing confirms that worked: " + edit
 		}
 		return "this error came up" + how + " " + where + " before" + when + " — changed next: " + edit
 	}
 	if p.Candidate {
 		return "this error came up" + how + " " + where + " before" + when +
-			" — one session ran this after it, and nothing confirms it worked: " + cmd
+			" — this was run after it, and nothing confirms it worked: " + cmd
 	}
 	// A repaired remedy is not "what followed it", it is the command the reader
 	// has just run, corrected — and this is the one surface where they already

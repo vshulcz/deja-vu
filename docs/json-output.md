@@ -858,7 +858,7 @@ The commands sessions on this machine ran after that error:
 ```
 
 `candidate` is the half-evidence flag the prose renders as *"ran next,
-unconfirmed"*: one session ran this after the error and nothing has confirmed it
+unconfirmed"*: this was run after the error and nothing has confirmed it
 worked. A caller acting on a fix automatically needs to know which half it is
 holding, so it is a field rather than a wording difference.
 

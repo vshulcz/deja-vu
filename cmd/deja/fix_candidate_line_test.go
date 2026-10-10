@@ -33,6 +33,21 @@ func TestACandidateSaysNobodyConfirmedIt(t *testing.T) {
 	}
 }
 
+// A candidate is not one sighting: a red test answered by the same command in
+// three sessions stays unconfirmed by design, and the line said "one session
+// ran this" beside "came up in 3 sessions".
+func TestACandidateDoesNotCountItsSightingsAsOne(t *testing.T) {
+	for _, p := range []index.FixPair{
+		{Command: "docker compose up -d postgres", Candidate: true},
+		{Edit: "ledger/post.go", Candidate: true},
+	} {
+		got := fixLine(p, 3)
+		if strings.Contains(got, "one session") || !strings.Contains(got, "in 3 sessions") {
+			t.Errorf("candidate line %q", got)
+		}
+	}
+}
+
 // And a command that failed is still no remedy, whichever half of the evidence
 // it came from.
 func TestACandidateThatFailedIsStillNotAnAnswer(t *testing.T) {

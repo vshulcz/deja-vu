@@ -851,7 +851,7 @@ func mcpFix(dir, name string, raw json.RawMessage) (string, int, error) {
 		if index.FixCandidateSeen(dir, a.Error, func(project string) bool {
 			return pol.Allows(policy.ActivationMCP, project)
 		}) {
-			return "One session ran something after that error, and nothing has confirmed it worked - deja waits for a second sighting before naming a remedy.", 0, nil
+			return "Something was run after that error before, and nothing has confirmed it worked - deja names no remedy until something does.", 0, nil
 		}
 		// A remedy exists and was held back because it cannot be taken back;
 		// saying nothing ran would be false. What sessions said still helps.

@@ -107,7 +107,7 @@ func runFix(dir string, args []string, stdout io.Writer) error {
 		if index.FixCandidateSeen(dir, text, func(project string) bool {
 			return pol.Allows(policy.ActivationSearch, project)
 		}) {
-			fmt.Fprintln(stdout, "deja: one session ran something after that error, and nothing has confirmed it worked — deja waits for a second sighting before naming a remedy")
+			fmt.Fprintln(stdout, "deja: something was run after that error before, and nothing has confirmed it worked — deja names no remedy until something does")
 			return nil
 		}
 		if index.FixWithheldAsIrreversible(dir, text, func(project string) bool {
@@ -233,7 +233,7 @@ type fixRowJSON struct {
 	// and a script wanting to apply the correction needs the same two halves.
 	Failed string `json:"failed,omitempty"`
 	// Candidate is the half-evidence flag the prose renders as "ran next,
-	// unconfirmed": one session ran this after the error and nothing has
+	// unconfirmed": this was run after the error and nothing has
 	// confirmed it worked. A caller acting on a fix needs to know which it has.
 	Candidate bool `json:"candidate"`
 	// When is omitted rather than zero-valued: an absent timestamp is a real
