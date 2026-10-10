@@ -3001,6 +3001,22 @@ func titlePlaceholder(t string) bool {
 	return t == "" || strings.HasPrefix(t, harnessOutputTitlePrefix)
 }
 
+// titleRankOfRow is where a row's title sits in sessionTitleFrom's order: what
+// the person asked (3), the agent's words (2), tool output (1), plumbing or
+// nothing (0). A pass that sees only part of a session keeps a title unless
+// what it read outranks it, as a rebuild of the whole session would.
+func titleRankOfRow(title string, fromAgent bool) int {
+	switch {
+	case titlePlaceholder(title):
+		return 0
+	case strings.HasPrefix(title, toolOutputTitlePrefix):
+		return 1
+	case fromAgent:
+		return 2
+	}
+	return 3
+}
+
 func harnessOutputTitle(t string) string {
 	return harnessOutputTitlePrefix + truncateTitle(stripPlumbingTag(t), 60-len([]rune(harnessOutputTitlePrefix)))
 }
@@ -4726,7 +4742,14 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			if s.Path != "" && owns {
 				meta.Path = s.Path
 			}
-			if titlePlaceholder(meta.Title) {
+			// A row named from the agent's words or tool output takes the
+			// first question that arrives later, as a rebuild names it.
+			outranked := false
+			if s.Title == "" && !titlePlaceholder(meta.Title) {
+				t, agent := sessionTitleFrom(s)
+				outranked = titleRankOfRow(t, agent) > titleRankOfRow(meta.Title, meta.AgentTitle)
+			}
+			if titlePlaceholder(meta.Title) || outranked {
 				// The incremental fallback redacted nothing at all before; keep
 				// sessionTitleFrom's correct fromAgent bit and redact before the
 				// cut, as the full rebuild does.

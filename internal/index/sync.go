@@ -1068,6 +1068,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = old.Counted, old.Words, old.LastMsg, old.Opening
 			meta.Asked, meta.Hit, meta.GaveUp, meta.NoText = old.Asked, old.Hit, old.GaveUp, old.NoText
 			meta.Touched, meta.TouchHits, meta.Settled, meta.RanCommand = old.Touched, old.TouchHits, old.Settled, old.RanCommand
+			// The title is derived from this batch alone, and the turn that
+			// named the row came in an earlier one.
+			if titleRankOfRow(old.Title, old.AgentTitle) >= titleRankOfRow(meta.Title, meta.AgentTitle) {
+				meta.Title, meta.AgentTitle = old.Title, old.AgentTitle
+			}
 		} else {
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = 0, 0, 0, 0
 			meta.Asked, meta.Hit, meta.GaveUp = nil, nil, false
