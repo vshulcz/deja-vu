@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Betik ikili dosyayı `~/.local/bin` içine koyar. Bu dizin henüz `PATH` içinde değilse ikinci komut aynı kabukta bulunmaz: betiğin yazdırdığı, tam yolu içeren `next:` satırını çalıştırın ya da `PATH` satırı eklendikten sonra yeni bir kabuk açın.
+
 `raw.githubusercontent.com` erişilemiyorsa aynı sürümü sunan bir npm aynası var:
 
 ```sh

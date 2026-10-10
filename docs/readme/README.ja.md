@@ -52,6 +52,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+スクリプトはバイナリを `~/.local/bin` に置きます。このディレクトリがまだ `PATH` にない場合、同じシェルでは 2 つ目のコマンドが見つかりません。スクリプトが表示するフルパス付きの `next:` 行を実行するか、`PATH` の行を追加したあとで新しいシェルを開いてください。
+
 <p align="center"><img src="https://raw.githubusercontent.com/vshulcz/deja-vu/main/assets/banner.png" width="700" alt="最初のインデックス作成後に deja が表示するもの：ロゴ、見つかったエージェント、そしてあなた自身の履歴から取ったクエリ"></p>
 
 インストールに 10 秒、インデックス作成に約 10 秒で、すぐに使えます。2 つ目のコマンドは、見つかったすべての

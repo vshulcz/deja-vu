@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Le script place le binaire dans `~/.local/bin`. Si ce dossier n'est pas encore dans votre `PATH`, le même shell ne trouve pas la deuxième commande : lancez la ligne `next:` que le script affiche, avec le chemin complet, ou ouvrez un nouveau shell une fois la ligne `PATH` ajoutée.
+
 Si `raw.githubusercontent.com` n'est pas joignable, il existe un miroir npm dans la même version :
 
 ```sh

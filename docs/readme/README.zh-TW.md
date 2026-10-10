@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+腳本把執行檔放在 `~/.local/bin`。如果這個目錄還不在 `PATH` 裡，同一個 shell 找不到第二條指令：執行腳本印出的 `next:` 那一行（帶完整路徑），或是在加上 `PATH` 那一行之後開一個新的 shell。
+
 連不上 `raw.githubusercontent.com` 時走 npm 鏡像，版本是同一個：
 
 ```sh

@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+스크립트는 바이너리를 `~/.local/bin`에 둡니다. 이 디렉터리가 아직 `PATH`에 없으면 같은 셸에서 두 번째 명령을 찾지 못합니다. 스크립트가 출력하는 전체 경로가 담긴 `next:` 줄을 실행하거나, `PATH` 줄을 추가한 뒤 새 셸을 여세요.
+
 `raw.githubusercontent.com`에 연결되지 않으면 npm 미러를 쓰세요. 버전은 같습니다:
 
 ```sh

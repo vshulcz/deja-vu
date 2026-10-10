@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+स्क्रिप्ट बाइनरी को `~/.local/bin` में रखती है। अगर यह डायरेक्टरी अभी आपके `PATH` में नहीं है, तो उसी शेल में दूसरा कमांड नहीं मिलेगा: स्क्रिप्ट जो `next:` लाइन छापती है (उसमें पूरा पाथ है) उसे चलाएँ, या `PATH` वाली लाइन जुड़ने के बाद नया शेल खोलें।
+
 अगर `raw.githubusercontent.com` तक पहुँच नहीं है, तो उसी वर्शन का npm मिरर है:
 
 ```sh

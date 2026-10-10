@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+O script coloca o binário em `~/.local/bin`. Se esse diretório ainda não estiver no seu `PATH`, o mesmo shell não encontra o segundo comando: rode a linha `next:` que o script imprime, com o caminho completo, ou abra um novo shell depois que a linha do `PATH` for adicionada.
+
 Se o `raw.githubusercontent.com` não estiver acessível, existe um espelho no npm com a mesma versão:
 
 ```sh

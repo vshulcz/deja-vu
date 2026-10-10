@@ -41,6 +41,8 @@ curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | s
 deja install --auto
 ```
 
+Скрипт кладёт бинарник в `~/.local/bin`. Если этой папки ещё нет в `PATH`, вторая команда в той же оболочке не найдётся: запустите строку `next:`, которую печатает скрипт (в ней полный путь), или откройте новую оболочку, когда строка с `PATH` добавлена.
+
 Если `raw.githubusercontent.com` недоступен, есть зеркало в npm, версия та же:
 
 ```sh
