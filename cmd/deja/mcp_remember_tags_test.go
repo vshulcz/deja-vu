@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -31,5 +32,36 @@ func TestMCPRememberStoresTags(t *testing.T) {
 	got := body.String()
 	if !strings.Contains(got, "#urgent") || !strings.Contains(got, "#perf") {
 		t.Errorf("remember dropped its tags; note body = %q", got)
+	}
+}
+
+// A note stored over MCP without a project went under "notes", where no hook
+// in the project it was about would serve it. It is filed the way the CLI
+// files it: under the project the server runs in.
+func TestMCPRememberFilesUnderTheWorkingProject(t *testing.T) {
+	withStatsStores(t)
+	dir := os.Getenv("DEJA_INDEX_DIR")
+	work := filepath.Join(t.TempDir(), "payments")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(work)
+	out, err := callMCPTool(dir, "remember", []byte(`{"text":"ledger retries go through the outbox table"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := os.Getwd()
+	want := sources.ClaudeProjectName(cwd)
+	if !strings.Contains(out, projectForEcho(want)) {
+		t.Errorf("remember answered %q, want it filed under %s", out, want)
+	}
+	notes := sources.LoadNotes()
+	if len(notes) == 0 {
+		t.Fatal("no note stored")
+	}
+	for _, s := range notes {
+		if s.Project != want {
+			t.Errorf("note filed under %q, want %q", s.Project, want)
+		}
 	}
 }

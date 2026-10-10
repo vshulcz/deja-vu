@@ -576,7 +576,14 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 			return "", fmt.Errorf("text required")
 		}
 		if strings.TrimSpace(a.Project) == "" {
+			// Filed where `deja remember` files it, under the project the
+			// server runs in, so the hooks there serve it back.
 			a.Project = "notes"
+			if cwd, err := os.Getwd(); err == nil {
+				if p := sources.ClaudeProjectName(cwd); p != "" {
+					a.Project = p
+				}
+			}
 		}
 		switch err := sources.AppendNoteTagged(a.Project, a.Text, a.Tags, time.Now()); {
 		case errors.Is(err, sources.ErrNoteExists):
