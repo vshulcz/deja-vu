@@ -58,12 +58,13 @@ const (
 
 // RecapSession is one session's lines, with where they came from.
 type RecapSession struct {
-	Harness string    `json:"harness"`
-	ID      string    `json:"id"`
-	Project string    `json:"project,omitempty"`
-	Title   string    `json:"title,omitempty"`
-	When    time.Time `json:"when"`
-	Lines   []string  `json:"lines"`
+	Harness string `json:"harness"`
+	ID      string `json:"id"`
+	Project string `json:"project,omitempty"`
+	Title   string `json:"title,omitempty"`
+	// Omitted for an undated session, as on the session object.
+	When  time.Time `json:"when,omitzero"`
+	Lines []string  `json:"lines"`
 }
 
 // Recap is a window of work, grouped by project, newest session first.
