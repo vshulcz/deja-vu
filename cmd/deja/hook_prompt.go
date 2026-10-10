@@ -8,10 +8,13 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -1522,20 +1525,25 @@ func focusSession(s model.Session, terms []string) model.Session {
 	// narrowing below and, when the session stays too big, the density pass
 	// after it. Each of them used to lowercase the whole session again, and a
 	// marathon session is thousands of messages.
+	//
+	// The same rule the block is built with. This step spelled the word the
+	// way the question happened to spell it, while the ranking that chose the
+	// session and the digest that shows a line from it both fold the ending —
+	// so a session whose only mention was in another case was narrowed to
+	// nothing and dropped whole.
+	//
+	// Asked for the whole query at once: per term, each call lowercased the
+	// entire message again. Spread over the cores, since each message is
+	// independent and this pass was a third of the per-prompt hook's wall time
+	// on a store with marathon sessions.
 	low := make([]string, len(s.Messages))
-	for i, m := range s.Messages {
-		low[i] = strings.ToLower(m.Text)
-	}
+	hit := make([]bool, len(s.Messages))
+	parallelChunks(len(s.Messages), func(i int) {
+		low[i] = strings.ToLower(s.Messages[i].Text)
+		hit[i] = search.TermHitsLowered(low[i], terms) > 0
+	})
 	for i := range s.Messages {
-		// The same rule the block is built with. This step spelled the word
-		// the way the question happened to spell it, while the ranking that
-		// chose the session and the digest that shows a line from it both fold
-		// the ending — so a session whose only mention was in another case was
-		// narrowed to nothing and dropped whole.
-		//
-		// Asked for the whole query at once: per term, each call lowercased the
-		// entire message again.
-		if search.TermHitsLowered(low[i], terms) == 0 {
+		if !hit[i] {
 			continue
 		}
 		for j := i - window; j <= i+window; j++ {
@@ -1566,20 +1574,53 @@ func focusSession(s model.Session, terms []string) model.Session {
 	return s
 }
 
+// parallelChunks runs fn over 0..n-1 in chunks handed out to one goroutine per
+// core. fn must write only to its own index.
+func parallelChunks(n int, fn func(i int)) {
+	const chunk = 64
+	workers := min(runtime.GOMAXPROCS(0), (n+chunk-1)/chunk)
+	if workers < 2 {
+		for i := range n {
+			fn(i)
+		}
+		return
+	}
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for range workers {
+		go func() {
+			defer wg.Done()
+			for {
+				lo := int(next.Add(chunk)) - chunk
+				if lo >= n {
+					return
+				}
+				for i := lo; i < min(lo+chunk, n); i++ {
+					fn(i)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 // densestMessages keeps the cap best messages by how many distinct terms each
 // one carries, in original order so the exchange still reads as a conversation.
 func densestMessages(msgs []model.Message, low, terms []string, cap int) []model.Message {
 	type scored struct {
 		i, hits int
 	}
-	var ranked []scored
-	for i := range msgs {
-		hits := 0
+	hitsAt := make([]int, len(msgs))
+	parallelChunks(len(msgs), func(i int) {
 		for _, t := range terms {
 			if strings.Contains(low[i], t) {
-				hits++
+				hitsAt[i]++
 			}
 		}
+	})
+	var ranked []scored
+	for i, hits := range hitsAt {
 		if hits > 0 {
 			ranked = append(ranked, scored{i, hits})
 		}
