@@ -4196,13 +4196,13 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 		if err != nil {
 			return err
 		}
-		eachIndexKey(r.Text, r.Time, func(tok string) {
-			b := bucket(tok)
-			if buckets[b] == nil {
-				buckets[b] = map[string][]posting{}
-			}
-			buckets[b][tok] = append(buckets[b][tok], posting{Off: off, Sid: meta.Ord})
-		})
+		// The same part and the same tool bit a full build gives the record.
+		// Tokenizing the whole text here put every hash of a written side,
+		// every replaced span's body and whole build logs into the postings
+		// of each session this pass carried, and dropped the bit the
+		// per-session read bound uses to spend its budget on speech first:
+		// a live index held twice the tokens a rebuild of it did.
+		addIndexKeys(buckets, tokenizedPart(r.Role, r.Text), off, meta.Ord, r.Time, isToolRole(r.Role))
 		if _, exists := m.Sessions[r.Key]; exists {
 			return nil
 		}

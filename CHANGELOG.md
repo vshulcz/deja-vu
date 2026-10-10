@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An index kept up to date for weeks no longer grows past what a rebuild of it holds: a pass that rewrote the record log posted every carried record's whole text, hashes of written lines and full build logs included, and dropped the bit that ranks tool output below what people said. Searches here run 21% faster after the rebuild this version triggers, and the buckets went from 81 to 62 MB (#4919).
 - Typing on a large history no longer stalls the screen: it ran one search per letter, and now searches when you pause. A refresh keeps the selected session, a search typed during the first build survives the build ending, a session that grew is read again, a session put back leaves Kept, the reader's ctrl keys no longer edit the list behind it, `?` on an empty search box opens help instead of becoming the query, and the wait line no longer draws over the screen (#4900).
 
 ## [0.22.0] - 2026-10-09

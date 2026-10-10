@@ -692,7 +692,12 @@ import (
 // 69 keys each fix pair on every error line of the output it answers, not only
 // the first: `deja fix` with the line under a failing test's name found
 // nothing, while friction counted it. Only a rebuild re-mines the pairs.
-const version = 69
+//
+// 70: an incremental pass that rewrites the record log gives each carried
+// record the postings a full build does. It tokenized whole texts and dropped
+// the tool bit, so a long-lived index held twice the tokens of a rebuild and
+// ranked tool output as speech; only a rebuild takes those postings out.
+const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
