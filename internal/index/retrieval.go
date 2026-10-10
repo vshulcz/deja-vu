@@ -3035,6 +3035,8 @@ func scanRecordsWithVariants(dir string, m Manifest, o query.Options, offsets []
 		s := by[r.Key]
 		if s == nil {
 			cp := sessionFromMeta(meta)
+			// Only the matching records are read here.
+			cp.Held = meta.Counted
 			s = &cp
 			by[r.Key] = s
 		}
