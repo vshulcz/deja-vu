@@ -3744,6 +3744,11 @@ func printSourcesTo(w io.Writer, dir string) {
 	}
 	skipStore := sources.ExcludedHarnesses()
 	for _, it := range items {
+		// A store DEJA_STORES leaves out has no row, as in doctor: it is not
+		// read, so it has no count to report.
+		if sources.StoreSilenced(it.name) {
+			continue
+		}
 		// A store the reader excluded is named and not read. Walking it here
 		// reported three sessions and eighteen messages for a harness deja had
 		// just been told never to open, which is the opposite of what this
@@ -3804,6 +3809,9 @@ func printSourcesTo(w io.Writer, dir string) {
 	// one of them, and an excluded opencode kept being opened and kept printing
 	// the sqlite3 error the exclusion exists to silence.
 	excludedRow := func(name, location string) bool {
+		if sources.StoreSilenced(name) {
+			return true
+		}
 		if !skipStore[name] {
 			return false
 		}
