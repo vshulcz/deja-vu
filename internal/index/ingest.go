@@ -2153,7 +2153,7 @@ func metaForSession(s model.Session) SessionMeta {
 	if len(s.Messages) > 0 {
 		last = messageFingerprint(s.Messages[len(s.Messages)-1])
 	}
-	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s),
+	return SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Title: title, AgentTitle: agentTitle, Started: s.Started, Updated: s.Updated, Touched: touched, TouchHits: touchHits, Counted: len(s.Messages), LastMsg: last, Asked: askedHashes(s.Messages), Hit: frictionHashes(s.Messages), GaveUp: gaveUp(s.Messages), Words: sessionWords(s.Messages), NoText: !holdsText(s), Settled: sessionSettled(s), RanCommand: ranCommand(s.Messages),
 		Kind: s.Kind, Parent: s.Parent, Agent: s.Agent, Opening: SessionOpening(s),
 		OrigID: s.OrigID, RemoteID: s.RemoteID, From: s.From, Lifecycle: s.Lifecycle, LifecycleNote: s.LifecycleNote, LifecycleAt: s.LifecycleAt}
 }
@@ -2176,16 +2176,24 @@ func sessionSettled(s model.Session) string {
 	// names the session, and nothing else reads this field. Extracting for the
 	// rest cost 21s of a 51s rebuild on a 2.0 GB corpus for an answer no caller
 	// could reach.
-	ran := false
-	for _, m := range s.Messages {
-		if m.Role == roleCommand {
-			ran = true
-			break
-		}
-	}
-	if !ran {
+	if !ranCommand(s.Messages) {
 		return ""
 	}
+	return settledFrom(s)
+}
+
+func ranCommand(ms []model.Message) bool {
+	for _, m := range ms {
+		if m.Role == roleCommand {
+			return true
+		}
+	}
+	return false
+}
+
+// settledFrom is sessionSettled without the command gate.
+func settledFrom(s model.Session) string {
+	const tail, budget = 150, 200
 	if len(s.Messages) > tail {
 		cp := s
 		cp.Messages = s.Messages[len(s.Messages)-tail:]
@@ -2242,6 +2250,21 @@ func extendDerived(meta *SessionMeta, ms []model.Message) {
 	}
 	if paths, hits := topTouchedCounted(tail); len(paths) > 0 {
 		meta.Touched, meta.TouchHits = mergeTouchedCounted(meta.Touched, meta.TouchHits, paths, hits)
+	}
+	// The line is picked from the session's last 150 messages, and reading a
+	// live session whole again on every append costs more than the line is
+	// worth. The old line stands in for the messages before the tail: picked
+	// against the tail by the same rules, a concluding line already held
+	// outranks a newer one that only reports.
+	meta.RanCommand = meta.RanCommand || ranCommand(tail)
+	if meta.RanCommand {
+		win := tail
+		if meta.Settled != "" {
+			win = append([]model.Message{{Role: "assistant", Text: meta.Settled}}, tail...)
+		}
+		if s := settledFrom(model.Session{Harness: meta.Harness, Messages: win}); s != "" {
+			meta.Settled = s
+		}
 	}
 }
 
@@ -4737,7 +4760,16 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// flipped its GaveUp and put the loser's files in its Touched —
 			// the wrong conversation's files surfacing in blame (#1304).
 			if owns {
+				ran := meta.RanCommand
 				extendDerived(&meta, s.Messages)
+				// The session's first command: its line can come from what it
+				// said before this tail, which the fold never saw. Once per
+				// session, so the whole read is affordable here.
+				if !ran && meta.RanCommand && known {
+					if whole, ok := wholeSession(p, s); ok {
+						meta.Settled = sessionSettled(whole)
+					}
+				}
 				// The bridge record can land in any append, and a later one
 				// read from the watermark does not carry it again.
 				if s.RemoteID != "" {

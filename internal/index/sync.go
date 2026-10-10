@@ -1067,11 +1067,11 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			// the batch folds into what the row already holds.
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = old.Counted, old.Words, old.LastMsg, old.Opening
 			meta.Asked, meta.Hit, meta.GaveUp, meta.NoText = old.Asked, old.Hit, old.GaveUp, old.NoText
-			meta.Touched, meta.TouchHits, meta.Settled = old.Touched, old.TouchHits, old.Settled
+			meta.Touched, meta.TouchHits, meta.Settled, meta.RanCommand = old.Touched, old.TouchHits, old.Settled, old.RanCommand
 		} else {
 			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = 0, 0, 0, 0
 			meta.Asked, meta.Hit, meta.GaveUp = nil, nil, false
-			meta.Touched, meta.TouchHits, meta.Settled = nil, nil, ""
+			meta.Touched, meta.TouchHits, meta.Settled, meta.RanCommand = nil, nil, "", false
 			meta.NoText = !holdsText(batch)
 			meta.Ord = nextOrd
 			nextOrd++
