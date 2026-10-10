@@ -4,6 +4,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -77,6 +78,7 @@ type tuiApp struct {
 	loading map[string]bool
 	loadQ   chan model.Session
 	updates chan func()
+	bg      sync.WaitGroup // one-shot work off the event loop, see spawn
 
 	view   int
 	reader readerState
@@ -179,6 +181,16 @@ func (a *tuiApp) post(f func()) {
 	}
 }
 
+// spawn runs f off the event loop and counts it, so a test can wait for the
+// screen's background reads and writes to end before its temp dirs go.
+func (a *tuiApp) spawn(f func()) {
+	a.bg.Add(1)
+	go func() {
+		defer a.bg.Done()
+		f()
+	}()
+}
+
 func (a *tuiApp) run() {
 	a.loadHome()
 	if a.scope == scopeHere && a.total == 0 {
@@ -187,11 +199,11 @@ func (a *tuiApp) run() {
 	}
 	go a.detailWorker()
 	if a.view == viewWelcome {
-		go a.firstBuild()
+		a.spawn(a.firstBuild)
 	} else {
-		go a.refreshIndex()
-		go a.loadKept()
-		go a.loadBehind()
+		a.spawn(a.refreshIndex)
+		a.spawn(a.loadKept)
+		a.spawn(a.loadBehind)
 	}
 	// Fast enough for the tail and the spinners to move smoothly; rows that
 	// did not change are not written, so an idle screen costs nothing.
@@ -225,7 +237,7 @@ func (a *tuiApp) refreshIndex() {
 			a.say("Index not updated: "+err.Error(), false)
 			return
 		}
-		go a.loadBehind()
+		a.spawn(a.loadBehind)
 		a.reload()
 	})
 }
@@ -405,7 +417,9 @@ func (a *tuiApp) startSearch() {
 	// history each one is a full pass, and a word typed at speed started one
 	// per letter, which held the screen still for seconds.
 	stale := func() bool { return a.latest.Load() != int64(seq) }
+	a.bg.Add(1)
 	time.AfterFunc(60*time.Millisecond, func() {
+		defer a.bg.Done()
 		if stale() {
 			return
 		}
@@ -434,7 +448,8 @@ func (a *tuiApp) startSearch() {
 			refresh := a.listed == num(a.scope)+"\x00"+q
 			a.setRows(nil, hits, len(hits))
 			if len(a.rows) == 0 && scope != scopeKept {
-				go a.lookBeyond(a.listed, o, box, maps.Clone(a.filter))
+				listed, filter := a.listed, maps.Clone(a.filter)
+				a.spawn(func() { a.lookBeyond(listed, o, box, filter) })
 			}
 			// The banner offers the newest answer under ↵, so it is the
 			// one selected, on a new query only: a refresh of the same one

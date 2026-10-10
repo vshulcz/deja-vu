@@ -91,8 +91,8 @@ func (a *tuiApp) firstBuild() {
 		}
 	})
 	if err == nil {
-		go a.loadKept()
-		go a.loadBehind()
+		a.spawn(a.loadKept)
+		a.spawn(a.loadBehind)
 	}
 }
 

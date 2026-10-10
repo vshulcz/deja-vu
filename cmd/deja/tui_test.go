@@ -45,6 +45,9 @@ func tuiStore(t *testing.T) (string, string) {
 func newTestTUI(t *testing.T, dir string) *tuiApp {
 	t.Helper()
 	a := newTUIApp(dir, nil)
+	// Background work still writing into the store would race the temp
+	// dirs' removal; cleanups run last-in first, so this goes before them.
+	t.Cleanup(a.bg.Wait)
 	a.projects = nil
 	a.scope = scopeAll
 	a.clock = func() time.Time { return time.Date(2026, 3, 4, 12, 0, 0, 0, time.UTC) }

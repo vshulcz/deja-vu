@@ -86,7 +86,7 @@ func (a *tuiApp) forgetSession(s model.Session) {
 		forget = forgetInChild(a.dir)
 	}
 	a.say("Forgetting "+search.ShortID(s.ID)+"…", true)
-	go func() {
+	a.spawn(func() {
 		err := forget(s.ID)
 		a.post(func() {
 			if err != nil {
@@ -106,7 +106,7 @@ func (a *tuiApp) forgetSession(s model.Session) {
 			}
 			a.say("Forgotten. deja forget --unforget "+s.ID+" brings it back.", true)
 		})
-	}()
+	})
 }
 
 // forgetInChild runs the forget command as its own process: it prints as it
@@ -187,7 +187,7 @@ func (a *tuiApp) putBack() {
 		a.say("Still in "+agentName(s.Harness)+", nothing to put back.", false)
 		return
 	}
-	go func() {
+	a.spawn(func() {
 		err := writeBackSession(a.dir, d.full, io.Discard)
 		a.post(func() {
 			if err != nil {
@@ -209,5 +209,5 @@ func (a *tuiApp) putBack() {
 			}
 			a.say("Put back. r resumes it in "+agentName(s.Harness)+".", true)
 		})
-	}()
+	})
 }
