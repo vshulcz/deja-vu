@@ -1040,6 +1040,29 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	// walks every manifest entry, so importing n sessions cost O(n²) and a
 	// 100k batch took 306s against 1.9s for forgetting the same 100k (#1024).
 	nextOrd := nextSessionOrd(m.Sessions)
+	// A session whose first command arrives in this batch: how it settled can
+	// come from what it said in an earlier batch, which this one does not
+	// carry. Read once for all of them.
+	firstRun := map[string]bool{}
+	for _, key := range keys {
+		if old := m.Sessions[key]; old.ID != "" && !old.RanCommand {
+			for _, r := range recsByKey[key] {
+				if r.Role == roleCommand {
+					firstRun[key] = true
+					break
+				}
+			}
+		}
+	}
+	earlier := map[string][]model.Message{}
+	if len(firstRun) > 0 {
+		if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tbl, firstRun, func(r Record) {
+			earlier[r.Key] = append(earlier[r.Key], model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}); err != nil {
+			_ = rw.Close()
+			return err
+		}
+	}
 	for _, key := range keys {
 		meta := metas[key]
 		// The derived fields are folded the way local ingest folds an append,
@@ -1082,8 +1105,8 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			nextOrd++
 		}
 		extendDerived(&meta, ms)
-		if settled := sessionSettled(batch); settled != "" {
-			meta.Settled = settled
+		if firstRun[key] {
+			meta.Settled = sessionSettled(model.Session{Harness: meta.Harness, Messages: append(earlier[key], ms...)})
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
