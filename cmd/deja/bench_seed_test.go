@@ -57,3 +57,12 @@ func TestBenchUsageNamesTheSeedFlag(t *testing.T) {
 		t.Errorf("usage does not mention --seed: %v", err)
 	}
 }
+
+// A seed that is not a number is named as such, not as a strconv error.
+func TestBenchSeedNotANumberSaysSo(t *testing.T) {
+	hermeticEnv(t)
+	_, err := captureRun(t, "bench", "recall", "--seed", "abc")
+	if err == nil || !strings.Contains(err.Error(), `--seed needs a whole number, got "abc"`) || strings.Contains(err.Error(), "strconv") {
+		t.Errorf("bench --seed abc: %v", err)
+	}
+}

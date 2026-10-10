@@ -62,7 +62,7 @@ func parseBenchArgs(sub string, args []string) (jsonOutput bool, seed int64, err
 			}
 			value, parseErr := strconv.ParseInt(args[i+1], 10, 64)
 			if parseErr != nil {
-				return false, 0, fmt.Errorf("bench %s: invalid seed: %w", sub, parseErr)
+				return false, 0, fmt.Errorf("bench %s: --seed needs a whole number, got %q", sub, args[i+1])
 			}
 			seed = value
 			i++
