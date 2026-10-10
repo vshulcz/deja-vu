@@ -55,7 +55,7 @@ func ids(out map[string]any) []string {
 // this user_id only, and a retried request_id is not stored twice.
 func TestAddThenSearchFollowsTheContract(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	s := &server{store: t.TempDir(), token: "k", maxItems: 10, maxChars: 8000}
+	s := &server{tables: map[string]map[string]string{}, store: t.TempDir(), token: "k", maxItems: 10, maxChars: 8000}
 	h := s.routes()
 	for i := range 12 {
 		add(t, h, fmt.Sprintf("r%d", i), "u1", fmt.Sprintf("noise-%d", i),
@@ -97,7 +97,7 @@ func TestAddThenSearchFollowsTheContract(t *testing.T) {
 // A session longer than the budget is cut on a character, not inside one.
 func TestLongSessionIsCutOnARune(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	s := &server{store: t.TempDir(), maxItems: 5}
+	s := &server{tables: map[string]map[string]string{}, store: t.TempDir(), maxItems: 5}
 	h := s.routes()
 	add(t, h, "r1", "u", "ru", "миграция индекса падает на шарде "+strings.Repeat("ёжик ", 200), "поправил шард")
 	// Cyrillic is two bytes a letter, so one of two neighbouring budgets lands

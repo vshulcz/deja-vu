@@ -15,9 +15,7 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -26,7 +24,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -72,6 +69,7 @@ type server struct {
 	maxItems int
 	maxChars int
 	mu       sync.Mutex
+	tables   map[string]map[string]string
 }
 
 func main() {
@@ -83,7 +81,7 @@ func main() {
 	if *store == "" {
 		log.Fatal("amlserve: -store is required")
 	}
-	s := &server{store: *store, token: os.Getenv("AML_TOKEN"), maxItems: *maxItems, maxChars: *maxChars}
+	s := &server{tables: map[string]map[string]string{}, store: *store, token: os.Getenv("AML_TOKEN"), maxItems: *maxItems, maxChars: *maxChars}
 	if s.token == "" {
 		log.Print("amlserve: AML_TOKEN is empty, requests are not authenticated")
 	}
@@ -130,24 +128,51 @@ func reply(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-// hashName is the on-disk name for an id the caller sent: user_id and
-// session_id never reach a path as they came.
-var hashName = regexp.MustCompile(`^[0-9a-f]{24}$`)
-
-func hash(s string) string {
-	h := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(h[:12])
+// nameOf is the on-disk name of an id the caller sent, numbered in the order
+// first seen and kept in a table beside the names: user_id and session_id
+// never reach a path, not even hashed. ok is false when the id is unknown and
+// create is off.
+func (s *server) nameOf(table, prefix, id string, create bool) (string, bool, error) {
+	t, ok := s.tables[table]
+	if !ok {
+		t = map[string]string{}
+		if b, err := os.ReadFile(table); err == nil {
+			if err := json.Unmarshal(b, &t); err != nil {
+				return "", false, err
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", false, err
+		}
+		s.tables[table] = t
+	}
+	if name, ok := t[id]; ok {
+		return name, true, nil
+	}
+	if !create {
+		return "", false, nil
+	}
+	name := fmt.Sprintf("%s%d", prefix, len(t)+1)
+	t[id] = name
+	b, _ := json.Marshal(t)
+	if err := os.MkdirAll(filepath.Dir(table), 0o755); err != nil {
+		return "", false, err
+	}
+	tmp := table + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return "", false, err
+	}
+	return name, true, os.Rename(tmp, table)
 }
 
 // userDir is the store of one user_id; the transcripts sit where the Claude
 // parser looks for them, under one project.
-func (s *server) userDir(user string) (root, proj, idx string) {
-	name := hash(user)
-	if !hashName.MatchString(name) {
-		panic("amlserve: hash is not hex")
+func (s *server) userDir(user string, create bool) (root, proj, idx string, ok bool, err error) {
+	name, ok, err := s.nameOf(filepath.Join(s.store, "users.json"), "u", user, create)
+	if !ok || err != nil {
+		return "", "", "", ok, err
 	}
 	root = filepath.Join(s.store, name)
-	return root, filepath.Join(root, "claude", "-work-aml"), filepath.Join(root, "index.db")
+	return root, filepath.Join(root, "claude", "-work-aml"), filepath.Join(root, "index.db"), true, nil
 }
 
 // useStore points the index at one user's store. The roots are process-wide,
@@ -175,8 +200,12 @@ func (s *server) add(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, proj, idx := s.userDir(req.UserID)
-	if err := s.write(proj, req); err != nil {
+	root, proj, idx, _, err := s.userDir(req.UserID, true)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.write(root, proj, req); err != nil {
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -191,13 +220,13 @@ func (s *server) add(w http.ResponseWriter, r *http.Request) {
 // write adds the chunk to its session's transcript. Each line carries the
 // request_id it came in, and the file is replaced whole, so a retried
 // request_id either finds every line of its chunk on disk or none of them.
-func (s *server) write(proj string, req addRequest) error {
+func (s *server) write(root, proj string, req addRequest) error {
 	if err := os.MkdirAll(proj, 0o755); err != nil {
 		return err
 	}
-	sid := hash(req.SessionID)
-	if !hashName.MatchString(sid) {
-		return errors.New("session hash is not hex")
+	sid, _, err := s.nameOf(filepath.Join(root, "sessions.json"), "s", req.SessionID, true)
+	if err != nil {
+		return err
 	}
 	path := filepath.Join(proj, sid+".jsonl")
 	old, err := os.ReadFile(path)
@@ -253,8 +282,12 @@ func (s *server) search(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	root, proj, idx := s.userDir(req.UserID)
-	if _, err := os.Stat(proj); err != nil {
+	root, proj, idx, ok, err := s.userDir(req.UserID, false)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !ok {
 		reply(w, map[string]any{"data": []item{}})
 		return
 	}
@@ -311,9 +344,6 @@ func rank(idx, q string) ([]search.Hit, error) {
 // transcript when it fits, otherwise the matched excerpts and then the
 // transcript from the top until the budget runs out.
 func (s *server) render(proj, sid string, snippets []string) (string, string) {
-	if !hashName.MatchString(sid) {
-		return "", ""
-	}
 	orig, err := os.ReadFile(filepath.Join(proj, sid+".sid"))
 	if err != nil {
 		return "", ""
