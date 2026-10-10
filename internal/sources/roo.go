@@ -86,7 +86,7 @@ func RooRoots() []string {
 func rooCustomStorageRoots() []string {
 	var out []string
 	for _, settings := range vsCodeUserSettingsPaths() {
-		b, err := os.ReadFile(settings)
+		b, err := readJSONFile(settings)
 		if err != nil {
 			continue
 		}
@@ -255,7 +255,7 @@ func RooCLITask(path string) (id, workspace string) {
 		return "", ""
 	}
 	var item rooHistoryItem
-	if b, err := os.ReadFile(filepath.Join(dir, "history_item.json")); err == nil {
+	if b, err := readJSONFile(filepath.Join(dir, "history_item.json")); err == nil {
 		_ = json.Unmarshal(b, &item)
 	}
 	return id, item.Workspace
@@ -288,7 +288,7 @@ func ParseRooTask(path string) ([]model.Session, error) {
 // Roo fork and its extension writes the same three files, so the only thing
 // that differs is the harness a session belongs to (#3643).
 func parseRooShapedTask(path, harness string) ([]model.Session, error) {
-	b, err := os.ReadFile(path)
+	b, err := readJSONFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func parseRooShapedTask(path, harness string) ([]model.Session, error) {
 	s := model.Session{Harness: harness, ID: harness + "-task-" + taskID, Path: path, Project: harness}
 	base := time.Time{}
 	var item rooHistoryItem
-	if hb, err := os.ReadFile(filepath.Join(taskDir, "history_item.json")); err == nil && json.Unmarshal(hb, &item) == nil {
+	if hb, err := readJSONFile(filepath.Join(taskDir, "history_item.json")); err == nil && json.Unmarshal(hb, &item) == nil {
 		s.Title = firstLineTrim(item.Task)
 		if item.Workspace != "" {
 			s.Project = projectName(item.Workspace)

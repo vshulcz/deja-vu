@@ -2,6 +2,7 @@ package sources
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -269,23 +270,16 @@ func scanJSONL(path string, fn func(map[string]any)) error {
 	return scanJSONLFromOffset(path, 0, fn)
 }
 
-// scanJSONLWithHeaderFromOffset is scanJSONLFromOffset for a format whose
-// first line is metadata rather than a turn: the session's id, its title, the
-// directory it ran in. Resuming past that line left the parser with none of
-// it, so an appended turn arrived under a key made from the filename and the
-// session it belonged to never grew — measured on omp and prime, where the
-// append made a second session, and on goose and openclaw, where it renamed
-// the project (#2870).
-//
-// The header is handed over again on every resume. That is safe because it is
-// metadata: the parsers read it into fields they set rather than append to.
-func scanJSONLWithHeaderFromOffset(path string, offset int64, fn func(map[string]any)) error {
-	return scanJSONLWithHeaderFromOffsetFunc(path, offset, 1, func(map[string]any) bool { return true }, fn)
-}
-
-// scanJSONLWithHeaderFromOffsetFunc is scanJSONLWithHeaderFromOffset for a
-// format whose header need not be line 1: isHeader picks it out of the first
-// lookahead lines. omp writes a title slot before its session record, and
+// scanJSONLWithHeaderFromOffsetFunc is scanJSONLFromOffset for a format whose
+// first lines carry metadata rather than a turn: the session's id, its title,
+// the directory it ran in. Resuming past that line left the parser with none
+// of it, so an appended turn arrived under a key made from the filename and
+// the session it belonged to never grew (#2870). The header is handed over
+// again on every resume, which is safe because parsers read it into fields
+// they set rather than append to. isHeader picks it out of the first
+// lookahead lines: taking line 1 whatever it held replayed a flat
+// transcript's first prompt on every resume, and left an omp session split
+// in two, since omp writes a title slot before its session record (#4406). omp writes a title slot before its session record, and
 // taking line 1 left an omp session split in two on every resume (#4406).
 func scanJSONLWithHeaderFromOffsetFunc(path string, offset int64, lookahead int, isHeader func(map[string]any) bool, fn func(map[string]any)) error {
 	if offset > 0 {
@@ -1061,4 +1055,12 @@ func fileParsed(path string) {
 	if fn != nil {
 		fn(path)
 	}
+}
+
+// readJSONFile reads a store kept as one JSON document, without the UTF-8 byte
+// order mark some Windows tools write: json.Unmarshal refuses the mark, and the
+// whole session went for three bytes. trimJSONSpace does the same for a line.
+func readJSONFile(path string) ([]byte, error) {
+	b, err := os.ReadFile(path)
+	return bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")), err
 }

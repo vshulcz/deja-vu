@@ -393,7 +393,7 @@ func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) er
 		line, err := r.ReadBytes('\n')
 		if bytes.Contains(line, grokUserChunk) || bytes.Contains(line, grokAgentChunk) || bytes.Contains(line, grokToolCall) || bytes.Contains(line, grokToolUpdate) {
 			var event grokUpdateEvent
-			if json.Unmarshal(line, &event) == nil {
+			if json.Unmarshal(trimJSONSpace(line), &event) == nil {
 				fn(event)
 			}
 		}
@@ -408,7 +408,7 @@ func scanGrokUpdatesFrom(path string, offset int64, fn func(grokUpdateEvent)) er
 
 func readGrokSummary(updatePath string) grokSummary {
 	var doc grokSummary
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(updatePath), "summary.json"))
+	b, err := readJSONFile(filepath.Join(filepath.Dir(updatePath), "summary.json"))
 	if err == nil {
 		_ = json.Unmarshal(b, &doc)
 	}

@@ -340,7 +340,7 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		if raw == "" && readErr != nil {
 			break
 		}
-		line := strings.TrimRight(raw, " \t\r\n")
+		line := strings.TrimRight(strings.TrimPrefix(raw, "\ufeff"), " \t\r\n")
 		if !inFence && strings.HasPrefix(line, aiderSessionMark) {
 			endSession()
 			idx++
