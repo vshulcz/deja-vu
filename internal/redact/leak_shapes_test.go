@@ -75,6 +75,10 @@ func TestWebhookURLIsMasked(t *testing.T) {
 	if strings.Contains(out, "FAKEfakeFAKEfake12345678") {
 		t.Errorf("webhook secret survived: %q", out)
 	}
+	in = "POST https://discord" + ".com/api/webhooks/123456789/FAKEfakeFAKEfake_abcdefgh"
+	if out, _ := Text(in); strings.Contains(out, "FAKEfakeFAKEfake_abcdefgh") || !strings.Contains(out, "/api/webhooks/123456789/") {
+		t.Errorf("discord webhook: %q", out)
+	}
 }
 
 // Outbound turns home paths into ~/…, and recap and the stats card rely on it,

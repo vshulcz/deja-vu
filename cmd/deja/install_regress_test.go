@@ -19,6 +19,9 @@ func regressHome(t *testing.T) string {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
+	// goose and other Windows resolvers read APPDATA, not the home directory.
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+	t.Setenv("LOCALAPPDATA", filepath.Join(home, "AppData", "Local"))
 	t.Setenv("XDG_CONFIG_HOME", "")
 	t.Setenv("XDG_DATA_HOME", "")
 	t.Setenv("HERMES_HOME", filepath.Join(home, ".hermes"))
@@ -261,8 +264,7 @@ func TestRepeatInstallLeavesTOMLWithStatusLineAlone(t *testing.T) {
 			if err := regressRun(t, false, tc.target, "--no-index"); err != nil {
 				t.Fatal(err)
 			}
-			var out string
-			out = captureStdout(t, func() {
+			out := captureStdout(t, func() {
 				if err := runInstall(filepath.Join(homeDir(), ".deja-index"), []string{tc.target, "--no-index"}, false); err != nil {
 					t.Error(err)
 				}

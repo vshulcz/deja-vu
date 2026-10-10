@@ -38,7 +38,8 @@ func claudeHookRunNote(hooks map[string]any) string {
 	}
 	// A file that is there and cannot run fails the same lookup; it exits 126,
 	// and the remedy is the mode, not the path.
-	if fi, err := os.Stat(strings.Trim(exe, `"'`)); err == nil && !fi.IsDir() && fi.Mode()&0o111 == 0 {
+	// Windows has no exec bit to lose.
+	if fi, err := os.Stat(strings.Trim(exe, `"'`)); err == nil && !fi.IsDir() && runtime.GOOS != "windows" && fi.Mode()&0o111 == 0 {
 		return exe + " is not executable, so every hook exits 126 — `deja install claude-auto` restores it"
 	}
 	return filepath.Base(sh) + " cannot find " + exe + " as the hooks spell it, so every hook exits 127 — `deja install claude-auto` rewrites them"

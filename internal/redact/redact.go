@@ -86,8 +86,9 @@ var (
 	// behind an Authorization header: "token" alone is an ordinary word.
 	authTokenRE = regexp.MustCompile(`(?i)\b(authorization\\*["']?\s*[:=]\s*\\*["']?\s*token)(\s+)([A-Za-z0-9._~+/=-]{16,})`)
 	// A webhook URL is a credential whole: whoever holds it can post. The path
-	// ids stay so the line still says which hook it was.
-	webhookURLRE = regexp.MustCompile(`(hooks\.slack\.com/(?:services|workflows|triggers)/[A-Za-z0-9]+/[A-Za-z0-9]+/|discord(?:app)?\.com/api/webhooks/[0-9]+/)([A-Za-z0-9_-]{16,})`)
+	// ids stay so the line still says which hook it was. The host is checked
+	// beside the call, so the pattern is the path alone.
+	webhookPathRE = regexp.MustCompile(`(/(?:services|workflows|triggers)/[A-Za-z0-9]+/[A-Za-z0-9]+/|/api/webhooks/[0-9]+/)([A-Za-z0-9_-]{16,})`)
 	// A secret named in prose and quoted rather than assigned. Tool output is
 	// full of this shape — `password authentication failed for user "admin"
 	// with password "S3cr3tP@ssw0rd!"` — and genericKVRE cannot reach it:
@@ -547,9 +548,11 @@ func textPass(s string, allow map[string]bool) (string, Counts) {
 		})
 		// Under the URL gate: a webhook travels as https://…, and another
 		// scan of every message cost more than the rule.
-		s = replaceSubmatch(s, webhookURLRE, "webhook-url", p, func(m []string) string {
-			return m[1] + "[redacted:webhook-url]"
-		})
+		if strings.Contains(lower, "hooks.slack.com") || strings.Contains(lower, "discord") {
+			s = replaceSubmatch(s, webhookPathRE, "webhook-url", p, func(m []string) string {
+				return m[1] + "[redacted:webhook-url]"
+			})
+		}
 	}
 	if strings.Contains(lower, "aws") {
 		s = replaceSubmatch(s, awsSecretRE, "aws-secret", p, func(m []string) string {

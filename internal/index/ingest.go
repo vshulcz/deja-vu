@@ -4685,7 +4685,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			// A tail with no files of its own names only the directory the
 			// session started in; the row already holds what the whole file
 			// said, which a rebuild also takes.
-			if s.Project != "" && s.Project != "-" && owns && !(known && named && s.ProjectFromDir) {
+			if s.Project != "" && s.Project != "-" && owns && (!known || !named || !s.ProjectFromDir) {
 				meta.Project = s.Project
 			}
 			if s.Path != "" && owns {
