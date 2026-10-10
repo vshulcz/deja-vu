@@ -2171,7 +2171,6 @@ func metaForSession(s model.Session) SessionMeta {
 // have produced. Empty when the session settled nothing, which is the same
 // answer the hook gave then.
 func sessionSettled(s model.Session) string {
-	const tail, budget = 150, 200
 	// Only a session that ran a command can ever be asked: the command table
 	// names the session, and nothing else reads this field. Extracting for the
 	// rest cost 21s of a 51s rebuild on a 2.0 GB corpus for an answer no caller
