@@ -168,9 +168,22 @@ func installTOMLStatusline(path, table, block, cmd string, uninstall bool) (inst
 		return installResult{Path: path, Action: "unchanged", Note: statuslineKeptNote(prev, cmd, true)}, nil
 	}
 	var out []string
-	if start >= 0 {
+	switch {
+	case start >= 0 && !uninstall:
+		// Rewritten where it stands. Moved to the end, it traded places with
+		// the MCP block the same target writes, which also goes to the end, so
+		// every repeat install rewrote the file twice and reported a change.
+		keep := end
+		for keep > start+1 && strings.TrimSpace(lines[keep-1]) == "" {
+			keep--
+		}
+		out = append(append(append(out, lines[:start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
+		s := strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+		a, err := writeIfChanged(path, old, []byte(s))
+		return installResult{Path: path, Action: a}, err
+	case start >= 0:
 		out = append(append(out, lines[:start]...), lines[end:]...)
-	} else {
+	default:
 		out = lines
 	}
 	s := strings.TrimRight(strings.Join(out, "\n"), "\n")

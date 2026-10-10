@@ -3010,6 +3010,25 @@ func installTOML(path, block string, uninstall bool) (installResult, error) {
 			note = switchedOffNote
 		}
 		s += block
+		// One block of deja's is rewritten where it stands. Moved to the end
+		// it traded places with the status line grok-auto and trae-auto write
+		// to the same file, which also goes last, and every repeat install
+		// rewrote the file and reported a change.
+		var own []tomlMCPBlock
+		for _, b := range blocks {
+			if b.key == "deja" {
+				own = append(own, b)
+			}
+		}
+		if len(own) == 1 {
+			lines := strings.Split(text, "\n")
+			keep := own[0].end
+			for keep > own[0].start+1 && strings.TrimSpace(lines[keep-1]) == "" {
+				keep--
+			}
+			out := append(append(append([]string{}, lines[:own[0].start]...), strings.Split(strings.TrimRight(block, "\n"), "\n")...), lines[keep:]...)
+			s = strings.TrimRight(strings.Join(out, "\n"), "\n") + "\n"
+		}
 	} else {
 		note = leftNamedDejaEntriesNote(foreignTOMLDejaKeys(s))
 		if s != "" {
