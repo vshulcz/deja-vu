@@ -1182,7 +1182,10 @@ func newBucketReader(dir string) *bucketReader {
 }
 
 func (b *bucketReader) postings(tok string) ([]posting, error) {
-	p := filepath.Join(b.dir, "buckets", bucket(tok)+".bin")
+	p, ok := bucketPath(b.dir, tok)
+	if !ok {
+		return nil, nil
+	}
 	entries, cached := b.entries[p]
 	if !cached {
 		e, f, err := openBucketDir(p)
