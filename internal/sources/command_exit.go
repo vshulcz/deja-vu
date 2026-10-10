@@ -176,3 +176,28 @@ var gooseExitResumes = resumesUnlessAnswering(`"tool`, func(m map[string]any) ([
 	}
 	return calls, ""
 })
+
+// qwenExitResumes is the same rule for Qwen Code, which writes Gemini's parts:
+// a functionCall in one record, its functionResponse in a tool_result record.
+var qwenExitResumes = resumesUnlessAnswering(`"function`, func(m map[string]any) ([]string, string) {
+	msg, _ := m["message"].(map[string]any)
+	items, _ := msg["parts"].([]any)
+	var calls []string
+	for _, it := range items {
+		p, _ := it.(map[string]any)
+		if call, ok := p["functionCall"].(map[string]any); ok {
+			calls = append(calls, str(call["id"]))
+		}
+		resp, ok := p["functionResponse"].(map[string]any)
+		if !ok {
+			continue
+		}
+		r, _ := resp["response"].(map[string]any)
+		out, _ := r["output"].(string)
+		errOut, _ := r["error"].(string)
+		if id := str(resp["id"]); id != "" && (geminiExitCode(out) > 0 || geminiExitCode(errOut) > 0) {
+			return calls, id
+		}
+	}
+	return calls, ""
+})
