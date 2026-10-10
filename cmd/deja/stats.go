@@ -128,6 +128,26 @@ func runStats(dir string, args []string) error {
 	if impact && year {
 		return fmt.Errorf("stats: --impact and --year are two reports — ask for one")
 	}
+	if impact && redaction {
+		return fmt.Errorf("stats: --impact and --redaction are two reports — ask for one")
+	}
+	// Both reports cover the whole store and print as text or JSON. They
+	// printed text over a --html or --card they ignored, and returned the same
+	// figures under a filter they never applied.
+	for _, r := range []struct {
+		on   bool
+		flag string
+	}{{impact, "--impact"}, {redaction, "--redaction"}} {
+		if !r.on {
+			continue
+		}
+		if options.Harness != "" || options.Project != "" || options.Since > 0 || options.Role != "" {
+			return fmt.Errorf("stats: %s takes no filters — it covers the whole store", r.flag)
+		}
+		if card || html {
+			return fmt.Errorf("stats: %s prints as text or --json, not as --card or --html", r.flag)
+		}
+	}
 	if impact {
 		return runStatsImpact(os.Stdout, dir, jsonOut)
 	}

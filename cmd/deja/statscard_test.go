@@ -161,6 +161,34 @@ func TestStatsFlagValidation(t *testing.T) {
 	}
 }
 
+// --impact and --redaction cover the whole store as text or JSON. They printed
+// text over an --html they ignored, and the same figures under any filter.
+func TestStatsWholeStoreReportsRefuseWhatTheyIgnore(t *testing.T) {
+	hermeticEnv(t)
+	page := filepath.Join(t.TempDir(), "x.html")
+	for _, report := range []string{"--impact", "--redaction"} {
+		for _, extra := range [][]string{
+			{"--html", page},
+			{"--card"},
+			{"--project", "nosuch"},
+			{"--harness", "codex"},
+			{"--since", "1m"},
+			{"--role", "user"},
+		} {
+			args := append([]string{report}, extra...)
+			if err := runStats(index.DefaultDir(), args); err == nil {
+				t.Errorf("stats %v: accepted a flag it ignores", args)
+			}
+		}
+	}
+	if err := runStats(index.DefaultDir(), []string{"--impact", "--redaction"}); err == nil {
+		t.Error("two reports at once")
+	}
+	if _, err := os.Stat(page); err == nil {
+		t.Error("a refused run wrote the page")
+	}
+}
+
 func TestHandoffsReceivedCountedFromIndex(t *testing.T) {
 	ss := []model.Session{
 		{ID: "h1", Messages: []model.Message{{Role: "user", Text: "You are picking up work handed off from a claude session (project x)"}}},
