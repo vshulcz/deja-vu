@@ -264,7 +264,7 @@ func doctorHooks(w io.Writer) {
 		// Named, because the difference is what the machine is missing out on:
 		// a settings.json written by an older deja keeps working and quietly
 		// lacks everything added since.
-		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install`\n",
+		fmt.Fprintf(w, "               %d of %d events wired — no %s; run `deja install claude-auto`\n",
 			st.want-len(st.missing), st.want, strings.Join(st.missing, ", "))
 	}
 	if note := doctorHookRepeats(st.hooks, claudeHookWiring, "claude-auto"); note != "" {
@@ -338,7 +338,7 @@ func doctorCodexHook(w io.Writer) {
 	}
 	line := fmt.Sprintf("  %-12s %-11s %s", "codex-hook", status, reportPath(hooksPath))
 	if len(missing) > 0 {
-		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install`",
+		line += fmt.Sprintf("\n               %d of %d events wired — no %s; run `deja install codex-auto`",
 			len(codexHookWiring)-len(missing), len(codexHookWiring), strings.Join(missing, ", "))
 	}
 	if status == "untrusted" {
