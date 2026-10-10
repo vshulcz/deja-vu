@@ -321,6 +321,13 @@ func readRecord(r io.Reader, t *recordTables) (Record, error) {
 // want; other bodies are skipped after peeking the key field. On a large log
 // this trades a full decode of every record for a few length reads.
 func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn func(Record)) error {
+	return eachRecordForKeysInRoles(path, t, want, nil, fn)
+}
+
+// eachRecordForKeysInRoles is eachRecordForKeys that also skips, by the
+// record's prefix, the bodies of wanted sessions whose role is not in roles.
+// A nil roles keeps every role.
+func eachRecordForKeysInRoles(path string, t *recordTables, want, roles map[string]bool, fn func(Record)) error {
 	atomic.AddInt64(&recordLogScans, 1)
 	f, err := openIndexFile(path)
 	if err != nil {
@@ -358,7 +365,17 @@ func eachRecordForKeys(path string, t *recordTables, want map[string]bool, fn fu
 		if un <= 0 {
 			return errShortRecord
 		}
-		if !want[t.lookup(kid)] {
+		skip := !want[t.lookup(kid)]
+		if !skip && roles != nil {
+			// Key, source and role lead the payload; the body after them is
+			// only read for a role the caller wants.
+			if head, _ := r.Peek(min(int(n), 3*binary.MaxVarintLen64)); len(head) > 0 {
+				if _, role, ok := recordRoleIn(head, t); ok && !roles[role] {
+					skip = true
+				}
+			}
+		}
+		if skip {
 			if _, derr := r.Discard(int(n)); derr != nil {
 				if derr == io.EOF || derr == io.ErrUnexpectedEOF {
 					return nil
