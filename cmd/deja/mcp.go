@@ -2577,8 +2577,14 @@ func buildingNowForAgent(dir string) string {
 		// agent actually made landed in this sentence, and an agent does not ask
 		// again, it concludes there is no history. Of the last four upgrades,
 		// three changed only what deja derives from a transcript.
-		if !index.Damaged(dir) && index.ReadableSnapshot(dir) {
+		damaged := index.Damaged(dir)
+		if !damaged && index.ReadableSnapshot(dir) {
 			return ""
+		}
+		// A store that will not read is not an upgrade, and saying "for this
+		// version" sent the reader looking at versions.
+		if damaged {
+			return "deja's index could not be read and is being rebuilt. Recall comes online shortly; ask again then."
 		}
 		return "deja is rebuilding its index for this version of deja. Recall comes online shortly; ask again then."
 	}

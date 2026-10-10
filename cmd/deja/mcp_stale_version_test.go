@@ -91,3 +91,19 @@ func TestRecallDeclinesALayoutItCannotRead(t *testing.T) {
 		t.Errorf("an unreadable layout was served as an answer:\n%s", got)
 	}
 }
+
+// A manifest that will not decode is damage, not an upgrade: the sentence for
+// it named "this version of deja" and sent the reader after versions.
+func TestRecallNamesADamagedStoreAsDamage(t *testing.T) {
+	dir := staleStore(t)
+	if err := os.WriteFile(filepath.Join(dir, "manifest.gob"), []byte("not a manifest"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := callMCPTool(dir, "recall", json.RawMessage(`{"query":"quokkabloom retry budget"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got, "for this version") || !strings.Contains(got, "could not be read") {
+		t.Errorf("recall over a manifest that will not decode blamed the version:\n%s", got)
+	}
+}
