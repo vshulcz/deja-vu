@@ -1,6 +1,9 @@
 package search
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -19,12 +22,12 @@ func TestALineSpecThatCannotBeUsedIsSaidOutLoud(t *testing.T) {
 		// Digits trimLineSuffix accepted, that name no line.
 		{"a.txt:0", "a.txt", 0, "there is no line 0"},
 		{"a.txt:99999999999999999999", "a.txt", 0, "too large to be a line number"},
-		// Not digits, so the suffix is never cut and the whole string stays the
-		// path — which is what a colon in a real filename needs.
-		{"a.txt:abc", "a.txt:abc", 0, `"abc" is not a line number`},
-		{"a.txt:-1", "a.txt:-1", 0, `"-1" is not a line number`},
-		{"a.txt:+3", "a.txt:+3", 0, `"+3" is not a line number`},
-		{"a.txt:2.5", "a.txt:2.5", 0, `"2.5" is not a line number`},
+		// Not digits. The note says the answer is for the whole file, so the
+		// file is what is searched: kept whole, `pool.go:abc` matched nothing.
+		{"a.txt:abc", "a.txt", 0, `"abc" is not a line number`},
+		{"a.txt:-1", "a.txt", 0, `"-1" is not a line number`},
+		{"a.txt:+3", "a.txt", 0, `"+3" is not a line number`},
+		{"a.txt:2.5", "a.txt", 0, `"2.5" is not a line number`},
 	} {
 		path, line, note := cutLineSuffix(tc.in)
 		if path != tc.path || line != tc.line {
@@ -69,6 +72,22 @@ func TestAColonInAFilenameIsNotAMistypedLine(t *testing.T) {
 		if path != in || line != 0 {
 			t.Errorf("cutLineSuffix(%q) = %q, %d; want the string unchanged", in, path, line)
 		}
+	}
+}
+
+// A file that really is named with the colon is taken as written.
+func TestAnExistingFileWithAColonIsTakenAsWritten(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a colon cannot be in a Windows filename")
+	}
+	dir := t.TempDir()
+	name := filepath.Join(dir, "a.txt:abc")
+	if err := os.WriteFile(name, []byte("x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path, line, note := cutLineSuffix(name)
+	if path != name || line != 0 || note != "" {
+		t.Errorf("cutLineSuffix(%q) = %q, %d, %q; want it as written", name, path, line, note)
 	}
 }
 

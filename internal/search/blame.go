@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -156,7 +157,19 @@ func ResolveBlamePath(name string) (BlameTarget, error) {
 func cutLineSuffix(name string) (string, int, string) {
 	trimmed := trimLineSuffix(name)
 	if trimmed == name {
-		return name, 0, mistypedLineNote(name)
+		note := mistypedLineNote(name)
+		if note == "" {
+			return name, 0, ""
+		}
+		// The note promises the whole file, so the file is what is searched:
+		// searching `pool.go:abc` as written found nothing under a line that
+		// said it was answering for pool.go. A file really named that way is
+		// still taken as written.
+		if _, err := os.Stat(name); err == nil {
+			return name, 0, ""
+		}
+		head, _, _ := lastColon(name)
+		return head, 0, note
 	}
 	rest := strings.TrimPrefix(name[len(trimmed):], ":")
 	head, _, _ := strings.Cut(rest, ":")
