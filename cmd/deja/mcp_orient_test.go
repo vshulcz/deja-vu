@@ -63,6 +63,19 @@ func TestOrientOnAStoreWithNothingInItSaysSo(t *testing.T) {
 	}
 }
 
+// A project whose sessions ran nothing that repeats still has sessions. orient
+// said none had worked there while recall for the same project found them.
+func TestOrientCountsSessionsWithNothingToMap(t *testing.T) {
+	dir, _ := tuiStore(t)
+	out, err := callMCPTool(dir, "orient", json.RawMessage(`{"mode":"orient","project":"payments"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "No past session") || !strings.Contains(out, "2 sessions worked in payments") {
+		t.Errorf("orient on a project with two sessions answered %q", out)
+	}
+}
+
 // The mode is declared, reachable through the one tool, and needs no payload —
 // q is what every other mode reads, and orient asking for one would be asking
 // the agent a question it called orient to avoid.
