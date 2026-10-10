@@ -547,37 +547,6 @@ func frictionHashes(ms []model.Message) []uint64 {
 	return out
 }
 
-// hitFromRecords is frictionHashes for the import path, which holds a session
-// as records rather than messages. Imported sessions used to carry no Hit, so
-// the brief's one friction line — which reads meta.Hit — never counted a wall a
-// peer kept hitting, while `deja friction` (which reads the record log) and
-// stats both did. Same gap the asked-twice line had, same shape of fix.
-func hitFromRecords(recs []Record) []uint64 {
-	var out []uint64
-	seen := map[uint64]bool{}
-	for _, r := range recs {
-		if r.Role != roleToolOutput {
-			continue
-		}
-		for _, line := range strings.Split(r.Text, "\n") {
-			line, ok := FrictionLine(line)
-			if !ok {
-				continue
-			}
-			h := frictionHash(line)
-			if seen[h] {
-				continue
-			}
-			seen[h] = true
-			out = append(out, h)
-			if len(out) >= frictionSessionCap {
-				return out
-			}
-		}
-	}
-	return out
-}
-
 // PromotedNoteMetas returns the sessions that carry a promoted note's state —
 // the shape a decision has after it crosses a machine boundary, where the local
 // notes file knows nothing about it. Manifest only, so a caller in a hook pays a

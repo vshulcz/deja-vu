@@ -190,22 +190,6 @@ func clauseNegatesOrDefers(clause, phrase string) bool {
 	return strings.HasSuffix(c, "?")
 }
 
-// gaveUpFromRecords is gaveUp for the import path, which holds a session as
-// records rather than as messages.
-func gaveUpFromRecords(recs []Record) bool {
-	for _, r := range recs {
-		if r.Role != "user" && r.Role != "assistant" {
-			continue
-		}
-		for _, line := range strings.Split(r.Text, "\n") {
-			if _, ok := GiveUpLine(line); ok {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // gaveUp reports whether a session says, somewhere in what was actually said,
 // that something was tried and dropped. Only speech counts: tool output is
 // full of the word "reverted" from git itself, and a command someone ran is

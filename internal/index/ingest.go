@@ -2352,60 +2352,6 @@ func askedHashes(ms []model.Message) []uint64 {
 	return out
 }
 
-// askedFromRecords is askedHashes for the import path, which holds a session as
-// records rather than messages. Imported sessions used to carry no Asked, so
-// the brief's asked-twice line — which reads meta.Asked — never saw a repeat
-// that crossed a sync boundary, while stats' RepeatQuestions (from records)
-// counted it. The two disagreed on the same store.
-func askedFromRecords(recs []Record) []uint64 {
-	var out []uint64
-	seen := map[uint64]bool{}
-	for _, r := range recs {
-		if r.Role != "user" {
-			continue
-		}
-		v, ok := askedHashOf(r.Text)
-		if !ok || seen[v] {
-			continue
-		}
-		seen[v] = true
-		out = append(out, v)
-		if len(out) >= askedQuestionCap {
-			break
-		}
-	}
-	return out
-}
-
-// countedFromRecords is the message count local ingest keeps as Counted: the
-// records that are a turn of the conversation, not the work records deja
-// derives beside them. It feeds the corpus size the ranking divides by, so an
-// imported session with none counted as a single document (#2569).
-func countedFromRecords(recs []Record) int {
-	n := 0
-	for _, r := range recs {
-		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
-			continue
-		}
-		n++
-	}
-	return n
-}
-
-// wordsFromRecords is sessionWords over the same records: the document length
-// BM25 normalises by. Without it an imported session is scored on the length of
-// the match alone, which is the marathon-wins case search.go describes.
-func wordsFromRecords(recs []Record) int {
-	ms := make([]model.Message, 0, len(recs))
-	for _, r := range recs {
-		if r.Role == roleFiles || r.Role == roleCommand || r.Role == roleEdit {
-			continue
-		}
-		ms = append(ms, model.Message{Role: r.Role, Text: r.Text})
-	}
-	return sessionWords(ms)
-}
-
 // notAsked rejects the text a harness writes under the user role: hook
 // envelopes, interruption notices, resume preambles, the compaction summary.
 // It repeats across sessions by construction, so without this the most
@@ -2540,25 +2486,6 @@ func topTouchedFiles(ms []model.Message) []string {
 		countTouchedPaths(count, m.Text)
 	}
 	return rankTouched(count)
-}
-
-// touchedFromRecords is topTouchedFiles for the import path, which holds a
-// session as records rather than messages. Imported sessions used to carry no
-// Touched, so `deja blame` — which reads it — could not attribute a peer's
-// edits even though `search --role files` surfaced the same records.
-// touchedFromRecords derives the touched-file ranking and the counts behind it.
-// The counts were computed here and thrown away, so an imported session carried
-// a ranking nothing could merge — the shape #1333 fixed for local ingest, still
-// standing for peers (#2558).
-func touchedFromRecords(recs []Record) ([]string, []int) {
-	count := map[string]int{}
-	for _, r := range recs {
-		if r.Role != roleFiles {
-			continue
-		}
-		countTouchedPaths(count, r.Text)
-	}
-	return rankTouchedCounted(count)
 }
 
 // countTouchedPaths tallies the file paths in one `files` record's text, one

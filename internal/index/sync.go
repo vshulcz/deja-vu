@@ -16,6 +16,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -763,7 +764,30 @@ func Import(dir, inDir string) (int, error) {
 	if err := appendImportedRecords(dir, &m, recsByKey, metas); err != nil {
 		return added, err
 	}
+	refreshImportSidecars(dir, m.Sessions, recsByKey)
 	return added, skippedError(skipped)
+}
+
+// refreshImportSidecars brings the tables mined from sessions up to the batch,
+// as the append-only pass does for what it read. Without it a peer's commands
+// were missing from the command tables and session facts until a rebuild, and
+// a fix the batch confirmed stayed a candidate.
+func refreshImportSidecars(dir string, sessions map[string]SessionMeta, recsByKey map[string][]Record) {
+	var batch []model.Session
+	for _, key := range sortedKeys(recsByKey) {
+		meta := sessions[key]
+		s := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project}
+		for _, r := range recsByKey[key] {
+			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+		}
+		batch = append(batch, s)
+	}
+	mergeFixes(dir, dir, batch, map[string]bool{})
+	if carriesWork(batch) {
+		buildCommandsFromIndex(dir)
+		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)
+		buildSessionFactsFromIndex(dir)
+	}
 }
 
 // importSnapshot is what one file had contributed before it was read, so a
@@ -992,33 +1016,17 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 	nextOrd := nextSessionOrd(m.Sessions)
 	for _, key := range keys {
 		meta := metas[key]
-		// Derive the file-touch list the way local ingest does. Without it an
-		// imported session carried no Touched, so `deja blame` — which reads
-		// Touched to find who edited a file — could not attribute a peer's edits
-		// even though `search --role files` surfaced the same records.
-		if t, hits := touchedFromRecords(recsByKey[key]); len(t) > 0 {
-			meta.Touched, meta.TouchHits = t, hits
+		// The derived fields are folded the way local ingest folds an append,
+		// over every record the batch carries, so an imported row reads as
+		// the one a rebuild of this index writes for it. Counting only the
+		// conversation turns, and never setting Settled, Opening or LastMsg,
+		// ranked a peer's sessions on other lengths and left them without
+		// their lineage and how they ended.
+		ms := make([]model.Message, 0, len(recsByKey[key]))
+		for _, r := range recsByKey[key] {
+			ms = append(ms, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
-		// Same reason for the asked-twice signal: without meta.Asked an imported
-		// session can never contribute a repeat to the brief, so a question a
-		// peer asked and you asked again crossed a sync boundary unseen.
-		if a := askedFromRecords(recsByKey[key]); len(a) > 0 {
-			meta.Asked = a
-		}
-		// And the two counts ranking divides by. A batch carries the records it
-		// carries, so these add up across batches the way the local
-		// incremental path adds them up across appends (#2569).
-		batchCounted := countedFromRecords(recsByKey[key])
-		batchWords := wordsFromRecords(recsByKey[key])
-		// And the friction signal, for the same reason: without meta.Hit the
-		// brief's one wall line never counted an error a peer kept hitting,
-		// though `deja friction` and stats both did.
-		if hh := hitFromRecords(recsByKey[key]); len(hh) > 0 {
-			meta.Hit = hh
-		}
-		// And whether the session reports backing something out, so a peer's
-		// dead end arrives marked instead of reading like a live answer.
-		batchGaveUp := gaveUpFromRecords(recsByKey[key])
+		batch := model.Session{Harness: meta.Harness, Messages: ms}
 		old := m.Sessions[key]
 		if old.ID != "" {
 			meta.Ord = old.Ord
@@ -1028,31 +1036,23 @@ func appendImportedRecords(dir string, m *Manifest, recsByKey map[string][]Recor
 			if old.Updated.After(meta.Updated) {
 				meta.Updated = old.Updated
 			}
-			// A re-import carries only the records new since last time; the ones
-			// behind the earlier Touched/Asked/Hit are in the ledger and skipped,
-			// so recomputing from this batch alone would drop them. Union with what
-			// the session already had, so a file a peer edited in an earlier batch
-			// stays blamable (#1024 follow-up). Both sides are ranked lists, so the
-			// union is by rank: taking the older list first and cutting the newer
-			// off at the cap kept six earlier paths over the file this batch worked
-			// on hardest (#1333). Six slots mean some earlier path does lose its
-			// place — to a path the session worked on more, which is what the field
-			// holds.
-			meta.Touched, meta.TouchHits = mergeTouchedCounted(old.Touched, old.TouchHits, meta.Touched, meta.TouchHits)
-			meta.Asked = mergeCappedU64(old.Asked, meta.Asked, askedQuestionCap)
-			meta.Hit = mergeCappedU64(old.Hit, meta.Hit, frictionSessionCap)
-			// Same reason: a reversal reported in an earlier batch is not in
-			// this one, so OR with what the row already carried rather than
-			// letting a later batch clear the mark.
-			meta.GaveUp = old.GaveUp || batchGaveUp
-			meta.Counted = old.Counted + batchCounted
-			meta.Words = old.Words + batchWords
+			// A re-import carries only the records new since last time; the
+			// ones behind the earlier fields are in the ledger and skipped, so
+			// the batch folds into what the row already holds.
+			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = old.Counted, old.Words, old.LastMsg, old.Opening
+			meta.Asked, meta.Hit, meta.GaveUp, meta.NoText = old.Asked, old.Hit, old.GaveUp, old.NoText
+			meta.Touched, meta.TouchHits, meta.Settled = old.Touched, old.TouchHits, old.Settled
 		} else {
-			meta.GaveUp = batchGaveUp
-			meta.Counted = batchCounted
-			meta.Words = batchWords
+			meta.Counted, meta.Words, meta.LastMsg, meta.Opening = 0, 0, 0, 0
+			meta.Asked, meta.Hit, meta.GaveUp = nil, nil, false
+			meta.Touched, meta.TouchHits, meta.Settled = nil, nil, ""
+			meta.NoText = !holdsText(batch)
 			meta.Ord = nextOrd
 			nextOrd++
+		}
+		extendDerived(&meta, ms)
+		if settled := sessionSettled(batch); settled != "" {
+			meta.Settled = settled
 		}
 		m.Sessions[key] = meta
 		for _, r := range recsByKey[key] {
