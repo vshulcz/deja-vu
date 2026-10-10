@@ -144,7 +144,7 @@ func TestAClaudeFolderReadBeforeItsCWDLandsIsNamedOnceItDoes(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	claudeCWDNameCache = sync.Map{}
+	claudeCWDNameCache, claudeCWDMiss = sync.Map{}, sync.Map{}
 	path := filepath.Join(dir, "aaaa.jsonl")
 	snap := `{"type":"file-history-snapshot","messageId":"m0","snapshot":{"trackedFileBackups":{}}}` + "\n"
 	if err := os.WriteFile(path, []byte(snap), 0o600); err != nil {
@@ -155,6 +155,10 @@ func TestAClaudeFolderReadBeforeItsCWDLandsIsNamedOnceItDoes(t *testing.T) {
 	if err := os.WriteFile(path, []byte(snap+user), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// The write lands right after the miss, but a file clock coarser than
+	// time.Now, or one keeping whole seconds, can stamp it a little before.
+	early := time.Now().Add(-time.Second)
+	_ = os.Chtimes(path, early, early)
 	if got := claudeProjectNameFor(path); got != "w/проект" {
 		t.Errorf("after cwd landed the folder is %q, want w/проект", got)
 	}
@@ -169,7 +173,7 @@ func TestAClaudeFolderMissIsKeptForOlderTranscripts(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	claudeCWDNameCache = sync.Map{}
+	claudeCWDNameCache, claudeCWDMiss = sync.Map{}, sync.Map{}
 	path := filepath.Join(dir, "aaaa.jsonl")
 	snap := `{"type":"file-history-snapshot","messageId":"m0","snapshot":{"trackedFileBackups":{}}}` + "\n"
 	if err := os.WriteFile(path, []byte(snap), 0o600); err != nil {

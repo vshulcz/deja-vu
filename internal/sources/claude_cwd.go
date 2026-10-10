@@ -106,8 +106,11 @@ func claudeProjectNameFor(path string) string {
 	// in it: with thousands in one folder that was a directory listing per
 	// file, and `deja sources` took half a minute. A transcript written since
 	// is where a cwd can have landed (#4225), so it reads the folder again.
+	// File times run on a coarser clock than time.Now and some filesystems
+	// keep whole seconds, so a write just after the miss can be stamped
+	// before it; only a transcript older than the slack counts as older.
 	if at, ok := claudeCWDMiss.Load(dir); ok {
-		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.(time.Time)) {
+		if fi, err := os.Stat(path); err == nil && fi.ModTime().Before(at.(time.Time).Add(-claudeCWDMissSlack)) {
 			return claudeProjectName(dir)
 		}
 	}
@@ -123,6 +126,8 @@ func claudeProjectNameFor(path string) string {
 	claudeCWDNameCache.Store(dir, name)
 	return name
 }
+
+const claudeCWDMissSlack = 2 * time.Second
 
 var (
 	claudeCWDNameCache sync.Map // project folder -> display name
