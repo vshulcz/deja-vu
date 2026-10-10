@@ -875,8 +875,10 @@ func detectRenamedFiles(oldFiles, files map[string]FileState) map[string]string 
 
 // applyRenamedFiles moves a manifest from the old names to the new ones. The
 // records themselves do not move: their source path is interned, so one entry
-// in that table is every record's path at once.
-func applyRenamedFiles(m *Manifest, renamed map[string]string) {
+// in that table is every record's path at once. It returns the sessions the
+// move put in another project.
+func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
+	reprojected := map[string]bool{}
 	for _, np := range sortedKeys(renamed) {
 		op := renamed[np]
 		of, ok := m.Files[op]
@@ -886,9 +888,22 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) {
 		of.Path = np
 		m.Files[np] = of
 		delete(m.Files, op)
+		// A move to another directory can be a move to another project: a
+		// renamed checkout is a renamed Claude project folder. The project is
+		// what the reader says for the new path, as a rebuild would set it.
+		var moved []model.Session
+		if filepath.Dir(np) != filepath.Dir(op) {
+			moved, _ = parseAppendedFile("", np, FileState{}, true)
+		}
 		for key, meta := range m.Sessions {
 			if meta.Path == op {
 				meta.Path = np
+				for _, s := range moved {
+					if s.Harness+":"+s.ID == key && s.Project != "" && s.Project != meta.Project {
+						meta.Project = s.Project
+						reprojected[key] = true
+					}
+				}
 				m.Sessions[key] = meta
 			}
 		}
@@ -904,6 +919,27 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) {
 			}
 		}
 	}
+	return reprojected
+}
+
+// reprojectSidecars files the tables a session feeds under the project a
+// rename moved it to. Nothing was read, so the pairs keep their rows and take
+// the new project; the command tables are mined again from the records.
+func reprojectSidecars(dir string, sessions map[string]SessionMeta, keys map[string]bool) {
+	if pairs := ReadFixes(dir); len(pairs) > 0 {
+		dirty := false
+		for i, p := range pairs {
+			if keys[p.Key] {
+				pairs[i].Project, dirty = sessions[p.Key].Project, true
+			}
+		}
+		if dirty {
+			_ = writeGobAtomic(fixesPath(dir), pairs)
+		}
+	}
+	buildCommandsFromIndex(dir)
+	buildCommandFailsFromIndex(dir, nil, nil)
+	buildSessionFactsFromIndex(dir)
 }
 
 // orphanState is what a full rebuild has to carry: sessions whose transcript
@@ -939,6 +975,10 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	}
 	want := map[string]bool{}
 	var present map[string]bool
+	moved := map[string]bool{}
+	for _, op := range detectRenamedFiles(m.Files, files) {
+		moved[op] = true
+	}
 	for _, p := range sortedKeys(m.Files) {
 		if p == syncImportPath {
 			continue // importedSessions carries these
@@ -957,6 +997,11 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 		}
 		if _, err := os.Lstat(p); err == nil {
 			continue // on disk after all, just not in this pass's set
+		}
+		// Renamed or moved to another folder: read from where it is now,
+		// as the incremental pass follows it.
+		if moved[p] {
+			continue
 		}
 		if !deletedFromLiveStore(p) {
 			continue
@@ -3699,10 +3744,14 @@ func updateIndex(dir, harness, scope string, files map[string]FileState, force b
 	// answering once and nothing on any screen saying so (#3546).
 	if err == nil && !force {
 		if pairs := detectRenamedFiles(old.Files, files); len(pairs) > 0 {
-			applyRenamedFiles(&old, pairs)
+			reprojected := applyRenamedFiles(&old, pairs)
 			// Failing to record it costs the duplicate this exists to avoid,
 			// not correctness: the pass below then treats the file as new.
-			if werr := writeManifest(dir, old); werr == nil && progress != nil {
+			werr := writeManifest(dir, old)
+			if werr == nil && len(reprojected) > 0 {
+				reprojectSidecars(dir, old.Sessions, reprojected)
+			}
+			if werr == nil && progress != nil {
 				fmt.Fprintf(progress, "deja: %d transcript%s renamed — the index followed the new name\n", len(pairs), pluralS(len(pairs)))
 			}
 		}
