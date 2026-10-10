@@ -387,7 +387,7 @@ o deja indexou antes da limpeza continuam pesquisáveis depois de o arquivo sumi
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

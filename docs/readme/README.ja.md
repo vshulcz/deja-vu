@@ -600,7 +600,7 @@ macOS と Linux です。実環境でのレポートは [#9](https://github.com/
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

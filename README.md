@@ -588,8 +588,13 @@ battle-tested paths. Field reports welcome in [#9](https://github.com/vshulcz/de
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+The index is under `~/.cache/deja`, your `remember` and `promote` notes in
+`~/.local/share/deja`, and the rules, exclude list and hook launcher in
+`~/.config/deja` (or under `XDG_DATA_HOME` and `XDG_CONFIG_HOME` when set; on
+Windows the notes are in `%AppData%\deja`).
 
 </details>
 

@@ -386,7 +386,7 @@ Claude Code удаляет записи старше 30 дней
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

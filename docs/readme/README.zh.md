@@ -349,7 +349,7 @@ Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

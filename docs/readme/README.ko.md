@@ -378,7 +378,7 @@ deja가 색인한 세션은 파일이 사라진 뒤에도 검색됩니다. 자�
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

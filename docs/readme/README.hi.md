@@ -383,7 +383,7 @@ Claude Code 30 दिन से पुराने रिकॉर्ड हट�
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>

@@ -388,7 +388,7 @@ deja'nın temizlikten önce indekslediği oturumlar, dosya kaybolduktan sonra da
 
 ```sh
 deja uninstall --all
-rm -rf ~/.cache/deja
+rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
 
 </details>
