@@ -655,6 +655,18 @@ const toolMatchWeight = 0.5
 // questions with it (#3351).
 const subjectShare = 0.5
 
+// longQueryTerms is where a query stops being a question and becomes a pasted
+// document, counted in informative terms. The longest LongMemEval question has
+// 32 and the agents' recall queries a handful; a GitHub issue has a median of
+// 69. Past it, scoring is BM25-shaped: summed over the session and divided by
+// its length against the average with longQueryLengthB. On 362 SWE-ContextBench
+// tasks searching the same repo's past tasks by issue text, R@1 goes from 42.5%
+// to 50.8% and R@10 from 78.2% to 83.4% (#4925). Applied to every query
+// instead, LongMemEval hit@1 fell from 87.4% to 82.8%.
+const longQueryTerms = 40
+
+const longQueryLengthB = 0.75
+
 // rankIDF is what a match is WORTH: documents counted in sessions, the unit
 // ranking has always used. Weighting by the gate's number instead lifts every
 // term a few long sessions happen to repeat, which reorders the top of the
@@ -1483,6 +1495,20 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		}
 	}
 	matchedTerms = coverageCounts(matchedTerms, matchedIdentifying, identifyingTerms)
+	// A query this long is a pasted document — an issue, a log, a spec — and
+	// ranking it is finding the documents most like it, so a session's score
+	// pays for its length the way BM25 does and is summed over the session
+	// rather than read off its best message.
+	long := len(terms) >= longQueryTerms
+	var sumWords, nWords float64
+	if long {
+		for _, meta := range inProject {
+			if meta.Words > 0 {
+				sumWords += float64(meta.Words)
+				nWords++
+			}
+		}
+	}
 	ranked := make([]relevanceScored, 0, len(score))
 	for ord, sc := range score {
 		if sc <= 0 {
@@ -1522,7 +1548,9 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 			}
 		}
 		coocc := 1 + 0.2*(best-1)
-		sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		if !long {
+			sc = bestMsg*coocc + 0.25*(sc-bestMsg)
+		}
 		// Coverage: distinct informative terms beat repetition.
 		if matchedTerms[ord] > 1 {
 			sc *= 1 + 0.15*float64(matchedTerms[ord]-1)
@@ -1550,6 +1578,11 @@ func relevantMetasCounts(dir string, m Manifest, projects, terms []string, n int
 		named := 0
 		if queryBest <= 0 || bestMatched[ord] >= queryBest*subjectShare {
 			named = 1
+		}
+		if w := inProject[ord].Words; long && w > 0 && sumWords > 0 {
+			norm := 1 - longQueryLengthB + longQueryLengthB*float64(w)/(sumWords/nWords)
+			sc /= norm
+			focus[ord] /= norm
 		}
 		ranked = append(ranked, relevanceScored{inProject[ord], sc, matchedTerms[ord], anyTerms[ord], strongTerms[ord], named, focus[ord]})
 	}
