@@ -70,6 +70,9 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 		seen      = map[string]bool{}
 		held      = map[string][]model.Message{}
 		heldOrder []string
+		// A call is written twice, as the request the reply makes and as the
+		// start of its execution; its command is one run, recorded once.
+		called = map[string]bool{}
 	)
 	addPath := func(p string) {
 		if p == "" || seen[p] || !IndexToolPaths() {
@@ -77,6 +80,15 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 		}
 		seen[p] = true
 		files = append(files, p)
+	}
+	toolArgs := func(id, name string, args map[string]any, at time.Time) {
+		if id != "" {
+			if called[id] {
+				return
+			}
+			called[id] = true
+		}
+		copilotAgentToolArgs(&s, name, args, at, addPath)
 	}
 	for _, raw := range strings.Split(string(data), "\n") {
 		raw = strings.TrimSpace(raw)
@@ -124,8 +136,9 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 			var d struct {
 				Content      string `json:"content"`
 				ToolRequests []struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
+					ToolCallID string `json:"toolCallId"`
+					Name       string `json:"name"`
+					Arguments  string `json:"arguments"`
 				} `json:"toolRequests"`
 			}
 			if json.Unmarshal(e.Data, &d) != nil {
@@ -148,7 +161,7 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 				if json.Unmarshal([]byte(req.Arguments), &args) != nil {
 					continue
 				}
-				copilotAgentToolArgs(&s, req.Name, args, at, addPath)
+				toolArgs(req.ToolCallID, req.Name, args, at)
 			}
 		case "tool.execution_start":
 			var d struct {
@@ -157,7 +170,7 @@ func parseCopilotAgentTranscript(path string, data []byte) ([]model.Session, err
 				Arguments  map[string]any `json:"arguments"`
 			}
 			if json.Unmarshal(e.Data, &d) == nil {
-				copilotAgentToolArgs(&s, d.ToolName, d.Arguments, at, addPath)
+				toolArgs(d.ToolCallID, d.ToolName, d.Arguments, at)
 				// An edit is held until the call says how it ended: a
 				// refused one changed nothing.
 				c := copilotChatCallChange(d.ToolName, d.Arguments)
