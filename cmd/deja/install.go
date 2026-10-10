@@ -1597,9 +1597,57 @@ func dropOwnBackup(path string) {
 	if err != nil {
 		return
 	}
-	if mentionsDeja(b) {
+	if mentionsDeja(b) && !holdsForeignDejaEntry(b) {
 		_ = os.Remove(bak)
 	}
+}
+
+// holdsForeignDejaEntry reports whether a JSON snapshot keeps an entry named
+// "deja" that runs some other program. Its name is the marker mentionsDeja
+// goes by, and install replaces such an entry with deja's own, so the snapshot
+// is the only copy of it left.
+func holdsForeignDejaEntry(b []byte) bool {
+	v, ok := decodeJSONCExact(bytes.TrimPrefix(b, utf8BOM))
+	if !ok {
+		return false
+	}
+	var walk func(any) bool
+	walk = func(v any) bool {
+		switch t := v.(type) {
+		case map[string]any:
+			for k, c := range t {
+				if e, ok := c.(map[string]any); ok && k == "deja" && foreignEntry(e) {
+					return true
+				}
+				if walk(c) {
+					return true
+				}
+			}
+		case []any:
+			for _, c := range t {
+				if walk(c) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(v)
+}
+
+// foreignEntry reports whether an MCP entry launches something other than
+// deja: deja's own always runs its `mcp` subcommand, whatever the binary is
+// called, and a remote server has a url and no command at all.
+func foreignEntry(e map[string]any) bool {
+	if e["url"] != nil && e["command"] == nil {
+		return true
+	}
+	if entryCommandName(e) == "" || entryRunsDeja(e) {
+		return false
+	}
+	words, _ := e["command"].([]any)
+	args, _ := e["args"].([]any)
+	return !commandListRunsMCP(append(append([]any{}, words...), args...))
 }
 
 // mentionsDeja reports whether a config snapshot carries deja's own wiring.
