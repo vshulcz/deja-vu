@@ -77,6 +77,14 @@ func TestAmbiguousDryRunPreviewsTheCommandAsTyped(t *testing.T) {
 	if !strings.Contains(out, "with --all-matches it would drop: 3 sessions") {
 		t.Errorf("the dry run does not say whose 3 sessions those are:\n%s", out)
 	}
+	// The refusal promises a listing, so the dry run names the sessions, and
+	// it does not point the reader back at the command they just ran.
+	if !strings.Contains(out, "sessions: claude:s1, claude:s10, claude:s11") {
+		t.Errorf("the dry run lists no ids:\n%s", out)
+	}
+	if strings.Contains(out, "--dry-run` lists") {
+		t.Errorf("the dry run sends the reader to itself:\n%s", out)
+	}
 	// The unambiguous form keeps its plain wording — nothing to qualify there.
 	one, err := captureRun(t, "forget", "--session", "s1", "--dry-run")
 	if err != nil {
