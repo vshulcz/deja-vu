@@ -116,12 +116,25 @@ func (p painter) chip(x, y int, h string, n int, sel bool, max int) int {
 
 // putHL writes text with every occurrence of the query's words picked out.
 // It clips with an ellipsis like PutClip.
+// A first match past the edge brings its part of the line in from the left,
+// after an ellipsis, so a hit is never drawn off screen.
 func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, max int) int {
 	if termwidth.Columns(text) > max-x {
 		if max-x < 1 {
 			return x
 		}
-		text = termwidth.Cut(text, max-x-1) + "…"
+		if from, to := firstMark(highlightMask([]rune(text), terms)); to > 0 {
+			rs := []rune(text)
+			if termwidth.Columns(string(rs[:to])) > max-x-1 {
+				// The match ends two thirds of the way in, its line's tail after it.
+				lead := []rune(termwidth.CutRight(string(rs[:to]), (max-x-2)*2/3))
+				x = p.Put(x, y, "…", base, max)
+				text = string(rs[min(from, to-len(lead)):])
+			}
+		}
+		if termwidth.Columns(text) > max-x {
+			text = termwidth.Cut(text, max-x-1) + "…"
+		}
 	}
 	rs := []rune(text)
 	mark := highlightMask(rs, terms)
@@ -142,6 +155,20 @@ func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, ma
 		}
 	}
 	return x
+}
+
+// firstMark is the rune span of the first marked run, or 0, 0.
+func firstMark(mark []bool) (int, int) {
+	for i, m := range mark {
+		if m {
+			j := i
+			for j < len(mark) && mark[j] {
+				j++
+			}
+			return i, j
+		}
+	}
+	return 0, 0
 }
 
 // highlightMask marks the runes of rs that belong to a case-insensitive match

@@ -94,6 +94,7 @@ func (a *tuiApp) forgetSession(s model.Session) {
 				return
 			}
 			delete(a.details, sessionKey(s))
+			a.dropKept(s)
 			if a.view == viewReader && sessionKey(a.reader.s) == sessionKey(s) {
 				a.view = viewList
 			}
@@ -107,6 +108,18 @@ func (a *tuiApp) forgetSession(s model.Session) {
 			a.say("Forgotten. deja forget --unforget "+s.ID+" brings it back.", true)
 		})
 	})
+}
+
+// dropKept takes a session off the Deleted tab.
+func (a *tuiApp) dropKept(s model.Session) {
+	k := sessionKey(s)
+	delete(a.keptIDs, k)
+	for i, ks := range a.kept {
+		if sessionKey(ks) == k {
+			a.kept = append(a.kept[:i:i], a.kept[i+1:]...)
+			return
+		}
+	}
 }
 
 // forgetInChild runs the forget command as its own process: it prints as it
@@ -196,14 +209,7 @@ func (a *tuiApp) putBack() {
 			}
 			d.gone = false
 			// Back where its agent reads it, it is no longer a kept one.
-			k := sessionKey(s)
-			delete(a.keptIDs, k)
-			for i, ks := range a.kept {
-				if sessionKey(ks) == k {
-					a.kept = append(a.kept[:i:i], a.kept[i+1:]...)
-					break
-				}
-			}
+			a.dropKept(s)
 			if a.scope == scopeKept && a.view != viewReader {
 				a.reload()
 			}

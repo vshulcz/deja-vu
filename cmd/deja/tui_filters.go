@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -162,10 +163,9 @@ func (a *tuiApp) wall() time.Time {
 func (a *tuiApp) drawQuery(x, y, max int) int {
 	p := a.p
 	q := a.query
-	start := 0
-	for start < len(q) && termwidth.Columns(string(q[start:])) > max-x-1 {
-		start++
-	}
+	// The width of q[start:] only falls as start grows: a search, not a walk
+	// that measures the whole tail for every rune of a long paste.
+	start := sort.Search(len(q), func(i int) bool { return termwidth.Columns(string(q[i:])) <= max-x-1 })
 	if start > 0 {
 		x = p.Put(x, y, "…", fgs(cMuted), max)
 		start++

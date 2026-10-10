@@ -140,12 +140,11 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 			fold = readerMaxLines
 		}
 		if len(body) > fold+1 {
-			more := len(body) - fold
 			note := " · t shows all"
 			if fold == readerMaxLines {
 				note = " · deja show has the whole session"
 			}
-			body = append(body[:fold], readerLine{text: "… " + tuiCount(more, "more line") + note, st: fgs(cFaint), indent: 4, block: look.block})
+			body = foldBody(body, fold, note, look.block)
 		}
 		for _, b := range body {
 			if b.hit {
@@ -159,6 +158,44 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 	if r.hit >= len(r.hits) {
 		r.hit = max(0, len(r.hits)-1)
 	}
+}
+
+// foldBody keeps the first fold lines of a message and, past them, a few lines
+// around each match: a hit the reader counts is one it can go to.
+func foldBody(body []readerLine, fold int, note string, block bool) []readerLine {
+	keep := make([]bool, len(body))
+	for i := 0; i < fold; i++ {
+		keep[i] = true
+	}
+	budget := readerMaxLines
+	for i := fold; i < len(body) && budget > 0; i++ {
+		if !body[i].hit {
+			continue
+		}
+		for j := max(fold, i-2); j <= min(len(body)-1, i+2); j++ {
+			if !keep[j] {
+				keep[j] = true
+				budget--
+			}
+		}
+	}
+	var out []readerLine
+	for i := 0; i < len(body); {
+		j := i + 1
+		if !keep[i] {
+			for j < len(body) && !keep[j] {
+				j++
+			}
+		}
+		// A gap of one line costs the note's line anyway.
+		if keep[i] || j-i == 1 {
+			out = append(out, body[i])
+		} else {
+			out = append(out, readerLine{text: "… " + tuiCount(j-i, "more line") + note, st: fgs(cFaint), indent: 4, block: block})
+		}
+		i = j
+	}
+	return out
 }
 
 func readerWhen(m model.Message) string {
@@ -180,8 +217,10 @@ func anyMarked(m []bool) bool {
 func (a *tuiApp) drawReader() {
 	p := a.p
 	r := &a.reader
-	if r.d == nil {
-		r.d = a.details[sessionKey(r.s)]
+	// A session that grew while it was open gets its new read laid out in
+	// place of the one the reader started with.
+	if d := a.details[sessionKey(r.s)]; d != nil && d != r.d {
+		r.d, r.layoutW = d, 0
 	}
 	s := r.s
 	p.Fill(0, 0, p.W, 1, cMantle)
