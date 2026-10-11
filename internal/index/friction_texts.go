@@ -8,10 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
-	"sync"
 )
 
 // frictionTextsFile holds, for every session that carries a wall, the first
@@ -286,39 +284,26 @@ func keepWalls(lines map[uint64]string, walls map[uint64]bool) map[uint64]string
 }
 
 // readFrictionEntries reads the tool output of keys from offset from on and
-// folds it onto what start gives each key. Sessions are parsed in parallel,
-// each on one worker so its outputs stay in order. A promoted note is loaded
-// the way frictionReader loads it.
+// folds it onto what start gives each key. A promoted note is loaded the way
+// frictionReader loads it.
 func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, keys, stampOnly map[string]bool, from int64, walls map[uint64]bool, start func(string) (uint64, map[uint64]string)) (map[string]frictionEntry, error) {
 	out := make(map[string]frictionEntry, len(keys))
 	if len(keys) == 0 {
 		return out, nil
 	}
-	workers := min(runtime.GOMAXPROCS(0), 8)
-	type item struct{ key, text string }
-	chans := make([]chan item, workers)
-	results := make([]map[string]frictionEntry, workers)
-	var wg sync.WaitGroup
-	for i := range chans {
-		chans[i] = make(chan item, 64)
-		results[i] = map[string]frictionEntry{}
-		wg.Add(1)
-		go func(in chan item, res map[string]frictionEntry) {
-			defer wg.Done()
-			for it := range in {
-				e, ok := res[it.key]
-				if !ok {
-					e.stamp, e.lines = start(it.key)
-				}
-				e.stamp = stampText(e.stamp, it.text)
-				if !stampOnly[it.key] {
-					firstFrictionLines(it.text, walls, e.lines)
-				}
-				res[it.key] = e
-			}
-		}(chans[i], results[i])
+	// In the read's own goroutine: the parse is a fraction of a second on a
+	// real store, and handing 150k outputs to workers cost more in wakeups.
+	send := func(key, text string) {
+		e, ok := out[key]
+		if !ok {
+			e.stamp, e.lines = start(key)
+		}
+		e.stamp = stampText(e.stamp, text)
+		if !stampOnly[key] {
+			firstFrictionLines(text, walls, e.lines)
+		}
+		out[key] = e
 	}
-	send := func(key, text string) { chans[keyHash(key)%uint64(workers)] <- item{key, text} }
 	plain := map[string]bool{}
 	var notes []SessionMeta
 	for k := range keys {
@@ -353,17 +338,8 @@ func readFrictionEntries(dir string, m Manifest, f *os.File, t *recordTables, ke
 			}
 		}
 	}
-	for _, c := range chans {
-		close(c)
-	}
-	wg.Wait()
 	if err != nil {
 		return nil, err
-	}
-	for _, res := range results {
-		for k, e := range res {
-			out[k] = e
-		}
 	}
 	// A session with no tool output in what was read keeps what it started
 	// with: nothing for a fresh one, its old entry for an extended one.
