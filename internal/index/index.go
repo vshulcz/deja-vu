@@ -707,6 +707,9 @@ import (
 // only redacted again by a rebuild.
 // 70: an append folds its tail into Settled, which it never updated, and the
 // row records whether the session ran a command.
+// 70: recoffsets.bin and frictext.bin sit beside the log. Both are caches
+// checked against it, so an index without them reads as before and needs no
+// rebuild for them.
 const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the

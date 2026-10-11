@@ -180,6 +180,7 @@ func takeSnap(t *testing.T, dir string) snap {
 		s.sidecars[name] = inUTC(string(b))
 	}
 	add("compactions", m.Compactions)
+	add("friction texts", checkFrictionTexts(t, dir, m))
 	var kept []string
 	for p, f := range m.Files {
 		if f.Kept {

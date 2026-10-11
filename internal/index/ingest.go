@@ -4384,6 +4384,11 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	}
 	setDatabaseStoreWatermarks(m.Files, m.Sessions)
 	m.RecordStrings = tbl.strs
+	// Ahead of the commit, which checks its entries against the new log
+	// rather than parsing every session that carries a wall again.
+	if b, err := os.ReadFile(filepath.Join(dir, frictionTextsFile)); err == nil {
+		_ = os.WriteFile(filepath.Join(tmp, frictionTextsFile), b, 0o600)
+	}
 	if err := writeManifest(tmp, m); err != nil {
 		return err
 	}

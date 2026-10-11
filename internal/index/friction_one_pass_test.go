@@ -40,10 +40,18 @@ func TestTopFrictionReadsTheLogOnceForSeveralWalls(t *testing.T) {
 	if err := Ensure(dir, "", true, nil); err != nil {
 		t.Fatal(err)
 	}
+	// Without frictext.bin, which answers with no pass at all.
+	frictionTextsOff = true
 	before := RecordLogScans()
 	got := TopFriction(dir, 0, nil)
+	frictionTextsOff = false
 	if scans := RecordLogScans() - before; scans != 1 {
 		t.Fatalf("recovering %d walls took %d passes over the record log, want 1", len(got), scans)
+	}
+	before = RecordLogScans()
+	held := TopFriction(dir, 0, nil)
+	if scans := RecordLogScans() - before; scans != 0 || fmt.Sprint(held) != fmt.Sprint(got) {
+		t.Fatalf("with frictext.bin: %d passes and %+v, want 0 and %+v", scans, held, got)
 	}
 	if len(got) != len(walls) {
 		t.Fatalf("got %d walls, want %d: %+v", len(got), len(walls), got)

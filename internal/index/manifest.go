@@ -526,6 +526,11 @@ func commitManifest(dir string, m Manifest, wroteRecords bool) error {
 		// walking the log, which is what they did before it existed.
 		_ = writeRecordOffsets(dir, tablesFromManifest(m), core.RecordsSize)
 	}
+	if err == nil {
+		// After the offset table, which it reads through. Also on a commit
+		// without records: a forget or a rename moves the walls.
+		_ = writeFrictionTexts(dir, m, core.RecordsSize)
+	}
 	return err
 }
 

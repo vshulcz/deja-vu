@@ -661,7 +661,15 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 		if len(metas) < FrictionMinSessions {
 			continue
 		}
-		sort.Slice(metas, func(i, j int) bool { return metas[i].Updated.After(metas[j].Updated) })
+		// Ties broken by key: the newest carrier's line is the wall's text,
+		// and two carriers updated in the same second came out of a map walk
+		// in either order, so the line shown changed from run to run.
+		sort.Slice(metas, func(i, j int) bool {
+			if !metas[i].Updated.Equal(metas[j].Updated) {
+				return metas[i].Updated.After(metas[j].Updated)
+			}
+			return metas[i].Harness+":"+metas[i].ID < metas[j].Harness+":"+metas[j].ID
+		})
 		cs = append(cs, cluster{h, metas})
 	}
 	sort.Slice(cs, func(i, j int) bool {
@@ -688,6 +696,7 @@ func TopFriction(dir string, n int, allow func(project string) bool) []Friction 
 	}
 	var out []Friction
 	rd := newFrictionReader(dir, m)
+	rd.texts = loadFrictionTexts(dir, m, want)
 	for i, c := range cs {
 		if want[c.hash] == "" {
 			// The walls after this one that are still unread, newest carrier
@@ -731,6 +740,19 @@ func newestOf(ms []SessionMeta) time.Time {
 // the difference between one lookup and N.
 func frictionTexts(rd *frictionReader, metas []SessionMeta, want map[uint64]string, target uint64) {
 	for _, meta := range metas {
+		if e, ok := rd.texts[meta.Harness+":"+meta.ID]; ok {
+			// The first line behind each wall, which is all the loop below
+			// would take from this session.
+			for h, line := range e.lines {
+				if cur, wanted := want[h]; wanted && cur == "" {
+					want[h] = line
+				}
+			}
+			if want[target] != "" {
+				return
+			}
+			continue
+		}
 		outputs, ok := rd.toolOutput(meta)
 		if !ok {
 			continue
@@ -770,6 +792,8 @@ type frictionReader struct {
 	m     Manifest
 	ahead []SessionMeta
 	read  map[string][]string
+	// texts answers for the sessions frictext.bin holds; nil reads them all.
+	texts map[string]frictionEntry
 }
 
 func newFrictionReader(dir string, m Manifest) *frictionReader {
@@ -792,6 +816,9 @@ func (rd *frictionReader) toolOutput(meta SessionMeta) ([]string, bool) {
 		}
 		k := next.Harness + ":" + next.ID
 		if _, done := rd.read[k]; done || next.Harness == "deja" {
+			continue
+		}
+		if _, held := rd.texts[k]; held {
 			continue
 		}
 		keys[k] = true
