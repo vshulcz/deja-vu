@@ -3,7 +3,6 @@ package sources
 import (
 	"encoding/json"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -96,19 +95,31 @@ func claudeChanges(file, id string) []Change {
 }
 
 // relTo is p relative to the directory the session ran in, when it is under
-// it; otherwise p as written.
+// it; otherwise p as written. Paths are compared in slash form, so a
+// transcript reads the same whichever OS wrote it and whichever reads it.
 func relTo(cwd, p string) string {
 	if cwd == "" {
 		return p
 	}
-	join := p
-	if !filepath.IsAbs(p) {
-		join = filepath.Join(cwd, p)
+	base := path.Clean(strings.ReplaceAll(cwd, `\`, "/"))
+	full := strings.ReplaceAll(p, `\`, "/")
+	if !absPath(full) {
+		full = base + "/" + full
 	}
-	if r, err := filepath.Rel(filepath.Clean(cwd), filepath.Clean(join)); err == nil && !strings.HasPrefix(r, "..") {
-		return filepath.ToSlash(r)
+	full = path.Clean(full)
+	if full == base {
+		return p
+	}
+	if r, ok := strings.CutPrefix(full, strings.TrimSuffix(base, "/")+"/"); ok {
+		return r
 	}
 	return p
+}
+
+// absPath reports whether p, in slash form, is absolute on any OS: rooted, or
+// with a drive letter.
+func absPath(p string) bool {
+	return strings.HasPrefix(p, "/") || len(p) >= 3 && p[1] == ':' && p[2] == '/'
 }
 
 // FinalChanges is what a session's edits came to: an edit that rewrites text
@@ -151,7 +162,7 @@ func FinalChanges(cs []Change) []Change {
 // or the agent's notes.
 func scratchFile(c Change, all []Change) bool {
 	p := c.Path
-	if filepath.IsAbs(p) || strings.HasPrefix(p, "..") || strings.Contains(p, "/tmp/") || strings.HasPrefix(p, "tmp/") {
+	if absPath(strings.ReplaceAll(p, `\`, "/")) || strings.HasPrefix(p, "..") || strings.Contains(p, "/tmp/") || strings.HasPrefix(p, "tmp/") {
 		return true
 	}
 	created := c.Created

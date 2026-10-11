@@ -19,6 +19,8 @@ func TestChangesReadsEditsBackFromTheTranscript(t *testing.T) {
 		`{"type":"assistant","sessionId":"other-session","cwd":"/work/app","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/work/app/pkg/b.go","old_string":"FOREIGN","new_string":"FOREIGN2"}}]}}`,
 		`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","message":{"content":[{"type":"tool_use","name":"MultiEdit","input":{"file_path":"pkg/c.go","edits":[{"old_string":"one","new_string":"uno"},{"old_string":"two","new_string":"dos"}]}}]}}`,
 		`{"type":"assistant","sessionId":"` + id + `","cwd":"/work/app","message":{"content":[{"type":"tool_use","name":"Write","input":{"file_path":"/etc/hosts.bak","content":"elsewhere"}}]}}`,
+		// A transcript written on Windows reads the same anywhere.
+		`{"type":"assistant","sessionId":"` + id + `","cwd":"C:\\work\\app","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"C:\\work\\app\\pkg\\d.go","old_string":"a","new_string":"b"}}]}}`,
 		`not json`,
 	}
 	path := filepath.Join(t.TempDir(), id+".jsonl")
@@ -30,12 +32,12 @@ func TestChangesReadsEditsBackFromTheTranscript(t *testing.T) {
 	for _, c := range got {
 		paths = append(paths, c.Path+":"+c.New)
 	}
-	want := "pkg/a.go:x := 2|pkg/c.go:uno|pkg/c.go:dos|/etc/hosts.bak:elsewhere"
+	want := "pkg/a.go:x := 2|pkg/c.go:uno|pkg/c.go:dos|/etc/hosts.bak:elsewhere|pkg/d.go:b"
 	if strings.Join(paths, "|") != want {
 		t.Fatalf("got %v\nwant %s", paths, want)
 	}
 	// A file outside the project is not a change to it.
-	if fin := FinalChanges(got); len(fin) != 3 {
+	if fin := FinalChanges(got); len(fin) != 4 {
 		t.Fatalf("final %v", fin)
 	}
 	if Changes(model.Session{Harness: "codex", Path: path}) != nil {
