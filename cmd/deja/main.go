@@ -1085,7 +1085,11 @@ func ctxFromIDPrefix(dir, q string) (bool, error) {
 	if line := lifecycleLine(hits[0]); line != "" {
 		fmt.Fprintln(os.Stdout, line)
 	}
-	search.PrintContextStyled(os.Stdout, s, "", search.ColorOK(os.Stdout), printableWidth(os.Stdout))
+	cw := &countingWriter{w: os.Stdout}
+	search.PrintContextStyled(cw, s, "", search.ColorOK(os.Stdout), printableWidth(os.Stdout))
+	if blk := changesBlock(s, search.ContextBudget-cw.n); blk != "" {
+		fmt.Fprint(os.Stdout, "\n"+blk)
+	}
 	return true, nil
 }
 
@@ -1223,7 +1227,11 @@ func cmdCtx(dir string, rest []string) error {
 	if full, ok, ferr := findByPrefix(dir, whole.ID); ferr == nil && ok {
 		whole = full
 	}
-	search.PrintContextStyled(os.Stdout, whole, q, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
+	cw := &countingWriter{w: os.Stdout}
+	search.PrintContextStyled(cw, whole, q, search.ColorOK(os.Stdout), printableWidth(os.Stdout))
+	if blk := changesBlock(whole, search.ContextBudget-cw.n); blk != "" {
+		fmt.Fprint(os.Stdout, "\n"+blk)
+	}
 	return nil
 }
 

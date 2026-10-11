@@ -321,6 +321,8 @@ Search intersects postings to find candidates, then scores each with BM25 over t
 
 `recall_context` and the hooks reuse the same scored order; the point-of-action decision line comes from the same conclusion extraction the digest uses.
 
+Reading one session back (`ctx`, `recall_context`, the session resource) puts the code it changed under the header, ahead of the conversation, so a digest cut to its budget loses the end of the talk rather than the fix. The edits are read from the transcript at that moment (`sources.Changes`, Claude Code for now): the index keeps the written side of an edit only as line hashes, and that stays so.
+
 ## Semantic sidecar
 
 `deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a

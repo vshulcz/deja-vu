@@ -2053,12 +2053,13 @@ func contextByID(dir, q string) (string, idContext, bool) {
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, "")
+	printed := withChanges(b.String(), whole)
 	// The fact before the content, the way the CLI prints it: an agent handed
 	// the note promoted from a session it named has to be told the session was
 	// forgotten (#1624). It travels out of band — see idContext.note — because
 	// deja's own words do not belong inside a frame that tells the reader to
 	// treat what it holds as untrusted.
-	return b.String(), idContext{session: whole.ID, size: rawSize([]model.Session{whole}),
+	return printed, idContext{session: whole.ID, size: rawSize([]model.Session{whole}),
 		// FindByPrefix resolved this session from the selector, so a prefix
 		// here is honest by construction.
 		note: forgottenSourceNote(whole, q, true)}, true
@@ -2150,7 +2151,7 @@ func recallContextResultFrom(dir, q, harness string) (string, int, int64, []stri
 	}
 	var b bytes.Buffer
 	search.PrintContext(&b, whole, q)
-	text := b.String() + contextOthersNote(len(hits))
+	text := withChanges(b.String(), whole) + contextOthersNote(len(hits))
 	if hits[0].Tier != search.TierExact {
 		// The words below say which one was dropped, and a session matched
 		// without it does not name what was asked either — the dropped word
