@@ -151,6 +151,7 @@ func takeSnap(t *testing.T, dir string) snap {
 		s.records = append(s.records, fmt.Sprintf("%s|%s|%s|%s|%q", r.Record.Key, r.Record.Role, r.Record.Time.UTC().Format("2006-01-02T15:04:05.000"), filepath.Base(r.Record.SourcePath), r.Record.Text))
 	}
 	sort.Strings(s.records)
+	checkRecordOffsets(t, dir, m, recs)
 	files, _ := filepath.Glob(filepath.Join(dir, "buckets", "*.bin"))
 	for _, f := range files {
 		data, err := readBucket(f)

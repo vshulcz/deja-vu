@@ -76,6 +76,12 @@ func runRandomHistory(t *testing.T, seed int64) {
 	h := newTwoWayEnv(t)
 	r := &historyRun{t: t, h: h, rng: rand.New(rand.NewSource(seed)), index: filepath.Join(h.tmp, "a.db")}
 	r.openStores()
+	// Even seeds extend the offset table on every pass; odd ones leave the
+	// tail to the readers' walk, as a small append does on a real store.
+	if seed%2 == 0 {
+		defer func(floor, share int64) { recordOffsetsRefreshFloor, recordOffsetsRefreshShare = floor, share }(recordOffsetsRefreshFloor, recordOffsetsRefreshShare)
+		recordOffsetsRefreshFloor, recordOffsetsRefreshShare = 0, 1<<62
+	}
 	steps := 24
 	for i := 0; i < steps; i++ {
 		r.anyStep()
