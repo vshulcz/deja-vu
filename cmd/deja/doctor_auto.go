@@ -299,6 +299,8 @@ func autoWiringState(a autoWiring) (state string, binaryMissing bool) {
 	// looks like a machine with memory and runs without it.
 	case a.name == "opencode" && opencodePluginShapeStale(string(b)):
 		state = "stale"
+	case a.name == "deepseek" && dshNoticeSourceRetired(string(b)):
+		state = "stale"
 	// Reasonix loads a package only while plugin-packages.json holds an
 	// enabled record of it; the directory alone is inert.
 	case a.name == "reasonix" && !reasonixPackageEnabled():
@@ -436,6 +438,8 @@ func doctorAutoRecall(w io.Writer) {
 			// it cannot work: the MCP install writes this same file, and only
 			// the -auto target writes the hook (#3313). Name that target.
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no %s call — `deja install %s-auto`)\n", a.name, "stale", reportPath(path), a.marker, a.name)
+		case a.name == "deepseek" && dshNoticeSourceRetired(string(b)):
+			fmt.Fprintf(w, "  %-12s %-11s %s  (written for dsh's v3 sessions — dsh 0.1.7 and later refuse its notices and stop the session; `deja install deepseek-auto`)\n", a.name, "stale", reportPath(path))
 		case a.name == "reasonix" && !reasonixPackageEnabled():
 			fmt.Fprintf(w, "  %-12s %-11s %s  (no enabled record in %s — `deja install reasonix-auto`)\n", a.name, "stale", reportPath(path), reportPath(reasonixStatePath()))
 		case a.name == "zcode" && !zcodeHooksRun(b):
@@ -656,6 +660,13 @@ func codexHasSeenItsHook() bool {
 	}
 	hooks, _ := root["hooks"].(map[string]any)
 	return codexPrimaryPin(codexDejaPins(string(cfg), path, hooks)) != ""
+}
+
+// dshNoticeSourceRetired reports whether the installed plugin still tags its
+// notices with the v3 "plugin" source kind, which dsh's v4 sessions refuse on
+// append (#4937).
+func dshNoticeSourceRetired(js string) bool {
+	return strings.Contains(js, `source: { kind: "plugin",`)
 }
 
 // opencodePluginShapeStale reports whether the installed plugin is written for

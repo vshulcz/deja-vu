@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -63,18 +64,22 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 			t.Errorf("%s has lastmod %q, which is not a date", named, lastmod)
 			continue
 		}
-		out, err := exec.Command("git", "-C", root, "log", "-1", "--format=%as", "--", rel).Output()
+		// The UTC day of the commit, the way genregistry dates it (#4922): %as
+		// is the day in the author's zone and can be a day off.
+		out, err := exec.Command("git", "-C", root, "log", "-1", "--format=%at", "--", rel).Output()
 		if err != nil {
 			t.Fatalf("git log %s: %v", loc, err)
 		}
-		day := strings.TrimSpace(string(out))
-		if day == "" {
+		stamp := strings.TrimSpace(string(out))
+		if stamp == "" {
 			continue // not committed yet
 		}
-		changed, err := time.Parse("2006-01-02", day)
+		secs, err := strconv.ParseInt(stamp, 10, 64)
 		if err != nil {
-			t.Fatalf("git returned %q for %s", day, loc)
+			t.Fatalf("git returned %q for %s", stamp, loc)
 		}
+		changed := time.Unix(secs, 0).UTC().Truncate(24 * time.Hour)
+		day := changed.Format("2006-01-02")
 		// Both directions: a date behind the file is the drift this catches, and
 		// a date ahead of it is the same lie told the other way round — a page
 		// that says it changed tomorrow is one a crawler is told to come back
