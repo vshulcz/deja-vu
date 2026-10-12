@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"path"
 	"strings"
@@ -19,6 +20,24 @@ type Change struct {
 	// Created marks a whole-file write: a file the session brought into being
 	// rather than one it edited.
 	Created bool
+	// call is the tool call that made the change, to drop it when the
+	// harness reports that call failed.
+	call string
+}
+
+// withoutFailed drops the changes whose tool call came back an error: an
+// edit refused, denied or aimed at text that was not there changed nothing.
+func withoutFailed(cs []Change, failed map[string]bool) []Change {
+	if len(failed) == 0 {
+		return cs
+	}
+	out := cs[:0]
+	for _, c := range cs {
+		if c.call == "" || !failed[c.call] {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // Changes reads the edits a session made back from its transcript, in the
@@ -41,6 +60,7 @@ func Changes(s model.Session) []Change {
 func claudeChanges(file, id string) []Change {
 	var out []Change
 	cwd := ""
+	failed := map[string]bool{}
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		var v struct {
 			Type      string `json:"type"`
@@ -50,10 +70,29 @@ func claudeChanges(file, id string) []Change {
 				Content json.RawMessage `json:"content"`
 			} `json:"message"`
 		}
-		if json.Unmarshal(line, &v) != nil || v.Type != "assistant" {
+		if json.Unmarshal(line, &v) != nil || (v.Type != "assistant" && v.Type != "user") {
 			return
 		}
 		if id != "" && v.SessionID != "" && v.SessionID != id {
+			return
+		}
+		if v.Type == "user" {
+			// The result of each call comes back on a user line.
+			if !bytes.Contains(line, []byte(`"is_error"`)) {
+				return
+			}
+			var results []struct {
+				Type      string `json:"type"`
+				ToolUseID string `json:"tool_use_id"`
+				IsError   bool   `json:"is_error"`
+			}
+			if json.Unmarshal(trimJSONSpace(v.Message.Content), &results) == nil {
+				for _, r := range results {
+					if r.Type == "tool_result" && r.IsError && r.ToolUseID != "" {
+						failed[r.ToolUseID] = true
+					}
+				}
+			}
 			return
 		}
 		if v.Cwd != "" {
@@ -61,6 +100,7 @@ func claudeChanges(file, id string) []Change {
 		}
 		var parts []struct {
 			Type  string `json:"type"`
+			ID    string `json:"id"`
 			Name  string `json:"name"`
 			Input struct {
 				FilePath  string `json:"file_path"`
@@ -83,17 +123,17 @@ func claudeChanges(file, id string) []Change {
 			rel := relTo(cwd, p.Input.FilePath)
 			switch p.Name {
 			case "Write":
-				out = append(out, Change{Path: rel, New: p.Input.Content, Created: true})
+				out = append(out, Change{Path: rel, New: p.Input.Content, Created: true, call: p.ID})
 			case "Edit":
-				out = append(out, Change{Path: rel, Old: p.Input.OldString, New: p.Input.NewString})
+				out = append(out, Change{Path: rel, Old: p.Input.OldString, New: p.Input.NewString, call: p.ID})
 			case "MultiEdit":
 				for _, e := range p.Input.Edits {
-					out = append(out, Change{Path: rel, Old: e.OldString, New: e.NewString})
+					out = append(out, Change{Path: rel, Old: e.OldString, New: e.NewString, call: p.ID})
 				}
 			}
 		}
 	})
-	return out
+	return withoutFailed(out, failed)
 }
 
 // relTo is p relative to the directory the session ran in, when it is under

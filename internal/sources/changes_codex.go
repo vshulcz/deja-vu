@@ -14,6 +14,7 @@ import (
 func codexChanges(file string) []Change {
 	var out []Change
 	cwd, metaSeen := "", false
+	failed := map[string]bool{}
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		var v struct {
 			Type    string          `json:"type"`
@@ -39,6 +40,17 @@ func codexChanges(file string) []Change {
 				cwd = p.Cwd
 			}
 		case "response_item":
+			if bytes.Contains(v.Payload, []byte(`_call_output"`)) {
+				var o struct {
+					Type   string `json:"type"`
+					CallID string `json:"call_id"`
+					Output any    `json:"output"`
+				}
+				if json.Unmarshal(v.Payload, &o) == nil && o.CallID != "" && codexCallFailed(o.Output) {
+					failed[o.CallID] = true
+				}
+				return
+			}
 			if !bytes.Contains(v.Payload, []byte("Begin Patch")) {
 				return
 			}
@@ -51,6 +63,7 @@ func codexChanges(file string) []Change {
 			default:
 				return
 			}
+			call, _ := p["call_id"].(string)
 			seen := map[string]bool{}
 			for _, patch := range patchTexts(p, 0) {
 				if seen[patch] {
@@ -59,12 +72,42 @@ func codexChanges(file string) []Change {
 				seen[patch] = true
 				for _, c := range parseApplyPatch(patch) {
 					c.Path = relTo(cwd, c.Path)
+					c.call = call
 					out = append(out, c)
 				}
 			}
 		}
 	})
-	return out
+	return withoutFailed(out, failed)
+}
+
+// codexCallFailed reads a tool call's output for a failure: a nonzero exit
+// code, in the text header a custom tool's output starts with or in a shell
+// call's JSON metadata, or apply_patch saying it could not apply. An output
+// it cannot read is not taken as a failure.
+func codexCallFailed(out any) bool {
+	text, _ := out.(string)
+	if text == "" {
+		if b, err := json.Marshal(out); err == nil {
+			text = string(b)
+		}
+	}
+	if i := strings.Index(text, "Exit code: "); i >= 0 {
+		rest := text[i+len("Exit code: "):]
+		if j := strings.IndexAny(rest, "\n\r"); j >= 0 {
+			rest = rest[:j]
+		}
+		return strings.TrimSpace(rest) != "0"
+	}
+	var meta struct {
+		Metadata struct {
+			ExitCode *int `json:"exit_code"`
+		} `json:"metadata"`
+	}
+	if json.Unmarshal([]byte(text), &meta) == nil && meta.Metadata.ExitCode != nil {
+		return *meta.Metadata.ExitCode != 0
+	}
+	return strings.Contains(text, "apply_patch verification failed") || strings.Contains(text, "Failed to apply patch")
 }
 
 // patchTexts finds the apply_patch texts in a tool call: a string field that
