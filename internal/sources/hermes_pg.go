@@ -129,5 +129,54 @@ func ParseHermesPG(dsn string, sinceNano int64) ([]model.Session, error) {
 	if d, ok := tok.(json.Delim); !ok || d != '[' {
 		return nil, fmt.Errorf("hermes pg: expected a json array")
 	}
-	return decodeHermesArray(dec, "hermes", HermesPGStorePath(dsn))
+	out2, err := decodeHermesArray(dec, "hermes", HermesPGStorePath(dsn))
+	if err != nil {
+		return nil, err
+	}
+	applyHermesMeta(out2, hermesPGSessionMeta(dsn))
+	return out2, nil
+}
+
+// hermesPGSessionMeta is hermesSessionMeta for the Postgres store: the same
+// sessions table, read with the columns it has. Best effort, as there.
+func hermesPGSessionMeta(dsn string) map[string]hermesMeta {
+	out, err := HermesPGRunner(dsn, `select coalesce(json_agg(column_name),'[]') from information_schema.columns where table_name = 'sessions'`)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	if json.Unmarshal([]byte(strings.TrimSpace(string(out))), &names) != nil {
+		return nil
+	}
+	cols := map[string]bool{}
+	for _, n := range names {
+		cols[n] = true
+	}
+	if !cols["id"] {
+		return nil
+	}
+	fields := "id::text as id"
+	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
+		if cols[col] {
+			fields += fmt.Sprintf(", %s::text as %s", col, key)
+		}
+	}
+	out, err = HermesPGRunner(dsn, `select coalesce(json_agg(s),'[]') from (select `+fields+` from sessions) s`)
+	if err != nil {
+		return nil
+	}
+	var rows []struct {
+		ID string `json:"id"`
+		hermesMeta
+	}
+	if json.Unmarshal([]byte(strings.TrimSpace(string(out))), &rows) != nil {
+		return nil
+	}
+	meta := make(map[string]hermesMeta, len(rows))
+	for _, r := range rows {
+		if r.ID != "" {
+			meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent)}
+		}
+	}
+	return meta
 }

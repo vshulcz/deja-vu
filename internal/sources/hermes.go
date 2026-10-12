@@ -170,13 +170,30 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		}
 		return nil, err
 	}
-	cwds := hermesSessionCwds(db)
+	applyHermesMeta(out, hermesSessionMeta(db))
+	return out, nil
+}
+
+// applyHermesMeta stamps each session with what the sessions table says:
+// its project from the directory it ran in, and who started it. A subagent's
+// run folds under the session that spawned it, as Claude Code's sidechains
+// do, and a cron job's run stays searchable but is not what a person asked
+// (#4948).
+func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 	for i := range out {
-		if cwd := cwds[out[i].ID]; cwd != "" {
-			out[i].Project = projectName(cwd)
+		m := meta[out[i].ID]
+		if m.Cwd != "" {
+			out[i].Project = projectName(m.Cwd)
+		}
+		switch m.Source {
+		case "subagent":
+			if m.Parent != "" {
+				out[i].Kind, out[i].Parent = "subagent", m.Parent
+			}
+		case "cron":
+			out[i].Kind = "cron"
 		}
 	}
-	return out, nil
 }
 
 // decodeHermesArray reads {session_id,role,content,timestamp} rows into
@@ -321,32 +338,55 @@ func nonEmptyFile(p string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// hermesSessionCwds reads the directory each session was recorded in, from the
-// sessions table Hermes keeps beside messages. Stamped with the profile alone,
-// every session fell into one project, and the prompt hook — which ranks the
-// payload's project only — never served a Hermes session in the directory it
-// was about (#3257). Best effort: a store from before the table, or a row with
-// no cwd, keeps the profile.
-func hermesSessionCwds(db string) map[string]string {
-	q := `select json_object('id',id,'cwd',cwd) from sessions where cwd is not null and cwd <> ''`
-	out, err := sqliteOutput(db, q)
+// hermesMeta is what Hermes' sessions table says about one session: the
+// directory it was recorded in, who started it (cli, cron, subagent, a
+// messaging platform) and the session that spawned it.
+type hermesMeta struct {
+	Cwd    string `json:"cwd"`
+	Source string `json:"source"`
+	Parent string `json:"parent"`
+}
+
+// hermesSessionMeta reads hermesMeta for every session. Stamped with the
+// profile alone, every session fell into one project, and the prompt hook —
+// which ranks the payload's project only — never served a Hermes session in
+// the directory it was about (#3257). Best effort: a store from before the
+// table or a column keeps what it has.
+func hermesSessionMeta(db string) map[string]hermesMeta {
+	cols := map[string]bool{}
+	if out, err := sqliteOutput(db, `select name from pragma_table_info('sessions')`); err == nil {
+		for _, c := range strings.Fields(string(out)) {
+			cols[c] = true
+		}
+	}
+	if !cols["id"] {
+		return nil
+	}
+	fields := `'id',cast(id as text)`
+	for col, key := range map[string]string{"cwd": "cwd", "source": "source", "parent_session_id": "parent"} {
+		if cols[col] {
+			fields += fmt.Sprintf(`,'%s',cast(%s as text)`, key, col)
+		}
+	}
+	out, err := sqliteOutput(db, `select json_object(`+fields+`) from sessions`)
 	if err != nil {
 		return nil
 	}
 	rows, err := sqliteObjects[struct {
-		ID  string `json:"id"`
-		Cwd string `json:"cwd"`
+		ID string `json:"id"`
+		hermesMeta
 	}](out)
 	if err != nil {
 		return nil
 	}
-	cwds := make(map[string]string, len(rows))
+	meta := make(map[string]hermesMeta, len(rows))
 	for _, r := range rows {
-		if r.ID != "" && strings.TrimSpace(r.Cwd) != "" {
-			cwds[r.ID] = strings.TrimSpace(r.Cwd)
+		if r.ID == "" {
+			continue
 		}
+		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent)}
 	}
-	return cwds
+	return meta
 }
 
 // hermesProfile names the session's project after the profile directory when

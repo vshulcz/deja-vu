@@ -218,13 +218,13 @@ func precompactHarnessArg(args []string) string {
 	return ""
 }
 
-// withoutSubagentRuns drops the sessions a parent spawned. The caller keeps
-// the original pool when this leaves nothing, so a project whose only history
-// is subagent runs still gets a digest.
+// withoutSubagentRuns drops the sessions a parent spawned, and a scheduled
+// job's runs (#4948). The caller keeps the original pool when this leaves
+// nothing, so a project whose only history is such runs still gets a digest.
 func withoutSubagentRuns(ss []model.Session) []model.Session {
 	out := make([]model.Session, 0, len(ss))
 	for _, s := range ss {
-		if s.Kind == "sidechain" {
+		if s.Kind == "sidechain" || s.Kind == "cron" {
 			continue
 		}
 		out = append(out, s)
