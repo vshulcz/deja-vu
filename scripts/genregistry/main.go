@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -391,12 +392,17 @@ func lastChanged(file string) (string, error) {
 	if len(strings.TrimSpace(string(dirty))) > 0 {
 		return time.Now().UTC().Format("2006-01-02"), nil
 	}
-	out, err := exec.Command("git", "log", "-1", "--format=%as", "--", file).Output()
+	// %at, not %as: %as prints the day in the author's own zone, so a commit
+	// made at 00:30 in +03:00 dated every page it touched a day ahead of UTC,
+	// and the next commit from another zone moved them back (#4906, #4908). A
+	// Unix time carries no zone, and cutting the day in UTC here means neither
+	// the author's zone nor the machine running the generator can move it.
+	out, err := exec.Command("git", "log", "-1", "--format=%at", "--", file).Output()
 	if err != nil {
 		return "", fmt.Errorf("git log %s: %w", file, err)
 	}
-	day := strings.TrimSpace(string(out))
-	if day == "" {
+	stamp := strings.TrimSpace(string(out))
+	if stamp == "" {
 		// A clean, tracked file with no commit behind it means the history is
 		// not here. `git log` says so by printing nothing and exiting 0, so
 		// this used to leave every date untouched and report success — a run
@@ -405,7 +411,11 @@ func lastChanged(file string) (string, error) {
 		// anything (#3984).
 		return "", fmt.Errorf("no commit in this clone touched %s: %s", file, shallowHint())
 	}
-	return day, nil
+	secs, err := strconv.ParseInt(stamp, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("git log %s: %q is not a Unix time", file, stamp)
+	}
+	return time.Unix(secs, 0).UTC().Format("2006-01-02"), nil
 }
 
 // shallowHint says which of the two ways to have no history this is, because

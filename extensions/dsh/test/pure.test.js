@@ -298,3 +298,12 @@ test("a command's exit is read off its last line only", () => {
   assert.deepEqual(exitStatus("quoted [exit code: 1] mid-output"), { body: "quoted [exit code: 1] mid-output", failed: false });
   assert.equal(resultText({ content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }] }), "a\nb");
 });
+
+// dsh v4 refuses the retired "plugin" source kind while encoding the append,
+// so the whole turn failed and nothing reached the session log. The producer
+// owns its kind — "plugin:deja", what dsh's own v3→v4 migration assigns an
+// unmapped plugin — and the closing quotes keep this from matching it.
+test("the notice carries a producer-owned v4 source, not the retired plugin wrapper", () => {
+  assert.match(source, /source: \{ kind: "plugin:deja", form: "notice" \}/);
+  assert.doesNotMatch(source, /kind: "plugin"/);
+});

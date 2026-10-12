@@ -439,14 +439,16 @@ async function toolNote(exec, result) {
   return "";
 }
 
-// A context message the way dsh's own plugins build one: user role, a plugin
-// source so it is not read back as something the person typed, a fresh id,
-// frozen.
+// A context message the way dsh's own plugins build one: user role, a
+// producer-owned source so it is not read back as something the person typed,
+// a fresh id, frozen. v4 session format refuses the bare "plugin" kind, so the
+// producer owns "plugin:deja" — the value dsh's own v3→v4 migration assigns an
+// unmapped plugin.
 function noteMessage(text) {
   const message = {
     role: "user",
     content: [{ type: "text", text }],
-    source: { kind: "plugin", plugin: "deja", form: "notice" },
+    source: { kind: "plugin:deja", form: "notice" },
     id: randomUUID(),
   };
   Object.freeze(message.content[0]);

@@ -69,10 +69,10 @@ show(await post({ name: "str_replace_editor", arguments: { command: "str_replace
 	if len(lines) != 8 {
 		t.Fatalf("driver said %q", out)
 	}
-	if lines[0] != `[["user","plugin","NOTE about the file"]]` {
+	if lines[0] != `[["user","plugin:deja","NOTE about the file"]]` {
 		t.Errorf("a read did not carry the file's note: %s", lines[0])
 	}
-	if lines[1] != `[["user","plugin","FIX seen before"]]` {
+	if lines[1] != `[["user","plugin:deja","FIX seen before"]]` {
 		t.Errorf("a failed bash did not carry the earlier fix: %s", lines[1])
 	}
 	if lines[2] != `[]` {
@@ -87,14 +87,14 @@ show(await post({ name: "str_replace_editor", arguments: { command: "str_replace
 	if lines[4] != `[]` {
 		t.Errorf("a command that exited 0 with a marker in its output was answered: %s", lines[4])
 	}
-	if lines[5] != `[["user","plugin","FIX seen before"]]` {
+	if lines[5] != `[["user","plugin:deja","FIX seen before"]]` {
 		t.Errorf("a command killed by a signal did not carry the earlier fix: %s", lines[5])
 	}
 	// dsh's other shell and its other editor (#4293).
-	if lines[6] != `[["user","plugin","FIX seen before"]]` {
+	if lines[6] != `[["user","plugin:deja","FIX seen before"]]` {
 		t.Errorf("a failed pwsh command did not carry the earlier fix: %s", lines[6])
 	}
-	if lines[7] != `[["user","plugin","NOTE about the file"]]` {
+	if lines[7] != `[["user","plugin:deja","NOTE about the file"]]` {
 		t.Errorf("a str_replace_editor edit did not carry the file's note: %s", lines[7])
 	}
 	asked, err := os.ReadFile(calls)

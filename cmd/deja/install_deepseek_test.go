@@ -181,6 +181,12 @@ func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 	if !strings.Contains(js, "prompt !== asked") {
 		t.Errorf("no guard on the cached prompt, so deja runs again every assembly:\n%s", js)
 	}
+	if strings.Contains(js, `kind: "plugin"`) {
+		t.Errorf("the notice wraps its source in the retired v3 plugin kind, which dsh v4 refuses at append time:\n%s", js)
+	}
+	if !strings.Contains(js, `kind: "plugin:deja"`) {
+		t.Errorf("the notice does not carry the producer-owned v4 kind, what dsh's own migration assigns an unmapped plugin:\n%s", js)
+	}
 
 	layer, err := os.ReadFile(filepath.Join(home, ".dsh", "cordis.patch.yml"))
 	if err != nil {
