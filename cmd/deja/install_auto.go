@@ -275,6 +275,11 @@ import { spawn } from "node:child_process"
 
 const HOOK = %q
 
+// HOOK_DEADLINE is how long a hook may hold up the model request. opencode
+// awaits the hook first, so a call stuck on a store read stalled the turn
+// with it (#4951). Past it the turn goes on without memory.
+const HOOK_DEADLINE = 10000
+
 // runHook runs the deja hook launcher and resolves with its stdout,
 // feeding payload on stdin when there is one. Never rejects: memory is
 // optional.
@@ -282,15 +287,24 @@ const runHook = (subcommand, payload, cwd) =>
   new Promise((resolve) => {
     let child
     try {
-      child = spawn(HOOK, [subcommand], cwd ? { cwd } : {})
+      // stderr is not read, so it is not piped: a full pipe would block the
+      // hook, and one a grandchild holds would outlive the deadline.
+      child = spawn(HOOK, [subcommand], { stdio: ["pipe", "pipe", "ignore"], ...(cwd ? { cwd } : {}) })
     } catch {
       resolve("")
       return
     }
     let out = ""
+    const timer = setTimeout(() => {
+      resolve("")
+      try { child.kill("SIGKILL") } catch {}
+      // A grandchild can still hold the pipe; let go of it too.
+      child.stdout.destroy()
+    }, HOOK_DEADLINE)
+    timer.unref?.()
     child.stdout.on("data", (d) => { out += d })
-    child.on("error", () => resolve(""))
-    child.on("close", () => resolve(out))
+    child.on("error", () => { clearTimeout(timer); resolve("") })
+    child.on("close", () => { clearTimeout(timer); resolve(out) })
     child.stdin.on("error", () => {})
     if (payload !== undefined) child.stdin.write(payload)
     child.stdin.end()

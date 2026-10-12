@@ -152,32 +152,42 @@ func opencodeV2(db string) bool { return opencodeSchemaOf(db).v2 }
 // — `synthetic`, `system`, `idle`, `shell`, `skill`, `model-switched` and the
 // rest — are opencode talking to itself, which is what `$.synthetic` marked on
 // the old schema and what the parser dropped there too.
-const opencodeV2Parts = `with parts as (` +
-	`select sm.id as mid, sm.session_id as sid, sm.type as role, sm.time_created as mc, sm.data as mdata, ` +
-	`j.value as data, j.key as ord ` +
-	`from session_message sm, json_each(sm.data,'$.content') j ` +
-	`where sm.type='assistant' and json_type(sm.data,'$.content')='array' ` +
-	`union all ` +
-	`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
-	`json_object('type','text','text',json_extract(sm.data,'$.text'),'time',json_extract(sm.data,'$.time')), 0 ` +
-	`from session_message sm ` +
-	`where sm.type='user' and json_extract(sm.data,'$.text') is not null ` +
-	`union all ` +
-	// What opencode compacted away, kept the way the old schema's summary
-	// message is: searchable, and not the agent talking.
-	`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
-	`json_object('type','text','text',json_extract(sm.data,'$.summary'),'time',json_extract(sm.data,'$.time')), 0 ` +
-	`from session_message sm ` +
-	`where sm.type='compaction' and json_extract(sm.data,'$.summary') is not null) `
+//
+// only, when set, is the condition each branch puts on session_id before it
+// expands a message's JSON: put on s.id outside the CTE, SQLite did not push it
+// into the branches and decoded every message of the store to return one
+// session: over 12 s on a 4 GB store against 17 ms for the same rows (#4951).
+func opencodeV2Parts(only string) string {
+	if only != "" {
+		only = " and sm.session_id " + only
+	}
+	return `with parts as (` +
+		`select sm.id as mid, sm.session_id as sid, sm.type as role, sm.time_created as mc, sm.data as mdata, ` +
+		`j.value as data, j.key as ord ` +
+		`from session_message sm, json_each(sm.data,'$.content') j ` +
+		`where sm.type='assistant' and json_type(sm.data,'$.content')='array'` + only + ` ` +
+		`union all ` +
+		`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
+		`json_object('type','text','text',json_extract(sm.data,'$.text'),'time',json_extract(sm.data,'$.time')), 0 ` +
+		`from session_message sm ` +
+		`where sm.type='user' and json_extract(sm.data,'$.text') is not null` + only + ` ` +
+		`union all ` +
+		// What opencode compacted away, kept the way the old schema's summary
+		// message is: searchable, and not the agent talking.
+		`select sm.id, sm.session_id, sm.type, sm.time_created, sm.data, ` +
+		`json_object('type','text','text',json_extract(sm.data,'$.summary'),'time',json_extract(sm.data,'$.time')), 0 ` +
+		`from session_message sm ` +
+		`where sm.type='compaction' and json_extract(sm.data,'$.summary') is not null` + only + `) `
+}
 
 // opencodeV2Query returns the 2.x reader, emitting the same row object the 1.x
 // projection does so one loop reads both.
-func opencodeV2Query(sessionTable, where string, limit int) string {
+func opencodeV2Query(sessionTable, where string, limit int, only string) string {
 	lim := ""
 	if limit > 0 {
 		lim = fmt.Sprintf(" limit %d", limit)
 	}
-	return opencodeV2Parts +
+	return opencodeV2Parts(only) +
 		`select json_object(` +
 		`'id',cast(s.id as text),'directory',cast(s.directory as text),` +
 		`'time_created',s.time_created,'time_updated',s.time_updated,` +
@@ -228,6 +238,11 @@ func opencodeV2Query(sessionTable, where string, limit int) string {
 // column is asked for the turn's own stamps, under `$.time.start` for a tool
 // and `$.time.created` for a turn.
 func opencodeV2SinceWhere(db string, t time.Time) string {
+	return " and s.id in (" + opencodeV2SinceSet(db, t) + ")"
+}
+
+// opencodeV2SinceSet is the query of those session ids on its own.
+func opencodeV2SinceSet(db string, t time.Time) string {
 	touched := opencodeV2Touched(db, t)
 	if !opencodeSchemaOf(db).turnsStamped {
 		rfc := sqlEscape(t.UTC().Format(time.RFC3339Nano))
@@ -235,7 +250,7 @@ func opencodeV2SinceWhere(db string, t time.Time) string {
 		touched = fmt.Sprintf("select x.sid from parts x where %s or x.mc > '%s' or %s or %s > '%s'",
 			newerThanEpoch("x.mc", t), rfc, newerThanEpoch(at, t), at, rfc)
 	}
-	return opencodeSessionTouched(opencodeSessionTable(db), t, touched)
+	return opencodeTouchedSet(opencodeSessionTable(db), t, touched)
 }
 
 // opencodeV2Touched names the sessions with a session_message row stamped

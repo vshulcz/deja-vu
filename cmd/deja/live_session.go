@@ -239,7 +239,7 @@ func askerHead(id, transcript string) (model.Session, bool) {
 		return s, err == nil
 	}
 	if strings.HasPrefix(id, "ses_") {
-		for _, s := range sources.LoadOpencodePrefix(id) {
+		for _, s := range sources.LoadOpencodeSession(id) {
 			if s.ID == id {
 				return s, true
 			}

@@ -130,6 +130,69 @@ func LoadOpencodePrefix(p string) []model.Session {
 	return ss
 }
 
+// LoadOpencodeSession reads the one session with this exact id, through the
+// session index: a new session's lineage is asked for before any build has
+// seen it, on the way to the agent's first request (#4951).
+func LoadOpencodeSession(id string) []model.Session {
+	only := "= '" + sqlEscape(id) + "'"
+	where := " and s.id " + only
+	ss, _ := parseOpencodeLayouts("opencode", OpencodeDB(), where, where, 0, only)
+	return ss
+}
+
+// opencodeSetCap is how many session ids a read names one by one. A pass with
+// more changed sessions than this reads through the subquery, which costs a
+// scan of the store and is what a first build does anyway.
+var opencodeSetCap = 2000
+
+// parseOpencodeSet reads the sessions the query set names, with the ids looked
+// up first and named inside each 2.x branch, so only their messages are
+// decoded. A lookup that fails or names too many reads as before. where1, when
+// set, is the 1.x clause of a store that keeps 1.x sessions in their own table;
+// empty, the 1.x reader takes the same sessions.
+func parseOpencodeSet(harness, db, where1, set string) ([]model.Session, error) {
+	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
+		return nil, nil
+	}
+	ids, ok := opencodeIDs(db, set)
+	if !ok {
+		where := " and s.id in (" + set + ")"
+		if where1 == "" {
+			where1 = where
+		}
+		return parseOpencodeLayouts(harness, db, where1, where, 0, "")
+	}
+	if len(ids) == 0 && where1 == "" {
+		return nil, nil
+	}
+	quoted := make([]string, len(ids))
+	for i, id := range ids {
+		quoted[i] = "'" + sqlEscape(id) + "'"
+	}
+	only := "in (" + strings.Join(quoted, ",") + ")"
+	where := " and s.id " + only
+	if where1 == "" {
+		where1 = where
+	}
+	return parseOpencodeLayouts(harness, db, where1, where, 0, only)
+}
+
+// opencodeIDs runs set, a query of session ids, and returns them; false when
+// the read fails or there are more than opencodeSetCap.
+func opencodeIDs(db, set string) ([]string, bool) {
+	b, err := sqliteOutput(db, fmt.Sprintf("select id from (%s) limit %d", set, opencodeSetCap+1))
+	if err != nil {
+		return nil, false
+	}
+	var ids []string
+	for _, ln := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			ids = append(ids, ln)
+		}
+	}
+	return ids, len(ids) <= opencodeSetCap
+}
+
 // OpencodeStoreLacks reports whether the store a CLI session of this harness
 // lives in holds no session row with this id — deleted with `opencode session
 // delete`, or pruned. False whenever that cannot be told: no store, or a read
@@ -186,10 +249,15 @@ func parseOpencodeSchemaDBSince(harness, db string, t time.Time) ([]model.Sessio
 		// A session can have turns in both layouts, and a session read again
 		// replaces what the index holds, so one touched on either side is read
 		// from both.
-		w := opencodeSessionTouched("session", t, opencodeV1Touched(db, t)+" union "+opencodeV2Touched(db, t))
-		return parseOpencodeLayouts(harness, db, w, w, 0)
+		return parseOpencodeSet(harness, db, "", opencodeTouchedSet("session", t, opencodeV1Touched(db, t)+" union "+opencodeV2Touched(db, t)))
 	}
-	return parseOpencodeLayouts(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceWhere(db, t), 0)
+	if opencodeSchemaOf(db).v2 {
+		// The changed sessions are named before the projection runs: an
+		// outer s.id in (...) was not pushed into the 2.x branches, and every
+		// pass decoded the whole store (#4951).
+		return parseOpencodeSet(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceSet(db, t))
+	}
+	return parseOpencodeLayouts(harness, db, opencodeSinceWhere(db, t), opencodeV2SinceWhere(db, t), 0, "")
 }
 
 // opencodeSinceSlack is how far before the watermark a since read starts.
@@ -232,7 +300,12 @@ func opencodeV1Touched(db string, t time.Time) string {
 // moved past t, and those touched names. One list for s.id to be looked up in:
 // an OR beside it made SQLite scan every part instead.
 func opencodeSessionTouched(table string, t time.Time, touched string) string {
-	return fmt.Sprintf(" and s.id in (select id from %s where %s or time_updated > '%s' union %s)",
+	return " and s.id in (" + opencodeTouchedSet(table, t, touched) + ")"
+}
+
+// opencodeTouchedSet is the query of those session ids on its own.
+func opencodeTouchedSet(table string, t time.Time, touched string) string {
+	return fmt.Sprintf("select id from %s where %s or time_updated > '%s' union %s",
 		table, newerThanEpoch("time_updated", t), sqlEscape(t.UTC().Format(time.RFC3339Nano)), touched)
 }
 
@@ -245,13 +318,16 @@ func ParseOpencodeDBWhere(db, where string, limit int) ([]model.Session, error) 
 // `OpenCodeSchemaConfig::kilo` — so the harness a session belongs to is the
 // only difference (#3643).
 func parseOpencodeSchemaDB(harness, db, where string, limit int) ([]model.Session, error) {
-	return parseOpencodeLayouts(harness, db, where, where, limit)
+	return parseOpencodeLayouts(harness, db, where, where, limit, "")
 }
 
 // parseOpencodeLayouts reads a store with the clause each layout needs: where1
 // for the 1.x projection, where2 for the 2.x one. A store upgraded from 1.x
 // holds both, and each of its sessions is read from one of them (#4151).
-func parseOpencodeLayouts(harness, db, where1, where2 string, limit int) ([]model.Session, error) {
+//
+// only2, when set, limits the 2.x branches to those sessions before their JSON
+// is expanded; see opencodeV2Parts.
+func parseOpencodeLayouts(harness, db, where1, where2 string, limit int, only2 string) ([]model.Session, error) {
 	// The sqlite3 CLI CREATES a missing database file on open — never let it.
 	if fi, err := os.Stat(db); err != nil || fi.Size() == 0 {
 		return nil, nil
@@ -278,7 +354,7 @@ func parseOpencodeLayouts(harness, db, where1, where2 string, limit int) ([]mode
 		}
 	}
 	if schema.v2 {
-		n, err := readOpencodeRows(harness, db, opencodeV2Query(schema.sessionTable, where2, limit), by)
+		n, err := readOpencodeRows(harness, db, opencodeV2Query(schema.sessionTable, where2, limit, only2), by)
 		if err != nil {
 			return nil, err
 		}
