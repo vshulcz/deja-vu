@@ -25,8 +25,12 @@ var (
 	editOldKeys     = []string{"old_string", "oldString", "old_str", "old_text", "oldText"}
 	editNewKeys     = []string{"new_string", "newString", "new_str", "new_text", "newText"}
 	editContentKeys = []string{"content", "file_text", "contents"}
-	editCwdKeys     = []string{"cwd", "workdir", "working_directory", "workingDirectory", "directory", "projectRoot", "project_root", "workspace_root"}
+	editCwdKeys     = []string{"cwd", "workdir", "working_directory", "workingDirectory", "projectRoot", "project_root", "workspace_root"}
 	toolNameKeys    = []string{"name", "toolName", "tool_name", "tool", "function"}
+	// toolArgKeys hold a tool call's arguments beside its name. An edit is
+	// only taken from inside one: the same shape in a system prompt, a tool
+	// schema or a read result is not a change the session made.
+	toolArgKeys = map[string]bool{"input": true, "arguments": true, "args": true, "parameters": true, "params": true, "rawInput": true, "raw_input": true}
 )
 
 // writeToolName is a tool that writes a whole file. A path with content is
@@ -41,6 +45,9 @@ var writeToolName = regexp.MustCompile(`(?i)write|create|save|new_?file`).MatchS
 // sessions in one file, one session would show another's code — so the file
 // is parsed by its own harness first and must come back as one session.
 func genericChanges(s model.Session) []Change {
+	if ext := strings.ToLower(path.Ext(s.Path)); ext != ".json" && ext != ".jsonl" {
+		return nil
+	}
 	fi, err := os.Stat(s.Path)
 	if err != nil || !fi.Mode().IsRegular() || fi.Size() > genericChangesMaxBytes {
 		return nil
@@ -69,7 +76,7 @@ func genericChanges(s model.Session) []Change {
 			// was read before it still counts.
 			break
 		}
-		w.walk(v, "", 0)
+		w.walk(v, "", false, 0)
 	}
 	cwd := w.cwd
 	if cwd == "" {
@@ -95,7 +102,10 @@ func (w *editWalker) add(c Change) {
 	w.out = append(w.out, c)
 }
 
-func (w *editWalker) walk(v any, tool string, depth int) {
+// walk visits v. call is the tool call whose arguments v sits in, "" outside
+// any: edits, writes and patches are only read inside one, and the call's name
+// is what tells a write from a read.
+func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
 	if depth > 16 {
 		return
 	}
@@ -104,9 +114,12 @@ func (w *editWalker) walk(v any, tool string, depth int) {
 		if s := strings.TrimSpace(t); len(s) < 4<<20 && (strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[")) {
 			var inner any
 			if json.Unmarshal([]byte(s), &inner) == nil {
-				w.walk(inner, tool, depth+1)
+				w.walk(inner, call, inArgs, depth+1)
 				return
 			}
+		}
+		if !inArgs {
+			return
 		}
 		for _, patch := range patchTexts(t, 0) {
 			for _, c := range parseApplyPatch(patch) {
@@ -115,47 +128,58 @@ func (w *editWalker) walk(v any, tool string, depth int) {
 		}
 	case []any:
 		for _, x := range t {
-			w.walk(x, tool, depth+1)
+			w.walk(x, call, inArgs, depth+1)
 		}
 	case map[string]any:
-		if name := firstStringField(t, toolNameKeys); name != "" {
-			tool = name
-		}
-		if w.cwd == "" {
+		if !inArgs && w.cwd == "" {
 			if c := firstStringField(t, editCwdKeys); absPath(strings.ReplaceAll(c, `\`, "/")) {
 				w.cwd = c
 			}
 		}
-		if p := firstStringField(t, editPathKeys); p != "" {
-			old, oldOK := firstStringFieldOK(t, editOldKeys)
-			nw, newOK := firstStringFieldOK(t, editNewKeys)
-			switch {
-			case oldOK && newOK:
-				w.add(Change{Path: p, Old: old, New: nw})
-			case writeToolName(tool):
-				if body, ok := firstStringFieldOK(t, editContentKeys); ok {
-					w.add(Change{Path: p, New: body, Created: true})
-				}
-			}
-			if edits, ok := t["edits"].([]any); ok {
-				for _, e := range edits {
-					if m, ok := e.(map[string]any); ok {
-						old, oldOK := firstStringFieldOK(m, editOldKeys)
-						nw, newOK := firstStringFieldOK(m, editNewKeys)
-						if oldOK && newOK {
-							w.add(Change{Path: p, Old: old, New: nw})
-						}
-					}
-				}
-			}
+		if inArgs {
+			w.edit(t, call)
 		}
+		name := firstStringField(t, toolNameKeys)
 		keys := make([]string, 0, len(t))
 		for k := range t {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			w.walk(t[k], tool, depth+1)
+			if name != "" && toolArgKeys[k] {
+				w.walk(t[k], name, true, depth+1)
+				continue
+			}
+			w.walk(t[k], call, inArgs, depth+1)
+		}
+	}
+}
+
+// edit takes the change an argument object describes, if it describes one.
+func (w *editWalker) edit(t map[string]any, call string) {
+	p := firstStringField(t, editPathKeys)
+	if p == "" {
+		return
+	}
+	old, oldOK := firstStringFieldOK(t, editOldKeys)
+	nw, newOK := firstStringFieldOK(t, editNewKeys)
+	switch {
+	case oldOK && newOK:
+		w.add(Change{Path: p, Old: old, New: nw})
+	case writeToolName(call):
+		if body, ok := firstStringFieldOK(t, editContentKeys); ok {
+			w.add(Change{Path: p, New: body, Created: true})
+		}
+	}
+	if edits, ok := t["edits"].([]any); ok {
+		for _, e := range edits {
+			if m, ok := e.(map[string]any); ok {
+				old, oldOK := firstStringFieldOK(m, editOldKeys)
+				nw, newOK := firstStringFieldOK(m, editNewKeys)
+				if oldOK && newOK {
+					w.add(Change{Path: p, Old: old, New: nw})
+				}
+			}
 		}
 	}
 }
