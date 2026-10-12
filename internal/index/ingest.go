@@ -2114,6 +2114,83 @@ func (m msgSeen) dup(key, role string, ts time.Time, text string) bool {
 	return false
 }
 
+// repeatKey is a message as the record dedupe sees it: role, time and text.
+type repeatKey struct {
+	role string
+	at   int64
+	text uint64
+}
+
+func repeatKeyOf(role string, at time.Time, text string) repeatKey {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(text))
+	return repeatKey{role, at.UnixNano(), h.Sum64()}
+}
+
+// dropRepeatedMessages drops a message that repeats an earlier one of the
+// session verbatim, time included, before anything is derived from it. The
+// record log already kept one copy, and the counts and sidecars took both, so
+// a line a store wrote twice counted as two turns in a rebuild and as however
+// many passes it was split across in an update. A message without a time or
+// text is kept: two of those are not evidence of a duplicate.
+func dropRepeatedMessages(ms []model.Message) []model.Message {
+	var seen map[repeatKey]bool
+	out := ms[:0]
+	for _, m := range ms {
+		if !m.Time.IsZero() && strings.TrimSpace(m.Text) != "" {
+			if seen == nil {
+				seen = make(map[repeatKey]bool, len(ms))
+			}
+			k := repeatKeyOf(m.Role, m.Time, m.Text)
+			if seen[k] {
+				continue
+			}
+			seen[k] = true
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+// dropStoredRepeats is dropRepeatedMessages for a tail: it drops the messages
+// of s the index already holds from the same file, and marks every stored
+// message of the session in seen so its records are not written twice. Only a
+// message no newer than the row can repeat one, so a tail that is all new
+// reads nothing.
+func dropStoredRepeats(rw *recordWriter, dir string, s *model.Session, row SessionMeta, seen msgSeen) {
+	if row.ID == "" {
+		return
+	}
+	older := false
+	for _, m := range s.Messages {
+		if !m.Time.IsZero() && !m.Time.After(row.Updated) && strings.TrimSpace(m.Text) != "" {
+			older = true
+			break
+		}
+	}
+	if !older || rw.w.Flush() != nil {
+		return
+	}
+	key := s.Harness + ":" + s.ID
+	stored := map[repeatKey]bool{}
+	if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), rw.tables, map[string]bool{key: true}, func(r Record) {
+		seen.dup(key, r.Role, r.Time, r.Text)
+		if r.SourcePath == s.Path {
+			stored[repeatKeyOf(r.Role, r.Time, r.Text)] = true
+		}
+	}); err != nil {
+		return
+	}
+	out := s.Messages[:0]
+	for _, m := range s.Messages {
+		if !m.Time.IsZero() && stored[repeatKeyOf(m.Role, m.Time, m.Text)] {
+			continue
+		}
+		out = append(out, m)
+	}
+	s.Messages = out
+}
+
 func metaForSession(s model.Session) SessionMeta {
 	title := s.Title
 	agentTitle := s.AgentTitle
@@ -4686,6 +4763,9 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 		// text, so the same session got different signatures depending on which
 		// path had touched it last.
 		preRedactSessions(&m, ss)
+		for i := range ss {
+			dropStoredRepeats(rw, dir, &ss[i], m.Sessions[ss[i].Harness+":"+ss[i].ID], seenMsgs)
+		}
 		// Kept for the sidecars below, after redaction so a pair cannot carry a
 		// credential the records do not.
 		appended = append(appended, ss...)
@@ -5000,6 +5080,7 @@ func wholeSession(p string, s model.Session) (model.Session, bool) {
 	}
 	for _, w := range ss {
 		if w.Harness == s.Harness && w.ID == s.ID {
+			w.Messages = dropRepeatedMessages(w.Messages)
 			return w, true
 		}
 	}
@@ -5590,6 +5671,7 @@ func preRedactSessions(m *Manifest, ss []model.Session) {
 						mu.Unlock()
 					}
 				}
+				s.Messages = dropRepeatedMessages(s.Messages)
 			}
 		}()
 	}

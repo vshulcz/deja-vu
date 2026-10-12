@@ -698,3 +698,15 @@ func TestDeleteMatchesRebuild(t *testing.T) {
 		}
 	})
 }
+
+// A line the store wrote twice, the copy arriving in a later append: the
+// update wrote a second record and stopped counting at the copy, where a
+// rebuild keeps one record and counts the line once.
+func TestARepeatedLineMatchesRebuild(t *testing.T) {
+	h := newTwoWayEnv(t)
+	h.twoWays("repeated line", func() {
+		h.put("app", "s1", hPrompt("app", "s1", 2, 0, "why does the pool fail")+hSay("app", "s1", 2, 0, "Looking at it."))
+	}, func() {
+		h.add("app", "s1", hSay("app", "s1", 2, 0, "The pool needs a fix.")+hSay("app", "s1", 2, 0, "Looking at it."))
+	})
+}

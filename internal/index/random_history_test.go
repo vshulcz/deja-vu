@@ -71,6 +71,9 @@ type historySession struct {
 	calls        int
 	// torn holds the second half of a line written without it.
 	torn string
+	// said is the last line the agent said, kept to be written again verbatim,
+	// time and all, as a store that duplicates a line does.
+	said string
 }
 
 type historyRun struct {
@@ -150,7 +153,13 @@ func (r *historyRun) words(n int) string {
 func (r *historyRun) turns(s *historySession) string {
 	var b strings.Builder
 	for n := 1 + r.rng.Intn(3); n > 0; n-- {
-		s.min++
+		if s.said != "" && r.rng.Intn(6) == 0 {
+			b.WriteString(s.said)
+		}
+		// Some turns share a minute with the one before.
+		if r.rng.Intn(4) > 0 {
+			s.min++
+		}
 		if s.min > 59 {
 			s.day, s.min = s.day+1, 0
 		}
@@ -160,7 +169,8 @@ func (r *historyRun) turns(s *historySession) string {
 		case 0:
 			b.WriteString(hPrompt(s.project, s.sid, s.day, s.min, r.prompt(4)))
 		case 1:
-			b.WriteString(hSay(s.project, s.sid, s.day, s.min, "The "+r.words(5)+" needs a fix."))
+			s.said = hSay(s.project, s.sid, s.day, s.min, "The "+r.words(5)+" needs a fix.")
+			b.WriteString(s.said)
 		case 2:
 			b.WriteString(hBash(s.project, s.sid, s.day, s.min, id, "go test ./"+historyWords[r.rng.Intn(len(historyWords))]+"/...",
 				"--- FAIL: TestPool (0.01s)\n    pool_test.go:12: "+r.words(3)+"\n"+r.wall()+"FAIL", true))

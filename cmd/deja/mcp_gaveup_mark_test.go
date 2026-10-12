@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,7 +30,7 @@ func seedGaveUpSessions(t *testing.T) string {
 			"2026-03-01T10:01:00Z")
 		for i := range filler {
 			turn("assistant", strings.Repeat("flimsyshard retry notes and more notes ", 60),
-				"2026-03-01T1"+string(rune('0'+i%10))+":0"+string(rune('0'+i%6))+":00Z")
+				fmt.Sprintf("2026-03-01T%02d:%02d:00Z", 11+i/60, i%60))
 		}
 		if err := os.WriteFile(filepath.Join(proj, id+".jsonl"), []byte(b.String()), 0o644); err != nil {
 			t.Fatal(err)
