@@ -186,7 +186,7 @@ func judgeFixes(all []FixPair) []FixPair {
 		// sighting here meant the session that would have confirmed it found
 		// nothing to confirm, so a full build reached pairs the same corpus
 		// grown one session at a time never did (#1301).
-		p.Candidate = !selfEvidentPair(p) && !(repetitionConfirms(p) && repeats[fixKey(p)] >= 2)
+		p.Candidate = !selfEvidentPair(p) && (!repetitionConfirms(p) || repeats[fixKey(p)] < 2)
 		out = append(out, p)
 	}
 	// One command per (error, command) is enough — the rest are the same fix
