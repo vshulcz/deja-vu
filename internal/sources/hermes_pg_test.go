@@ -10,15 +10,24 @@ import (
 type fakePG struct {
 	fingerprint string
 	rows        string
-	lastSQL     string
-	err         error
+	// columns and sessions answer the sessions-table reads; empty, the store
+	// has no sessions table.
+	columns, sessions string
+	lastSQL           string
+	err               error
 }
 
 func (f *fakePG) run(dsn, sql string) ([]byte, error) {
-	f.lastSQL = sql
 	if f.err != nil {
 		return nil, f.err
 	}
+	switch {
+	case strings.Contains(sql, "information_schema.columns"):
+		return []byte(f.columns + "\n"), nil
+	case strings.Contains(sql, "from sessions"):
+		return []byte(f.sessions + "\n"), nil
+	}
+	f.lastSQL = sql
 	if strings.HasPrefix(sql, "select count(*)") {
 		return []byte(f.fingerprint + "\n"), nil
 	}
@@ -129,5 +138,34 @@ func TestHermesPGStorePathHidesTheDSN(t *testing.T) {
 	}
 	if !IsHermesPGStore(tok) {
 		t.Fatalf("%q not recognised as a pg store", tok)
+	}
+}
+
+// The Postgres store has the same sessions table, and a session read from it
+// carries who started it as one read from SQLite does (#4948).
+func TestParseHermesPGReadsSessionKinds(t *testing.T) {
+	f := &fakePG{
+		rows: `[
+		{"session_id":"s-cli","role":"user","content":"plan the migration","timestamp":1785000000},
+		{"session_id":"s-sub","role":"user","content":"read the schema","timestamp":1785000010},
+		{"session_id":"s-cron","role":"user","content":"nightly digest","timestamp":1785000020}
+	]`,
+		columns:  `["id","source","parent_session_id","cwd","model"]`,
+		sessions: `[{"id":"s-cli","source":"cli","parent":null,"cwd":"/w/app"},{"id":"s-sub","source":"subagent","parent":"s-cli","cwd":"/w/app"},{"id":"s-cron","source":"cron","parent":null,"cwd":null}]`,
+	}
+	defer SetHermesPGRunner(f.run)()
+	ss, err := ParseHermesPG("postgres://deja@192.0.2.1/hermes", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, s := range ss {
+		got[s.ID] = s.Kind + "/" + s.Parent + "/" + s.Project
+	}
+	want := map[string]string{"s-cli": "//w/app", "s-sub": "subagent/s-cli/w/app", "s-cron": "cron//hermes"}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("%s = %q, want %q", id, got[id], w)
+		}
 	}
 }

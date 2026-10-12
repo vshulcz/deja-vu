@@ -534,7 +534,12 @@ func TestHermesCompactionStrippedImage(t *testing.T) {
 // the order Hermes reads its own sessions in.
 func TestHermesPGReadsInInsertionOrder(t *testing.T) {
 	var sql string
-	defer SetHermesPGRunner(func(_, q string) ([]byte, error) { sql = q; return []byte("[]"), nil })()
+	defer SetHermesPGRunner(func(_, q string) ([]byte, error) {
+		if strings.Contains(q, "from messages") {
+			sql = q
+		}
+		return []byte("[]"), nil
+	})()
 	if _, err := ParseHermesPG("postgres://deja@192.0.2.1/hermes", 0); err != nil {
 		t.Fatal(err)
 	}

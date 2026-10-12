@@ -170,16 +170,21 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 		}
 		return nil, err
 	}
-	meta := hermesSessionMeta(db)
+	applyHermesMeta(out, hermesSessionMeta(db))
+	return out, nil
+}
+
+// applyHermesMeta stamps each session with what the sessions table says:
+// its project from the directory it ran in, and who started it. A subagent's
+// run folds under the session that spawned it, as Claude Code's sidechains
+// do, and a cron job's run stays searchable but is not what a person asked
+// (#4948).
+func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 	for i := range out {
 		m := meta[out[i].ID]
 		if m.Cwd != "" {
 			out[i].Project = projectName(m.Cwd)
 		}
-		// Hermes records who started a session. A subagent's run folds under
-		// the session that spawned it, as Claude Code's sidechains do, and a
-		// cron job's run stays searchable but is not what a person asked
-		// (#4948).
 		switch m.Source {
 		case "subagent":
 			if m.Parent != "" {
@@ -189,7 +194,6 @@ func parseHermesDBWhere(db, where string) ([]model.Session, error) {
 			out[i].Kind = "cron"
 		}
 	}
-	return out, nil
 }
 
 // decodeHermesArray reads {session_id,role,content,timestamp} rows into
