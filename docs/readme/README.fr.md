@@ -112,7 +112,7 @@ resserre à mesure que vous tapez.
 - La zone de recherche accepte des filtres : un agent suivi de deux-points (`codex:`), `today`, `yesterday`, `week`, `month` et `in:<projet>`.
 - `r` reprend la session dans l'agent qui l'a écrite. `o` la poursuit dans n'importe quel autre agent, qui démarre avec ce que la session a demandé, décidé et laissé en suspens.
 - `tab` bascule entre ce projet, tous les projets et Deleted, les sessions que leur agent a supprimées et que deja garde encore ; `R` en remet une en place.
-- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), dans la liste, `q` quitte.
+- `?` liste toutes les touches, `^k` donne le reste (copier l'id de la session ou le chemin du projet, oublier une session), dans la liste, `q` quitte ; `esc` revient d'un cran et quitte quand la zone de recherche est vide.
 
 Avec `DEJA_TUI=0`, il affiche à la place le résumé texte, qui est aussi `deja brief`. Dans un pipe, il affiche
 ce qui est indexé et quelle commande lancer ensuite.
@@ -151,7 +151,7 @@ La référence complète est sur le [site de documentation](https://vshulcz.gith
 ## Vie privée
 
 L'indexation et la recherche sont locales. Seuls `deja update`, `deja sync ssh`, la vérification de version
-dans `deja doctor`, `deja embed`, qui va vers l'endpoint que vous configurez, et un coup d'œil quotidien à la
+dans `deja doctor`, `deja embed`, qui va vers l'endpoint que vous configurez (et, une fois le sidecar sémantique construit, chaque recherche, qui envoie la requête à cet endpoint), et un coup d'œil quotidien à la
 dernière release depuis une commande interactive touchent au réseau. Ce coup d'œil n'envoie aucune donnée de
 session ; `DEJA_OFFLINE=1` ou `DEJA_NO_UPDATE_NOTICE=1` le désactive.
 
@@ -192,7 +192,7 @@ $ deja "jwt refresh token"
 | `deja how <outil>` | Comment cela se lance vraiment sur cette machine, avec de vrais arguments, tirés des commandes que les agents ont déjà exécutées. |
 | `deja fix <erreur>` | Ce qui a été lancé après la même erreur sur cette machine, et après quoi l'erreur n'est pas revenue. Jamais un merge, un force push ni une suppression. |
 | `deja friction` | Les erreurs qui touchent trois sessions différentes ou plus, avec les outils d'où elles viennent. |
-| `deja ctx <requête>` | Résumé Markdown du meilleur résultat, prêt à être collé dans un prompt. |
+| `deja ctx <requête>` | Résumé Markdown du meilleur résultat, avec le code qu'il a modifié, prêt à être collé dans un prompt. |
 | `deja resume <id>` | Rouvre la session trouvée dans l'outil auquel elle appartient. |
 | `deja view` | Exporte toute la mémoire dans un seul fichier HTML local. Pas de serveur, rien ne quitte la machine. |
 | `deja doctor [--deep]` | Auto-diagnostic ; avec `--deep`, vérifie l'index contre les fichiers source. |
@@ -398,6 +398,11 @@ détails sont dans
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+L'index est dans `~/.cache/deja`, vos notes `remember` et `promote` dans
+`~/.local/share/deja`, et les règles, la liste d'exclusion et le lanceur des hooks dans
+`~/.config/deja` (ou sous `XDG_DATA_HOME` et `XDG_CONFIG_HOME` s'ils sont définis ; sous
+Windows, les notes sont dans `%AppData%\deja`).
 
 </details>
 

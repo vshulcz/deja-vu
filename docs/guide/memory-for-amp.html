@@ -140,7 +140,7 @@
 <h1>Adding memory to Amp</h1>
 <p class="pagelede">a plugin API modelled on pi's, and one file is the whole install<span class="mins" data-mins></span></p>
 
-<p>Amp keeps its threads on the server and a copy under <code>~/.local/share/amp/threads</code>, and can continue one with <code>amp threads continue</code>. A new thread reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
+<p>Amp keeps its threads on its server. Older versions also wrote a copy under <code>~/.local/share/amp/threads</code>, and deja's plugin writes each thread it runs there, so threads from before the plugin was installed are not indexed. Amp can continue one with <code>amp threads continue</code>. A new thread reads nothing from the others, and nothing from the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
 
 <h2>What it already has</h2>
 <p>No hooks, but a plugin API — acknowledged in Amp's own docs as inspired by pi's — and plugins under <code>~/.config/amp/plugins/*.ts</code> are auto-discovered, so installing is one file and no settings edit. Amp also takes MCP servers, under <code>amp.mcpServers</code> in its settings file.</p>
@@ -152,9 +152,10 @@
 <li><b>agent.start</b> — fires with the prompt in hand and its return value is appended to the user message, so the first turn of a thread carries a digest of what this project's recent sessions settled, and later turns carry recall for the question actually asked. This is both halves of what Claude Code splits across SessionStart and UserPromptSubmit.</li>
 <li><b>tool.result</b> — a command has just failed, and this machine has fixed that same error before. The handler is handed the output the model is about to read and hands back a replacement, so the repair arrives beside the error in the same turn rather than a turn later. The status stays an error: a repair that reported success would be a lie about the command.</li>
 <li><b>session.start</b> and the command palette — while a first index is still building, that is said once rather than looking like memory that does not work, and <code>deja: search past sessions</code> is there for searching by hand.</li>
+<li><b>agent.end</b>: the thread is written to <code>~/.local/share/amp/threads</code> so deja indexes it, and a status item beside the prompt editor shows what deja recalled today.</li>
 </ul>
 <p>Guidance goes to <code>~/.agents/skills/deja-history/SKILL.md</code>, the shared skills directory Amp reads — <code>amp skill list</code> shows it beside Amp's built-in skills.</p>
-<p><code>tool.call</code> runs before a command does, but its answer can only allow, reject, modify the arguments or synthesize a result — none of them add context — so the pre-tool line other harnesses get has nowhere to go in Amp. Amp also has no compaction event, so the list of blocks a thread has already been shown is not cleared when its context is.</p>
+<p><code>tool.call</code> runs before a command does, but its answer can only allow, reject, modify the arguments or synthesize a result, so a file's history arrives on <code>tool.result</code> instead: after a <code>Read</code>, the step before an edit, and after <code>edit_file</code> and <code>create_file</code>. Amp has no compaction event either. On each <code>agent.start</code> the plugin compares the thread as the model sees it with the full thread, hands the turns a compaction took out to deja, and the working state rides the next prompt's recall.</p>
 
 <h2>What arrives</h2>
 <p>On each prompt, the history it is actually about, when there is any; silence is the common case. Measured on the stand: 43 ms and 556 bytes for the session digest, 21 ms and 286 bytes for the repair after a failed command, nothing when there is nothing to say — <a href="token-cost.html">what memory costs</a> has the wider comparison.</p>

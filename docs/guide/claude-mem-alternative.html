@@ -149,7 +149,7 @@
 <tr><td>Who writes it</td><td>nobody: transcripts are indexed as written, with secrets redacted</td><td>a model summarises each session: claude-mem's hosted observer (sign-in, 14-day trial), your OpenRouter or Gemini key, or your Anthropic plan</td></tr>
 <tr><td>Runs in the background</td><td>nothing</td><td>a worker on Bun with an HTTP port, and Chroma for vector search</td></tr>
 <tr><td>Install</td><td>one 18.6 MB binary</td><td><code>npx claude-mem install</code>, which pulls Bun and uv if missing</td></tr>
-<tr><td>Agents</td><td>35, read natively</td><td>Claude Code, Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot, OpenClaw</td></tr>
+<tr><td>Agents</td><td>41, read natively</td><td>Claude Code, Codex, Cursor, opencode, Windsurf, Antigravity, Grok Bot, OpenClaw</td></tr>
 <tr><td>Tool definitions sent with every request</td><td>477 tokens, 1 tool</td><td>2,307 tokens, 15 tools</td></tr>
 <tr><td>Search</td><td>lexical, optional embeddings</td><td>SQLite FTS5 and Chroma vectors</td></tr>
 <tr><td>Browse it</td><td><code>deja view</code>, one local HTML file</td><td>web viewer served by the worker</td></tr>

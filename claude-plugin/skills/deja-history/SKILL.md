@@ -19,7 +19,7 @@ If the deja tool is not available in this session, the same index is reachable t
 These are the modes of the one deja tool, passed as `mode`.
 
 - recall: search with the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Not for library docs or general knowledge; only this user's own sessions.
-- context: a full digest of the single best-matching session, once a recall hit looks right and the reasoning behind it matters.
+- context: a full digest of the single best-matching session, with the code it changed, once a recall hit looks right and the reasoning behind it matters.
 - blame: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
 - fix: paste a failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
 - how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.

@@ -112,7 +112,7 @@ enquanto você digita.
 - A caixa aceita filtros: um agente com dois-pontos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<projeto>`.
 - `r` retoma a sessão no agente que a escreveu. `o` continua em qualquer outro agente, que começa com o que a sessão perguntou, decidiu e deixou em aberto.
 - `tab` alterna entre este projeto, todos os projetos e Deleted, as sessões que o próprio agente apagou e que o deja ainda guarda; `R` devolve uma ao lugar.
-- `?` lista todas as teclas, `^k` tem o resto (copiar o id da sessão ou o caminho do projeto, esquecer uma sessão), na lista, `q` sai.
+- `?` lista todas as teclas, `^k` tem o resto (copiar o id da sessão ou o caminho do projeto, esquecer uma sessão), na lista, `q` sai; `esc` volta um passo e sai com a caixa de busca vazia.
 
 Com `DEJA_TUI=0` ele imprime o resumo em texto, que também é o `deja brief`. Num pipe, imprime o que está
 indexado e qual comando rodar em seguida.
@@ -150,7 +150,7 @@ A referência completa está no [site da documentação](https://vshulcz.github.
 ## Privacidade
 
 Indexar e buscar são operações locais. Só usam a rede `deja update`, `deja sync ssh`, a checagem de versão
-dentro do `deja doctor`, o `deja embed`, que vai ao endpoint que você configurar, e uma olhada diária na
+dentro do `deja doctor`, o `deja embed`, que vai ao endpoint que você configurar (e, depois que o sidecar semântico existe, cada busca, que envia a consulta a esse endpoint), e uma olhada diária na
 última release a partir de um comando interativo. Essa olhada não envia dados de sessão; `DEJA_OFFLINE=1` ou
 `DEJA_NO_UPDATE_NOTICE=1` a desliga.
 
@@ -190,7 +190,7 @@ $ deja "jwt refresh token"
 | `deja how <ferramenta>` | Como isso é executado de verdade nesta máquina, com argumentos reais, tirados de comandos que os agentes já rodaram. |
 | `deja fix <erro>` | O que foi executado depois do mesmo erro nesta máquina, e depois do quê o erro não voltou. Nunca um merge, um force push nem uma exclusão. |
 | `deja friction` | Erros que aparecem em três ou mais sessões diferentes, dizendo de quais ferramentas vieram. |
-| `deja ctx <consulta>` | Resumo em Markdown do melhor resultado, pronto para entrar num prompt. |
+| `deja ctx <consulta>` | Resumo em Markdown do melhor resultado, com o código que ele alterou, pronto para entrar num prompt. |
 | `deja resume <id>` | Reabre a sessão encontrada na ferramenta a que ela pertence. |
 | `deja view` | Exporta toda a memória para um único arquivo HTML local. Sem servidor, nada sai da máquina. |
 | `deja doctor [--deep]` | Autodiagnóstico; com `--deep` verifica o índice contra os arquivos de origem. |
@@ -391,6 +391,11 @@ o deja indexou antes da limpeza continuam pesquisáveis depois de o arquivo sumi
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+O índice fica em `~/.cache/deja`, suas notas de `remember` e `promote` em
+`~/.local/share/deja`, e as regras, a lista de exclusão e o lançador dos hooks em
+`~/.config/deja` (ou sob `XDG_DATA_HOME` e `XDG_CONFIG_HOME` quando definidos; no
+Windows as notas ficam em `%AppData%\deja`).
 
 </details>
 

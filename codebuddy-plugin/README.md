@@ -47,14 +47,16 @@ for Windows. Without it, use `deja install codebuddy-auto`, which writes hooks
 that run through PowerShell.
 
 deja reads CodeBuddy's own sessions from `~/.codebuddy/projects`
-(`CODEBUDDY_CONFIG_DIR` is honoured) and WorkBuddy's from `~/.workbuddy/projects`.
+(`CODEBUDDY_CONFIG_DIR` is honoured) and WorkBuddy's from `~/.workbuddy/projects` and, for WorkBuddy AI,
+`~/.workbuddy-ai/projects` (`WORKBUDDY_CONFIG_DIR` is honoured).
 
 ## Privacy
 
 Indexing and search are local: deja reads the transcripts in place and keeps
 its index under `~/.cache/deja`. The network is used only by `deja update`,
 `deja sync ssh`, the version check in `deja doctor`, `deja embed` against an
-endpoint you configure, and a once-a-day release check from a command typed at a
+endpoint you configure (and, once it has built the semantic sidecar, each
+search, which sends the query to that endpoint), and a once-a-day release check from a command typed at a
 terminal (`DEJA_OFFLINE=1` turns it off). Details are in the
 [repository README](https://github.com/vshulcz/deja-vu#readme); security policy in
 [SECURITY.md](https://github.com/vshulcz/deja-vu/blob/main/SECURITY.md).

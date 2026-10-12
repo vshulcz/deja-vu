@@ -112,7 +112,7 @@ mientras escribes.
 - La caja acepta filtros: un agente con dos puntos (`codex:`), `today`, `yesterday`, `week`, `month` e `in:<proyecto>`.
 - `r` reanuda la sesión en el agente que la escribió. `o` la continúa en cualquier otro agente, que empieza con lo que la sesión preguntó, decidió y dejó pendiente.
 - `tab` cambia entre este proyecto, todos los proyectos y Deleted, las sesiones que su agente borró y que deja aún guarda; `R` devuelve una a su sitio.
-- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), en la lista, `q` sale.
+- `?` lista todas las teclas, `^k` tiene el resto (copiar el id de la sesión o la ruta del proyecto, olvidar una sesión), en la lista, `q` sale; `esc` retrocede un paso y sale con la caja de búsqueda vacía.
 
 Con `DEJA_TUI=0` imprime en su lugar el resumen en texto, que también es `deja brief`. Por una tubería,
 imprime qué está indexado y qué comando ejecutar a continuación.
@@ -150,7 +150,7 @@ La referencia completa está en el [sitio de documentación](https://vshulcz.git
 ## Privacidad
 
 Indexar y buscar son operaciones locales. Solo usan la red `deja update`, `deja sync ssh`, la comprobación de
-versión dentro de `deja doctor`, `deja embed`, que va al endpoint que tú configures, y una consulta diaria a
+versión dentro de `deja doctor`, `deja embed`, que va al endpoint que tú configures (y, una vez construido el sidecar semántico, cada búsqueda, que envía la consulta a ese endpoint), y una consulta diaria a
 la última release desde un comando interactivo. Esa consulta no envía datos de sesiones; `DEJA_OFFLINE=1` o
 `DEJA_NO_UPDATE_NOTICE=1` la desactiva.
 
@@ -191,7 +191,7 @@ $ deja "jwt refresh token"
 | `deja how <herramienta>` | Cómo se ejecuta esto de verdad en esta máquina, con argumentos reales, sacados de comandos que los agentes ya corrieron. |
 | `deja fix <error>` | Qué se ejecutó después del mismo error en esta máquina, y tras lo cual el error no volvió a aparecer. Nunca un merge, un force push ni un borrado. |
 | `deja friction` | Errores que aparecen en tres o más sesiones distintas, indicando de qué herramientas vienen. |
-| `deja ctx <consulta>` | Resumen en Markdown del mejor resultado, listo para meter en un prompt. |
+| `deja ctx <consulta>` | Resumen en Markdown del mejor resultado, con el código que cambió, listo para meter en un prompt. |
 | `deja resume <id>` | Vuelve a abrir la sesión encontrada en la herramienta a la que pertenece. |
 | `deja view` | Exporta toda la memoria a un único archivo HTML local. Sin servidor, nada sale de la máquina. |
 | `deja doctor [--deep]` | Autodiagnóstico; con `--deep` verifica el índice contra los archivos de origen. |
@@ -395,6 +395,11 @@ Los detalles están en
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+El índice está en `~/.cache/deja`, tus notas de `remember` y `promote` en
+`~/.local/share/deja`, y las reglas, la lista de exclusión y el lanzador de hooks en
+`~/.config/deja` (o bajo `XDG_DATA_HOME` y `XDG_CONFIG_HOME` si están definidos; en
+Windows las notas están en `%AppData%\deja`).
 
 </details>
 

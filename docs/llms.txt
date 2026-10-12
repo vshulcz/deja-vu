@@ -1,6 +1,6 @@
 # deja-vu
 
-> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and thirty-five more agents wrote on this machine — including the months before it was installed — and answers from them over MCP, the command line, or a full-screen search in the terminal. BM25 over the transcripts: no model, no embeddings unless you point `deja embed` at an endpoint, and no network path besides a daily release check, which DEJA_OFFLINE=1 turns off.
+> Local memory for coding agents, built from the session transcripts they already write to disk. deja indexes what Claude Code, Codex, Cursor, opencode, Gemini CLI, Zed and thirty-five more agents wrote on this machine — including the months before it was installed — and answers from them over MCP, the command line, or a full-screen search in the terminal. BM25 over the transcripts: no model, no embeddings unless you point `deja embed` at an endpoint, and no network use besides the commands that exist for it (`deja update`, `deja sync ssh`, `deja doctor`'s version check) and a daily release check, which DEJA_OFFLINE=1 turns off.
 
 Two things distinguish it from memory tools that record forward: it starts full, because the history is already on disk, and recall arrives without being asked — at session start, on each prompt, before an edit or a command, after a command fails, and on the way back from a compaction, where deja keeps the task, files and commands the summary drops. Credentials are stripped as the index is built.
 
@@ -99,7 +99,7 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [Command Code](https://vshulcz.github.io/deja-vu/guide/memory-for-commandcode.html)
 - [ZCode](https://vshulcz.github.io/deja-vu/guide/memory-for-zcode.html)
 - [Reasonix](https://vshulcz.github.io/deja-vu/guide/memory-for-reasonix.html): a plugin package; recall rides in the turn tail, not the system prompt
-- [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html): read-only, nothing to install yet
+- [CodeWhale](https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html)
 
 ## Evidence
 

@@ -112,7 +112,7 @@ daralır.
 - Arama kutusu filtre de alır: iki nokta üst üsteli bir ajan (`codex:`), `today`, `yesterday`, `week`, `month` ve `in:<proje>`.
 - `r` oturumu onu yazan ajanda sürdürür. `o` başka herhangi bir ajanda devam ettirir; o ajan, oturumun ne sorduğu, neye karar verdiği ve neyi açık bıraktığıyla başlar.
 - `tab` bu proje, tüm projeler ve Deleted arasında geçiş yapar; Deleted, ajanının sildiği ama deja'nın hâlâ tuttuğu oturumlardır. `R` birini yerine koyar.
-- `?` tüm tuşları listeler, geri kalanı `^k` içindedir (oturum id'sini veya proje yolunu kopyalamak, bir oturumu unutmak), listede `q` çıkar.
+- `?` tüm tuşları listeler, geri kalanı `^k` içindedir (oturum id'sini veya proje yolunu kopyalamak, bir oturumu unutmak), listede `q` çıkar; `esc` bir adım geri gider, arama kutusu boşsa çıkar.
 
 `DEJA_TUI=0` ile bunun yerine düz metin özeti yazdırır; bu, `deja brief` çıktısıyla aynıdır. Bir pipe'a
 bağlıyken neyin indekslendiğini ve sırada hangi komutun çalıştırılacağını yazdırır.
@@ -150,7 +150,7 @@ Tam başvuru [belge sitesinde](https://vshulcz.github.io/deja-vu/).
 ## Gizlilik
 
 İndeksleme ve arama yereldir. Ağı yalnızca `deja update`, `deja sync ssh`, `deja doctor` içindeki sürüm
-denetimi, sizin yapılandırdığınız uç noktaya giden `deja embed` ve etkileşimli bir komutun günde bir kez son
+denetimi, sizin yapılandırdığınız uç noktaya giden `deja embed` (anlamsal sidecar kurulduktan sonra sorguyu o uç noktaya gönderen her arama da) ve etkileşimli bir komutun günde bir kez son
 sürüme bakması kullanır. Bu bakış oturum verisi göndermez; `DEJA_OFFLINE=1` ya da `DEJA_NO_UPDATE_NOTICE=1`
 onu kapatır.
 
@@ -191,7 +191,7 @@ $ deja "jwt refresh token"
 | `deja how <araç>` | Bu makinede bu iş gerçekte nasıl çalıştırılıyor — ajanların daha önce çalıştırdığı komutlardan alınmış gerçek argümanlarla. |
 | `deja fix <hata>` | Bu makinede aynı hatadan sonra ne çalıştırıldı ve ondan sonra hata bir daha çıkmadı. Asla bir merge, force push ya da silme değil. |
 | `deja friction` | Üç veya daha fazla farklı oturuma isabet eden hatalar ve hangi araçlardan geldikleri. |
-| `deja ctx <sorgu>` | En iyi sonucun Markdown özeti, doğrudan bir prompt'a girecek biçimde. |
+| `deja ctx <sorgu>` | En iyi sonucun Markdown özeti, değiştirdiği kodla birlikte, doğrudan bir prompt'a girecek biçimde. |
 | `deja resume <id>` | Bulunan oturumu ait olduğu araçta yeniden açar. |
 | `deja view` | Tüm belleği tek bir yerel HTML dosyasına aktarır. Sunucu yok, veri makineden çıkmaz. |
 | `deja doctor [--deep]` | Kendi kendine denetim; `--deep` ile indeksi kaynak dosyalara karşı doğrular. |
@@ -392,6 +392,11 @@ deja'nın temizlikten önce indekslediği oturumlar, dosya kaybolduktan sonra da
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+İndeks `~/.cache/deja` altında, `remember` ve `promote` notlarınız
+`~/.local/share/deja` altında, kurallar, hariç tutma listesi ve hook başlatıcısı ise
+`~/.config/deja` altındadır (ayarlanmışsa `XDG_DATA_HOME` ve `XDG_CONFIG_HOME` altında;
+Windows'ta notlar `%AppData%\deja` içindedir).
 
 </details>
 

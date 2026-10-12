@@ -56,6 +56,6 @@ openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 
 ## 隐私
 
-deja 在智能体本来写入的位置读取会话文件，并在 `~/.cache/deja`（或 `DEJA_INDEX_DIR`）下建立本地索引。建立索引时密钥和令牌会被脱敏，索引和检索都不发起网络请求。
+deja 在智能体本来写入的位置读取会话文件，并在 `~/.cache/deja`（或 `DEJA_INDEX_DIR`）下建立本地索引。建立索引时密钥和令牌会被脱敏；没有启用语义检索（`deja embed`）时，索引和检索都不发起网络请求。
 
 属于 [deja-vu](https://github.com/vshulcz/deja-vu) 项目。MIT 许可。觉得有用的话，欢迎在 [GitHub](https://github.com/vshulcz/deja-vu) 上给 deja-vu 点个 Star。

@@ -31,7 +31,7 @@ This skill drives the ` + "`deja`" + ` binary through the shell. If the deja MCP
 
 - ` + "`deja recall \"<query>\"`" + `: a short page of the sessions that bear on the query, this project first, sized for an agent to read whole. Start here.
 - ` + "`deja search --json \"<query>\"`" + `: the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Only this user's own sessions, never library docs or general knowledge.
-- ` + "`deja ctx <query|id-prefix>`" + `: a full digest of the single best-matching session, once a hit looks right and the reasoning behind it matters. Takes no flags.
+- ` + "`deja ctx <query|id-prefix>`" + `: a full digest of the single best-matching session, with the code it changed, once a hit looks right and the reasoning behind it matters. Takes no flags.
 - ` + "`deja show <id-prefix> --harness <name> --json`" + `: the turns themselves, paged with ` + "`--offset`" + ` and ` + "`--limit`" + `. Use the id and harness a hit printed.
 - ` + "`deja blame <path> --json`" + `: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship. ` + "`deja blame <path>:<line>`" + ` narrows it to one line: the commit that last changed it and the session whose edit replaced the text that commit deleted, or one sentence saying why neither can be named.
 - ` + "`deja fix \"<pasted error>\"`" + `: the commands that followed that same error before, in sessions where it did not come back. Paste the failing output verbatim.

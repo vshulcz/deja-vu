@@ -27,6 +27,9 @@ before it activates the provider.
   give Claude Code and Codex: the recent work in this project and what held.
   After that, only when what was just asked matches something earlier. Most
   turns it adds nothing.
+- A cron job's run gets no automatic recall: when Hermes says the platform is
+  `cron`, the provider adds nothing on its own, and the deja tools still answer
+  when the job calls them.
 - Three tools: `deja_recall` searches past sessions, `deja_fix` says what was
   run after an error last time, `deja_blame` lists the sessions that edited a
   file.

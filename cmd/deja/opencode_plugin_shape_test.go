@@ -110,3 +110,19 @@ func TestBothOpencodePluginsCarryTheFileLineBackFromARead(t *testing.T) {
 		}
 	}
 }
+
+// A 2.x plugin written before the hook deadline loads and calls deja, so it
+// read as wired, while a stuck hook could still hold the turn (#4951). Doctor
+// sends it back to install.
+func TestDoctorCallsA2xPluginWithoutTheDeadlineStale(t *testing.T) {
+	t.Cleanup(func() { opencodeVersionMajor = opencodeVersionMajorReal })
+	opencodeVersionMajor = func() int { return 2 }
+	js := opencodePluginJS("/bin/deja")
+	if opencodePluginShapeStale(js) {
+		t.Fatal("the plugin install writes today reads as stale")
+	}
+	old := strings.NewReplacer("HOOK_DEADLINE", "LIMIT").Replace(js)
+	if !opencodePluginShapeStale(old) {
+		t.Error("a 2.x plugin with no hook deadline reads as current")
+	}
+}

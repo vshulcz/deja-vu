@@ -65,7 +65,7 @@ collapses to one server rather than listing every tool twice.
 ## The JSON surfaces
 
 `deja search`, `blame`, `fix`, `how`, `files`, `wip`, `last`, `show`, `stats`,
-`log`, `doctor`, `friction`, `secrets`, `tests` and `recap` all take `--json`. The envelope carries `schema_version`, and
+`log`, `doctor`, `friction`, `secrets`, `tests`, `recap` and `rules candidates` all take `--json`. The envelope carries `schema_version`, and
 `docs/json-output.md` is the contract: within a version, changes are additive.
 
 The smallest useful integration is two lines — what was decided about this file
@@ -146,7 +146,7 @@ and your test then breaks when the format does.
 
 ## If you integrate it
 
-Open an issue or a pull request adding a line to the list in the README. A
+Open an issue or a pull request saying so. A
 toolkit that wires deja for its users is the most useful thing that happens to
 this project, and it should be visible from the front page rather than
 discovered by reading commits.

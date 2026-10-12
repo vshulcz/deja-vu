@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Add memory to Cline: every agent's sessions — deja-vu</title>
-<meta name="description" content="Cline's hooks cannot carry context, so deja arrives as a plugin: a rule resolved as instructions are built, a message builder, and a /deja command.">
+<meta name="description" content="Cline's hook files cannot carry context, so deja comes as a plugin: a rule resolved as instructions are built, a message builder, runtime hooks and /deja.">
 <link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Add memory to Cline: every agent's sessions">
-<meta property="og:description" content="Cline's hooks cannot carry context, so deja arrives as a plugin: a rule resolved as instructions are built, a message builder, and a /deja command.">
+<meta property="og:description" content="Cline's hook files cannot carry context, so deja comes as a plugin: a rule resolved as instructions are built, a message builder, runtime hooks and /deja.">
 <meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html">
 <meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -26,15 +26,15 @@
 <meta property="og:image:height" content="640">
 <meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
 <meta name="twitter:title" content="Add memory to Cline: every agent's sessions">
-<meta name="twitter:description" content="Cline's hooks cannot carry context, so deja arrives as a plugin: a rule resolved as instructions are built, a message builder, and a /deja command.">
+<meta name="twitter:description" content="Cline's hook files cannot carry context, so deja comes as a plugin: a rule resolved as instructions are built, a message builder, runtime hooks and /deja.">
 <meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
 <meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Cline", "description": "Cline's hooks cannot carry context, so deja arrives as a plugin: a rule resolved when the session builds its instructions, a message builder that sees the prompt, and a /deja command.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to Cline", "description": "Cline's hook files cannot carry context, so deja comes as a plugin: a rule resolved as instructions are built, a message builder, runtime hooks and /deja.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-09-19"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for Cline", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Cline remember previous tasks?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps each task's messages on disk and can reopen one, but a new task does not read the others, and its rules files hold only what you wrote by hand."}}, {"@type": "Question", "name": "How do I add memory to Cline?", "acceptedAnswer": {"@type": "Answer", "text": "deja install cline-auto registers a plugin: a rule whose content is resolved when the session builds its instructions (session-start recall), a message builder that sees the prompt and adds the history it is about, and a /deja command. Cline's hooks are not used because they cannot return context."}}, {"@type": "Question", "name": "Can Cline see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of forty-one agents on the machine, including sessions from before deja was installed."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does Cline remember previous tasks?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps each task's messages on disk and can reopen one, but a new task does not read the others, and its rules files hold only what you wrote by hand."}}, {"@type": "Question", "name": "How do I add memory to Cline?", "acceptedAnswer": {"@type": "Answer", "text": "deja install cline-auto registers a plugin: a rule whose content is resolved when the session builds its instructions (session-start recall), a message builder that sees the prompt and adds the history it is about, runtime hooks for a file's history before an edit and the state after compaction, and a /deja command. Cline's hook files are not used because they cannot return context."}}, {"@type": "Question", "name": "Can Cline see what I did in Claude Code or Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, once deja is installed: the index covers the transcripts of forty-one agents on the machine, including sessions from before deja was installed."}}]}</script>
 </head>
 <body>
 <div class="glow"></div>
@@ -138,7 +138,7 @@
 <article>
 
 <h1>Adding memory to Cline</h1>
-<p class="pagelede">its hooks cannot carry context; its plugins can<span class="mins" data-mins></span></p>
+<p class="pagelede">its hook files cannot carry context; its plugins can<span class="mins" data-mins></span></p>
 
 <p>Cline writes every task to disk — the message log under its data directory, and the API conversation history under VS Code's global storage — and can reopen one. A new task reads your rules files and nothing else: not last week's task, and not the Claude Code or Codex session on the same machine where the problem was already solved. This page is about adding that.</p>
 
@@ -147,19 +147,20 @@
 <p>It works, and it costs what it looks like it costs. Every task reads those files in full whether or not they bear on the question, they hold what the model chose to write down rather than what happened, and keeping them accurate is work you do — a stale "current focus" is followed as confidently as a fresh one. Indexing is the other half of the answer: the task log is already on disk, complete, and nobody has to maintain it.</p>
 
 <h2>Why not hooks</h2>
-<p>Cline has hooks, and deja does not use them, because they cannot say anything to the model. Verified against CLI 3.0.46: <code>TaskStart</code> and <code>UserPromptSubmit</code> are spawned detached with stdout closed, <code>PreToolUse</code> keeps only <code>cancel</code> and <code>overrideInput</code>, <code>PreCompact</code> is mapped to no event at all, and <code>--hooks-dir</code> is read by nothing.</p>
+<p>Cline's hook files cannot say anything to the model, so deja does not write them. Verified against CLI 3.0.46: <code>TaskStart</code> and <code>UserPromptSubmit</code> are spawned detached with stdout closed, <code>PreToolUse</code> keeps only <code>cancel</code> and <code>overrideInput</code>, <code>PreCompact</code> is mapped to no event at all, and <code>--hooks-dir</code> is read by nothing. A plugin's own runtime hooks can, and deja uses those.</p>
 
 <h2>Adding recall</h2>
 <pre>deja install cline-auto</pre>
-<p>That registers a plugin with three parts, plus the MCP server so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision:</p>
+<p>That registers a plugin with four parts, plus the MCP server so the model can call the <code>deja</code> tool itself — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision:</p>
 <ul>
 <li><b>A rule</b> whose content is a function, resolved when the session builds its instructions — session-start recall by another name. A rule is handed nothing, so it recalls against the session rather than the question.</li>
 <li><b>A message builder</b>, the prompt-aware half: its build is called with the messages on their way to the model, and the new array it returns is what gets sent. That is where the history the prompt is actually about goes in.</li>
 <li><b>A <code>/deja</code> command</b> in the same session, for asking directly.</li>
+<li><b>Runtime hooks</b>: before an edit, the file's history beside the tool's result; when the CLI compacts, the working state is captured and handed back on the next prompt; when a run ends, the session is released for other sessions' recall. The deja-history skill ships in the same plugin package.</li>
 </ul>
 
 <h2>What arrives</h2>
-<p>At task start, a digest of what this machine has done on the project. On each prompt, the history it is about, when there is any; silence is the common case. When a command fails, what this machine ran after the same error before, placed beside the error. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+<p>At task start, a digest of what this machine has done on the project. On each prompt, the history it is about, when there is any; silence is the common case. When a command fails, what this machine ran after the same error before, placed beside the error. Before an edit, what earlier sessions settled about that file. After the CLI compacts, the state of the work on the next prompt. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
 <h2>The part that is not about Cline</h2>
 <p>The index covers every agent's transcripts on the machine — forty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in Cline, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

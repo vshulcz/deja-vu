@@ -143,7 +143,7 @@
 <p>One tool, <code>deja</code>, with a <code>mode</code> argument — eight capabilities behind one entry so an agent's tool list stays short. The names below are still callable as tools of their own for clients wired before the change; <code>context</code> was <code>recall_context</code>.</p>
 <table><thead><tr><th>Mode</th><th>What it does</th></tr></thead><tbody>
 <tr><td><code>recall</code></td><td>Search past sessions across every agent and return dense matches under ~4&nbsp;KB. Fires on phrases like "didn't we fix this before".</td></tr>
-<tr><td><code>context</code></td><td>Return a full markdown digest of the single best-matching session — the problem, decision and outcome.</td></tr>
+<tr><td><code>context</code></td><td>Return a markdown digest of the single best-matching session: the code it changed, as the lines each edit removed and added, then the problem, decision and outcome.</td></tr>
 <tr><td><code>blame</code></td><td>Given a file path, the prior sessions that discussed it, most specific first. git blame for the conversations behind the code.</td></tr>
 <tr><td><code>fix</code></td><td>Given a failing error, the command this machine ran after that same error before, when it did not come back. Matched on the error itself, not its words — evidence, not a guaranteed fix.</td></tr>
 <tr><td><code>how</code></td><td>How this machine actually runs a thing — the real command with the real flags, from what agents ran before. Call before inventing a build, test or deploy invocation that a guess would get wrong on this setup.</td></tr>

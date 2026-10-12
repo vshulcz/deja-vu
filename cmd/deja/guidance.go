@@ -18,7 +18,7 @@ const (
 const guidanceBody = `Before re-deriving past work, search deja when the user refers to past work, previous sessions, or what was decided before, before debugging an error or re-implementing something that may already exist, and when they state that something of theirs already exists that you have no record of ("I already have X", "we use Y for this"). Before telling the user that something on this machine does not exist — a command, a file, a setting, a past decision — recall first. ` + recallBeforeChange + ` Use the deja MCP tool and pick a mode:
 
 - recall: search history with a specific error, function, or decision.
-- context: get a concise digest of the best matching session.
+- context: get a concise digest of the best matching session, with the code it changed.
 
 Example: for "what did we decide about token refresh?", call deja with mode recall and query "token refresh decision", then mode context if the result needs more detail.
 
@@ -45,7 +45,7 @@ If the deja tool is not available in this session, the same index is reachable t
 These are the modes of the one deja tool, passed as ` + "`mode`" + `.
 
 - recall: search with the most specific token available — an exact error string, function name, file path, or flag. Several words are ANDed. Not for library docs or general knowledge; only this user's own sessions.
-- context: a full digest of the single best-matching session, once a recall hit looks right and the reasoning behind it matters.
+- context: a full digest of the single best-matching session, with the code it changed, once a recall hit looks right and the reasoning behind it matters.
 - blame: before editing, refactoring or deleting a file, the prior sessions that discussed it, so you know why it is shaped the way it is. Session history, not git authorship.
 - fix: paste a failing output verbatim to see the commands that followed that same error before, in sessions where it did not come back.
 - how: the real command with the real flags this machine runs for a build, test, deploy or script, ordered by how many sessions ran it. A guessed invocation is plausible and fails on this setup.

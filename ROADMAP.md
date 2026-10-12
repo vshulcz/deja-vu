@@ -57,8 +57,8 @@ the place to discuss design.
   tool hook that runs: aider, Continue's CLI, Roo Code, Zed and JetBrains AI
   Assistant, each recorded in the registry with the measurement behind it.
 - **Follow the work an agent handed off.** A subagent's run is its own session
-  now, and where a harness records the edge — Grok's `summary.json`, Claude's
-  sidechain files — recall can name the parent and the children. Cursor writes
+  now, and where a harness records the edge (Grok's `summary.json`, Claude's
+  sidechain files, Hermes' `parent_session_id`) recall can name the parent and the children. Cursor writes
   subagent transcripts too and their shape is unread; the rest of the harnesses
   that spawn agents are the same question.
 - **Close the matrix from upstream.** What is left in the support table is

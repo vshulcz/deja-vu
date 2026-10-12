@@ -108,7 +108,7 @@ skill 调用的是上面装好的 `deja` 二进制，自己不带。
 - 搜索框也认筛选词：带冒号的智能体名（`codex:`）、`today`、`yesterday`、`week`、`month`，以及 `in:<项目>`。
 - `r` 在写下这个会话的智能体里恢复它。`o` 在任意其他智能体里接着做，新智能体一开始就带着这个会话问过什么、定下了什么、还有什么没解决。
 - `tab` 在本项目、所有项目和 Deleted 之间切换；Deleted 是智能体已经删掉、deja 仍然保留的会话，`R` 把其中一个放回原处。
-- `?` 列出所有按键，其余操作在 `^k` 里（复制会话 id 或项目路径、忘掉一个会话），在列表里 `q` 退出。
+- `?` 列出所有按键，其余操作在 `^k` 里（复制会话 id 或项目路径、忘掉一个会话），在列表里 `q` 退出；`esc` 后退一步，搜索框为空时退出。
 
 设置 `DEJA_TUI=0` 时改为打印文本摘要，也就是 `deja brief` 的输出。输出到管道时，它打印已经索引了什么、下一步该运行哪条命令。
 
@@ -141,7 +141,7 @@ deja 把这些文件变成一层它们都能读的记忆。
 
 ## 隐私
 
-建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查、指向你所配置端点的 `deja embed`，以及交互式命令每天一次查看最新发布，会用到网络。这次查看不发送任何会话数据；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以关掉它。
+建索引和搜索都在本地。只有 `deja update`、`deja sync ssh`、`deja doctor` 里的版本检查、指向你所配置端点的 `deja embed`（语义索引建好之后，每次搜索也会把查询发到那个端点），以及交互式命令每天一次查看最新发布，会用到网络。这次查看不发送任何会话数据；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以关掉它。
 
 凭据在建索引时脱敏：AWS 密钥、`api_key=` 与 `token=` 赋值、bearer 令牌与裸 JWT、PEM 私钥块、
 各家提供商的令牌、`scheme://user:pass@host` 形式的 URL、没有规则能匹配的高熵值，
@@ -174,7 +174,7 @@ $ deja "jwt refresh token"
 | `deja how <工具>` | 这台机器实际怎么跑一件事，带真实参数，来自智能体此前跑过的命令。 |
 | `deja fix <报错>` | 这台机器上同样的报错之后跑过什么，且那次之后错误没有再出现。绝不会是 merge、force push 或删除。 |
 | `deja friction` | 命中三个以上不同会话的报错，并指出来自哪些工具。 |
-| `deja ctx <查询词>` | 最佳命中的 Markdown 摘要，可直接接进提示词。 |
+| `deja ctx <查询词>` | 最佳命中的 Markdown 摘要，附带它改动的代码，可直接接进提示词。 |
 | `deja resume <id>` | 在原来的工具里重新打开找到的那个会话。 |
 | `deja view` | 把整个记忆导出成一个本地 HTML 文件。没有服务端，数据不离开本机。 |
 | `deja doctor [--deep]` | 自检；加 `--deep` 时用源文件验证索引。 |
@@ -353,6 +353,10 @@ Claude Code 会删除 30 天以前的记录（`~/.claude/settings.json` 里的 `
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+索引在 `~/.cache/deja`，`remember` 和 `promote` 的笔记在 `~/.local/share/deja`，
+规则、排除列表和 hook 启动脚本在 `~/.config/deja`（设置了 `XDG_DATA_HOME` 和
+`XDG_CONFIG_HOME` 时在它们下面；Windows 上笔记在 `%AppData%\deja`）。
 
 </details>
 

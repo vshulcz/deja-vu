@@ -62,7 +62,7 @@ var helpEntries = []helpEntry{
 	{name: "ctx", group: groupSearch,
 		usage:    []string{"deja ctx <query|id-prefix>"},
 		desc:     "a context digest to paste or pipe into an agent",
-		more:     "A query collects the matching sessions; an id prints that one session's digest.",
+		more:     "A query prints the best-matching session's digest, an id that session's; then the code the session changed, each edit as the lines it removed and added.",
 		examples: []string{`deja ctx "schema migration rollback" > deja-context.md`, "deja ctx 01a00feb"}},
 	{name: "recall", group: groupSearch,
 		usage:    []string{"deja recall <words> [--project name] [--harness name] [--limit n]"},

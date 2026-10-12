@@ -112,7 +112,7 @@ Liste wird beim Tippen kürzer.
 - Das Suchfeld nimmt Filter: einen Agenten mit Doppelpunkt (`codex:`), `today`, `yesterday`, `week`, `month` und `in:<projekt>`.
 - `r` setzt die Session in dem Agenten fort, der sie geschrieben hat. `o` setzt sie in einem beliebigen anderen Agenten fort, der mit dem beginnt, was die Session gefragt, entschieden und offen gelassen hat.
 - `tab` wechselt zwischen diesem Projekt, allen Projekten und Deleted, den Sessions, die ihr Agent gelöscht hat und die deja noch hält; `R` legt eine davon zurück.
-- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), in der Liste beendet `q`.
+- `?` zeigt alle Tasten, `^k` hat den Rest (Session-ID oder Projektpfad kopieren, eine Session vergessen), in der Liste beendet `q`; `esc` geht einen Schritt zurück und beendet bei leerem Suchfeld.
 
 Mit `DEJA_TUI=0` kommt stattdessen die Textübersicht, die auch `deja brief` ausgibt. In einer Pipe
 zeigt es, was indiziert ist und welcher Befehl als Nächstes dran ist.
@@ -152,7 +152,7 @@ Die vollständige Referenz steht auf der [Dokumentationsseite](https://vshulcz.g
 ## Privatsphäre
 
 Indizieren und Suchen laufen lokal. Das Netz brauchen nur `deja update`, `deja sync ssh`, die Versionsprüfung
-in `deja doctor`, `deja embed`, das an den von dir konfigurierten Endpunkt geht, und ein interaktiver
+in `deja doctor`, `deja embed`, das an den von dir konfigurierten Endpunkt geht (und, sobald der semantische Sidecar gebaut ist, jede Suche, die die Anfrage an diesen Endpunkt schickt), und ein interaktiver
 Befehl, der einmal am Tag nach dem neuesten Release schaut. Dieser Blick sendet keine Session-Daten;
 `DEJA_OFFLINE=1` oder `DEJA_NO_UPDATE_NOTICE=1` schaltet ihn ab.
 
@@ -193,7 +193,7 @@ $ deja "jwt refresh token"
 | `deja how <werkzeug>` | Wie das auf dieser Maschine wirklich ausgeführt wird, mit echten Argumenten, aus Befehlen, die Agents bereits ausgeführt haben. |
 | `deja fix <fehler>` | Was auf dieser Maschine nach demselben Fehler ausgeführt wurde und wonach der Fehler nicht wieder auftrat. Niemals ein Merge, ein Force-Push oder eine Löschung. |
 | `deja friction` | Fehler, die in drei oder mehr verschiedenen Sessions auftauchen, mit Angabe der Werkzeuge. |
-| `deja ctx <suchbegriff>` | Markdown-Zusammenfassung des besten Treffers, direkt in einen Prompt einsetzbar. |
+| `deja ctx <suchbegriff>` | Markdown-Zusammenfassung des besten Treffers mit dem Code, den er geändert hat, direkt in einen Prompt einsetzbar. |
 | `deja resume <id>` | Öffnet die gefundene Session wieder in dem Werkzeug, zu dem sie gehört. |
 | `deja view` | Exportiert das gesamte Gedächtnis in eine einzelne lokale HTML-Datei. Kein Server, nichts verlässt die Maschine. |
 | `deja doctor [--deep]` | Selbstprüfung; mit `--deep` wird der Index gegen die Quelldateien verifiziert. |
@@ -400,6 +400,11 @@ verschwunden ist. Die Details stehen unter
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+Der Index liegt unter `~/.cache/deja`, deine `remember`- und `promote`-Notizen in
+`~/.local/share/deja`, Regeln, Ausschlussliste und Hook-Starter in `~/.config/deja`
+(oder unter `XDG_DATA_HOME` und `XDG_CONFIG_HOME`, wenn gesetzt; unter Windows liegen
+die Notizen in `%AppData%\deja`).
 
 </details>
 

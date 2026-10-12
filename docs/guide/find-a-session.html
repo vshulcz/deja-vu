@@ -156,7 +156,7 @@
 <p>Several words are ANDed, quotes require the exact phrase, and when nothing matches exactly the search falls back to word forms and close spellings rather than returning nothing. The harness column matters more than it looks: the session you want is often in the tool you were <em>not</em> thinking of.</p>
 
 <h2>Or search as you type</h2>
-<p>Bare <code>deja</code> in a terminal opens the same search as a full screen. Results update with each letter, the agent chips along the top count the hits per agent, and <code>a</code> narrows to one. <code>tab</code> moves between this project, all projects and Deleted, the sessions whose agent has since deleted them. The box also takes filters as words: <code>codex:</code> for one agent, <code>today</code>, <code>yesterday</code>, <code>week</code> or <code>month</code>, and <code>in:api</code> for one project. A search that finds nothing here names the other projects that have it, or offers the spelling your history uses. Open a session and <code>/</code> finds a word inside it, <code>]</code> and <code>[</code> jump between the turns you asked. When the box is empty, <code>↑</code> brings back what you searched before.</p>
+<p>Bare <code>deja</code> in a terminal opens the same search as a full screen. Results update as you type, the agent chips along the top count the hits per agent, and <code>a</code> narrows to one. <code>tab</code> moves between this project, all projects and Deleted, the sessions whose agent has since deleted them. The box also takes filters as words: <code>codex:</code> for one agent, <code>today</code>, <code>yesterday</code>, <code>week</code> or <code>month</code>, and <code>in:api</code> for one project. A search that finds nothing here names the other projects that have it, or offers the spelling your history uses. Open a session and <code>/</code> finds a word inside it, <code>]</code> and <code>[</code> jump between the turns you asked. When the box is empty, <code>↑</code> brings back what you searched before.</p>
 
 <h2>Narrowing without guessing</h2>
 <ul>
@@ -167,11 +167,11 @@
 </ul>
 
 <h2>Reading it, then continuing it</h2>
-<p>A hit gives you a session id. Two things to do with it:</p>
+<p>A hit gives you a session id. Three things to do with it:</p>
 <pre>deja show 8f31c0a9      # read the session
-deja ctx  8f31c0a9      # a Markdown digest to paste into whatever you are doing now
+deja ctx  8f31c0a9      # a digest of the session and the code it changed, to paste into whatever you are doing now
 deja resume 8f31c0a9    # reopen it in the agent that ran it</pre>
-<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for thirty-five of the forty-one harnesses deja reads. The remaining six — aider, Cherry Studio, DeepSeek Harness, JetBrains AI Assistant, VS Code Copilot Chat and Zed — have no resume path deja prints, and deja says so rather than pretending. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
+<p><code>resume</code> hands the id back to the harness that owns the session, with the project directory where that harness scopes its list to one. It works for thirty-five of the forty-one harnesses deja reads. The remaining six — aider, Cherry Studio, DeepSeek Harness, JetBrains AI Assistant, VS Code Copilot Chat and Zed — have no resume path deja prints, and deja says so rather than pretending. For a Codex session, <code>deja resume &lt;id&gt; --app</code> opens it in the ChatGPT desktop app on macOS and Windows instead. Roo Code is half of each: tasks its CLI created take <code>roo --session-id</code>, and tasks from the editor reopen in the editor. Reasonix resumes what its CLI started in a workspace; sessions from its desktop app reopen from the app.</p>
 <p>Ids are matched by prefix, so the eight characters a result prints are enough to type. On the screen there is nothing to type: <code>↵</code> opens the session at the match, <code>r</code> resumes it in its agent, and <code>o</code> continues it in a different one.</p>
 
 <h2>When the answer is a command rather than a session</h2>

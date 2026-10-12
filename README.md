@@ -224,7 +224,7 @@ as usual. `deja search <query>` skips the suggestion.
 | --- | --- |
 | `deja ctx <query>` | Markdown digest of the best match, with the code it changed, ready to pipe into a prompt. |
 | `deja recall <words>` | The page the MCP recall tool gives an agent: about 4 KB, this project first. For skills and scripts that run deja through the shell. |
-| `deja resume <id>` | Reopen a found session in its native harness. |
+| `deja resume <id>` | Reopen a found session in its native harness. `--app` opens a Codex session in the ChatGPT desktop app. |
 | `deja restore <path>` | Hand back a span an agent replaced, from the `old_string` its edit recorded. Never writes over the original. |
 | `deja promote <id>` | Distill a session into a curated note with provenance, tags and a lifecycle state. Notes outrank raw transcripts. |
 | `deja share <id>` | A sanitized session digest for a colleague, with secrets already scrubbed. |
@@ -268,7 +268,7 @@ whether or not the tool is called.
 | Mode | `q` is | Also reads | Returns |
 | --- | --- | --- | --- |
 | `recall` | the question, or an exact error string, name or flag | `harness?`, `limit?`, `offset?` | Dense matching snippets, capped at 4KB. |
-| `context` | the same as recall | `harness?` | Markdown digest of the best-matching session. |
+| `context` | the same as recall | `harness?` | Markdown digest of the best-matching session, with the code it changed. |
 | `blame` | a file path | `harness?`, `project?`, `since?`, `limit?`, `all?` | Sessions that discussed a file. |
 | `fix` | the failing output, verbatim | `limit?` | What this machine ran, or changed, after that same error before. |
 | `how` | the tool or target, e.g. `go test` | `project?`, `limit?` | The real invocation, from what agents ran here. |
@@ -523,8 +523,8 @@ is not secret detection: a shape it does not know can pass through. See the
 
 A recall is a lexical lookup against a local index:
 0.7–0.8 ms median, and nothing waits on a model. A hook adds the process start and a
-freshness check over your stores on top of that — tens of milliseconds on a store of
-a few gigabytes.
+freshness check over your stores on top of that: about 0.2 s end to end on a 1.9 GB
+store, and 0.59 s for the per-prompt hook on an index of 19k sessions.
 
 </details>
 

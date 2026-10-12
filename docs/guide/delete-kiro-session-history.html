@@ -138,13 +138,13 @@
 
 <h1>How to delete Kiro session history, and what you lose</h1>
 <p class="pagelede">the CLI and the IDE write different trees, so check which one a session came from<span class="mins" data-mins></span></p>
-<p>Kiro ships a CLI and an IDE, and they do not write the same files. Both keep their sessions under <code>~/.kiro/sessions</code>, but the CLI writes a pair of files per session and the IDE writes a directory per session. Deleting one conversation is easy once you know which tree it is in.</p>
+<p>Kiro ships a CLI and an IDE, and they do not write the same files. Both keep their sessions under <code>~/.kiro/sessions</code>, but the CLI writes a pair of files per session and the IDE, like <code>kiro-cli --v3</code>, writes a directory per session. Deleting one conversation is easy once you know which tree it is in.</p>
 
 <h2>Where the sessions are</h2>
 <p>The CLI writes two files per session, side by side:</p>
 <pre>~/.kiro/sessions/cli/&lt;sessionId&gt;.jsonl   the transcript
 ~/.kiro/sessions/cli/&lt;sessionId&gt;.json    the header: session id and the directory it ran in</pre>
-<p>The IDE writes one directory per session, grouped by workspace:</p>
+<p>The IDE writes one directory per session, grouped by workspace, and so does <code>kiro-cli --v3</code>, which also lists each session in <code>~/.kiro/session-index/&lt;workspace&gt;.jsonl</code>:</p>
 <pre>~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;/messages.jsonl
 ~/.kiro/sessions/&lt;workspace&gt;/sess_&lt;uuid&gt;/session.json</pre>
 <p><code>session.json</code> holds the id, the model, the workspace paths and the timestamps. <code>messages.jsonl</code> holds the conversation, along with the agent's own bookkeeping records.</p>
@@ -164,7 +164,7 @@
 <p><a href="https://github.com/vshulcz/deja-vu">deja</a> reads both Kiro trees, along with the other forty agents' histories on the machine, into one local index. It is searchable from the shell and readable by the agents themselves over MCP:</p>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja "Kiro session about the migration"</pre>
-<p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A CLI session you deleted stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>kiro-cli</code> can resume it; IDE sessions are not written back.</p>
+<p>Nothing to switch on first: the sessions are already on disk, including the months before deja was installed. <a href="privacy.html">Indexing and search stay local</a>, credentials are stripped as the index is built, and <code>deja forget</code> drops a session from the index for good. A CLI session you deleted stays under the Deleted tab of the screen bare <code>deja</code> opens, and <code>R</code> writes its conversation back so <code>kiro-cli</code> can resume it, including a <code>kiro-cli --v3</code> session listed in its session index; Kiro IDE sessions are not written back.</p>
 
 <p><a href="where-sessions-are-stored.html">Where every agent keeps its history</a> · <a href="memory-for-kiro.html">Memory for Kiro</a> · <a href="../registry/kiro.html">The Kiro format</a></p>
 <p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>

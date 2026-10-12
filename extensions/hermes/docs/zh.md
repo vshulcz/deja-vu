@@ -19,6 +19,7 @@ hermes config set memory.provider deja-memory
 ## 它做什么
 
 - 每个会话的第一轮之前，它把 deja 的钩子平时交给 Claude Code 和 Codex 的那份摘要交给 Hermes：这个项目最近做了什么，哪些结论站住了。之后只有当刚问的问题和以前的某次工作对得上时才补充内容，大多数轮次它什么都不加。
+- cron 任务的运行不会自动召回：Hermes 报告平台为 `cron` 时，提供者不主动添加内容；任务调用 deja 工具时仍会作答。
 - 三个工具：`deja_recall` 搜索过去的会话，`deja_fix` 告诉你上次遇到同一个报错之后运行了什么，`deja_blame` 列出改过某个文件的会话。
 - Hermes 往 MEMORY.md 或 USER.md 里加的条目，也会存成一条 deja 笔记，排序时排在周围那些会话前面。
 - 压缩时保留会话正在做的事，交给下一轮；会话结束时撤掉它的在线标记。

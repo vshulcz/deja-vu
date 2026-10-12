@@ -148,13 +148,14 @@
 <p>One difference from a stock Claude Code store matters for text rather than for tokens. Cherry Studio appends the same API call three or four times as the response streams — a new uuid each time, the same request id, the text growing. Read plainly that turns one reply into three messages, each a prefix of the next, so a recall can quote half a sentence and <code>deja show</code> prints the answer twice before finishing it. deja collapses the run and keeps the whole answer.</p>
 
 <h2>Getting recall into the app</h2>
-<pre>deja install cherrystudio</pre>
+<pre>deja install cherrystudio
+deja install cherrystudio-auto   # also the hooks</pre>
 <p>Cherry Studio keeps its MCP servers in its own SQLite store, seeded from a built-in list, so there is no config file to write and writing into a running app's database is not an installer's job. What the app has is import: <b>Settings → MCP → Import from JSON</b>. The command writes that file — <code>&lt;config&gt;/deja/cherrystudio-mcp.json</code> — and says where to point it. The <code>.mcpb</code> bundle from the <a href="https://github.com/vshulcz/deja-vu/releases/latest">latest release</a> is the same server through the app's other import path.</p>
 <p>Once imported, the agent has one tool with a mode: search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, get the commands and files this project's past sessions worked with, store a decision.</p>
 <p><code>deja doctor</code> reads the app's server list from <code>Data/cherrystudio.sqlite</code>, read-only, and says <code>not imported</code> until one of them runs <code>deja mcp</code>. If deja moves, re-import the file: rewriting it does not change the copy the app already has.</p>
 
-<h2>Why nothing arrives on its own</h2>
-<p>There is no hook surface a third party can use: the agent sessions run inside the Electron app, and the extension points are the MCP server list and its import paths. So recall is something the model reaches for, and the <a href="../registry/cherrystudio.html">registry entry</a> records auto-recall as impossible rather than as work someone could pick up.</p>
+<h2>Recall on its own</h2>
+<p>Cherry Studio's own agents run Claude Code with <code>Data/Agents/.claude</code> as their config directory, so <code>deja install cherrystudio-auto</code> adds Claude Code's hooks in that directory's <code>settings.json</code>: the project digest at session start, recall on each prompt, a file's history before an edit and the fix after a failed command. Two kinds of agent get none of it, by the app's design: the sealed built-in Support agent loads no settings, and an external-CLI provider reads only the project's settings. The <a href="../registry/cherrystudio.html">registry entry</a> has the details.</p>
 
 <h2>The part that is not about this harness</h2>
 <p>The index covers every agent's transcripts on the machine — forty-one of them, <a href="where-sessions-are-stored.html">each in its own format</a> — so a session you ran in the app answers a question asked in Claude Code or Cursor later. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

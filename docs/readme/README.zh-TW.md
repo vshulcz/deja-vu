@@ -108,7 +108,7 @@ skill 呼叫的是上面裝好的 `deja` 執行檔，自己不帶。
 - 搜尋框也認篩選詞：帶冒號的代理名（`codex:`）、`today`、`yesterday`、`week`、`month`，以及 `in:<專案>`。
 - `r` 在寫下這個會話的代理裡恢復它。`o` 在任意其他代理裡接著做，新代理一開始就帶著這個會話問過什麼、定下了什麼、還有什麼沒解決。
 - `tab` 在本專案、所有專案和 Deleted 之間切換；Deleted 是代理已經刪掉、deja 仍然保留的會話，`R` 把其中一個放回原處。
-- `?` 列出所有按鍵，其餘操作在 `^k` 裡（複製會話 id 或專案路徑、忘掉一個會話），在列表裡 `q` 離開。
+- `?` 列出所有按鍵，其餘操作在 `^k` 裡（複製會話 id 或專案路徑、忘掉一個會話），在列表裡 `q` 離開；`esc` 後退一步，搜尋框為空時離開。
 
 設定 `DEJA_TUI=0` 時改為印出文字摘要，也就是 `deja brief` 的輸出。輸出到管線時，它印出已經索引了什麼、下一步該執行哪條指令。
 
@@ -141,7 +141,7 @@ deja 把這些檔案變成一層它們都能讀的記憶。
 
 ## 隱私
 
-建索引和搜尋都在本機。只有 `deja update`、`deja sync ssh`、`deja doctor` 裡的版本檢查、指向你所設定端點的 `deja embed`，以及互動式指令每天一次查看最新發行版，會用到網路。這次查看不傳送任何會話資料；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以關掉它。
+建索引和搜尋都在本機。只有 `deja update`、`deja sync ssh`、`deja doctor` 裡的版本檢查、指向你所設定端點的 `deja embed`（語意索引建好之後，每次搜尋也會把查詢送到那個端點），以及互動式指令每天一次查看最新發行版，會用到網路。這次查看不傳送任何會話資料；`DEJA_OFFLINE=1` 或 `DEJA_NO_UPDATE_NOTICE=1` 可以關掉它。
 
 憑證在建索引時遮蔽：AWS 金鑰、`api_key=` 與 `token=` 賦值、bearer token 與裸 JWT、PEM 私鑰區塊、
 各家供應商的 token、`scheme://user:pass@host` 形式的 URL、沒有規則能比對的高熵值，
@@ -174,7 +174,7 @@ $ deja "jwt refresh token"
 | `deja how <工具>` | 這台機器實際怎麼跑一件事，帶真實參數，來自代理此前跑過的指令。 |
 | `deja fix <報錯>` | 這台機器上同樣的報錯之後跑過什麼，且那次之後錯誤沒有再出現。絕不會是 merge、force push 或刪除。 |
 | `deja friction` | 命中三個以上不同會話的報錯，並指出來自哪些工具。 |
-| `deja ctx <查詢詞>` | 最佳命中的 Markdown 摘要，可直接接進提示詞。 |
+| `deja ctx <查詢詞>` | 最佳命中的 Markdown 摘要，附帶它改動的程式碼，可直接接進提示詞。 |
 | `deja resume <id>` | 在原來的工具裡重新開啟找到的那個會話。 |
 | `deja view` | 把整個記憶匯出成一個本機 HTML 檔。沒有伺服器，資料不離開本機。 |
 | `deja doctor [--deep]` | 自我檢查；加 `--deep` 時用來源檔案驗證索引。 |
@@ -357,6 +357,10 @@ Claude Code 會刪除 30 天以前的記錄（`~/.claude/settings.json` 裡的 `
 deja uninstall --all
 rm -rf ~/.cache/deja ~/.local/share/deja ~/.config/deja
 ```
+
+索引在 `~/.cache/deja`，`remember` 和 `promote` 的筆記在 `~/.local/share/deja`，
+規則、排除清單和 hook 啟動腳本在 `~/.config/deja`（設定了 `XDG_DATA_HOME` 和
+`XDG_CONFIG_HOME` 時在它們底下；Windows 上筆記在 `%AppData%\deja`）。
 
 </details>
 

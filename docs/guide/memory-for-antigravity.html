@@ -150,7 +150,7 @@
 <p>Four files, all reversible with <code>deja uninstall antigravity-auto</code>:</p>
 <ul>
 <li><b>The MCP server</b> in <code>~/.gemini/config/mcp_config.json</code>, so the model can search past sessions, read one in full, see a file's history, ask what fixed an error, or store a decision.</li>
-<li><b>The plugin</b> at <code>~/.gemini/config/plugins/deja/</code> — <code>plugin.json</code> as the marker and <code>hooks.json</code> wiring <code>PreInvocation</code> to <code>deja hook-antigravity</code> with a 10-second timeout.</li>
+<li><b>The plugin</b> at <code>~/.gemini/config/plugins/deja/</code> — <code>plugin.json</code> as the marker and <code>hooks.json</code> wiring <code>PreInvocation</code> to <code>deja hook-antigravity</code>, and <code>Stop</code> to <code>deja hook-session-end</code> so a finished conversation is released for other sessions' recall, each with a 10-second timeout.</li>
 <li><b>The skill</b> at <code>plugins/deja/skills/deja-history/SKILL.md</code>, which the plugin directory ingests along with the rest.</li>
 <li><b>The launcher</b> at <code>~/.config/deja/bin/deja-hook</code>, which the hook command names instead of this build, so the wiring survives the binary moving.</li>
 </ul>
@@ -160,10 +160,10 @@
 <li>Without <code>plugin.json</code> the directory is not a plugin, and <code>hooks.json</code> beside it is ignored with no error.</li>
 <li><code>PreInvocation</code> is the only event whose output the model sees. <code>PreToolUse</code> fires but its reason never arrives, and <code>PostToolUse</code> has to answer with an empty object.</li>
 </ul>
-<p>So one event carries both channels: the project digest on the first invocation, and the history your prompt is about on the ones after it — read out of the <code>transcriptPath</code> the hook is handed, because Antigravity has no per-prompt event of its own.</p>
+<p>So one event carries everything: the project digest on the first invocation, then the history your prompt is about, the fix for a step that just failed, a file's history after an edit to it, and the state of the work after a <code>CHECKPOINT</code>, all read out of the <code>transcriptPath</code> the hook is handed, because Antigravity has no per-prompt, post-tool or compaction event whose output the model sees.</p>
 
 <h2>What arrives</h2>
-<p>An injected step before the model call: the digest once per conversation, then at most one short block when your own history answers what you just asked. Silence is the common case, and an injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
+<p>An injected step before the model call: the digest once per conversation, then at most one short block when your own history answers what you just asked, when a step just failed, when a file was just edited, or after a <code>CHECKPOINT</code>. Silence is the common case, and an injection is capped at 1,536 bytes per prompt and about 4 KB per tool call. <a href="token-cost.html">What memory costs</a> has the measured comparison.</p>
 
 <h2>The part that is not about Antigravity</h2>
 <p>The index covers every agent's transcripts on the machine — forty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in Antigravity, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

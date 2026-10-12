@@ -155,6 +155,7 @@
 <pre>deja install dsh-auto</pre>
 <p>That writes the MCP server and the <code>/deja</code> command into the profile patch layer, and adds the plugin that puts recall in front of the model. <code>deja install --auto</code> does the same for every other agent on the machine in one pass.</p>
 <p>Both at once is fine: the package looks for what the installer wrote in <code>$DSH_HOME/plugins/deja/</code> and contributes only what is missing, so you never get two <code>/deja</code> commands or the same recall twice.</p>
+<p>A plugin written before this release sends its notices with the retired v3 source, which dsh v4 refuses with "format v4 message requires a producer-owned source kind". <code>deja doctor</code> reports that plugin as stale. Run <code>deja install dsh-auto</code> again, or update <code>dsh-deja</code>, to replace it.</p>
 
 <h2>What arrives</h2>
 <p>Six tools the model can call — search past sessions, read one in full, see a file's history, ask what fixed an error, ask how a command is really run here, store a decision — a <code>/deja</code> command for asking directly, and recall that arrives on its own: before each assembly the plugin asks whether this machine's history answers the prompt, and adds it when it does. Silence is the common case. The same plugin speaks at the point of action too: after the agent reads or edits a file it adds what past sessions settled about that file, and after a command fails it adds what fixed the same error here before.</p>

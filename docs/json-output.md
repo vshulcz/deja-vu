@@ -197,7 +197,7 @@ when empty:
 | `lifecycle` | state of an imported promoted note: `accepted`, `rejected`, `superseded` or `stale` |
 | `lifecycle_note` | the note left with that state |
 | `lifecycle_at` | when that state was set |
-| `kind` | the harness's own word for a session an agent spawned — `sidechain` from Claude, `subagent` or `subagent_fork` from Grok, and whatever a harness deja has not met yet calls it; absent for sessions a person started |
+| `kind` | the harness's own word for a session it did not get from a person typing: an agent spawned it (`sidechain` from Claude, `subagent` or `subagent_fork` from Grok, `subagent` from Hermes) or a scheduler ran it (`cron` from Hermes, which session start and the prompt hook never offer unasked), and whatever a harness deja has not met yet calls it; absent for sessions a person started |
 | `parent` | the session this one was spawned from, where the harness records the edge itself — deja never infers one |
 | `agent` | name of the agent that ran a spawned session |
 
@@ -534,7 +534,7 @@ amp store says current Amp keeps its threads on ampcode.com.
 `sqlite3` and `git` are the two tools deja shells out to, each `ok` or
 `missing`, and sqlite3 can also be `broken` (with `path` and `error`) when the
 binary on PATH does not answer `select json_object('deja',1);`. sqlite3 reads every database-backed store (opencode and the schemas
-that borrow it, Cursor, Goose, Zed, Crush, Hermes, Grok, OpenClaw), and git supplies changed-file notes, worktree names and the task
+that borrow it, Cursor, Goose, Zed, Crush, Hermes, Grok, OpenClaw, Kiro CLI, Devin and older ZCode stores), and git supplies changed-file notes, worktree names and the task
 signal. Both degrade quietly, which is why the report names them.
 
 `index.sources_read_at` is when deja last walked this machine's stores, in RFC 3339, which is not when the index was last written: an import from a peer rewrites the index without opening a local transcript, so on a machine that syncs on a timer the two drift apart, and `stale_stores` is counted against this field rather than the build time. It is `never` when an import built the index and nothing local has been read yet, and absent on a store written before deja recorded it.
@@ -550,6 +550,9 @@ started with `--agent deja`).
 The `aider` row is `stale` when the context file is there and `~/.aider.conf.yml`
 has no `read:` entry for it, and `broken` when the entry is there and the file
 is not, which makes aider print an error on every start.
+The `deepseek` row is `stale` when deja's dsh plugin still tags its notices with
+the v3 `plugin` source kind: it calls deja, but dsh v4 refuses those notices and
+stops the session. `deja install deepseek-auto` rewrites it.
 `binary_missing` marks a row whose entries name a deja binary that is no longer
 there — what an upgrade leaves behind, with every hook exiting 127.
 `switched_off` marks a `wired` row the harness has turned off, so it will not

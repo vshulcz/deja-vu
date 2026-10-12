@@ -48,7 +48,7 @@ deja "test query"     # CLI search works
 One MCP tool, `deja`, with a `mode` argument (clients wired earlier can still call `recall`, `recall_context`, `blame`, `fix`, `how` and `remember` as tools of their own):
 
 - `recall` — dense results under ~4KB for a query.
-- `context` — markdown digest of the best-matching session (was `recall_context`).
+- `context` — markdown digest of the best-matching session, with the code it changed (was `recall_context`).
 - `blame` — which sessions discussed a file, and what was decided.
 - `fix` — what this machine ran after the same error last time.
 - `how` — the real invocation for a tool here, with its real flags.

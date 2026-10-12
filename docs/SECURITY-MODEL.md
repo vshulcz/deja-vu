@@ -34,6 +34,12 @@ characters or more, never as text. Attribution needs equality, not the bytes, so
 this is the one class of content the index holds without being able to hand it
 back: a hash cannot be read, quoted or searched for.
 
+Reading one session back (`deja ctx`, the MCP `context` mode, the session
+resource) is different: it reads the session's edits from its transcript at
+that moment, both sides, and shows them redacted ahead of the conversation.
+Nothing of it is stored, and `DEJA_INDEX_EDITS=0` and `DEJA_INDEX_WRITES=0` do
+not turn it off, since they act at ingest.
+
 ### Local writes
 
 The default index is `~/.cache/deja/index.db`; `DEJA_INDEX_DIR` changes that
@@ -41,6 +47,9 @@ location. The directory contains:
 
 - `records.bin`, with redacted message records;
 - `buckets/*.bin`, with token postings into those records;
+- `frictext.bin`, the first line of each repeated error's tool output, already
+  redacted, and `recoffsets.bin`, where each session's records sit in
+  `records.bin`;
 - `manifest.gob` and `sessions.gob`, with source file state, session metadata,
   redaction counts by rule, sync watermarks, imported-record deduplication keys,
   the few files each session touched most, and hashes — not text — of the
@@ -139,7 +148,10 @@ pipeline, or later user action sends them elsewhere.
 
 Redaction runs before session messages and titles are stored in the index and
 runs again for share and sync export output. It replaces matched values while
-leaving surrounding text searchable. The current patterns cover:
+leaving surrounding text searchable. `deja share` and `deja stats --year` also run an
+outbound pass that masks IP addresses, internal hostnames, emails and
+home-directory paths, including encoded folder names like `-Users-<name>-src`.
+The current patterns cover:
 
 - AWS access key IDs and secret-key assignments;
 - generic credential assignments such as `api_key=`, `token=`, `secret=`,
@@ -155,8 +167,9 @@ leaving surrounding text searchable. The current patterns cover:
   agent a password writes none of them. The value has to carry a digit or a
   symbol and it ends at the first space, so "the password is wrong" and "the
   password is the same as staging" are left alone;
-- bearer tokens and JWTs;
-- PEM private-key blocks;
+- bearer tokens, the `Authorization: Token` scheme, and JWTs;
+- PEM and PGP private-key blocks, whole, cut short, indented or JSON-escaped;
+- Slack and Discord webhook URLs;
 - known GitHub, GitLab, OpenAI/Anthropic-style, Groq, xAI, Hugging Face, npm,
   Slack, and Google token prefixes;
 - URLs containing `scheme://user:password@host` credentials;
@@ -172,6 +185,9 @@ leaving surrounding text searchable. The current patterns cover:
   excluded, and the assignment key must be a real word, so ordinary code and
   logs pass through unchanged (measured ~0.4% of messages affected on a real
   23 MB corpus).
+
+Text holding terminal escape sequences is read again without them, so colored
+output cannot split a value from its key.
 
 Pattern matching is not secret detection. A new provider's token shape, an
 unlabelled credential, encoded or transformed data, and a secret split across

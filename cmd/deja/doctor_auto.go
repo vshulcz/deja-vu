@@ -670,10 +670,14 @@ func dshNoticeSourceRetired(js string) bool {
 }
 
 // opencodePluginShapeStale reports whether the installed plugin is written for
-// the other opencode major. Silent when the version cannot be read: a guess
-// here would report a working machine as broken.
+// the other opencode major, or is a 2.x plugin from before the hook deadline,
+// which lets a stuck hook hold the turn (#4951). Silent when the version
+// cannot be read: a guess here would report a working machine as broken.
 func opencodePluginShapeStale(js string) bool {
 	v2 := strings.Contains(js, "export default")
+	if v2 && !strings.Contains(js, "HOOK_DEADLINE") {
+		return true
+	}
 	switch major := opencodeVersionMajor(); {
 	case major == 1:
 		return v2

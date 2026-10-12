@@ -11,9 +11,9 @@ same local index.
 | [`dsh/`](dsh) | npm `dsh-deja` | `dsh plugin --profile web add dsh-deja` |
 | [`openclaw/`](openclaw) | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | [`pi/`](pi) | npm `@vshulcz/pi-deja` (`pi-package`, also read by omp) | `pi install npm:@vshulcz/pi-deja` |
-| [`zed/`](zed) | Zed extension `deja-mcp-server` | Zed → Extensions → deja |
+| [`zed/`](zed) | Zed extension `deja-mcp-server` (in review: zed-industries/extensions#7307) | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
-| [`grok/`](grok) | Grok Build plugin `deja` | `grok plugin install deja` |
+| [`grok/`](grok) | Grok Build plugin `deja` (in review: xai-org/plugin-marketplace#332) | `grok plugin install deja` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Four more integrations live outside this directory because their registries or
@@ -29,7 +29,8 @@ The release publishes the four npm packages (opencode, dsh, openclaw, pi) at
 the release's own version, so `opencode-deja@0.22.0` and `dsh-deja@0.22.0` are
 the ones built against `deja 0.22.0` — `scripts/release-npm.mjs` sets the
 version and the `@vshulcz/deja-vu` dependency together, and the release
-workflow publishes the OpenClaw package to ClawHub at the same version. Each
+workflow publishes the OpenClaw package and the deja-search skill to ClawHub at
+the same version. Each
 package keeps its own `LICENSE` and `repository.directory` because npm
 publishes from that directory.
 
@@ -133,14 +134,16 @@ two files the Gemini install uses.
 The runtime integration — MCP server, hook pack, plugin — is written by
 `deja install openclaw-auto`; nothing here is needed for it. The skill on
 [ClawHub](https://clawhub.ai/vshulcz/deja-search) is the repository's root
-`skills/deja-search`, published with:
+`skills/deja-search`. The release workflow publishes it at the release's
+version with the `CLAWHUB_TOKEN` secret, since ClawHub's trusted publishing
+covers packages and not skills. By hand:
 
 ```sh
-clawhub skill publish skills/deja-search
+clawhub skill publish skills/deja-search --version <version>
 ```
 
 Its frontmatter declares the `deja` binary and how to install it, which is what
-ClawHub's security analysis checks. The version is given at publish time. Apart
+ClawHub's security analysis checks. Apart
 from that `metadata.openclaw` block, which only the registry copy carries, the
 file is the one `deja warmup` writes to `~/.agents/skills`, and a test keeps the
 two in step.
