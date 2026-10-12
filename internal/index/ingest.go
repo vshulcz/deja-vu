@@ -962,15 +962,17 @@ func applyRenamedFiles(m *Manifest, renamed map[string]string) map[string]bool {
 // rename moved it to. Nothing was read, so the pairs keep their rows and take
 // the new project; the command tables are mined again from the records.
 func reprojectSidecars(dir string, sessions map[string]SessionMeta, keys map[string]bool) {
-	if pairs := ReadFixes(dir); len(pairs) > 0 {
+	if raw, ok := readFixRaw(dir); !ok {
+		remineFixes(dir)
+	} else if len(raw) > 0 {
 		dirty := false
-		for i, p := range pairs {
+		for i, p := range raw {
 			if keys[p.Key] {
-				pairs[i].Project, dirty = sessions[p.Key].Project, true
+				raw[i].Project, dirty = sessions[p.Key].Project, true
 			}
 		}
 		if dirty {
-			_ = writeGobAtomic(fixesPath(dir), pairs)
+			writeFixTables(dir, raw)
 		}
 	}
 	buildCommandsFromIndex(dir)
@@ -4397,7 +4399,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	// has something to say, and the carried file is what a quiet update leaves.
 	// The command table is recomputed whole, and an empty one removes the
 	// carried file, as a full build would not write it (#4441).
-	mergeFixes(dir, tmp, replacements, replaceKeys)
+	mergeFixes(dir, tmp, sessionKeys(m), replacements, replaceKeys)
 	buildCommandsFromIndex(tmp)
 	for key := range replaceKeys {
 		dropped[key] = true
@@ -4422,7 +4424,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 // update are missing until a full build, which is the ordinary staleness of a
 // derived file and not the same thing as having none.
 func carrySidecars(dir, tmp string) {
-	for _, name := range []string{fixesFile, commandsFile, cooccurFile} {
+	for _, name := range []string{fixesFile, fixRawFile, commandsFile, cooccurFile} {
 		b, err := os.ReadFile(filepath.Join(dir, name))
 		if err != nil {
 			continue
@@ -4876,10 +4878,12 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	// file. The replacement path does the same three things after it carries
 	// them over; this path used to do none of them, which was survivable while
 	// it only ever saw a tail and is not once a new conversation comes through
-	// here (#3500). No `replaced` set: nothing was re-read, so every pair
-	// already on file is still earned — the new ones merge in beside them, and
-	// a candidate on file is what a second sighting needs to be promoted.
-	mergeFixes(dir, dir, appended, map[string]bool{})
+	// here (#3500). A session whose tail brought a tool record is mined again
+	// whole, so a pair that starts before the tail is found; the rest of the
+	// table is still earned, and a candidate on file is what a second sighting
+	// needs to be promoted.
+	whole, rewhole := wholeSessionsForFixes(dir, m, appended)
+	mergeFixes(dir, dir, nil, whole, rewhole)
 	// The two command tables are mined from every record the index holds, which
 	// is a scan of records.bin — 2.9s of an 8.6s pass on a 191 MB store. Nothing
 	// this pass added can change them unless it added a command or the output of

@@ -19,11 +19,11 @@ func TestACommandAfterARedTestIsNotConfirmedByRepetition(t *testing.T) {
 			{Role: "command", Text: "gh pr merge 2532 --squash --delete-branch", Time: now.Add(time.Minute)},
 		}, "claude:"+id, "p")
 	}
-	first := mergeFixPairs(nil, session("s1"))
+	first := judgeFixes(session("s1"))
 	if len(first) != 1 || !first[0].Candidate {
 		t.Fatalf("one sighting is a candidate: %+v", first)
 	}
-	second := mergeFixPairs(first, session("s2"))
+	second := judgeFixes(append(first, session("s2")...))
 	if len(second) != 1 {
 		t.Fatalf("the sighting is kept, not dropped: %+v", second)
 	}
@@ -43,7 +43,7 @@ func TestARepeatedCommandAfterAnOrdinaryFailureStillConfirms(t *testing.T) {
 			{Role: "command", Text: "brew services start postgresql", Time: now.Add(time.Minute)},
 		}, "claude:"+id, "p")
 	}
-	second := mergeFixPairs(mergeFixPairs(nil, session("s1")), session("s2"))
+	second := judgeFixes(append(judgeFixes(session("s1")), session("s2")...))
 	if len(second) != 1 || second[0].Candidate {
 		t.Fatalf("a repeated remedy for an ordinary failure must be a pair: %+v", second)
 	}
@@ -59,7 +59,7 @@ func TestAnEditAfterARedTestIsStillConfirmedByRepetition(t *testing.T) {
 			{Role: "edit", Text: "internal/billing/round.go\n-\tmath.Round(v)\n+\tmath.Floor(v + 0.5)", Time: now.Add(time.Minute)},
 		}, "claude:"+id, "p")
 	}
-	second := mergeFixPairs(mergeFixPairs(nil, session("s1")), session("s2"))
+	second := judgeFixes(append(judgeFixes(session("s1")), session("s2")...))
 	if len(second) != 1 || second[0].Candidate {
 		t.Fatalf("a repeated edit after a red test must be a pair: %+v", second)
 	}

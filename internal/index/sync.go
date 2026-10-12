@@ -790,7 +790,7 @@ func Import(dir, inDir string) (int, error) {
 	if err := appendImportedRecords(dir, &m, recsByKey, metas); err != nil {
 		return added, err
 	}
-	refreshImportSidecars(dir, m.Sessions, recsByKey)
+	refreshImportSidecars(dir, m, recsByKey)
 	return added, skippedError(skipped)
 }
 
@@ -798,17 +798,18 @@ func Import(dir, inDir string) (int, error) {
 // as the append-only pass does for what it read. Without it a peer's commands
 // were missing from the command tables and session facts until a rebuild, and
 // a fix the batch confirmed stayed a candidate.
-func refreshImportSidecars(dir string, sessions map[string]SessionMeta, recsByKey map[string][]Record) {
+func refreshImportSidecars(dir string, m Manifest, recsByKey map[string][]Record) {
 	var batch []model.Session
 	for _, key := range sortedKeys(recsByKey) {
-		meta := sessions[key]
+		meta := m.Sessions[key]
 		s := model.Session{ID: meta.ID, Harness: meta.Harness, Project: meta.Project}
 		for _, r := range recsByKey[key] {
 			s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
 		}
 		batch = append(batch, s)
 	}
-	mergeFixes(dir, dir, batch, map[string]bool{})
+	whole, rewhole := wholeSessionsForFixes(dir, m, batch)
+	mergeFixes(dir, dir, nil, whole, rewhole)
 	if carriesWork(batch) {
 		buildCommandsFromIndex(dir)
 		buildCommandFailsFromIndex(dir, readCommandFailState(dir), nil)

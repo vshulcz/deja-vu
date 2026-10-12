@@ -59,11 +59,11 @@ func TestAnEditRemedyIsACandidateUntilASecondSessionRepeatsIt(t *testing.T) {
 			{Role: "edit", Text: "internal/pool/pool.go\n-\tclose(c)\n+\tc.drain()", Time: now.Add(time.Minute)},
 		}, "claude:"+id, "p")
 	}
-	first := mergeFixPairs(nil, session("s1"))
+	first := judgeFixes(session("s1"))
 	if len(first) != 1 || !first[0].Candidate {
 		t.Fatalf("one sighting of an edit must be a candidate: %+v", first)
 	}
-	second := mergeFixPairs(first, session("s2"))
+	second := judgeFixes(append(first, session("s2")...))
 	if len(second) != 1 || second[0].Candidate {
 		t.Fatalf("a second session doing the same edit must confirm it: %+v", second)
 	}

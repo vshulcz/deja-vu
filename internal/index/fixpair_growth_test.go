@@ -152,7 +152,7 @@ func TestTheIncrementalMergePromotesACarriedCandidate(t *testing.T) {
 		{Role: roleToolOutput, Text: errText, Time: time.Now()},
 		{Role: roleCommand, Text: cmd, Time: time.Now()},
 	}}
-	mergeFixes(dir, dir, []model.Session{second}, map[string]bool{})
+	mergeFixes(dir, dir, nil, []model.Session{second}, map[string]bool{})
 	served := 0
 	for _, p := range ReadFixes(dir) {
 		if !p.Candidate {
@@ -184,11 +184,11 @@ func TestTheIncrementalMergeKeepsAFirstSighting(t *testing.T) {
 			{Role: roleCommand, Text: cmd, Time: when.Add(time.Second)},
 		}}
 	}
-	mergeFixes(dir, dir, []model.Session{session("one", time.Now().Add(-time.Hour))}, map[string]bool{})
+	mergeFixes(dir, dir, nil, []model.Session{session("one", time.Now().Add(-time.Hour))}, map[string]bool{})
 	if got := FixesFor(dir, errText, 3, nil); len(got) != 1 || !got[0].Candidate {
 		t.Fatalf("one sighting should come back marked unconfirmed: %+v", got)
 	}
-	mergeFixes(dir, dir, []model.Session{session("two", time.Now())}, map[string]bool{})
+	mergeFixes(dir, dir, nil, []model.Session{session("two", time.Now())}, map[string]bool{})
 	if got := FixesFor(dir, errText, 3, nil); len(got) == 0 {
 		t.Errorf("the second update confirmed the remedy and nothing was served: %+v", ReadFixes(dir))
 	}

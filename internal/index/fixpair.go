@@ -1,10 +1,11 @@
 package index
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,13 @@ import (
 
 const (
 	fixesFile = "fixes.gob"
+	// fixRawFile holds every pair mined from the corpus before judging, one row
+	// per session that produced it. The served table keeps one row per error
+	// and remedy, so the repeats that promoted a pair are gone from it, and an
+	// update that re-read the session behind a repeat could not take the
+	// promotion back. Judged again from this, an update leaves what a rebuild
+	// leaves. Read by updates only.
+	fixRawFile = "fixraw.gob"
 	// fixLookAhead is how far past the error a command still counts as an
 	// answer to it. Beyond that the session has moved on to something else.
 	fixLookAhead = 10
@@ -128,9 +136,8 @@ func fixesPath(dir string) string { return filepath.Join(dir, fixesFile) }
 func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string) {
 	// Mining is per session and reads nothing shared, and it was 9.4 s of a
 	// 51 s build on a real store — the longest of the four sidecars, with the
-	// rest of the machine idle. Collected per session and flattened in session
-	// order, so what lands on file does not depend on which worker finished
-	// first.
+	// rest of the machine idle. judgeFixes sorts before it judges, so what
+	// lands on file does not depend on which worker finished first.
 	perSession := make([][]FixPair, len(ss))
 	parallelForRanked(len(ss), func(i int) {
 		perSession[i] = fixPairsIn(ss[i].Messages, keyOf(ss[i]), ss[i].Project)
@@ -142,6 +149,26 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	if len(all) == 0 {
 		return
 	}
+	_ = writeGob(fixRawPath(tmp), all)
+	if kept := judgeFixes(all); len(kept) > 0 {
+		_ = writeGob(fixesPath(tmp), kept)
+	}
+}
+
+func fixRawPath(dir string) string { return filepath.Join(dir, fixRawFile) }
+
+// judgeFixes turns every pair mined from the corpus into the table served.
+func judgeFixes(all []FixPair) []FixPair {
+	// Newest first, and a fixed order among pairs of the same moment, so the
+	// row that survives below is the same whichever path collected them.
+	all = slices.Clone(all)
+	slices.SortStableFunc(all, func(a, b FixPair) int {
+		if c := b.When.Compare(a.When); c != 0 {
+			return c
+		}
+		return cmp.Or(strings.Compare(a.Key, b.Key), cmp.Compare(a.Sig, b.Sig),
+			strings.Compare(a.Command, b.Command), strings.Compare(a.Edit, b.Edit), strings.Compare(a.Error, b.Error))
+	})
 	// Sequence alone is weak evidence: on a real store only 13% of "the next
 	// command" mentioned anything the error named, so the other 87% are the
 	// session moving on to unrelated work. A pair is kept when it carries a
@@ -152,24 +179,16 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	for _, p := range all {
 		repeats[fixKey(p)]++
 	}
-	var out []FixPair
+	out := all[:0]
 	for _, p := range all {
-		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[fixKey(p)] >= 2) {
-			out = append(out, p)
-			continue
-		}
 		// Not a pair, and not nothing: the second kind of evidence accumulates
 		// across sessions, and sessions arrive one at a time. Dropping a
 		// sighting here meant the session that would have confirmed it found
 		// nothing to confirm, so a full build reached pairs the same corpus
 		// grown one session at a time never did (#1301).
-		p.Candidate = true
+		p.Candidate = !selfEvidentPair(p) && !(repetitionConfirms(p) && repeats[fixKey(p)] >= 2)
 		out = append(out, p)
 	}
-	if len(out) == 0 {
-		return
-	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].When.After(out[j].When) })
 	// One command per (error, command) is enough — the rest are the same fix
 	// from other days. Keying on the command alone was wrong: a generic remedy
 	// (`go mod tidy`, `npm install`) is the answer to several different errors,
@@ -177,7 +196,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 	// other signature it settled.
 	seen := map[string]bool{}
 	candidates, pairs := 0, 0
-	kept := out[:0]
+	var kept []FixPair
 	for _, p := range out {
 		if p.Candidate {
 			if candidates >= fixesCandidateMax {
@@ -202,7 +221,7 @@ func buildFixes(tmp string, ss []model.Session, keyOf func(model.Session) string
 			break
 		}
 	}
-	_ = writeGob(fixesPath(tmp), kept)
+	return kept
 }
 
 // selfEvidentPair reports whether a remedy stands on what it is rather than on
@@ -657,69 +676,7 @@ func LooksLikeError(text string) bool {
 	return false
 }
 
-// mergeFixPairs folds newly mined pairs into the table on file: a remedy that
-// names what the error named is a pair at once, anything else waits for a
-// second session to do the same thing.
-func mergeFixPairs(kept, fresh []FixPair) []FixPair {
-	seen := map[string]int{}
-	for _, p := range kept {
-		seen[fixKey(p)]++
-	}
-	repeats := map[string]int{}
-	for _, p := range fresh {
-		repeats[fixKey(p)]++
-	}
-	// A candidate already on file is the evidence a later session needs, so it
-	// counts towards the second sighting — and once something is promoted, the
-	// candidate copy of it goes. Not redundant with the deduplication below:
-	// two sessions carrying the same timestamp sort either way, and when the
-	// candidate copy sorts first it is the one that survives, so the pair the
-	// second sighting just earned is never served.
-	promoted := map[string]bool{}
-	for _, p := range fresh {
-		k := fixKey(p)
-		if selfEvidentPair(p) || (repetitionConfirms(p) && repeats[k]+seen[k] >= 2) {
-			p.Candidate = false
-			kept = append(kept, p)
-			promoted[k] = true
-			continue
-		}
-		p.Candidate = true
-		kept = append(kept, p)
-	}
-	for i := range kept {
-		if promoted[fixKey(kept[i])] {
-			kept[i].Candidate = false
-		}
-	}
-	sort.SliceStable(kept, func(i, j int) bool { return kept[i].When.After(kept[j].When) })
-	written := map[string]bool{}
-	out := kept[:0]
-	candidates := 0
-	for _, p := range kept {
-		k := fixKey(p)
-		if written[k] {
-			continue
-		}
-		// Candidates are bounded on their own. They serve nobody until a second
-		// session confirms them, so letting them share the pair budget would
-		// push real answers out of a table that is read whole.
-		if p.Candidate {
-			if candidates >= fixesCandidateMax {
-				continue
-			}
-			candidates++
-		}
-		written[k] = true
-		out = append(out, p)
-		if len(out) >= fixesMax+fixesCandidateMax {
-			break
-		}
-	}
-	return out
-}
-
-// mergeFixes updates the carried pairs with what the sessions in this
+// mergeFixes updates the pair tables with what the sessions in this
 // incremental update contain.
 //
 // Carrying alone was not enough. A new session is a new file, and a new file
@@ -729,28 +686,35 @@ func mergeFixPairs(kept, fresh []FixPair) []FixPair {
 // machine whose stores are append-only that build happens when the index
 // version changes and not otherwise.
 //
-// The pairs already carried keep their place unconditionally: they earned it
-// against the whole corpus, and re-judging them here — where most of that
-// corpus is not in hand — would drop the ones whose evidence was a repeat in a
-// session this update did not touch. Fresh candidates are judged the way a full
-// build judges them, counting a match against a carried pair as the repeat it
-// is.
-func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[string]bool) {
-	carried, torn := readFixesChecked(dir)
-	if torn {
-		// A file that will not decode is not an empty table. Carrying "no
-		// pairs" forward and writing back only this update's lost every pair
-		// mined before, for good and without a word. The records in tmp are the
-		// whole corpus by now, so the table is mined again from them.
+// The pairs of every session this update did not re-read are carried as they
+// were mined, the re-read ones are mined again, and the whole set is judged the
+// way a full build judges it. replacements are the re-read sessions whole,
+// replaced their keys. live is the sessions the updated index holds, or nil
+// when the update cannot have dropped one.
+func mergeFixes(dir, tmp string, live map[string]bool, replacements []model.Session, replaced map[string]bool) {
+	raw, ok := readFixRaw(dir)
+	if !ok {
+		// A table from before the raw one, or a torn one: the records in tmp are
+		// the whole corpus by now, so it is mined again from them.
 		remineFixes(tmp)
 		return
 	}
-	kept := make([]FixPair, 0, len(carried))
-	dirty := false
-	for _, p := range carried {
-		// Whatever this update re-read, it re-mines below; keeping the old rows
-		// too would duplicate a session's pairs on every edit to its file.
-		if replaced[p.Key] {
+	// The served table is written from the raw one, but a table an older,
+	// leakier build wrote is served until something rewrites it.
+	served, torn := readFixesChecked(dir)
+	changed := torn
+	for _, p := range served {
+		if leaksCredential(p) {
+			changed = true
+			break
+		}
+	}
+	kept := make([]FixPair, 0, len(raw))
+	for _, p := range raw {
+		// Whatever this update re-read is mined again below, and a session gone
+		// from the index is gone from a rebuild's table too.
+		if replaced[p.Key] || (live != nil && !live[p.Key]) {
+			changed = true
 			continue
 		}
 		// An index built before this path scrubbed its sessions holds pairs with
@@ -758,31 +722,110 @@ func mergeFixes(dir, tmp string, replacements []model.Session, replaced map[stri
 		// a pair whose session is not re-read — so without this the leak outlives
 		// the fix for it, indefinitely, on the machine that already has it.
 		if e, counts := redact.Text(p.Error); len(counts) > 0 {
-			p.Error, dirty = e, true
+			p.Error, changed = e, true
 		}
 		if c, counts := redact.Text(p.Command); len(counts) > 0 {
-			p.Command, dirty = c, true
+			p.Command, changed = c, true
 		}
 		if f, counts := redact.Text(p.Failed); len(counts) > 0 {
-			p.Failed, dirty = f, true
+			p.Failed, changed = f, true
 		}
 		kept = append(kept, p)
 	}
-	var fresh []FixPair
 	for _, s := range replacements {
-		fresh = append(fresh, fixPairsIn(s.Messages, s.Harness+":"+s.ID, s.Project)...)
+		fresh := fixPairsIn(s.Messages, s.Harness+":"+s.ID, s.Project)
+		changed = changed || len(fresh) > 0
+		kept = append(kept, fresh...)
 	}
-	if len(fresh) == 0 && len(kept) == len(carried) && !dirty {
+	if changed {
+		writeFixTables(tmp, kept)
+	}
+}
+
+func leaksCredential(p FixPair) bool {
+	for _, t := range []string{p.Error, p.Command, p.Failed} {
+		if _, counts := redact.Text(t); len(counts) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// writeFixTables writes the raw pairs and the table judged from them, and
+// removes both when there are none, as a full build would not write them.
+// Atomic, unlike buildFixes: this runs after carrySidecars has copied the live
+// tables into the build directory, and the swap ships whatever is there. A
+// truncating write that failed partway would ship an undecodable file, which
+// ReadFixes reports as no pairs at all — silence until the next full rebuild.
+func writeFixTables(dir string, raw []FixPair) {
+	if len(raw) == 0 {
+		_ = os.Remove(fixRawPath(dir))
+		_ = os.Remove(fixesPath(dir))
 		return
 	}
-	out := mergeFixPairs(kept, fresh)
-	// Atomic, unlike buildFixes above: that one writes into a directory made
-	// moments earlier, where the file cannot exist. This one runs after
-	// carrySidecars has copied the live table into the build directory, and the
-	// swap ships whatever is there. A truncating write that failed partway would
-	// ship an undecodable file, which ReadFixes reports as no pairs at all —
-	// silence until the next full rebuild.
-	_ = writeGobAtomic(fixesPath(tmp), out)
+	_ = writeGobAtomic(fixRawPath(dir), raw)
+	_ = writeGobAtomic(fixesPath(dir), judgeFixes(raw))
+}
+
+// wholeSessionsForFixes returns the sessions in tails whose pairs can have
+// changed, read whole from the index in dir, and their keys. A pair runs from
+// an error to the remedy after it, so mined from a tail alone an error before
+// the tail and its remedy in it were never paired, and a later repeat of the
+// error moves the pair. Only a tail that brings a tool record can change them.
+// On a read error the tails are mined as they are.
+func wholeSessionsForFixes(dir string, m Manifest, tails []model.Session) ([]model.Session, map[string]bool) {
+	keys := map[string]bool{}
+	for _, s := range tails {
+		for _, msg := range s.Messages {
+			if msg.Role != "user" && msg.Role != "assistant" {
+				keys[s.Harness+":"+s.ID] = true
+				break
+			}
+		}
+	}
+	if len(keys) == 0 {
+		return nil, keys
+	}
+	by := map[string]*model.Session{}
+	if err := eachRecordForKeys(filepath.Join(dir, "records.bin"), tablesFromManifest(m), keys, func(r Record) {
+		s := by[r.Key]
+		if s == nil {
+			cp := sessionFromMeta(m.Sessions[r.Key])
+			s = &cp
+			by[r.Key] = s
+		}
+		s.Messages = append(s.Messages, model.Message{Role: r.Role, Text: r.Text, Time: r.Time})
+	}); err != nil {
+		return tails, map[string]bool{}
+	}
+	out := make([]model.Session, 0, len(by))
+	for _, k := range sortedKeys(by) {
+		out = append(out, *by[k])
+	}
+	return out, keys
+}
+
+// readFixRaw loads the raw pairs. An index built before them has only the
+// served table, whose rows stand in for them: one sighting each, which is all
+// the incremental path ever counted. ok is false when neither can be read.
+func readFixRaw(dir string) (pairs []FixPair, ok bool) {
+	if err := readGob(fixRawPath(dir), &pairs); err == nil {
+		return pairs, true
+	}
+	if _, err := os.Stat(fixRawPath(dir)); err == nil {
+		return nil, false
+	}
+	served, torn := readFixesChecked(dir)
+	return served, !torn
+}
+
+// sessionKeys is the set of session keys m holds.
+func sessionKeys(m Manifest) map[string]bool {
+	keys := make(map[string]bool, len(m.Sessions))
+	for k := range m.Sessions {
+		keys[k] = true
+	}
+	return keys
 }
 
 // readFixesChecked is ReadFixes that tells a missing table from a torn one:
@@ -826,6 +869,7 @@ func remineFixes(dir string) {
 		ss = append(ss, *by[k])
 	}
 	_ = os.Remove(fixesPath(dir))
+	_ = os.Remove(fixRawPath(dir))
 	buildFixes(dir, ss, func(s model.Session) string { return s.Harness + ":" + s.ID })
 }
 

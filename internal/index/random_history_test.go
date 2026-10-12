@@ -30,11 +30,7 @@ func TestRandomHistoriesMatchARebuild(t *testing.T) {
 }
 
 // The same histories with error lines a few sessions share, so the walls and
-// frictext.bin have something to hold. Two tables are left out of the
-// comparison here because they already differ from a rebuild once a history
-// has errors in it: the fix pairs, which an update carries rather than mines
-// again (see carrySidecars), and the per-command failure counts, which come
-// out one session short after a forget and an unforget (seed 1).
+// frictext.bin have something to hold.
 func TestRandomHistoriesWithWallsMatchARebuild(t *testing.T) {
 	for _, seed := range historySeeds() {
 		t.Run(fmt.Sprint(seed), func(t *testing.T) { runRandomHistory(t, seed, true) })
@@ -123,12 +119,6 @@ func (r *historyRun) compare(seed int64, step int) {
 	}
 	label := fmt.Sprintf("seed %d after step %d", seed, step)
 	got, want := takeSnap(t, r.index), takeSnap(t, b)
-	if r.walls {
-		for _, name := range []string{"fixes", "commandfails"} {
-			delete(got.sidecars, name)
-			delete(want.sidecars, name)
-		}
-	}
 	if diffSnaps(t, label, got, want) > 0 {
 		t.Fatalf("%s; replay with -args -history-seed=%d. Steps:\n  %s", label, seed, strings.Join(r.log, "\n  "))
 	}

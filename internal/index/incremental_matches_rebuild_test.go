@@ -197,6 +197,14 @@ func takeSnap(t *testing.T, dir string) snap {
 	}
 	sort.Strings(fxs)
 	add("fixes", fxs)
+	raw, _ := readFixRaw(dir)
+	var rws []string
+	for _, p := range raw {
+		b, _ := json.Marshal(p)
+		rws = append(rws, string(b))
+	}
+	sort.Strings(rws)
+	add("fixraw", rws)
 	cmds := ReadCommands(dir)
 	var cs []string
 	for _, c := range cmds {
