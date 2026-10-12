@@ -32,6 +32,8 @@ func Changes(s model.Session) []Change {
 	switch s.Harness {
 	case "claude":
 		return claudeChanges(s.Path, s.ID)
+	case "codex":
+		return codexChanges(s.Path)
 	}
 	return nil
 }

@@ -1,0 +1,160 @@
+package sources
+
+import (
+	"bytes"
+	"encoding/json"
+	"strings"
+)
+
+// codexChanges reads a Codex rollout's edits from the patches it applied.
+// Codex edits files through apply_patch, a tool call whose input is the patch
+// text; older builds passed the same text as an argument of a shell call, so
+// the patch is taken from whichever string field of the call carries it.
+func codexChanges(file string) []Change {
+	var out []Change
+	cwd := ""
+	_ = scanJSONLBytes(file, 0, func(line []byte) {
+		var v struct {
+			Type    string          `json:"type"`
+			Payload json.RawMessage `json:"payload"`
+		}
+		if json.Unmarshal(line, &v) != nil {
+			return
+		}
+		switch v.Type {
+		case "session_meta", "turn_context":
+			var p struct {
+				Cwd string `json:"cwd"`
+			}
+			if json.Unmarshal(v.Payload, &p) == nil && p.Cwd != "" {
+				cwd = p.Cwd
+			}
+		case "response_item":
+			if !bytes.Contains(v.Payload, []byte("Begin Patch")) {
+				return
+			}
+			var p map[string]any
+			if json.Unmarshal(v.Payload, &p) != nil {
+				return
+			}
+			switch p["type"] {
+			case "custom_tool_call", "function_call", "local_shell_call":
+			default:
+				return
+			}
+			seen := map[string]bool{}
+			for _, patch := range patchTexts(p, 0) {
+				if seen[patch] {
+					continue
+				}
+				seen[patch] = true
+				for _, c := range parseApplyPatch(patch) {
+					c.Path = relTo(cwd, c.Path)
+					out = append(out, c)
+				}
+			}
+		}
+	})
+	return out
+}
+
+// patchTexts finds the apply_patch texts in a tool call: a string field that
+// holds one, or a JSON-encoded arguments string whose fields do.
+func patchTexts(v any, depth int) []string {
+	if depth > 4 {
+		return nil
+	}
+	var out []string
+	switch t := v.(type) {
+	case string:
+		// An arguments string is JSON first: the patch inside it is escaped.
+		if s := strings.TrimSpace(t); strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[") {
+			var inner any
+			if json.Unmarshal([]byte(s), &inner) == nil {
+				return patchTexts(inner, depth+1)
+			}
+		}
+		if i := strings.Index(t, "*** Begin Patch"); i >= 0 {
+			body := t[i:]
+			if j := strings.Index(body, "*** End Patch"); j >= 0 {
+				body = body[:j]
+			}
+			return []string{body}
+		}
+	case map[string]any:
+		for _, x := range t {
+			out = append(out, patchTexts(x, depth+1)...)
+		}
+	case []any:
+		for _, x := range t {
+			out = append(out, patchTexts(x, depth+1)...)
+		}
+	}
+	return out
+}
+
+// parseApplyPatch reads Codex's patch format: a file added whole, or a file
+// updated by hunks of context, removed and added lines. Each hunk is one
+// change from the lines it replaced to the lines it left. A deleted file is
+// not a change to read back.
+func parseApplyPatch(patch string) []Change {
+	var out []Change
+	var path string
+	var adding, updating bool
+	var add, old, new []string
+	hunk := false
+	flushHunk := func() {
+		if updating && hunk && (len(old) > 0 || len(new) > 0) {
+			out = append(out, Change{Path: path, Old: strings.Join(old, "\n"), New: strings.Join(new, "\n")})
+		}
+		old, new, hunk = nil, nil, false
+	}
+	flushFile := func() {
+		flushHunk()
+		if adding {
+			out = append(out, Change{Path: path, New: strings.Join(add, "\n"), Created: true})
+		}
+		path, adding, updating, add = "", false, false, nil
+	}
+	for _, l := range strings.Split(strings.ReplaceAll(patch, "\r\n", "\n"), "\n") {
+		switch {
+		case strings.HasPrefix(l, "*** Add File: "):
+			flushFile()
+			path, adding = strings.TrimSpace(strings.TrimPrefix(l, "*** Add File: ")), true
+		case strings.HasPrefix(l, "*** Update File: "):
+			flushFile()
+			path, updating = strings.TrimSpace(strings.TrimPrefix(l, "*** Update File: ")), true
+		case strings.HasPrefix(l, "*** Delete File: "):
+			flushFile()
+		case strings.HasPrefix(l, "*** Move to: ") && updating:
+			path = strings.TrimSpace(strings.TrimPrefix(l, "*** Move to: "))
+		case strings.HasPrefix(l, "*** "):
+			// *** Begin Patch, *** End of File and the like carry no text.
+		case adding:
+			if strings.HasPrefix(l, "+") {
+				add = append(add, l[1:])
+			}
+		case updating && strings.HasPrefix(l, "@@"):
+			flushHunk()
+			hunk = true
+		case updating:
+			hunk = true
+			switch {
+			case strings.HasPrefix(l, "-"):
+				old = append(old, l[1:])
+			case strings.HasPrefix(l, "+"):
+				new = append(new, l[1:])
+			case strings.HasPrefix(l, " "):
+				old, new = append(old, l[1:]), append(new, l[1:])
+			case l == "":
+				old, new = append(old, ""), append(new, "")
+			}
+		}
+	}
+	flushFile()
+	for i := range out {
+		out[i].Old = strings.TrimRight(out[i].Old, "\n")
+		out[i].New = strings.TrimRight(out[i].New, "\n")
+	}
+	return out
+}

@@ -40,7 +40,7 @@ func TestChangesReadsEditsBackFromTheTranscript(t *testing.T) {
 	if fin := FinalChanges(got); len(fin) != 4 {
 		t.Fatalf("final %v", fin)
 	}
-	if Changes(model.Session{Harness: "codex", Path: path}) != nil {
+	if Changes(model.Session{Harness: "gemini", Path: path}) != nil {
 		t.Fatal("a harness whose edits it cannot read gives nothing, not a guess")
 	}
 }

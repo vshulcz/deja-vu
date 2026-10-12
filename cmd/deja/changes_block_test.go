@@ -115,3 +115,37 @@ func TestChangeDiffKeepsOnlyWhatChanged(t *testing.T) {
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
 }
+
+// A Codex session's edits are apply_patch calls; reading the session back
+// shows them the same way (#4950).
+func TestRecallContextShowsACodexSessionsPatch(t *testing.T) {
+	tmp := hermeticEnv(t)
+	day := filepath.Join(tmp, "codex", "sessions", "2026", "07", "01")
+	if err := os.MkdirAll(day, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const id = "019a0001-1111-7000-8000-d6e7f8a9b0c1"
+	rec := func(at, typ string, payload any) string {
+		b, _ := json.Marshal(map[string]any{"timestamp": at, "type": typ, "payload": payload})
+		return string(b) + "\n"
+	}
+	patch := "*** Begin Patch\n*** Update File: /proj/django/ops.py\n@@\n def reduce(self):\n-    pass\n+    return [AddIndex(self.name)]\n*** End Patch\n"
+	body := rec("2026-07-01T10:00:00Z", "session_meta", map[string]any{"id": id, "cwd": "/proj"}) +
+		rec("2026-07-01T10:00:01Z", "response_item", map[string]any{"type": "message", "role": "user", "content": []any{map[string]any{"type": "input_text", "text": "squashed migrations still carry index_together"}}}) +
+		rec("2026-07-01T10:00:02Z", "response_item", map[string]any{"type": "custom_tool_call", "name": "apply_patch", "call_id": "c1", "input": patch}) +
+		rec("2026-07-01T10:00:03Z", "response_item", map[string]any{"type": "message", "role": "assistant", "content": []any{map[string]any{"type": "output_text", "text": "Fixed: reduce turns the rename into an AddIndex."}}})
+	if err := os.WriteFile(filepath.Join(day, "rollout-2026-07-01T10-00-00-"+id+".jsonl"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(tmp, "index.db")
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	text, n, _, _, err := recallContextResult(dir, id, "")
+	if err != nil || n != 1 {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	if !strings.Contains(text, "## what it changed") || !strings.Contains(text, "django/ops.py:") || !strings.Contains(text, "+     return [AddIndex(self.name)]") {
+		t.Fatalf("the patch is not in the session read back:\n%s", text)
+	}
+}
