@@ -25,6 +25,13 @@
     <summary>Every deja subcommand: search, ctx, blame, fix, how, secrets, remember, forget, stats, last, sources, install, embed, sync, doctor, bench and update.</summary>
   </entry>
   <entry>
+    <title>Add memory to Hermes: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"></link>
+    <updated>2026-10-12T00:00:00Z</updated>
+    <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
+  </entry>
+  <entry>
     <title>deja-vu — the one memory your coding agents share</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html"></link>
     <updated>2026-10-09T00:00:00Z</updated>
     <summary>How to give Kimi Code recall over every coding agent&#39;s sessions on the machine — the plugin, the hook that fires on each prompt, and the CLI path.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Qwen Code: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-qwen.html"></link>
-    <updated>2026-10-09T00:00:00Z</updated>
-    <summary>How to give Qwen Code recall over every coding agent&#39;s sessions on this machine — the Gemini extension format, and Claude-format marketplaces.</summary>
   </entry>
 </feed>

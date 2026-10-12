@@ -161,11 +161,18 @@ class DejaMemoryProvider(MemoryProvider):
     def initialize(self, session_id: str, **kwargs) -> None:
         self._first_turn = True
         self._session_id = session_id or ""
+        self._platform = kwargs.get("platform") or ""
 
     def system_prompt_block(self) -> str:
         return _ABOUT
 
     def prefetch(self, query: str, *, session_id: str = "") -> str:
+        # A cron run recalls nothing on its own, as in the plugin hook; its
+        # tools still answer when the job asks.
+        if getattr(self, "_platform", "") == "cron":
+            self._last_text = ""
+            self._last_count = 0
+            return ""
         # First turn gets the session digest, ranked by the project; every
         # turn after gets the relevance pass over what was just asked. Both
         # are the same text deja's own hooks inject in Claude Code and Codex.

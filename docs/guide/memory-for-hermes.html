@@ -161,7 +161,7 @@
 <p>That teaches the agent to reach for <code>deja search --json</code>, <code>deja ctx</code>, <code>deja blame</code> and <code>deja fix</code> on its own when a question sounds like earlier work. It needs the <code>deja</code> binary on <code>PATH</code> (<code>brew install deja-vu</code> or the <a href="getting-started.html">install script</a>) and nothing else.</p>
 
 <h2>What arrives</h2>
-<p>On each prompt, when this machine's history in any agent answers it, the plugin appends the matching session to the message; silence is the common case. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
+<p>On each prompt, when this machine's history in any agent answers it, the plugin appends the matching session to the message; silence is the common case. A cron job gets none of this on its own, only the tools when it calls them. An injection is capped at about 1.5 KB per prompt and 4 KB per tool call — <a href="token-cost.html">what memory costs</a> has the measured comparison.</p>
 
 <h2>The part that is not about Hermes</h2>
 <p>The index covers every agent's transcripts on the machine — forty-one of them, each in its own format — so a fix found in Claude Code answers a question asked in Hermes, including sessions from before any of this was installed. A transcript a client later deletes stays searchable; only <code>deja forget</code> drops one on purpose. Nothing here writes memories, so there is nothing to hallucinate into your history; indexing and search are local, and credentials are stripped as the index is built (<a href="privacy.html">privacy</a>).</p>

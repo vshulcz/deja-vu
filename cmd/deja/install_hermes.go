@@ -234,6 +234,11 @@ def recall(session_id=None, user_message=None, is_first_turn=False, **kwargs):
     _watch_compaction(session_id, kwargs.get("conversation_history"), kwargs.get("parent_session_id") or "")
     if _provider_active():
         return None
+    # A cron job's prompt is the same every fire: recalling for it costs a
+    # deja run and the context it adds each time, and tells the job nothing a
+    # person asked for. The deja tool still answers when the job calls it.
+    if kwargs.get("platform") == "cron":
+        return None
     if is_first_turn:
         # The session id, so hook-context stamps this session live: a first
         # turn returns before hook-prompt runs, and the deja tool answered it
