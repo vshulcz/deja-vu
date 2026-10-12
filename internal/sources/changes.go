@@ -54,7 +54,7 @@ func Changes(s model.Session) []Change {
 	case "codex":
 		return codexChanges(s.Path)
 	}
-	return nil
+	return genericChanges(s)
 }
 
 func claudeChanges(file, id string) []Change {
