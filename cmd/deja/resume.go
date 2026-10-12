@@ -23,11 +23,15 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if len(args) < 1 {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
-	doExec, writeBack := false, false
+	doExec, writeBack, app := false, false, false
 	prefix := ""
 	for _, a := range args {
 		if a == "--exec" {
 			doExec = true
+			continue
+		}
+		if a == "--app" {
+			app = true
 			continue
 		}
 		if a == "--write-back" {
@@ -38,7 +42,7 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 		// stray word, silently replaced the id and the refusal named it as the
 		// session that was missing (#2251).
 		if strings.HasPrefix(a, "-") && a != "-" {
-			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back and --exec", a)
+			return fmt.Errorf("resume: unknown flag %q — it takes an id-prefix, --write-back, --exec and --app", a)
 		}
 		if prefix != "" {
 			return fmt.Errorf("resume takes one id-prefix — got %q and %q", prefix, a)
@@ -63,6 +67,12 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	// through show, share, promote or handoff (#1026).
 	if err := denyPolicyHidden(prefix, s, os.Stderr); err != nil {
 		return err
+	}
+	if app {
+		if err := resumeGoneError(s); err != nil {
+			return err
+		}
+		return openInCodexApp(s, runtime.GOOS)
 	}
 	indexDir := dir
 	dir, cmdline, err := resumeCommand(s)
@@ -115,6 +125,43 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	}
 	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
 	return c.Run()
+}
+
+// openInCodexApp opens a Codex session in the ChatGPT desktop app, which
+// takes a CLI session by its id at codex://threads/<id> (#4907).
+func openInCodexApp(s model.Session, goos string) error {
+	argv, err := codexAppCommand(s, goos)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "deja: opening %s in the ChatGPT app\n", digest.Short(s.ID))
+	c := exec.Command(argv[0], argv[1:]...)
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("the ChatGPT app did not open it (%v) — an app too old to take codex:// links does this; `deja resume %s` prints the codex command", err, s.ID)
+	}
+	return nil
+}
+
+// codexAppCommand is the command that opens s in the ChatGPT app on goos.
+func codexAppCommand(s model.Session, goos string) ([]string, error) {
+	if s.Harness != "codex" || s.Project == "history" {
+		return nil, fmt.Errorf("--app opens Codex CLI sessions in the ChatGPT app; %s is a %s session", digest.Short(s.ID), agentName(s.Harness))
+	}
+	if strings.HasPrefix(s.Project, "imported:") {
+		return nil, fmt.Errorf("session %s was synced from another machine — open it there", digest.Short(s.ID))
+	}
+	if !resumeIDPattern.MatchString(s.ID) {
+		return nil, fmt.Errorf("session id %q contains characters deja will not place in a command", digest.Short(s.ID))
+	}
+	url := "codex://threads/" + s.ID
+	switch goos {
+	case "darwin":
+		return []string{"open", url}, nil
+	case "windows":
+		return []string{"cmd", "/c", "start", "", url}, nil
+	}
+	return nil, fmt.Errorf("the ChatGPT app runs on macOS and Windows — `deja resume %s` prints the codex command instead", s.ID)
 }
 
 // resumeWord puts a path on a resume command as one word. Anything outside

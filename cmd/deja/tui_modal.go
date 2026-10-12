@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -137,6 +138,12 @@ func (a *tuiApp) modalEnter() {
 func (a *tuiApp) continueIn(t continueTarget) {
 	s := a.m.src
 	a.modal = modalNone
+	if t.id == chatgptApp {
+		a.after = func() error { return openInCodexApp(s, runtime.GOOS) }
+		a.leaving = "Opening in the ChatGPT app…"
+		a.quit = true
+		return
+	}
 	a.rememberContinued(t.id)
 	if t.paste || !t.installed {
 		a.copySession(s, "paste it into "+agentName(t.id))

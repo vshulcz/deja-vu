@@ -25,6 +25,9 @@ var agentNames = map[string]string{
 // agentName is the short form for a chip or a card: the parenthesised gloss
 // some registry names carry is dropped.
 func agentName(h string) string {
+	if h == chatgptApp {
+		return "ChatGPT app"
+	}
 	n, ok := agentNames[h]
 	if !ok {
 		return h
@@ -43,6 +46,11 @@ type continueTarget struct {
 	recent    bool // continued into from this screen before
 	more      int  // on the folded line: how many agents it stands for
 }
+
+// chatgptApp is the picker's entry for a Codex session: the ChatGPT desktop
+// app opens a CLI session by its id, so it reopens the session itself rather
+// than handing its context on (#4907).
+const chatgptApp = "chatgpt-app"
 
 // continueTargets lists every agent a session can be handed to: the ones whose
 // command is on PATH first, the ones the reader uses most leading, then the

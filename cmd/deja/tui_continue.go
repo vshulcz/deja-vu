@@ -2,10 +2,12 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
+	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
@@ -57,8 +59,16 @@ func (a *tuiApp) openContinue() {
 	for _, ac := range a.agentsAll {
 		used[ac.h] = ac.n
 	}
-	a.m.targets = withRecent(continueTargets(nil, used), a.continued)
+	a.m.targets = withApp(withRecent(continueTargets(nil, used), a.continued), s, runtime.GOOS)
 	a.want(s)
+}
+
+// withApp puts the ChatGPT app first for a Codex session it can open.
+func withApp(ts []continueTarget, s model.Session, goos string) []continueTarget {
+	if _, err := codexAppCommand(s, goos); err != nil {
+		return ts
+	}
+	return append([]continueTarget{{id: chatgptApp, installed: true}}, ts...)
 }
 
 // withRecent moves the agents continued into before to the front, newest
@@ -250,6 +260,8 @@ func (a *tuiApp) drawContinue() {
 		t := ts[a.m.sel]
 		label = "Open in " + agentName(t.id)
 		switch {
+		case t.id == chatgptApp:
+			note = "Reopens this session itself, not a copy of its context."
 		case t.more > 0:
 			label = "Show them"
 			note = "They get the context on the clipboard; typing a name finds them."

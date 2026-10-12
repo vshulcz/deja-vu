@@ -3100,6 +3100,7 @@ var flagsOfOtherCommands = map[string]string{
 	"--to":               "handoff",
 	"--exec":             "resume",
 	"--write-back":       "resume",
+	"--app":              "resume",
 	"--plain":            "hook-prompt",
 	"--crush":            "hook-tool",
 	"--junie":            "hook-prompt",
