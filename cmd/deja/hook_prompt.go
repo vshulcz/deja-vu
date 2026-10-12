@@ -377,6 +377,12 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 			if !pol.Allows(policy.ActivationAuto, s.Project) {
 				continue
 			}
+			// A scheduled job's run is searchable, not offered unasked: its
+			// prompt is the same every fire, and what it carries in the user
+			// role is often someone else's text (#4948).
+			if s.Kind == "cron" {
+				continue
+			}
 			// matched counts informative terms; strong counts the rare ones — a
 			// term that identifies something on its own rather than merely beating
 			// the corpus average. Two informative terms earn the announcement. A
