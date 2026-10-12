@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-10-12
+
+Reading a session back now shows the code it changed, each edit as the lines
+it removed and added, for Claude Code, Codex and every harness whose
+transcript holds its edit calls. A Codex session opens in the ChatGPT desktop
+app with `deja resume <id> --app`, and the screen gets find in a session,
+filters in the box and cards that lead with the question. Session start takes
+0.38 s instead of 1.46 s and the per-prompt hook 0.59 s instead of 1.65 s on a
+19k-session index, and an opencode 2.x store no longer stalls a new session's
+first request. Secrets that slipped past redaction are masked, and the index
+holds up under crashes and concurrent use. The index version is now 70, so the
+store rebuilds once on the first run after upgrading.
+
 ### Added
 
 - Reading a session back shows the code it changed, each edit as the lines it removed and added. MCP `recall_context` and the session resource put it ahead of the conversation, `deja ctx` after the digest. Drafts the session rewrote are folded into their final form, the project's code comes before its tests, and the agent's reproduction scripts and notes are left out. On 48 SWE-ContextBench tasks the session that fixed the same code used to arrive with none of its fix; now 14 show most of it. Read from the transcript when asked, so the index stays the same size and keeps the written side as hashes. Claude Code, Codex and any harness whose transcript holds its edit calls as JSON, one session per file (#4935, #4950, #4955).
