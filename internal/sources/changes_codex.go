@@ -92,8 +92,9 @@ func codexCallFailed(out any) bool {
 			text = string(b)
 		}
 	}
-	if i := strings.Index(text, "Exit code: "); i >= 0 {
-		rest := text[i+len("Exit code: "):]
+	// The header opens the output; the same words further down are the
+	// command's own output, a patch line among them.
+	if rest, ok := strings.CutPrefix(strings.TrimSpace(text), "Exit code: "); ok {
 		if j := strings.IndexAny(rest, "\n\r"); j >= 0 {
 			rest = rest[:j]
 		}

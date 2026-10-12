@@ -65,10 +65,12 @@ func TestChangesLeaveOutEditsThatFailed(t *testing.T) {
 		rec("response_item", map[string]any{"type": "custom_tool_call_output", "call_id": "c1", "output": "Exit code: 1\nWall time: 0.1 seconds\nOutput:\napply_patch verification failed: Failed to find expected lines"}),
 		rec("response_item", map[string]any{"type": "custom_tool_call", "call_id": "c2", "name": "apply_patch", "input": patch("good.go", "b")}),
 		rec("response_item", map[string]any{"type": "custom_tool_call_output", "call_id": "c2", "output": "Exit code: 0\nWall time: 0.1 seconds\nOutput:\nSuccess. Updated the following files:\nM good.go\n"}),
+		rec("response_item", map[string]any{"type": "custom_tool_call", "call_id": "c4", "name": "apply_patch", "input": patch("echo.go", "d")}),
+		rec("response_item", map[string]any{"type": "custom_tool_call_output", "call_id": "c4", "output": "Success. Updated the following files:\nM echo.go\n+echo \"Exit code: 1\"\n"}),
 		rec("response_item", map[string]any{"type": "function_call", "call_id": "c3", "name": "shell", "arguments": string(shellArgs)}),
 		rec("response_item", map[string]any{"type": "function_call_output", "call_id": "c3", "output": `{"output":"error: patch failed","metadata":{"exit_code":1}}`}),
 	)
-	if got := paths(Changes(model.Session{Harness: "codex", ID: "s", Path: codex})); got != "good.go:b" {
+	if got := paths(Changes(model.Session{Harness: "codex", ID: "s", Path: codex})); got != "good.go:b echo.go:d" {
 		t.Errorf("codex: %q", got)
 	}
 }
