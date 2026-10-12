@@ -3,6 +3,7 @@ package sources
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -12,7 +13,7 @@ import (
 // the patch is taken from whichever string field of the call carries it.
 func codexChanges(file string) []Change {
 	var out []Change
-	cwd := ""
+	cwd, metaSeen := "", false
 	_ = scanJSONLBytes(file, 0, func(line []byte) {
 		var v struct {
 			Type    string          `json:"type"`
@@ -23,6 +24,14 @@ func codexChanges(file string) []Change {
 		}
 		switch v.Type {
 		case "session_meta", "turn_context":
+			// A fork copies the history it branched from, its parent's
+			// session_meta included; the file's own is the first (#3933).
+			if v.Type == "session_meta" {
+				if metaSeen {
+					return
+				}
+				metaSeen = true
+			}
 			var p struct {
 				Cwd string `json:"cwd"`
 			}
@@ -74,16 +83,31 @@ func patchTexts(v any, depth int) []string {
 				return patchTexts(inner, depth+1)
 			}
 		}
-		if i := strings.Index(t, "*** Begin Patch"); i >= 0 {
-			body := t[i:]
-			if j := strings.Index(body, "*** End Patch"); j >= 0 {
-				body = body[:j]
+		for {
+			i := strings.Index(t, "*** Begin Patch")
+			if i < 0 {
+				break
 			}
-			return []string{body}
+			body := t[i+len("*** Begin Patch"):]
+			j := strings.Index(body, "*** Begin Patch")
+			if k := strings.Index(body, "*** End Patch"); k >= 0 && (j < 0 || k < j) {
+				j = k
+			}
+			if j < 0 {
+				out = append(out, body)
+				break
+			}
+			out = append(out, body[:j])
+			t = body[j:]
 		}
 	case map[string]any:
-		for _, x := range t {
-			out = append(out, patchTexts(x, depth+1)...)
+		keys := make([]string, 0, len(t))
+		for k := range t {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			out = append(out, patchTexts(t[k], depth+1)...)
 		}
 	case []any:
 		for _, x := range t {

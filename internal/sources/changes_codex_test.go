@@ -65,3 +65,29 @@ func TestChangesReadsACodexSessionsPatches(t *testing.T) {
 		t.Fatalf("got\n%s\nwant\n%s", strings.Join(got, "\n--\n"), strings.Join(want, "\n--\n"))
 	}
 }
+
+// Two patches in one string are both read, and a fork's inherited
+// session_meta does not move the directory its paths are read against.
+func TestChangesReadsEveryCodexPatchAgainstTheFilesOwnDirectory(t *testing.T) {
+	rec := func(typ string, payload any) string {
+		b, _ := json.Marshal(map[string]any{"type": typ, "payload": payload})
+		return string(b)
+	}
+	two := "*** Begin Patch\n*** Update File: /w/child/a.go\n@@\n-1\n+2\n*** End Patch\n*** Begin Patch\n*** Update File: b.go\n@@\n-3\n+4\n*** End Patch\n"
+	lines := []string{
+		rec("session_meta", map[string]any{"id": "child", "cwd": "/w/child", "forked_from_id": "parent"}),
+		rec("session_meta", map[string]any{"id": "parent", "cwd": "/w/parent"}),
+		rec("response_item", map[string]any{"type": "custom_tool_call", "name": "apply_patch", "input": two}),
+	}
+	path := filepath.Join(t.TempDir(), "rollout.jsonl")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, c := range Changes(model.Session{Harness: "codex", ID: "child", Path: path}) {
+		got = append(got, c.Path+":"+c.New)
+	}
+	if strings.Join(got, " ") != "a.go:2 b.go:4" {
+		t.Fatalf("got %v", got)
+	}
+}
