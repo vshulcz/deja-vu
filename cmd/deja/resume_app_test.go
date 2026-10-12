@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"strings"
 	"testing"
 
@@ -32,6 +33,17 @@ func TestResumeAppOpensACodexSessionInTheChatGPTApp(t *testing.T) {
 	} {
 		if argv, err := codexAppCommand(s, "darwin"); err == nil {
 			t.Errorf("%s opened as %q", name, argv)
+		}
+	}
+}
+
+// --app opens the session itself, so a flag that runs or restores a command
+// alongside it is refused rather than dropped.
+func TestResumeAppRefusesExecAndWriteBack(t *testing.T) {
+	for _, extra := range []string{"--exec", "--write-back"} {
+		err := runResume(t.TempDir(), []string{"019a2b3c", "--app", extra}, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "neither --exec nor --write-back") {
+			t.Errorf("--app %s: %v", extra, err)
 		}
 	}
 }

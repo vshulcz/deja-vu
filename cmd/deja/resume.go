@@ -52,6 +52,9 @@ func runResume(dir string, args []string, stdout io.Writer) error {
 	if prefix == "" {
 		return idPrefixNeeded(dir, "resume needs an id prefix", "resume needs an id prefix (see `deja last`)")
 	}
+	if app && (doExec || writeBack) {
+		return fmt.Errorf("resume: --app opens the session in the ChatGPT app, so it takes neither --exec nor --write-back")
+	}
 	s, ok, err := findByPrefix(dir, prefix)
 	if pickedOnScreen == nil || pickedOnScreen.ID != prefix {
 		noteAmbiguousPrefix(dir, prefix, "resuming")
