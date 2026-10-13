@@ -71,7 +71,8 @@ They sit in a small panel above the input until the next prompt, or until you
 close it. The model gets exactly what it got before; these lines never reach
 it. tui, headless and sdk profiles have no page, so nothing changes there:
 the notes still come with the reply to `/deja`. A line that waits more than
-ten minutes for the page is dropped.
+ten minutes for the page is dropped. `deja install dsh-auto` writes the same
+panel from these files; with both installed you get one panel.
 
 ```yaml
 - insert:

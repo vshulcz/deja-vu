@@ -32,7 +32,7 @@ func dshStatusPath() string { return filepath.Join(dshStatusDir(), "index.js") }
 // dshStatusRow names the status plugin only when it is on disk, the same rule
 // as the auto-recall row.
 func dshStatusRow(withAuto bool) string {
-	if !withAuto {
+	if !withAuto || !dshPackageIsOurs(dshStatusDir()) {
 		return ""
 	}
 	return "    - id: deja-status\n" +

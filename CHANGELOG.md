@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt. tui, headless and sdk profiles have no page, so there the plugin still asks deja for plain text and leaves the notes for `/deja` and the next session to show (#4982).
 - Hermes shows the person deja's lines too, with deja as the memory provider: the receipt and the session-start notes ride Hermes's own recall line, `🧠 deja · …`, in the CLI, where it used to say only "recalled 1 memory". Same one deja call per hook, and the model's text is unchanged. Hermes 0.17 has no such line, `hermes -z` and `hermes chat -Q` print none, the TUI and desktop do not keep it on screen and a gateway chat may be a group, so there deja is still asked for plain text and keeps its notes.
+- A dsh profile wired by `deja install dsh-auto` shows the same panel, from the same files the npm plugin ships. With both installed there is still one panel and one recall (#4983).
 
 ### Fixed
 
+- `deja uninstall dsh-auto` works: the alias was refused on the way out, and an install under it was never recorded, so the directories it made stayed behind after an uninstall (#4983).
 - On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 
 - The semantic sidecar survives a rewrite of the index: each vector carries its record's identity, so search keeps using it and the next `deja embed` sends only new or changed records. Before, any pass that rewrote `records.bin` (a torn last line, a removed file) made search refuse the sidecar and the next run embed the whole store again, about 45 minutes on 112k records. A sidecar written before this is rekeyed on the next `deja embed` while the index still has its layout. Proposed by @AlexanderAbramovPav (#4976).
