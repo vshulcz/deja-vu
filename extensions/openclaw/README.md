@@ -64,10 +64,14 @@ only when all of these hold, and anything missing or unknown means no line:
   `direct`;
 - the sender is you: `commands.ownerAllowFrom`, or the channel's `allowFrom`
   when it lists exactly one id;
+- the channel sends replies whole: its streaming is set off, with no block
+  streaming turned on, e.g. `channels.telegram.streaming.mode: "off"`.
+  Telegram's default preview streaming sends a reply in chunks with no final
+  message to carry the line, so there deja is not even asked for it and the
+  receipt stays unspent;
 - the reply is the final text reply of that same run, to that same
-  conversation. A reply sent as stream chunks (Telegram's default preview
-  streaming, for one), a media or voice reply, or a run that ends without a
-  reply gets nothing, and the next message drops it.
+  conversation. A media or voice reply, or a run that ends without a reply,
+  gets nothing, and the next message drops it.
 
 No other deja note is ever sent to a channel: those still come with `/deja`.
 `"receipt": false` in the plugin config turns the line off.

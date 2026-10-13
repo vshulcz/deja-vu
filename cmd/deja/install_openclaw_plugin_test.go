@@ -224,7 +224,8 @@ func TestOpenClawPluginUsesThePhaseHooks(t *testing.T) {
 // context block. Everything else stays --plain and leaves the reply alone: a
 // group, a group whose channel says isGroup false, the TUI, receipt:false, a
 // stranger's DM after an owner turn that never replied (every DM shares
-// agent:main:main), and a block-stream chunk.
+// agent:main:main), a block-stream chunk, and a DM on a channel that streams
+// its replies, where deja is not asked for a receipt that could not show.
 func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the stub deja is a shell script")
@@ -252,7 +253,7 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	driver := `
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 const calls = process.env.DEJA_CALLS;
-const owner = { channels: { telegram: { allowFrom: ["4242"] }, googlechat: { allowFrom: ["4242"] } } };
+const owner = { channels: { telegram: { allowFrom: ["4242"], streaming: { mode: "off" } }, googlechat: { allowFrom: ["4242"], streaming: "off" } } };
 // Each case is a run of turns on one fresh plugin; the last turn's reply is judged.
 const cases = {
   dm: [{}],
@@ -262,6 +263,7 @@ const cases = {
   off: [{ config: { receipt: false } }],
   stranger: [{ kinds: [] }, { sender: "7", prompt: "zorbit, hi" }],
   block: [{ kinds: ["block"] }],
+  streaming: [{ host: { channels: { telegram: { allowFrom: ["4242"] } } }, kinds: ["block"] }],
 };
 const out = {};
 let run = 0;
@@ -269,7 +271,7 @@ for (const [name, turns] of Object.entries(cases)) {
   writeFileSync(calls, "");
   const { default: plugin } = await import("` + plugin + `?" + name);
   const hooks = {};
-  plugin.register({ on: (n, fn) => { hooks[n] = fn }, pluginConfig: turns[0].config || {}, config: owner });
+  plugin.register({ on: (n, fn) => { hooks[n] = fn }, pluginConfig: turns[0].config || {}, config: turns[0].host || owner });
   let last;
   for (const t of turns) {
     const key = t.key || "agent:main:main", channel = t.channel || "telegram", sender = t.sender || "4242";
@@ -336,7 +338,7 @@ console.log(JSON.stringify(out));
 	if dm.Calls != "hook-prompt\n" {
 		t.Errorf("want one JSON hook-prompt spawn in the DM, got %q", dm.Calls)
 	}
-	for _, name := range []string{"group", "unnamedGroup", "tui", "off"} {
+	for _, name := range []string{"group", "unnamedGroup", "tui", "off", "streaming"} {
 		if got[name].Sent != nil {
 			t.Errorf("%s: the reply was changed:\n%s", name, raw)
 		}
@@ -361,7 +363,7 @@ func TestOpenClawPluginSharesTheReceiptRules(t *testing.T) {
 	}
 	js := openclawPluginJS("/bin/deja")
 	for _, name := range []string{"splitHookReply", "deliversNotes", "ownerSender", "directSessionKey", "conversationOf",
-		"directTurn", "receiptAllowed", "replyTakes", "escapeMarkdown", "receiptLine", "withReceipt"} {
+		"directTurn", "wholeReplies", "receiptAllowed", "replyTakes", "escapeMarkdown", "receiptLine", "withReceipt"} {
 		src := string(lib)
 		i := strings.Index(src, "export function "+name+"(")
 		if i < 0 {

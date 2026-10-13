@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
+  wholeReplies,
   conversationOf,
   deliversNotes,
   directSessionKey,
@@ -21,7 +22,7 @@ import {
 const RECEIPT = 'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via: zorbit, queue, decide)'
 const LINE = '↺ you\'ve been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja'
 const CONTEXT = "<deja-recall>\ndrain with --grace 40\n</deja-recall>"
-const OWNER = { channels: { telegram: { allowFrom: ["4242"] } } }
+const OWNER = { channels: { telegram: { allowFrom: ["4242"], streaming: { mode: "off" } } } }
 
 test("the JSON reply splits into the model's text and the person's line", () => {
   const reply = JSON.stringify({ systemMessage: RECEIPT, hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: CONTEXT } })
@@ -223,7 +224,7 @@ test("a group chat, someone else's DM, the TUI and receipt:false keep --plain an
 
 // Blocker 2: a channel that reports isGroup false for a group it cannot name.
 test("a group whose channel says isGroup false still gets nothing", async () => {
-  const p = await plugin({ hostConfig: { channels: { googlechat: { allowFrom: ["4242"] } } } })
+  const p = await plugin({ hostConfig: { channels: { googlechat: { allowFrom: ["4242"], streaming: "off" } } } })
   const { sent } = await p.turn({ key: "agent:main:googlechat:group:spaces-a", channel: "googlechat", conversation: "spaces-a", isGroup: false })
   assert.equal(sent[0], undefined)
   assert.deepEqual(promptCalls(p.calls()), ["hook-prompt --plain"])
@@ -232,7 +233,7 @@ test("a group whose channel says isGroup false still gets nothing", async () => 
 // Blocker 1: every DM shares agent:main:main by default. The owner's turn ends
 // without a reply, and the next message in the session is a stranger's.
 test("a receipt left by an owner turn with no reply never reaches a stranger's DM", async () => {
-  const p = await plugin({ hostConfig: { channels: { telegram: { allowFrom: ["4242"] } } } })
+  const p = await plugin()
   await p.turn({ kinds: [] })
   const { sent } = await p.turn({ sender: "7", prompt: "hi there, zorbit?" })
   assert.equal(sent[0], undefined)
@@ -269,4 +270,30 @@ test("the session-start digest stays --plain on a channel, so its notes are not 
   const p = await plugin()
   await p.turn()
   assert.doesNotMatch(p.calls(), /^hook-context$/m)
+})
+
+test("only a channel set to send replies whole counts as whole; anything else is streaming", () => {
+  assert.equal(wholeReplies(OWNER, "telegram"), true)
+  assert.equal(wholeReplies({ channels: { telegram: { streaming: "off" } } }, "telegram"), true)
+  const streaming = [
+    {},
+    { channels: { telegram: {} } },
+    { channels: { telegram: { streaming: { mode: "partial" } } } },
+    { channels: { telegram: { streaming: { mode: "off", block: { enabled: true } } } } },
+    { channels: { telegram: { streaming: "off", accounts: { work: { streaming: "partial" } } } } },
+    { channels: { telegram: { streaming: "off" } }, agents: { defaults: { blockStreamingDefault: "on" } } },
+  ]
+  for (const cfg of streaming) assert.equal(wholeReplies(cfg, "telegram"), false, JSON.stringify(cfg))
+})
+
+// deja marks a receipt shown when it prints it. Where the reply streams there
+// is no final reply to carry it, so it must not be asked for.
+test("a DM on a streaming channel makes no JSON call", async () => {
+  for (const telegram of [{ allowFrom: ["4242"] }, { allowFrom: ["4242"], streaming: { mode: "partial" } }]) {
+    const p = await plugin({ hostConfig: { channels: { telegram } } })
+    const { built, sent } = await p.turn({ kinds: ["block"] })
+    assert.equal(built.prependContext, CONTEXT)
+    assert.equal(sent[0], undefined)
+    assert.deepEqual(promptCalls(p.calls()), ["hook-prompt --plain"], JSON.stringify(telegram))
+  }
 })

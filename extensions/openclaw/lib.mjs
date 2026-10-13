@@ -246,6 +246,25 @@ export function directTurn(event, ctx) {
   return { key, direct, channel, conversation, sender: String(e.senderId ?? c.senderId ?? "").trim() }
 }
 
+// wholeReplies says whether a channel is known to send a reply whole, as one
+// final message. A channel that streams it (Telegram's default preview
+// streaming, block streaming) sends it in chunks and never a final reply the
+// receipt could ride on, and deja marks a receipt shown when it prints it, so
+// there it is not asked for. Only streaming set off, with no block streaming
+// turned on for the channel, an account or by default, counts; anything else
+// is taken for streaming.
+export function wholeReplies(config, channel) {
+  const ch = String(channel || "").trim().toLowerCase()
+  const section = config && config.channels && config.channels[ch]
+  if (!ch || !section) return false
+  const off = (s) => s === "off" || s === false || (s && typeof s === "object" && s.mode === "off" && !(s.block && s.block.enabled === true))
+  if (!off(section.streaming)) return false
+  const accounts = section.accounts && typeof section.accounts === "object" ? Object.values(section.accounts) : []
+  if (accounts.some((a) => a && a.streaming !== undefined && !off(a.streaming))) return false
+  const defaults = config.agents && config.agents.defaults
+  return !(defaults && defaults.blockStreamingDefault === "on")
+}
+
 // receiptAllowed is the whole rule for asking deja for the receipt on this
 // turn: a 1:1 turn heard by before_dispatch, on a channel that delivers its
 // reply, from the owner, in the same session, with a run id to tie the reply
@@ -257,6 +276,7 @@ export function receiptAllowed(turn, ctx, channel, config) {
   if (!c.sessionKey || turn.key !== c.sessionKey || !directSessionKey(c.sessionKey)) return false
   if (c.chatType !== undefined && c.chatType !== "direct") return false
   if (!c.runId || !turn.sender || String(c.senderId ?? "").trim() !== turn.sender) return false
+  if (!wholeReplies(config, channel)) return false
   return ownerSender(config, channel, turn.sender)
 }
 

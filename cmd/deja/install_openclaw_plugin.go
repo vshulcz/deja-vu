@@ -540,6 +540,17 @@ function directTurn(event, ctx) {
     conversation !== ""
   return { key, direct, channel, conversation, sender: String(e.senderId ?? c.senderId ?? "").trim() }
 }
+function wholeReplies(config, channel) {
+  const ch = String(channel || "").trim().toLowerCase()
+  const section = config && config.channels && config.channels[ch]
+  if (!ch || !section) return false
+  const off = (s) => s === "off" || s === false || (s && typeof s === "object" && s.mode === "off" && !(s.block && s.block.enabled === true))
+  if (!off(section.streaming)) return false
+  const accounts = section.accounts && typeof section.accounts === "object" ? Object.values(section.accounts) : []
+  if (accounts.some((a) => a && a.streaming !== undefined && !off(a.streaming))) return false
+  const defaults = config.agents && config.agents.defaults
+  return !(defaults && defaults.blockStreamingDefault === "on")
+}
 function receiptAllowed(turn, ctx, channel, config) {
   const c = ctx || {}
   if (!turn || !turn.direct) return false
@@ -547,6 +558,7 @@ function receiptAllowed(turn, ctx, channel, config) {
   if (!c.sessionKey || turn.key !== c.sessionKey || !directSessionKey(c.sessionKey)) return false
   if (c.chatType !== undefined && c.chatType !== "direct") return false
   if (!c.runId || !turn.sender || String(c.senderId ?? "").trim() !== turn.sender) return false
+  if (!wholeReplies(config, channel)) return false
   return ownerSender(config, channel, turn.sender)
 }
 function replyTakes(held, event, ctx) {
