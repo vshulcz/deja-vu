@@ -47,7 +47,7 @@ func RecordIdent(r index.Record) uint64 {
 		for i := 0; i < len(s); i++ {
 			h = (h ^ uint64(s[i])) * prime
 		}
-		h = (h ^ 0) * prime
+		h *= prime
 	}
 	num := func(n uint64) {
 		for i := 0; i < 8; i++ {
