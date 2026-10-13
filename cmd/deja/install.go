@@ -5096,6 +5096,11 @@ func withAutoTargets(targets []string) []string {
 	out := make([]string, 0, len(targets)*2)
 	seen := map[string]bool{}
 	for _, t := range targets {
+		// `deja install dsh-auto` works, so `deja uninstall dsh-auto` has to:
+		// an alias missed the name list here and the run was refused.
+		if canonical, ok := installTargetAliases[t]; ok {
+			t = canonical
+		}
 		base := strings.TrimSuffix(t, "-auto")
 		if alias, ok := autoName[base]; ok {
 			for _, candidate := range []string{base, alias} {

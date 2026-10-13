@@ -31,7 +31,7 @@ func TestDeepSeekAutoOpensWithTheProjectDigest(t *testing.T) {
 	if !strings.Contains(s, `name: "deja:project"`) {
 		t.Errorf("no project-digest context is registered:\n%s", s)
 	}
-	if !strings.Contains(s, `"hook-context", "--plain"`) {
+	if !strings.Contains(s, `askHook("hook-context"`) {
 		t.Errorf("the digest never asks deja for the project's history:\n%s", s)
 	}
 	if !strings.Contains(s, "deja_once: true") {

@@ -197,6 +197,12 @@ func recordWiring(targets []string, uninstall bool) {
 		have[t] = true
 	}
 	for _, t := range targets {
+		// Under its own name: `deja install dsh-auto` was dropped as unknown
+		// below, so nothing was recorded and the directories it made were
+		// left behind by the uninstall.
+		if canonical, ok := installTargetAliases[t]; ok {
+			t = canonical
+		}
 		have[t] = !uninstall
 	}
 	known := map[string]bool{}

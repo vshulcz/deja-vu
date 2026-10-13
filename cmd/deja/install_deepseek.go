@@ -121,6 +121,22 @@ import { randomUUID } from "node:crypto";
 
 const DEJA = %q;
 
+// The person's half. dsh shows nobody what a plugin hands the model, so deja's
+// own lines — the receipt, the build and week notes — wait on a board and the
+// card in deja-notes/client.js asks for them under the composer. lib.js is the
+// npm plugin's, written beside this file; without it every hook stays --plain.
+// It loads without a top-level await: one here held this module's evaluation
+// back, and dsh then registered deja's contexts after its own file policy
+// rather than ahead of it, moving the recall within the runtime context.
+let notes = null;
+const notesReady = import("./lib.js")
+  .then((lib) => {
+    if (typeof lib.noteBoard === "function" && typeof lib.splitHookReply === "function") {
+      notes = { board: lib.noteBoard(), split: lib.splitHookReply };
+    }
+  })
+  .catch(() => {});
+
 // Memory is optional: a plugin that throws in an assembly ends the turn, so
 // every call deja makes is swallowed to "".
 function ask(args, payload) {
@@ -158,10 +174,22 @@ function askAsync(args, payload) {
   });
 }
 
+// askHook runs a hook once for both readers. Where a page shows the person's
+// lines, deja is asked for its JSON reply: additionalContext, the text --plain
+// prints, goes to the model and systemMessage waits on the board. Anywhere else
+// — tui, headless, sdk — it stays --plain: deja marks a note shown when it
+// prints it, so asking for notes nobody will read spends them.
+function askHook(hook, payload) {
+  if (!notes || !notes.board.hasReader()) return ask([hook, "--plain"], payload);
+  const reply = notes.split(ask([hook], payload));
+  notes.board.push(payload.session_id, reply.notes);
+  return reply.context;
+}
+
 // The session goes with the prompt: a compaction's recovery packet is kept
 // for this session, and only a prompt that names it gets the packet back.
 function recall(prompt, cwd, sid) {
-  return ask(["hook-prompt", "--plain"], { prompt, cwd, session_id: sid });
+  return askHook("hook-prompt", { prompt, cwd, session_id: sid });
 }
 
 // dsh names a session "session-<uuid>" and its log's folder the same; deja
@@ -236,7 +264,7 @@ function projectDigest(agent, seen) {
   const sid = sessionId(agent);
   if (sid && seen.has(sid)) return "";
   if (sid) seen.add(sid);
-  return ask(["hook-context", "--plain"], {
+  return askHook("hook-context", {
     session_id: sid,
     cwd: sessionCwd(agent),
     source: "startup",
@@ -352,6 +380,7 @@ function apply(ctx) {
       },
     });
   } catch {}
+  notesRoute(ctx);
 
   // The point of action. tools/post-execute runs on every tool result, and an
   // accept decision's additionalContexts reach the model on the next step: a
@@ -399,6 +428,39 @@ function apply(ctx) {
         return decision;
       }
     });
+  } catch {}
+}
+
+// The route rides dsh's own /api mount, which applies the same Host/Origin
+// fence and browser login as every other call the page makes. Only a profile
+// that serves the page — the connection service and a web server both —
+// registers it, and only then are the hooks asked for the person's lines. A
+// second copy of the route, the npm plugin's, finds the path taken and this one
+// stands down.
+function notesRoute(ctx) {
+  if (typeof ctx.inject !== "function") return;
+  try {
+    ctx.inject(["connection", "webServer"], (c) =>
+      notesReady.then(() => {
+        if (!notes) return;
+        const board = notes.board;
+        try {
+          c.connection.fetch.register({
+            path: "/api/deja-notes",
+            methods: ["GET"],
+            requestBody: "buffered",
+            fetch: async (request) => {
+              let sid = "";
+              try {
+                sid = bareSessionId(new URL(request.url).searchParams.get("session"));
+              } catch {}
+              return Response.json({ notes: sid ? board.take(sid) : [] }, { headers: { "cache-control": "no-store" } });
+            },
+          });
+          board.setReader();
+        } catch {}
+      }),
+    );
   } catch {}
 }
 
@@ -500,6 +562,7 @@ func dshPatchBlock(exe string, withAuto bool) string {
 		"      name: " + yamlQuote(dshCommandPath()) + "\n" +
 		autoRow(withAuto) +
 		dshStatusRow(withAuto) +
+		dshNotesRow(withAuto) +
 		dshBlockEnd
 }
 
@@ -669,6 +732,9 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 		if err := os.RemoveAll(dshStatusDir()); err != nil {
 			return installResult{}, err
 		}
+		if err := os.RemoveAll(dshNotesDir()); err != nil {
+			return installResult{}, err
+		}
 		// And the plugins directory above it, when deja made it (#3698).
 		pruneCreatedDir(filepath.Dir(filepath.Dir(dshCommandPath())))
 		return installResult{Path: path, Action: a}, nil
@@ -726,7 +792,7 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	if pkgAction != "unchanged" {
 		cmdAction = pkgAction
 	}
-	var status installResult
+	var status, notes installResult
 	if withAuto {
 		autoPath := dshAutoPath()
 		oldAuto, err := readConfig(autoPath)
@@ -745,11 +811,19 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 			return installResult{}, serr
 		}
 		status = installResult{Path: dshStatusDir(), Action: statusAction}
+		notesAction, nerr := writeDSHNotes()
+		if nerr != nil {
+			return installResult{}, nerr
+		}
+		notes = installResult{Path: dshNotesDir(), Action: notesAction}
 	} else {
 		if err := os.Remove(dshAutoPath()); err != nil && !os.IsNotExist(err) {
 			return installResult{}, err
 		}
 		if err := os.RemoveAll(dshStatusDir()); err != nil {
+			return installResult{}, err
+		}
+		if err := removeDSHNotes(); err != nil {
 			return installResult{}, err
 		}
 	}
@@ -763,6 +837,9 @@ func installDeepSeek(exe string, uninstall, withAuto bool) (installResult, error
 	results := []installResult{{Path: path, Action: a, Note: note}, plugins}
 	if status.Path != "" {
 		results = append(results, status)
+	}
+	if notes.Path != "" {
+		results = append(results, notes)
 	}
 	return wroteAll(results...), nil
 }
