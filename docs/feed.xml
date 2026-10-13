@@ -18,6 +18,13 @@
     <summary>How to give dsh recall over the sessions every coding agent on the machine already wrote — the plugin, the tools, and how it behaves beside the CLI install.</summary>
   </entry>
   <entry>
+    <title>Add memory to Hermes: every agent&#39;s sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"></link>
+    <updated>2026-10-13T00:00:00Z</updated>
+    <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
+  </entry>
+  <entry>
     <title>deja-vu — the one memory your coding agents share</title>
     <id>https://vshulcz.github.io/deja-vu/</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/"></link>
@@ -149,13 +156,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-cline.html"></link>
     <updated>2026-10-12T00:00:00Z</updated>
     <summary>Cline&#39;s hook files cannot carry context, so deja comes as a plugin: a rule resolved as instructions are built, a message builder, runtime hooks and /deja.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to Hermes: every agent&#39;s sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-hermes.html"></link>
-    <updated>2026-10-12T00:00:00Z</updated>
-    <summary>Hermes searches its own sessions and keeps MEMORY.md. deja adds the other forty agents: a plugin on pre_llm_call, the MCP tools, and a skill.</summary>
   </entry>
   <entry>
     <title>Add memory to opencode: every agent&#39;s sessions — deja-vu</title>
