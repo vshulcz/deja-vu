@@ -258,11 +258,31 @@ function isHuman(message) {
   return Boolean(message) && (!message.source || message.source.kind === "user");
 }
 
+// The log newest first. 0.1.x exposes it as session.events; 0.2.0 made the
+// array private and reads one event with eventAt(seq), seq being the next free
+// position, and reading events alone found no prompt there at all.
+function eventAtFrom(session) {
+  if (!session) return null;
+  if (Array.isArray(session.events)) return { top: session.events.length, at: (i) => session.events[i] };
+  if (typeof session.eventAt !== "function") return null;
+  const top = Number(session.seq);
+  if (!Number.isSafeInteger(top)) return null;
+  return { top, at: (i) => session.eventAt(i) };
+}
+
 function lastHumanText(agent) {
-  const events = agent && agent.session && agent.session.events;
-  if (!Array.isArray(events)) return "";
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
+  let log = null;
+  try {
+    log = eventAtFrom(agent && agent.session);
+  } catch {}
+  if (!log) return "";
+  for (let i = log.top - 1; i >= 0; i--) {
+    let event;
+    try {
+      event = log.at(i);
+    } catch {
+      return "";
+    }
     if (!event) continue;
     if (event.type === "user/message" && isHuman(event.data)) return userText(event.data);
     if (event.type === "agent/inbox/spliced") {

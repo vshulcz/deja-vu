@@ -80,3 +80,83 @@ export function contributions(wiring, config) {
     recall: settings.autoRecall !== false && !wired.auto,
   };
 }
+
+// newestEvents walks a dsh session's log from the end, whichever shape the
+// host gives it. 0.1.x exposes the log as session.events; 0.2.0 made the array
+// private and reads one event at a time with eventAt(seq), seq being the next
+// free position. Reading only session.events found nothing on 0.2.0, so the
+// per-prompt recall never ran there.
+export function* newestEvents(session) {
+  if (!session) return;
+  if (Array.isArray(session.events)) {
+    for (let i = session.events.length - 1; i >= 0; i--) yield session.events[i];
+    return;
+  }
+  if (typeof session.eventAt !== "function") return;
+  let top;
+  try {
+    top = Number(session.seq);
+  } catch {
+    return;
+  }
+  if (!Number.isSafeInteger(top)) return;
+  for (let i = top - 1; i >= 0; i--) {
+    let event;
+    try {
+      event = session.eventAt(i);
+    } catch {
+      return;
+    }
+    yield event;
+  }
+}
+
+// splitHookReply reads what `deja hook-prompt` or `deja hook-context` printed
+// in its JSON form and splits it by reader: additionalContext is for the model,
+// the same text --plain prints, and systemMessage is the line Claude Code
+// shows the person. One spawn answers both. Output that is not the JSON
+// envelope is all context, so a deja that printed plain text still reaches the
+// model.
+export function splitHookReply(stdout) {
+  const text = String(stdout || "").trim();
+  if (!text) return { context: "", notes: "" };
+  if (!text.startsWith("{")) return { context: text, notes: "" };
+  let reply;
+  try {
+    reply = JSON.parse(text);
+  } catch {
+    return { context: text, notes: "" };
+  }
+  if (!reply || typeof reply !== "object") return { context: "", notes: "" };
+  const out = reply.hookSpecificOutput;
+  const context = out && typeof out.additionalContext === "string" ? out.additionalContext.trim() : "";
+  const notes = typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : "";
+  return { context, notes };
+}
+
+// noteBoard holds deja's lines for the person until the page asks for them.
+// The recall runs in the host and the person reads a browser, so each
+// session's lines wait here and are handed over once: take() empties the
+// session's list. Bounded on both sides, because a page that never asks — a
+// headless run, a closed tab — must not grow the host's memory.
+export function noteBoard(perSession = 8, sessions = 64) {
+  const board = new Map();
+  return {
+    push(sid, text) {
+      const lines = String(text || "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      if (!sid || lines.length === 0) return;
+      const held = board.get(sid) || [];
+      board.delete(sid);
+      board.set(sid, [...held, ...lines].slice(-perSession));
+      while (board.size > sessions) board.delete(board.keys().next().value);
+    },
+    take(sid) {
+      const held = board.get(sid) || [];
+      board.delete(sid);
+      return held;
+    },
+  };
+}

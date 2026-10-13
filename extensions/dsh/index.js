@@ -12,7 +12,7 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { argv, contributions, exitStatus, guarded, resultText } from "./lib.js";
+import { argv, contributions, exitStatus, guarded, newestEvents, noteBoard, resultText, splitHookReply } from "./lib.js";
 
 const require = createRequire(import.meta.url);
 
@@ -270,7 +270,7 @@ function userText(message) {
 // one-shot on the session id in deja's ledger, which survives a resume in a new
 // process; the Set is the in-process guard that keeps the long-lived web and
 // tui profiles from spawning deja on every assembly of a session already shown.
-function autoDigest(ctx) {
+function autoDigest(ctx, board) {
   const seen = new Set();
 
   guarded(() =>
@@ -283,10 +283,15 @@ function autoDigest(ctx) {
         const sid = sessionId(agent);
         if (sid && seen.has(sid)) return "";
         if (sid) seen.add(sid);
-        return run(
-          ["hook-context", "--plain"],
+        // The JSON form, not --plain: the same digest for the model, plus the
+        // receipt and the build and week notes Claude Code shows the person,
+        // under the once rules deja keeps for them.
+        const reply = splitHookReply(run(
+          ["hook-context"],
           JSON.stringify({ session_id: sid, cwd: sessionCwd(agent), source: "startup", deja_once: true }),
-        );
+        ));
+        board.push(sid, reply.notes);
+        return reply.context;
       },
     }),
   );
@@ -311,7 +316,7 @@ function sessionCwd(agent) {
   return (header && header.cwd) || process.cwd();
 }
 
-function autoRecall(ctx) {
+function autoRecall(ctx, board) {
   let asked = "";
   let askedIn = "";
   let askedBy = "";
@@ -339,13 +344,48 @@ function autoRecall(ctx) {
           asked = prompt;
           askedIn = cwd;
           askedBy = sid;
-          recalled = run(["hook-prompt", "--plain"], JSON.stringify({ prompt, cwd, session_id: sid }));
+          // One spawn for both readers: additionalContext is what --plain
+          // prints, systemMessage the "you have been here" line.
+          const reply = splitHookReply(run(["hook-prompt"], JSON.stringify({ prompt, cwd, session_id: sid })));
+          recalled = reply.context;
+          board.push(sid, reply.notes);
         }
         // Silence is the common case: this speaks only when the history answers.
         return recalled;
       },
     }),
   );
+}
+
+// The person's half. dsh shows nobody what a plugin hands the model, and has
+// no notice channel a host plugin can write to, so deja's lines wait on a board
+// and the browser half (client.js) asks for them under the composer. The route
+// rides dsh's own /api mount, which applies the same Host/Origin fence and
+// browser login as every other call the page makes. A profile without the
+// connection service — headless, sdk, an older dsh — never runs this, and a
+// second copy of the plugin finds the path taken and stands down.
+const NOTES_PATH = "/api/deja-notes";
+
+function notesRoute(ctx, board) {
+  if (typeof ctx.inject !== "function") return;
+  try {
+    ctx.inject(["connection"], (c) => {
+      guarded(() =>
+        c.connection.fetch.register({
+          path: NOTES_PATH,
+          methods: ["GET"],
+          requestBody: "buffered",
+          fetch: async (request) => {
+            let sid = "";
+            try {
+              sid = bareSessionId(new URL(request.url).searchParams.get("session"));
+            } catch {}
+            return Response.json({ notes: sid ? board.take(sid) : [] }, { headers: { "cache-control": "no-store" } });
+          },
+        }),
+      );
+    });
+  } catch {}
 }
 
 // runAsync is run for a seam dsh awaits, so the event loop goes on while deja
@@ -519,10 +559,7 @@ function noteMessage(text) {
 // carried it in, so both are read. Anything a plugin contributed is skipped:
 // those carry a source of their own.
 function lastHumanText(agent) {
-  const events = agent && agent.session && agent.session.events;
-  if (!Array.isArray(events)) return "";
-  for (let i = events.length - 1; i >= 0; i--) {
-    const event = events[i];
+  for (const event of newestEvents(agent && agent.session)) {
     if (!event) continue;
     if (event.type === "user/message" && isHuman(event.data)) return userText(event.data);
     if (event.type === "agent/inbox/spliced") {
@@ -571,8 +608,10 @@ function apply(ctx, config) {
   if (adds.tools) tools(ctx);
   if (adds.command) command(ctx);
   if (adds.recall) {
-    autoDigest(ctx);
-    autoRecall(ctx);
+    const board = noteBoard();
+    autoDigest(ctx, board);
+    autoRecall(ctx, board);
+    notesRoute(ctx, board);
     toolNotes(ctx);
     sessionEnds(ctx);
   }

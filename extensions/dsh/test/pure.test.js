@@ -105,7 +105,9 @@ test("the project digest opens the session once and asks deja for it", () => {
   // agent/session-start is emit-only, so the digest rides the same assembly
   // seam the recall does; deja_once is what keeps it to one turn per session.
   assert.match(source, /name: "deja:project"/);
-  assert.match(source, /"hook-context", "--plain"/);
+  // The JSON form: the same digest, plus the notes for the person
+  // (notes.test.js).
+  assert.match(source, /\["hook-context"\],/);
   assert.match(source, /deja_once: true/);
 });
 

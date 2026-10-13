@@ -7,6 +7,7 @@
   "main": "./extensions/dsh/index.js",
   "exports": {
     ".": "./extensions/dsh/index.js",
+    "./client": "./extensions/dsh/client.js",
     "./package.json": "./package.json"
   },
   "files": [
@@ -51,6 +52,9 @@
   "dsh": {
     "bundle": {
       "patch": "./extensions/dsh/cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
   },
   "dependencies": {

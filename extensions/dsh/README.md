@@ -64,6 +64,13 @@ command that failed it gets what this machine ran after the same error before,
 a compaction keeps what the session was in the middle of, and a session that
 ends drops its live stamp.
 
+In `dsh web` you also see the lines deja prints for the person in Claude Code:
+the "you have been here" receipt when a prompt was answered from history, and
+at session start what was recalled, the first-build note and the weekly note.
+They sit in a small panel above the input until the next prompt, or until you
+close it. The model gets exactly what it got before; these lines never reach
+it. Headless and sdk profiles have no page, so nothing changes there.
+
 ```yaml
 - insert:
     - id: deja
@@ -80,6 +87,12 @@ message into the step — loads fine, completes the turn, and never reaches the
 model: a later listener in that waterfall rebuilds its answer from the payload
 and the added message is dropped with nothing reported. This was settled by
 reading the requests dsh 0.1.1-rc.2 actually sent.
+
+The person's lines take one deja call with the recall, not two: the plugin asks
+for the hook's JSON reply, hands `additionalContext` to the model and keeps
+`systemMessage` on the host until the page asks for it at `/api/deja-notes`,
+behind dsh's own login. The browser half is `client.js`, plain JS in dsh's
+module wrapper, so the package has no build step.
 
 ## What it does not do
 
