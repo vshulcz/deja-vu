@@ -24,6 +24,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/policy"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/sources"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
@@ -291,6 +292,44 @@ func joinNotes(a, b string) string {
 	return a + "\n" + b
 }
 
+// noteWidth is the most a line meant for the person may take, in terminal
+// columns. The hosts that show these lines are terminals and toasts; at 100 a
+// line still fits a 120-column terminal after the host's own prefix.
+const noteWidth = 100
+
+// fitNote appends each optional part to base while the line stays within
+// noteWidth, so a long tally drops out of the line instead of wrapping it.
+func fitNote(base string, parts ...string) string {
+	n := termwidth.Columns(base)
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		if m := termwidth.Columns(p); n+m <= noteWidth {
+			base += p
+			n += m
+		}
+	}
+	return base
+}
+
+// fitList joins names while they fit in width columns and counts the rest, so
+// the receipt names what touched the session without running off the line.
+func fitList(names []string, width int) string {
+	out := ""
+	for i, name := range names {
+		next := name
+		if i > 0 {
+			next = out + ", " + name
+		}
+		if i > 0 && termwidth.Columns(next) > width {
+			return fmt.Sprintf("%s +%d", out, len(names)-i)
+		}
+		out = next
+	}
+	return out
+}
+
 // indexDirWritable reports whether a rebuild could write where the index
 // lives. Ensure builds into a sibling directory and renames it over the old
 // one, so the parent is what has to be writable — not the index directory
@@ -323,7 +362,7 @@ func stuckWiringNote(targets []string) string {
 	if len(targets) == 0 {
 		return ""
 	}
-	return fmt.Sprintf("deja could not rewire %s — run `deja install %s` to see why; until then this line comes back every session",
+	return fmt.Sprintf("deja could not rewire %s — `deja install %s` says why",
 		strings.Join(targets, ", "), targets[0])
 }
 
@@ -337,7 +376,7 @@ func rewireNote(targets []string) string {
 	// nothing was hand-edited, and claiming an edit was destroyed reads as an
 	// accusation. Someone who did edit those commands still learns that they
 	// were rewritten, and where to put the change instead.
-	return fmt.Sprintf("deja rewrote its wiring for %s after an upgrade — `deja install` is what writes those commands", strings.Join(targets, ", "))
+	return fmt.Sprintf("deja rewired %s after an upgrade — `deja install` owns those commands", strings.Join(targets, ", "))
 }
 
 // recallIsOff reports the documented kill switch. One reader rather than a
@@ -364,7 +403,7 @@ func buildNotice(dir string) string {
 		// that has counted work to do is believed over the store walk: it is
 		// reading something, whatever a later look at the stores finds.
 		if st.Total <= 0 && noAgentHistoryFound() {
-			return "deja: no agent history was found on this machine yet — recall starts once an agent writes a session here; `deja sources` shows where deja looked"
+			return "deja: no agent history on this machine yet — `deja sources` shows where deja looked"
 		}
 		return st.line()
 	}
@@ -381,7 +420,7 @@ func buildNotice(dir string) string {
 		// sends them nowhere. `deja index` and doctor already separate the
 		// two; session start is where the state is first noticed (#1054).
 		if parent := filepath.Dir(dir); !dirExists(dir) && !dirExists(parent) {
-			return fmt.Sprintf("deja cannot find the index (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+			return fmt.Sprintf("deja cannot find the index (%s) — its disk may be unmounted; reconnect it or set DEJA_INDEX_DIR", parent)
 		}
 		// Which of the two states this is decides the sentence. A rebuild
 		// writes the new index beside the old directory and replaces it, so a
@@ -394,12 +433,12 @@ func buildNotice(dir string) string {
 		if dirWritable(filepath.Dir(dir)) {
 			return "deja: the index cannot answer — recall is quiet until `deja index` rebuilds it"
 		}
-		return fmt.Sprintf("deja needs to rebuild the index and %s is not writable — `deja index` says what to change", unwritableIndexDir(dir))
+		return fmt.Sprintf("deja cannot rebuild the index: %s is not writable — `deja index` says why", unwritableIndexDir(dir))
 	}
 	if !warmupJustRequested(dir) {
 		return ""
 	}
-	return "deja is indexing your history — recall comes online when it finishes"
+	return "deja is indexing your history — recall starts when it finishes"
 }
 
 // unwritableIndexDir names the directory to fix: the index directory when that
@@ -680,7 +719,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// working tree pointed at them, name the files that did it.
 		why := "from this project"
 		if len(taskMatched) > 0 {
-			why = "touching " + strings.Join(taskMatched, ", ")
+			why = "touching " + fitList(taskMatched, 48)
 		}
 		// A non-default policy is part of the receipt: the user should see
 		// that a rule, not chance, decided what memory crossed over.
@@ -704,31 +743,23 @@ func runHookContextMode(dir string, plain, once bool) error {
 		if r, ok := findReusedMemory(dir, func(project string) bool {
 			return hookPol.Allows(policy.ActivationAuto, project)
 		}); ok {
-			earned = fmt.Sprintf(" · most re-used recently: %q, %d×", trimBriefTitle(r.Title), r.Times)
+			earned = fmt.Sprintf(" · most re-used: %q %d×", trimBriefTitleTo(r.Title, 32), r.Times)
 		}
 		// The receipt is read at a glance, and several hosts show it in a
-		// toast about fifty columns wide. At 130 characters it wrapped to
-		// three lines over the conversation, splitting "2.4 KB" across two of
-		// them. What it says has to survive that, so the claim leads and the
-		// numbers trail, where a wrap costs least.
+		// toast about fifty columns wide, so it is one line: the claim and
+		// the policy always, then today's tally and the re-used session while
+		// they still fit. The byte count and the clause explaining what a
+		// recall is made it two terminal lines in Codex, and nobody acted on
+		// either.
 		//
-		// The clause explaining what a recall is has a job exactly once. The
-		// service line only appears from the second recall of the day, so its
-		// presence is the signal that this is no longer news.
-		svc := serviceReceipt(dir)
-		teaching := " — the agent starts already knowing them"
-		if svc != "" {
-			teaching = ""
-		}
 		// No colon after the name: hosts introduce the line themselves, and
 		// Claude Code's is "SessionStart:startup says:", which turned the
 		// receipt into "says: deja: recalled …" on screen. Without it the
 		// sentence reads whole after any host's prefix and still carries the
 		// name for hosts that add none.
 		resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring),
-			fmt.Sprintf("deja recalled %d prior session%s %s%s%s%s%s",
-				sessions, plural, why, teaching, svc, polNote, earned)+
-				fmt.Sprintf(" · %s of context", humanBytes(int64(len(digest))))))
+			fitNote(fmt.Sprintf("deja recalled %d prior session%s %s%s", sessions, plural, why, polNote),
+				serviceReceipt(dir), earned)))
 	}
 	// A build under way is said whether or not there is a receipt. Gating it on
 	// an empty message covered the session with nothing to recall and left out
@@ -786,7 +817,7 @@ func unreadableStoreNote(dir string) string {
 	if total == 0 {
 		return ""
 	}
-	return fmt.Sprintf("deja could not read %d path%s in %s — sessions are missing from recall; `deja doctor` names %s",
+	return fmt.Sprintf("deja could not read %d path%s in %s, so recall misses them — `deja doctor` names %s",
 		total, pluralS(total), strings.Join(names, ", "), pluralWhich(total))
 }
 
@@ -805,7 +836,7 @@ func withheldEverythingNote(dir string, withheld int) string {
 	if withheld == 0 {
 		return ""
 	}
-	note := fmt.Sprintf("deja recalled nothing here — the trust policy (%s) withheld %s from this project; `deja doctor` shows the rule",
+	note := fmt.Sprintf("deja recalled nothing: policy %s withheld %s here — `deja doctor` shows the rule",
 		policy.Load().Describe(policy.ActivationAuto), doctorCount(withheld, "session"))
 	if !noteIsNews(dir+".policynote", note) {
 		return ""
@@ -1703,11 +1734,10 @@ func serviceReceipt(dir string) string {
 	if n.Injections > 0 {
 		parts = append(parts, fmt.Sprintf("memory arrived %s", timesToday(n.Injections)))
 	}
-	tail := ""
-	if n.RawToday/int64(bytes) >= 2 {
-		tail = fmt.Sprintf(", %s distilled from %s", humanBytes(int64(bytes)), humanBytes(n.RawToday))
-	}
-	return " · today: " + strings.Join(parts, ", ") + tail
+	// The bytes stay in the gate above and out of the line: "3.1 KB distilled
+	// from 40 KB" was a number nobody acted on, and it pushed the receipt
+	// onto a second line. `deja stats` has it.
+	return " · today: " + strings.Join(parts, ", ")
 }
 
 // timesToday counts arrivals in words, so the receipt reads as a sentence
@@ -1730,7 +1760,7 @@ func staleReadOnlyNote(dir string) string {
 	if indexCanCatchUp(dir) {
 		return ""
 	}
-	return fmt.Sprintf("deja is serving the index as it was — it cannot be updated because %s is not writable", filepath.Dir(dir))
+	return fmt.Sprintf("deja is serving a stale index that cannot be updated — %s is not writable", filepath.Dir(dir))
 }
 
 // indexCanCatchUp reports whether the index is either current or able to

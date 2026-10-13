@@ -77,17 +77,20 @@ window.__ModuleLoader__.load({
           const href = m && safeHref(m[2]);
           return href ? { label: m[1].charAt(0).toUpperCase() + m[1].slice(1), href } : null;
         });
-        if (parts.length > 0 && links.every(Boolean)) {
-          out.links.push(...links);
-          continue;
-        }
-        const t = TRAILING_LINK.exec(line);
+        // Link parts at the end of a line ("… · docs: address") go to the
+        // link row; a line of nothing but links is all link row.
+        let keep = parts.length;
+        while (keep > 0 && links[keep - 1]) keep--;
+        out.links.push(...links.slice(keep));
+        if (keep === 0) continue;
+        const rest = keep < parts.length ? parts.slice(0, keep).join(" · ") : line;
+        const t = TRAILING_LINK.exec(rest);
         const href = t && safeHref(t[2]);
         if (href) {
           out.linked.push({ text: t[1], href });
           continue;
         }
-        out.notes.push(stripName(line));
+        out.notes.push(stripName(rest));
       }
       return out;
     }
@@ -178,7 +181,7 @@ window.__ModuleLoader__.load({
     }
 
     // A note reads as its claim and then its detail: the part after the first
-    // " — " or " · " is the detail ("1.4 KB of context"), drawn quieter.
+    // " — " or " · " is the detail ("today: memory arrived 3 times"), drawn quieter.
     function noteRow(text, key) {
       const cut = /\s+(—|·)\s+/.exec(text);
       if (!cut) return h("div", { key, className: "deja-note" }, text);

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // The first run of a new version says once what it brings: a short line plus
@@ -147,6 +149,11 @@ func TestWhatChangedNoteOneLine(t *testing.T) {
 	}
 	if strings.Contains(note, "\n") {
 		t.Errorf("note is not one line: %q", note)
+	}
+	// The embedded changelog's bullets run past 140 characters; the note
+	// cuts the first to what fits.
+	if w := termwidth.Columns(note); w > noteWidth {
+		t.Errorf("note is %d columns, over %d: %q", w, noteWidth, note)
 	}
 	// The terminal then says nothing.
 	if got := whatChangedTerminal(dir); got != "" {

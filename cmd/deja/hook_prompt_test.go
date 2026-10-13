@@ -15,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -389,9 +390,18 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	if strings.Contains(line, "AGENTS.md") {
 		t.Fatalf("plumbing leaked into deja vu line: %q", line)
 	}
+	// Every term is in the quote here, so the first is named and the rest go
+	// as soon as the line would pass noteWidth.
 	withWhy := dejaVuLine(s, "exporter", "midnight", "rows", "fourth")
-	if !strings.Contains(withWhy, "via: exporter, midnight, rows") || strings.Contains(withWhy, "fourth") {
+	if !strings.Contains(withWhy, "via exporter") || strings.Contains(withWhy, "fourth") {
 		t.Fatalf("via-terms missing or uncapped: %q", withWhy)
+	}
+	if termwidth.Columns(withWhy) > noteWidth && strings.Contains(withWhy, "via exporter,") {
+		t.Fatalf("a second term ran the line past %d columns: %q", noteWidth, withWhy)
+	}
+	short := model.Session{ID: "z", Project: "app", Messages: []model.Message{{Role: "user", Text: "drain the queue"}}}
+	if got := dejaVuLine(short, "queue", "grace", "deploy"); !strings.HasSuffix(got, "· via grace, deploy, queue)") {
+		t.Fatalf("with room, all three terms, the ones the quote lacks first: %q", got)
 	}
 	junk := model.Session{Harness: "codex", ID: "y", Project: "app",
 		Title:    `<environment_context> <cwd>/x</cwd>`,
@@ -683,7 +693,7 @@ func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
 		t.Errorf("the line does not say where the session came from: %q", got)
 	}
 	// The rest of the line — the topic and why it fired — is unchanged.
-	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via: ticker") {
+	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via ticker") {
 		t.Errorf("the line lost what it is for: %q", got)
 	}
 }
