@@ -72,13 +72,13 @@ test("the package wires every seam the installer's plugin does", async () => {
     if (prev === undefined) delete process.env.OPENCLAW_STATE_DIR
     else process.env.OPENCLAW_STATE_DIR = prev
   }
-  const seams = ["before_prompt_build", "before_compaction", "session_end"]
+  const seams = ["before_prompt_build", "reply_payload_sending", "before_compaction", "session_end"]
   // The digest rides agent:bootstrap where plugin hooks run, and the first
   // prompt otherwise.
   assert.deepEqual(events, [
-    "agent_turn_prepare", ...seams,
-    "hook agent:bootstrap", ...seams,
-    "agent_turn_prepare", ...seams,
+    "before_dispatch", "agent_turn_prepare", ...seams,
+    "before_dispatch", "hook agent:bootstrap", ...seams,
+    "before_dispatch", "agent_turn_prepare", ...seams,
   ])
 })
 

@@ -26,6 +26,8 @@ deja 可执行文件随包一起提供；你自己装的 deja（`brew install de
 - **工具**：`deja_recall`（检索历史）、`deja_fix`（这个报错之后上次跑了什么）、`deja_blame`（哪些会话动过某个文件、当时得出了什么结论）。
 - **`/deja <要查什么>`**：同样的检索，结果给你看，而不是给模型。
 
+在频道上（Telegram、Slack、Discord 等）和你的一对一私聊里，如果回复用到了你的历史，下方会多一行斜体：`↺ you've been here: "…" · Oct 4 · deja`。它经由 `reply_payload_sending` 在会话记录写入之后才加上，所以模型看不到，拿到的文本和以前完全一样。“你”指 `commands.ownerAllowFrom`，没有配置时指只列了一个 id 的频道 `allowFrom`。群聊、别人的私聊、TUI 和 Control UI 都没有这一行，其他 deja 提示也从不发到频道里，仍然随 `/deja` 给你。插件配置里设 `"receipt": false` 可以关掉。
+
 ## 配置
 
 ```json

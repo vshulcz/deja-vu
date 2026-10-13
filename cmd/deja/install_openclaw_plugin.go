@@ -391,7 +391,13 @@ func openclawPluginManifest() string {
   },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false
+    "additionalProperties": false,
+    "properties": {
+      "receipt": {
+        "type": "boolean",
+        "description": "In a 1:1 chat with the owner on a channel, add deja's one-line receipt under a reply answered from history. Default true."
+      }
+    }
   }
 }
 `
@@ -460,6 +466,128 @@ function toolLine(event, ctx) {
     return ask(["hook-tool-after", "--plain"], { tool_name: "bash", tool_input: { command: String(args.command || "") }, tool_response: text, session_id, cwd });
   }
   return "";
+}
+
+// deja's "you have been here" receipt rides under the reply in a 1:1 chat
+// with the owner on a channel (Telegram, Slack, Discord ...), as a context
+// block: the small footer each channel draws in its own way. Not in a group,
+// where other people read the reply, and not on the TUI or the Control UI
+// ("webchat"), which draw the transcript rather than the delivered reply. The
+// session-start notes never go to a channel: hook-context stays --plain, so
+// they are not spent and still come with the next session's digest.
+function deliversNotes(channel) {
+  const name = String(channel || "").trim().toLowerCase();
+  return name !== "" && name !== "webchat";
+}
+
+// The JSON reply split by reader: additionalContext, the text --plain prints,
+// for the model; systemMessage for the person. Output with no envelope is all
+// context.
+function splitHookReply(stdout) {
+  const text = String(stdout || "").trim();
+  if (!text) return { context: "", notes: "" };
+  const lines = text.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith("{")) continue;
+    let reply;
+    try {
+      reply = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!reply || typeof reply !== "object" || Array.isArray(reply)) continue;
+    if (!("hookSpecificOutput" in reply) && !("systemMessage" in reply)) continue;
+    const out = reply.hookSpecificOutput;
+    return {
+      context: typeof out?.additionalContext === "string" ? out.additionalContext.trim() : "",
+      notes: typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : "",
+    };
+  }
+  return { context: text, notes: "" };
+}
+
+// The owner is commands.ownerAllowFrom ("channel:id"); without it, a channel
+// allowlist of exactly one id. A wildcard, several people or no list is not
+// known to be the owner, and the receipt quotes their past work.
+function ownerSender(config, channel, senderId) {
+  const ch = String(channel || "").trim().toLowerCase();
+  const id = String(senderId ?? "").trim();
+  if (!ch || !id) return false;
+  const owners = config?.commands?.ownerAllowFrom;
+  if (Array.isArray(owners) && owners.length > 0) {
+    return owners.some((e) => String(e).trim().toLowerCase() === ch + ":" + id.toLowerCase());
+  }
+  const allow = config?.channels?.[ch]?.allowFrom;
+  if (!Array.isArray(allow)) return false;
+  const entries = allow.map((e) => String(e).trim()).filter(Boolean);
+  if (entries.length !== 1 || entries[0] === "*") return false;
+  return entries[0] === id || entries[0].toLowerCase() === ch + ":" + id.toLowerCase();
+}
+
+// before_dispatch is the hook told whether a message came in a group; the
+// prompt hook after it is not. What each session's last message was is kept
+// for five minutes, and a turn not heard of counts as not 1:1.
+const TURN_TTL = 5 * 60 * 1000;
+const turns = new Map();
+function heardTurn(event, ctx) {
+  const key = event?.sessionKey || ctx?.sessionKey || "";
+  if (!key) return;
+  turns.delete(key);
+  turns.set(key, {
+    direct: event?.isGroup === false,
+    sender: String(event?.senderId ?? ctx?.senderId ?? ""),
+    channel: String(event?.channel || ctx?.channelId || "").toLowerCase(),
+    at: Date.now(),
+  });
+  while (turns.size > 256) turns.delete(turns.keys().next().value);
+}
+function directTurn(key, channel, senderId) {
+  const t = key && turns.get(key);
+  if (!t || Date.now() - t.at > TURN_TTL || !t.direct) return false;
+  if (t.channel !== String(channel || "").toLowerCase()) return false;
+  return !senderId || t.sender === String(senderId);
+}
+
+// The receipt as one short line: no brand, no "via:" terms, the date kept,
+// and a small "deja" at the end since the block has no byline.
+const RECEIPT = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/;
+function receiptLine(text) {
+  for (const raw of String(text || "").split("\n")) {
+    const m = RECEIPT.exec(raw.trim());
+    if (!m) continue;
+    let topic = m[2];
+    try {
+      topic = JSON.stringify(JSON.parse(m[2]));
+    } catch {}
+    const when = m[3].split(/\s+·\s+via:\s+/)[0].trim();
+    const who = m[1] === "you have been here" ? "you've been here" : "done on another machine";
+    return "↺ " + who + ": " + topic + (when ? " · " + when : "") + " · deja";
+  }
+  return "";
+}
+
+// Each turn sets its session's receipt and a silent turn clears it, so a
+// reply never carries an older turn's line; a reply that never goes out
+// (NO_REPLY) never takes it, and it lapses with the turn.
+const receipts = new Map();
+function setReceipt(key, channel, line) {
+  if (!key) return;
+  receipts.delete(key);
+  if (line) receipts.set(key, { channel: String(channel || "").toLowerCase(), line, at: Date.now() });
+  while (receipts.size > 256) receipts.delete(receipts.keys().next().value);
+}
+function takeReceipt(key, channel) {
+  const held = key && receipts.get(key);
+  if (!held || held.channel !== String(channel || "").toLowerCase()) return "";
+  receipts.delete(key);
+  return Date.now() - held.at <= TURN_TTL ? held.line : "";
+}
+
+// A cron or heartbeat run has no person waiting on its reply.
+function turnChannel(ctx) {
+  if (ctx?.trigger && ctx.trigger !== "user") return "";
+  return ctx?.channel || ctx?.messageProvider || "";
 }
 
 // The status page behind deja's Control UI tab: deja's status line, refreshed
@@ -540,6 +668,10 @@ export default {
         deja_once: true,
       });
     };
+    const showReceipt = api.pluginConfig?.receipt !== false;
+    api.on("before_dispatch", async (event, ctx) => {
+      heardTurn(event, ctx);
+    });
     let bootstrap = false;
     // A plugin hook is wired only while hooks.internal.enabled is not false.
     if (typeof api.registerHook === "function" && api.config?.hooks?.internal?.enabled !== false) {
@@ -581,11 +713,20 @@ export default {
         // store, half of all injections were then a word-for-word repeat. The
         // event is {prompt, messages}; the session is on ctx (#4581).
         const at = where(ctx);
-        const recall = ask(["hook-prompt", "--plain"], {
-          prompt,
-          session_id: at.id,
-          cwd: at.cwd,
-        });
+        const channel = turnChannel(ctx);
+        const payload = { prompt, session_id: at.id, cwd: at.cwd };
+        // One spawn either way: the JSON reply where the receipt can be shown
+        // (its context for the model, the receipt kept for the reply), --plain
+        // anywhere else, which leaves the receipt unspent.
+        let recall;
+        if (showReceipt && deliversNotes(channel) && directTurn(ctx?.sessionKey, channel, ctx?.senderId) &&
+          ownerSender(api.config, channel, ctx?.senderId)) {
+          const reply = splitHookReply(ask(["hook-prompt"], payload));
+          setReceipt(ctx.sessionKey, channel, receiptLine(reply.notes));
+          recall = reply.context;
+        } else {
+          recall = ask(["hook-prompt", "--plain"], payload);
+        }
         // Silence is the common case — the hook speaks only when the user's
         // own history answers what they just asked.
         if (!recall) return;
@@ -593,6 +734,20 @@ export default {
       },
       { timeoutMs: 15000 },
     );
+    // The reply on its way to the chat takes its turn's receipt, as a context
+    // block under the answer, in italics as the agent's own markdown would set
+    // a footer. The transcript the model reads is written before this.
+    if (showReceipt) {
+      api.on("reply_payload_sending", async (event) => {
+        if (!event || event.kind === "tool" || !deliversNotes(event.channel)) return;
+        const line = takeReceipt(event.sessionKey, event.channel);
+        if (!line) return;
+        const presentation = event.payload?.presentation && typeof event.payload.presentation === "object" ? event.payload.presentation : {};
+        const blocks = Array.isArray(presentation.blocks) ? presentation.blocks : [];
+        const text = /[_*]/.test(line) ? line : "_" + line + "_";
+        return { payload: { ...event.payload, presentation: { ...presentation, blocks: [...blocks, { type: "context", text }] } } };
+      });
+    }
     // Compaction throws away the blocks this session was shown while the list
     // that stops them repeating outlives it, so without this the memory the
     // session just lost is the memory recall refuses to send again. The event

@@ -12,7 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 )
 
-// dsh-deja asks for the JSON reply and gives the model additionalContext,
+// dsh-deja and openclaw-deja ask for the JSON reply and give the model additionalContext,
 // where it used to give it what --plain printed; the systemMessage beside it
 // goes to the person. That swap is only safe while the two forms carry the
 // same text for the model, so each form runs on a fresh copy of the same

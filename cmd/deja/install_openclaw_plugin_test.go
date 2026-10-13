@@ -217,3 +217,113 @@ func TestOpenClawPluginUsesThePhaseHooks(t *testing.T) {
 		}
 	}
 }
+
+// deja's receipt reaches the person in a 1:1 chat with the owner: the prompt
+// hook asks once for the JSON reply, the model gets what --plain prints, and
+// the reply on its way to Telegram carries one short receipt line as a context
+// block. A group chat, the TUI ("webchat") and receipt:false stay --plain and
+// leave the reply alone, and the session-start digest is never asked for its
+// notes on a channel.
+func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the stub deja is a shell script")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node is needed to run the plugin openclaw would run")
+	}
+	home := t.TempDir()
+	stub := filepath.Join(home, "deja")
+	calls := filepath.Join(home, "calls")
+	reply := `{"systemMessage":"deja-vu — you have been here: \"zorbit drain\" (Oct 7 · via: zorbit, drain)","hookSpecificOutput":{"additionalContext":"RECALLED drain with --grace 40"}}`
+	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s\\n' \"$*\" >> " + calls + "\n" +
+		"case \"$*\" in\n" +
+		"  'hook-prompt --plain') printf 'RECALLED drain with --grace 40' ;;\n" +
+		"  hook-prompt) printf '%s\\n' '" + reply + "' ;;\n" +
+		"esac\n"
+	if err := os.WriteFile(stub, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	plugin := filepath.Join(home, "index.mjs")
+	if err := os.WriteFile(plugin, []byte(openclawPluginJS(stub)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	driver := `
+const cases = {
+  dm: { channel: "telegram", isGroup: false },
+  group: { channel: "telegram", isGroup: true },
+  tui: { channel: "webchat", isGroup: false },
+  off: { channel: "telegram", isGroup: false, pluginConfig: { receipt: false } },
+};
+const out = {};
+for (const [name, c] of Object.entries(cases)) {
+  const { default: plugin } = await import("` + plugin + `?" + name);
+  const hooks = {};
+  plugin.register({
+    on: (n, fn) => { hooks[n] = fn },
+    pluginConfig: c.pluginConfig || {},
+    config: { channels: { telegram: { allowFrom: ["4242"] } } },
+  });
+  const key = "agent:main:" + name;
+  await hooks.before_dispatch?.({ sessionKey: key, channel: c.channel, senderId: "4242", isGroup: c.isGroup }, {});
+  const built = await hooks.before_prompt_build({ prompt: "what did we decide about the zorbit drain", messages: [] },
+    { sessionKey: key, sessionId: "s-" + name, channel: c.channel, senderId: "4242", trigger: "user" });
+  const sent = hooks.reply_payload_sending
+    ? await hooks.reply_payload_sending({ kind: "final", channel: c.channel, sessionKey: key, payload: { text: "Use --grace 40." } }, {})
+    : null;
+  out[name] = { context: built?.prependContext ?? null, sent: sent ?? null };
+}
+console.log(JSON.stringify(out));
+`
+	run := filepath.Join(home, "drive.mjs")
+	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := exec.Command(node, run).CombinedOutput()
+	if err != nil {
+		t.Fatalf("driving the plugin: %v\n%s", err, raw)
+	}
+	var got map[string]struct {
+		Context string `json:"context"`
+		Sent    *struct {
+			Payload struct {
+				Text         string `json:"text"`
+				Presentation struct {
+					Blocks []struct {
+						Type string `json:"type"`
+						Text string `json:"text"`
+					} `json:"blocks"`
+				} `json:"presentation"`
+			} `json:"payload"`
+		} `json:"sent"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("driver said %s", raw)
+	}
+	for name, c := range got {
+		if c.Context != "RECALLED drain with --grace 40" {
+			t.Errorf("%s: the model was not given what --plain prints: %q", name, c.Context)
+		}
+	}
+	dm := got["dm"]
+	if dm.Sent == nil {
+		t.Fatalf("the reply in the owner's DM went out without the receipt:\n%s", raw)
+	}
+	blocks := dm.Sent.Payload.Presentation.Blocks
+	want := `_↺ you've been here: "zorbit drain" · Oct 7 · deja_`
+	if dm.Sent.Payload.Text != "Use --grace 40." || len(blocks) != 1 || blocks[0].Type != "context" || blocks[0].Text != want {
+		t.Errorf("want one context block %q under the reply:\n%s", want, raw)
+	}
+	for _, name := range []string{"group", "tui", "off"} {
+		if got[name].Sent != nil {
+			t.Errorf("%s: the reply was changed:\n%s", name, raw)
+		}
+	}
+	body, _ := os.ReadFile(calls)
+	if n := strings.Count(string(body), "hook-prompt\n"); n != 1 {
+		t.Errorf("want one JSON hook-prompt spawn (the DM), got %d:\n%s", n, body)
+	}
+	if n := strings.Count(string(body), "hook-prompt --plain\n"); n != 3 {
+		t.Errorf("want the group, TUI and receipt:false turns on --plain, got %d:\n%s", n, body)
+	}
+}

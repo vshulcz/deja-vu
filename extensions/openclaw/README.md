@@ -48,6 +48,20 @@ what is missing.
   concluded).
 - **`/deja <query>`**: the same search, answered to you rather than the model.
 
+In a 1:1 chat with you on a channel (Telegram, Slack, Discord and the rest),
+a reply that was answered from your history gets one italic line under it:
+
+```
+↺ you've been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja
+```
+
+It is added through `reply_payload_sending` after the transcript is written,
+so the model never sees it and gets exactly the text it got before. "You" is
+`commands.ownerAllowFrom`, or the channel's `allowFrom` when it lists exactly
+one id. Group chats, someone else's DM, the TUI and the Control UI get nothing,
+and no other deja note is ever sent to a channel: those still come with `/deja`.
+`"receipt": false` in the plugin config turns the line off.
+
 ## Config
 
 ```json
@@ -57,15 +71,16 @@ what is missing.
       "deja-vu": {
         "enabled": true,
         "hooks": { "allowConversationAccess": true },
-        "config": { "autoRecall": true, "tools": true, "bin": "/opt/homebrew/bin/deja" }
+        "config": { "autoRecall": true, "tools": true, "receipt": true, "bin": "/opt/homebrew/bin/deja" }
       }
     }
   }
 }
 ```
 
-All three are optional. `autoRecall: false` keeps the tools and drops the
-per-turn recall; `tools: false` the reverse.
+All are optional. `autoRecall: false` keeps the tools and drops the
+per-turn recall; `tools: false` the reverse. `receipt: false` drops the line
+under replies in your DMs.
 
 `hooks.allowConversationAccess` is OpenClaw's grant, not the plugin's: 2026.8.1
 and later run a non-bundled plugin's `before_prompt_build` only with it, and a

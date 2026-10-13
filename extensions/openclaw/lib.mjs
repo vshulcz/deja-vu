@@ -144,6 +144,151 @@ export function toolCall(event, at) {
   return null
 }
 
+// splitHookReply reads what `deja hook-prompt` or `deja hook-context` printed
+// in its JSON form and splits it by reader: additionalContext is for the model,
+// the same text --plain prints, and systemMessage is deja's lines for the
+// person. One spawn answers both. The envelope is the last line that parses as
+// one; output with no envelope is all context, so a deja that printed plain
+// text still reaches the model.
+export function splitHookReply(stdout) {
+  const text = String(stdout || "").trim()
+  if (!text) return { context: "", notes: "" }
+  const lines = text.split("\n")
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (!line.startsWith("{")) continue
+    let reply
+    try {
+      reply = JSON.parse(line)
+    } catch {
+      continue
+    }
+    if (!reply || typeof reply !== "object" || Array.isArray(reply)) continue
+    if (!("hookSpecificOutput" in reply) && !("systemMessage" in reply)) continue
+    const out = reply.hookSpecificOutput
+    const context = out && typeof out.additionalContext === "string" ? out.additionalContext.trim() : ""
+    const notes = typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : ""
+    return { context, notes }
+  }
+  return { context: text, notes: "" }
+}
+
+// deliversNotes says whether a turn on this channel ends in a reply the
+// person reads as it was delivered. A channel's reply goes through
+// reply_payload_sending on its way out, so deja's receipt can ride along as a
+// footer. The TUI and the Control UI chat are both "webchat": they draw the
+// transcript, and a footer added on the way out is never shown there. Neither
+// is a turn with no channel at all, such as `openclaw agent`.
+export function deliversNotes(channel) {
+  const name = String(channel || "").trim().toLowerCase()
+  return name !== "" && name !== "webchat"
+}
+
+// ownerSender says whether a sender is the person whose history deja reads.
+// commands.ownerAllowFrom names the owner as "channel:id"; without it, a
+// channel allowlist of exactly one id is that one person. Anything else — a
+// wildcard, several people, no list — is not known to be the owner, and the
+// answer is no: the receipt quotes their past work.
+export function ownerSender(config, channel, senderId) {
+  const ch = String(channel || "").trim().toLowerCase()
+  const id = String(senderId ?? "").trim()
+  if (!ch || !id) return false
+  const owners = config && config.commands && config.commands.ownerAllowFrom
+  if (Array.isArray(owners) && owners.length > 0) {
+    return owners.some((e) => String(e).trim().toLowerCase() === ch + ":" + id.toLowerCase())
+  }
+  const allow = config && config.channels && config.channels[ch] && config.channels[ch].allowFrom
+  if (!Array.isArray(allow)) return false
+  const entries = allow.map((e) => String(e).trim()).filter(Boolean)
+  if (entries.length !== 1 || entries[0] === "*") return false
+  return entries[0] === id || entries[0].toLowerCase() === ch + ":" + id.toLowerCase()
+}
+
+// directTurns remembers, per session, whether the message that started its
+// turn came in a 1:1 chat and from whom. before_dispatch is the hook that is
+// told isGroup; the prompt hook after it is not. A turn the board never heard
+// about counts as not direct, and so does one older than a few minutes.
+export function directTurns({ ttlMs = 5 * 60 * 1000, sessions = 256, now = Date.now } = {}) {
+  const turns = new Map()
+  return {
+    heard(event, ctx) {
+      const key = (event && event.sessionKey) || (ctx && ctx.sessionKey) || ""
+      if (!key) return
+      turns.delete(key)
+      turns.set(key, {
+        direct: Boolean(event) && event.isGroup === false,
+        sender: String((event && event.senderId) ?? (ctx && ctx.senderId) ?? ""),
+        channel: String((event && event.channel) || (ctx && ctx.channelId) || "").toLowerCase(),
+        at: now(),
+      })
+      while (turns.size > sessions) turns.delete(turns.keys().next().value)
+    },
+    direct(key, channel, senderId) {
+      const t = key && turns.get(key)
+      if (!t || now() - t.at > ttlMs || !t.direct) return false
+      if (t.channel !== String(channel || "").toLowerCase()) return false
+      return !senderId || t.sender === String(senderId)
+    },
+  }
+}
+
+const RECEIPT = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/
+
+// receiptLine turns deja's per-prompt receipt into the one line a chat shows:
+// no brand in front, no "via:" terms, the date kept. The block it rides in
+// has no byline, so a small "deja" at the end says whose line it is. "" when
+// the text holds no receipt.
+export function receiptLine(text) {
+  for (const raw of String(text || "").split("\n")) {
+    const m = RECEIPT.exec(raw.trim())
+    if (!m) continue
+    let topic = m[2]
+    try {
+      topic = JSON.stringify(JSON.parse(m[2]))
+    } catch {}
+    const when = m[3].split(/\s+·\s+via:\s+/)[0].trim()
+    const who = m[1] === "you have been here" ? "you've been here" : "done on another machine"
+    return "↺ " + who + ": " + topic + (when ? " · " + when : "") + " · deja"
+  }
+  return ""
+}
+
+// receiptBoard holds a session's receipt between the prompt hook and the
+// reply that carries it, under the session key and the channel. Each turn sets
+// it, a silent turn clears it, so a reply never carries an older turn's line.
+// A reply that never goes out (NO_REPLY, a cancelled send) never takes it, and
+// it lapses after a few minutes.
+export function receiptBoard({ ttlMs = 5 * 60 * 1000, sessions = 256, now = Date.now } = {}) {
+  const board = new Map()
+  return {
+    set(key, channel, line) {
+      if (!key) return
+      board.delete(key)
+      if (line) board.set(key, { channel: String(channel || "").toLowerCase(), line, at: now() })
+      while (board.size > sessions) board.delete(board.keys().next().value)
+    },
+    take(key, channel) {
+      const held = key && board.get(key)
+      if (!held || held.channel !== String(channel || "").toLowerCase()) return ""
+      board.delete(key)
+      return now() - held.at <= ttlMs ? held.line : ""
+    },
+  }
+}
+
+// withReceipt adds the receipt under a reply as a context block, the small
+// footer OpenClaw's message presentation defines. It is set in italics the way
+// the agent's own markdown would set one, since most channels draw the block
+// as a plain last paragraph; a line that already holds _ or * is left as it
+// is. The reply's own text and blocks are untouched.
+export function withReceipt(payload, line) {
+  if (!payload || !line) return payload
+  const text = /[_*]/.test(line) ? line : "_" + line + "_"
+  const presentation = payload.presentation && typeof payload.presentation === "object" ? payload.presentation : {}
+  const blocks = Array.isArray(presentation.blocks) ? presentation.blocks : []
+  return { ...payload, presentation: { ...presentation, blocks: [...blocks, { type: "context", text }] } }
+}
+
 // where names the session and workspace a hook runs for, the way the
 // installer's plugin does. The id is the transcript id, not the session key:
 // hook-context stamps the session live under that id, which keeps it out of

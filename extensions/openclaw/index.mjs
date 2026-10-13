@@ -12,11 +12,18 @@ import {
   argv,
   configPath,
   contributions,
+  deliversNotes,
+  directTurns,
   installerPluginPath,
   mcpWired,
+  ownerSender,
   promptText,
+  receiptBoard,
+  receiptLine,
+  splitHookReply,
   toolCall,
   where,
+  withReceipt,
 } from "./lib.mjs"
 
 const require = createRequire(import.meta.url)
@@ -182,6 +189,30 @@ export default {
     // a compacted session had been shown.
     if (adds.recall) {
       const seen = new Map()
+      // deja's "you have been here" receipt rides under the reply in a 1:1
+      // chat with the owner on a channel (Telegram, Slack, Discord ...). Not in
+      // a group, where other people read the reply, and not on the TUI or the
+      // Control UI, which draw the transcript rather than the delivered reply.
+      // The session-start notes (what was recalled, the build and week notes,
+      // the docs line) never go to a channel: hook-context stays --plain, so
+      // they are not spent and still come with /deja.
+      const receipts = config.receipt !== false
+      const turns = directTurns()
+      const board = receiptBoard()
+      // before_dispatch is the hook told whether the message came in a group.
+      api.on("before_dispatch", async (event, ctx) => {
+        turns.heard(event, ctx)
+      })
+      // A cron or heartbeat run has no person waiting on its reply.
+      const turnChannel = (ctx) => {
+        if (ctx && ctx.trigger && ctx.trigger !== "user") return ""
+        return (ctx && (ctx.channel || ctx.messageProvider)) || ""
+      }
+      const ownerDirect = (ctx, channel) =>
+        receipts &&
+        deliversNotes(channel) &&
+        turns.direct(ctx && ctx.sessionKey, channel, ctx && ctx.senderId) &&
+        ownerSender(api.config, channel, ctx && ctx.senderId)
       // Both seams below fire once per agent run, so deja_once is what keeps
       // the digest to the first of them.
       const digest = (event, ctx) => {
@@ -230,11 +261,20 @@ export default {
           const prompt = promptText(event)
           if (!prompt) return
           const at = where(seen, event, ctx, process.cwd())
-          const recall = await ask(
-            ["hook-prompt", "--plain"],
-            JSON.stringify({ prompt, session_id: at.id, cwd: at.cwd }),
-            10000,
-          )
+          const channel = turnChannel(ctx)
+          const payload = JSON.stringify({ prompt, session_id: at.id, cwd: at.cwd })
+          // One spawn either way. Where the receipt can be shown, deja is asked
+          // for its JSON reply: additionalContext, the text --plain prints, goes
+          // to the model and the receipt waits for the reply. Anywhere else it
+          // stays --plain, and deja keeps the receipt unspent.
+          let recall
+          if (ownerDirect(ctx, channel)) {
+            const reply = splitHookReply(await ask(["hook-prompt"], payload, 10000))
+            board.set(ctx.sessionKey, channel, receiptLine(reply.notes))
+            recall = reply.context
+          } else {
+            recall = await ask(["hook-prompt", "--plain"], payload, 10000)
+          }
           // Silence is the common case — the hook speaks only when the user's
           // own history answers what they just asked.
           if (!recall) return
@@ -242,6 +282,17 @@ export default {
         },
         { timeoutMs: 15000 },
       )
+      // The reply on its way to the chat takes its turn's receipt, as a context
+      // block under the answer. The transcript the model reads is written
+      // before this, so the line never reaches it.
+      if (receipts) {
+        api.on("reply_payload_sending", async (event) => {
+          if (!event || event.kind === "tool" || !deliversNotes(event.channel)) return
+          const line = board.take(event.sessionKey, event.channel)
+          if (!line) return
+          return { payload: withReceipt(event.payload, line) }
+        })
+      }
       // Compaction throws away the blocks this session was shown, and the list
       // that stops them repeating outlives it. The event names the session
       // file, which still holds the turns about to be summarised: deja reads
@@ -296,8 +347,9 @@ export default {
       }
     }
 
-    // /deja answers the person directly. The hooks above only reach the
-    // model, so this reply is also where deja's own notes reach them.
+    // /deja answers the person directly. On the TUI and the Control UI the
+    // hooks above only reach the model, so this reply is also where deja's own
+    // notes reach them there.
     try {
       if (typeof api.registerCommand === "function") {
         api.registerCommand({
