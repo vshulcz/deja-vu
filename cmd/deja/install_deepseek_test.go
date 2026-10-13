@@ -175,7 +175,7 @@ func TestInstallDeepSeekWritesTheAutoRecallPlugin(t *testing.T) {
 	if !strings.Contains(js, `"agent/inbox/spliced"`) {
 		t.Errorf("at assembly time the prompt is only in the inbox splice, and this plugin never reads it:\n%s", js)
 	}
-	if !strings.Contains(js, `"hook-prompt", "--plain"`) {
+	if !strings.Contains(js, `askHook("hook-prompt"`) {
 		t.Errorf("the plugin never asks deja for a block:\n%s", js)
 	}
 	if !strings.Contains(js, "prompt !== asked") {
