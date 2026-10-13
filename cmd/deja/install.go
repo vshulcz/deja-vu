@@ -5066,6 +5066,12 @@ func withWiredAutoTargets(targets []string) []string {
 	for _, t := range readWiringState().Targets {
 		wired[t] = true
 	}
+	// `deja install dsh-auto` went unrecorded until the alias was fixed, so
+	// those machines' record says nothing about deepseek-auto and --all took
+	// auto.js away (#3687). deja's own auto.js on disk says it was wired.
+	if dshGeneratedAutoOnDisk() {
+		wired["deepseek-auto"] = true
+	}
 	out := make([]string, 0, len(targets))
 	for _, t := range targets {
 		out = append(out, t)

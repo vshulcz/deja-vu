@@ -14,7 +14,7 @@ import (
 // runs one turn through it the way dsh would: two contexts assembled for a
 // session, and, when web is true, the connection and web-server services the
 // web profile injects. It returns what the driver printed and the stub's calls.
-func driveDSHAuto(t *testing.T, web, withLib bool) (string, string) {
+func driveDSHAuto(t *testing.T, web, withLib, card bool) (string, string) {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("the stub deja is a shell script")
@@ -48,6 +48,10 @@ func driveDSHAuto(t *testing.T, web, withLib bool) (string, string) {
 	if err := os.WriteFile(dshAutoPath(), []byte(dshAutoJS(stub)), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	loadCard := ""
+	if card {
+		loadCard = `(await import(pathToFileURL(process.argv[3]).href)).default({ effect: (f) => f() });`
+	}
 	services := "{}"
 	if web {
 		services = `{ connection: { fetch: { register: (r) => { routes.push(r) } } }, webServer: {} }`
@@ -55,6 +59,7 @@ func driveDSHAuto(t *testing.T, web, withLib bool) (string, string) {
 	driver := `
 import { pathToFileURL } from "node:url";
 const plugin = (await import(pathToFileURL(process.argv[2]).href)).default;
+` + loadCard + `
 const routes = [];
 const contexts = {};
 const services = ` + services + `;
@@ -80,7 +85,7 @@ for (const r of routes) {
 	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := exec.Command(node, run, dshAutoPath()).CombinedOutput()
+	out, err := exec.Command(node, run, dshAutoPath(), dshNotesPath()).CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving auto.js: %v\n%s", err, out)
 	}
@@ -92,7 +97,7 @@ for (const r of routes) {
 // JSON reply, hands the model exactly the text --plain prints, and keeps the
 // receipt and notes for the card behind /api/deja-notes, once (#4983).
 func TestDeepSeekAutoShowsThePersonDejasLinesInDshWeb(t *testing.T) {
-	out, asked := driveDSHAuto(t, true, true)
+	out, asked := driveDSHAuto(t, true, true, true)
 	for _, want := range []string{
 		"project=MODEL TEXT hook-context\n",
 		"recall=MODEL TEXT hook-prompt\n",
@@ -115,15 +120,19 @@ func TestDeepSeekAutoShowsThePersonDejasLinesInDshWeb(t *testing.T) {
 // lib.js the plugin still recalls and registers no route.
 func TestDeepSeekAutoKeepsPlainWhereNoPageReads(t *testing.T) {
 	for _, tc := range []struct {
-		name         string
-		web, withLib bool
+		name               string
+		web, withLib, card bool
+		routes             string
 	}{
-		{"headless", false, true},
-		{"no lib.js", true, false},
+		{"headless", false, true, true, "routes=0\n"},
+		{"no lib.js", true, false, true, "routes=0\n"},
+		// The person switched the deja-notes row off: no card, so the route
+		// may stand but nothing is asked for it.
+		{"card row off", true, true, false, "routes=1\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out, asked := driveDSHAuto(t, tc.web, tc.withLib)
-			if !strings.Contains(out, "project=MODEL TEXT hook-context\n") || !strings.Contains(out, "recall=MODEL TEXT hook-prompt\n") || !strings.Contains(out, "routes=0\n") {
+			out, asked := driveDSHAuto(t, tc.web, tc.withLib, tc.card)
+			if !strings.Contains(out, "project=MODEL TEXT hook-context\n") || !strings.Contains(out, "recall=MODEL TEXT hook-prompt\n") || !strings.Contains(out, tc.routes) {
 				t.Errorf("driver:\n%s", out)
 			}
 			if strings.Count(asked, "--plain") != 2 {
@@ -207,5 +216,72 @@ func TestDshAliasIsRecordedAndUninstalls(t *testing.T) {
 	recordWiring([]string{"dsh-auto"}, false)
 	if st := readWiringState(); strings.Join(st.Targets, ",") != "deepseek-auto" {
 		t.Errorf("recorded targets = %v", st.Targets)
+	}
+}
+
+// A plugins/deja-notes or plugins/deja-status of somebody else's is left as it
+// is by install, by the MCP-only target and by uninstall, and the layer names
+// no deja row for it.
+func TestDeepSeekLeavesSomeoneElsesPluginPackages(t *testing.T) {
+	home := dshStatusHome(t)
+	theirs := map[string]string{}
+	for _, name := range []string{"deja-notes", "deja-status"} {
+		dir := filepath.Join(home, ".dsh", "plugins", name)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		body := "export default function apply() { /* mine: " + name + " */ }\n"
+		if err := os.WriteFile(filepath.Join(dir, "index.js"), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		theirs[dir] = body
+	}
+	check := func(step string) {
+		t.Helper()
+		for dir, body := range theirs {
+			if b, err := os.ReadFile(filepath.Join(dir, "index.js")); err != nil || string(b) != body {
+				t.Errorf("%s: %s/index.js = %q, %v", step, dir, b, err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "client.js")); !os.IsNotExist(err) {
+				t.Errorf("%s: deja wrote into %s", step, dir)
+			}
+		}
+	}
+	res, err := installDeepSeekAuto("/usr/local/bin/deja", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("install")
+	if !strings.Contains(res.Note, "alone") || !strings.Contains(res.Note, "deja-notes") {
+		t.Errorf("install did not say it left them: %+v", res)
+	}
+	layer, _ := os.ReadFile(filepath.Join(home, ".dsh", "cordis.patch.yml"))
+	if strings.Contains(string(layer), "deja-notes") || strings.Contains(string(layer), "deja-status") {
+		t.Errorf("the layer names a package deja did not write:\n%s", layer)
+	}
+	if _, err := installDeepSeekMCP("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	check("MCP-only install")
+	if _, err := installDeepSeekAuto("/usr/local/bin/deja", true); err != nil {
+		t.Fatal(err)
+	}
+	check("uninstall")
+}
+
+// A machine wired with `deja install dsh-auto` before the alias was recorded
+// has deja's auto.js on disk and no deepseek-auto in the record. install --all
+// has to keep it, or it takes auto.js and the card away.
+func TestInstallAllKeepsDshAutoWiredBeforeItWasRecorded(t *testing.T) {
+	hermeticEnv(t)
+	t.Setenv("DSH_HOME", filepath.Join(t.TempDir(), ".dsh"))
+	if got := withWiredAutoTargets([]string{"deepseek"}); strings.Join(got, ",") != "deepseek" {
+		t.Fatalf("premise: nothing on disk, got %v", got)
+	}
+	if _, err := installDeepSeekAuto("/usr/local/bin/deja", false); err != nil {
+		t.Fatal(err)
+	}
+	if got := withWiredAutoTargets([]string{"deepseek"}); strings.Join(got, ",") != "deepseek,deepseek-auto" {
+		t.Errorf("withWiredAutoTargets = %v", got)
 	}
 }
