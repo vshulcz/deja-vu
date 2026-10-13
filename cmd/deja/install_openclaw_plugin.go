@@ -521,9 +521,13 @@ function directSessionKey(key) {
   return !parts.some((p) => p === "group" || p === "channel" || p === "thread" || p === "topic")
 }
 function conversationOf(id, channel) {
-  const s = String(id ?? "").trim().toLowerCase()
-  const prefix = String(channel || "").trim().toLowerCase() + ":"
-  return s.startsWith(prefix) ? s.slice(prefix.length) : s
+  let s = String(id ?? "").trim().toLowerCase()
+  const own = String(channel || "").trim().toLowerCase() + ":"
+  if (s.startsWith(own)) s = s.slice(own.length)
+  for (const prefix of ["channel:", "chat:", "user:"]) {
+    if (s.startsWith(prefix)) return s.slice(prefix.length)
+  }
+  return s
 }
 function directTurn(event, ctx) {
   const e = event || {}
@@ -545,9 +549,10 @@ function wholeReplies(config, channel) {
   const section = config && config.channels && config.channels[ch]
   if (!ch || !section) return false
   const off = (s) => s === "off" || s === false || (s && typeof s === "object" && s.mode === "off" && !(s.block && s.block.enabled === true))
-  if (!off(section.streaming)) return false
+  // blockStreaming: true is the older spelling of streaming.block.enabled.
+  if (!off(section.streaming) || section.blockStreaming === true) return false
   const accounts = section.accounts && typeof section.accounts === "object" ? Object.values(section.accounts) : []
-  if (accounts.some((a) => a && a.streaming !== undefined && !off(a.streaming))) return false
+  if (accounts.some((a) => a && ((a.streaming !== undefined && !off(a.streaming)) || a.blockStreaming === true))) return false
   const defaults = config.agents && config.agents.defaults
   return !(defaults && defaults.blockStreamingDefault === "on")
 }
@@ -570,8 +575,9 @@ function replyTakes(held, event, ctx) {
   if (!held.runId || (e.runId || c.runId) !== held.runId) return false
   if (conversationOf(c.conversationId, channel) !== held.conversation) return false
   if (c.senderId !== undefined && String(c.senderId).trim() !== held.sender) return false
-  const chatType = e.usageState && e.usageState.chatType
-  if (chatType !== undefined && chatType !== "direct") return false
+  // The delivery's own word that it is a 1:1 chat, required: a session key
+  // with no group word in it (session.scope "global") says nothing.
+  if (!e.usageState || e.usageState.chatType !== "direct") return false
   const p = e.payload || {}
   if (p.audioAsVoice === true) return false
   return typeof p.text === "string" && p.text.trim() !== ""
@@ -744,7 +750,9 @@ export default {
         // store, half of all injections were then a word-for-word repeat. The
         // event is {prompt, messages}; the session is on ctx (#4581).
         const key = ctx?.sessionKey || "";
-        if (key) board.delete(key);
+        // A second prompt hook in the same run keeps the receipt deja already
+        // spent on it; one from any other run drops what was left.
+        if (key && board.get(key)?.runId !== ctx?.runId) board.delete(key);
         const at = where(ctx);
         const channel = turnChannel(ctx);
         const turn = key ? turns.get(key) : undefined;

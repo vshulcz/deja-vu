@@ -266,7 +266,9 @@ export default {
           const prompt = promptText(event)
           if (!prompt) return
           const key = (ctx && ctx.sessionKey) || ""
-          if (key) board.delete(key)
+          // A second prompt hook in the same run keeps the receipt deja already
+          // spent on it; one from any other run drops what was left.
+          if (key && board.get(key)?.runId !== (ctx && ctx.runId)) board.delete(key)
           const at = where(seen, event, ctx, process.cwd())
           const channel = turnChannel(ctx)
           const turn = key ? turns.get(key) : undefined

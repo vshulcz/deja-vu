@@ -218,11 +218,18 @@ export function directSessionKey(key) {
 }
 
 // conversationOf names a conversation the same way whichever hook reported
-// it: before_dispatch says "4242", the reply's hook "telegram:4242".
+// it: before_dispatch says "4242", the reply's hook "telegram:4242". The
+// prefixes are the ones OpenClaw strips for before_dispatch (stripChannelPrefix:
+// "channel:", "chat:", "user:", then "<channel>:"), applied after the channel's
+// own, so a Slack "slack:channel:D1" and a "D1" meet.
 export function conversationOf(id, channel) {
-  const s = String(id ?? "").trim().toLowerCase()
-  const prefix = String(channel || "").trim().toLowerCase() + ":"
-  return s.startsWith(prefix) ? s.slice(prefix.length) : s
+  let s = String(id ?? "").trim().toLowerCase()
+  const own = String(channel || "").trim().toLowerCase() + ":"
+  if (s.startsWith(own)) s = s.slice(own.length)
+  for (const prefix of ["channel:", "chat:", "user:"]) {
+    if (s.startsWith(prefix)) return s.slice(prefix.length)
+  }
+  return s
 }
 
 // directTurn is what before_dispatch says about the message that starts a
@@ -258,9 +265,10 @@ export function wholeReplies(config, channel) {
   const section = config && config.channels && config.channels[ch]
   if (!ch || !section) return false
   const off = (s) => s === "off" || s === false || (s && typeof s === "object" && s.mode === "off" && !(s.block && s.block.enabled === true))
-  if (!off(section.streaming)) return false
+  // blockStreaming: true is the older spelling of streaming.block.enabled.
+  if (!off(section.streaming) || section.blockStreaming === true) return false
   const accounts = section.accounts && typeof section.accounts === "object" ? Object.values(section.accounts) : []
-  if (accounts.some((a) => a && a.streaming !== undefined && !off(a.streaming))) return false
+  if (accounts.some((a) => a && ((a.streaming !== undefined && !off(a.streaming)) || a.blockStreaming === true))) return false
   const defaults = config.agents && config.agents.defaults
   return !(defaults && defaults.blockStreamingDefault === "on")
 }
@@ -282,7 +290,7 @@ export function receiptAllowed(turn, ctx, channel, config) {
 
 // replyTakes says whether a reply on its way out is the one the receipt was
 // kept for: the final reply of the same run, to the same conversation, on the
-// same channel, still a 1:1 chat, carrying text. A block-stream chunk, a media
+// same channel, that the delivery itself calls direct, carrying text. A block-stream chunk, a media
 // or voice reply, or anything that does not match gets nothing.
 export function replyTakes(held, event, ctx) {
   const e = event || {}
@@ -293,8 +301,9 @@ export function replyTakes(held, event, ctx) {
   if (!held.runId || (e.runId || c.runId) !== held.runId) return false
   if (conversationOf(c.conversationId, channel) !== held.conversation) return false
   if (c.senderId !== undefined && String(c.senderId).trim() !== held.sender) return false
-  const chatType = e.usageState && e.usageState.chatType
-  if (chatType !== undefined && chatType !== "direct") return false
+  // The delivery's own word that it is a 1:1 chat, required: a session key
+  // with no group word in it (session.scope "global") says nothing.
+  if (!e.usageState || e.usageState.chatType !== "direct") return false
   const p = e.payload || {}
   if (p.audioAsVoice === true) return false
   return typeof p.text === "string" && p.text.trim() !== ""

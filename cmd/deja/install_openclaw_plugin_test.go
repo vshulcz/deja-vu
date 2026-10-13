@@ -264,6 +264,12 @@ const cases = {
   stranger: [{ kinds: [] }, { sender: "7", prompt: "zorbit, hi" }],
   block: [{ kinds: ["block"] }],
   streaming: [{ host: { channels: { telegram: { allowFrom: ["4242"] } } }, kinds: ["block"] }],
+  legacyBlock: [{ host: { channels: { telegram: { allowFrom: ["4242"], streaming: "off", blockStreaming: true } } } }],
+  // session.scope "global": no group word in the key, so the delivery's chat type decides.
+  global: [{ key: "global", chatType: null }],
+  slack: [{ host: { channels: { slack: { allowFrom: ["U9"], streaming: "off" } } }, key: "agent:main:slack:direct:u9",
+    channel: "slack", sender: "U9", conv: "D0123", replyConv: "slack:channel:D0123" }],
+  twice: [{ prompts: 2 }],
 };
 const out = {};
 let run = 0;
@@ -276,15 +282,20 @@ for (const [name, turns] of Object.entries(cases)) {
   for (const t of turns) {
     const key = t.key || "agent:main:main", channel = t.channel || "telegram", sender = t.sender || "4242";
     const conv = t.conv || sender, runId = "run-" + ++run;
+    const chatType = t.chatType === undefined ? (t.isGroup ? "group" : "direct") : t.chatType;
     await hooks.before_dispatch?.({ sessionKey: key, channel, senderId: sender, isGroup: t.isGroup ?? false },
       { sessionKey: key, channelId: channel, conversationId: conv, senderId: sender });
-    const built = await hooks.before_prompt_build({ prompt: t.prompt || "what did we decide about the zorbit drain", messages: [] },
-      { sessionKey: key, sessionId: "s", channel, senderId: sender, trigger: "user", runId });
+    let built;
+    for (let i = 0; i < (t.prompts || 1); i++) {
+      built = (await hooks.before_prompt_build({ prompt: t.prompt || "what did we decide about the zorbit drain", messages: [] },
+        { sessionKey: key, sessionId: "s", channel, senderId: sender, trigger: "user", runId })) ?? built;
+    }
     const sent = [];
     for (const kind of t.kinds ?? ["final"]) {
       sent.push(hooks.reply_payload_sending
-        ? (await hooks.reply_payload_sending({ kind, channel, sessionKey: key, runId, payload: { text: "Use --grace 40." } },
-          { channelId: channel, conversationId: channel + ":" + conv, senderId: sender, runId })) ?? null
+        ? (await hooks.reply_payload_sending({ kind, channel, sessionKey: key, runId, usageState: chatType ? { chatType } : undefined,
+          payload: { text: "Use --grace 40." } },
+          { channelId: channel, conversationId: t.replyConv || channel + ":" + conv, senderId: sender, runId })) ?? null
         : null);
     }
     last = { context: built?.prependContext ?? null, sent: sent[sent.length - 1] ?? null };
@@ -338,7 +349,7 @@ console.log(JSON.stringify(out));
 	if dm.Calls != "hook-prompt\n" {
 		t.Errorf("want one JSON hook-prompt spawn in the DM, got %q", dm.Calls)
 	}
-	for _, name := range []string{"group", "unnamedGroup", "tui", "off", "streaming"} {
+	for _, name := range []string{"group", "unnamedGroup", "tui", "off", "streaming", "legacyBlock"} {
 		if got[name].Sent != nil {
 			t.Errorf("%s: the reply was changed:\n%s", name, raw)
 		}
@@ -346,9 +357,17 @@ console.log(JSON.stringify(out));
 			t.Errorf("%s: want --plain, got %q", name, got[name].Calls)
 		}
 	}
-	for _, name := range []string{"stranger", "block"} {
+	for _, name := range []string{"stranger", "block", "global"} {
 		if got[name].Sent != nil {
-			t.Errorf("%s: a reply that is not the owner's final reply took the receipt:\n%s", name, raw)
+			t.Errorf("%s: a reply that is not the owner's final direct reply took the receipt:\n%s", name, raw)
+		}
+	}
+	// A Slack DM's reply names its conversation "slack:channel:D…", the
+	// dispatch "D…"; and a second prompt hook in the run keeps the receipt.
+	for _, name := range []string{"slack", "twice"} {
+		c := got[name]
+		if c.Sent == nil || len(c.Sent.Payload.Presentation.Blocks) != 1 || c.Sent.Payload.Presentation.Blocks[0].Text != want {
+			t.Errorf("%s: the owner's DM reply went out without the receipt:\n%s", name, raw)
 		}
 	}
 }

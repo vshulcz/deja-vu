@@ -115,9 +115,12 @@ test("the receipt is asked for only on the owner's 1:1 turn with a run id", () =
 
 test("only the final text reply of the same run, to the same conversation, takes the receipt", () => {
   const held = { ...directTurn(dmEvent, dmCtx), runId: "r1", line: LINE }
-  const event = { kind: "final", channel: "telegram", sessionKey: "agent:main:main", runId: "r1", payload: { text: "ok" } }
+  const event = { kind: "final", channel: "telegram", sessionKey: "agent:main:main", runId: "r1", usageState: { chatType: "direct" }, payload: { text: "ok" } }
   const ctx = { channelId: "telegram", conversationId: "telegram:4242", senderId: "4242", runId: "r1" }
   assert.equal(replyTakes(held, event, ctx), true)
+  // No chat type from the delivery is not a 1:1 chat.
+  assert.equal(replyTakes(held, { ...event, usageState: undefined }, ctx), false)
+  assert.equal(replyTakes(held, { ...event, usageState: {} }, ctx), false)
   assert.equal(replyTakes(held, { ...event, kind: "block" }, ctx), false)
   assert.equal(replyTakes(held, { ...event, runId: "r2" }, { ...ctx, runId: "r2" }), false)
   assert.equal(replyTakes(held, event, { ...ctx, conversationId: "telegram:7" }), false)
@@ -172,19 +175,23 @@ async function plugin({ pluginConfig = {}, hostConfig = OWNER } = {}) {
     hooks,
     calls: () => readFileSync(calls, "utf8"),
     // One turn. dispatch: false is a run with no inbound message (a heartbeat).
-    async turn({ key = "agent:main:main", channel = "telegram", sender = "4242", conversation = sender, isGroup = false, prompt = "what did we decide about draining the zorbit queue", trigger = "user", dispatch = true, kinds = ["final"] } = {}) {
+    // chatType is what the delivery's usageState says; replyConversation is the
+    // reply hook's conversation id; prompts is how many times the prompt hook
+    // fires in the run.
+    async turn({ key = "agent:main:main", channel = "telegram", sender = "4242", conversation = sender, isGroup = false, prompt = "what did we decide about draining the zorbit queue", trigger = "user", dispatch = true, kinds = ["final"], chatType = isGroup ? "group" : "direct", replyConversation = channel + ":" + conversation, prompts = 1 } = {}) {
       const runId = "run-" + ++n
       if (dispatch) {
         await hooks.before_dispatch({ sessionKey: key, channel, senderId: sender, isGroup }, { sessionKey: key, channelId: channel, conversationId: conversation, senderId: sender })
       }
       const ctx = { sessionKey: key, sessionId: "s", workspaceDir: dir, channel, messageProvider: channel, senderId: dispatch ? sender : undefined, trigger, runId }
-      const built = await hooks.before_prompt_build({ prompt, messages: [] }, ctx)
+      let built
+      for (let i = 0; i < prompts; i++) built = (await hooks.before_prompt_build({ prompt, messages: [] }, ctx)) ?? built
       const sent = []
       for (const kind of kinds) {
         const out = hooks.reply_payload_sending
           ? await hooks.reply_payload_sending(
-              { kind, channel, sessionKey: key, runId, payload: { text: "Use --grace 40." } },
-              { channelId: channel, conversationId: channel + ":" + conversation, sessionKey: key, senderId: dispatch ? sender : undefined, runId },
+              { kind, channel, sessionKey: key, runId, usageState: chatType ? { chatType } : undefined, payload: { text: "Use --grace 40." } },
+              { channelId: channel, conversationId: replyConversation, sessionKey: key, senderId: dispatch ? sender : undefined, runId },
             )
           : undefined
         sent.push(out)
@@ -296,4 +303,36 @@ test("a DM on a streaming channel makes no JSON call", async () => {
     assert.equal(sent[0], undefined)
     assert.deepEqual(promptCalls(p.calls()), ["hook-prompt --plain"], JSON.stringify(telegram))
   }
+})
+
+// session.scope "global" gives every chat one key with no group word in it, so
+// the delivery's own chat type is the backstop.
+test("a reply the delivery does not call direct gets nothing", async () => {
+  for (const chatType of [null, "group"]) {
+    const p = await plugin()
+    const { sent } = await p.turn({ key: "global", chatType })
+    assert.equal(sent[0], undefined, String(chatType))
+  }
+})
+
+test("the older blockStreaming switch counts as streaming, on the channel or an account", () => {
+  assert.equal(wholeReplies({ channels: { telegram: { streaming: "off", blockStreaming: true } } }, "telegram"), false)
+  assert.equal(wholeReplies({ channels: { telegram: { streaming: "off", accounts: { work: { blockStreaming: true } } } } }, "telegram"), false)
+  assert.equal(wholeReplies({ channels: { telegram: { streaming: "off", blockStreaming: false } } }, "telegram"), true)
+})
+
+test("a Slack DM's reply matches its conversation through OpenClaw's prefixes", async () => {
+  assert.equal(conversationOf("slack:channel:D0123", "slack"), "d0123")
+  assert.equal(conversationOf("channel:D0123", "slack"), "d0123")
+  assert.equal(conversationOf("user:U9", "slack"), "u9")
+  const p = await plugin({ hostConfig: { channels: { slack: { allowFrom: ["U9"], streaming: { mode: "off" } } } } })
+  const { sent } = await p.turn({ key: "agent:main:slack:direct:u9", channel: "slack", sender: "U9", conversation: "D0123", replyConversation: "slack:channel:D0123" })
+  assert.deepEqual(blocksOf(sent[0]), [{ type: "context", text: "_" + LINE + "_" }])
+})
+
+test("a second prompt hook in the same run keeps the receipt deja already spent", async () => {
+  const p = await plugin()
+  const { sent } = await p.turn({ prompts: 2 })
+  assert.deepEqual(blocksOf(sent[0]), [{ type: "context", text: "_" + LINE + "_" }])
+  assert.deepEqual(promptCalls(p.calls()), ["hook-prompt", "hook-prompt --plain"])
 })
