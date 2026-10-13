@@ -55,18 +55,31 @@ func weekNoteAt(dir string, now time.Time) string {
 		line += fmt.Sprintf(", %d déjà vu", n.DejaVuWeek)
 	}
 	line += " — deja stats --card"
-	// The first week note carries the one sentence deja says about itself, when
-	// the install never printed it (a plugin or package install has no proof).
-	if star := starLine(dir); star != "" {
-		line += " · " + star
-	}
 	return line
 }
 
 // humanNotes is what deja has to tell the person rather than the model: the
-// one-time built note, the weekly count, and the one-time what-changed note
-// for a new version. Each marks itself shown, so whichever surface prints
-// them first is the only one that does.
+// one-time built note, the one-time what-changed note for a new version, the
+// weekly count, and the once-per-index GitHub line. One of them per call, the
+// first that is due: four at once made a session start a wall of text. Each
+// marks itself shown only when it is returned, so the rest wait for the next
+// session start rather than being spent unseen.
 func humanNotes(dir string) string {
-	return joinNotes(builtNote(dir), joinNotes(weekNote(dir), whatChangedNote(dir)))
+	for _, note := range []func(string) string{builtNote, whatChangedNote, weekNote, pendingStar} {
+		if line := note(dir); line != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+// pendingStar is the GitHub line for a person who has not seen it: on the
+// hook path that is a plugin or package install, which has no install proof
+// to carry it. It waits until the built note has been shown, so it follows
+// an index that found something, never an empty machine.
+func pendingStar(dir string) string {
+	if _, err := os.Stat(dir + ".builtnote"); err != nil {
+		return ""
+	}
+	return starLine(dir)
 }

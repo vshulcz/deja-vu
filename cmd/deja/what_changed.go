@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/vshulcz/deja-vu"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // whatChangedTerminal returns the terminal message for the first run of a new
@@ -34,11 +35,32 @@ func whatChangedNote(dir string) string {
 	if len(items) == 0 {
 		return ""
 	}
-	line := fmt.Sprintf("deja v%s is new — %s", current, items[0])
+	head := fmt.Sprintf("deja v%s is new — ", current)
+	tail := ""
 	if len(items) > 1 {
-		line += fmt.Sprintf(" (and %d more in the changelog)", len(items)-1)
+		tail = fmt.Sprintf(" (+%d more)", len(items)-1)
 	}
-	return line
+	// One line: the change is cut to what is left of noteWidth, since a
+	// changelog sentence runs to 140 characters on its own.
+	item := items[0]
+	if room := noteWidth - termwidth.Columns(head) - termwidth.Columns(tail); termwidth.Columns(item) > room {
+		item = cutChangelogItem(item, room)
+	}
+	return head + item + tail
+}
+
+// cutChangelogItem cuts a changelog sentence to width columns, ellipsis
+// included, without ending inside a `code span` or a (#NNNN) reference: half
+// a command or half an issue number points nowhere.
+func cutChangelogItem(item string, width int) string {
+	cut := termwidth.Cut(item, width-1)
+	if strings.Count(cut, "`")%2 == 1 {
+		cut = cut[:strings.LastIndex(cut, "`")]
+	}
+	if i := strings.LastIndex(cut, "(#"); i >= 0 && !strings.Contains(cut[i:], ")") {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,;:(—") + "…"
 }
 
 // whatChangedFor returns the top three changes since the last version this

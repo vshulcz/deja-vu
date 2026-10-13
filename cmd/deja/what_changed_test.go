@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // The first run of a new version says once what it brings: a short line plus
@@ -148,6 +150,11 @@ func TestWhatChangedNoteOneLine(t *testing.T) {
 	if strings.Contains(note, "\n") {
 		t.Errorf("note is not one line: %q", note)
 	}
+	// The embedded changelog's bullets run past 140 characters; the note
+	// cuts the first to what fits.
+	if w := termwidth.Columns(note); w > noteWidth {
+		t.Errorf("note is %d columns, over %d: %q", w, noteWidth, note)
+	}
 	// The terminal then says nothing.
 	if got := whatChangedTerminal(dir); got != "" {
 		t.Errorf("the terminal said %q after the hook, want nothing", got)
@@ -194,5 +201,22 @@ func TestWhatChangedItemsAreShort(t *testing.T) {
 	run := strings.Repeat("word ", 60)
 	if got := firstSentence(run); len([]rune(got)) > 140 {
 		t.Errorf("firstSentence left %d characters, want at most 140", len([]rune(got)))
+	}
+}
+
+// A cut never ends inside a code span or an issue reference.
+func TestWhatChangedCutKeepsCodeAndReferencesWhole(t *testing.T) {
+	item := "Session start shows one note at a time, and `deja hook-context --notes` prints the rest later (#4993) for hosts that render it"
+	for width := 20; width < len(item); width++ {
+		got := cutChangelogItem(item, width)
+		if termwidth.Columns(got) > width {
+			t.Fatalf("width %d: %q is %d columns", width, got, termwidth.Columns(got))
+		}
+		if strings.Count(got, "`")%2 == 1 {
+			t.Fatalf("width %d: cut inside the code span: %q", width, got)
+		}
+		if i := strings.LastIndex(got, "(#"); i >= 0 && !strings.Contains(got[i:], ")") {
+			t.Fatalf("width %d: cut inside the reference: %q", width, got)
+		}
 	}
 }

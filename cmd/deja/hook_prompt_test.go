@@ -15,6 +15,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/stats"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/search"
@@ -389,9 +390,35 @@ func TestDejaVuTopicSkipsHarnessPlumbing(t *testing.T) {
 	if strings.Contains(line, "AGENTS.md") {
 		t.Fatalf("plumbing leaked into deja vu line: %q", line)
 	}
+	// The year-old date leaves the quote 42 columns, which cuts "midnight"
+	// out of it, so that term is named first; the fourth is never named.
 	withWhy := dejaVuLine(s, "exporter", "midnight", "rows", "fourth")
-	if !strings.Contains(withWhy, "via: exporter, midnight, rows") || strings.Contains(withWhy, "fourth") {
+	if !strings.Contains(withWhy, "· via midnight") || strings.Contains(withWhy, "fourth") {
 		t.Fatalf("via-terms missing or uncapped: %q", withWhy)
+	}
+	if w := termwidth.Columns(withWhy); w > noteWidth {
+		t.Fatalf("the line is %d columns, over %d: %q", w, noteWidth, withWhy)
+	}
+	// A quote with quotes in it is measured as printed, escapes included, and
+	// a 39-character identifier as the first term is cut to fit, not dropped.
+	quoted := model.Session{ID: "q", Project: "app", Messages: []model.Message{{Role: "user", Text: `why does "make test" fail on the "replica" path after the nightly exporter runs`}}}
+	ident := "TestReplicaExporterDropsRowsAtMidnight1"
+	got := dejaVuLine(quoted, ident, "exporter")
+	if w := termwidth.Columns(got); w > noteWidth {
+		t.Fatalf("the line is %d columns, over %d: %q", w, noteWidth, got)
+	}
+	if !strings.Contains(got, `\"make test\"`) || !strings.Contains(got, "· via TestReplica") {
+		t.Fatalf("the quote or the first term is missing: %q", got)
+	}
+	// The order is checked against the quote as cut: a term that only the cut
+	// tail held is news to the reader and goes first.
+	tail := model.Session{ID: "t", Project: "app", Updated: time.Now(), Messages: []model.Message{{Role: "user", Text: "the exporter drops the last batch of rows every night at midnight, only on the replica"}}}
+	if got := dejaVuLine(tail, "exporter", "replica"); !strings.Contains(got, "· via replica") || strings.Contains(got, "on the replica\"") {
+		t.Fatalf("a term cut out of the quote was not put first: %q", got)
+	}
+	short := model.Session{ID: "z", Project: "app", Messages: []model.Message{{Role: "user", Text: "drain the queue"}}}
+	if got := dejaVuLine(short, "queue", "grace", "deploy"); !strings.HasSuffix(got, "· via grace, deploy, queue)") {
+		t.Fatalf("with room, all three terms, the ones the quote lacks first: %q", got)
 	}
 	junk := model.Session{Harness: "codex", ID: "y", Project: "app",
 		Title:    `<environment_context> <cwd>/x</cwd>`,
@@ -683,7 +710,7 @@ func TestDejaVuLineDoesNotClaimAPeersWorkAsYours(t *testing.T) {
 		t.Errorf("the line does not say where the session came from: %q", got)
 	}
 	// The rest of the line — the topic and why it fired — is unchanged.
-	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via: ticker") {
+	if !strings.Contains(got, "ticker window") || !strings.Contains(got, "via ticker") {
 		t.Errorf("the line lost what it is for: %q", got)
 	}
 }

@@ -46,21 +46,27 @@ func TestTheFirstSessionAfterTheBuildHearsWhatWasIndexed(t *testing.T) {
 		return resp.SystemMessage
 	}
 	first := read()
-	if !strings.Contains(first, "deja indexed 2 sessions from 1 agent") {
+	if !strings.Contains(first, "deja indexed 2 sessions (1 agent") {
 		t.Fatalf("the first session after the build was not told what was indexed: %q", first)
 	}
-	if !strings.Contains(first, "1 question asked more than once") {
-		t.Fatalf("the repeat count is missing: %q", first)
+	if !strings.Contains(first, "deja indexed 2 sessions (1 agent, 1 repeat question) · docs: vshulcz.github.io/deja-vu\n") &&
+		!strings.HasSuffix(first, "deja indexed 2 sessions (1 agent, 1 repeat question) · docs: vshulcz.github.io/deja-vu") {
+		t.Fatalf("the built note is not the one line with the repeat count and the docs: %q", first)
 	}
-	if !strings.Contains(first, starText) {
-		t.Fatalf("the install proof of a marketplace install left out the one line deja says about itself: %q", first)
+	// One once-only note per session start: the GitHub line waits for the
+	// next one rather than making this one a wall.
+	if strings.Contains(first, starText) {
+		t.Fatalf("the built note and the GitHub line arrived together: %q", first)
 	}
 	second := read()
 	if strings.Contains(second, "deja indexed") {
 		t.Fatalf("the built note repeated: %q", second)
 	}
-	if strings.Contains(second, starText) {
-		t.Fatalf("the star line repeated: %q", second)
+	if !strings.Contains(second, starText) {
+		t.Fatalf("a marketplace install never heard the one line deja says about itself: %q", second)
+	}
+	if third := read(); strings.Contains(third, starText) {
+		t.Fatalf("the star line repeated: %q", third)
 	}
 }
 

@@ -153,8 +153,8 @@
 <p>The plugin runs the <a href="https://github.com/vshulcz/deja-vu">deja</a> binary, which does the indexing. npm installs a copy with the package, a <code>deja</code> already on your PATH wins over it, and <code>DEJA_BIN</code> overrides both — so your own <code>deja update</code> or <code>brew upgrade</code> is what decides the version, not whatever a plugin release froze.</p>
 <p>With the CLI instead:</p>
 <pre>deja install dsh-auto</pre>
-<p>That writes the MCP server and the <code>/deja</code> command into the profile patch layer, and adds the plugin that puts recall in front of the model. <code>deja install --auto</code> does the same for every other agent on the machine in one pass.</p>
-<p>Both at once is fine: the package looks for what the installer wrote in <code>$DSH_HOME/plugins/deja/</code> and contributes only what is missing, so you never get two <code>/deja</code> commands or the same recall twice.</p>
+<p>That writes the MCP server and the <code>/deja</code> command into the profile patch layer, and adds the plugin that puts recall in front of the model. In <code>dsh web</code> it also adds the panel above the input where you see deja's "you have been here" receipt and its session-start notes, the same one the package draws. <code>deja install --auto</code> does the same for every other agent on the machine in one pass.</p>
+<p>Both at once is fine: the package looks for what the installer wrote in <code>$DSH_HOME/plugins/deja/</code> and contributes only what is missing, so you never get two <code>/deja</code> commands, two panels or the same recall twice.</p>
 <p>A plugin written before this release sends its notices with the retired v3 source, which dsh v4 refuses with "format v4 message requires a producer-owned source kind". <code>deja doctor</code> reports that plugin as stale. Run <code>deja install dsh-auto</code> again, or update <code>dsh-deja</code>, to replace it.</p>
 
 <h2>What arrives</h2>

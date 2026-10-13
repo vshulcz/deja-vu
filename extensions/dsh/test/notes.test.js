@@ -14,7 +14,7 @@ import { newestEvents, noteBoard, splitHookReply } from "../lib.js";
 const RECALL = "<deja-recall>\nthe staging queue drains with --grace 40\n</deja-recall>";
 const RECEIPT = 'deja-vu — you have been here: "staging queue drain" (3 days ago · via: grace)';
 const DIGEST = "<deja-recall>\nthis project settled on pnpm\n</deja-recall>";
-const BUILT = "deja indexed 12 sessions from 2 agents";
+const BUILT = "deja indexed 12 sessions (2 agents)";
 
 test("the JSON reply splits into the model's text and the person's", () => {
   const reply = JSON.stringify({
@@ -167,7 +167,7 @@ test("the recall reaches the model unchanged and the receipt reaches the page", 
   // A web user who runs /deja before the page asked sees the lines there, once.
   web.contexts.get("deja:project")(assembly("session-5678"));
   const reply = await web.command.handler({ rawInput: "staging queue", agent: { sessionId: "session-5678" } });
-  assert.match(reply.text, new RegExp(BUILT));
+  assert.ok(reply.text.includes(BUILT), reply.text);
   assert.deepEqual(await ask("session-5678"), [], "the lines /deja showed came back on the page");
 });
 

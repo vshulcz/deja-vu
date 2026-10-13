@@ -167,7 +167,7 @@ func (s *warmupStatus) line() string {
 	// false — 3% of the sessions read is not a few seconds from done. The
 	// reader is told what deja is doing and that recall follows it, which is
 	// the true part (#2598).
-	return fmt.Sprintf("deja: indexing your history (%s%s) — recall comes online when it finishes", s.phaseName(), pct)
+	return fmt.Sprintf("deja: indexing your history (%s%s) — recall starts when it finishes", s.phaseName(), pct)
 }
 
 // publishBuildProgress installs the file sink for the work that happens before

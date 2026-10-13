@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- deja's lines for the person fit on one line each, and a session start shows the recall receipt plus at most one once-only note (the built note, what changed, the week note, the GitHub line), so a fresh install no longer opens with four lines. The receipt drops its byte count and the docs line folds into the built note. What the model receives is unchanged.
+
 ### Added
 
 - In a 1:1 chat with the owner on an OpenClaw channel (Telegram, Slack, Discord and the rest), a reply answered from history gets one italic line under it: `↺ you've been here: "<topic>" · Oct 4 · deja`. Same deja call per prompt, same text for the model. It goes only on the final text reply of the same run, and only when every 1:1 signal agrees and the sender is the owner; anything unknown means no line. It needs a channel that sends replies whole (`channels.telegram.streaming.mode: "off"`); on a streaming channel deja is not asked for it. Group chats, other people's DMs, the TUI and the Control UI get nothing, and no other deja note is sent to a channel. `"receipt": false` in the plugin config turns it off. In the npm plugin and the one `deja install openclaw-auto` writes.
 - dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt. tui, headless and sdk profiles have no page, so there the plugin still asks deja for plain text and leaves the notes for `/deja` and the next session to show (#4982).
+- Hermes shows the person deja's lines too, with deja as the memory provider: the receipt and the session-start notes ride Hermes's own recall line, `🧠 deja · …`, in the CLI, where it used to say only "recalled 1 memory". Same one deja call per hook, and the model's text is unchanged. Hermes 0.17 has no such line, `hermes -z` and `hermes chat -Q` print none, the TUI and desktop do not keep it on screen and a gateway chat may be a group, so there deja is still asked for plain text and keeps its notes.
+- A dsh profile wired by `deja install dsh-auto` shows the same panel, from the same files the npm plugin ships. With both installed there is still one panel and one recall (#4983).
 
 ### Fixed
 
+- `deja uninstall dsh-auto` works: the alias was refused on the way out, and an install under it was never recorded, so the directories it made stayed behind after an uninstall (#4983).
 - On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 
 - The semantic sidecar survives a rewrite of the index: each vector carries its record's identity, so search keeps using it and the next `deja embed` sends only new or changed records. Before, any pass that rewrote `records.bin` (a torn last line, a removed file) made search refuse the sidecar and the next run embed the whole store again, about 45 minutes on 112k records. A sidecar written before this is rekeyed on the next `deja embed` while the index still has its layout. Proposed by @AlexanderAbramovPav (#4976).

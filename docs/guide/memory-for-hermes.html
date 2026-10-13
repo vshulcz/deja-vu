@@ -152,7 +152,7 @@
 <pre>hermes config set memory.provider deja-memory</pre>
 <p>The provider alone, without the MCP server or the hook plugin, is in the Hermes plugin catalog and installs from Hermes itself once deja is on PATH:</p>
 <pre>hermes plugins install deja-vu</pre>
-<p>With the provider active the model gets the same recall before each turn and three tools — <code>deja_recall</code>, <code>deja_fix</code>, <code>deja_blame</code> — and the <code>pre_llm_call</code> plugin steps aside so nothing arrives twice.</p>
+<p>With the provider active the model gets the same recall before each turn and three tools — <code>deja_recall</code>, <code>deja_fix</code>, <code>deja_blame</code> — and the <code>pre_llm_call</code> plugin steps aside so nothing arrives twice. You also see what it brought: Hermes prints one recall line per turn, and deja's receipt (<code>🧠 deja · you have been here: "…" (3d ago)</code>) and its session-start notes ride that line in the CLI. <code>hermes -z</code>, <code>hermes chat -Q</code>, gateway chats, the TUI and desktop stay quiet, and deja keeps the notes for a session that shows them. The hook plugin has no such line to write to, so without the provider deja stays silent on screen.</p>
 <p>Reading Hermes's store needs the <code>sqlite3</code> CLI on the machine; <code>deja doctor</code> names it if it is missing.</p>
 
 <h2>Or only the skill</h2>

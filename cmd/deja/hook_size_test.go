@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/index"
@@ -45,6 +44,8 @@ func runHookCapturing(t *testing.T, dir, event string) string {
 // The size on the first screen was a ceiling to whole kilobytes, so 631 bytes
 // read as "~1KB" while statusline and stats counted the real figure — the one
 // number a reader sees first was the one no command could reproduce (#991).
+// The receipt quotes no size now, so the first screen cannot disagree with
+// the counters; what is left to hold is that the counters still count.
 func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		// The helper swaps the process's stdin and stdout for pipes; on
@@ -90,10 +91,10 @@ func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 	if resp.SystemMessage == "" {
 		t.Skip("no memory to recall in this environment")
 	}
-	if strings.Contains(resp.SystemMessage, "KB)") && !strings.Contains(resp.SystemMessage, ".") {
-		t.Errorf("the size is still rounded to whole kilobytes: %q", resp.SystemMessage)
+	if byteFigure.MatchString(resp.SystemMessage) {
+		t.Errorf("the first screen quotes a size again: %q", resp.SystemMessage)
 	}
-	// The number has to be the same one the counters accumulate.
+	// The counters still measure the injection.
 	stats, err := captureRun(t, "stats", "--json")
 	if err != nil {
 		t.Fatal(err)
@@ -106,10 +107,7 @@ func TestHookSizeMatchesWhatTheCountersReport(t *testing.T) {
 	if err := json.Unmarshal([]byte(stats), &s); err != nil {
 		t.Fatal(err)
 	}
-	// The number, not its punctuation: the receipt names what the figure
-	// measures ("… of context") since #1082, and the invariant this test
-	// exists for is that the two surfaces quote the same number.
-	if want := humanBytes(s.Recall.Bytes); !strings.Contains(resp.SystemMessage, want) {
-		t.Errorf("the first screen says something else than stats counts (%s):\n%s", want, resp.SystemMessage)
+	if s.Recall.Bytes <= 0 || int(s.Recall.Bytes) < len(resp.Hook.Context) {
+		t.Errorf("stats counts %d bytes for a %d-byte injection", s.Recall.Bytes, len(resp.Hook.Context))
 	}
 }

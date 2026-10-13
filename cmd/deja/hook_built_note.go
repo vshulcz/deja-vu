@@ -30,25 +30,24 @@ func builtNote(dir string) string {
 		return ""
 	}
 	_ = os.WriteFile(marker, []byte("1"), 0o600)
-	line := fmt.Sprintf("deja indexed %s session%s from %d agent%s on this machine",
-		formatStatNumber(sessions), pluralS(sessions), harnesses, pluralS(harnesses))
-	if repeated > 0 {
-		line += fmt.Sprintf(" — %d question%s asked more than once; the earlier answers now arrive before you re-ask",
-			repeated, pluralS(repeated))
-	} else {
-		line += " — what they decided now arrives before you re-ask"
-	}
+	// One line: the count and what it found. The sentence that used to
+	// explain what an index is for, and the docs on a line of their own, made
+	// the first session start four lines tall in every host.
 	// A marketplace install never runs `deja install`, so this notice is the
 	// first thing deja says to that person. It is also the only place left to
-	// say where the docs and the tracker are (#3030).
-	if where := whereToLook(dir); where != "" {
-		line += "\n" + where
+	// say where the docs are (#3030); the site links the tracker.
+	return builtLine(sessions, harnesses, repeated, whereToLook(dir) != "")
+}
+
+// builtLine is the built note's text for what the build found.
+func builtLine(sessions, harnesses, repeated int, docs bool) string {
+	found := fmt.Sprintf("%d agent%s", harnesses, pluralS(harnesses))
+	if repeated > 0 {
+		found += fmt.Sprintf(", %s repeat question%s", formatStatNumber(repeated), pluralS(repeated))
 	}
-	// This is the install proof for a marketplace install, the moment starText
-	// was written for; waiting for the first week note meant a week of use
-	// with recalls before it could be said at all.
-	if star := starLine(dir); star != "" {
-		line += "\n" + star
+	line := fmt.Sprintf("deja indexed %s session%s (%s)", formatStatNumber(sessions), pluralS(sessions), found)
+	if docs {
+		line += " · " + docsLink
 	}
 	return line
 }

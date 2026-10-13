@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -56,36 +57,29 @@ func sessionStart(t *testing.T, dir, cwd, session string) hookResp {
 	return r
 }
 
-// The receipt names the sessions and then quotes a size, and a reader takes
-// the number for the size of the thing the sentence names. It is the size of
-// the whole injected block, whose frame and instruction lines are a constant
-// ~499 bytes — 82% of the number on a one-message store (#1082).
-//
-// The number itself stays: `deja stats` and the status bar quote the same
-// figure, and TestHookSizeMatchesWhatTheCountersReport exists to keep them
-// agreeing. That one-number invariant is worth more than a second, smaller
-// number; what changed is that the sentence now says what the figure measures.
-func TestReceiptSaysWhatTheSizeMeasures(t *testing.T) {
+// The receipt used to quote the size of the injected block, and a reader took
+// it for the size of the sessions it named; #1082 labelled it "of context".
+// Nobody acted on the number and it pushed the receipt onto a second terminal
+// line, so it is gone: `deja stats` and the status bar still carry the figure
+// (TestInjectedBlockAndItsAccountingKeepTheFrame).
+func TestReceiptCarriesNoByteCount(t *testing.T) {
 	dir := oneMessageStore(t)
 	r := sessionStart(t, dir, "/tmp/projt", "q1")
 
 	if r.SystemMessage == "" {
 		t.Fatalf("no receipt at all, wrong fixture")
 	}
+	if !strings.Contains(r.SystemMessage, "deja recalled 1 prior session") {
+		t.Errorf("the receipt lost its claim: %q", r.SystemMessage)
+	}
 	ctx := r.HookSpecificOutput.AdditionalContext
-	if len(ctx) < 400 {
-		t.Fatalf("injected block is %d bytes, too small to tell frame from memory", len(ctx))
-	}
-	// The recalled message is a couple of dozen bytes and the framed block is
-	// several hundred, so on this fixture an unqualified size is the defect.
-	if !strings.Contains(r.SystemMessage, "of context") {
-		t.Errorf("receipt sizes the sessions without saying the figure is the injected context: %q", r.SystemMessage)
-	}
-	// And it is still the figure the other surfaces quote.
-	if !strings.Contains(r.SystemMessage, humanBytes(int64(len(ctx)))) {
-		t.Errorf("receipt no longer quotes the injected size %s: %q", humanBytes(int64(len(ctx))), r.SystemMessage)
+	if strings.Contains(r.SystemMessage, humanBytes(int64(len(ctx)))) || byteFigure.MatchString(r.SystemMessage) {
+		t.Errorf("the receipt still quotes a size: %q", r.SystemMessage)
 	}
 }
+
+// byteFigure is a size as humanBytes writes it.
+var byteFigure = regexp.MustCompile(`\b\d+(\.\d+)? (B|KB|MB|GB)\b`)
 
 // The frame is still sent to the agent, and the usage counters still measure
 // it: they are labelled as injected context, and the frame is injected.

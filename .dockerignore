@@ -3,3 +3,4 @@ docs/assets
 assets
 fixtures
 *.md
+!CHANGELOG.md
