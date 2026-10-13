@@ -133,12 +133,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 	for _, v := range old.Vectors {
 		seen[v.Offset] = true
 	}
-	var pending []index.OffsetRecord
-	for _, r := range recs {
-		if !seen[r.Offset] {
-			pending = append(pending, r)
-		}
-	}
+	pending := toEmbed(recs, seen)
 	batches := 0
 	for len(pending) > 0 {
 		n := len(pending)
@@ -151,6 +146,12 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		}
 		vectors, err := client.Embed(context.Background(), texts)
 		if err != nil {
+			// Keep what this run embedded since the last checkpoint: a run
+			// that failed half an hour in lost all of it (#4975).
+			if len(old.Vectors) > 0 {
+				old.Model, old.Generation, old.Covered = client.Model, gen, len(old.Vectors)
+				_ = write(dir, old)
+			}
 			return Sidecar{}, err
 		}
 		for i, values := range vectors {
@@ -178,6 +179,20 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		return Sidecar{}, err
 	}
 	return old, nil
+}
+
+// toEmbed is the records still to embed: not embedded yet, and with text to
+// send. A record that cleaning left empty has nothing to embed, and Ollama
+// refuses the whole batch over one empty input ("empty content"), as OpenAI's
+// API does (#4975).
+func toEmbed(recs []index.OffsetRecord, seen map[int64]bool) []index.OffsetRecord {
+	var pending []index.OffsetRecord
+	for _, r := range recs {
+		if !seen[r.Offset] && strings.TrimSpace(r.Record.Text) != "" {
+			pending = append(pending, r)
+		}
+	}
+	return pending
 }
 
 // embedBatch is how many texts go in one request; checkpointEvery is how many

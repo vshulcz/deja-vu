@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -87,6 +88,18 @@ func (c *Client) Embed(ctx context.Context, texts []string) ([][]float32, error)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// The body says why: Ollama answers a batch holding one empty input
+		// with 400 and {"error":"empty content"}, and the status alone sent
+		// people hunting (#4975).
+		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		d := strings.TrimSpace(string(detail))
+		if c.apiKey != "" {
+			// An endpoint that echoes the request must not hand the key back.
+			d = strings.ReplaceAll(d, c.apiKey, "<redacted>")
+		}
+		if d != "" {
+			return nil, fmt.Errorf("embedding endpoint returned %s: %s", resp.Status, d)
+		}
 		return nil, fmt.Errorf("embedding endpoint returned %s", resp.Status)
 	}
 	var out struct {

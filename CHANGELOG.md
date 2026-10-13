@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `deja embed` no longer stops on Ollama with a bare `400 Bad Request`: a record with no text is not sent (Ollama refuses the whole batch over one empty input), the error carries the endpoint's reason, and a run that fails keeps the vectors it embedded since the last checkpoint. Reported with a tested patch by @AlexanderAbramovPav (#4975).
+
 ## [0.22.1] - 2026-10-12
 
 Reading a session back now shows the code it changed, each edit as the lines
