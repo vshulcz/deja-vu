@@ -101,7 +101,12 @@ const STAND = [
 test("the card leads with the receipt and drops deja's name from each line", async () => {
   const { mod } = await load();
   const p = mod.parseNotes(STAND);
-  assert.deepEqual(p.receipt, { topic: "how should the zorbit queue drain on deploy", meta: "3d ago · via drain, zorbit, queue", elsewhere: false });
+  // Only the brand is stripped: the lead says what the quote is.
+  assert.deepEqual(p.receipt, { lead: "You have been here:", topic: "how should the zorbit queue drain on deploy", meta: "3d ago · via drain, zorbit, queue" });
+  assert.equal(
+    mod.parseNotes(['deja-vu — this was done on another machine: "rotate the keys" (2w ago · via: rotate)']).receipt.lead,
+    "This was done on another machine:",
+  );
   assert.deepEqual(p.notes, [
     "Recalled 3 prior sessions from this project — the agent starts already knowing them · 1.4 KB of context",
     "Indexed 13 sessions from 1 agent on this machine — what they decided now arrives before you re-ask",

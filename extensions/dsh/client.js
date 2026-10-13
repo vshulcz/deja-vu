@@ -67,7 +67,8 @@ window.__ModuleLoader__.load({
         if (!line) continue;
         const r = RECEIPT.exec(line);
         if (r) {
-          out.receipt = { topic: r[2], meta: r[3].replace(/\bvia:\s+/, "via "), elsewhere: r[1] !== "you have been here" };
+          // Only the brand goes; the lead says what the quote is.
+          out.receipt = { lead: r[1].charAt(0).toUpperCase() + r[1].slice(1) + ":", topic: r[2], meta: r[3].replace(/\bvia:\s+/, "via ") };
           continue;
         }
         const parts = line.split(/\s+·\s+/);
@@ -150,6 +151,7 @@ window.__ModuleLoader__.load({
 }
 .deja-receipt { margin-top: 2px; font-size: 13px; line-height: 20px; }
 .deja-topic { color: var(--dsw-alias-label-primary, CanvasText); }
+.deja-lead { color: var(--dsw-alias-label-tertiary, GrayText); }
 .deja-meta { color: var(--dsw-alias-label-tertiary, GrayText); font-size: 12px; margin-left: 8px; white-space: nowrap; }
 .deja-note { color: var(--dsw-alias-label-secondary, GrayText); margin-top: 2px; }
 .deja-detail { color: var(--dsw-alias-label-caption, GrayText); }
@@ -197,7 +199,8 @@ window.__ModuleLoader__.load({
         body.push(
           h(
             "div",
-            { key: "receipt", className: "deja-receipt", title: r.elsewhere ? "this was done on another machine" : "you have been here" },
+            { key: "receipt", className: "deja-receipt" },
+            h("span", { className: "deja-lead" }, r.lead + " "),
             h("span", { className: "deja-topic" }, "“" + r.topic + "”"),
             h("span", { className: "deja-meta" }, r.meta),
           ),
