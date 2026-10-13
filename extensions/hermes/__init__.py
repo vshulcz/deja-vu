@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 from typing import Any, Dict, List, Optional
 
 from agent.memory_provider import MemoryProvider
@@ -148,6 +149,25 @@ _SHOWS_LINE = ("cli",)
 
 _BRAND = re.compile(r"^deja(?:-vu)?(?:\s+—\s+|\s*:\s+|\s+)", re.IGNORECASE)
 
+# "deja is indexing your history — recall comes online when it finishes" is
+# about this moment; a turn later it may be false, so it is never held.
+_PROGRESS = re.compile(r"\bindexing your history\b", re.IGNORECASE)
+
+
+def _status_prints(status_callback):
+    """Whether Hermes will print the recall line. The CLI hands a provider
+    the agent's _emit_status, and `hermes -z` and `hermes chat -Q` set the
+    agent's suppress_status_output after construction (oneshot.py,
+    cli_single_query.py, 0.21.7), so the flag is read per turn. Without the
+    agent to ask, only a terminal on stdout is taken to show it."""
+    agent = getattr(status_callback, "__self__", None)
+    if agent is not None and hasattr(agent, "suppress_status_output"):
+        return not agent.suppress_status_output
+    try:
+        return sys.stdout.isatty()
+    except Exception:
+        return False
+
 
 def _split_reply(out):
     """deja's JSON hook reply, split by reader: additionalContext is for the
@@ -220,6 +240,7 @@ class DejaMemoryProvider(MemoryProvider):
         self._first_turn = True
         self._session_id = session_id or ""
         self._platform = kwargs.get("platform") or ""
+        self._status_callback = kwargs.get("status_callback")
 
     def system_prompt_block(self) -> str:
         return _ABOUT
@@ -264,18 +285,21 @@ class DejaMemoryProvider(MemoryProvider):
         # "recalled N memories" from it, and 0 renders generically.
         self._last_count = sum(1 for line in text.splitlines() if line.startswith("- "))
         # Hermes prints the indicator only after a prefetch that returned
-        # text. A note that came without any waits for the next one.
-        held = (self._held_notes + notes)[-8:]
+        # text. A note that came without any waits for the next one, except
+        # build progress, which is stale by then.
+        lines = [line for note in notes for line in note.splitlines() if line.strip()]
         if text:
-            self._last_notes, self._held_notes = held, []
+            self._last_notes, self._held_notes = (self._held_notes + lines)[-8:], []
         else:
-            self._last_notes, self._held_notes = [], held
+            fresh = [line for line in lines if not _PROGRESS.search(line)]
+            self._last_notes, self._held_notes = [], (self._held_notes + fresh)[-8:]
         return text
 
     def _hook(self, command, payload, timeout):
         """One deja run: the model's text, and deja's line for the person
-        when this Hermes has a recall indicator to show it on."""
-        if RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE:
+        when this Hermes will print a recall indicator to show it on."""
+        if (RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE
+                or not _status_prints(getattr(self, "_status_callback", None))):
             return _deja([command, "--plain"], payload, timeout=timeout), ""
         return _split_reply(_deja([command], payload, timeout=timeout))
 
@@ -312,6 +336,11 @@ class DejaMemoryProvider(MemoryProvider):
             self._session_id = new_session_id
         if reset or rewound:
             self._first_turn = True
+        # Lines held for the conversation that just ended are not about the
+        # next one (/new, /reset, /resume, /branch). A compression keeps the
+        # conversation, and its lines.
+        if kwargs.get("reason") != "compression":
+            self._held_notes, self._last_notes = [], []
         # The compression committed. deja builds the recovery packet from the
         # turns that were summarised, under the id the next turn will ask
         # with, and hands it back on that turn.

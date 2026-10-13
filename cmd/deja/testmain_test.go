@@ -14,6 +14,12 @@ func TestMain(m *testing.M) {
 	if os.Getenv(hookEchoEnv) == "1" {
 		hookEcho()
 	}
+	// And for deja itself, where a test drives a host's plugin against the
+	// real hooks (install_hermes_notes_test.go).
+	if os.Getenv(runMainEnv) == "1" {
+		main()
+		os.Exit(0)
+	}
 	root, err := os.MkdirTemp("", "deja-command-test-")
 	if err != nil {
 		panic(err)

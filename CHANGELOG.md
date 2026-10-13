@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt. tui, headless and sdk profiles have no page, so there the plugin still asks deja for plain text and leaves the notes for `/deja` and the next session to show (#4982).
-- Hermes shows the person deja's lines too, with deja as the memory provider: the receipt and the session-start notes ride Hermes's own recall line, `🧠 deja · …`, in the CLI, where it used to say only "recalled 1 memory". Same one deja call per hook, and the model's text is unchanged. Hermes 0.17 has no such line, the TUI and desktop do not keep it on screen and a gateway chat may be a group, so there deja is still asked for plain text and keeps its notes.
+- Hermes shows the person deja's lines too, with deja as the memory provider: the receipt and the session-start notes ride Hermes's own recall line, `🧠 deja · …`, in the CLI, where it used to say only "recalled 1 memory". Same one deja call per hook, and the model's text is unchanged. Hermes 0.17 has no such line, `hermes -z` and `hermes chat -Q` print none, the TUI and desktop do not keep it on screen and a gateway chat may be a group, so there deja is still asked for plain text and keeps its notes.
 
 ### Fixed
 
