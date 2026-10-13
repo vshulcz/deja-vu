@@ -1,14 +1,17 @@
 // dsh-deja, browser half: the lines deja writes for the person.
 //
-// The host half hands the model its recall and keeps deja's own line for the
+// The host half hands the model its recall and keeps deja's own lines for the
 // person — the "you have been here" receipt, the build and week notes — on a
-// board behind /api/deja-notes. This draws them just above the input, the way
-// Claude Code prints a hook's systemMessage. Plain JS in dsh's module wrapper,
-// so the package needs no build step: React comes from the shell's module
-// table, and everything else here is the platform.
+// board behind /api/deja-notes. This draws them in a small card just above the
+// input, the way Claude Code prints a hook's systemMessage. Plain JS in dsh's
+// module wrapper, so the package needs no build step: React comes from the
+// shell's module table, colours and sizes from dsh's own theme variables, so
+// light and dark both follow the app.
 //
 // Nothing here may break the page. A host without the route answers 404, a
 // page without a session draws nothing, and any failure leaves the dock empty.
+// Text is always inserted as text, and a link is only drawn for an http(s)
+// address.
 window.__ModuleLoader__.load({
   id: "dsh-deja",
   factory: (require) => {
@@ -18,6 +21,77 @@ window.__ModuleLoader__.load({
 
     // The panels above the input — dsh's queue and todo docks sit here.
     const SLOT = "conversation.input.dock";
+    // Lines shown above the footer before "more": the receipt and one note.
+    // With the footer that is three lines at most.
+    const VISIBLE = 2;
+
+    // ---- what the lines say ----------------------------------------------
+
+    // The card's header already names deja, so the name in front of each line
+    // is dropped when it is drawn. The server's text is not changed.
+    function stripName(line) {
+      const rest = String(line).replace(/^deja(?:-vu)?(?:\s+—\s+|\s*:\s+|\s+)/i, "");
+      if (rest === line || !rest) return line;
+      return rest.charAt(0).toUpperCase() + rest.slice(1);
+    }
+
+    // safeHref accepts an http(s) address, with or without its scheme, and
+    // nothing else: no javascript:, no data:, no relative path.
+    function safeHref(raw) {
+      let text = String(raw || "").trim();
+      if (!text || /\s/.test(text)) return null;
+      if (!/^[a-z][a-z0-9+.-]*:/i.test(text)) text = "https://" + text;
+      let url;
+      try {
+        url = new URL(text);
+      } catch {
+        return null;
+      }
+      if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+      if (!url.hostname || !url.hostname.includes(".")) return null;
+      return url.href;
+    }
+
+    const RECEIPT = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+"(.+)"\s+\((.+)\)$/;
+    // "label: address · label: address", every part a link.
+    const LINK_PART = /^([A-Za-z][\w ]{0,20}):\s+(\S+)$/;
+    // A sentence that ends on its address: " — github.com/…".
+    const TRAILING_LINK = /^(.*\S)\s+—\s+(\S+)$/;
+
+    // parseNotes sorts the board's lines into what the card draws: the
+    // receipt, plain notes, a row of links and a sentence that is a link.
+    function parseNotes(lines) {
+      const out = { receipt: null, notes: [], links: [], linked: [] };
+      for (const raw of lines || []) {
+        const line = String(raw || "").trim();
+        if (!line) continue;
+        const r = RECEIPT.exec(line);
+        if (r) {
+          out.receipt = { topic: r[2], meta: r[3].replace(/\bvia:\s+/, "via "), elsewhere: r[1] !== "you have been here" };
+          continue;
+        }
+        const parts = line.split(/\s+·\s+/);
+        const links = parts.map((p) => {
+          const m = LINK_PART.exec(p);
+          const href = m && safeHref(m[2]);
+          return href ? { label: m[1].charAt(0).toUpperCase() + m[1].slice(1), href } : null;
+        });
+        if (parts.length > 0 && links.every(Boolean)) {
+          out.links.push(...links);
+          continue;
+        }
+        const t = TRAILING_LINK.exec(line);
+        const href = t && safeHref(t[2]);
+        if (href) {
+          out.linked.push({ text: t[1], href });
+          continue;
+        }
+        out.notes.push(stripName(line));
+      }
+      return out;
+    }
+
+    // ---- fetching ----------------------------------------------------------
 
     function notesUrl(sessionId) {
       // Relative, as dsh's own /api calls are: the page may be mounted below
@@ -34,6 +108,125 @@ window.__ModuleLoader__.load({
         .then((res) => (res.ok ? res.json() : null))
         .then((body) => (body && Array.isArray(body.notes) ? body.notes.filter((n) => typeof n === "string") : []))
         .catch(() => []);
+    }
+
+    // ---- drawing -----------------------------------------------------------
+
+    // Styled with dsh's theme variables, as its own todo and queue docks are,
+    // so the card follows light and dark. Fallbacks only matter on a host that
+    // defines none of them.
+    const STYLES = `
+.deja-card {
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--dsh-composer-side-clearance, 16px) - 4 * var(--dsh-composer-dock-inset, 8px));
+  max-width: calc(var(--dsh-composer-card-max-width, 780px) - 4 * var(--dsh-composer-dock-inset, 8px));
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: 0 auto;
+  padding: 6px 12px 8px;
+  border-radius: var(--dsw-radius-lg, 10px);
+  background: var(--dsw-specific-menu, Canvas);
+  backdrop-filter: var(--dsw-menu-backdrop-filter, none);
+  box-shadow: var(--dsw-elevation-panel, none);
+  color: var(--dsw-alias-label-secondary, GrayText);
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+  animation: deja-card-in 160ms ease-out;
+}
+@keyframes deja-card-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .deja-card { animation: none; } }
+.deja-head { display: flex; align-items: center; gap: 8px; height: 20px; }
+.deja-name { flex: 1 1 auto; color: var(--dsw-alias-label-caption, GrayText); font-size: 11px; font-weight: 500; letter-spacing: .02em; }
+.deja-close {
+  flex: none; display: grid; place-items: center; width: 20px; height: 20px; margin-right: -6px;
+  padding: 0; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  color: var(--dsw-alias-label-tertiary, GrayText); font: inherit; font-size: 14px; line-height: 1;
+}
+.deja-close:hover { background: var(--dsw-alias-interactive-bg-hover, transparent); }
+.deja-close:focus-visible, .deja-more:focus-visible, .deja-card a:focus-visible {
+  outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary, Highlight));
+  outline-offset: 1px;
+}
+.deja-receipt { margin-top: 2px; font-size: 13px; line-height: 20px; }
+.deja-topic { color: var(--dsw-alias-label-primary, CanvasText); }
+.deja-meta { color: var(--dsw-alias-label-tertiary, GrayText); font-size: 12px; margin-left: 8px; white-space: nowrap; }
+.deja-note { color: var(--dsw-alias-label-secondary, GrayText); margin-top: 2px; }
+.deja-detail { color: var(--dsw-alias-label-caption, GrayText); }
+.deja-foot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin-top: 4px; font-size: 12px; }
+.deja-card a { color: var(--dsw-alias-link, var(--dsw-alias-state-business-primary, LinkText)); text-decoration: none; }
+.deja-card a:hover { text-decoration: underline; }
+.deja-linked a { color: var(--dsw-alias-label-tertiary, GrayText); }
+.deja-more {
+  padding: 0; border: 0; background: transparent; cursor: pointer; font: inherit;
+  color: var(--dsw-alias-label-tertiary, GrayText); text-decoration: underline; text-underline-offset: 2px;
+}
+`;
+
+    function installStyles() {
+      const style = document.createElement("style");
+      style.dataset.plugin = "dsh-deja";
+      style.textContent = STYLES;
+      document.head.appendChild(style);
+      return () => style.remove();
+    }
+
+    function link(href, label, key) {
+      return h("a", { key, href, target: "_blank", rel: "noopener noreferrer" }, label);
+    }
+
+    // A note reads as its claim and then its detail: the part after the first
+    // " — " or " · " is the detail ("1.4 KB of context"), drawn quieter.
+    function noteRow(text, key) {
+      const cut = /\s+(—|·)\s+/.exec(text);
+      if (!cut) return h("div", { key, className: "deja-note" }, text);
+      return h(
+        "div",
+        { key, className: "deja-note" },
+        text.slice(0, cut.index),
+        h("span", { className: "deja-detail" }, " " + text.slice(cut.index).trim()),
+      );
+    }
+
+    function Card({ lines, onClose }) {
+      const [open, setOpen] = React.useState(false);
+      const parsed = parseNotes(lines);
+      const body = [];
+      if (parsed.receipt) {
+        const r = parsed.receipt;
+        body.push(
+          h(
+            "div",
+            { key: "receipt", className: "deja-receipt", title: r.elsewhere ? "this was done on another machine" : "you have been here" },
+            h("span", { className: "deja-topic" }, "“" + r.topic + "”"),
+            h("span", { className: "deja-meta" }, r.meta),
+          ),
+        );
+      }
+      parsed.notes.forEach((n, i) => body.push(noteRow(n, "n" + i)));
+      // Links stay in view: the docs, the tracker and the one-time sentence
+      // share one small footer row rather than queueing behind "more".
+      const footer = [
+        ...parsed.links.map((l, i) => link(l.href, l.label, "a" + i)),
+        ...parsed.linked.map((l, i) => h("span", { key: "s" + i, className: "deja-linked" }, link(l.href, l.text))),
+      ];
+      if (body.length === 0 && footer.length === 0) return null;
+      const hidden = open ? 0 : Math.max(0, body.length - VISIBLE);
+      if (hidden > 0) {
+        footer.unshift(h("button", { key: "more", type: "button", className: "deja-more", onClick: () => setOpen(true) }, hidden + " more"));
+      }
+      return h(
+        "div",
+        { className: "deja-card", "data-deja-notes": "", role: "status" },
+        h(
+          "div",
+          { className: "deja-head" },
+          h("span", { className: "deja-name" }, "deja-vu"),
+          h("button", { type: "button", className: "deja-close", title: "Dismiss", "aria-label": "Dismiss deja-vu notes", onClick: onClose }, "×"),
+        ),
+        hidden > 0 ? body.slice(0, VISIBLE) : body,
+        footer.length > 0 ? h("div", { className: "deja-foot" }, footer) : null,
+      );
     }
 
     function DejaNotes(props) {
@@ -75,59 +268,14 @@ window.__ModuleLoader__.load({
       }, [sessionId, running]);
 
       if (lines.length === 0) return null;
-      // Drawn as dsh draws its own todo panel in the same seat: a card just
-      // above the input, as wide as it.
-      const inset = "var(--dsh-composer-dock-inset, 8px)";
-      const clearance = "var(--dsh-composer-side-clearance, 16px)";
-      return h(
-        "div",
-        {
-          "data-deja-notes": "",
-          style: {
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "8px",
-            boxSizing: "border-box",
-            width: `calc(100% - 2 * ${clearance} - 4 * ${inset})`,
-            maxWidth: `calc(var(--dsh-composer-card-max-width, 780px) - 4 * ${inset})`,
-            margin: "0 auto",
-            padding: "6px 12px",
-            borderRadius: "var(--dsw-radius-lg, 10px)",
-            background: "var(--dsw-specific-menu, rgba(127,127,127,0.08))",
-            boxShadow: "var(--dsw-elevation-panel, none)",
-            fontSize: "12px",
-            lineHeight: "18px",
-            color: "var(--dsw-alias-label-secondary, #6b7079)",
-          },
-        },
-        h(
-          "div",
-          { style: { flex: "1 1 auto", minWidth: 0, overflowWrap: "anywhere" } },
-          lines.map((line, i) => h("div", { key: i }, line)),
-        ),
-        h(
-          "button",
-          {
-            type: "button",
-            title: "Dismiss",
-            "aria-label": "Dismiss deja's notes",
-            onClick: () => setLines([]),
-            style: {
-              flex: "0 0 auto",
-              border: 0,
-              background: "transparent",
-              color: "inherit",
-              cursor: "pointer",
-              padding: "0 2px",
-              font: "inherit",
-            },
-          },
-          "×",
-        ),
-      );
+      return h(Card, { lines, onClose: () => setLines([]) });
     }
 
     function apply(ctx) {
+      try {
+        if (typeof ctx.effect === "function") ctx.effect(installStyles, "dsh-deja: styles");
+        else installStyles();
+      } catch {}
       try {
         ctx.slots.inject(SLOT, () => {
           try {
@@ -141,6 +289,10 @@ window.__ModuleLoader__.load({
 
     module.exports.inject = ["slots"];
     module.exports.apply = apply;
+    // For the tests; the host reads only inject and apply.
+    module.exports.parseNotes = parseNotes;
+    module.exports.stripName = stripName;
+    module.exports.safeHref = safeHref;
     return module.exports;
   },
 });

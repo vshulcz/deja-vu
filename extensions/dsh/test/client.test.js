@@ -1,16 +1,16 @@
 // The browser half, run in node against a minimal hooks runtime: enough
-// useState and useEffect to render the panel and step it through a session
+// useState and useEffect to render the card and step it through a session
 // switch, without React or a browser.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 function runtime() {
-  let slots = [];
+  const slots = [];
   let i = 0;
   let pending = [];
   const React = {
-    createElement: (type, props, ...children) => ({ type, props, children }),
+    createElement: (type, props, ...children) => ({ type, props: props || {}, children }),
     useState(init) {
       const k = i++;
       if (!(k in slots)) slots[k] = { value: typeof init === "function" ? init() : init };
@@ -27,29 +27,47 @@ function runtime() {
       });
     },
   };
+  // Function components are expanded in place, sharing one hook list, which
+  // holds while the tree keeps its shape between renders.
+  const expand = (node) => {
+    if (Array.isArray(node)) return node.map(expand);
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.type === "function") return expand(node.type({ ...node.props, children: node.children }));
+    return { ...node, children: node.children.map(expand) };
+  };
   return {
     React,
     async render(Component, props) {
       i = 0;
-      Component(props);
+      expand(Component(props));
       const run = pending;
       pending = [];
       run.forEach((f) => f());
       // Let the fetches the effects started settle, then render what they left.
       await new Promise((r) => setTimeout(r, 0));
       i = 0;
-      return Component(props);
+      return expand(Component(props));
     },
   };
 }
 
 function text(tree) {
-  if (!tree) return "";
-  if (typeof tree === "string") return tree;
-  return (tree.children || []).flat().map(text).join("|");
+  if (tree === null || tree === undefined || tree === false) return "";
+  if (typeof tree === "string" || typeof tree === "number") return String(tree);
+  if (Array.isArray(tree)) return tree.map(text).join("|");
+  return text(tree.children);
 }
 
-async function load(notesFor) {
+function find(tree, pred, out = []) {
+  if (Array.isArray(tree)) tree.forEach((t) => find(t, pred, out));
+  else if (tree && typeof tree === "object") {
+    if (pred(tree)) out.push(tree);
+    find(tree.children, pred, out);
+  }
+  return out;
+}
+
+async function load(notesFor = {}) {
   const rt = runtime();
   let registration = null;
   globalThis.window = { __ModuleLoader__: { load: (r) => (registration = r) } };
@@ -66,20 +84,79 @@ async function load(notesFor) {
   });
   let Component = null;
   mod.apply({ slots: { inject: (_name, cb) => cb(), register: (_opts, c) => { Component = c; return () => {}; } } });
-  return { rt, Component };
+  return { rt, Component, mod };
 }
 
-test("the panel shows a session's lines and draws nothing without them", async () => {
-  const { rt, Component } = await load({ A: ["deja-vu — you have been here: \"x\""] });
-  const idle = (selector) => selector({ running: false });
-  assert.match(text(await rt.render(Component, { sessionId: "A", useSession: idle })), /you have been here/);
+const idle = (selector) => selector({ running: false });
+
+// What deja printed on the stand, verbatim.
+const STAND = [
+  "deja recalled 3 prior sessions from this project — the agent starts already knowing them · 1.4 KB of context",
+  "deja indexed 13 sessions from 1 agent on this machine — what they decided now arrives before you re-ask",
+  "docs: vshulcz.github.io/deja-vu · issues: github.com/vshulcz/deja-vu/issues",
+  "if deja earns its keep, a star on GitHub helps the next person find it — github.com/vshulcz/deja-vu",
+  'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (3d ago · via: drain, zorbit, queue)',
+];
+
+test("the card leads with the receipt and drops deja's name from each line", async () => {
+  const { mod } = await load();
+  const p = mod.parseNotes(STAND);
+  assert.deepEqual(p.receipt, { topic: "how should the zorbit queue drain on deploy", meta: "3d ago · via drain, zorbit, queue", elsewhere: false });
+  assert.deepEqual(p.notes, [
+    "Recalled 3 prior sessions from this project — the agent starts already knowing them · 1.4 KB of context",
+    "Indexed 13 sessions from 1 agent on this machine — what they decided now arrives before you re-ask",
+  ]);
+  assert.deepEqual(p.links, [
+    { label: "Docs", href: "https://vshulcz.github.io/deja-vu" },
+    { label: "Issues", href: "https://github.com/vshulcz/deja-vu/issues" },
+  ]);
+  assert.deepEqual(p.linked, [{ text: "if deja earns its keep, a star on GitHub helps the next person find it", href: "https://github.com/vshulcz/deja-vu" }]);
+  // The name only goes where it leads the line.
+  assert.equal(mod.stripName("deja this week: 4 recalls"), "This week: 4 recalls");
+  assert.equal(mod.stripName("dejavu is not deja"), "dejavu is not deja");
+  assert.equal(mod.stripName("the index is behind"), "the index is behind");
+});
+
+test("only an http(s) address becomes a link", async () => {
+  const { mod } = await load();
+  assert.equal(mod.safeHref("github.com/vshulcz/deja-vu"), "https://github.com/vshulcz/deja-vu");
+  assert.equal(mod.safeHref("http://example.com/x"), "http://example.com/x");
+  assert.equal(mod.safeHref("javascript:alert(1)"), null);
+  assert.equal(mod.safeHref("data:text/html,hi"), null);
+  assert.equal(mod.safeHref("/api/deja-notes"), null);
+  assert.equal(mod.safeHref("localhost"), null);
+  // A line whose address is refused stays text.
+  const p = mod.parseNotes(["docs: javascript:alert(1)", "see this — javascript:alert(1)"]);
+  assert.deepEqual(p.links, []);
+  assert.deepEqual(p.linked, []);
+  assert.equal(p.notes.length, 2);
+});
+
+test("the card keeps to the receipt and one note, the rest behind more, links in view", async () => {
+  const { rt, Component } = await load({ A: [...STAND] });
+  const tree = await rt.render(Component, { sessionId: "A", useSession: idle });
+  const shown = text(tree);
+  assert.match(shown, /deja-vu/);
+  assert.match(shown, /how should the zorbit queue drain on deploy/);
+  assert.match(shown, /Recalled 3 prior sessions/);
+  assert.doesNotMatch(shown, /Indexed 13 sessions/, "a second note is not behind the toggle");
+  assert.match(shown, /1 more/);
+  // The one-time sentence and the docs are links in view, not raw addresses.
+  assert.match(shown, /a star on GitHub/);
+  assert.doesNotMatch(shown, /github\.com/);
+  const links = find(tree, (n) => n.type === "a");
+  assert.deepEqual(links.map((a) => text(a)), ["Docs", "Issues", "if deja earns its keep, a star on GitHub helps the next person find it"]);
+  for (const a of links) {
+    assert.equal(a.props.target, "_blank");
+    assert.match(a.props.rel, /noopener/);
+    assert.match(a.props.href, /^https?:\/\//);
+  }
 });
 
 // dsh may keep the component and hand it another session. Both idle, so no
-// turn starts to clear the panel: A's receipt stood under B's conversation.
+// turn starts to clear the card: A's receipt stood under B's conversation.
 test("switching to another idle session clears the last one's lines", async () => {
   const { rt, Component } = await load({ A: ["receipt for A"] });
-  const idle = (selector) => selector({ running: false });
   assert.match(text(await rt.render(Component, { sessionId: "A", useSession: idle })), /receipt for A/);
   assert.equal(await rt.render(Component, { sessionId: "B", useSession: idle }), null, "A's line is still drawn under B");
 });
