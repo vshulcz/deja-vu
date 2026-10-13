@@ -44,10 +44,14 @@ window.__ModuleLoader__.load({
 
       // A new session or a new turn starts clean: a receipt answers the prompt
       // it came with, and left standing under the next one it would name the
-      // wrong question.
+      // wrong question. The session check stands on its own, because dsh may
+      // keep this component and hand it another idle session.
       React.useEffect(() => {
-        if (running !== false) setLines([]);
-      }, [sessionId, running]);
+        setLines([]);
+      }, [sessionId]);
+      React.useEffect(() => {
+        if (running === true) setLines([]);
+      }, [running]);
 
       React.useEffect(() => {
         if (!sessionId) return undefined;

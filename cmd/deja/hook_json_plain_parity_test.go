@@ -97,3 +97,38 @@ func TestJSONReplyCarriesWhatPlainPrints(t *testing.T) {
 		t.Error("the session start carries no line for the person")
 	}
 }
+
+// The other ways the two hooks answer: a compaction's recovery packet, and the
+// nudge alone (which the asked-for handoff also goes through). Each has its
+// own plain and JSON branch.
+func TestJSONReplyCarriesWhatPlainPrintsForThePacketAndTheNudge(t *testing.T) {
+	packet := func(t *testing.T, shape hookToolShape) string {
+		dir, workspace, _ := prepareCompaction(t)
+		var out bytes.Buffer
+		if delivered, err := emitCompactionRecovery(dir, "compaction-fixture", workspace, "UserPromptSubmit", shape, &out); err != nil || !delivered {
+			t.Fatalf("no packet: delivered=%v err=%v", delivered, err)
+		}
+		return out.String()
+	}
+	var plain, js string
+	t.Run("packet-plain", func(t *testing.T) { plain = packet(t, hookToolPlain) })
+	t.Run("packet-json", func(t *testing.T) { js = packet(t, hookToolClaude) })
+	var resp sessionStartHookResponse
+	if err := json.Unmarshal([]byte(strings.TrimSpace(js)), &resp); err != nil {
+		t.Fatalf("not the hook envelope: %v\n%s", err, js)
+	}
+	if strings.TrimSpace(plain) == "" || strings.TrimSpace(plain) != strings.TrimSpace(resp.HookSpecificOutput.AdditionalContext) {
+		t.Errorf("the packet differs between forms:\n--plain:\n%s\n--json:\n%s", plain, resp.HookSpecificOutput.AdditionalContext)
+	}
+
+	var a, b bytes.Buffer
+	_ = emitNudgeOnly(&a, true, "last time this failed, it was the lockfile")
+	_ = emitNudgeOnly(&b, false, "last time this failed, it was the lockfile")
+	resp = sessionStartHookResponse{}
+	if err := json.Unmarshal(b.Bytes(), &resp); err != nil {
+		t.Fatalf("not the hook envelope: %v\n%s", err, b.String())
+	}
+	if strings.TrimSpace(a.String()) != strings.TrimSpace(resp.HookSpecificOutput.AdditionalContext) {
+		t.Errorf("the nudge differs between forms:\n%s\n%s", a.String(), resp.HookSpecificOutput.AdditionalContext)
+	}
+}

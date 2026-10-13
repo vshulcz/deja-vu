@@ -114,39 +114,55 @@ export function* newestEvents(session) {
 // splitHookReply reads what `deja hook-prompt` or `deja hook-context` printed
 // in its JSON form and splits it by reader: additionalContext is for the model,
 // the same text --plain prints, and systemMessage is the line Claude Code
-// shows the person. One spawn answers both. Output that is not the JSON
-// envelope is all context, so a deja that printed plain text still reaches the
-// model.
+// shows the person. One spawn answers both.
+//
+// The envelope is the last line that parses as one, so a stray line printed
+// ahead of it does not carry the person's line into the model's context with
+// it. Output with no envelope at all is all context, so a deja that printed
+// plain text still reaches the model.
 export function splitHookReply(stdout) {
   const text = String(stdout || "").trim();
   if (!text) return { context: "", notes: "" };
-  if (!text.startsWith("{")) return { context: text, notes: "" };
-  let reply;
-  try {
-    reply = JSON.parse(text);
-  } catch {
-    return { context: text, notes: "" };
+  const lines = text.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (!line.startsWith("{")) continue;
+    let reply;
+    try {
+      reply = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (!reply || typeof reply !== "object" || Array.isArray(reply)) continue;
+    if (!("hookSpecificOutput" in reply) && !("systemMessage" in reply)) continue;
+    const out = reply.hookSpecificOutput;
+    const context = out && typeof out.additionalContext === "string" ? out.additionalContext.trim() : "";
+    const notes = typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : "";
+    return { context, notes };
   }
-  if (!reply || typeof reply !== "object") return { context: "", notes: "" };
-  const out = reply.hookSpecificOutput;
-  const context = out && typeof out.additionalContext === "string" ? out.additionalContext.trim() : "";
-  const notes = typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : "";
-  return { context, notes };
+  return { context: text, notes: "" };
 }
 
 // noteBoard holds deja's lines for the person until the page asks for them.
 // The recall runs in the host and the person reads a browser, so each
 // session's lines wait here and are handed over once: take() empties the
-// session's list. Bounded on both sides, because a page that never asks — a
-// headless run, a closed tab — must not grow the host's memory.
-export function noteBoard(perSession = 8, sessions = 64) {
+// session's list. Two tabs on one session race for them, and the first to ask
+// gets them; the other shows nothing, which is the same once rule deja keeps.
+//
+// Bounded three ways, because a page that never asks must not grow the host's
+// memory, and a session reopened tomorrow must not open on yesterday's receipt:
+// lines per session, sessions held, and how long a line waits.
+export function noteBoard({ perSession = 8, sessions = 64, ttlMs = 10 * 60 * 1000, now = Date.now } = {}) {
   const board = new Map();
+  let reader = false;
   return {
     push(sid, text) {
+      const at = now();
       const lines = String(text || "")
         .split("\n")
         .map((line) => line.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .map((line) => ({ line, at }));
       if (!sid || lines.length === 0) return;
       const held = board.get(sid) || [];
       board.delete(sid);
@@ -156,7 +172,16 @@ export function noteBoard(perSession = 8, sessions = 64) {
     take(sid) {
       const held = board.get(sid) || [];
       board.delete(sid);
-      return held;
+      const fresh = now() - ttlMs;
+      return held.filter((n) => n.at >= fresh).map((n) => n.line);
+    },
+    // Whether anything will ever read the board. deja marks its notes shown
+    // when it prints them, so asking for them with no page to show them on
+    // spends them: `/deja` and the next Claude Code session would not see
+    // them either.
+    hasReader: () => reader,
+    setReader: () => {
+      reader = true;
     },
   };
 }

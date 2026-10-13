@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt.
+- dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt. tui, headless and sdk profiles have no page, so there the plugin still asks deja for plain text and leaves the notes for `/deja` and the next session to show (#4982).
 
 ### Fixed
 
-- On dsh 0.2.0 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt`.
+- On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 
 - The semantic sidecar survives a rewrite of the index: each vector carries its record's identity, so search keeps using it and the next `deja embed` sends only new or changed records. Before, any pass that rewrote `records.bin` (a torn last line, a removed file) made search refuse the sidecar and the next run embed the whole store again, about 45 minutes on 112k records. A sidecar written before this is rekeyed on the next `deja embed` while the index still has its layout. Proposed by @AlexanderAbramovPav (#4976).
 - `deja embed` no longer stops on Ollama with a bare `400 Bad Request`: a record with no text is not sent (Ollama refuses the whole batch over one empty input), the error carries the endpoint's reason, and a run that fails keeps the vectors it embedded since the last checkpoint. Reported with a tested patch by @AlexanderAbramovPav (#4975).
