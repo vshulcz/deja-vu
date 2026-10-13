@@ -1447,10 +1447,35 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	if len(terms) > 3 {
 		terms = terms[:3]
 	}
+	// "you have been here" for a session that arrived from another machine
+	// claims the reader did work they have never seen — the context block
+	// below labels it `imported:` and this line contradicted it (#1001).
+	who := "you have been here"
+	if strings.HasPrefix(s.Project, "imported:") {
+		who = "this was done on another machine"
+	}
+	when := search.RelativeDate(s.Updated)
+	// The quote, measured as printed (quotes and escapes included), gets what
+	// the line has left after the fixed words, the date and room for one
+	// term of up to 16 columns: at most 50 columns and never under 26.
+	room := noteWidth - termwidth.Columns(fmt.Sprintf("deja-vu — %s:  (%s)", who, when))
+	if len(terms) > 0 {
+		longest := 0
+		for _, t := range terms {
+			longest = max(longest, termwidth.Columns(t))
+		}
+		room -= termwidth.Columns(" · via ") + min(longest, 16)
+	}
+	quoted := quoteWithin(topic, max(26, min(50, room)))
 	// A term the quote already shows tells the reader nothing the quote does
-	// not, so the ones it lacks go first and are the last to be dropped.
+	// not, so the ones it lacks go first and are the last to be dropped. The
+	// quote as cut is what the reader sees, so that is what is checked.
+	shown := topic
+	if u, err := strconv.Unquote(quoted); err == nil {
+		shown = u
+	}
+	lower := strings.ToLower(shown)
 	terms = slices.Clone(terms)
-	lower := strings.ToLower(topic)
 	slices.SortStableFunc(terms, func(a, b string) int {
 		ina, inb := strings.Contains(lower, strings.ToLower(a)), strings.Contains(lower, strings.ToLower(b))
 		switch {
@@ -1461,24 +1486,6 @@ func dejaVuLine(s model.Session, terms ...string) string {
 		}
 		return 1
 	})
-	// "you have been here" for a session that arrived from another machine
-	// claims the reader did work they have never seen — the context block
-	// below labels it `imported:` and this line contradicted it (#1001).
-	who := "you have been here"
-	if strings.HasPrefix(s.Project, "imported:") {
-		who = "this was done on another machine"
-	}
-	when := search.RelativeDate(s.Updated)
-	// The quote gets what the line has left after the fixed words, the date
-	// and the first term, up to 48 columns and never under 24.
-	room := noteWidth - termwidth.Columns(fmt.Sprintf("deja-vu — %s: \"\" (%s)", who, when))
-	if len(terms) > 0 {
-		room -= termwidth.Columns(" · via " + terms[0])
-	}
-	room = max(24, min(48, room))
-	if termwidth.Columns(topic) > room {
-		topic = strings.TrimSpace(termwidth.Cut(topic, room-1)) + "…"
-	}
 	// No colon after the name, for the reason the session-start receipts lost
 	// theirs: the host introduces the line itself. Claude Code renders this as
 	// "UserPromptSubmit says: …", which read "says: deja-vu: you have been
@@ -1486,15 +1493,23 @@ func dejaVuLine(s model.Session, terms ...string) string {
 	//
 	// Name the terms that triggered the moment: "you have been here" with no
 	// visible reason reads as noise the first time it misfires. The first
-	// always, the rest while the line stays within noteWidth.
-	head := fmt.Sprintf("deja-vu — %s: %q (%s", who, topic, when)
+	// always, cut if it alone would pass noteWidth, the rest while they fit.
+	head := fmt.Sprintf("deja-vu — %s: %s (%s", who, quoted, when)
 	why := ""
 	for i, t := range terms {
-		next := why + ", " + t
 		if i == 0 {
-			next = " · via " + t
+			left := noteWidth - termwidth.Columns(head+" · via )")
+			if termwidth.Columns(t) > left {
+				if left < 4 {
+					break
+				}
+				t = termwidth.Cut(t, left-1) + "…"
+			}
+			why = " · via " + t
+			continue
 		}
-		if i > 0 && termwidth.Columns(head+next+")") > noteWidth {
+		next := why + ", " + t
+		if termwidth.Columns(head+next+")") > noteWidth {
 			break
 		}
 		why = next

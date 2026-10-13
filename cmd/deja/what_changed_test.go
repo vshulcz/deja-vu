@@ -203,3 +203,20 @@ func TestWhatChangedItemsAreShort(t *testing.T) {
 		t.Errorf("firstSentence left %d characters, want at most 140", len([]rune(got)))
 	}
 }
+
+// A cut never ends inside a code span or an issue reference.
+func TestWhatChangedCutKeepsCodeAndReferencesWhole(t *testing.T) {
+	item := "Session start shows one note at a time, and `deja hook-context --notes` prints the rest later (#4993) for hosts that render it"
+	for width := 20; width < len(item); width++ {
+		got := cutChangelogItem(item, width)
+		if termwidth.Columns(got) > width {
+			t.Fatalf("width %d: %q is %d columns", width, got, termwidth.Columns(got))
+		}
+		if strings.Count(got, "`")%2 == 1 {
+			t.Fatalf("width %d: cut inside the code span: %q", width, got)
+		}
+		if i := strings.LastIndex(got, "(#"); i >= 0 && !strings.Contains(got[i:], ")") {
+			t.Fatalf("width %d: cut inside the reference: %q", width, got)
+		}
+	}
+}

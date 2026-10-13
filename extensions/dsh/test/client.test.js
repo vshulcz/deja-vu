@@ -92,7 +92,7 @@ const idle = (selector) => selector({ running: false });
 // What deja printed on the stand, verbatim.
 const STAND = [
   "deja recalled 3 prior sessions from this project · today: memory arrived 3 times",
-  "deja indexed 13 sessions from 1 agent · docs: vshulcz.github.io/deja-vu",
+  "deja indexed 13 sessions (1 agent) · docs: vshulcz.github.io/deja-vu",
   "if deja is useful, a GitHub star helps others find it — github.com/vshulcz/deja-vu",
   'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (3d ago · via grace)',
 ];
@@ -110,7 +110,7 @@ test("the card leads with the receipt and drops deja's name from each line", asy
   );
   assert.deepEqual(p.notes, [
     "Recalled 3 prior sessions from this project · today: memory arrived 3 times",
-    "Indexed 13 sessions from 1 agent",
+    "Indexed 13 sessions (1 agent)",
   ]);
   // The docs address at the end of the built note goes to the link row.
   assert.deepEqual(p.links, [{ label: "Docs", href: "https://vshulcz.github.io/deja-vu" }]);

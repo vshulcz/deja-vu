@@ -12,6 +12,7 @@ import (
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
+	"github.com/vshulcz/deja-vu/internal/usage"
 )
 
 // checkPersonLines fails when the lines deja shows the person run past one
@@ -104,25 +105,33 @@ func TestSessionStartSaysAtMostTwoShortLines(t *testing.T) {
 	checkPersonLines(t, "the déjà vu line", resp.SystemMessage, 1)
 }
 
-// The fixed notes at the sizes a real machine reaches: long topics, several
-// targets, large counts. Each stays one line.
+// Every note at the sizes a real machine reaches, from the functions that
+// write it: long topics, several targets, large counts, a home-directory path.
 func TestEachPersonNoteFitsOneLine(t *testing.T) {
 	long := model.Session{ID: "l", Project: "app", Updated: time.Now().Add(-90 * 24 * time.Hour),
 		Messages: []model.Message{{Role: "user", Text: "why does the nightly exporter drop the last batch of rows at midnight on the replica"}}}
 	imported := long
 	imported.Project = "imported:app"
+	const home = "/Users/alexandra/Library/Caches/deja"
 	notes := map[string]string{
-		"rewire":       rewireNote([]string{"claude-auto", "codex-auto", "gemini"}),
-		"stuck":        stuckWiringNote([]string{"claude-auto", "codex-auto"}),
+		"rewire":       rewireNote([]string{"claude-auto", "codex-auto", "gemini", "opencode", "copilot"}),
+		"stuck":        stuckWiringNote([]string{"claude-auto", "codex-auto", "gemini", "opencode", "copilot"}),
 		"déjà vu":      dejaVuLine(long, "exporter", "replica", "nightly"),
 		"imported":     dejaVuLine(imported, "exporter", "replica", "nightly"),
-		"receipt":      fitNote("deja recalled 12 prior sessions touching "+fitList([]string{"internal/index/ingest.go", "cmd/deja/hook_context.go", "README.md"}, 48), " · today: 14 recalls, memory arrived 9 times", ` · most re-used: "how should the zorbit queue drain…" 4×`),
 		"star":         starText,
-		"docs":         "deja indexed 123,456 sessions (11 agents, 1,234 repeat questions) · " + docsLink,
-		"indexing":     "deja is indexing your history — recall starts when it finishes",
-		"index cannot": "deja: the index cannot answer — recall is quiet until `deja index` rebuilds it",
+		"built":        builtLine(123456, 41, 1234, true),
+		"indexing":     indexingNote,
+		"progress":     (&warmupStatus{Phase: "sessions", Done: 42, Total: 100}).line(),
+		"index cannot": indexCannotAnswerNote,
+		"unmounted":    unmountedIndexNote("/Volumes/ext/caches"),
+		"unwritable":   unwritableIndexNote(home + "/index.db"),
+		"withheld":     withheldNote("local-only+imported:team-laptop", 1234),
+		"stale":        staleIndexNote(home),
 	}
 	for name, note := range notes {
+		if note == "" {
+			t.Errorf("%s is empty, so this measures nothing", name)
+		}
 		checkPersonLines(t, name, note, 1)
 	}
 	if got := fitList([]string{"a.go", "b.go", "c.go"}, 48); got != "a.go, b.go, c.go" {
@@ -130,5 +139,54 @@ func TestEachPersonNoteFitsOneLine(t *testing.T) {
 	}
 	if got := fitList([]string{"internal/index/ingest.go", "cmd/deja/hook_context.go", "README.md"}, 48); got != "internal/index/ingest.go +2" {
 		t.Errorf("fitList = %q, want the names that fit and a count of the rest", got)
+	}
+}
+
+// A warning names its path and its command whole. When a path is so long
+// that even the short form passes noteWidth, the line is allowed to run long
+// rather than cut either: that is the one exception to the width.
+func TestAWarningWithALongPathKeepsThePathAndTheCommand(t *testing.T) {
+	const path = "/Volumes/Team Archive Drive 2026/shared/agent-history/caches/deja/index.db"
+	for name, c := range map[string]struct{ note, command string }{
+		"unmounted":  {unmountedIndexNote(path), "DEJA_INDEX_DIR"},
+		"unwritable": {unwritableIndexNote(path), "`deja index`"},
+		"stale":      {staleIndexNote(path), ""},
+	} {
+		if !strings.Contains(c.note, path) {
+			t.Errorf("%s cut the path: %q", name, c.note)
+		}
+		if !strings.Contains(c.note, c.command) {
+			t.Errorf("%s lost its command %s: %q", name, c.command, c.note)
+		}
+		if strings.Contains(c.note, "\n") {
+			t.Errorf("%s is more than one line: %q", name, c.note)
+		}
+	}
+	// With a short path the long form is kept, prose and all.
+	if got := unmountedIndexNote("/Volumes/ext"); !strings.Contains(got, "reconnect it") {
+		t.Errorf("a short path still lost the prose: %q", got)
+	}
+}
+
+// The re-used session's name is the part of the receipt only it says (#579),
+// so on a day with a tally it is the tally that goes, not the name.
+func TestReceiptKeepsTheReusedNameOverTheTally(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "index")
+	for range 3 {
+		usage.RecordResult(dir, usage.KindHook, 900, 2, false)
+	}
+	svc := serviceReceipt(dir)
+	if svc == "" {
+		t.Fatal("no tally on a day with three injections, so the test proves nothing")
+	}
+	title := "how should the zorbit queue drain on deploy day"
+	got := receiptLine("deja recalled 3 prior sessions from this project", reusedMemory{Title: title, Times: 4}, svc)
+	if !strings.Contains(got, "most re-used: \"how should the zorbit") || !strings.HasSuffix(got, " 4×") {
+		t.Errorf("the re-used name did not survive: %q", got)
+	}
+	checkPersonLines(t, "receipt", got, 1)
+	// Without a re-used session the tally is what follows the claim.
+	if got := receiptLine("deja recalled 3 prior sessions from this project", reusedMemory{}, svc); !strings.HasSuffix(got, svc) {
+		t.Errorf("the tally was dropped with room for it: %q", got)
 	}
 }
