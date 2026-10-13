@@ -2,7 +2,9 @@ package embed
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -154,5 +156,65 @@ func TestStaleRule(t *testing.T) {
 	}
 	if Stale(dir, Sidecar{Generation: gen, Vectors: vectors}) {
 		t.Error("a sidecar for this index counts as stale")
+	}
+}
+
+// A rewrite that drops a session moves every later record. A vector found by
+// identity still answers with its own session's text: the misattribution of
+// #1355 is what made offsets-only sidecars stale, and identity is what lets
+// this one be used.
+func TestAVectorFindsItsRecordAfterARewrite(t *testing.T) {
+	dir, _ := threeSessionStore(t)
+	vec := func(text string) []float32 {
+		switch {
+		case strings.Contains(text, "vault"):
+			return []float32{1, 0, 0}
+		case strings.Contains(text, "kafka"):
+			return []float32{0, 1, 0}
+		}
+		return []float32{0, 0, 1}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Input []string `json:"input"`
+		}
+		raw, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(raw, &body)
+		out := make([][]float32, len(body.Input))
+		for i, text := range body.Input {
+			out[i] = vec(text)
+		}
+		payload, _ := json.Marshal(map[string]any{"embeddings": out})
+		_, _ = w.Write(payload)
+	}))
+	defer ts.Close()
+	client := &Client{URL: ts.URL, Model: "test"}
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "project", "a.jsonl")); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", true, nil); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Read(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if Stale(dir, s) {
+		t.Fatal("a sidecar whose vectors carry their identity was called stale")
+	}
+	hits, err := SemanticSearch(context.Background(), dir, search.Options{Query: "the scheduler", All: true}, s, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 || hits[0].Session.ID != "ccc" || !strings.Contains(hits[0].Snippets[0], "scheduler") {
+		t.Fatalf("after the rewrite the scheduler question found %+v", hits)
+	}
+	for _, h := range hits {
+		if h.Session.ID == "aaa" {
+			t.Errorf("the dropped session came back: %+v", h)
+		}
 	}
 }

@@ -162,10 +162,10 @@ func TestEmbedIndexOnlyEmbedsANewSessionsOwnRecords(t *testing.T) {
 	}
 }
 
-// The other side of the rule, end to end: a rebuild moves every record, so no
-// offset survives and every vector has to be made again. Cheap would be wrong
-// here.
-func TestEmbedIndexRebuildsEverythingAfterARebuild(t *testing.T) {
+// A rewrite moves every record, and the vectors used to go with the offsets:
+// the next run embedded the whole store again (#4976). Each vector now finds
+// its record by identity, so only the record the rewrite changed is sent.
+func TestEmbedIndexEmbedsOnlyWhatARewriteChanged(t *testing.T) {
 	var embedded atomic.Int64
 	client := countingClient(t, &embedded)
 	dir, _ := embedStore(t)
@@ -186,7 +186,40 @@ func TestEmbedIndexRebuildsEverythingAfterARebuild(t *testing.T) {
 	if _, err := EmbedIndex(dir, client, nil); err != nil {
 		t.Fatal(err)
 	}
-	if again := embedded.Load(); again < 2 {
-		t.Errorf("a replaced records.bin re-embedded %d records, want every one of them", again)
+	if again := embedded.Load(); again != 1 {
+		t.Errorf("a replaced records.bin re-embedded %d records, want only the rewritten 1", again)
+	}
+}
+
+// A version 1 sidecar has no identities, so its vectors cannot follow a rewrite
+// and every record is embedded again, as before.
+func TestAVersion1SidecarIsEmbeddedAgainAfterARewrite(t *testing.T) {
+	var embedded atomic.Int64
+	client := countingClient(t, &embedded)
+	dir, _ := embedStore(t)
+	s, err := EmbedIndex(dir, client, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range s.Vectors {
+		s.Vectors[i].Ident = 0
+	}
+	if err := write(dir, s); err != nil {
+		t.Fatal(err)
+	}
+	root := os.Getenv("DEJA_CLAUDE_ROOT")
+	rewound := `{"type":"user","sessionId":"a","timestamp":"2026-01-04T00:00:00Z","message":{"role":"user","content":"the scheduler story, rewritten"}}` + "\n"
+	if err := os.WriteFile(filepath.Join(root, "project", "a.jsonl"), []byte(rewound), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := index.Ensure(dir, "", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	embedded.Store(0)
+	if _, err := EmbedIndex(dir, client, nil); err != nil {
+		t.Fatal(err)
+	}
+	if again := embedded.Load(); again != 5 {
+		t.Errorf("a version 1 sidecar after a rewrite re-embedded %d records, want all 5", again)
 	}
 }

@@ -124,7 +124,9 @@ func TestMaybeSemanticSidecarBranches(t *testing.T) {
 		t.Fatal("dead endpoint must skip")
 	}
 	t.Setenv("DEJA_EMBED_URL", srv.URL+"/api/embed")
-	// Generation moves on re-index: stale sidecar skips.
+	// A version 2 sidecar follows its records through a rebuild and is still
+	// used; one written before identities is stale once the generation moves.
+	asVersion1Sidecar(t, index.DefaultDir())
 	writeClaudeFixture(t, filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "p", "s2.jsonl"), "s2", []string{
 		`{"type":"user","sessionId":"s2","timestamp":"2026-01-03T03:04:05Z","message":{"role":"user","content":"another session"}}`,
 	})

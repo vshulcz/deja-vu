@@ -329,9 +329,15 @@ Reading one session back (`ctx`, `recall_context`, the session resource) puts th
 
 `deja embed` writes `<index-dir>.vectors.bin`. The file begins with `DJV1`, a
 version, vector dimension, model name, manifest generation, vector count, and
-covered-record watermark. Each entry stores the records.bin byte offset, its
-session key, and fixed-width float32 values. Writes use a temporary file and
-rename. A changed manifest generation or model discards old entries; a corrupt
+covered-record watermark. Each entry stores the records.bin byte offset, the
+record's identity (a hash of its session, role, time, length and first 256
+bytes of text), its session key, and fixed-width float32 values. Writes use a
+temporary file and rename. A rewrite of records.bin moves the offsets, so a
+vector finds its record by identity once its offset no longer holds it, and
+the next `deja embed` carries every vector to its record's new offset and
+embeds only records it has not seen. A changed model discards old entries.
+Version 1 entries have no identity: they are carried only while the layout
+they were made for holds, and search refuses them after a rewrite. A corrupt
 sidecar is treated as absent and rebuilt.
 
 ### Hybrid reranking

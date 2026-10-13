@@ -48,10 +48,11 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 	for _, s := range metaSessions {
 		byKey[s.Harness+":"+s.ID] = s
 	}
-	byOffset := make(map[int64]index.Record, len(records))
-	for _, record := range records {
-		byOffset[record.Offset] = record.Record
+	gen, err := index.Generation(dir)
+	if err != nil {
+		return nil, err
 	}
+	lookup := newRecordLookup(records, sameLayout(sidecar.Generation, gen))
 	best := make(map[string]match)
 	heldNotes := make(map[string]match)
 	for _, vector := range sidecar.Vectors {
@@ -59,7 +60,7 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 		if !ok {
 			continue
 		}
-		record, ok := byOffset[vector.Offset]
+		record, ok := lookup.find(vector)
 		if !ok || (o.Role != "" && record.Role != o.Role) {
 			continue
 		}

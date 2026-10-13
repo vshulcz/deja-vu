@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The semantic sidecar survives a rewrite of the index: each vector carries its record's identity, so search keeps using it and the next `deja embed` sends only new or changed records. Before, any pass that rewrote `records.bin` (a torn last line, a removed file) made search refuse the sidecar and the next run embed the whole store again, about 45 minutes on 112k records. A sidecar written before this is rekeyed on the next `deja embed` while the index still has its layout. Proposed by @AlexanderAbramovPav (#4976).
 - `deja embed` no longer stops on Ollama with a bare `400 Bad Request`: a record with no text is not sent (Ollama refuses the whole batch over one empty input), the error carries the endpoint's reason, and a run that fails keeps the vectors it embedded since the last checkpoint. Reported with a tested patch by @AlexanderAbramovPav (#4975).
 - The code a Gemini CLI session changed, and that of any harness read through the generic edit reader, leaves out a tool call marked failed, an edit or a patch alike: a `replace` Gemini refused showed as code the session wrote (#4974).
 

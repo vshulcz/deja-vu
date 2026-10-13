@@ -15,15 +15,109 @@ import (
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 )
 
-const sidecarVersion uint16 = 1
+// sidecarVersion 2 adds each vector's Ident. A version 1 file is still read,
+// and its vectors are rekeyed on the next `deja embed` while the layout they
+// were made for holds.
+const sidecarVersion uint16 = 2
 
 var magic = [4]byte{'D', 'J', 'V', '1'}
 
 type Vector struct {
 	Offset int64
+	// Ident is the record's identity (RecordIdent), what finds the record
+	// again once a rewrite of records.bin has moved every offset. Zero in a
+	// vector from a version 1 sidecar.
+	Ident  uint64
 	Key    string
 	Values []float32
 }
+
+// RecordIdent names a record by what it holds rather than where it sits: its
+// session, role, time and text. Any pass that rewrites records.bin moves the
+// offsets, and a sidecar keyed by offset alone was thrown away and embedded
+// again from zero, 45 minutes on a 112k-record store, often within the hour
+// it was built (#4976). The text is hashed by its length and first 256 bytes,
+// which with the session and the time is enough to tell records apart and
+// keeps a lookup over every record cheap.
+func RecordIdent(r index.Record) uint64 {
+	// FNV-1a by hand, without the allocations of hash/fnv and fmt.
+	const prime = 1099511628211
+	h := uint64(14695981039346656037)
+	str := func(s string) {
+		for i := 0; i < len(s); i++ {
+			h = (h ^ uint64(s[i])) * prime
+		}
+		h = (h ^ 0) * prime
+	}
+	num := func(n uint64) {
+		for i := 0; i < 8; i++ {
+			h = (h ^ (n & 0xff)) * prime
+			n >>= 8
+		}
+	}
+	text := r.Text
+	if len(text) > 256 {
+		text = text[:256]
+	}
+	str(r.Key)
+	str(r.Role)
+	num(uint64(r.Time.UnixNano()))
+	num(uint64(len(r.Text)))
+	str(text)
+	if h != 0 {
+		return h
+	}
+	return 1
+}
+
+// keyed reports whether every vector carries its record's identity, so none
+// depends on the offsets staying put.
+func keyed(s Sidecar) bool {
+	for _, v := range s.Vectors {
+		if v.Ident == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// recordLookup finds the record a vector was made from: at its offset while
+// the index keeps the layout the sidecar was written for, and by identity once
+// a rewrite has moved it. Hashing every record costs about 30 ms over 100k, so
+// it is paid only after a rewrite, once per search.
+type recordLookup struct {
+	records  []index.OffsetRecord
+	byOffset map[int64]index.Record
+	byIdent  map[uint64]index.Record
+	layout   bool
+}
+
+func newRecordLookup(records []index.OffsetRecord, layout bool) *recordLookup {
+	l := &recordLookup{records: records, byOffset: make(map[int64]index.Record, len(records)), layout: layout}
+	for _, r := range records {
+		l.byOffset[r.Offset] = r.Record
+	}
+	return l
+}
+
+func (l *recordLookup) find(v Vector) (index.Record, bool) {
+	r, ok := l.byOffset[v.Offset]
+	if v.Ident == 0 || l.layout {
+		return r, ok
+	}
+	if l.byIdent == nil {
+		l.byIdent = make(map[uint64]index.Record, len(l.records))
+		for _, x := range l.records {
+			id := RecordIdent(x.Record)
+			if _, dup := l.byIdent[id]; !dup {
+				l.byIdent[id] = x.Record
+			}
+		}
+	}
+	r, ok = l.byIdent[v.Ident]
+	return r, ok && r.Key == v.Key
+}
+
 type Sidecar struct {
 	Model, Generation string
 	Dim               int
@@ -38,8 +132,11 @@ type Sidecar struct {
 // to another one and semantic search quoted text the named session never said
 // (#1355). The generation was recorded for exactly this and only checked when
 // re-embedding.
+//
+// A sidecar whose vectors all carry their record's identity is never stale:
+// each vector finds its record by what it holds, wherever it now sits.
 func Stale(dir string, s Sidecar) bool {
-	if len(s.Vectors) == 0 {
+	if len(s.Vectors) == 0 || keyed(s) {
 		return false
 	}
 	gen, err := index.Generation(dir)
@@ -110,30 +207,49 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 		return Sidecar{}, err
 	}
 	old, _ := Read(dir)
-	if old.Model != client.Model || !sameLayout(old.Generation, gen) || old.Dim == 0 {
+	if old.Model != client.Model || old.Dim == 0 {
 		old = Sidecar{}
 	}
-	// Vectors the caller no longer allows go, rather than being carried forward
-	// because the layout matched. A policy that tightens has to reach the
-	// sidecar too: the vectors are already off the machine, but SemanticSearch
-	// reads this file directly, so keeping them means the withheld sessions
-	// keep coming back as answers (#1311).
-	allowed := make(map[int64]bool, len(recs))
+	// A vector is carried to the record it was made from, found by identity
+	// and given that record's offset now. Only the records the caller allows
+	// are looked in, so vectors the caller no longer allows go rather than
+	// being carried forward: a policy that tightens has to reach the sidecar
+	// too, since SemanticSearch reads this file directly and kept vectors bring
+	// the withheld sessions back as answers (#1311). A version 1 vector has no
+	// identity and is carried only while the layout it was made for holds.
+	current := make(map[uint64]index.OffsetRecord, len(recs))
 	for _, r := range recs {
-		allowed[r.Offset] = true
-	}
-	kept := old.Vectors[:0:0]
-	for _, v := range old.Vectors {
-		if allowed[v.Offset] {
-			kept = append(kept, v)
+		if id := RecordIdent(r.Record); current[id].Record.Key == "" {
+			current[id] = r
 		}
 	}
-	old.Vectors = kept
-	seen := make(map[int64]bool, len(old.Vectors))
-	for _, v := range old.Vectors {
-		seen[v.Offset] = true
+	var lookup *recordLookup
+	if sameLayout(old.Generation, gen) {
+		lookup = newRecordLookup(recs, true)
 	}
-	pending := toEmbed(recs, seen)
+	covered := make(map[uint64]bool, len(old.Vectors))
+	kept := old.Vectors[:0:0]
+	for _, v := range old.Vectors {
+		id := v.Ident
+		if id == 0 {
+			if lookup == nil {
+				continue
+			}
+			r, ok := lookup.byOffset[v.Offset]
+			if !ok || r.Key != v.Key {
+				continue
+			}
+			id = RecordIdent(r)
+		}
+		r, ok := current[id]
+		if !ok || r.Record.Key != v.Key || covered[id] {
+			continue
+		}
+		covered[id] = true
+		kept = append(kept, Vector{Offset: r.Offset, Ident: id, Key: v.Key, Values: v.Values})
+	}
+	old.Vectors = kept
+	pending := toEmbed(recs, covered)
 	batches := 0
 	for len(pending) > 0 {
 		n := len(pending)
@@ -161,7 +277,7 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 			if len(values) != old.Dim {
 				return Sidecar{}, fmt.Errorf("embedding dimension changed from %d to %d", old.Dim, len(values))
 			}
-			old.Vectors = append(old.Vectors, Vector{Offset: pending[i].Offset, Key: pending[i].Record.Key, Values: values})
+			old.Vectors = append(old.Vectors, Vector{Offset: pending[i].Offset, Ident: RecordIdent(pending[i].Record), Key: pending[i].Record.Key, Values: values})
 		}
 		pending = pending[n:]
 		batches++
@@ -185,12 +301,20 @@ func EmbedIndex(dir string, client *Client, keep func(index.Record) bool) (Sidec
 // send. A record that cleaning left empty has nothing to embed, and Ollama
 // refuses the whole batch over one empty input ("empty content"), as OpenAI's
 // API does (#4975).
-func toEmbed(recs []index.OffsetRecord, seen map[int64]bool) []index.OffsetRecord {
+// A record with the same identity as one already covered or queued shares its
+// vector, so it is sent once. covered is updated with what is queued.
+func toEmbed(recs []index.OffsetRecord, covered map[uint64]bool) []index.OffsetRecord {
 	var pending []index.OffsetRecord
 	for _, r := range recs {
-		if !seen[r.Offset] && strings.TrimSpace(r.Record.Text) != "" {
-			pending = append(pending, r)
+		if strings.TrimSpace(r.Record.Text) == "" {
+			continue
 		}
+		id := RecordIdent(r.Record)
+		if covered[id] {
+			continue
+		}
+		covered[id] = true
+		pending = append(pending, r)
 	}
 	return pending
 }
@@ -222,7 +346,7 @@ func Read(dir string) (Sidecar, error) {
 	var version, dim uint16
 	var count, covered uint64
 	var model, gen string
-	if err = binary.Read(f, binary.LittleEndian, &version); err != nil || version != sidecarVersion {
+	if err = binary.Read(f, binary.LittleEndian, &version); err != nil || version < 1 || version > sidecarVersion {
 		return Sidecar{}, fmt.Errorf("unsupported vector sidecar")
 	}
 	if err = binary.Read(f, binary.LittleEndian, &dim); err != nil {
@@ -247,6 +371,11 @@ func Read(dir string) (Sidecar, error) {
 	for i := range out.Vectors {
 		if err = binary.Read(f, binary.LittleEndian, &out.Vectors[i].Offset); err != nil {
 			return Sidecar{}, err
+		}
+		if version >= 2 {
+			if err = binary.Read(f, binary.LittleEndian, &out.Vectors[i].Ident); err != nil {
+				return Sidecar{}, err
+			}
 		}
 		if out.Vectors[i].Key, err = readString(f); err != nil {
 			return Sidecar{}, err
@@ -278,6 +407,7 @@ func write(dir string, s Sidecar) error {
 		ew.num(uint64(s.Covered))
 		for _, v := range s.Vectors {
 			ew.num(v.Offset)
+			ew.num(v.Ident)
 			ew.str(v.Key)
 			ew.num(v.Values)
 		}

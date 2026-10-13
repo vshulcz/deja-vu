@@ -17,14 +17,16 @@ import (
 // empty stopped `deja embed` half an hour in (#4975). It is not sent.
 func TestARecordWithNoTextIsNotSent(t *testing.T) {
 	recs := []index.OffsetRecord{
-		{Offset: 0, Record: index.Record{Text: "the pool is not closed"}},
-		{Offset: 10, Record: index.Record{Text: ""}},
-		{Offset: 20, Record: index.Record{Text: " \n\t"}},
-		{Offset: 30, Record: index.Record{Text: "already embedded"}},
-		{Offset: 40, Record: index.Record{Text: "raise the timeout"}},
+		{Offset: 0, Record: index.Record{Key: "claude:a", Text: "the pool is not closed"}},
+		{Offset: 10, Record: index.Record{Key: "claude:a", Text: ""}},
+		{Offset: 20, Record: index.Record{Key: "claude:a", Text: " \n\t"}},
+		{Offset: 30, Record: index.Record{Key: "claude:a", Text: "already embedded"}},
+		{Offset: 40, Record: index.Record{Key: "claude:a", Text: "raise the timeout"}},
+		{Offset: 50, Record: index.Record{Key: "claude:a", Text: "raise the timeout"}},
 	}
 	var got []int64
-	for _, r := range toEmbed(recs, map[int64]bool{30: true}) {
+	covered := map[uint64]bool{RecordIdent(recs[3].Record): true}
+	for _, r := range toEmbed(recs, covered) {
 		got = append(got, r.Offset)
 	}
 	if len(got) != 2 || got[0] != 0 || got[1] != 40 {

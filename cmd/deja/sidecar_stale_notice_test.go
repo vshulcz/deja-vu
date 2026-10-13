@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,11 +17,10 @@ import (
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
-// A rebuild of records.bin retires the sidecar, because vectors address records
-// by offset (#1355). One more indexed session is enough, so this is the state
-// every machine that embeds passes through — and search dropped the semantic
-// tier without a word, while the unreachable endpoint beside it has always said
-// so (#2208).
+// A rebuild of records.bin retired a sidecar whose vectors address records by
+// offset alone (#1355), which every version 1 sidecar does. Search dropped the
+// semantic tier without a word, while the unreachable endpoint beside it has
+// always said so (#2208).
 func TestAStaleSidecarIsNamedOnTheSearchPath(t *testing.T) {
 	hermeticEnv(t)
 	store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
@@ -51,6 +52,7 @@ func TestAStaleSidecarIsNamedOnTheSearchPath(t *testing.T) {
 	if _, err := embed.EmbedIndex(dir, &embed.Client{URL: ts.URL, Model: "test"}, nil); err != nil {
 		t.Fatal(err)
 	}
+	asVersion1Sidecar(t, dir)
 
 	said := func(run func(notice *os.File)) string {
 		t.Helper()
@@ -118,5 +120,39 @@ func TestAStaleSidecarIsNamedOnTheSearchPath(t *testing.T) {
 	})
 	if n := strings.Count(both, "deja embed"); n != 1 {
 		t.Errorf("one search said it %d times:\n%s", n, both)
+	}
+}
+
+// asVersion1Sidecar rewrites the sidecar in dir the way deja wrote it before
+// vectors carried their record's identity, so a test can reach the stale path
+// a version 2 sidecar no longer takes.
+func asVersion1Sidecar(t *testing.T, dir string) {
+	t.Helper()
+	s, err := embed.Read(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	str := func(v string) {
+		_ = binary.Write(&b, binary.LittleEndian, uint32(len(v)))
+		b.WriteString(v)
+	}
+	b.WriteString("DJV1")
+	_ = binary.Write(&b, binary.LittleEndian, uint16(1))
+	_ = binary.Write(&b, binary.LittleEndian, uint16(s.Dim))
+	str(s.Model)
+	str(s.Generation)
+	_ = binary.Write(&b, binary.LittleEndian, uint64(len(s.Vectors)))
+	_ = binary.Write(&b, binary.LittleEndian, uint64(s.Covered))
+	for _, v := range s.Vectors {
+		_ = binary.Write(&b, binary.LittleEndian, v.Offset)
+		str(v.Key)
+		_ = binary.Write(&b, binary.LittleEndian, v.Values)
+	}
+	if err := os.WriteFile(embed.Path(dir), b.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if back, err := embed.Read(dir); err != nil || len(back.Vectors) != len(s.Vectors) || (len(back.Vectors) > 0 && back.Vectors[0].Ident != 0) {
+		t.Fatalf("the version 1 sidecar does not read back: %v", err)
 	}
 }
