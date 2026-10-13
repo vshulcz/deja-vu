@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `deja embed` no longer stops on Ollama with a bare `400 Bad Request`: a record with no text is not sent (Ollama refuses the whole batch over one empty input), the error carries the endpoint's reason, and a run that fails keeps the vectors it embedded since the last checkpoint. Reported with a tested patch by @AlexanderAbramovPav (#4975).
+- The code a Gemini CLI session changed, and that of any harness read through the generic edit reader, leaves out a tool call marked failed, an edit or a patch alike: a `replace` Gemini refused showed as code the session wrote (#4974).
 
 ## [0.22.1] - 2026-10-12
 

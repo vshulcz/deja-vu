@@ -31,6 +31,8 @@ var (
 	// only taken from inside one: the same shape in a system prompt, a tool
 	// schema or a read result is not a change the session made.
 	toolArgKeys = map[string]bool{"input": true, "arguments": true, "args": true, "parameters": true, "params": true, "rawInput": true, "raw_input": true}
+	// callStatusKeys name the field a harness marks a failed call with.
+	callStatusKeys = []string{"status", "callStatus", "toolStatus", "resultStatus"}
 )
 
 // writeToolName is a tool that writes a whole file. A path with content is
@@ -76,7 +78,7 @@ func genericChanges(s model.Session) []Change {
 			// was read before it still counts.
 			break
 		}
-		w.walk(v, "", false, 0)
+		w.walk(v, "", false, false, 0)
 	}
 	cwd := w.cwd
 	if cwd == "" {
@@ -105,7 +107,7 @@ func (w *editWalker) add(c Change) {
 // walk visits v. call is the tool call whose arguments v sits in, "" outside
 // any: edits, writes and patches are only read inside one, and the call's name
 // is what tells a write from a read.
-func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
+func (w *editWalker) walk(v any, call string, failed bool, inArgs bool, depth int) {
 	if depth > 16 {
 		return
 	}
@@ -114,11 +116,11 @@ func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
 		if s := strings.TrimSpace(t); len(s) < 4<<20 && (strings.HasPrefix(s, "{") || strings.HasPrefix(s, "[")) {
 			var inner any
 			if json.Unmarshal([]byte(s), &inner) == nil {
-				w.walk(inner, call, inArgs, depth+1)
+				w.walk(inner, call, failed, inArgs, depth+1)
 				return
 			}
 		}
-		if !inArgs {
+		if !inArgs || failed {
 			return
 		}
 		for _, patch := range patchTexts(t, 0) {
@@ -128,7 +130,7 @@ func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
 		}
 	case []any:
 		for _, x := range t {
-			w.walk(x, call, inArgs, depth+1)
+			w.walk(x, call, failed, inArgs, depth+1)
 		}
 	case map[string]any:
 		if !inArgs && w.cwd == "" {
@@ -137,7 +139,7 @@ func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
 			}
 		}
 		if inArgs {
-			w.edit(t, call)
+			w.edit(t, call, failed)
 		}
 		name := firstStringField(t, toolNameKeys)
 		keys := make([]string, 0, len(t))
@@ -147,18 +149,30 @@ func (w *editWalker) walk(v any, call string, inArgs bool, depth int) {
 		sort.Strings(keys)
 		for _, k := range keys {
 			if name != "" && toolArgKeys[k] {
-				w.walk(t[k], name, true, depth+1)
+				// A tool call object may carry its own status beside the
+				// arguments: Gemini marks a refused call "error" there.
+				w.walk(t[k], name, failedCall(firstStringField(t, callStatusKeys)), true, depth+1)
 				continue
 			}
-			w.walk(t[k], call, inArgs, depth+1)
+			w.walk(t[k], call, failed, inArgs, depth+1)
 		}
 	}
 }
 
+// failedCall reports whether a tool call's status marks it as having changed
+// nothing: an error, a cancellation, a refusal.
+func failedCall(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "error", "cancelled", "canceled", "failed", "refused", "denied":
+		return true
+	}
+	return false
+}
+
 // edit takes the change an argument object describes, if it describes one.
-func (w *editWalker) edit(t map[string]any, call string) {
+func (w *editWalker) edit(t map[string]any, call string, failed bool) {
 	p := firstStringField(t, editPathKeys)
-	if p == "" {
+	if p == "" || failed {
 		return
 	}
 	old, oldOK := firstStringFieldOK(t, editOldKeys)
