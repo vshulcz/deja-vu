@@ -27,6 +27,12 @@ before it activates the provider.
   give Claude Code and Codex: the recent work in this project and what held.
   After that, only when what was just asked matches something earlier. Most
   turns it adds nothing.
+- You see what it brought: the lines deja shows in Claude Code (the "you have
+  been here" receipt, what a session start recalled, the build and week notes)
+  ride Hermes's recall line, `🧠 deja · …`, in the CLI. The model's text is
+  the same as before. Hermes 0.17 has no recall line, the TUI only flashes it
+  in the status bar, and a gateway chat may be a group other people read, so
+  everywhere but the CLI deja keeps its notes for a session that shows them.
 - A cron job's run gets no automatic recall: when Hermes says the platform is
   `cron`, the provider adds nothing on its own, and the deja tools still answer
   when the job calls them.

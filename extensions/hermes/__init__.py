@@ -11,6 +11,7 @@ this machine already wrote to disk, indexed locally by the deja binary.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from typing import Any, Dict, List, Optional
@@ -136,11 +137,68 @@ def _query_args(command, text):
     return [command, text]
 
 
+# Where the recall indicator is a line the person reads: the CLI prints it
+# under the prompt. The TUI and desktop only flash it in the status bar, which
+# the turn's own status replaces at once (0.21.7); the API server and ACP drop
+# it; a gateway posts it to a chat that may be a group other people read.
+# deja marks a note shown when it prints it, so everywhere else it is asked
+# for --plain and keeps its notes for a session that shows them. Cron recalls
+# nothing at all (prefetch below).
+_SHOWS_LINE = ("cli",)
+
+_BRAND = re.compile(r"^deja(?:-vu)?(?:\s+—\s+|\s*:\s+|\s+)", re.IGNORECASE)
+
+
+def _split_reply(out):
+    """deja's JSON hook reply, split by reader: additionalContext is for the
+    model and is what --plain prints; systemMessage is for the person. Output
+    with no envelope is all context, so the model still gets it."""
+    text = (out or "").strip()
+    if not text:
+        return "", ""
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            reply = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(reply, dict) or not ("hookSpecificOutput" in reply or "systemMessage" in reply):
+            continue
+        out = reply.get("hookSpecificOutput")
+        context = out.get("additionalContext") if isinstance(out, dict) else ""
+        note = reply.get("systemMessage")
+        return (context.strip() if isinstance(context, str) else "",
+                note.strip() if isinstance(note, str) else "")
+    return text, ""
+
+
+def _indicator_label(notes):
+    """deja's lines for the person, as the label of Hermes's recall line:
+    "🧠 <label> — recalled N memories". deja's name leads once, so each line
+    drops its own. Several lines stack under the first, and the host's count
+    goes on a line of its own rather than after the last note."""
+    lines = []
+    for note in notes:
+        for line in note.splitlines():
+            line = _BRAND.sub("", line.strip(), count=1).replace("via: ", "via ")
+            if line:
+                lines.append(line)
+    if not lines:
+        return "deja"
+    if len(lines) == 1:
+        return "deja · " + lines[0]
+    return "deja · " + "\n   ".join(lines) + "\n  "
+
+
 class DejaMemoryProvider(MemoryProvider):
     def __init__(self):
         self._first_turn = True
         self._last_text = ""
         self._last_count = 0
+        self._last_notes = []
+        self._held_notes = []
 
     @property
     def name(self) -> str:
@@ -180,7 +238,7 @@ class DejaMemoryProvider(MemoryProvider):
         # wallpaper.
         # Both calls are milliseconds against a built index and never build
         # one; the timeouts are the ceiling for a machine that is swapping.
-        parts = []
+        parts, notes = [], []
         session_id = session_id or getattr(self, "_session_id", "")
         if self._first_turn:
             self._first_turn = False
@@ -188,25 +246,43 @@ class DejaMemoryProvider(MemoryProvider):
             # which keeps it out of its own MCP recall on this first turn, and
             # keys the digest's once-per-session ledger (#4246 for the hook).
             start = json.dumps({"session_id": session_id or "", "cwd": os.getcwd()})
-            digest = _deja(["hook-context", "--plain"], start, timeout=8)
+            digest, note = self._hook("hook-context", start, timeout=8)
             if digest:
                 parts.append(digest)
+            if note:
+                notes.append(note)
         if query:
             payload = json.dumps({"prompt": query, "session_id": session_id or ""})
-            hit = _deja(["hook-prompt", "--plain"], payload, timeout=5)
+            hit, note = self._hook("hook-prompt", payload, timeout=5)
             if hit:
                 parts.append(hit)
+            if note:
+                notes.append(note)
         text = "\n\n".join(parts)
         self._last_text = text
         # One bullet per recalled session or fact; the indicator reads
         # "recalled N memories" from it, and 0 renders generically.
         self._last_count = sum(1 for line in text.splitlines() if line.startswith("- "))
+        # Hermes prints the indicator only after a prefetch that returned
+        # text. A note that came without any waits for the next one.
+        held = (self._held_notes + notes)[-8:]
+        if text:
+            self._last_notes, self._held_notes = held, []
+        else:
+            self._last_notes, self._held_notes = [], held
         return text
+
+    def _hook(self, command, payload, timeout):
+        """One deja run: the model's text, and deja's line for the person
+        when this Hermes has a recall indicator to show it on."""
+        if RecallStatus is None or getattr(self, "_platform", "") not in _SHOWS_LINE:
+            return _deja([command, "--plain"], payload, timeout=timeout), ""
+        return _split_reply(_deja([command], payload, timeout=timeout))
 
     def recall_status(self):
         if RecallStatus is None or not self._last_text:
             return None
-        return RecallStatus(provider_label="deja", count=self._last_count)
+        return RecallStatus(provider_label=_indicator_label(self._last_notes), count=self._last_count)
 
     def sync_turn(self, user_content: str, assistant_content: str, *, session_id: str = "", messages=None) -> None:
         # Hermes writes the session to its own store; deja indexes that store
