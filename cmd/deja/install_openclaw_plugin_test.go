@@ -220,10 +220,11 @@ func TestOpenClawPluginUsesThePhaseHooks(t *testing.T) {
 
 // deja's receipt reaches the person in a 1:1 chat with the owner: the prompt
 // hook asks once for the JSON reply, the model gets what --plain prints, and
-// the reply on its way to Telegram carries one short receipt line as a context
-// block. A group chat, the TUI ("webchat") and receipt:false stay --plain and
-// leave the reply alone, and the session-start digest is never asked for its
-// notes on a channel.
+// the final reply on its way to Telegram carries one short receipt line as a
+// context block. Everything else stays --plain and leaves the reply alone: a
+// group, a group whose channel says isGroup false, the TUI, receipt:false, a
+// stranger's DM after an owner turn that never replied (every DM shares
+// agent:main:main), and a block-stream chunk.
 func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the stub deja is a shell script")
@@ -234,9 +235,9 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 	}
 	home := t.TempDir()
 	stub := filepath.Join(home, "deja")
-	calls := filepath.Join(home, "calls")
 	reply := `{"systemMessage":"deja-vu — you have been here: \"zorbit drain\" (Oct 7 · via: zorbit, drain)","hookSpecificOutput":{"additionalContext":"RECALLED drain with --grace 40"}}`
-	script := "#!/bin/sh\ncat >/dev/null\nprintf '%s\\n' \"$*\" >> " + calls + "\n" +
+	script := "#!/bin/sh\nin=$(cat)\nprintf '%s\\n' \"$*\" >> \"$DEJA_CALLS\"\n" +
+		"case \"$in\" in *zorbit*) ;; *) exit 0 ;; esac\n" +
 		"case \"$*\" in\n" +
 		"  'hook-prompt --plain') printf 'RECALLED drain with --grace 40' ;;\n" +
 		"  hook-prompt) printf '%s\\n' '" + reply + "' ;;\n" +
@@ -249,29 +250,44 @@ func TestOpenClawPluginShowsTheReceiptInAnOwnerDM(t *testing.T) {
 		t.Fatal(err)
 	}
 	driver := `
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+const calls = process.env.DEJA_CALLS;
+const owner = { channels: { telegram: { allowFrom: ["4242"] }, googlechat: { allowFrom: ["4242"] } } };
+// Each case is a run of turns on one fresh plugin; the last turn's reply is judged.
 const cases = {
-  dm: { channel: "telegram", isGroup: false },
-  group: { channel: "telegram", isGroup: true },
-  tui: { channel: "webchat", isGroup: false },
-  off: { channel: "telegram", isGroup: false, pluginConfig: { receipt: false } },
+  dm: [{}],
+  group: [{ key: "agent:main:telegram:group:-100", conv: "-100", isGroup: true }],
+  unnamedGroup: [{ key: "agent:main:googlechat:group:spaces-a", channel: "googlechat", conv: "spaces-a", isGroup: false }],
+  tui: [{ channel: "webchat" }],
+  off: [{ config: { receipt: false } }],
+  stranger: [{ kinds: [] }, { sender: "7", prompt: "zorbit, hi" }],
+  block: [{ kinds: ["block"] }],
 };
 const out = {};
-for (const [name, c] of Object.entries(cases)) {
+let run = 0;
+for (const [name, turns] of Object.entries(cases)) {
+  writeFileSync(calls, "");
   const { default: plugin } = await import("` + plugin + `?" + name);
   const hooks = {};
-  plugin.register({
-    on: (n, fn) => { hooks[n] = fn },
-    pluginConfig: c.pluginConfig || {},
-    config: { channels: { telegram: { allowFrom: ["4242"] } } },
-  });
-  const key = "agent:main:" + name;
-  await hooks.before_dispatch?.({ sessionKey: key, channel: c.channel, senderId: "4242", isGroup: c.isGroup }, {});
-  const built = await hooks.before_prompt_build({ prompt: "what did we decide about the zorbit drain", messages: [] },
-    { sessionKey: key, sessionId: "s-" + name, channel: c.channel, senderId: "4242", trigger: "user" });
-  const sent = hooks.reply_payload_sending
-    ? await hooks.reply_payload_sending({ kind: "final", channel: c.channel, sessionKey: key, payload: { text: "Use --grace 40." } }, {})
-    : null;
-  out[name] = { context: built?.prependContext ?? null, sent: sent ?? null };
+  plugin.register({ on: (n, fn) => { hooks[n] = fn }, pluginConfig: turns[0].config || {}, config: owner });
+  let last;
+  for (const t of turns) {
+    const key = t.key || "agent:main:main", channel = t.channel || "telegram", sender = t.sender || "4242";
+    const conv = t.conv || sender, runId = "run-" + ++run;
+    await hooks.before_dispatch?.({ sessionKey: key, channel, senderId: sender, isGroup: t.isGroup ?? false },
+      { sessionKey: key, channelId: channel, conversationId: conv, senderId: sender });
+    const built = await hooks.before_prompt_build({ prompt: t.prompt || "what did we decide about the zorbit drain", messages: [] },
+      { sessionKey: key, sessionId: "s", channel, senderId: sender, trigger: "user", runId });
+    const sent = [];
+    for (const kind of t.kinds ?? ["final"]) {
+      sent.push(hooks.reply_payload_sending
+        ? (await hooks.reply_payload_sending({ kind, channel, sessionKey: key, runId, payload: { text: "Use --grace 40." } },
+          { channelId: channel, conversationId: channel + ":" + conv, senderId: sender, runId })) ?? null
+        : null);
+    }
+    last = { context: built?.prependContext ?? null, sent: sent[sent.length - 1] ?? null };
+  }
+  out[name] = { ...last, calls: readFileSync(calls, "utf8") };
 }
 console.log(JSON.stringify(out));
 `
@@ -279,12 +295,15 @@ console.log(JSON.stringify(out));
 	if err := os.WriteFile(run, []byte(driver), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := exec.Command(node, run).CombinedOutput()
+	cmd := exec.Command(node, run)
+	cmd.Env = append(os.Environ(), "DEJA_CALLS="+filepath.Join(home, "calls"))
+	raw, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("driving the plugin: %v\n%s", err, raw)
 	}
 	var got map[string]struct {
 		Context string `json:"context"`
+		Calls   string `json:"calls"`
 		Sent    *struct {
 			Payload struct {
 				Text         string `json:"text"`
@@ -314,16 +333,44 @@ console.log(JSON.stringify(out));
 	if dm.Sent.Payload.Text != "Use --grace 40." || len(blocks) != 1 || blocks[0].Type != "context" || blocks[0].Text != want {
 		t.Errorf("want one context block %q under the reply:\n%s", want, raw)
 	}
-	for _, name := range []string{"group", "tui", "off"} {
+	if dm.Calls != "hook-prompt\n" {
+		t.Errorf("want one JSON hook-prompt spawn in the DM, got %q", dm.Calls)
+	}
+	for _, name := range []string{"group", "unnamedGroup", "tui", "off"} {
 		if got[name].Sent != nil {
 			t.Errorf("%s: the reply was changed:\n%s", name, raw)
 		}
+		if got[name].Calls != "hook-prompt --plain\n" {
+			t.Errorf("%s: want --plain, got %q", name, got[name].Calls)
+		}
 	}
-	body, _ := os.ReadFile(calls)
-	if n := strings.Count(string(body), "hook-prompt\n"); n != 1 {
-		t.Errorf("want one JSON hook-prompt spawn (the DM), got %d:\n%s", n, body)
+	for _, name := range []string{"stranger", "block"} {
+		if got[name].Sent != nil {
+			t.Errorf("%s: a reply that is not the owner's final reply took the receipt:\n%s", name, raw)
+		}
 	}
-	if n := strings.Count(string(body), "hook-prompt --plain\n"); n != 3 {
-		t.Errorf("want the group, TUI and receipt:false turns on --plain, got %d:\n%s", n, body)
+}
+
+// The installer's plugin carries the receipt rules as a copy of
+// extensions/openclaw/lib.mjs's, so a fix to one that misses the other would
+// gate the receipt differently depending on how deja was installed.
+func TestOpenClawPluginSharesTheReceiptRules(t *testing.T) {
+	lib, err := os.ReadFile(filepath.Join("..", "..", "extensions", "openclaw", "lib.mjs"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	js := openclawPluginJS("/bin/deja")
+	for _, name := range []string{"splitHookReply", "deliversNotes", "ownerSender", "directSessionKey", "conversationOf",
+		"directTurn", "receiptAllowed", "replyTakes", "escapeMarkdown", "receiptLine", "withReceipt"} {
+		src := string(lib)
+		i := strings.Index(src, "export function "+name+"(")
+		if i < 0 {
+			t.Fatalf("lib.mjs has no %s", name)
+		}
+		end := strings.Index(src[i:], "\n}\n")
+		fn := src[i+len("export ") : i+end+2]
+		if !strings.Contains(js, fn) {
+			t.Errorf("the installer's plugin does not carry lib.mjs's %s as it is", name)
+		}
 	}
 }

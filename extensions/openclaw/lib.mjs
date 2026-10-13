@@ -144,12 +144,13 @@ export function toolCall(event, at) {
   return null
 }
 
-// splitHookReply reads what `deja hook-prompt` or `deja hook-context` printed
-// in its JSON form and splits it by reader: additionalContext is for the model,
-// the same text --plain prints, and systemMessage is deja's lines for the
-// person. One spawn answers both. The envelope is the last line that parses as
-// one; output with no envelope is all context, so a deja that printed plain
-// text still reaches the model.
+// splitHookReply reads what `deja hook-prompt` printed in its JSON form and
+// splits it by reader: additionalContext is for the model, the same text
+// --plain prints, and systemMessage is deja's line for the person. One spawn
+// answers both. The envelope is the last line that parses as one. Any other
+// line deja printed would have been printed by --plain too, so it stays with
+// the model's text, where --plain would have put it; output with no envelope
+// is all context.
 export function splitHookReply(stdout) {
   const text = String(stdout || "").trim()
   if (!text) return { context: "", notes: "" }
@@ -167,8 +168,10 @@ export function splitHookReply(stdout) {
     if (!("hookSpecificOutput" in reply) && !("systemMessage" in reply)) continue
     const out = reply.hookSpecificOutput
     const context = out && typeof out.additionalContext === "string" ? out.additionalContext.trim() : ""
+    const before = lines.slice(0, i).join("\n").trim()
+    const after = lines.slice(i + 1).join("\n").trim()
     const notes = typeof reply.systemMessage === "string" ? reply.systemMessage.trim() : ""
-    return { context, notes }
+    return { context: [before, context, after].filter(Boolean).join("\n"), notes }
   }
   return { context: text, notes: "" }
 }
@@ -186,8 +189,8 @@ export function deliversNotes(channel) {
 
 // ownerSender says whether a sender is the person whose history deja reads.
 // commands.ownerAllowFrom names the owner as "channel:id"; without it, a
-// channel allowlist of exactly one id is that one person. Anything else — a
-// wildcard, several people, no list — is not known to be the owner, and the
+// channel allowlist of exactly one id is that one person. Anything else (a
+// wildcard, several people, no list) is not known to be the owner, and the
 // answer is no: the receipt quotes their past work.
 export function ownerSender(config, channel, senderId) {
   const ch = String(channel || "").trim().toLowerCase()
@@ -204,89 +207,114 @@ export function ownerSender(config, channel, senderId) {
   return entries[0] === id || entries[0].toLowerCase() === ch + ":" + id.toLowerCase()
 }
 
-// directTurns remembers, per session, whether the message that started its
-// turn came in a 1:1 chat and from whom. before_dispatch is the hook that is
-// told isGroup; the prompt hook after it is not. A turn the board never heard
-// about counts as not direct, and so does one older than a few minutes.
-export function directTurns({ ttlMs = 5 * 60 * 1000, sessions = 256, now = Date.now } = {}) {
-  const turns = new Map()
-  return {
-    heard(event, ctx) {
-      const key = (event && event.sessionKey) || (ctx && ctx.sessionKey) || ""
-      if (!key) return
-      turns.delete(key)
-      turns.set(key, {
-        direct: Boolean(event) && event.isGroup === false,
-        sender: String((event && event.senderId) ?? (ctx && ctx.senderId) ?? ""),
-        channel: String((event && event.channel) || (ctx && ctx.channelId) || "").toLowerCase(),
-        at: now(),
-      })
-      while (turns.size > sessions) turns.delete(turns.keys().next().value)
-    },
-    direct(key, channel, senderId) {
-      const t = key && turns.get(key)
-      if (!t || now() - t.at > ttlMs || !t.direct) return false
-      if (t.channel !== String(channel || "").toLowerCase()) return false
-      return !senderId || t.sender === String(senderId)
-    },
-  }
+// directSessionKey says whether a session key can only be a 1:1 chat's: one
+// that names a group, a channel, a thread or a topic cannot. agent:main:main,
+// where every DM lands by default, passes here; the turn itself still has to
+// say it was 1:1.
+export function directSessionKey(key) {
+  const parts = String(key || "").trim().toLowerCase().split(":")
+  if (!parts[0]) return false
+  return !parts.some((p) => p === "group" || p === "channel" || p === "thread" || p === "topic")
 }
 
-const RECEIPT = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/
+// conversationOf names a conversation the same way whichever hook reported
+// it: before_dispatch says "4242", the reply's hook "telegram:4242".
+export function conversationOf(id, channel) {
+  const s = String(id ?? "").trim().toLowerCase()
+  const prefix = String(channel || "").trim().toLowerCase() + ":"
+  return s.startsWith(prefix) ? s.slice(prefix.length) : s
+}
+
+// directTurn is what before_dispatch says about the message that starts a
+// turn, kept so the prompt hook can tell whether that turn is a 1:1 chat. It
+// is 1:1 only if every signal OpenClaw gives agrees: isGroup is false, not
+// missing; the session key is not a group's; a chat type, when there is one,
+// is "direct". Anything missing or unknown counts as not 1:1.
+export function directTurn(event, ctx) {
+  const e = event || {}
+  const c = ctx || {}
+  const key = e.sessionKey || c.sessionKey || ""
+  const channel = String(e.channel || c.channelId || "").trim().toLowerCase()
+  const chatType = e.chatType ?? c.chatType
+  const conversation = conversationOf(c.conversationId ?? e.conversationId, channel)
+  const direct =
+    e.isGroup === false &&
+    directSessionKey(key) &&
+    (chatType === undefined || chatType === "direct") &&
+    channel !== "" &&
+    conversation !== ""
+  return { key, direct, channel, conversation, sender: String(e.senderId ?? c.senderId ?? "").trim() }
+}
+
+// receiptAllowed is the whole rule for asking deja for the receipt on this
+// turn: a 1:1 turn heard by before_dispatch, on a channel that delivers its
+// reply, from the owner, in the same session, with a run id to tie the reply
+// to. Every condition fails closed.
+export function receiptAllowed(turn, ctx, channel, config) {
+  const c = ctx || {}
+  if (!turn || !turn.direct) return false
+  if (!deliversNotes(channel) || turn.channel !== String(channel).trim().toLowerCase()) return false
+  if (!c.sessionKey || turn.key !== c.sessionKey || !directSessionKey(c.sessionKey)) return false
+  if (c.chatType !== undefined && c.chatType !== "direct") return false
+  if (!c.runId || !turn.sender || String(c.senderId ?? "").trim() !== turn.sender) return false
+  return ownerSender(config, channel, turn.sender)
+}
+
+// replyTakes says whether a reply on its way out is the one the receipt was
+// kept for: the final reply of the same run, to the same conversation, on the
+// same channel, still a 1:1 chat, carrying text. A block-stream chunk, a media
+// or voice reply, or anything that does not match gets nothing.
+export function replyTakes(held, event, ctx) {
+  const e = event || {}
+  const c = ctx || {}
+  if (!held || e.kind !== "final") return false
+  const channel = String(e.channel || c.channelId || "").trim().toLowerCase()
+  if (channel !== held.channel) return false
+  if (!held.runId || (e.runId || c.runId) !== held.runId) return false
+  if (conversationOf(c.conversationId, channel) !== held.conversation) return false
+  if (c.senderId !== undefined && String(c.senderId).trim() !== held.sender) return false
+  const chatType = e.usageState && e.usageState.chatType
+  if (chatType !== undefined && chatType !== "direct") return false
+  const p = e.payload || {}
+  if (p.audioAsVoice === true) return false
+  return typeof p.text === "string" && p.text.trim() !== ""
+}
+
+// escapeMarkdown keeps a quoted topic from being read as formatting: a
+// topic with an underscore or a star would otherwise end the italics early.
+export function escapeMarkdown(text) {
+  return String(text).replace(/[\\\x60*_~|\[\]]/g, "\\$&")
+}
 
 // receiptLine turns deja's per-prompt receipt into the one line a chat shows:
-// no brand in front, no "via:" terms, the date kept. The block it rides in
-// has no byline, so a small "deja" at the end says whose line it is. "" when
-// the text holds no receipt.
+// no brand in front, no "via" terms, the date kept. The block it rides in has
+// no byline, so a small "deja" at the end says whose line it is. "" when the
+// text holds no receipt.
 export function receiptLine(text) {
+  const shape = /^deja-vu\s+—\s+(you have been here|this was done on another machine):\s+("(?:[^"\\]|\\.)*")\s+\((.+)\)$/
   for (const raw of String(text || "").split("\n")) {
-    const m = RECEIPT.exec(raw.trim())
+    const m = shape.exec(raw.trim())
     if (!m) continue
-    let topic = m[2]
+    let topic = m[2].slice(1, -1)
     try {
-      topic = JSON.stringify(JSON.parse(m[2]))
+      topic = JSON.parse(m[2])
     } catch {}
-    const when = m[3].split(/\s+·\s+via:\s+/)[0].trim()
+    const when = m[3].split(/\s+·\s+via:?\s+/)[0].trim()
     const who = m[1] === "you have been here" ? "you've been here" : "done on another machine"
-    return "↺ " + who + ": " + topic + (when ? " · " + when : "") + " · deja"
+    return "↺ " + who + ': "' + escapeMarkdown(topic) + '"' + (when ? " · " + escapeMarkdown(when) : "") + " · deja"
   }
   return ""
 }
 
-// receiptBoard holds a session's receipt between the prompt hook and the
-// reply that carries it, under the session key and the channel. Each turn sets
-// it, a silent turn clears it, so a reply never carries an older turn's line.
-// A reply that never goes out (NO_REPLY, a cancelled send) never takes it, and
-// it lapses after a few minutes.
-export function receiptBoard({ ttlMs = 5 * 60 * 1000, sessions = 256, now = Date.now } = {}) {
-  const board = new Map()
-  return {
-    set(key, channel, line) {
-      if (!key) return
-      board.delete(key)
-      if (line) board.set(key, { channel: String(channel || "").toLowerCase(), line, at: now() })
-      while (board.size > sessions) board.delete(board.keys().next().value)
-    },
-    take(key, channel) {
-      const held = key && board.get(key)
-      if (!held || held.channel !== String(channel || "").toLowerCase()) return ""
-      board.delete(key)
-      return now() - held.at <= ttlMs ? held.line : ""
-    },
-  }
-}
-
 // withReceipt adds the receipt under a reply as a context block, the small
-// footer OpenClaw's message presentation defines. It is set in italics the way
-// the agent's own markdown would set one, since most channels draw the block
-// as a plain last paragraph; a line that already holds _ or * is left as it
-// is. The reply's own text and blocks are untouched.
+// footer OpenClaw's message presentation defines, set in italics the way the
+// agent's own markdown would set one, since most channels draw the block as a
+// plain last paragraph. The reply's own text and blocks are untouched.
 export function withReceipt(payload, line) {
   if (!payload || !line) return payload
-  const text = /[_*]/.test(line) ? line : "_" + line + "_"
   const presentation = payload.presentation && typeof payload.presentation === "object" ? payload.presentation : {}
   const blocks = Array.isArray(presentation.blocks) ? presentation.blocks : []
-  return { ...payload, presentation: { ...presentation, blocks: [...blocks, { type: "context", text }] } }
+  return { ...payload, presentation: { ...presentation, blocks: [...blocks, { type: "context", text: "_" + line + "_" }] } }
 }
 
 // where names the session and workspace a hook runs for, the way the

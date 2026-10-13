@@ -12,14 +12,13 @@ import {
   argv,
   configPath,
   contributions,
-  deliversNotes,
-  directTurns,
+  directTurn,
   installerPluginPath,
   mcpWired,
-  ownerSender,
   promptText,
-  receiptBoard,
+  receiptAllowed,
   receiptLine,
+  replyTakes,
   splitHookReply,
   toolCall,
   where,
@@ -189,30 +188,36 @@ export default {
     // a compacted session had been shown.
     if (adds.recall) {
       const seen = new Map()
-      // deja's "you have been here" receipt rides under the reply in a 1:1
-      // chat with the owner on a channel (Telegram, Slack, Discord ...). Not in
-      // a group, where other people read the reply, and not on the TUI or the
-      // Control UI, which draw the transcript rather than the delivered reply.
-      // The session-start notes (what was recalled, the build and week notes,
-      // the docs line) never go to a channel: hook-context stays --plain, so
-      // they are not spent and still come with /deja.
+      // deja's "you have been here" receipt rides under the final reply in a
+      // 1:1 chat with the owner on a channel (Telegram, Slack, Discord ...).
+      // Not in a group, where other people read the reply, and not on the TUI or
+      // the Control UI, which draw the transcript rather than the delivered
+      // reply. The session-start notes never go to a channel: hook-context stays
+      // --plain, so they are not spent and still come with /deja.
+      //
+      // By default every DM shares agent:main:main, so a receipt is tied to the
+      // run, the conversation and the sender it was asked for, and every new
+      // message or prompt in the session drops whatever an earlier turn left.
       const receipts = config.receipt !== false
-      const turns = directTurns()
-      const board = receiptBoard()
+      const turns = new Map()
+      const board = new Map()
+      const keep = (map, key, value) => {
+        map.delete(key)
+        map.set(key, value)
+        while (map.size > 256) map.delete(map.keys().next().value)
+      }
       // before_dispatch is the hook told whether the message came in a group.
       api.on("before_dispatch", async (event, ctx) => {
-        turns.heard(event, ctx)
+        const turn = directTurn(event, ctx)
+        if (!turn.key) return
+        board.delete(turn.key)
+        keep(turns, turn.key, turn)
       })
       // A cron or heartbeat run has no person waiting on its reply.
       const turnChannel = (ctx) => {
         if (ctx && ctx.trigger && ctx.trigger !== "user") return ""
         return (ctx && (ctx.channel || ctx.messageProvider)) || ""
       }
-      const ownerDirect = (ctx, channel) =>
-        receipts &&
-        deliversNotes(channel) &&
-        turns.direct(ctx && ctx.sessionKey, channel, ctx && ctx.senderId) &&
-        ownerSender(api.config, channel, ctx && ctx.senderId)
       // Both seams below fire once per agent run, so deja_once is what keeps
       // the digest to the first of them.
       const digest = (event, ctx) => {
@@ -260,17 +265,22 @@ export default {
         async (event, ctx) => {
           const prompt = promptText(event)
           if (!prompt) return
+          const key = (ctx && ctx.sessionKey) || ""
+          if (key) board.delete(key)
           const at = where(seen, event, ctx, process.cwd())
           const channel = turnChannel(ctx)
+          const turn = key ? turns.get(key) : undefined
+          if (key) turns.delete(key)
           const payload = JSON.stringify({ prompt, session_id: at.id, cwd: at.cwd })
           // One spawn either way. Where the receipt can be shown, deja is asked
           // for its JSON reply: additionalContext, the text --plain prints, goes
           // to the model and the receipt waits for the reply. Anywhere else it
           // stays --plain, and deja keeps the receipt unspent.
           let recall
-          if (ownerDirect(ctx, channel)) {
+          if (receipts && receiptAllowed(turn, ctx, channel, api.config)) {
             const reply = splitHookReply(await ask(["hook-prompt"], payload, 10000))
-            board.set(ctx.sessionKey, channel, receiptLine(reply.notes))
+            const line = receiptLine(reply.notes)
+            if (line) keep(board, key, { ...turn, runId: ctx.runId, line })
             recall = reply.context
           } else {
             recall = await ask(["hook-prompt", "--plain"], payload, 10000)
@@ -286,11 +296,14 @@ export default {
       // block under the answer. The transcript the model reads is written
       // before this, so the line never reaches it.
       if (receipts) {
-        api.on("reply_payload_sending", async (event) => {
-          if (!event || event.kind === "tool" || !deliversNotes(event.channel)) return
-          const line = board.take(event.sessionKey, event.channel)
-          if (!line) return
-          return { payload: withReceipt(event.payload, line) }
+        api.on("reply_payload_sending", async (event, ctx) => {
+          const key = (event && event.sessionKey) || (ctx && ctx.sessionKey) || ""
+          const held = key && board.get(key)
+          if (!held || !event || event.kind !== "final") return
+          // The final reply settles it either way: shown here or dropped.
+          board.delete(key)
+          if (!replyTakes(held, event, ctx)) return
+          return { payload: withReceipt(event.payload, held.line) }
         })
       }
       // Compaction throws away the blocks this session was shown, and the list

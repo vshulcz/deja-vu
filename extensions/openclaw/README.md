@@ -56,10 +56,20 @@ a reply that was answered from your history gets one italic line under it:
 ```
 
 It is added through `reply_payload_sending` after the transcript is written,
-so the model never sees it and gets exactly the text it got before. "You" is
-`commands.ownerAllowFrom`, or the channel's `allowFrom` when it lists exactly
-one id. Group chats, someone else's DM, the TUI and the Control UI get nothing,
-and no other deja note is ever sent to a channel: those still come with `/deja`.
+so the model never sees it and gets exactly the text it got before. It shows
+only when all of these hold, and anything missing or unknown means no line:
+
+- the message came in a 1:1 chat: OpenClaw said `isGroup: false`, the session
+  key names no group, channel, thread or topic, and any chat type it gave is
+  `direct`;
+- the sender is you: `commands.ownerAllowFrom`, or the channel's `allowFrom`
+  when it lists exactly one id;
+- the reply is the final text reply of that same run, to that same
+  conversation. A reply sent as stream chunks (Telegram's default preview
+  streaming, for one), a media or voice reply, or a run that ends without a
+  reply gets nothing, and the next message drops it.
+
+No other deja note is ever sent to a channel: those still come with `/deja`.
 `"receipt": false` in the plugin config turns the line off.
 
 ## Config

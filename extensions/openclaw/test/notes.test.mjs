@@ -4,7 +4,19 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { deliversNotes, directTurns, ownerSender, receiptBoard, receiptLine, splitHookReply, withReceipt } from "../lib.mjs"
+import {
+  conversationOf,
+  deliversNotes,
+  directSessionKey,
+  directTurn,
+  escapeMarkdown,
+  ownerSender,
+  receiptAllowed,
+  receiptLine,
+  replyTakes,
+  splitHookReply,
+  withReceipt,
+} from "../lib.mjs"
 
 const RECEIPT = 'deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via: zorbit, queue, decide)'
 const LINE = '↺ you\'ve been here: "how should the zorbit queue drain on deploy" · Oct 4 · deja'
@@ -14,20 +26,36 @@ const OWNER = { channels: { telegram: { allowFrom: ["4242"] } } }
 test("the JSON reply splits into the model's text and the person's line", () => {
   const reply = JSON.stringify({ systemMessage: RECEIPT, hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: CONTEXT } })
   assert.deepEqual(splitHookReply(reply), { context: CONTEXT, notes: RECEIPT })
-  assert.deepEqual(splitHookReply("warning: slow disk\n" + reply), { context: CONTEXT, notes: RECEIPT })
   assert.deepEqual(splitHookReply(CONTEXT), { context: CONTEXT, notes: "" })
   assert.deepEqual(splitHookReply(""), { context: "", notes: "" })
 })
 
+test("a stray stdout line stays with the model's text, where --plain would print it", () => {
+  const reply = JSON.stringify({ systemMessage: RECEIPT, hookSpecificOutput: { additionalContext: CONTEXT } })
+  assert.deepEqual(splitHookReply("deja: index rebuilt\n" + reply), { context: "deja: index rebuilt\n" + CONTEXT, notes: RECEIPT })
+  // Its plain counterpart, for the same stray line.
+  assert.equal(splitHookReply("deja: index rebuilt\n" + CONTEXT).context, "deja: index rebuilt\n" + CONTEXT)
+})
+
 test("the receipt becomes one short line without the brand or the via terms", () => {
   assert.equal(receiptLine(RECEIPT), LINE)
+  // #4994 drops the colon after "via".
+  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4 · via zorbit)'), LINE)
+  assert.equal(receiptLine('deja-vu — you have been here: "how should the zorbit queue drain on deploy" (Oct 4)'), LINE)
   assert.equal(
     receiptLine('deja-vu — this was done on another machine: "rotate the \\"api\\" key" (3d ago)'),
-    '↺ done on another machine: "rotate the \\"api\\" key" · 3d ago · deja',
+    '↺ done on another machine: "rotate the "api" key" · 3d ago · deja',
   )
-  // Anything that is not the receipt is not shown on a channel.
   assert.equal(receiptLine("deja recalled 3 prior sessions from this project"), "")
   assert.equal(receiptLine("docs: vshulcz.github.io/deja-vu · issues: github.com/vshulcz/deja-vu/issues"), "")
+})
+
+test("markdown in the topic is escaped so it cannot end the italics", () => {
+  assert.equal(escapeMarkdown("fix my_module *now* [x] `y`"), "fix my\\_module \\*now\\* \\[x\\] \\`y\\`")
+  assert.equal(
+    receiptLine('deja-vu — you have been here: "rename snake_case_names" (Oct 4 · via: rename)'),
+    '↺ you\'ve been here: "rename snake\\_case\\_names" · Oct 4 · deja',
+  )
 })
 
 test("only a channel that delivers its reply can carry the receipt", () => {
@@ -40,38 +68,62 @@ test("the owner is ownerAllowFrom, else a channel allowlist of exactly one perso
   assert.equal(ownerSender({ commands: { ownerAllowFrom: ["telegram:4242"] }, ...OWNER }, "telegram", "7"), false)
   assert.equal(ownerSender(OWNER, "telegram", "4242"), true)
   assert.equal(ownerSender(OWNER, "telegram", "7"), false)
-  // Several people, a wildcard or no list: not known to be the owner.
   assert.equal(ownerSender({ channels: { telegram: { allowFrom: ["4242", "7"] } } }, "telegram", "4242"), false)
   assert.equal(ownerSender({ channels: { telegram: { allowFrom: ["*"] } } }, "telegram", "4242"), false)
   assert.equal(ownerSender({}, "telegram", "4242"), false)
 })
 
-test("a turn counts as 1:1 only when before_dispatch said so, recently, for that sender", () => {
-  let clock = 0
-  const turns = directTurns({ ttlMs: 1000, now: () => clock })
-  turns.heard({ sessionKey: "k", channel: "telegram", senderId: "4242", isGroup: false })
-  assert.equal(turns.direct("k", "telegram", "4242"), true)
-  assert.equal(turns.direct("k", "telegram", "7"), false)
-  assert.equal(turns.direct("k", "slack", "4242"), false)
-  assert.equal(turns.direct("other", "telegram", "4242"), false)
-  turns.heard({ sessionKey: "g", channel: "telegram", senderId: "4242", isGroup: true })
-  assert.equal(turns.direct("g", "telegram", "4242"), false)
-  // A host that does not say isGroup is not taken for a 1:1 chat.
-  turns.heard({ sessionKey: "u", channel: "telegram", senderId: "4242" })
-  assert.equal(turns.direct("u", "telegram", "4242"), false)
-  clock = 5000
-  assert.equal(turns.direct("k", "telegram", "4242"), false)
+test("a session key that names a group, a channel, a thread or a topic is never 1:1", () => {
+  assert.equal(directSessionKey("agent:main:main"), true)
+  assert.equal(directSessionKey("agent:main:telegram:direct:4242"), true)
+  for (const key of ["agent:main:telegram:group:-100", "agent:main:discord:channel:1", "agent:main:slack:direct:u1:thread:9", "agent:main:telegram:group:-1:topic:2", ""]) {
+    assert.equal(directSessionKey(key), false, key)
+  }
+  assert.equal(conversationOf("telegram:4242", "telegram"), "4242")
+  assert.equal(conversationOf("4242", "telegram"), "4242")
 })
 
-test("each turn sets the board, a silent turn clears it, and a reply takes it once", () => {
-  const board = receiptBoard()
-  board.set("k", "telegram", LINE)
-  board.set("k", "telegram", "")
-  assert.equal(board.take("k", "telegram"), "")
-  board.set("k", "telegram", LINE)
-  assert.equal(board.take("k", "slack"), "")
-  assert.equal(board.take("k", "telegram"), LINE)
-  assert.equal(board.take("k", "telegram"), "")
+const dmEvent = { sessionKey: "agent:main:main", channel: "telegram", senderId: "4242", isGroup: false }
+const dmCtx = { sessionKey: "agent:main:main", channelId: "telegram", conversationId: "4242", senderId: "4242" }
+
+test("a turn is 1:1 only when every signal agrees, and anything missing fails closed", () => {
+  assert.equal(directTurn(dmEvent, dmCtx).direct, true)
+  const notDirect = [
+    [{ ...dmEvent, isGroup: undefined }, dmCtx],
+    [{ ...dmEvent, isGroup: true }, dmCtx],
+    // isGroup false, but the key is a group's: a channel that never set the group subject.
+    [{ ...dmEvent, sessionKey: "agent:main:googlechat:group:spaces/a" }, { ...dmCtx, sessionKey: "agent:main:googlechat:group:spaces/a" }],
+    [{ ...dmEvent, chatType: "group" }, dmCtx],
+    [dmEvent, { ...dmCtx, conversationId: undefined }],
+  ]
+  for (const [e, c] of notDirect) assert.equal(directTurn(e, c).direct, false, JSON.stringify([e, c]))
+})
+
+test("the receipt is asked for only on the owner's 1:1 turn with a run id", () => {
+  const turn = directTurn(dmEvent, dmCtx)
+  const ctx = { sessionKey: "agent:main:main", senderId: "4242", runId: "r1" }
+  assert.equal(receiptAllowed(turn, ctx, "telegram", OWNER), true)
+  assert.equal(receiptAllowed(turn, { ...ctx, runId: undefined }, "telegram", OWNER), false)
+  assert.equal(receiptAllowed(turn, { ...ctx, senderId: "7" }, "telegram", OWNER), false)
+  assert.equal(receiptAllowed(turn, { ...ctx, chatType: "group" }, "telegram", OWNER), false)
+  assert.equal(receiptAllowed(turn, { ...ctx, sessionKey: "agent:main:other" }, "telegram", OWNER), false)
+  assert.equal(receiptAllowed(turn, ctx, "webchat", OWNER), false)
+  assert.equal(receiptAllowed(turn, ctx, "telegram", {}), false)
+  assert.equal(receiptAllowed(undefined, ctx, "telegram", OWNER), false)
+})
+
+test("only the final text reply of the same run, to the same conversation, takes the receipt", () => {
+  const held = { ...directTurn(dmEvent, dmCtx), runId: "r1", line: LINE }
+  const event = { kind: "final", channel: "telegram", sessionKey: "agent:main:main", runId: "r1", payload: { text: "ok" } }
+  const ctx = { channelId: "telegram", conversationId: "telegram:4242", senderId: "4242", runId: "r1" }
+  assert.equal(replyTakes(held, event, ctx), true)
+  assert.equal(replyTakes(held, { ...event, kind: "block" }, ctx), false)
+  assert.equal(replyTakes(held, { ...event, runId: "r2" }, { ...ctx, runId: "r2" }), false)
+  assert.equal(replyTakes(held, event, { ...ctx, conversationId: "telegram:7" }), false)
+  assert.equal(replyTakes(held, event, { ...ctx, senderId: "7" }), false)
+  assert.equal(replyTakes(held, { ...event, usageState: { chatType: "group" } }, ctx), false)
+  assert.equal(replyTakes(held, { ...event, payload: { mediaUrl: "file:///a.png" } }, ctx), false)
+  assert.equal(replyTakes(held, { ...event, payload: { text: "hi", audioAsVoice: true } }, ctx), false)
 })
 
 test("the receipt goes under the reply as one italic context block", () => {
@@ -82,9 +134,10 @@ test("the receipt goes under the reply as one italic context block", () => {
   assert.equal(withReceipt(none, ""), none)
 })
 
-// The plugin as OpenClaw drives it: before_dispatch, the prompt hook, then the
-// reply on its way out. A stub deja answers both forms and records its calls.
-async function drive({ channel, isGroup, senderId = "4242", pluginConfig = {}, hostConfig = OWNER, reply = true }) {
+// The plugin as OpenClaw drives it, one turn at a time: before_dispatch for a
+// channel message, the prompt hook, then the replies on their way out. A stub
+// deja answers the zorbit question in both forms and records its calls.
+async function plugin({ pluginConfig = {}, hostConfig = OWNER } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "openclaw-notes-"))
   const calls = join(dir, "calls")
   const stub = join(dir, "deja")
@@ -92,7 +145,6 @@ async function drive({ channel, isGroup, senderId = "4242", pluginConfig = {}, h
   writeFileSync(
     stub,
     "#!/bin/sh\nprintf '%s\\n' \"$*\" >> " + calls + "\ncase \"$1\" in hook-*) in=$(cat) ;; esac\n" +
-      // Only the zorbit question is in the history; anything else is silence.
       'case "$in" in *zorbit*) ;; *) [ "$1" = hook-prompt ] && exit 0 ;; esac\n' +
       'case "$*" in\n' +
       "  --version) echo 0.22.1 ;;\n" +
@@ -104,8 +156,8 @@ async function drive({ channel, isGroup, senderId = "4242", pluginConfig = {}, h
   const prev = process.env.OPENCLAW_STATE_DIR
   process.env.OPENCLAW_STATE_DIR = dir
   const hooks = {}
-  const { default: plugin } = await import("../index.mjs?" + Math.random())
-  plugin.register({
+  const { default: mod } = await import("../index.mjs?" + Math.random())
+  mod.register({
     id: "deja-vu",
     pluginConfig: { bin: stub, tools: false, ...pluginConfig },
     config: { ...hostConfig, plugins: { entries: { "deja-vu": { hooks: { allowConversationAccess: true } } } } },
@@ -114,53 +166,107 @@ async function drive({ channel, isGroup, senderId = "4242", pluginConfig = {}, h
   })
   if (prev === undefined) delete process.env.OPENCLAW_STATE_DIR
   else process.env.OPENCLAW_STATE_DIR = prev
-  const key = isGroup ? "agent:main:telegram:group:-100" : "agent:main:main"
-  await hooks.before_dispatch?.({ sessionKey: key, channel, senderId, isGroup }, { sessionKey: key, channelId: channel, senderId })
-  const ctx = { sessionKey: key, sessionId: "s-1", workspaceDir: dir, channel, messageProvider: channel, senderId, trigger: "user" }
-  const built = await hooks.before_prompt_build({ prompt: "what did we decide about draining the zorbit queue", messages: [] }, ctx)
-  const sent =
-    reply && hooks.reply_payload_sending
-      ? await hooks.reply_payload_sending({ kind: "final", channel, sessionKey: key, payload: { text: "Use --grace 40." } }, {})
-      : undefined
-  return { built, sent, calls: readFileSync(calls, "utf8"), hooks, key }
+  let n = 0
+  return {
+    hooks,
+    calls: () => readFileSync(calls, "utf8"),
+    // One turn. dispatch: false is a run with no inbound message (a heartbeat).
+    async turn({ key = "agent:main:main", channel = "telegram", sender = "4242", conversation = sender, isGroup = false, prompt = "what did we decide about draining the zorbit queue", trigger = "user", dispatch = true, kinds = ["final"] } = {}) {
+      const runId = "run-" + ++n
+      if (dispatch) {
+        await hooks.before_dispatch({ sessionKey: key, channel, senderId: sender, isGroup }, { sessionKey: key, channelId: channel, conversationId: conversation, senderId: sender })
+      }
+      const ctx = { sessionKey: key, sessionId: "s", workspaceDir: dir, channel, messageProvider: channel, senderId: dispatch ? sender : undefined, trigger, runId }
+      const built = await hooks.before_prompt_build({ prompt, messages: [] }, ctx)
+      const sent = []
+      for (const kind of kinds) {
+        const out = hooks.reply_payload_sending
+          ? await hooks.reply_payload_sending(
+              { kind, channel, sessionKey: key, runId, payload: { text: "Use --grace 40." } },
+              { channelId: channel, conversationId: channel + ":" + conversation, sessionKey: key, senderId: dispatch ? sender : undefined, runId },
+            )
+          : undefined
+        sent.push(out)
+      }
+      return { built, sent }
+    },
+  }
 }
 
 const promptCalls = (calls) => calls.split("\n").filter((c) => c.startsWith("hook-prompt"))
+const blocksOf = (out) => out && out.payload && out.payload.presentation && out.payload.presentation.blocks
 
 test("a 1:1 chat with the owner shows the receipt under the reply and gives the model what --plain prints", async () => {
-  const { built, sent, calls } = await drive({ channel: "telegram", isGroup: false })
+  const p = await plugin()
+  const { built, sent } = await p.turn()
   assert.equal(built.prependContext, CONTEXT)
-  assert.ok(sent && sent.payload, "the reply went out without the receipt")
-  assert.equal(sent.payload.text, "Use --grace 40.")
-  assert.deepEqual(sent.payload.presentation.blocks, [{ type: "context", text: "_" + LINE + "_" }])
-  assert.deepEqual(promptCalls(calls), ["hook-prompt"])
+  assert.deepEqual(blocksOf(sent[0]), [{ type: "context", text: "_" + LINE + "_" }])
+  assert.equal(sent[0].payload.text, "Use --grace 40.")
+  assert.deepEqual(promptCalls(p.calls()), ["hook-prompt"])
 })
 
-test("a group chat, someone else's DM, the TUI and receipt:false all keep --plain and leave the reply alone", async () => {
+test("a group chat, someone else's DM, the TUI and receipt:false keep --plain and leave the reply alone", async () => {
   const cases = [
-    { channel: "telegram", isGroup: true },
-    { channel: "telegram", isGroup: false, senderId: "7" },
-    { channel: "webchat", isGroup: false },
-    { channel: "telegram", isGroup: false, pluginConfig: { receipt: false } },
+    [{}, { key: "agent:main:telegram:group:-100", conversation: "-100", isGroup: true }],
+    [{}, { sender: "7" }],
+    [{}, { channel: "webchat" }],
+    [{ pluginConfig: { receipt: false } }, {}],
   ]
-  for (const c of cases) {
-    const { built, sent, calls } = await drive(c)
-    assert.equal(built.prependContext, CONTEXT, JSON.stringify(c))
-    assert.equal(sent, undefined, JSON.stringify(c))
-    assert.deepEqual(promptCalls(calls), ["hook-prompt --plain"], JSON.stringify(c))
+  for (const [opts, turn] of cases) {
+    const p = await plugin(opts)
+    const { built, sent } = await p.turn(turn)
+    assert.equal(built.prependContext, CONTEXT, JSON.stringify(turn))
+    assert.equal(sent[0], undefined, JSON.stringify(turn))
+    assert.deepEqual(promptCalls(p.calls()), ["hook-prompt --plain"], JSON.stringify(turn))
   }
 })
 
-test("the session-start digest stays --plain on a channel, so its notes are not spent there", async () => {
-  const { calls } = await drive({ channel: "telegram", isGroup: false })
-  assert.doesNotMatch(calls, /^hook-context$/m)
+// Blocker 2: a channel that reports isGroup false for a group it cannot name.
+test("a group whose channel says isGroup false still gets nothing", async () => {
+  const p = await plugin({ hostConfig: { channels: { googlechat: { allowFrom: ["4242"] } } } })
+  const { sent } = await p.turn({ key: "agent:main:googlechat:group:spaces-a", channel: "googlechat", conversation: "spaces-a", isGroup: false })
+  assert.equal(sent[0], undefined)
+  assert.deepEqual(promptCalls(p.calls()), ["hook-prompt --plain"])
 })
 
-test("a reply that never goes out leaves nothing for the next turn's reply", async () => {
-  const { hooks, key } = await drive({ channel: "telegram", isGroup: false, reply: false })
-  // The next turn finds nothing in the history: its reply carries no receipt.
-  await hooks.before_dispatch({ sessionKey: key, channel: "telegram", senderId: "4242", isGroup: false }, {})
-  await hooks.before_prompt_build({ prompt: "hello", messages: [] }, { sessionKey: key, channel: "telegram", senderId: "4242", trigger: "user" })
-  const sent = await hooks.reply_payload_sending({ kind: "final", channel: "telegram", sessionKey: key, payload: { text: "hi" } }, {})
-  assert.equal(sent, undefined)
+// Blocker 1: every DM shares agent:main:main by default. The owner's turn ends
+// without a reply, and the next message in the session is a stranger's.
+test("a receipt left by an owner turn with no reply never reaches a stranger's DM", async () => {
+  const p = await plugin({ hostConfig: { channels: { telegram: { allowFrom: ["4242"] } } } })
+  await p.turn({ kinds: [] })
+  const { sent } = await p.turn({ sender: "7", prompt: "hi there, zorbit?" })
+  assert.equal(sent[0], undefined)
+})
+
+test("a receipt left by an owner turn with no reply never reaches a heartbeat run's reply", async () => {
+  const p = await plugin()
+  await p.turn({ kinds: [] })
+  const { sent } = await p.turn({ dispatch: false, trigger: "heartbeat", prompt: "heartbeat" })
+  assert.equal(sent[0], undefined)
+})
+
+test("a reply from another run in the same session does not take the receipt", async () => {
+  const p = await plugin()
+  await p.turn({ kinds: [] })
+  // A reply arriving for the next run, before that run's own prompt hook.
+  const out = await p.hooks.reply_payload_sending(
+    { kind: "final", channel: "telegram", sessionKey: "agent:main:main", runId: "run-99", payload: { text: "late" } },
+    { channelId: "telegram", conversationId: "telegram:4242", senderId: "4242", runId: "run-99" },
+  )
+  assert.equal(out, undefined)
+})
+
+// Nit 3: block-stream chunks are not the reply's end.
+test("block-stream chunks pass untouched and the final reply carries the receipt", async () => {
+  const p = await plugin()
+  const { sent } = await p.turn({ kinds: ["block", "block", "final"] })
+  assert.equal(sent[0], undefined)
+  assert.equal(sent[1], undefined)
+  assert.deepEqual(blocksOf(sent[2]), [{ type: "context", text: "_" + LINE + "_" }])
+})
+
+test("the session-start digest stays --plain on a channel, so its notes are not spent there", async () => {
+  const p = await plugin()
+  await p.turn()
+  assert.doesNotMatch(p.calls(), /^hook-context$/m)
 })

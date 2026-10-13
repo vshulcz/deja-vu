@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- In a 1:1 chat with the owner on an OpenClaw channel (Telegram, Slack, Discord and the rest), a reply answered from history gets one italic line under it: `↺ you've been here: "<topic>" · Oct 4 · deja`. Same deja call per prompt, same text for the model. Group chats, other people's DMs, the TUI and the Control UI get nothing, and no other deja note is sent to a channel. `"receipt": false` in the plugin config turns it off. In the npm plugin and the one `deja install openclaw-auto` writes.
+- In a 1:1 chat with the owner on an OpenClaw channel (Telegram, Slack, Discord and the rest), a reply answered from history gets one italic line under it: `↺ you've been here: "<topic>" · Oct 4 · deja`. Same deja call per prompt, same text for the model. It goes only on the final text reply of the same run, and only when every 1:1 signal agrees and the sender is the owner; anything unknown means no line. Group chats, other people's DMs, stream-chunked replies, the TUI and the Control UI get nothing, and no other deja note is sent to a channel. `"receipt": false` in the plugin config turns it off. In the npm plugin and the one `deja install openclaw-auto` writes.
 - dsh web shows the person the lines deja prints for them in Claude Code: the "you have been here" receipt, and at session start what was recalled and the build and week notes. They sit in a panel above the input. The model's text is unchanged and the receipt costs no extra deja call per prompt. tui, headless and sdk profiles have no page, so there the plugin still asks deja for plain text and leaves the notes for `/deja` and the next session to show (#4982).
 
 ### Fixed
