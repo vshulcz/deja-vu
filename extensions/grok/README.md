@@ -13,9 +13,13 @@ embeddings, no network path besides a daily release check, which DEJA_OFFLINE=1 
 ## Install
 
 ```sh
-grok plugin marketplace add xai-org/plugin-marketplace
+grok plugin marketplace add vshulcz/deja-vu
 grok plugin install deja
 ```
+
+The entry in the official xAI marketplace is in review
+([xai-org/plugin-marketplace#332](https://github.com/xai-org/plugin-marketplace/pull/332));
+until it lands, this repository is the marketplace.
 
 Install the binary first — plugins deliver files, not runtimes or native
 binaries:

@@ -9,9 +9,11 @@ Grok 记得自己的会话。这个插件回答的是另一个问题：你在这
 ## 安装
 
 ```sh
-grok plugin marketplace add xai-org/plugin-marketplace
+grok plugin marketplace add vshulcz/deja-vu
 grok plugin install deja
 ```
+
+官方 xAI 插件市场的条目还在审核中（[xai-org/plugin-marketplace#332](https://github.com/xai-org/plugin-marketplace/pull/332)），在它合并之前，这个仓库本身就是插件市场。
 
 先装可执行文件——插件分发的是文件，不是运行时，也不是原生二进制：
 

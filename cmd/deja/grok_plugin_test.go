@@ -52,6 +52,39 @@ func TestGrokPluginVersionMatchesTheManifest(t *testing.T) {
 	}
 }
 
+// `grok plugin marketplace add vshulcz/deja-vu` reads .grok-plugin/marketplace.json
+// at the repo root; `grok plugin install deja` then installs the entry by name.
+func TestGrokMarketplacePointsAtThePlugin(t *testing.T) {
+	var market struct {
+		Plugins []struct {
+			Name   string `json:"name"`
+			Source struct {
+				Type string `json:"type"`
+				Path string `json:"path"`
+			} `json:"source"`
+		} `json:"plugins"`
+	}
+	if err := json.Unmarshal(repoFile(t, ".grok-plugin/marketplace.json"), &market); err != nil {
+		t.Fatalf("marketplace.json: %v", err)
+	}
+	if len(market.Plugins) != 1 {
+		t.Fatalf("want exactly one plugin, got %d", len(market.Plugins))
+	}
+	p := market.Plugins[0]
+	if p.Source.Type != "local" || p.Source.Path != "./extensions/grok" {
+		t.Fatalf("source = %+v, want local ./extensions/grok", p.Source)
+	}
+	var manifest struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(repoFile(t, "extensions/grok/.grok-plugin/plugin.json"), &manifest); err != nil {
+		t.Fatalf("plugin.json: %v", err)
+	}
+	if p.Name != manifest.Name {
+		t.Fatalf("marketplace entry %q, plugin manifest %q: `grok plugin install deja` finds it by name", p.Name, manifest.Name)
+	}
+}
+
 func TestGrokPluginNoteNamesBothVersionsWhenBehind(t *testing.T) {
 	hermeticEnv(t)
 	writeGrokPlugin(t, "deja-9f3c1a2", "deja", "0.1.0")

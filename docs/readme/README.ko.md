@@ -68,7 +68,7 @@ dsh plugin --profile web add dsh-deja
 # Zed: 확장 패널에서 deja 검색
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI: codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
-# Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
+# Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
 hermes plugins install deja-vu
@@ -235,7 +235,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | 플러그인 `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | 플러그인 `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` 다음 `codex plugin add deja-vu@deja-vu` |
-| Grok Build | 플러그인 `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` 다음 `grok plugin install deja` |
+| Grok Build | 플러그인 `deja` | `grok plugin marketplace add vshulcz/deja-vu` 다음 `grok plugin install deja` |
 | OpenClaw | ClawHub와 npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (그리고 omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | Hermes 플러그인 카탈로그의 메모리 공급자 `deja-memory` | `hermes plugins install deja-vu`, 또는 GitHub에서: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |

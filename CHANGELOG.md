@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The Grok Build install line works: deja was never in `xai-org/plugin-marketplace`, so `grok plugin install deja` after adding it found nothing. This repository is a Grok marketplace now, `grok plugin marketplace add vshulcz/deja-vu` then `grok plugin install deja`; the official entry is still in review (xai-org/plugin-marketplace#332).
 - ZCode keeps the per-prompt recall when the "you have been here" line is due. `hook-prompt` ignored the `--strict` that ZCode's hook passes, so the reply carried `systemMessage` and ZCode discarded all of it, recall included.
 - Cursor no longer uses up deja's notes for the person. It shows a hook's message only when the hook blocks, so the once-only notes (the built note, the week note) and the session-start receipt went to Cursor, were counted as shown and never seen, and Claude Code on the same index skipped them. A Cursor session start now gets only the model's text, which is unchanged, and leaves those notes for the next host that shows them; a session start under `--strict` or `--copilot` does the same. A rewire after an upgrade still happens on a Cursor start, and its note is dropped there.
 - In the Gemini CLI TUI, deja's lines end in `[deja]` instead of the full hook command (`[/Users/…/deja-hook hook-prompt]`), which wrapped the receipt onto a second line. The extension is rewritten on upgrade, so nothing to re-run.

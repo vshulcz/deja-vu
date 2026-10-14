@@ -36,6 +36,7 @@ func TestEveryStoreListingCountsTheRestOfTheHarnesses(t *testing.T) {
 		{file: ".claude-plugin/marketplace.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more agents"},
 		{file: "codex-plugin/.codex-plugin/plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more agents"},
 		{file: "extensions/kimi/kimi.plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
+		{file: ".grok-plugin/marketplace.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
 		{file: "extensions/grok/.grok-plugin/plugin.json", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more"},
 		{file: "extensions/grok/README.md", named: 5, shape: "Claude Code, Codex, Cursor, opencode, Zed and %s more agents"},
 		{file: "extensions/dsh/index.js", named: 4, shape: "Claude Code, Codex, Cursor, opencode and %s more agents"},

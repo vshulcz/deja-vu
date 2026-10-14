@@ -70,7 +70,7 @@ dsh plugin --profile web add dsh-deja
 # Zed: найдите deja в панели расширений
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI: codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
-# Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
+# Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
 hermes plugins install deja-vu
@@ -240,7 +240,7 @@ TRAE CLI · Muse Code · Junie · JetBrains AI Assistant · Devin CLI · Windsur
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | плагин `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | плагин `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`, затем `codex plugin add deja-vu@deja-vu` |
-| Grok Build | плагин `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`, затем `grok plugin install deja` |
+| Grok Build | плагин `deja` | `grok plugin marketplace add vshulcz/deja-vu`, затем `grok plugin install deja` |
 | OpenClaw | ClawHub и npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (и omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | провайдер памяти `deja-memory` в каталоге плагинов Hermes | `hermes plugins install deja-vu` или с GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |

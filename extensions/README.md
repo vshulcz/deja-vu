@@ -13,7 +13,7 @@ same local index.
 | [`pi/`](pi) | npm `@vshulcz/pi-deja` (`pi-package`, also read by omp) | `pi install npm:@vshulcz/pi-deja` |
 | [`zed/`](zed) | Zed extension `deja-mcp-server` (in review: zed-industries/extensions#7307) | Zed → Extensions → deja |
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
-| [`grok/`](grok) | Grok Build plugin `deja` (in review: xai-org/plugin-marketplace#332) | `grok plugin install deja` |
+| [`grok/`](grok) | Grok Build plugin `deja` from this repository's marketplace, then `grok plugin install deja` (official entry in review: xai-org/plugin-marketplace#332) | `grok plugin marketplace add vshulcz/deja-vu` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
 
 Four more integrations live outside this directory because their registries or
@@ -48,11 +48,12 @@ cd extensions/openclaw && npm publish --access public && clawhub package publish
 cd extensions/pi       && npm publish --access public
 ```
 
-The Grok plugin is published by a catalog entry, not by us: the entry in
-`xai-org/plugin-marketplace` pins a full commit SHA of this repository and a
-`path` of `extensions/grok`, and Grok re-verifies the SHA after cloning. A new
-version of the plugin means a pull request there that moves the pin — nothing
-ships until it does.
+The Grok plugin installs from this repository's own catalog,
+`.grok-plugin/marketplace.json`, which points at `extensions/grok` on `main`, so
+it ships with every merge. The entry proposed to `xai-org/plugin-marketplace`
+pins a full commit SHA of this repository and a `path` of `extensions/grok`, and
+Grok re-verifies the SHA after cloning; once it lands, a new version there means
+a pull request that moves the pin.
 
 The Zed extension is not published by us: `zed-industries/extensions` pins this
 repository as a submodule and builds `extensions/zed`. A new version means

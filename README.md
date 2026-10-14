@@ -359,7 +359,7 @@ for people who install extensions there rather than from a CLI:
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu` then `codex plugin add deja-vu@deja-vu` |
-| Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace` then `grok plugin install deja` |
+| Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu` then `grok plugin install deja` |
 | OpenClaw | ClawHub and npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (and omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | memory provider `deja-memory`, in the Hermes plugin catalog | `hermes plugins install deja-vu`, or from GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |

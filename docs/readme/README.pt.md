@@ -70,7 +70,7 @@ dsh plugin --profile web add dsh-deja
 # Zed: procure deja no painel de extensões
 # Kimi Code: /plugins install https://github.com/vshulcz/deja-vu
 # Codex CLI: codex plugin marketplace add https://github.com/vshulcz/deja-vu && codex plugin add deja-vu@deja-vu
-# Grok Build: grok plugin marketplace add xai-org/plugin-marketplace && grok plugin install deja
+# Grok Build: grok plugin marketplace add vshulcz/deja-vu && grok plugin install deja
 openclaw plugins install clawhub:@vshulcz/openclaw-deja && openclaw config set plugins.entries.deja-vu.hooks.allowConversationAccess true
 pi install npm:@vshulcz/pi-deja
 hermes plugins install deja-vu
@@ -241,7 +241,7 @@ cada um tem um pacote no próprio ecossistema, para quem instala extensões por 
 | Zed | `deja-context-server` | Zed → Extensions → deja |
 | Kimi Code | plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | Codex CLI | plugin `deja-vu` | `codex plugin marketplace add https://github.com/vshulcz/deja-vu`, depois `codex plugin add deja-vu@deja-vu` |
-| Grok Build | plugin `deja` | `grok plugin marketplace add xai-org/plugin-marketplace`, depois `grok plugin install deja` |
+| Grok Build | plugin `deja` | `grok plugin marketplace add vshulcz/deja-vu`, depois `grok plugin install deja` |
 | OpenClaw | ClawHub e npm `@vshulcz/openclaw-deja` | `openclaw plugins install clawhub:@vshulcz/openclaw-deja` |
 | pi (e omp) | npm `@vshulcz/pi-deja` | `pi install npm:@vshulcz/pi-deja` |
 | Hermes | provedor de memória `deja-memory`, no catálogo de plugins do Hermes | `hermes plugins install deja-vu`, ou do GitHub: `hermes plugins install vshulcz/deja-vu/extensions/hermes` |

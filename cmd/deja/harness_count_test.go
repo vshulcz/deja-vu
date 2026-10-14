@@ -30,6 +30,7 @@ func TestTheIntroductionsCountEveryHarness(t *testing.T) {
 		"extensions/dsh/index.js",
 		"extensions/opencode/index.js",
 		"extensions/grok/.grok-plugin/plugin.json",
+		".grok-plugin/marketplace.json",
 		"extensions/kimi/kimi.plugin.json",
 		// The manifests a plugin listing renders, which live at the repo root.
 		"kimi.plugin.json",
