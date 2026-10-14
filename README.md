@@ -367,6 +367,14 @@ for people who install extensions there rather than from a CLI:
 Either path works alone, and both together double nothing: each package reads what
 `deja install` already wrote and uses the deja you already have.
 
+In a [Spec Kit](https://github.com/github/spec-kit) project, an extension adds
+`/speckit.deja-vu.recall`, which searches past sessions for the feature before you
+implement it:
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
+
 The same search is also a skill, for any agent that loads a `SKILL.md`:
 
 ```sh

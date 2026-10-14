@@ -97,6 +97,20 @@ jobs:
       - name: Pin Windows manifests
         run: go run ./scripts/pinmanifests -version "${GITHUB_REF_NAME#v}" -checksums dist/checksums.txt
 
+      # After the pin, so the manifest inside says this release's version: the
+      # Spec Kit catalog entry names that version, the zip's URL and its sha256.
+      - name: Pack the Spec Kit extension
+        run: |
+          cd extensions/spec-kit
+          zip -qr "$GITHUB_WORKSPACE/dist/deja-spec-kit.zip" .
+          unzip -p "$GITHUB_WORKSPACE/dist/deja-spec-kit.zip" extension.yml | grep -qx "  version: \"${GITHUB_REF_NAME#v}\""
+          echo "deja-spec-kit.zip sha256 $(sha256sum "$GITHUB_WORKSPACE/dist/deja-spec-kit.zip" | cut -d' ' -f1)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Attach the Spec Kit extension to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" dist/deja-spec-kit.zip --clobber
+
       - name: Attach the manifests to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -186,6 +186,8 @@ grok plugin install deja
 /plugins install https://github.com/vshulcz/deja-vu   # inside Kimi Code
 # Zed → Extensions → deja</pre>
 <div class="note">Either path is enough — <code>deja install --auto</code> wires these as well. The opencode and dsh packages read what the installer wrote and contribute only what is missing, and in Zed both halves register under one server id, so having both never means two servers or a tool listed twice.</div>
+<p>In a <a href="https://github.com/github/spec-kit">Spec Kit</a> project, an extension adds <code>/speckit.deja-vu.recall</code>, which searches past sessions for the feature before you implement it:</p>
+<pre>specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip</pre>
 <p>After that, an agent can call <code>recall</code> the moment you reference past work — see <a href="agents.html">Agents &amp; MCP</a>. Confirm the wiring any time with <code>deja doctor</code>.</p>
 <h2>Optional: semantic recall</h2>
 <p>If you run a local embedding endpoint (Ollama, LM Studio), <code>deja embed</code> adds a vector sidecar so rephrased queries still match. Without one, deja works exactly as before. See <a href="search.html">Search</a>.</p>

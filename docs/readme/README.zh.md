@@ -229,6 +229,12 @@ opencode、dsh 和 OpenClaw 只补上缺的那部分；Kimi、Grok、Codex 和 p
 
 它们用的都是你已经装好的 deja，包里自带的那份只是兜底。
 
+在 [Spec Kit](https://github.com/github/spec-kit) 项目里，有一个扩展提供 `/speckit.deja-vu.recall`，在实现功能之前先搜索过去的会话：
+
+```sh
+specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip
+```
+
 ## 可选的语义召回
 
 用 `DEJA_EMBED_URL` 把 `deja embed` 指向本地的 Ollama、LM Studio 或任何 OpenAI 兼容端点，
