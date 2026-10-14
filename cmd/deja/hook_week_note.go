@@ -22,11 +22,15 @@ const weekNoteEvery = 7 * 24 * time.Hour
 // The first session after install starts the clock rather than reporting:
 // "deja this week: 1 recall" a minute after the install would be the hook
 // counting itself.
-func weekNote(dir string) string {
-	return weekNoteAt(dir, time.Now())
-}
+func weekNote(dir string) string { return weekNoteFor(dir, time.Now(), true) }
 
-func weekNoteAt(dir string, now time.Time) string {
+func weekNoteAt(dir string, now time.Time) string { return weekNoteFor(dir, now, true) }
+
+// weekNoteFor is the week note for a reader that may not be the owner alone;
+// see builtNoteFor. The second line names the session agents used most, and
+// for a shared reader it names the agent and the id but never the title,
+// which is the person's own question.
+func weekNoteFor(dir string, now time.Time, private bool) string {
 	p := dir + ".weeknote"
 	if b, err := os.ReadFile(p); err == nil {
 		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && now.Sub(time.Unix(ts, 0)) < weekNoteEvery {
@@ -55,7 +59,7 @@ func weekNoteAt(dir string, now time.Time) string {
 		line += fmt.Sprintf(", %d déjà vu", n.DejaVuWeek)
 	}
 	line += " — deja stats --card"
-	return line
+	return joinNotes(line, weekUsedLine(dir, now, private))
 }
 
 // humanNotes is what deja has to tell the person rather than the model: the
@@ -70,7 +74,8 @@ func humanNotes(dir string) string { return humanNotesFor(dir, true) }
 // see builtNoteFor.
 func humanNotesFor(dir string, private bool) string {
 	built := func(dir string) string { return builtNoteFor(dir, private) }
-	for _, note := range []func(string) string{built, whatChangedNote, weekNote, pendingStar} {
+	week := func(dir string) string { return weekNoteFor(dir, time.Now(), private) }
+	for _, note := range []func(string) string{built, whatChangedNote, week, pendingStar} {
 		if line := note(dir); line != "" {
 			return line
 		}

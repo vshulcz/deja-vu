@@ -743,8 +743,16 @@ func rememberOldest(p string, oldest time.Time, size int64) {
 // served it inside the retention window. Search uses it as a small bounded
 // boost: what agents keep pulling is what the user keeps needing.
 func WornSessions(indexDir string) map[string]int {
+	return WornSessionsSince(indexDir, time.Time{})
+}
+
+// WornSessionsSince is WornSessions for the recalls after since.
+func WornSessionsSince(indexDir string, since time.Time) map[string]int {
 	out := map[string]int{}
 	for _, e := range read(Path(indexDir)) {
+		if !since.IsZero() && !e.Time.After(since) {
+			continue
+		}
 		// Only what was asked for. A `dejavu` event is deja pushing a session
 		// into a prompt because the wording matched, not an agent reaching for
 		// it — and it was 60–70% of the count, so the receipt's "most re-used"

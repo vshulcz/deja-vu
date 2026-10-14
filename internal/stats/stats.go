@@ -579,6 +579,31 @@ func CreditedAloud(text string) bool {
 // bound keeps an ordinary "deja:" in prose from counting as a reference.
 var dejaSessionRef = regexp.MustCompile(`deja:[0-9a-zA-Z][0-9a-zA-Z_.-]{7,}`)
 
+// CreditedRefs is the session ids a credit line names: the deja:<id> on a
+// line that also says "déjà vu", each once. An id quoted in prose elsewhere in
+// the turn is not credited, and the older "deja-vu recalled" shape names no
+// id, so it gives none.
+func CreditedRefs(text string) []string {
+	if !strings.Contains(text, "deja:") {
+		return nil
+	}
+	var out []string
+	seen := map[string]bool{}
+	for _, line := range strings.Split(text, "\n") {
+		if !strings.Contains(strings.ToLower(line), "déjà vu") {
+			continue
+		}
+		for _, m := range dejaSessionRef.FindAllString(line, -1) {
+			ref := strings.TrimRight(strings.TrimPrefix(m, "deja:"), ".-_")
+			if len(ref) >= 8 && !seen[ref] {
+				seen[ref] = true
+				out = append(out, ref)
+			}
+		}
+	}
+	return out
+}
+
 // UsedNotCredited counts assistant turns that name a recalled session without
 // saying the credit line — the second of the two things folded into the 2% in
 // #3079: injections the model used and did not credit, as opposed to
