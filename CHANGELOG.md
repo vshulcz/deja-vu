@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Cursor no longer uses up deja's notes for the person. It shows a hook's message only when the hook blocks, so the once-only notes (the built note, the week note) and the session-start receipt went to Cursor, were counted as shown and never seen, and Claude Code on the same index skipped them. A Cursor session start now gets only the model's text, which is unchanged, and leaves those notes for the next host that shows them; a session start under `--strict` or `--copilot` does the same. A rewire after an upgrade still happens on a Cursor start, and its note is dropped there.
+- In the Gemini CLI TUI, deja's lines end in `[deja]` instead of the full hook command (`[/Users/…/deja-hook hook-prompt]`), which wrapped the receipt onto a second line. The extension is rewritten on upgrade, so nothing to re-run.
 - `deja uninstall dsh-auto` works: the alias was refused on the way out, and an install under it was never recorded, so the directories it made stayed behind after an uninstall (#4983).
 - On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 

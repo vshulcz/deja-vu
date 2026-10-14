@@ -82,9 +82,14 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 		"hooks": map[string]any{
 			// SessionStart injects additionalContext into the session history
 			// and prints systemMessage.
+			//
+			// Every hook's systemMessage lands in the TUI as an info line
+			// tagged with the hook's name, which falls back to the command:
+			// without a name each of deja's lines ended in a dim
+			// "[/path/to/deja-hook hook-prompt]" (checked on 0.64.0).
 			"SessionStart": []any{map[string]any{
 				"hooks": []any{map[string]any{
-					"type": "command", "command": hookRun(exe, "hook-context"),
+					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-context"),
 					// Gemini reads timeout in milliseconds; a Claude-style 10
 					// kills the hook before it can answer.
 					"timeout": 10000,
@@ -92,11 +97,11 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			}},
 			// BeforeAgent is gemini's name for UserPromptSubmit — it is handed
 			// the prompt and appends what the hook returns to the request as
-			// <hook_context>. Only systemMessage is limited to the blocking
-			// case; additionalContext is not.
+			// <hook_context>. systemMessage shows too, as an info line in
+			// the TUI and on stderr under -p (0.64.0).
 			"BeforeAgent": []any{map[string]any{
 				"hooks": []any{map[string]any{
-					"type": "command", "command": hookRun(exe, "hook-prompt"),
+					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-prompt"),
 					"timeout": 10000,
 				}},
 			}},
@@ -116,13 +121,13 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			"AfterTool": []any{map[string]any{
 				"matcher": "run_shell_command",
 				"hooks": []any{map[string]any{
-					"type": "command", "command": hookRun(exe, "hook-tool-after"),
+					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-tool-after"),
 					"timeout": 10000,
 				}},
 			}, map[string]any{
 				"matcher": "read_file|replace|write_file",
 				"hooks": []any{map[string]any{
-					"type": "command", "command": hookRun(exe, "hook-tool"),
+					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-tool"),
 					"timeout": 10000,
 				}},
 			}},
@@ -131,7 +136,7 @@ func installGeminiExtension(exe string, uninstall bool) (installResult, error) {
 			// session's MCP recall can answer with it (#4210).
 			"SessionEnd": []any{map[string]any{
 				"hooks": []any{map[string]any{
-					"type": "command", "command": hookRun(exe, "hook-session-end"),
+					"type": "command", "name": geminiExtensionName, "command": hookRun(exe, "hook-session-end"),
 					"timeout": 10000,
 				}},
 			}},
