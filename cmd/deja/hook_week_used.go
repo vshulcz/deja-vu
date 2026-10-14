@@ -208,7 +208,9 @@ func weekUsedHarness(m index.SessionMeta) string {
 // everywhere, or the whole id when that prefix names more than one session.
 func weekUsedID(dir string, m index.SessionMeta) string {
 	short := shortID(m.ID)
-	if short != m.ID && index.PrefixMatches(dir, short) > 1 {
+	// Counted the way show resolves it: a session the policy withholds
+	// neither takes the short id nor gets named by a longer one (#2401).
+	if short != m.ID && index.PrefixMatchesAllowed(dir, short, searchAllows()) > 1 {
 		return m.ID
 	}
 	return short
