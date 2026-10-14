@@ -55,7 +55,7 @@ func New(root string) (*Dater, error) {
 
 // Close stops the reader.
 func (d *Dater) Close() error {
-	d.in.Close()
+	_ = d.in.Close()
 	return d.cmd.Wait()
 }
 

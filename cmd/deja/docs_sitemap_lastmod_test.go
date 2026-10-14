@@ -43,7 +43,7 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer dater.Close()
+	defer func() { _ = dater.Close() }()
 
 	const slack = 7 * 24 * time.Hour
 	for _, m := range found {

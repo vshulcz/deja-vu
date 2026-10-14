@@ -385,7 +385,7 @@ func refreshLastmod(text string) (string, error) {
 	if err != nil {
 		return text, err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	var first error
 	out := locRe.ReplaceAllStringFunc(text, func(m string) string {
 		loc := locRe.FindStringSubmatch(m)[1]
@@ -418,7 +418,7 @@ func refreshDateModified() error {
 	if err != nil {
 		return err
 	}
-	defer d.Close()
+	defer func() { _ = d.Close() }()
 	for _, glob := range []string{"docs/guide/*.html", "docs/zh/guide/*.html"} {
 		pages, err := filepath.Glob(filepath.FromSlash(glob))
 		if err != nil {
