@@ -153,6 +153,9 @@ func TestTheBuiltFindingFitsANoteLine(t *testing.T) {
 			t.Errorf("%s lost its count and agents: %q", name, line)
 		}
 	}
+	if got := builtErrorLine(builtFindingWall, 3, nil); strings.Contains(got, "()") || !strings.HasSuffix(got, " in 3 sessions") {
+		t.Errorf("sessions with no agent named left empty parentheses: %q", got)
+	}
 	got := builtErrorLine(long, 3, agents[:2])
 	if !strings.Contains(got, "Error: connect") || !strings.Contains(got, "connection refused`") || !strings.Contains(got, "…") {
 		t.Errorf("the cut error lost an end: %q", got)

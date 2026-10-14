@@ -74,7 +74,7 @@ func builtFinding(dir string, allow func(string) bool, private bool) string {
 // The error is cut from the middle: the tool is at the front and what failed
 // is at the end, while the middle is a path or a host.
 func builtErrorLine(text string, n int, harnesses []string) string {
-	agents := " in " + formatStatNumber(n) + " sessions (" + fitList(harnesses, 24) + ")"
+	agents := builtSessionsIn(n, harnesses)
 	const lead = "this machine has hit `"
 	room := noteWidth - termwidth.Columns(lead+"`"+agents)
 	return lead + elideMiddleColumns(search.SafeLine(text), room) + "`" + agents
@@ -83,10 +83,20 @@ func builtErrorLine(text string, n int, harnesses []string) string {
 // builtAskedLine is the question's version, quoted the way the receipt quotes
 // a title.
 func builtAskedLine(text string, n int, harnesses []string) string {
-	agents := " in " + formatStatNumber(n) + " sessions (" + fitList(harnesses, 24) + ")"
+	agents := builtSessionsIn(n, harnesses)
 	const lead = "you asked "
 	room := noteWidth - termwidth.Columns(lead+agents)
 	return lead + quoteWithin(trimBriefTitleTo(text, 1<<20), room) + agents
+}
+
+// builtSessionsIn is " in N sessions (claude, codex)", without the
+// parentheses when no session names its agent.
+func builtSessionsIn(n int, harnesses []string) string {
+	out := " in " + formatStatNumber(n) + " sessions"
+	if list := fitList(harnesses, 24); list != "" {
+		out += " (" + list + ")"
+	}
+	return out
 }
 
 // elideMiddleColumns is elideMiddleBytes measured in terminal columns.
