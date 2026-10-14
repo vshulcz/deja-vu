@@ -747,8 +747,10 @@ func cmdHookContext(dir string, rest []string) error {
 		// dsh and OpenClaw put the plain digest in front of the model only. It
 		// prints the notes meant for the person, and nothing else, for the
 		// plugin to add to a reply the person does read.
+		// A plugin reply can land in a group chat (OpenClaw's /deja), so the
+		// notes here never quote the person's own questions.
 		case "--notes", "-notes":
-			if notes := humanNotes(dir); notes != "" {
+			if notes := humanNotesFor(dir, false); notes != "" {
 				fmt.Fprintln(os.Stdout, notes)
 			}
 			return nil
