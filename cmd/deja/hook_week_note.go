@@ -16,14 +16,12 @@ import (
 // stats know the difference, and nobody runs them (#3065).
 const weekNoteEvery = 7 * 24 * time.Hour
 
-// weekNote is that one line, or "". It goes out on the JSON path only — the
+// weekNoteAt is that one line, or "". It goes out on the JSON path only — the
 // plain path is the model's context, where a receipt to the person is noise.
 //
 // The first session after install starts the clock rather than reporting:
 // "deja this week: 1 recall" a minute after the install would be the hook
 // counting itself.
-func weekNote(dir string) string { return weekNoteFor(dir, time.Now(), true) }
-
 func weekNoteAt(dir string, now time.Time) string { return weekNoteFor(dir, now, true) }
 
 // weekNoteFor is the week note for a reader that may not be the owner alone;
