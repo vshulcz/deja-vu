@@ -62,6 +62,19 @@ step's metadata, then the trajectory's.
   `~/.codeium/windsurf/mcp_config.json` under `mcpServers`, the file Cascade
   reads. `devin-desktop --add-mcp` writes the Code OSS-level `User/mcp.json`
   instead, which Cascade does not read.
+  The same install puts deja's guidance block in
+  `~/.codeium/windsurf/memories/global_rules.md`, which Cascade keeps in
+  context always. Cascade caps that file at 6,000 characters including the
+  user's own rules, so a file that would pass the cap with the block is left
+  as it is, and install and `deja doctor` say so. The skill goes to
+  `skills/deja-history/SKILL.md` and `/deja` to
+  `global_workflows/deja.md`. Workflows get no argument substitution, so the
+  workflow names the query in words.
+- **Hooks are not wired.** Cascade runs `~/.codeium/windsurf/hooks.json`, but
+  none of a hook's output reaches the model: exit 2 only blocks, and
+  `show_output` is shown in the UI and is not offered for `pre_user_prompt`
+  ([docs](https://docs.devin.ai/desktop/cascade/hooks)). The rule, the skill and
+  the workflow come from the docs and have not been run against the app.
 - **Checked against** Devin Desktop 3.5.17 on macOS (Code OSS 1.110.1):
   runtime paths, the envelope against a live file, and descriptor field
   numbers (#308). The fixtures are synthetic, built by

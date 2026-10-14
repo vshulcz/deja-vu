@@ -104,6 +104,21 @@
 <p><code>~/.codeium/windsurf/mcp_config.json</code> under <code>mcpServers</code>, the file Cascade</p>
 <p>reads. <code>devin-desktop --add-mcp</code> writes the Code OSS-level <code>User/mcp.json</code></p>
 <p>instead, which Cascade does not read.</p>
+<p>The same install puts deja&#39;s guidance block in</p>
+<p><code>~/.codeium/windsurf/memories/global_rules.md</code>, which Cascade keeps in</p>
+<p>context always. Cascade caps that file at 6,000 characters including the</p>
+<p>user&#39;s own rules, so a file that would pass the cap with the block is left</p>
+<p>as it is, and install and <code>deja doctor</code> say so. The skill goes to</p>
+<p><code>skills/deja-history/SKILL.md</code> and <code>/deja</code> to</p>
+<p><code>global_workflows/deja.md</code>. Workflows get no argument substitution, so the</p>
+<p>workflow names the query in words.</p>
+<ul>
+<li><strong>Hooks are not wired.</strong> Cascade runs <code>~/.codeium/windsurf/hooks.json</code>, but</li>
+</ul>
+<p>none of a hook&#39;s output reaches the model: exit 2 only blocks, and</p>
+<p><code>show_output</code> is shown in the UI and is not offered for <code>pre_user_prompt</code></p>
+<p>(<a href="https://docs.devin.ai/desktop/cascade/hooks">docs</a>). The rule, the skill and</p>
+<p>the workflow come from the docs and have not been run against the app.</p>
 <ul>
 <li><strong>Checked against</strong> Devin Desktop 3.5.17 on macOS (Code OSS 1.110.1):</li>
 </ul>

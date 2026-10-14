@@ -3206,24 +3206,17 @@
       "capabilities": {
         "mcp": true,
         "auto": false,
-        "skill": false,
-        "command": false,
+        "skill": true,
+        "command": true,
         "resume": false,
         "handoff": "paste",
         "prereq": "none"
       },
       "gaps": {
         "auto": {
-          "state": "todo",
-          "why": "Cascade documents user hooks in ~/.codeium/windsurf/hooks.json, but deja installs none yet and nobody has checked on a stand that Devin Desktop 3.5.17 hands a hook's output to the model (#308)."
-        },
-        "skill": {
-          "state": "unknown",
-          "why": "No user-level skill directory for Cascade was checked in the Devin Desktop 3.5.17 bundle, so deja has nowhere it knows to put a SKILL.md (#308)."
-        },
-        "command": {
-          "state": "unknown",
-          "why": "Cascade workflows are its slash commands; where a user-level workflow lives in Devin Desktop 3.5.17 was not checked, so deja writes no /deja command (#308)."
+          "state": "blocked",
+          "why": "Cascade runs user hooks from ~/.codeium/windsurf/hooks.json, but none of their output reaches the model: exit 2 only blocks the action, and show_output is shown in the UI and is not offered for pre_user_prompt. Recall reaches Cascade through the MCP tool, the global rule and the skill.",
+          "source": "https://docs.devin.ai/desktop/cascade/hooks"
         },
         "resume": {
           "state": "impossible",
@@ -3234,38 +3227,38 @@
       "surfaces": {
         "digest": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "prompt": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "pre_tool": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "failure": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "compaction_reset": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "compaction_capture": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "compaction_packet": {
           "status": "no",
-          "proof": "todo",
-          "note": "no hook wired to carry a packet into the next turn yet (#308)"
+          "proof": "blocked",
+          "note": "no Cascade hook output reaches the model, so nothing carries a packet into the next turn"
         },
         "mcp": {
           "status": "yes",
@@ -3279,13 +3272,13 @@
         },
         "session_end": {
           "status": "no",
-          "proof": "todo",
-          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+          "proof": "blocked",
+          "note": "No Cascade hook output reaches the model: exit 2 only blocks, and show_output is shown in the UI and not offered for pre_user_prompt (docs.devin.ai/desktop/cascade/hooks)"
         },
         "rules": {
           "status": "no",
           "proof": "todo",
-          "note": "Cascade's global rules file is not written by deja rules yet; its path in Devin Desktop 3.5.17 is unchecked (#308)"
+          "note": "deja install windsurf puts its guidance block in ~/.codeium/windsurf/memories/global_rules.md; deja rules does not copy into it, since Cascade caps that file at 6,000 characters shared with the user's own rules (#308)"
         },
         "statusline": {
           "status": "no",

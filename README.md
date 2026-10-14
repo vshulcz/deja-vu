@@ -325,7 +325,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | paste | none |
-| Windsurf / Devin Desktop | ✅ | — | ? | ? | ✕ | paste | none |
+| Windsurf / Devin Desktop | ✅ | ⚠ | ✅ | ✅ | ✕ | paste | none |
 | CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
 | TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |

@@ -1545,6 +1545,11 @@ func doctorMCP(w io.Writer) {
 				fmt.Fprintf(w, "  %-12s %s\n", "", note)
 			}
 		}
+		// Cascade's rules file has a cap the user's own rules share, so the
+		// block can be missing for a reason install already gave.
+		if status == "wired" && c.name == "windsurf" {
+			fmt.Fprintf(w, "  %-12s global rules %s: %s\n", "", reportPath(windsurfRulesPath()), windsurfRulesState())
+		}
 		// One "wired" can be two registrations: a hand add under another name
 		// — the project is called deja-vu, after all — plus the `deja` a later
 		// install wrote beside it. Each session then starts the server twice

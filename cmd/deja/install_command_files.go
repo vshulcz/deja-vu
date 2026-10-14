@@ -63,11 +63,15 @@ func cursorCommand(exe string) string {
 }
 
 func markdownCommand(exe string) string {
+	return markdownCommandWith(exe, "$ARGUMENTS")
+}
+
+func markdownCommandWith(exe, argsToken string) string {
 	return `---
 description: Search this machine's past AI coding sessions (deja-vu)
 ---
 
-` + commandBody(exe, "$ARGUMENTS")
+` + commandBody(exe, argsToken)
 }
 
 // commandFilePaths is where each harness reads a user-level command from.
@@ -123,6 +127,9 @@ func commandFilePath(harness string) string {
 		// `/prompts get deja` (kiro.dev manage-prompts; the 2.22 TUI maps the
 		// backend's "global" prompts to /name in its command list).
 		return filepath.Join(sources.KiroConfigDir(), "prompts", "deja.md")
+	case "windsurf":
+		// A Cascade workflow, run as /deja (docs.devin.ai/desktop/cascade/workflows).
+		return windsurfWorkflowPath()
 	case "omp":
 		// The default profile's agent directory, ~/.omp/agent. A named
 		// profile reads its own and does not get the command.
@@ -146,6 +153,9 @@ func commandFileText(harness, exe string) string {
 	// keeps the turn going until the model closes it, so its file has none.
 	if harness == "cursor" || harness == "kiro" || harness == "codewhale" {
 		return cursorCommand(exe)
+	}
+	if harness == "windsurf" {
+		return windsurfWorkflow(exe)
 	}
 	return markdownCommand(exe)
 }

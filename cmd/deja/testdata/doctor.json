@@ -893,6 +893,11 @@
       "path": "<tmp>/home/.codewhale/commands/deja.md"
     },
     {
+      "name": "windsurf",
+      "state": "missing",
+      "path": "<tmp>/home/.codeium/windsurf/global_workflows/deja.md"
+    },
+    {
       "name": "copilot-chat",
       "state": "missing",
       "path": "<tmp>/home/.config/Code/User/prompts/deja.prompt.md"
