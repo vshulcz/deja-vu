@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-10-15
+
+deja now reads Windsurf / Devin Desktop: Cascade's encrypted conversation
+files are decrypted, authenticated and indexed, and `deja install windsurf`
+adds the MCP server, a global rule, the skill and a `/deja` workflow. That
+makes 42 harnesses. Grok Build installs the plugin from this repository's own
+marketplace, and a Spec Kit extension ships with each release. The person sees
+more of what deja did: the first session names an error the machine keeps
+hitting, the weekly note names the session agents used, and dsh, Hermes,
+OpenClaw and Gemini show deja's line where the person reads it. Kimi Code and
+Qwen Code edit calls are pinned by fixtures from @beiryu.
+
 ### Changed
 
 - deja's lines for the person fit on one line each, and a session start shows the recall receipt plus at most one once-only note (the built note, what changed, the week note, the GitHub line), so a fresh install no longer opens with four lines. The receipt drops its byte count and the docs line folds into the built note. What the model receives is unchanged.
