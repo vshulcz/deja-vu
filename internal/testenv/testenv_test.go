@@ -20,6 +20,7 @@ func TestRedirects(t *testing.T) {
 		"XDG_CACHE_HOME":               false,
 		"TERM":                         false,
 		"DEJA_MCP_ORPHAN_HELPER":       false,
+		"DEJA_WRITE_EXTENSIONS":        false,
 	} {
 		if got := Redirects(name); got != want {
 			t.Errorf("Redirects(%q) = %v, want %v", name, got, want)

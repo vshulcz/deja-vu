@@ -30,9 +30,11 @@ var secrets = []string{"GITHUB_TOKEN", "OPENAI_API_KEY"}
 // Redirects reports whether name can point deja at something outside the test.
 // A name ending in _HELPER is a test talking to a copy of its own binary
 // (DEJA_MCP_ORPHAN_HELPER), so it is never scrubbed: losing it made that child
-// exit at once, which only Windows noticed.
+// exit at once, which only Windows noticed. A DEJA_WRITE_ name tells a test to
+// rewrite its checked-in files (DEJA_WRITE_EXTENSIONS) and is kept too, or the
+// command the failing test prints could never work (#4989).
 func Redirects(name string) bool {
-	if toolchain[name] || strings.HasSuffix(name, "_HELPER") {
+	if toolchain[name] || strings.HasSuffix(name, "_HELPER") || strings.HasPrefix(name, "DEJA_WRITE_") {
 		return false
 	}
 	for _, s := range secrets {
