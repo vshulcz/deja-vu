@@ -75,6 +75,34 @@ func TestInstallGeminiWritesAnExtension(t *testing.T) {
 	}
 }
 
+// Gemini tags each hook's systemMessage with the hook's name, or with its
+// whole command when it has none — the person read deja's receipt followed by
+// "[/Users/…/deja-hook hook-prompt]".
+func TestGeminiHooksAreNamedForTheirInfoLine(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	if _, err := installGeminiAuto("/bin/deja", false); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	n := 0
+	for event, groups := range geminiExtensionHooks(t, home) {
+		for _, g := range groups {
+			inner, _ := g["hooks"].([]any)
+			for _, raw := range inner {
+				h, _ := raw.(map[string]any)
+				if h["name"] != "deja" {
+					t.Errorf("%s hook %v has name %v, want deja", event, h["command"], h["name"])
+				}
+				n++
+			}
+		}
+	}
+	if n == 0 {
+		t.Fatal("no hooks written")
+	}
+}
+
 func TestInstallGeminiUninstallLeavesTheSwitchAlone(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
