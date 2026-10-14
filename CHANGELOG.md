@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Cursor no longer uses up deja's notes for the person. It shows a hook's message only when the hook blocks, so the built note, the week note and the "you have been here" receipt went to Cursor, were counted as shown and never seen, and Claude Code on the same index skipped them. Cursor sessions now get only the model's text, which is unchanged; the same holds for hooks run with `--strict` or `--copilot`.
 - `deja uninstall dsh-auto` works: the alias was refused on the way out, and an install under it was never recorded, so the directories it made stayed behind after an uninstall (#4983).
 - On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 

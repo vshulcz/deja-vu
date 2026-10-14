@@ -597,6 +597,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	payload := readHookStdin()
 	unreadable := len(bytes.TrimSpace(payload)) > 0 && json.Unmarshal(payload, &input) != nil
 	adoptCopilotHost(payload)
+	adoptCursorHost(payload)
 	input.SessionID = adoptGrok(adoptGrok(input.SessionID, input.grokEnvelope.SessionID), input.ConversationID)
 	input.WorkspaceRoots = adoptGrokRoots(input.WorkspaceRoots, input.WorkspaceRoot)
 	// The reply goes out under the event it arrived on, not under
@@ -695,11 +696,13 @@ func runHookContextMode(dir string, plain, once bool) error {
 			// The environment block is not the project's memory, and while a
 			// build runs it is all there is: without this the whole rebuild
 			// passed in silence on any machine with facts to report (#927).
-			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
-			// Last, after anything that needs acting on: what the build
-			// found, once (#3073), then once a week what the week looked
-			// like (#3065).
-			resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
+			if notesHaveReader() {
+				resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), joinNotes(withheldEverythingNote(dir, withheld), buildNotice(dir))))
+				// Last, after anything that needs acting on: what the build
+				// found, once (#3073), then once a week what the week looked
+				// like (#3065).
+				resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
+			}
 			emitHookResponse(resp)
 			return nil
 		}
@@ -709,7 +712,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 		// Only on the JSON path: systemMessage is the host's UI channel,
 		// whereas the plain path is injected into the model's context, where
 		// a progress line is noise.
-		if !plain {
+		if !plain && notesHaveReader() {
 			// The session that asks for the build is the one that hears
 			// nothing about it: the child has not written its first progress
 			// line yet. That session is the first one after an upgrade or a
@@ -784,7 +787,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// Announce only when the recalled set changed since the last announcement:
 	// injection is recency-ranked, so repeating the same receipt every session
 	// start is wallpaper, and wallpaper builds no habit.
-	if sessions > 0 && receiptIsNews(dir, digest) {
+	if sessions > 0 && notesHaveReader() && receiptIsNews(dir, digest) {
 		plural := ""
 		if sessions > 1 {
 			plural = "s"
@@ -835,6 +838,8 @@ func runHookContextMode(dir string, plain, once bool) error {
 			receiptLine(fmt.Sprintf("deja recalled %d prior session%s %s%s", sessions, plural, why, polNote),
 				reused, serviceReceipt(dir))))
 	}
+	// Nothing below is spent on a host that shows it to nobody.
+	//
 	// A build under way is said whether or not there is a receipt. Gating it on
 	// an empty message covered the session with nothing to recall and left out
 	// the one that has something: the digest there came from the cache, which
@@ -843,24 +848,26 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// printed was "the agent starts already knowing them" and nothing else
 	// (#2697) — the silence #927 fixed on the environment-facts path, reached
 	// from the other side.
-	if note := buildNotice(dir); note != "" {
-		if resp.SystemMessage == "" {
-			resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), note))
-		} else {
-			resp.SystemMessage = joinNotes(resp.SystemMessage, note)
+	if notesHaveReader() {
+		if note := buildNotice(dir); note != "" {
+			if resp.SystemMessage == "" {
+				resp.SystemMessage = joinNotes(rewireNote(rewired), joinNotes(stuckWiringNote(stuckWiring), note))
+			} else {
+				resp.SystemMessage = joinNotes(resp.SystemMessage, note)
+			}
 		}
-	}
-	if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
-		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
-	}
-	// What the build found, once (#3073), then once a week what the week
-	// looked like (#3065) — after everything that needs acting on.
-	resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
-	// An index that is behind and cannot be written stays behind. "the agent
-	// starts already knowing them" was printed over a picture missing today's
-	// work, and this path said nothing — search names the same state (#1005).
-	if note := staleReadOnlyNote(dir); note != "" {
-		resp.SystemMessage = joinNotes(note, resp.SystemMessage)
+		if note := unreadableStoreNote(dir); storeNoteIsNews(dir, note) {
+			resp.SystemMessage = joinNotes(note, resp.SystemMessage)
+		}
+		// What the build found, once (#3073), then once a week what the week
+		// looked like (#3065) — after everything that needs acting on.
+		resp.SystemMessage = joinNotes(resp.SystemMessage, humanNotes(dir))
+		// An index that is behind and cannot be written stays behind. "the agent
+		// starts already knowing them" was printed over a picture missing today's
+		// work, and this path said nothing — search names the same state (#1005).
+		if note := staleReadOnlyNote(dir); note != "" {
+			resp.SystemMessage = joinNotes(note, resp.SystemMessage)
+		}
 	}
 	emitHookResponse(resp)
 	return nil
