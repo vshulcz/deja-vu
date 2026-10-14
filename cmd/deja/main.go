@@ -252,10 +252,19 @@ var commands = map[string]command{
 		if sayIfTypedByHand("hook-prompt") {
 			return nil
 		}
-		plain := len(rest) > 0 && (rest[0] == "--plain" || rest[0] == "-plain")
-		// --copilot: the flat answer Copilot CLI reads (see hook_strict.go).
-		if len(rest) > 0 && (rest[0] == "--copilot" || rest[0] == "-copilot") {
-			copilotHookOutput = true
+		plain := false
+		for _, a := range rest {
+			switch a {
+			case "--plain", "-plain":
+				plain = true
+			// --copilot: the flat answer Copilot CLI reads (see hook_strict.go).
+			case "--copilot", "-copilot":
+				copilotHookOutput = true
+			// --strict: ZCode discards a reply with a key it does not know,
+			// recall and all, so the receipt line stays out (hook_strict.go).
+			case "--strict", "-strict":
+				strictHookOutput = true
+			}
 		}
 		return endLineOnTerminal(os.Stdout, func(w io.Writer) error { return runHookPromptMode(dir, os.Stdin, w, plain) })
 	},

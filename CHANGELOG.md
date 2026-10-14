@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- ZCode keeps the per-prompt recall when the "you have been here" line is due. `hook-prompt` ignored the `--strict` that ZCode's hook passes, so the reply carried `systemMessage` and ZCode discarded all of it, recall included.
 - `deja uninstall dsh-auto` works: the alias was refused on the way out, and an install under it was never recorded, so the directories it made stayed behind after an uninstall (#4983).
 - On dsh 0.2.0-rc.2 the per-prompt recall never ran, in the npm plugin and in the one `deja install dsh-auto` writes: 0.2.0-rc.2 dropped `session.events`, so the plugin found no prompt to ask about. It now reads the log with `eventAt` (#4981).
 
