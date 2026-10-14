@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-Hans" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>给 Codex CLI 加记忆：召回这台机器上所有智能体的历史会话 — deja-vu</title>
+<meta name="description" content="如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html">
+<link rel="alternate" hreflang="zh-Hans" href="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html">
+<link rel="alternate" hreflang="en" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
+<link rel="alternate" hreflang="x-default" href="https://vshulcz.github.io/deja-vu/guide/memory-for-codex.html">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:title" content="给 Codex CLI 加记忆：召回这台机器上所有智能体的历史会话">
+<meta property="og:description" content="如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — 给编程智能体的可搜索本地记忆">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<meta name="twitter:title" content="给 Codex CLI 加记忆：召回这台机器上所有智能体的历史会话">
+<meta name="twitter:description" content="如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../../assets/icon.svg">
+<link rel="stylesheet" href="../../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<link rel="apple-touch-icon" href="../../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "给 Codex CLI 加记忆", "description": "如何让 Codex CLI 查到这台机器上每个编程智能体的会话：MCP 服务器、需要你批准的钩子，以及插件市场。", "url": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html", "inLanguage": "zh-Hans", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "给 Codex CLI 加记忆", "item": "https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "怎么给 Codex CLI 加记忆？", "acceptedAnswer": {"@type": "Answer", "text": "跑 deja install codex-auto，把 MCP 服务器连同钩子一起写进 ~/.codex/config.toml，然后在 /hooks 里批准一次钩子。"}}, {"@type": "Question", "name": "Codex CLI 的会话存在哪里？", "acceptedAnswer": {"@type": "Answer", "text": "在 ${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl 下，你敲过的提示词放在旁边的 history.jsonl 里。"}}, {"@type": "Question", "name": "装好 Codex 钩子之后为什么什么都没发生？", "acceptedAnswer": {"@type": "Answer", "text": "Codex 不会运行没给它看过的钩子。打开 Codex，在 /hooks 里批准一次；在那之前什么都不会跑，codex exec 也一样。"}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../../"><img src="../../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../../">首页</a><a class="lnk" href="getting-started.html">文档</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../../">← deja-vu</a><div class="grp">中文指南</div>
+<a href="getting-started.html">快速开始</a>
+<a href="does-my-agent-remember.html">智能体记得之前的对话吗</a>
+<a href="forgetting.html">为什么会忘事</a>
+<a href="where-sessions-are-stored.html">历史文件在哪里</a>
+<a href="session-files-on-disk.html">会话文件怎么删</a>
+<a href="privacy.html">隐私</a>
+<a href="memory-for-codex.html" aria-current="page">给 Codex CLI 加记忆</a>
+<a href="memory-for-dsh.html">给 DeepSeek Harness 加记忆</a>
+<a href="memory-for-kimi.html">给 Kimi Code 加记忆</a>
+<a href="memory-for-qwen.html">给 Qwen Code 加记忆</a>
+<div class="grp">English</div>
+<a href="../../guide/find-a-session.html">Finding a session</a>
+<a href="../../guide/session-files-on-disk.html">Session files on disk</a>
+<a href="../../guide/where-sessions-are-stored.html">Where history lives</a>
+<a href="../../guide/delete-copilot-chat-history.html">Delete Copilot Chat history</a>
+<a href="../../guide/commands.html">CLI reference</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/readme/README.zh.md">中文 README</a>
+<a href="../../registry/README.html">Format registry</a><a class="sidecat" href="../../"><img src="../../assets/icon-live.svg" width="46" height="46" alt=""><span>它记得，你就不必记</span></a></aside>
+<article>
+
+<h1>给 Codex CLI 加记忆</h1>
+<p class="pagelede">MCP 服务器、需要你批准的钩子，还有插件市场<span class="mins" data-mins></span></p>
+
+<p>Codex CLI 会记下每个会话，然后把下一个会话开成空的。rollout 文件还在磁盘上，同一周里你在另一个智能体里做的事也还在。</p>
+
+<h2>全部记忆就是 AGENTS.md</h2>
+<p>Codex 在会话开始时读 <code>AGENTS.md</code>——仓库里的那份，以及对所有项目生效的 <code>~/.codex/AGENTS.md</code>——这就是它仅有的记忆。它没有自动提炼记忆的功能，也不会替你追加任何内容；除了你自己写进那个文件的，什么都带不到下一个会话。</p>
+
+<h2>Codex 已经有的部分</h2>
+<p>rollout 放在 <code>${CODEX_HOME:-~/.codex}/sessions/YYYY/MM/DD/rollout-*.jsonl</code> 下，你敲过的提示词放在旁边的 <code>history.jsonl</code> 里。完整，但没有任何东西读它。<a href="../../registry/codex.html">Codex 的会话文件是怎么读的</a>里有格式，以及解析它时踩过的坑。</p>
+
+<h2>接上召回</h2>
+<pre>deja install codex-auto</pre>
+<p>这会把 deja MCP 服务器写进 <code>~/.codex/config.toml</code>，同时写入把召回送进会话的钩子：会话开始时、每次提问时、执行命令或补丁之前、命令失败之后、压缩之前，以及会话结束时。只装服务器用 <code>deja install codex</code>。</p>
+<p>在你怀疑有 bug 之前先知道一点：Codex 不会运行没给它看过的钩子。打开 Codex，在 <code>/hooks</code> 里批准一次，否则磁盘上的文件看起来全都对，记忆却一条也送不到——<code>codex exec</code> 也一样。</p>
+<p>这个仓库同时也是一个 Codex 插件市场：</p>
+<pre>codex plugin marketplace add https://github.com/vshulcz/deja-vu
+codex plugin add deja-vu@deja-vu</pre>
+<p>两条路一起跑是安全的，不会变成两份：MCP 服务器按名字索引，而我们交付的每份清单都把它叫作 <code>deja</code>，所以两边会合成同一个服务器，而不是把每个工具列两遍。</p>
+<p>无论走哪条路都需要那个二进制，因为插件交付的是文件，不是运行时：</p>
+<pre>brew install deja-vu
+# 或者
+curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh</pre>
+
+<h2>为什么这在 Codex 里比多数智能体更要紧</h2>
+<p>Codex 的会话短而多——一天的活分散在十几个 rollout 文件里，而不是一条长线程。于是你周二定下的那件事，靠翻很难找到，靠搜索却很容易。<a href="find-a-session.html">找回解决问题的那次会话</a>讲的就是命令这一侧。</p>
+<p>Codex 还会在压缩之前把会话记录交给钩子，所以这里的工作上下文可以恢复：deja 留下任务、涉及的文件，以及每条命令和它是否成功，并在摘要之后的下一轮交还一次。见<a href="../../guide/after-compaction.html">压缩之后</a>。</p>
+
+<h2>和这个 harness 无关的那一半</h2>
+<p>索引覆盖这台机器上每个智能体的转录——今天是四十二个，<a href="where-sessions-are-stored.html">各有各的格式</a>——所以在一个工具里找到的修法，能回答在另一个工具里提的问题，包括这一切装上来之前的会话。这就是选择索引、而不是选择边用边记的原因。</p>
+<p>这里没有任何东西在写记忆，所以也就没有什么能凭空编进你的历史里；建索引和检索都在本地，凭据在建索引时就被脱敏（<a href="../../guide/privacy.html">隐私说明</a>）。每次提问注入上限 1536 字节，每次工具调用约 4 KB——<a href="../../guide/token-cost.html">记忆要花多少 token</a> 里有实测对比。</p>
+
+<p><a href="getting-started.html">快速开始</a> · <a href="../../registry/codex.html">Codex 的会话文件是怎么读的</a></p>
+</article>
+</div>
+<footer>deja-vu 采用 MIT 许可，在你的机器上运行。<a href="https://github.com/vshulcz/deja-vu">GitHub 源码</a> · <a href="../../">首页</a></footer>
+</div>
+<script src="../../assets/guide.js" defer></script>
+</body>
+</html>

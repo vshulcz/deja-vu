@@ -96,6 +96,7 @@ https://vshulcz.github.io/deja-vu/registry/amp.html
 https://vshulcz.github.io/deja-vu/registry/copilot-chat.html
 https://vshulcz.github.io/deja-vu/registry/continue.html
 https://vshulcz.github.io/deja-vu/registry/crush.html
+https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-dsh.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-kimi.html
 https://vshulcz.github.io/deja-vu/zh/guide/memory-for-qwen.html
@@ -125,6 +126,7 @@ https://vshulcz.github.io/deja-vu/zh/guide/where-sessions-are-stored.html
 https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html
 https://vshulcz.github.io/deja-vu/zh/guide/privacy.html
 https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html
+https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html
 https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html
 https://vshulcz.github.io/deja-vu/zh/guide/lost-context.html
 https://vshulcz.github.io/deja-vu/registry/codebuddy.html
