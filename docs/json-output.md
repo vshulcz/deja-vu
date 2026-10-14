@@ -519,7 +519,8 @@ ones that pair with `rereading`; the field is absent on a current store. Store
 `state`
 values are `ok`, `missing`, `unplugged` (no files, and the disk the store was on
 is gone), `excluded` (the harness is in the exclude list, so nothing was read),
-`unreadable` (which adds an `error` with what the parser said), `parsed-zero`,
+`unreadable` (which adds an `error` with what the parser said, or for windsurf
+a `skipped` count of trajectories that failed authentication), `parsed-zero`,
 `denied` (which adds a `denied` field naming the unreadable path),
 `needs-sqlite3` and `needs-zstd` (which add a `skipped` field saying which CLI
 is missing when the store was skipped for it, or which sqlite3 on PATH did not

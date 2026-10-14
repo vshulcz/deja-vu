@@ -526,7 +526,13 @@ func printDoctorStoreWarnings(w io.Writer, stores []doctorStore) {
 			// With the reason. "Please report it" and nothing to report is how
 			// #1642 arrived: a store deja refused, and no way for its owner or
 			// for us to tell which refusal it was.
-			if store.Error != "" {
+			//
+			// A skip reason here is a count of files deja opened and refused,
+			// not a format change: Windsurf trajectories that fail
+			// authentication (#308).
+			if store.Skipped != "" {
+				fmt.Fprintf(w, "  warning      %s %s; those sessions are missing from recall\n", store.Name, store.Skipped)
+			} else if store.Error != "" {
 				fmt.Fprintf(w, "  warning      %s store cannot be read — %s; please report it\n",
 					store.Name, store.Error)
 			} else {
@@ -1167,6 +1173,13 @@ func doctorHarnessStores(w io.Writer, dir string, all bool) {
 	// which hold none; the count is the workspace files.
 	printRow("jetbrains", sources.JetBrainsRoot(), doctorExists(sources.JetBrainsRoot()),
 		doctorCount(len(sources.JetBrainsSessionFiles()), "workspace file"))
+	// Every Cascade trajectory is sealed, and one that fails authentication
+	// is out of recall; the row counts those apart (#308).
+	wsDetail := doctorCount(len(sources.WindsurfSessionFiles()), "file")
+	if reason := sources.SkipReason("windsurf"); reason != "" {
+		wsDetail += ", " + reason
+	}
+	printRow("windsurf", sources.WindsurfRoot(), doctorExists(sources.WindsurfRoot()), wsDetail)
 	// Reasonix keeps a dozen sidecars beside each transcript — metadata, event
 	// logs, locks, subagent logs — so those are placed, not counted as unread.
 	rxRoot := sources.ReasonixRoot()
@@ -2084,6 +2097,7 @@ func doctorMCPConfigs() []doctorMCPConfig {
 		{"codewhale", codewhaleMCPPath(), doctorJSONWired("servers"), doctorJSONDejaKeys("servers")},
 		{"junie", junieMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"jetbrains", jetBrainsMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
+		{"windsurf", windsurfMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"gjc", gjcMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},
 		{"zcode", zcodeConfigPath(), doctorZCodeWired, nil},
 		{"commandcode", commandCodeMCPPath(), doctorJSONWired("mcpServers"), doctorJSONDejaKeys("mcpServers")},

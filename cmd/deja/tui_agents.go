@@ -19,7 +19,7 @@ var agentNames = map[string]string{
 	"senpi": "Senpi", "gjc": "gajae-code", "kimchi": "Kimchi Coding", "commandcode": "Command Code",
 	"zcode": "ZCode", "kiro": "Kiro", "kilocode": "Kilo Code", "roo": "Roo Code", "zed": "Zed",
 	"devin": "Devin CLI", "codewhale": "CodeWhale", "junie": "Junie", "jetbrains": "JetBrains AI Assistant",
-	"codebuddy": "CodeBuddy Code", "reasonix": "Reasonix", "trae": "TRAE CLI", "muse": "Muse Code",
+	"windsurf": "Windsurf / Devin Desktop", "codebuddy": "CodeBuddy Code", "reasonix": "Reasonix", "trae": "TRAE CLI", "muse": "Muse Code",
 }
 
 // agentName is the short form for a chip or a card: the parenthesised gloss

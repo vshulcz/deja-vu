@@ -7,7 +7,7 @@
 
 <p align="center"><b>Your coding agents stop re-debugging what you already fixed.</b></p>
 
-<p align="center">Claude Code, Codex, Cursor and 38 more agents already save every session to disk.
+<p align="center">Claude Code, Codex, Cursor and 39 more agents already save every session to disk.
 deja indexes all of it, months back, and hands the part that matters
 to whichever agent is working now.</p>
 
@@ -68,7 +68,7 @@ prints what is indexed and which command to run next.
 ## Highlights
 
 - **Starts full.** Months of history from before you installed it are searchable on day one: `deja "connection pool exhausted"` over gigabytes.
-- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [forty-one agents](#supported-harnesses) read the same index.
+- **One memory, every agent.** A fix found in Codex comes back in Claude Code, Cursor or opencode; all [forty-two agents](#supported-harnesses) read the same index.
 - **Nobody has to ask.** Recall arrives at session start, before a file is edited or a command runs, and after a command fails.
 - **Survives compaction.** Over 43 measured compactions the summary kept 77% of the decisions and 0.2% of the commands; deja hands back the rest ([how](docs/compaction.md)).
 - **Indexes the work, not just the talk.** The files each turn opened, the commands with their exit status, the exact spans an edit replaced.
@@ -281,7 +281,7 @@ whether or not the tool is called.
 ## Supported harnesses
 
 <!-- matrix:start -->
-aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
+aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &middot; Codex CLI &middot; Copilot CLI &middot; VS Code Copilot Chat &middot; Cursor &middot; DeepSeek Harness &middot; Gemini CLI &middot; Goose &middot; Grok Build &middot; Hermes &middot; Kimi Code &middot; omp (Oh My Pi) &middot; OpenClaw &middot; opencode &middot; Continue &middot; Crush &middot; pi &middot; prime-agent (PrimeIntellect) &middot; Qwen Code &middot; Cherry Studio &middot; Senpi &middot; gajae-code &middot; Kimchi Coding &middot; Command Code &middot; ZCode &middot; Kiro &middot; Kilo Code &middot; Roo Code &middot; Zed &middot; Devin CLI &middot; CodeWhale &middot; Junie &middot; JetBrains AI Assistant &middot; Windsurf / Devin Desktop &middot; CodeBuddy Code &middot; Reasonix &middot; TRAE CLI &middot; Muse Code.
 
 <details>
 <summary>What each one supports</summary>
@@ -325,6 +325,7 @@ aider &middot; Amp &middot; Antigravity &middot; Claude Code &middot; Cline &mid
 | CodeWhale | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Junie | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | JetBrains AI Assistant | ✅ | ⚠ | ⚠ | ⚠ | ✕ | paste | none |
+| Windsurf / Devin Desktop | ✅ | — | ? | ? | ✕ | paste | none |
 | CodeBuddy Code | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |
 | Reasonix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | zstd for 1.x sessions |
 | TRAE CLI | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | none |

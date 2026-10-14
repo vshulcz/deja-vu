@@ -1017,6 +1017,8 @@ func installTarget(target, exe string, uninstall bool) (installResult, error) {
 		return installJunieAuto(exe, uninstall)
 	case "jetbrains":
 		return installJetBrains(exe, uninstall)
+	case "windsurf":
+		return installWindsurf(exe, uninstall)
 	case "gjc":
 		return installGjc(exe, uninstall)
 	case "gjc-auto":
@@ -5255,7 +5257,7 @@ func installTargetNames() []string {
 		"cline", "cline-auto",
 		"goose", "goose-auto",
 		"crush", "crush-auto",
-		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "junie", "junie-auto", "jetbrains", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
+		"grok", "grok-auto", "copilot", "copilot-auto", "roo", "kilocode", "kilocode-auto", "cherrystudio", "cherrystudio-auto", "kiro", "kiro-auto", "senpi", "senpi-auto", "kimchi", "kimchi-auto", "codewhale", "codewhale-auto", "junie", "junie-auto", "jetbrains", "windsurf", "gjc", "gjc-auto", "zcode", "zcode-auto", "commandcode", "commandcode-auto", "aider",
 		// Continue keeps the server and the slash command in one assistant
 		// config, and its skill in the folder beside it; there is no hook to
 		// wire, so there is nothing an -auto target would add (#3062).
@@ -5413,6 +5415,7 @@ func existingTargetChecks() map[string]string {
 		"codewhale":    sources.CodeWhaleRoot(), // its sessions; deja creates mcp.json
 		"junie":        sources.JunieRoot(),     // its sessions; deja creates config.json and mcp/
 		"jetbrains":    sources.JetBrainsRoot(), // the IDEs' config; deja writes ~/.ai/mcp
+		"windsurf":     filepath.Join(sources.WindsurfRoot(), "cascade"),
 		"gjc":          sources.GjcRoot(),
 		"zcode":        sources.ZCodeRoot(),
 		"commandcode":  commandCodeFirstRoot(),

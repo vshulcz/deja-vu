@@ -327,6 +327,15 @@
       "indexed_sessions": 0
     },
     {
+      "name": "windsurf",
+      "state": "missing",
+      "paths": [
+        "<tmp>/home/.codeium/windsurf"
+      ],
+      "files": 0,
+      "indexed_sessions": 0
+    },
+    {
       "name": "reasonix",
       "state": "missing",
       "paths": [
@@ -568,6 +577,11 @@
       "name": "jetbrains",
       "state": "config-missing",
       "path": "<tmp>/home/.ai/mcp/mcp.json"
+    },
+    {
+      "name": "windsurf",
+      "state": "config-missing",
+      "path": "<tmp>/home/.codeium/windsurf/mcp_config.json"
     },
     {
       "name": "gjc",

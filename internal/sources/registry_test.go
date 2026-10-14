@@ -50,6 +50,7 @@ func TestFormatRegistryConformance(t *testing.T) {
 		"DEJA_CODEBUDDY_ROOTS", "CODEBUDDY_CONFIG_DIR", "WORKBUDDY_CONFIG_DIR",
 		"DEJA_NOTES_FILE",
 		"DEJA_JUNIE_ROOT", "JUNIE_HOME", "DEJA_JETBRAINS_ROOT",
+		"DEJA_WINDSURF_ROOT",
 	} {
 		t.Setenv(key, "")
 	}
@@ -398,6 +399,8 @@ func parseRegistryFixtureIn(t *testing.T, id, path, work string) []model.Session
 		sessions, err = ParseJunieFile(path)
 	case "jetbrains":
 		sessions, err = ParseJetBrainsFile(path)
+	case "windsurf":
+		sessions, err = ParseWindsurfFile(path)
 	case "deepseek":
 		// The fixture is stored raw: the harness writes zstd frames by default,
 		// and a registry fixture that needs an external tool to read cannot be

@@ -3189,6 +3189,117 @@
       }
     },
     {
+      "id": "windsurf",
+      "store_paths": [
+        "~/.codeium/windsurf/cascade/<cascade-id>.pb",
+        "%USERPROFILE%\\.codeium\\windsurf\\cascade\\<cascade-id>.pb",
+        "${DEJA_WINDSURF_ROOT}/cascade/<cascade-id>.pb"
+      ],
+      "format_kind": "aes-gcm-protobuf",
+      "fixture_paths": [
+        "fixtures/registry/windsurf/cascade/c4f3a2b1-7e6d-4c5b-9a8f-1e2d3c4b5a69.pb",
+        "fixtures/registry/windsurf/cascade/8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.pb"
+      ],
+      "parser_source": "internal/sources/windsurf.go",
+      "last_verified": "2026-07-28",
+      "display_name": "Windsurf / Devin Desktop",
+      "capabilities": {
+        "mcp": true,
+        "auto": false,
+        "skill": false,
+        "command": false,
+        "resume": false,
+        "handoff": "paste",
+        "prereq": "none"
+      },
+      "gaps": {
+        "auto": {
+          "state": "todo",
+          "why": "Cascade documents user hooks in ~/.codeium/windsurf/hooks.json, but deja installs none yet and nobody has checked on a stand that Devin Desktop 3.5.17 hands a hook's output to the model (#308)."
+        },
+        "skill": {
+          "state": "unknown",
+          "why": "No user-level skill directory for Cascade was checked in the Devin Desktop 3.5.17 bundle, so deja has nowhere it knows to put a SKILL.md (#308)."
+        },
+        "command": {
+          "state": "unknown",
+          "why": "Cascade workflows are its slash commands; where a user-level workflow lives in Devin Desktop 3.5.17 was not checked, so deja writes no /deja command (#308)."
+        },
+        "resume": {
+          "state": "impossible",
+          "why": "`devin-desktop --sessions` opens the Sessions window and takes no id; the extension's setCascadeId and openCascadeInEditorTab are private RPCs, so no command reopens a conversation by id.",
+          "source": "https://github.com/vshulcz/deja-vu/issues/308"
+        }
+      },
+      "surfaces": {
+        "digest": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "prompt": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "pre_tool": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "failure": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "compaction_reset": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "compaction_capture": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "compaction_packet": {
+          "status": "no",
+          "proof": "todo",
+          "note": "no hook wired to carry a packet into the next turn yet (#308)"
+        },
+        "mcp": {
+          "status": "yes",
+          "proof": "fixture",
+          "note": "~/.codeium/windsurf/mcp_config.json, Cascade's own file, not the Code OSS-level User/mcp.json"
+        },
+        "handoff": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "Cascade runs inside the app with no command line to take a prompt, so the packet is pasted"
+        },
+        "session_end": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade hooks in ~/.codeium/windsurf/hooks.json are not wired yet; whether Devin Desktop 3.5.17 hands their output to the model is unchecked (#308)"
+        },
+        "rules": {
+          "status": "no",
+          "proof": "todo",
+          "note": "Cascade's global rules file is not written by deja rules yet; its path in Devin Desktop 3.5.17 is unchecked (#308)"
+        },
+        "statusline": {
+          "status": "no",
+          "proof": "todo",
+          "note": "no status surface for Cascade was looked for in Devin Desktop 3.5.17 (#308)"
+        },
+        "reader": {
+          "status": "partial",
+          "proof": "fixture",
+          "note": "typed prompts and planner replies only; tools, edits and thinking are left out, and response before modified_response is unverified against a successful turn"
+        }
+      }
+    },
+    {
       "id": "codebuddy",
       "store_paths": [
         "${CODEBUDDY_CONFIG_DIR:-~/.codebuddy}/projects/<mangled-cwd>/<session-id>.jsonl",

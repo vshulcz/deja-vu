@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where Windsurf / Devin Desktop stores its history — session format</title>
+<meta name="description" content="Where Windsurf / Devin Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/registry/windsurf.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where Windsurf / Devin Desktop stores its history — session format">
+<meta property="og:description" content="Where Windsurf / Devin Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/registry/windsurf.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta name="twitter:title" content="Where Windsurf / Devin Desktop stores its history — session format">
+<meta name="twitter:description" content="Where Windsurf / Devin Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"vshulcz"},"description":"Where Windsurf / Devin Desktop writes its conversation history on disk, what the files contain, the quirks deja found in them, and when the format was last verified against a real store.","headline":"Windsurf / Devin Desktop","inLanguage":"en","isPartOf":{"@type":"WebSite","name":"deja-vu","url":"https://vshulcz.github.io/deja-vu/"},"publisher":{"@type":"Person","name":"vshulcz"},"url":"https://vshulcz.github.io/deja-vu/registry/windsurf.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/","name":"deja-vu","position":1},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/guide/harnesses.html","name":"Harnesses","position":2},{"@type":"ListItem","item":"https://vshulcz.github.io/deja-vu/registry/windsurf.html","name":"Windsurf / Devin Desktop","position":3}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="../guide/getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">&larr; deja-vu</a><div class="grp">Guide</div><a href="../guide/getting-started.html">Getting started</a><a href="../guide/harnesses.html">Harnesses</a><div class="grp">Session formats</div><a href="README.html">All formats</a><a href="aider.html">aider</a><a href="amp.html">Amp</a><a href="antigravity.html">Antigravity</a><a href="cherrystudio.html">Cherry Studio</a><a href="claude-code.html">Claude Code</a><a href="cline.html">Cline</a><a href="codebuddy.html">CodeBuddy Code</a><a href="codewhale.html">CodeWhale</a><a href="codex.html">Codex CLI</a><a href="commandcode.html">Command Code</a><a href="continue.html">Continue</a><a href="copilot.html">Copilot CLI</a><a href="crush.html">Crush</a><a href="cursor.html">Cursor</a><a href="deepseek.html">DeepSeek Harness</a><a href="devin.html">Devin CLI</a><a href="gjc.html">gajae-code</a><a href="gemini.html">Gemini CLI</a><a href="goose.html">Goose</a><a href="grok.html">Grok Build</a><a href="hermes.html">Hermes</a><a href="jetbrains.html">JetBrains AI Assistant</a><a href="junie.html">Junie</a><a href="kilocode.html">Kilo Code</a><a href="kimchi.html">Kimchi Coding</a><a href="kimi.html">Kimi Code</a><a href="kiro.html">Kiro</a><a href="muse.html">Muse Code</a><a href="omp.html">omp (Oh My Pi)</a><a href="openclaw.html">OpenClaw</a><a href="opencode.html">opencode</a><a href="pi.html">pi</a><a href="prime.html">prime-agent (PrimeIntellect)</a><a href="qwen.html">Qwen Code</a><a href="reasonix.html">Reasonix</a><a href="roo.html">Roo Code</a><a href="senpi.html">Senpi</a><a href="trae.html">TRAE CLI</a><a href="copilot-chat.html">VS Code Copilot Chat</a><a href="windsurf.html" aria-current="page">Windsurf / Devin Desktop</a><a href="zcode.html">ZCode</a><a href="zed.html">Zed</a></aside>
+<article>
+<h1>Windsurf / Devin Desktop</h1>
+<ul>
+<li><strong>ID</strong>: <code>windsurf</code></li>
+<li><strong>Store</strong>: <code>~/.codeium/windsurf/cascade/&lt;cascade-id&gt;.pb</code>, one file per Cascade conversation</li>
+<li><strong>Config root</strong>: <code>~/.codeium/windsurf</code> on macOS and Linux, <code>%USERPROFILE%\.codeium\windsurf</code> on Windows</li>
+<li><strong>Read overrides</strong>: <code>DEJA_WINDSURF_ROOT</code> replaces the config root</li>
+<li><strong>Format</strong>: an AES-256-GCM sealed <code>CortexTrajectory</code> protobuf</li>
+<li><strong>Needs</strong>: nothing</li>
+<li><strong>Resume</strong>: none — <code>devin-desktop --sessions</code> opens the Sessions window, and no command takes a conversation id</li>
+</ul>
+<p>Windsurf now ships as Devin Desktop. The bundle still carries the Windsurf</p>
+<p>internals (<code>com.exafunction.windsurf</code>, <code>extensions/windsurf</code>, the language</p>
+<p>server&#39;s <code>--codeium_dir .codeium/windsurf</code>), and the Cascade store is the same,</p>
+<p>so deja reads both under one id. The <code>state.vscdb</code> databases hold no Cascade</p>
+<p>transcripts on 3.5.17.</p>
+<p>Each file is <code>nonce(12) || ciphertext || tag(16)</code>: AES-256-GCM, no additional</p>
+<p>data, and the key the language server carries as a constant,</p>
+<p><code>safeCodeiumworldKeYsecretBalloon</code>. deja authenticates a file before decoding</p>
+<p>it. One that fails is skipped whole and counted: <code>deja doctor</code> and the index</p>
+<p>run say <code>windsurf 3 trajectories failed authentication</code> rather than show a</p>
+<p>shorter history.</p>
+<p>Inside is a <code>CortexTrajectory</code>. The fields deja reads, by number from the</p>
+<p>generated descriptors in the bundled extension:</p>
+<div class="tablewrap"><table>
+<tr><th>Message</th><th>Fields</th></tr>
+<tr><td><code>CortexTrajectory</code></td><td>1 <code>trajectory_id</code>, 2 <code>steps</code>, 6 <code>cascade_id</code>, 7 <code>metadata</code>, 10 <code>renamed_title</code></td></tr>
+<tr><td><code>CortexTrajectoryMetadata</code></td><td>1 <code>workspaces</code>, 2 <code>created_at</code></td></tr>
+<tr><td><code>CortexWorkspaceMetadata</code></td><td>1 <code>workspace_folder_absolute_uri</code>, 2 <code>git_root_absolute_uri</code></td></tr>
+<tr><td><code>CortexTrajectoryStep</code></td><td>5 <code>metadata</code>, 19 <code>user_input</code>, 20 <code>planner_response</code></td></tr>
+<tr><td><code>CortexStepMetadata</code></td><td>1 <code>created_at</code>, 8 <code>completed_at</code></td></tr>
+<tr><td><code>CortexStepUserInput</code></td><td>1 <code>query</code>, 2 <code>user_response</code></td></tr>
+<tr><td><code>CortexStepPlannerResponse</code></td><td>1 <code>response</code>, 3 <code>thinking</code>, 8 <code>modified_response</code></td></tr>
+</table></div>
+<p>The session id is <code>cascade_id</code>, which is also the file name. The project is</p>
+<p>the first workspace&#39;s git root when it has one, else its folder; both are</p>
+<p><code>file://</code> URIs. The title is <code>renamed_title</code>, else the first prompt. A typed</p>
+<p>prompt is <code>user_response</code>, with <code>query</code> read when that is empty; the reply is</p>
+<p><code>response</code>, with <code>modified_response</code> read when that is empty. Thinking, tool</p>
+<p>calls, edits, terminal state and plans are left out. Timestamps come from each</p>
+<p>step&#39;s metadata, then the trajectory&#39;s.</p>
+<p><strong>Last verified:</strong> 2026-07-28</p>
+<h2 id="known-quirks-and-drift">Known quirks and drift</h2>
+<ul>
+<li><strong>Reply precedence is unverified.</strong> The live trajectory examined on 3.5.17</li>
+</ul>
+<p>was refused by the service before the model answered, so which of</p>
+<p><code>response</code> and <code>modified_response</code> a successful turn fills has not been</p>
+<p>seen. deja reads <code>response</code> first.</p>
+<ul>
+<li><strong>Error-only trajectories.</strong> A refused turn still writes a trajectory: the</li>
+</ul>
+<p>prompt, then steps with no planner response. It is indexed with its prompts.</p>
+<ul>
+<li><strong>Not read.</strong> <code>implicit/*.pb</code> (context trajectories), <code>brain/</code> (plans and</li>
+</ul>
+<p>other state) and the newer ACP session store are different sources from</p>
+<p>Cascade.</p>
+<ul>
+<li><strong>Unknown fields are skipped</strong> by wire type, so a schema that grows keeps</li>
+</ul>
+<p>reading. A file that authenticates and does not decode is reported as an</p>
+<p>unreadable path and costs only itself.</p>
+<ul>
+<li><strong>Wiring.</strong> <code>deja install windsurf</code> writes the server into</li>
+</ul>
+<p><code>~/.codeium/windsurf/mcp_config.json</code> under <code>mcpServers</code>, the file Cascade</p>
+<p>reads. <code>devin-desktop --add-mcp</code> writes the Code OSS-level <code>User/mcp.json</code></p>
+<p>instead, which Cascade does not read.</p>
+<ul>
+<li><strong>Checked against</strong> Devin Desktop 3.5.17 on macOS (Code OSS 1.110.1):</li>
+</ul>
+<p>runtime paths, the envelope against a live file, and descriptor field</p>
+<p>numbers (#308). The fixtures are synthetic, built by</p>
+<p><code>internal/sources/windsurf_fixture_test.go</code>.</p>
+
+<hr>
+<p>deja reads this format and 41 others, and turns what it finds into memory your
+agents can search. See the <a href="../guide/harnesses.html">harness matrix</a> for what is
+wired where, or <a href="../guide/getting-started.html">install it</a> and search your own
+history.</p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

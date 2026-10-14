@@ -3749,6 +3749,7 @@ func printSourcesTo(w io.Writer, dir string) {
 		{"codewhale", sources.CodeWhaleRoot(), sources.CodeWhaleRoots(), sources.CodeWhaleSessionFiles, sources.LoadCodeWhale},
 		{"junie", sources.JunieRoot(), []string{sources.JunieRoot()}, sources.JunieSessionFiles, sources.LoadJunie},
 		{"jetbrains", sources.JetBrainsRoot(), []string{sources.JetBrainsRoot()}, sources.JetBrainsSessionFiles, sources.LoadJetBrains},
+		{"windsurf", sources.WindsurfRoot(), []string{sources.WindsurfRoot()}, sources.WindsurfSessionFiles, sources.LoadWindsurf},
 		{"reasonix", sources.ReasonixRoot(), sources.ReasonixRoots(), sources.ReasonixSessionFiles, sources.LoadReasonix},
 		{"muse", sources.MuseRoot(), sources.MuseRoots(), sources.MuseSessionFiles, sources.LoadMuse},
 		{"deepseek", sources.DeepSeekRoot(), []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles, sources.LoadDeepSeek},
@@ -3811,6 +3812,11 @@ func printSourcesTo(w io.Writer, dir string) {
 		if it.name == "zed" {
 			if reason := sources.SkipReason("zed"); reason != "" {
 				note = "\t(" + reason + " — Zed threads unavailable)"
+			}
+		}
+		if it.name == "windsurf" {
+			if reason := sources.SkipReason("windsurf"); reason != "" {
+				note = "\t(" + reason + " — those conversations unavailable)"
 			}
 		}
 		if n := projectExcludePatterns(); n > 0 {

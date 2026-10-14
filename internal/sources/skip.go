@@ -21,6 +21,11 @@ func SkipReason(harness string) string {
 	if harness == "zed" {
 		return zedSkipReason()
 	}
+	// Windsurf needs no tool, but a trajectory GCM refuses is just as
+	// unread, and the count is the only sign of it (#308).
+	if harness == "windsurf" {
+		return windsurfSkipReason()
+	}
 	// DeepSeek Harness writes its log as zstd frames by default, so without the
 	// tool the files are there and unreadable — the same failure as Zed's, one
 	// layer up: whole sessions rather than thread bodies inside a store.

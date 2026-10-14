@@ -49,6 +49,7 @@ func hermeticEnv(t *testing.T) string {
 	t.Setenv("JUNIE_HOME", "")
 	t.Setenv("DEJA_JUNIE_ROOT", "")
 	t.Setenv("DEJA_JETBRAINS_ROOT", "")
+	t.Setenv("DEJA_WINDSURF_ROOT", "")
 	// Windows resolvers read APPDATA rather than the home directory — goose's
 	// config is one — so leaving it alone lets one test's install show up in
 	// another's report.

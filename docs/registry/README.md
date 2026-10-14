@@ -38,6 +38,7 @@ This registry records observed on-disk session formats for the harnesses that de
 | [CodeWhale](codewhale.md) | one JSON document per session, Anthropic-shaped content blocks |
 | [Junie](junie.md) | one event-log JSONL per session directory, blocks folded by step |
 | [JetBrains AI Assistant](jetbrains.md) | chats in each IDE's workspace XML, agent chats in base64 JSON task logs |
+| [Windsurf / Devin Desktop](windsurf.md) | one AES-GCM sealed protobuf per Cascade conversation |
 | [CodeBuddy Code](codebuddy.md) | Claude Code's project tree, OpenAI Responses-style items per line |
 | [Reasonix](reasonix.md) | flat role/content JSONL per session, clock and workspace in a sidecar; 1.x keeps a zstd-framed event log per session directory |
 | [TRAE CLI](trae.md) | Codex rollouts under `~/.trae/cli`, user turns from events only, tool calls in `history_mutation` |
@@ -63,3 +64,5 @@ Open an issue with the harness name and version, operating system, observed stor
 5. Set **Last verified** to the observation date, here and in `registry.json` — those two are compared, so a page cannot claim a check the registry does not have.
 
 SQLite fixture sources are stored as SQL so changes remain reviewable. The conformance test materializes them in a temporary directory before parsing.
+
+The Windsurf fixtures are encrypted protobuf; `internal/sources/windsurf_fixture_test.go` is their readable source and fails when the committed bytes drift from it.

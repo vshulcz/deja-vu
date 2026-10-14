@@ -156,7 +156,7 @@
 <h3>Handoff: this session should continue over there</h3>
 <p>The other case is a live piece of work that has to move — the model hit a usage limit, or the job is better suited to a different agent. That is not a search; it is packaging what the session established so the next one starts from it:</p>
 <pre>deja handoff --to codex</pre>
-<p>It reads the session from the index and prints what the next agent needs: the problem, what has been established, and where it stopped. <code>--exec</code> launches the target agent with it when its CLI takes a prompt, which is every agent but Roo, Zed, Cherry Studio and JetBrains AI Assistant; for those four you paste the text into a new chat. No protocol between the two tools, nothing to install on both ends, and it works between agents that know nothing about each other.</p>
+<p>It reads the session from the index and prints what the next agent needs: the problem, what has been established, and where it stopped. <code>--exec</code> launches the target agent with it when its CLI takes a prompt, which is every agent but Roo, Zed, Cherry Studio, JetBrains AI Assistant and Windsurf / Devin Desktop; for those five you paste the text into a new chat. No protocol between the two tools, nothing to install on both ends, and it works between agents that know nothing about each other.</p>
 <p>From the interactive screen (<code>deja</code> with no arguments) it is one key: find the session, press <code>o</code>, pick the agent. Agents installed on this machine are listed first and start with the session's context — what it asked, decided and left open; for the others the context goes to the clipboard.</p>
 
 <h2>Why a per-tool memory does not cover it</h2>
@@ -165,7 +165,7 @@
 <h2>What it takes</h2>
 <pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
 deja install --auto</pre>
-<p>The second command wires recall into every agent it finds on the machine and builds the index over all of their stores at once — <a href="where-sessions-are-stored.html">forty-one of them today</a>, including the sessions that predate the install. Nothing is copied between tools and no history is moved: one local index, read by whichever agent is asking.</p>
+<p>The second command wires recall into every agent it finds on the machine and builds the index over all of their stores at once — <a href="where-sessions-are-stored.html">forty-two of them today</a>, including the sessions that predate the install. Nothing is copied between tools and no history is moved: one local index, read by whichever agent is asking.</p>
 <p>Across machines rather than tools, <code>deja sync ssh &lt;host&gt;</code> moves the index itself, append-only and with no service in the middle.</p>
 
 <p><a href="forgetting.html">Why agents forget</a> · <a href="repeated-mistakes.html">When the same wall comes back</a> · <a href="agents.html">Which agent supports what</a></p>

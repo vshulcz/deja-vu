@@ -8,3 +8,6 @@ docs/** text=auto eol=lf
 # '\r'. Seven tests went red on windows-latest for that reason alone, and only
 # after a build failure stopped hiding them.
 *.md text eol=lf
+
+# Encrypted fixtures: a CRLF checkout would corrupt them.
+*.pb binary

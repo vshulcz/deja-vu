@@ -17,7 +17,7 @@ func TestCorruptFixturesAcrossParsers(t *testing.T) {
 	root := filepath.Join("..", "..", "fixtures", "registry")
 	var files []string
 	_ = filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && (strings.HasSuffix(p, ".jsonl") || strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".md") || strings.HasSuffix(p, ".xml")) {
+		if err == nil && !d.IsDir() && (strings.HasSuffix(p, ".jsonl") || strings.HasSuffix(p, ".json") || strings.HasSuffix(p, ".md") || strings.HasSuffix(p, ".xml") || strings.HasSuffix(p, ".pb")) {
 			files = append(files, p)
 		}
 		return nil

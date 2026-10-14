@@ -344,7 +344,7 @@ func TestTUIContinueIn(t *testing.T) {
 		t.Fatal("ctrl-o opens continue-in")
 	}
 	s := screen(a.frame(120, 40))
-	wantOnScreen(t, s, "Continue this session in…", "+41 not installed here", "Show them")
+	wantOnScreen(t, s, "Continue this session in…", "+42 not installed here", "Show them")
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyEnter})
 	wantOnScreen(t, screen(a.frame(120, 40)), "Copy for")
 	for _, k := range []tui.Key{tui.KeyDown, tui.KeyRight, tui.KeyLeft, tui.KeyUp, tui.KeyTab} {
@@ -383,7 +383,7 @@ func TestTUIAgentsFilter(t *testing.T) {
 	a := newTestTUI(t, dir)
 	a.listFocus = true
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'a'})
-	wantOnScreen(t, screen(a.frame(120, 36)), "Agents", "41 supported")
+	wantOnScreen(t, screen(a.frame(120, 36)), "Agents", "42 supported")
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: ' '})
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: ' '})
 	a.handle(tui.Event{Kind: tui.EvKey, Key: tui.KeyRune, Rune: 'x'})

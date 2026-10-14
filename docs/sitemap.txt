@@ -153,3 +153,4 @@ https://vshulcz.github.io/deja-vu/guide/delete-zed-thread-history.html
 https://vshulcz.github.io/deja-vu/registry/jetbrains.html
 https://vshulcz.github.io/deja-vu/registry/junie.html
 https://vshulcz.github.io/deja-vu/registry/devin.html
+https://vshulcz.github.io/deja-vu/registry/windsurf.html

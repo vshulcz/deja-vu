@@ -568,6 +568,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 		{"codewhale", sources.CodeWhaleRoots(), sources.CodeWhaleSessionFiles(), sources.ParseCodeWhaleFile},
 		{"junie", []string{sources.JunieRoot()}, sources.JunieSessionFiles(), sources.ParseJunieFile},
 		{"jetbrains", []string{sources.JetBrainsRoot()}, sources.JetBrainsSessionFiles(), sources.ParseJetBrainsFile},
+		{"windsurf", []string{sources.WindsurfRoot()}, sources.WindsurfSessionFiles(), sources.ParseWindsurfFile},
 		{"reasonix", sources.ReasonixRoots(), sources.ReasonixSessionFiles(), sources.ParseReasonixFile},
 		{"muse", sources.MuseRoots(), sources.MuseSessionFiles(), sources.ParseMuseFile},
 		{"deepseek", []string{sources.DeepSeekRoot()}, sources.DeepSeekSessionFiles(), sources.ParseDeepSeekFile},

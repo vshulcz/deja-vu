@@ -577,6 +577,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 		// the recorded directory is a preference, not a requirement: reopen
 		// where the session ran when that directory is still here.
 		return existingDir(resumeRecordedDir(s)), "devin --resume " + s.ID, nil
+	case "windsurf":
+		// `devin-desktop --sessions` opens the Sessions window with Cascade's
+		// history in it and takes no id; the extension's own RPCs that do are
+		// private (#308).
+		return "", "", fmt.Errorf("windsurf conversations reopen from Devin Desktop's Sessions window (`devin-desktop --sessions`); no command takes a conversation id")
 	case "deepseek":
 		return "", "", fmt.Errorf("neither of DeepSeek Harness's two apps takes a session id, so there is nothing to reopen by")
 	case "codewhale":

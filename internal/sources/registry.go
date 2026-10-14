@@ -797,6 +797,16 @@ func allHarnesses() []Harness {
 			}},
 		},
 		{
+			// Windsurf / Devin Desktop: one AES-GCM sealed protobuf per
+			// Cascade conversation, rewritten whole as it grows.
+			Name: "windsurf", Load: LoadWindsurf, Files: WindsurfSessionFiles,
+			Kinds: []FileKind{{
+				Name:  "windsurf",
+				Match: isWindsurfTrajectory,
+				Parse: fullParse(ParseWindsurfFile),
+			}},
+		},
+		{
 			Name: "deja", Load: LoadNotes, Files: func() []string { return []string{NotesFile()} },
 			Kinds: []FileKind{{
 				Name:      "deja",

@@ -35,12 +35,13 @@ the place to discuss design.
 ## Next
 
 - **Compaction recovery on the last hosts.** The packet after a compaction now
-  reaches 34 of the 41 harnesses: from the transcript a hook is handed where the
+  reaches 34 of the 42 harnesses: from the transcript a hook is handed where the
   host offers one, and elsewhere from the turns the store keeps before the
   summary, delivered on the next hook that reaches the model. Devin CLI is next,
   once its `sessions.db` catch-up has a capture to ride. aider, Continue, Kiro,
   Roo Code, Zed and JetBrains AI Assistant have no hook that runs at that point,
-  and the registry records why for each.
+  and the registry records why for each. Windsurf / Devin Desktop documents
+  Cascade hooks that deja does not wire yet (#308).
 - **The plan, before it is executed.** `deja check` answers a plan with what this
   machine already knows about it, and `hook-plan` delivers the same thing at
   `ExitPlanMode`. No installer wires it yet: the measurement that would justify
@@ -50,7 +51,7 @@ the place to discuss design.
   recording what a recall was for, not only that it happened — would let reuse be
   both stronger and precise without lifting an off-topic session.
 - **Point-of-action in the harnesses that still refuse it.** The file's prior
-  decision before an edit reaches 31 of the 41 harnesses and the repair beside a
+  decision before an edit reaches 31 of the 42 harnesses and the repair beside a
   failed command 30. Where a host drops what a hook returns — Kimi, Kiro, goose,
   CodeWhale, Antigravity, Junie — the line is parked and arrives with the next
   hook that reaches the model, a step late. What is left is the hosts with no
