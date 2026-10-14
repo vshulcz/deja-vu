@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -380,6 +381,8 @@ func TestOpenClawPluginSharesTheReceiptRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A windows checkout turns lib.mjs's line endings into CRLF.
+	lib = bytes.ReplaceAll(lib, []byte("\r\n"), []byte("\n"))
 	js := openclawPluginJS("/bin/deja")
 	for _, name := range []string{"splitHookReply", "deliversNotes", "ownerSender", "directSessionKey", "conversationOf",
 		"directTurn", "wholeReplies", "receiptAllowed", "replyTakes", "escapeMarkdown", "receiptLine", "withReceipt"} {
