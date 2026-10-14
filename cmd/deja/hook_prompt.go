@@ -174,6 +174,7 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 	unreadable := json.NewDecoder(bytes.NewReader(payload)).Decode(&input) != nil
 	input.adopt()
 	adoptCopilotHost(payload)
+	adoptCursorHost(payload)
 	// The kill switch. It reached the session-start hook and nothing else, so
 	// this hook — every user message, and the wiring for seven harnesses —
 	// kept injecting on a machine with recall off (#2701).
@@ -504,7 +505,8 @@ func runHookPromptMode(dir string, stdin io.Reader, stdout io.Writer, plain bool
 
 	// "You have been here" on the strength of one word teaches the user to
 	// ignore the line. The recall itself still goes in.
-	showLine := confident && dejaVuLineDue(dir, input.SessionID)
+	// Not on a host that shows it to nobody: the window it keeps is spent.
+	showLine := confident && notesHaveReader() && dejaVuLineDue(dir, input.SessionID)
 	// The payload is sized to the claim. Two informative terms is a real match
 	// and earns the digest; a single rare term is a hint, and a hint that costs
 	// a full digest on every message is most of what deja spends. The pointer
