@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "claude-mem alternative for Codex, Cursor, opencode", "description": "No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.", "url": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-09-29"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "claude-mem alternative for Codex, Cursor, opencode", "description": "No model, worker or sign-in: deja-vu indexes the sessions Codex, Cursor, opencode and 32 other agents already keep, including those from before install.", "url": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-29", "dateModified": "2026-10-12"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "claude-mem alternative", "item": "https://vshulcz.github.io/deja-vu/guide/claude-mem-alternative.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What is a claude-mem alternative that works without an API key?", "acceptedAnswer": {"@type": "Answer", "text": "deja-vu indexes the session files Claude Code, Codex, Cursor, opencode and 31 other agents already write, verbatim and with secrets redacted, and serves them back over MCP and session-start hooks. No model writes the memory, so it needs no key, no sign-in and no background worker."}}, {"@type": "Question", "name": "Does claude-mem remember sessions from before it was installed?", "acceptedAnswer": {"@type": "Answer", "text": "No. It records through hooks from install on, so on the first day it has nothing to answer from. deja-vu reads the transcripts already on disk, so older sessions are searchable right after the first index."}}, {"@type": "Question", "name": "Can I run deja-vu and claude-mem together?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. deja-vu only reads the agents' session files and never touches ~/.claude-mem. Both add context at session start; deja install --all wires deja without its session-start recall if two blocks is too much."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "CLAUDE.md, AGENTS.md, GEMINI.md: one rules file", "description": "Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.", "url": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-28", "dateModified": "2026-09-28"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "CLAUDE.md, AGENTS.md, GEMINI.md: one rules file", "description": "Claude Code reads CLAUDE.md, Codex AGENTS.md, Gemini GEMINI.md. Share one file in a repo, and keep your own rules in step across agents with deja rules sync.", "url": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-28", "dateModified": "2026-10-08"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"One rules file","item":"https://vshulcz.github.io/deja-vu/guide/one-rules-file.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Does Claude Code read AGENTS.md?","acceptedAnswer":{"@type":"Answer","text":"Since 2.1.277 Claude Code reads a project's AGENTS.md when the project has no CLAUDE.md. With both present it reads CLAUDE.md, so a CLAUDE.md that holds one line, @AGENTS.md, imports the shared file and works on any version with imports."}},{"@type":"Question","name":"How do I use one rules file for Claude Code, Codex and Gemini CLI?","acceptedAnswer":{"@type":"Answer","text":"In a repository, keep the rules in AGENTS.md, import it from CLAUDE.md with @AGENTS.md, and point Gemini CLI at it with context.fileName in .gemini/settings.json. For your own rules across projects, keep them in ~/.config/deja/rules.md and run deja rules sync, which copies them into each installed agent's global rules file."}},{"@type":"Question","name":"Where are the global rules files for Claude Code, Codex and Gemini CLI?","acceptedAnswer":{"@type":"Answer","text":"~/.claude/CLAUDE.md for Claude Code, ~/.codex/AGENTS.md for Codex, ~/.gemini/GEMINI.md for Gemini CLI, ~/.config/opencode/AGENTS.md for opencode and ~/.qwen/QWEN.md for Qwen Code."}}]}</script>
 </head>
@@ -61,16 +61,18 @@
 <a href="one-rules-file.html" aria-current="page">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

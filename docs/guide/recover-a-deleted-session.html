@@ -34,7 +34,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to recover a deleted Claude Code session", "description": "A Claude Code session missing from --resume: where the file went, the four reasons it moved rather than vanished, and what is actually recoverable.", "url": "https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to recover a deleted Claude Code session", "description": "A Claude Code session missing from --resume: where the file went, the four reasons it moved rather than vanished, and what is actually recoverable.", "url": "https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Recover a deleted session", "item": "https://vshulcz.github.io/deja-vu/guide/recover-a-deleted-session.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Can I recover a deleted Claude Code session?", "acceptedAnswer": {"@type": "Answer", "text": "Not from Claude Code: the transcript is one file, deletion removes it, and there is no archive to restore from. What can be recovered is a session that only looks deleted — moved to another project directory, swept by cleanupPeriodDays, written by a headless client, or living under a different config directory — plus whatever a backup or an index read before the file went."}}, {"@type": "Question", "name": "Why did my Claude Code sessions disappear?", "acceptedAnswer": {"@type": "Answer", "text": "The usual cause is cleanupPeriodDays, which removes transcripts after 30 days by default. The second is renaming or moving the project: the directory name under ~/.claude/projects encodes the absolute path, so the old sessions are still on disk under the old encoded name and --resume in the new path lists nothing."}}, {"@type": "Question", "name": "Where is a session that claude --resume does not list?", "acceptedAnswer": {"@type": "Answer", "text": "Look under ~/.claude/projects for a directory encoding the old path, in ~/.claude/transcripts where headless and SDK clients write, and — on a Mac with Xcode — under ~/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig. A CLAUDE_CONFIG_DIR set in one shell and not another moves all of it."}}, {"@type": "Question", "name": "Does deja recover deleted sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It keeps what it indexed. A transcript deja read before the file went stays searchable and readable through deja show, because the index does not follow a single file out the door, and deja resume --write-back writes its conversation back where claude --resume finds it. It cannot recover a session it never read."}}]}</script>
 </head>
@@ -63,16 +63,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold" open><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold" open><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html" aria-current="page">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
@@ -162,7 +164,7 @@ ls ~/.claude/projects | grep -i &lt;repo-name&gt;
 
 # by session id, if you have it from a log or a screenshot
 grep -rl '&lt;session-id&gt;' ~/.claude 2&gt;/dev/null</pre>
-<p>If the file turns up under an old encoded directory, moving it into the current one puts the session back in <code>--resume</code>: the list is the directory, not a database.</p>
+<p>If the file turns up under an old encoded directory, moving it into the current one puts the session back in <code>--resume</code>: the list is the directory, not a database. Resuming by id failed with <code>No conversation found with session ID</code>? That error has <a href="no-conversation-found-claude-code.html">its own page</a>.</p>
 
 <h2>What is genuinely recoverable</h2>
 <p>If the file is gone, the honest list is short. A filesystem snapshot or backup taken while it existed. The Trash, if it was deleted from a file manager rather than with <code>rm</code>. And anything that read the transcript before it went.</p>

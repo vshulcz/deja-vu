@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete VS Code Copilot Chat history", "description": "Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete VS Code Copilot Chat history", "description": "Where VS Code Copilot Chat keeps conversations, how to remove one or all of them, and what goes with them.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-19", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Copilot Chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-copilot-chat-history.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does VS Code Copilot Chat store conversations?", "acceptedAnswer": {"@type": "Answer", "text": "Under the VS Code user directory, per workspace: workspaceStorage/<hash>/chatSessions/ holds one file per chat, and newer builds also write workspaceStorage/<hash>/GitHub.copilot-chat/transcripts/*.jsonl. Chats from a window with no folder open live in globalStorage/emptyWindowChatSessions/."}}, {"@type": "Question", "name": "How do I delete one conversation rather than all of them?", "acceptedAnswer": {"@type": "Answer", "text": "From the Chat view: Show Chats, then delete the one you mean. On disk a conversation is one file, so removing that file with VS Code closed does the same thing — but removing the whole workspaceStorage/<hash> directory takes that workspace's other state with it."}}, {"@type": "Question", "name": "Why are there two folders of chats?", "acceptedAnswer": {"@type": "Answer", "text": "The extension changed where it writes. Older builds keep chatSessions; newer ones keep GitHub.copilot-chat/transcripts, and a machine that has been through an upgrade has both. On VS Code Server 1.137 there is no chatSessions directory at all."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

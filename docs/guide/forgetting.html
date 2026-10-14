@@ -35,7 +35,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Your coding agent forgets everything between sessions", "description": "Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history Claude Code, Codex and Cursor already wrote to disk.", "url": "https://vshulcz.github.io/deja-vu/guide/forgetting.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/forgetting.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Your coding agent forgets everything between sessions", "description": "Why coding agents start from scratch every session, what compaction actually keeps, and how to read the history Claude Code, Codex and Cursor already wrote to disk.", "url": "https://vshulcz.github.io/deja-vu/guide/forgetting.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/forgetting.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Forgetting","item":"https://vshulcz.github.io/deja-vu/guide/forgetting.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does my coding agent forget everything between sessions?","acceptedAnswer":{"@type":"Answer","text":"A session's context window is discarded when the session ends. The transcript is still written to disk — Claude Code, Codex, Cursor, opencode and others each keep their own log — but nothing reads it back, so the next session starts empty."}},{"@type":"Question","name":"Does compaction preserve what happened earlier in a session?","acceptedAnswer":{"@type":"Answer","text":"Partly. Measured over 43 real compactions, the summary kept 77% of the decisions and 0.2% of the commands that had been run. Prose survives; the work does not."}},{"@type":"Question","name":"Can an agent read the sessions I had before I installed anything?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the tool indexes the transcripts that are already on disk rather than recording forward from installation. Those files hold months of history before any memory tool existed."}}]}</script>
 </head>
@@ -64,16 +64,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

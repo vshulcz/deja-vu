@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Cursor chat history, and what you lose", "description": "How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Cursor chat history, and what you lose", "description": "How to delete Cursor chat history — where the chats live in state.vscdb, why deleting the file resets more than chats, and what the CLI writes separately.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-10-10"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Cursor chat history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-cursor-chat-history.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Cursor store chat history?", "acceptedAnswer": {"@type": "Answer", "text": "In state.vscdb, a SQLite database under the Cursor user directory — ~/Library/Application Support/Cursor/User on macOS, ~/.config/Cursor/User elsewhere — in globalStorage/ and workspaceStorage/<id>/. Chats are rows in the cursorDiskKV table: composerData:<id> per chat and bubbleId:<chat>:<bubble> per message."}}, {"@type": "Question", "name": "How do I delete Cursor chat history?", "acceptedAnswer": {"@type": "Answer", "text": "Deleting a chat in the Cursor UI is the safe operation. The database it writes to holds the rest of the IDE's state as well, so removing state.vscdb clears chats and also whatever else was in it. Cursor CLI transcripts are separate plain files under ~/.cursor/projects/<encoded-path>/agent-transcripts and can be deleted on their own."}}, {"@type": "Question", "name": "Does Cursor archive chats instead of deleting them?", "acceptedAnswer": {"@type": "Answer", "text": "There is no archive directory to recover from: a chat you remove is gone from the database. Anything that indexed it beforehand is the only copy left."}}, {"@type": "Question", "name": "Why is Cursor's history a database and not files?", "acceptedAnswer": {"@type": "Answer", "text": "Cursor is a VS Code fork and uses VS Code's key-value store for extension state, so the chats are values beside other IDE state rather than one file per conversation. Reading them needs the sqlite3 CLI."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

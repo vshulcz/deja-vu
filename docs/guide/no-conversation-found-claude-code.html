@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code: No conversation found with session ID — deja-vu</title>
+<meta name="description" content="claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Claude Code: No conversation found with session ID">
+<meta property="og:description" content="claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Claude Code: No conversation found with session ID">
+<meta name="twitter:description" content="claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "No conversation found with session ID: what Claude Code is telling you", "description": "claude --resume found no session file under ~/.claude/projects. Five causes, reproduced on 2.1.295, how to find the file, and how to get the session back.", "url": "https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-10-14"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "No conversation found", "item": "https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What does \"No conversation found with session ID\" mean in Claude Code?", "acceptedAnswer": {"@type": "Answer", "text": "claude --resume <id> looks for <id>.jsonl under ~/.claude/projects (or $CLAUDE_CONFIG_DIR/projects) and found none, or found a file with no messages in it. The usual causes: the 30-day cleanupPeriodDays sweep deleted it, it was deleted by hand or by claude project purge, a different CLAUDE_CONFIG_DIR is in effect, or the session was written to <config>/transcripts by a headless client."}}, {"@type": "Question", "name": "Do I need to be in the project directory to resume a Claude Code session by id?", "acceptedAnswer": {"@type": "Answer", "text": "Not on current versions. On Claude Code 2.1.295 a resume by id searches every project directory under ~/.claude/projects. The picker shown by claude --resume without an id lists only the current directory's sessions."}}, {"@type": "Question", "name": "How do I find the file for a Claude Code session id?", "acceptedAnswer": {"@type": "Answer", "text": "find ~/.claude -name '<session-id>.jsonl' -ls. If it is under transcripts/, move it into any directory under ~/.claude/projects and resume by id. If it is under another config directory, resume with that CLAUDE_CONFIG_DIR. If nothing is found, the file is gone."}}, {"@type": "Question", "name": "Can I resume a Claude Code session after its file was deleted?", "acceptedAnswer": {"@type": "Answer", "text": "Not from Claude Code itself, which has no archive. A backup taken before the deletion works, and so does an index that read the file first: deja keeps sessions it has indexed, and deja resume <id> --write-back writes the conversation back where claude --resume finds it."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold" open><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html" aria-current="page">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>No conversation found with session ID: what Claude Code is telling you</h1>
+<p class="pagelede">the file for that id is not where <code>claude --resume</code> looks, and there are five ways that happens<span class="mins" data-mins></span></p>
+
+<p>The full message is one line:</p>
+<pre>$ claude --resume 7b1d2c3e-1111-4222-8333-444455556666
+No conversation found with session ID: 7b1d2c3e-1111-4222-8333-444455556666</pre>
+<p>Claude Code keeps each conversation as one file, <code>&lt;session-id&gt;.jsonl</code>, in a directory per project under <code>~/.claude/projects</code>. Resuming by id means finding that file. The error says it found none, or found one with no conversation in it. It never means the session is stored somewhere Claude Code forgot about: there is no database behind the list, only those files.</p>
+<p>Everything below was reproduced on Claude Code 2.1.295 with a throwaway <code>CLAUDE_CONFIG_DIR</code>.</p>
+
+<h2>What it is not: the wrong directory</h2>
+<p>The usual advice is to <code>cd</code> into the project the session ran in. For a resume by id that does not matter on current versions: the lookup searches every project directory under <code>~/.claude/projects</code>, and a session started in one repository resumed by id from another. The interactive picker, <code>claude --resume</code> with no id, is different: it lists the sessions of the directory you are in, so a session from a renamed or moved project is missing from the list while its id still works.</p>
+
+<h2>The five causes</h2>
+<ol>
+<li><b>The file was swept.</b> <code>cleanupPeriodDays</code> in <code>~/.claude/settings.json</code> defaults to 30 days, and Claude Code deletes transcripts older than that without saying so. An id from last month's notes is the most common way to hit this error. <a href="session-files-on-disk.html">How the sweep works</a>.</li>
+<li><b>The file was deleted.</b> By hand, by <code>claude project purge</code>, or by a cleanup script that removed old <code>.jsonl</code> files.</li>
+<li><b>A different config directory.</b> With <code>CLAUDE_CONFIG_DIR</code> set, Claude Code reads <code>$CLAUDE_CONFIG_DIR/projects</code> and nothing under <code>~/.claude</code>. A shell, a container or an IDE task that sets it differently from the one that wrote the session gets this error for every id from the other tree.</li>
+<li><b>The session was headless.</b> Sessions written by SDK-driven and headless clients can land in <code>&lt;config&gt;/transcripts/</code> instead of <code>projects/</code>. A file there is not found by <code>--resume</code>; in the test it gave exactly this message until it was moved under <code>projects/</code>.</li>
+<li><b>The file holds no conversation.</b> An empty <code>.jsonl</code>, or one with only a summary line and no messages, gives the same error even though the file is right there.</li>
+</ol>
+<p>A near miss prints something else: with <code>-p</code>, a short id prefix is refused with <code>--resume requires a valid session ID or session title</code>, because <code>claude -p --resume</code> takes a full UUID or a session title, not a prefix.</p>
+<p>A program that drives Claude Code, such as the Agent SDK or an editor extension, runs the same CLI underneath, so the same message and the same causes apply when it surfaces as part of a longer error.</p>
+
+<h2>Find the file</h2>
+<pre># is it anywhere under the default tree, transcripts/ included
+find ~/.claude -name '&lt;session-id&gt;.jsonl' -ls
+
+# which config directory this shell uses
+echo "${CLAUDE_CONFIG_DIR:-~/.claude}"
+
+# the id mentioned inside another file, e.g. a subagent or a renamed copy
+grep -rl '&lt;session-id&gt;' ~/.claude 2&gt;/dev/null</pre>
+<p>If <code>find</code> lists a file with a size of zero, or a few hundred bytes, it is cause 5 and there is nothing to resume. If it is under <code>transcripts/</code>, move it into any project directory and resume by id:</p>
+<pre>mv ~/.claude/transcripts/&lt;session-id&gt;.jsonl ~/.claude/projects/&lt;project-dir&gt;/
+claude --resume &lt;session-id&gt;</pre>
+<p>If it is under another config directory, run <code>claude --resume</code> with that <code>CLAUDE_CONFIG_DIR</code>, or copy the file across. If <code>find</code> prints nothing, the file is gone: a Time Machine or other snapshot taken before the sweep is the only copy Claude Code itself can use.</p>
+
+<h2>Keep it from happening again</h2>
+<p>Raise the retention so the sweep stops taking sessions you still reference:</p>
+<pre># ~/.claude/settings.json
+{ "cleanupPeriodDays": 3650 }</pre>
+<p>That covers cause 1. It does nothing for a session already gone, and nothing for the others.</p>
+
+<h2>When the file is already gone</h2>
+<p>An index built while the file existed is the one copy that survives the sweep. <a href="https://github.com/vshulcz/deja-vu">deja</a> reads every Claude Code transcript on the machine, and a session it has read stays in its index after Claude Code deletes the file. Find it by what it was about, then write it back where <code>claude --resume</code> looks:</p>
+<pre>deja "the migration that broke the staging build"   # the hit carries the session id
+deja show &lt;id&gt;                                      # read the conversation deja kept
+deja resume &lt;id&gt; --write-back                       # put it back in ~/.claude/projects, print the resume command</pre>
+<p>The written file holds the conversation, user and assistant turns; tool calls and their output stay in deja. Bare <code>deja</code> opens a screen whose Deleted tab lists every session whose agent deleted it and deja still holds, and <code>R</code> on one does the same write-back. None of this helps for a session deja never read, so it has to be in place before the sweep:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>The first index reads the history already on disk, so it covers the sessions you have now. Indexing and search run locally.</p>
+
+<p><a href="recover-a-deleted-session.html">Recover a deleted session</a> · <a href="session-files-on-disk.html">Deleting Claude Code sessions</a> · <a href="resume-a-session.html">Resuming yesterday's session</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

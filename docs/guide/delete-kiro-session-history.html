@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kiro session history", "description": "Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-09-26"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Delete Kiro session history", "description": "Kiro keeps CLI and IDE sessions in two different trees under ~/.kiro/sessions. Where each one is, how to remove one session or all, and what else Kiro keeps.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Kiro session history", "item": "https://vshulcz.github.io/deja-vu/guide/delete-kiro-session-history.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where does Kiro store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.kiro/sessions, in two trees. The CLI writes a pair of files per session to ~/.kiro/sessions/cli: <sessionId>.jsonl holds the transcript and <sessionId>.json the header. The IDE writes one directory per session, ~/.kiro/sessions/<workspace>/sess_<uuid>, holding messages.jsonl and session.json."}}, {"@type": "Question", "name": "How do I delete one Kiro session?", "acceptedAnswer": {"@type": "Answer", "text": "Close Kiro first. For a CLI session, remove both files named after the session id. For an IDE session, remove its sess_ directory. Each session is its own file or directory, so removing one does not touch the others."}}, {"@type": "Question", "name": "Does deleting ~/.kiro/sessions remove everything Kiro kept?", "acceptedAnswer": {"@type": "Answer", "text": "Not necessarily. The IDE also mirrors chats into its globalStorage, and the CLI's TUI keeps conversations in a data.sqlite3 database. Neither lives under ~/.kiro/sessions, so check them too if the goal is that nothing is left."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

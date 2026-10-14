@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Resuming the session you had yesterday", "description": "Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.", "url": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-25", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Resuming the session you had yesterday", "description": "Find the session across every agent on the machine, then reopen it in the tool that owns it — or take the digest instead of the whole conversation.", "url": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-25", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"Resuming a session","item":"https://vshulcz.github.io/deja-vu/guide/resume-a-session.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I resume a previous coding session?","acceptedAnswer":{"@type":"Answer","text":"deja resume <id> prints the command that reopens that exact conversation, including the directory it must run in. Thirty-five of the forty-two indexed harnesses support it."}},{"@type":"Question","name":"Can I find a session from a different agent?","acceptedAnswer":{"@type":"Answer","text":"Yes. deja searches every agent's transcripts at once and each hit carries its harness and session id, which the agents' own resume commands cannot do."}},{"@type":"Question","name":"What if I only want the conclusion?","acceptedAnswer":{"@type":"Answer","text":"deja ctx <id-prefix> returns the session as a digest — decisions, files touched, commands run — small enough to paste into a session you are already in."}}]}</script>
 </head>
@@ -61,16 +61,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold" open><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold" open><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html" aria-current="page">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
@@ -144,7 +146,7 @@
 
 <h2>Find it first</h2>
 <pre>deja "connection pool exhausted"</pre>
-<p>Search runs over every agent's transcripts on the machine at once, and each hit carries the harness it belongs to and its session id. That is the step the tools themselves cannot do: <code>claude --resume</code> lists Claude's sessions, <code>codex resume</code> lists Codex's, and neither knows the other exists.</p>
+<p>Search runs over every agent's transcripts on the machine at once, and each hit carries the harness it belongs to and its session id. That is the step the tools themselves cannot do: <code>claude --resume</code> lists Claude's sessions, <code>codex resume</code> lists Codex's, and neither knows the other exists. When one of them refuses a session, see <a href="no-conversation-found-claude-code.html">No conversation found with session ID</a> for Claude Code and <a href="codex-resume-session.html">Codex resume</a> for Codex.</p>
 <p>Without an id in hand, run <code>deja</code> with no arguments. The full-screen search opens on the sessions behind your uncommitted change and the recent ones in this project; type to search, <code>↵</code> to read a session, <code>r</code> to reopen it in its agent, or <code>o</code> to continue it in a different one.</p>
 
 <h2>Then reopen it</h2>

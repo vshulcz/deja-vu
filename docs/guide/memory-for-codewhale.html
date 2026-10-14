@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to CodeWhale", "description": "CodeWhale keeps one JSON file per session under ~/.codewhale and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-09-21"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Adding memory to CodeWhale", "description": "CodeWhale keeps one JSON file per session under ~/.codewhale and reads none of them back. deja indexes them with every other agent on the machine and makes them searchable.", "url": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-21", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Memory for CodeWhale", "item": "https://vshulcz.github.io/deja-vu/guide/memory-for-codewhale.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does CodeWhale remember previous sessions?", "acceptedAnswer": {"@type": "Answer", "text": "It writes one pretty-printed JSON file per session under ~/.codewhale/sessions and can resume one, but a new session reads none of the others. deja indexes them with every other agent's transcripts on the machine, so the history is searchable from anywhere."}}, {"@type": "Question", "name": "Is CodeWhale the same thing as the DeepSeek Harness?", "acceptedAnswer": {"@type": "Answer", "text": "No. CodeWhale is the Rust terminal agent that shipped as deepseek-tui until v0.8.41; it writes one JSON file per session. The DeepSeek Harness keeps zstd-framed JSONL under ~/.dsh and has a guide of its own. deja reads both, and a machine part-way through the rename still keeps ~/.deepseek/sessions, which deja walks too."}}, {"@type": "Question", "name": "How do I search my CodeWhale history?", "acceptedAnswer": {"@type": "Answer", "text": "deja last lists recent sessions, deja search finds a phrase across every agent on the machine, and deja show prints one session in full. deja writes no CodeWhale config in this release, so recall here is the CLI — and any agent that does have the MCP server wired, because there is one index."}}]}</script>
 </head>
@@ -61,16 +61,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

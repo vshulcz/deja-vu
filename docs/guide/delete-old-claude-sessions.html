@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete old Claude Code sessions", "description": "Deleting Claude Code sessions by age: the find command, the cleanupPeriodDays setting, what an old session still costs on disk, and what you lose when it goes.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-09-26"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete old Claude Code sessions", "description": "Deleting Claude Code sessions by age: the find command, the cleanupPeriodDays setting, what an old session still costs on disk, and what you lose when it goes.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-26", "dateModified": "2026-10-10"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete old sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-old-claude-sessions.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete old Claude Code sessions?", "acceptedAnswer": {"@type": "Answer", "text": "By age, with find: find ~/.claude/projects -name '*.jsonl' -mtime +30 -delete removes every transcript last written more than 30 days ago. Run it without -delete first to see the list."}}, {"@type": "Question", "name": "Does Claude Code archive old sessions?", "acceptedAnswer": {"@type": "Answer", "text": "No. There is no archive, no trash and no recycle bin. The list in claude --resume is built by reading ~/.claude/projects, so a session missing from it is a file missing from disk."}}, {"@type": "Question", "name": "Can Claude Code delete old sessions automatically?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. cleanupPeriodDays in ~/.claude/settings.json is the retention in days; transcripts older than that are removed. It is 30 by default, and raising it keeps them longer."}}, {"@type": "Question", "name": "Does deleting old sessions free much disk space?", "acceptedAnswer": {"@type": "Answer", "text": "Usually not. On one machine with 1,320 transcripts totalling 2.73 GB, the 368 files older than 30 days held 0.11 GB — four percent. The ten largest sessions held 2.36 GB, eighty-six percent."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

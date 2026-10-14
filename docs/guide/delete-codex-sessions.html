@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Codex CLI sessions, and what you lose", "description": "How to delete Codex CLI sessions — one rollout, one day, or all of ~/.codex/sessions — and why ~/.codex/history.jsonl keeps your prompts regardless.", "url": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-15", "dateModified": "2026-10-10"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Delete Codex sessions", "item": "https://vshulcz.github.io/deja-vu/guide/delete-codex-sessions.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I delete a Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "Run codex delete with its id, or delete its rollout file under ~/.codex/sessions/YYYY/MM/DD/; rollouts older than a week are compressed to rollout-*.jsonl.zst. The sessions directory is dated, so one day's work is one directory, and rm -rf ~/.codex/sessions removes every session. Prompt history is a separate file, ~/.codex/history.jsonl, and survives that."}}, {"@type": "Question", "name": "Where does Codex CLI store its sessions?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: rollouts at sessions/YYYY/MM/DD/rollout-*.jsonl as append-only JSONL, and prompt history at history.jsonl. Codex inside Xcode uses ~/Library/Developer/Xcode/CodingAssistant/codex instead."}}, {"@type": "Question", "name": "Does deleting a Codex rollout remove the prompt from history?", "acceptedAnswer": {"@type": "Answer", "text": "No. history.jsonl holds your prompts independently of the rollouts, with no assistant replies and no project metadata, so a prompt can survive the session it belongs to. Delete both if you want it gone."}}, {"@type": "Question", "name": "Does Codex CLI delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Nothing sweeps them on a schedule the way Claude Code's cleanupPeriodDays does; the rollout files stay until you remove them."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>

@@ -31,7 +31,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex CLI history: view, search and sync it", "description": "Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-30", "dateModified": "2026-09-30"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex CLI history: view, search and sync it", "description": "Where Codex CLI keeps session history, why grep misses sessions older than a week, jq and sqlite3 recipes, and search across every Codex session.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-history.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-30", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Codex CLI history", "item": "https://vshulcz.github.io/deja-vu/guide/codex-history.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Where is Codex CLI history stored?", "acceptedAnswer": {"@type": "Answer", "text": "Under ${CODEX_HOME:-~/.codex}: one rollout file per session at sessions/YYYY/MM/DD/rollout-*.jsonl, compressed to .jsonl.zst after seven days, archived sessions in archived_sessions/, your prompts alone in history.jsonl, and the resume picker's session list in state_5.sqlite."}}, {"@type": "Question", "name": "How do I search my Codex history?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume lists sessions by title but does not search inside them. grep works on .jsonl rollouts but misses the .jsonl.zst ones older than a week; zstdgrep reads those. deja-vu indexes both, plus archived sessions, and ranks results: deja --harness codex \"your query\"."}}, {"@type": "Question", "name": "Can I sync Codex history between machines?", "acceptedAnswer": {"@type": "Answer", "text": "Codex keeps history local. deja sync ssh <host> carries deja's index of it to another machine, where it is searchable with deja; it does not add sessions to that machine's codex resume picker."}}]}</script>
 </head>
@@ -60,16 +60,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold" open><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold" open><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html" aria-current="page">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
@@ -159,7 +161,7 @@ codex resume --include-non-interactive   # codex exec runs too
 codex fork                   # a copy of an old session to continue from
 codex archive &lt;id&gt;           # hide it; codex unarchive brings it back
 codex delete &lt;id&gt;            # gone for good</pre>
-<p>The picker shows titles and first messages. It does not look inside the conversations, and it only knows about Codex.</p>
+<p>The picker shows titles and first messages. It does not look inside the conversations, and it only knows about Codex. When a session is missing from it, or resume fails with <code>no rollout found</code>, see <a href="codex-resume-session.html">Codex resume</a>.</p>
 
 <h2>Reading it without any tool</h2>
 <p>The last few sessions, with where they ran:</p>

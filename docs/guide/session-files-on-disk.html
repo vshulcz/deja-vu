@@ -35,7 +35,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Claude Code session files: how big they get and whether to delete them", "description": "What Claude Code writes to ~/.claude/projects, how large those JSONL files get in practice, what you lose by deleting them, and how to reclaim space without losing your history.", "url": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-09-19"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "How to delete Claude Code sessions, and what you lose", "description": "One session: delete its .jsonl under ~/.claude/projects. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear and --resume do.", "url": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-09-02", "dateModified": "2026-10-14"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Session files on disk", "item": "https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"}]}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is there a command to delete Claude Code sessions?", "acceptedAnswer": {"@type": "Answer", "text": "For a whole project, yes: claude project purge (Claude Code 2.1.126 and later) deletes its transcripts, memory directory, file-edit history and ~/.claude.json entry; --dry-run lists them first and --all does every project. A single session has no command: remove its .jsonl file under ~/.claude/projects."}}, {"@type": "Question", "name": "Does Claude Code delete old sessions by itself?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Transcripts under ~/.claude/projects are kept for 30 days by default and then removed; the setting is cleanupPeriodDays in ~/.claude/settings.json. Raise it to keep them."}}, {"@type": "Question", "name": "How do I delete a Claude Code session?", "acceptedAnswer": {"@type": "Answer", "text": "Delete its file: rm ~/.claude/projects/<project-dir>/<session-id>.jsonl. Remove the project directory to drop every session of that project, or set cleanupPeriodDays in ~/.claude/settings.json to have Claude Code delete sessions older than N days on its own. The session leaves claude --resume immediately; prompt history in ~/.claude/history.jsonl is separate."}}, {"@type": "Question", "name": "How do I delete all Claude Code sessions?", "acceptedAnswer": {"@type": "Answer", "text": "rm -rf ~/.claude/projects/* removes every session of every project; rm -rf ~/.claude/projects/<project-dir> removes one project's. Prompt history is a separate file, ~/.claude/history.jsonl, and survives both."}}, {"@type": "Question", "name": "Does Claude Code archive sessions instead of deleting them?", "acceptedAnswer": {"@type": "Answer", "text": "No. There is no archive: a session that no longer appears in claude --resume was swept by cleanupPeriodDays and its file is gone. The resume list is built from the files on disk."}}, {"@type": "Question", "name": "Can I delete Claude Code session files?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, nothing in the agent breaks. You lose the ability to resume those sessions, any future search over that history, and your record of what the agent ran. Deleting the largest few files usually frees the space without losing much history."}}, {"@type": "Question", "name": "Where does Claude Code store session files?", "acceptedAnswer": {"@type": "Answer", "text": "Under ~/.claude/projects, one directory per project and one JSONL file per session, unless CLAUDE_CONFIG_DIR points elsewhere. Codex uses ~/.codex/sessions and Cursor uses a SQLite state.vscdb."}}, {"@type": "Question", "name": "How much disk space do Claude Code sessions use?", "acceptedAnswer": {"@type": "Answer", "text": "On one machine with thirteen projects and two months of heavy daily use: 875 files totalling 1.6 GB, median 304 KB per session, with a single runaway session accounting for 586 MB."}}, {"@type": "Question", "name": "What is inside a Claude Code .jsonl session file?", "acceptedAnswer": {"@type": "Answer", "text": "JSON Lines: one object per line, appended as the session runs, each carrying a role, timestamp, session id and payload — your prompt, the assistant reply, or a tool call and its output, verbatim."}}]}</script>
 </head>
@@ -64,16 +64,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold" open><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html" aria-current="page">Claude Code</a>
@@ -165,6 +167,7 @@ rm ~/.claude/projects/-Users-you-project/&lt;session-id&gt;.jsonl
 # ~/.claude/settings.json
 { "cleanupPeriodDays": 7 }</pre>
 <p>Three things people expect and do not get. A session you delete disappears from <code>claude --resume</code> at once; that list is built from the files. Your prompt history is a separate file, <code>~/.claude/history.jsonl</code>, and stays until you delete it too. And there is no archive: a session that is no longer in <code>--resume</code> was swept by <code>cleanupPeriodDays</code>, and the file is gone, not archived. Before you delete by hand, the sections below say what the files cost you and what you lose.</p>
+<p>If one of those sessions might matter later, index them before you delete: <a href="https://github.com/vshulcz/deja-vu">deja</a> keeps a searchable copy of every session it has read, and <code>deja resume &lt;id&gt; --write-back</code> puts one back where <code>claude --resume</code> finds it. Already gone? <a href="recover-a-deleted-session.html">What is still recoverable</a>, and what <a href="no-conversation-found-claude-code.html">No conversation found with session ID</a> means.</p>
 
 <h2>How big they actually get</h2>
 <p>One developer's <code>~/.claude/projects</code>: thirteen projects, two months of heavy daily use.</p>
@@ -212,7 +215,7 @@ find ~/.claude/projects -name '*.jsonl' -size +100M -ls
 
 # a project you will never open again
 claude project purge ~/code/old-project</pre>
-<p>Deleting by age is the tempting one and the one to avoid: old sessions are exactly the ones you no longer remember, so they are worth the most per byte.</p>
+<p>Deleting by age is the tempting one and the one to avoid: old sessions are exactly the ones you no longer remember, so they are worth the most per byte. If you do want it, <a href="delete-old-claude-sessions.html">deleting old Claude Code sessions</a> has the <code>find -mtime</code> line and what it frees.</p>
 
 <h2>Backing them up</h2>
 <p>They are ordinary files, so any backup tool works. If you want them readable somewhere else — a different machine, a different agent, or as Markdown — see <a href="export-conversations.html">exporting sessions</a> and <a href="sync-across-machines.html">across machines</a>.</p>

@@ -32,7 +32,7 @@
 <link rel="apple-touch-icon" href="../assets/icon.svg">
 <link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
 <link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-09-15"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "What compaction drops, and how to get it back", "description": "What a context compaction keeps and what it silently drops — measured over 43 real compactions — and how to recover the commands, errors and edits the summary left out.", "url": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-08-24", "dateModified": "2026-10-07"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"deja-vu","item":"https://vshulcz.github.io/deja-vu/"},{"@type":"ListItem","position":2,"name":"After compaction","item":"https://vshulcz.github.io/deja-vu/guide/after-compaction.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What does context compaction actually keep?","acceptedAnswer":{"@type":"Answer","text":"Measured over 43 real compactions: 77% of the decisions survived the summary and 0.2% of the commands that had been run. Reasoning is summarised; the exact invocations, error text and edited spans are dropped."}},{"@type":"Question","name":"Can I recover what a compaction dropped?","acceptedAnswer":{"@type":"Answer","text":"Yes, if the full transcript is still on disk. Harnesses write the whole session to a log file; the compaction only shortens what is in the model context, not what was written."}},{"@type":"Question","name":"How do I stop losing work to compaction?","acceptedAnswer":{"@type":"Answer","text":"Index the transcripts and let the agent search them, so the summary stops being the only copy. Indexing before compaction runs keeps the session searchable even after the window collapses."}}]}</script>
 </head>
@@ -61,16 +61,18 @@
 <a href="one-rules-file.html">One rules file</a>
 <a href="token-cost.html">What memory costs</a>
 </details>
-<details class="grpfold"><summary>Session history <span class="n">9</span></summary>
+<details class="grpfold"><summary>Session history <span class="n">11</span></summary>
 <a href="where-sessions-are-stored.html">Where history lives</a>
 <a href="find-a-session.html">Finding a session</a>
 <a href="codex-history.html">Codex history</a>
 <a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html">Codex resume</a>
 <a href="export-conversations.html">Exporting sessions</a>
 <a href="sync-across-machines.html">Across machines</a>
 <a href="auditing-agents.html">Auditing an agent</a>
 <a href="credentials-in-transcripts.html">Credentials in transcripts</a>
 <a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
 </details>
 <details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
 <a href="session-files-on-disk.html">Claude Code</a>
