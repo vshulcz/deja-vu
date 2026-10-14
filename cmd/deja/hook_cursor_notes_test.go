@@ -130,3 +130,46 @@ func TestCursorPromptGetsTheRecallWithoutTheReceipt(t *testing.T) {
 		t.Error("the receipt's window was spent on a host that shows nobody the receipt")
 	}
 }
+
+// --strict and --copilot blank the line after it is built, so the notes have
+// to be left unbuilt there too or they are marked shown and lost.
+func TestStrictAndCopilotSessionStartsLeaveTheNotesUnspent(t *testing.T) {
+	for _, tc := range []struct{ flag, payload string }{
+		{"--strict", `{"session_id":"z1","hook_event_name":"SessionStart","source":"startup","cwd":"/proj"}`},
+		{"--copilot", `{"sessionId":"cp1","source":"new","cwd":"/proj"}`},
+	} {
+		t.Run(tc.flag, func(t *testing.T) {
+			hermeticEnv(t)
+			t.Setenv("DEJA_WARMUP_SENTINEL", "")
+			oldSpawn := spawnWarmup
+			spawnWarmup = func(_, _ string) error { return nil }
+			t.Cleanup(func() { spawnWarmup = oldSpawn })
+			t.Cleanup(func() { strictHookOutput, copilotHookOutput = false, false })
+			store := filepath.Join(os.Getenv("DEJA_CLAUDE_ROOT"), "-proj")
+			if err := os.MkdirAll(store, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			line := `{"type":"user","message":{"role":"user","content":"why does the retry loop drop the last attempt"},"timestamp":"2026-03-01T10:00:00Z","sessionId":"s1","cwd":"/proj"}`
+			if err := os.WriteFile(filepath.Join(store, "s1.jsonl"), []byte(line+"\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := captureRunStderr(t, "index"); err != nil {
+				t.Fatal(err)
+			}
+			withHookStdin(t, tc.payload)
+			out, err := captureRun(t, "hook-context", tc.flag)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out, "retry loop") {
+				t.Fatalf("the model lost the digest under %s: %q", tc.flag, out)
+			}
+			dir := index.DefaultDir()
+			for _, mark := range []string{".builtnote", ".receipt"} {
+				if _, err := os.Stat(dir + mark); err == nil {
+					t.Errorf("%s was written under %s, a reply that shows nobody the note", mark, tc.flag)
+				}
+			}
+		})
+	}
+}
