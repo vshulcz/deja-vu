@@ -64,8 +64,13 @@ func weekNoteAt(dir string, now time.Time) string {
 // first that is due: four at once made a session start a wall of text. Each
 // marks itself shown only when it is returned, so the rest wait for the next
 // session start rather than being spent unseen.
-func humanNotes(dir string) string {
-	for _, note := range []func(string) string{builtNote, whatChangedNote, weekNote, pendingStar} {
+func humanNotes(dir string) string { return humanNotesFor(dir, true) }
+
+// humanNotesFor is humanNotes for a reader that may not be the owner alone;
+// see builtNoteFor.
+func humanNotesFor(dir string, private bool) string {
+	built := func(dir string) string { return builtNoteFor(dir, private) }
+	for _, note := range []func(string) string{built, whatChangedNote, weekNote, pendingStar} {
 		if line := note(dir); line != "" {
 			return line
 		}
