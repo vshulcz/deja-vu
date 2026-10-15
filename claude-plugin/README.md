@@ -27,7 +27,7 @@ brew install deja-vu
 or
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+npm i -g @vshulcz/deja-vu
 ```
 
 Having both this bundle and `deja install` is fine: the hooks here stand down
