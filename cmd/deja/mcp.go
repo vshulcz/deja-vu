@@ -515,14 +515,20 @@ func callMCPTool(dir, name string, raw json.RawMessage) (string, error) {
 		if line := buildingNowForAgent(dir); line != "" {
 			return frameRecall(line), nil
 		}
-		// The block goes out once per session and lands after the frame, so it
-		// has to come out of the same budget: appended afterwards it put the
-		// first recall of every session — the one an agent plans against — over
-		// the cap by its own length (#1806).
+		// The block goes out once per session and has to come out of the same
+		// budget: appended afterwards it put the first recall of every session —
+		// the one an agent plans against — over the cap by its own length
+		// (#1806). It goes inside the frame, as it does at session start: it
+		// quotes transcript error lines and the commands that followed them, so
+		// after the close a planted tag in one of them read as deja's own text
+		// (#5051).
 		env, deliverEnv := environmentOnce(dir)
 		text, sessions, raw, ids, projects, err := recallTextResultIn(dir, a.Query, a.Harness, a.Project, int(a.Limit), int(a.Offset), recallMCPBudget-recallFrameOverhead-len(env))
 		if err == nil {
-			text = frameRecall(text) + env
+			if strings.TrimSpace(text) == "" {
+				env = strings.TrimLeft(env, "\n")
+			}
+			text = frameRecall(text + env)
 			deliverEnv()
 			usage.RecordServedFromInto(dir, usage.KindRecall, text, mcpConnID(), sessions, raw, ids, projects, policy.Load().Describe(policy.ActivationMCP))
 		}

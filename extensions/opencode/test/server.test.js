@@ -72,6 +72,7 @@ case "$1" in
   hook-tool-after) echo '{"hookSpecificOutput":{"additionalContext":"ran next: go mod tidy"}}' ;;
   hook-precompact) cat > "${join(dir, "precompact.json")}" ;;
   search) echo 'found it' ;;
+  --framed) echo "framed $2" ;;
   *) echo 0.0.0 ;;
 esac
 `,
@@ -131,7 +132,7 @@ test("setup wires every channel the 1.x hooks have onto 2.x's seams", async () =
     for (const t of tools) assert.deepEqual(t.options, { codemode: false }, `${t.name} is not a direct tool`)
     const recall = tools[0]
     assert.deepEqual(recall.input.required, ["query"])
-    assert.deepEqual(await recall.execute({ query: "flake" }), { content: "found it" })
+    assert.deepEqual(await recall.execute({ query: "flake" }), { content: "framed search" })
 
     assert.equal(hooks.session.context.length, 1)
     assert.equal(hooks.session.compaction.length, 1)

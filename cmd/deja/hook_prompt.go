@@ -663,6 +663,7 @@ func writePromptResponse(stdout io.Writer, resp sessionStartHookResponse) {
 	if strictHookOutput {
 		resp.SystemMessage = ""
 	}
+	resp.SystemMessage = safeNote(resp.SystemMessage)
 	b, err := json.Marshal(resp)
 	if err != nil {
 		return

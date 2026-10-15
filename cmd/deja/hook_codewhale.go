@@ -108,15 +108,12 @@ func codewhaleMessageSubmit(dir string, stdin io.Reader, stdout io.Writer) error
 	if len(parts) == 0 {
 		return nil
 	}
-	extra := strings.Join(parts, "\n\n")
 	// A reply over the limit is invalid and CodeWhale keeps the message as it
 	// was, so what deja adds is cut to fit rather than costing the person
-	// their own text.
-	if room := codewhaleTextMax - len(in.Text) - 2; len(extra) > room {
-		if room <= 0 {
-			return nil
-		}
-		extra = truncateToolLine(extra, room)
+	// their own text, and cut inside each frame rather than through it.
+	extra := fitFramed(parts, "\n\n", codewhaleTextMax-len(in.Text)-2)
+	if extra == "" {
+		return nil
 	}
 	b, err := json.Marshal(map[string]string{"text": in.Text + "\n\n" + extra})
 	if err != nil {

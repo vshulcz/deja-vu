@@ -488,13 +488,14 @@ class DejaMemoryProvider(MemoryProvider):
     def handle_tool_call(self, tool_name: str, args: Dict[str, Any], **kwargs) -> str:
         # A tool the model just asked for can wait: a first search may rebuild
         # the index, which took 18s on a large machine. The per-turn hooks
-        # above never build.
+        # above never build. --framed because what these print is written for
+        # a person: the model gets it inside deja's untrusted-data frame.
         if tool_name == "deja_recall":
-            text = _deja(_query_args("search", args.get("query", "")), timeout=120)
+            text = _deja(["--framed"] + _query_args("search", args.get("query", "")), timeout=120)
         elif tool_name == "deja_fix":
-            text = _deja(_query_args("fix", args.get("error", "")), timeout=120)
+            text = _deja(["--framed"] + _query_args("fix", args.get("error", "")), timeout=120)
         elif tool_name == "deja_blame":
-            text = _deja(_query_args("blame", args.get("path", "")), timeout=120)
+            text = _deja(["--framed"] + _query_args("blame", args.get("path", "")), timeout=120)
         else:
             return json.dumps({"error": "unknown tool %%s" %% tool_name})
         return json.dumps({"result": text or "nothing in this machine's history matches"})

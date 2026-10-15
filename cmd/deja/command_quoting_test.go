@@ -28,7 +28,7 @@ func TestCommandSnippetLeavesAPlainPathAlone(t *testing.T) {
 	}
 	// The snippet names the subcommand now; what this test is about is that the
 	// path itself is left unquoted.
-	if !strings.Contains(body, "/usr/local/bin/deja search -- \"the user's request\"") {
+	if !strings.Contains(body, "/usr/local/bin/deja --framed search -- \"the user's request\"") {
 		t.Fatalf("the snippet lost its shape:\n%s", body)
 	}
 }

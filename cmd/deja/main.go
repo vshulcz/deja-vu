@@ -375,6 +375,9 @@ var commands = map[string]command{
 }
 
 func run(args []string) error {
+	if len(args) > 0 && args[0] == framedFlag {
+		return runFramed(args[1:])
+	}
 	dir := index.DefaultDir()
 	// Before anything reads or writes: every path deja writes hangs off the
 	// home directory, and it answers "" when there is none, so
@@ -750,7 +753,7 @@ func cmdHookContext(dir string, rest []string) error {
 		// A plugin reply can land in a group chat (OpenClaw's /deja), so the
 		// notes here never quote the person's own questions.
 		case "--notes", "-notes":
-			if notes := humanNotesFor(dir, false); notes != "" {
+			if notes := safeNote(humanNotesFor(dir, false)); notes != "" {
 				fmt.Fprintln(os.Stdout, notes)
 			}
 			return nil

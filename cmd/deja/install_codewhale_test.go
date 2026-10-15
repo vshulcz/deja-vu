@@ -136,3 +136,54 @@ func TestHookCodeWhaleToolCallBeforeSendsNoDecision(t *testing.T) {
 		t.Errorf("hook sent a decision: %s", out.String())
 	}
 }
+
+// A message near CodeWhale's limit leaves deja little room, and the cut came
+// after framing: the reply ended mid-digest with `<deja-recall>` open (#5051).
+// What is added is cut inside its frame, which still closes.
+func TestHookCodeWhaleMessageSubmitCutsInsideTheFrame(t *testing.T) {
+	hermeticEnv(t)
+	dir := t.TempDir()
+	key := deferredKey("cw-1", "/w")
+	if err := os.MkdirAll(filepath.Join(deferredRoot(dir), key), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	waiting := frameRecall(strings.Repeat("the frobnicator uses zorblax. ", 200))
+	if err := os.WriteFile(filepath.Join(deferredRoot(dir), key, "a"), []byte(waiting), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	typed := "please look at this log " + strings.Repeat("x", 31000)
+	in, _ := json.Marshal(map[string]string{"text": typed, "session_id": "cw-1", "workspace": "/w"})
+	var out bytes.Buffer
+	if err := runHookCodeWhale(dir, []string{"message_submit"}, bytes.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	var resp struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &resp); err != nil {
+		t.Fatalf("not JSON: %q", out.String())
+	}
+	if len(resp.Text) > codewhaleTextMax {
+		t.Fatalf("reply is %d bytes against %d", len(resp.Text), codewhaleTextMax)
+	}
+	added := strings.TrimPrefix(resp.Text, typed+"\n\n")
+	if !strings.Contains(added, "zorblax") {
+		t.Fatalf("nothing was added, so this proves nothing: %q", added)
+	}
+	if strings.Count(added, "<deja-recall>") != 1 || !strings.HasSuffix(added, recallFrameFooter) {
+		t.Errorf("the cut left the frame open: …%q", added[max(0, len(added)-80):])
+	}
+}
+
+func TestFitFramedDropsABlockWithNoRoomForItsFrame(t *testing.T) {
+	a, b := frameRecall("first"), frameRecall(strings.Repeat("second ", 50))
+	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+recallFrameOverhead); got != a {
+		t.Errorf("got %q, want only the first block", got)
+	}
+	if got := fitFramed([]string{a, b}, "\n\n", len(a)+2+recallFrameOverhead+10); !strings.HasSuffix(got, "second sec"+recallFrameFooter) {
+		t.Errorf("the second block was not cut inside its frame: %q", got)
+	}
+	if got := fitFramed([]string{"plain text here"}, "", 5); got != "plain" {
+		t.Errorf("an unframed part was not cut plainly: %q", got)
+	}
+}

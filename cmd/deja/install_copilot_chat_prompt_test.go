@@ -52,7 +52,7 @@ func TestInstallCopilotChatPromptWritesPerHost(t *testing.T) {
 		if !strings.Contains(body, "$ARGUMENTS") {
 			t.Errorf("%s takes no arguments, so /deja <query> would drop the query", path)
 		}
-		if !strings.Contains(body, "/usr/local/bin/deja search") {
+		if !strings.Contains(body, "/usr/local/bin/deja --framed search") {
 			t.Errorf("%s names no fallback command", path)
 		}
 	}
