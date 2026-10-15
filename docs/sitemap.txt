@@ -16,9 +16,9 @@ https://vshulcz.github.io/deja-vu/guide/one-rules-file.html
 https://vshulcz.github.io/deja-vu/guide/auditing-agents.html
 https://vshulcz.github.io/deja-vu/guide/find-a-session.html
 https://vshulcz.github.io/deja-vu/guide/codex-history.html
+https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html
 https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html
 https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html
-https://vshulcz.github.io/deja-vu/guide/parallel-sessions.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-opencode.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-dsh.html
 https://vshulcz.github.io/deja-vu/guide/memory-for-kimi.html
