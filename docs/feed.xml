@@ -18,6 +18,13 @@
     <summary>The most accurate, cheapest and fastest memory for coding agents: Claude Code, Codex and 40 more agents, built from the sessions already on your disk.</summary>
   </entry>
   <entry>
+    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
+    <updated>2026-10-15T00:00:00Z</updated>
+    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
+  </entry>
+  <entry>
     <title>Delete Kimi Code session history — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/delete-kimi-code-session-history.html"></link>
@@ -72,13 +79,6 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.</summary>
-  </entry>
-  <entry>
-    <title>Memory plugins for Claude Code, Codex and Cursor, compared</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/compare.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/compare.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>deja-vu next to claude-mem, agentmemory, MemPalace, Mem0, Letta, CASS, ctx and agentsview: what each captures, where it keeps it, how it scores.</summary>
   </entry>
   <entry>
     <title>API keys in your coding agent transcripts — deja-vu</title>
