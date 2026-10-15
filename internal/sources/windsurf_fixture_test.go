@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/sha256"
 	"encoding/binary"
 	"os"
 	"path/filepath"
@@ -113,7 +114,10 @@ func windsurfSeal(plain []byte, nonce byte) []byte {
 	if err != nil {
 		panic(err)
 	}
-	n := bytes.Repeat([]byte{nonce}, windsurfNonce)
+	// A nonce of one repeated byte made the committed .pb files start with
+	// 01 01 01 01, the MMDF mailbox magic, and file scanners stopped there.
+	sum := sha256.Sum256([]byte{nonce})
+	n := sum[:windsurfNonce]
 	return gcm.Seal(n, n, plain, nil)
 }
 
