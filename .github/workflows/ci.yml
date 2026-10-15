@@ -669,7 +669,29 @@ jobs:
           # page writes an untracked file and a diff of tracked files does not
           # see it: genregistry writes one per harness, so the first run after a
           # parser lands is exactly the case this has to catch.
-          if [ -n "$(git status --porcelain)" ]; then
+          #
+          # A squash merge re-dates the commit that carries a page, so a page
+          # merged the UTC day after its PR's last commit regenerates one day
+          # later on main and nothing else changes (#5032). Drift that is only
+          # in lastmod and dateModified passes here, and so does the feed when
+          # one moved, since the feed is the newest pages by those dates. Inside
+          # a pull request the dates come from its own commits and do not move,
+          # so a feed nobody regenerated still fails there. TestSitemapLastmodFollowsThePages
+          # holds the dates to within a week, and the next regeneration commits
+          # the new day.
+          norm() { sed -E 's/(<lastmod>|"dateModified": ")[0-9]{4}-[0-9]{2}-[0-9]{2}/\1DATE/g'; }
+          stale=
+          dated=
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then stale=1; fi
+          for f in $(git diff --name-only); do
+            if [ "$f" = docs/feed.xml ]; then continue; fi
+            if cmp -s <(git show "HEAD:$f" | norm) <(norm < "$f"); then dated=1; else stale=1; fi
+          done
+          if ! git diff --quiet -- docs/feed.xml && [ -z "$dated" ]; then stale=1; fi
+          if [ -n "$(git status --porcelain)" ] && [ -z "$stale" ]; then
+            echo "::notice::Only page dates moved, as after a squash merge on a later day (#5032):"
+            git --no-pager diff --stat
+          elif [ -n "$stale" ]; then
             echo "::error::A generated file is not what its generator writes. Run:"
             echo "::error::  go run ./scripts/gennav && go run ./scripts/genmatrix && go run ./scripts/genregistry && go run ./scripts/genfeed"
             git --no-pager status --short
