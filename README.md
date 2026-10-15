@@ -580,7 +580,8 @@ for each agent: [where sessions are stored](https://vshulcz.github.io/deja-vu/gu
 Claude Code deletes transcripts
 older than 30 days (`cleanupPeriodDays` in `~/.claude/settings.json`), and `claude --resume` lists
 only what is left. A session deja indexed before the cleanup stays searchable after the
-file is gone. Details: [session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
+file is gone, and the weekly note at session start says how many it kept, with an id
+`deja resume <id> --write-back` puts back. Details: [session files on disk](https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html).
 
 </details>
 

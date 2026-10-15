@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `deja share --to out.md <id>` refuses the flag before building the index, as `deja share <id> --to out.md` already did, instead of reporting that no session matches "--to". From @mvanhorn (#5014).
 - PowerShell completion offers every role after `--role`, not the old three, and `--year` on `deja stats`. From @notsubash (#5017).
+- The weekly note says when an agent deleted sessions deja kept: `Claude Code deleted 37 sessions this week; deja kept them — deja resume 5a1c0de0-111 --write-back`. Agents are named in one line, the id is the newest deletion, and an agent deja cannot write back to gets `deja show <id>`. A quiet week still says it. The window starts at the index pass that found each transcript gone; sessions kept before this release carry no date and are not counted.
+- `deja install` for Claude Code says when its cleanup is on: `Claude Code deletes transcripts after 30 days; deja keeps a copy of each one it indexes from now on`, read from `cleanupPeriodDays` (managed settings first, `CLAUDE_CONFIG_DIR` respected) and printed at 30 days or less. The setting is not changed.
 
 ## [0.22.2] - 2026-10-15
 

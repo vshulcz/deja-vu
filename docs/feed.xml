@@ -44,6 +44,11 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/zh/guide/delete-old-claude-sessions.html"></link>
     <updated>2026-10-15T00:00:00Z</updated>
     <summary>find ~/.claude/projects -mtime +30 -delete 一条命令就能清掉，cleanupPeriodDays 则按时间自动清——以及为什么按时间删腾出的磁盘远比按大小删少。</summary>
+    <title>How to delete Claude Code sessions — deja-vu</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
+    <updated>2026-10-15T00:00:00Z</updated>
+    <summary>One session: delete its .jsonl under ~/.claude/projects. A whole project: claude project purge. On a timer: cleanupPeriodDays. What /clear and --resume do.</summary>
   </entry>
   <entry>
     <title>Persistent memory for coding agents over MCP — deja-vu</title>
