@@ -21,7 +21,7 @@
 <meta name="theme-color" content="#0b0f10">
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"A local memory layer for coding agents: retroactive search over agent session history, MCP recall, redaction, stats, share and SSH sync.","url":"https://vshulcz.github.io/deja-vu/","downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"deja-vu","operatingSystem":"macOS, Linux, Windows","applicationCategory":"DeveloperApplication","description":"deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.","url":"https://vshulcz.github.io/deja-vu/","sameAs":["https://github.com/vshulcz/deja-vu","https://www.npmjs.com/package/@vshulcz/deja-vu","https://formulae.brew.sh/formula/deja-vu"],"downloadUrl":"https://github.com/vshulcz/deja-vu/releases","license":"https://github.com/vshulcz/deja-vu/blob/main/LICENSE","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"author":{"@type":"Person","name":"Vladislav Shulcz","url":"https://github.com/vshulcz"}}</script>
 <link rel="icon" type="image/svg+xml" sizes="16x16" href="assets/favicon.svg">
 <link rel="icon" type="image/svg+xml" sizes="any" href="assets/icon.svg">
 <link rel="apple-touch-icon" href="assets/icon.svg">
@@ -85,6 +85,7 @@ h1 em{font-style:normal;color:var(--amber)}
 .cmdline button:hover{color:var(--ink);border-color:var(--coat-dim)}
 .under{margin-top:12px;font:12.5px var(--mono);color:var(--faint)}
 .under b{color:var(--coat-hi);font-weight:400}
+.defn{margin:-48px 0 56px;max-width:68ch;font-size:15px;color:var(--body)}
 
 .proof{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:12px;overflow:hidden}
@@ -296,7 +297,7 @@ footer a:hover{color:var(--ink)}
   .proof,.steps{grid-template-columns:1fr}
 }
 </style>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "Shared session memory for coding agents, built from the transcripts already on disk.", "inLanguage": "en", "sameAs": ["https://github.com/vshulcz/deja-vu"], "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "deja-vu", "alternateName": "deja", "url": "https://vshulcz.github.io/deja-vu/", "description": "deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.", "inLanguage": "en", "sameAs": ["https://github.com/vshulcz/deja-vu"], "publisher": {"@type": "Person", "name": "vshulcz", "url": "https://github.com/vshulcz"}}</script>
 </head>
 <body>
 
@@ -318,7 +319,7 @@ footer a:hover{color:var(--ink)}
     <p id="recall-line" hidden></p>
     <h1>Your agent is about to re-debug something you fixed in <em>March</em>.</h1>
     <p class="lede">Fix it in Codex, and Claude Code remembers. deja indexes the sessions all
-      41 of your coding agents already wrote to disk — months of history from before you
+      42 of your coding agents already wrote to disk — months of history from before you
       installed it — and hands the right one back in whichever agent asks.</p>
     <div class="cmdline">
       <span class="p">$</span>
@@ -333,6 +334,8 @@ footer a:hover{color:var(--ink)}
     <span class="bubble" id="bubble"></span>
   </div>
 </header>
+
+<p class="defn">deja-vu is a local memory tool for coding agents: it indexes the session transcripts that Claude Code, Codex, Cursor and 39 other agents already write to disk, and gives the relevant past work back to the agent through hooks and an MCP server, with no LLM and nothing leaving the machine.</p>
 
 
 <div class="exchange reveal">
