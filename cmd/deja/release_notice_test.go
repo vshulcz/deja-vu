@@ -122,6 +122,42 @@ func TestReleaseNoticeNeverStartsALookWhereItMayNotSpeak(t *testing.T) {
 	}
 }
 
+// #5053: a harness that runs `deja mcp` or a hook under a pty gives both
+// streams a terminal, and the look went out from the MCP server. Every
+// harness-run command in the dispatch table stays out, whatever the tty says.
+func TestReleaseNoticeNeverStartsFromAHarnessCommand(t *testing.T) {
+	withVersion(t, "1.0.0")
+	dir := releaseNoticeEnv(t)
+	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_800_000_000, 0)
+	var spawns atomic.Int32
+	spawn := func(string) error { spawns.Add(1); return nil }
+	var names []string
+	for name := range commands {
+		if harnessRunCommand(name) {
+			names = append(names, name)
+		}
+	}
+	for _, want := range []string{"mcp", "hook-prompt", "hook-context", "statusline"} {
+		if !harnessRunCommand(want) {
+			t.Errorf("%s is not counted as harness-run", want)
+		}
+	}
+	for _, name := range names {
+		if n := startReleaseNotice([]string{name}, true, dir, now, spawn); n != nil {
+			t.Errorf("deja %s on a terminal got a notice", name)
+		}
+	}
+	if spawns.Load() != 0 {
+		t.Errorf("harness commands started %d looks", spawns.Load())
+	}
+	if _, err := os.Stat(dir + ".release"); err == nil {
+		t.Error("a harness command wrote the release stamp")
+	}
+}
+
 // One look a day, in another process; what it found is printed by the next
 // run with no wait, once a day, and never for a release that is not newer.
 func TestReleaseNoticeLooksOnceADayAndPrintsWhatTheLookFound(t *testing.T) {

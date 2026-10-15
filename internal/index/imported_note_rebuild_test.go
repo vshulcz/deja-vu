@@ -113,7 +113,9 @@ func TestImportedNoteStateDerivedFromTextWhenRowHasNone(t *testing.T) {
 	if meta.Lifecycle != "rejected" {
 		t.Errorf("the retraction was not re-derived: lifecycle = %q", meta.Lifecycle)
 	}
-	if meta.LifecycleNote != "we no longer invalidate on write (from claude:a18, 2026-08-04)" {
+	// Without the loader's "(from …, day)" tail, as the note reads where it was
+	// filed (#5053).
+	if meta.LifecycleNote != "we no longer invalidate on write" {
 		t.Errorf("the correction text was not re-derived: %q", meta.LifecycleNote)
 	}
 }

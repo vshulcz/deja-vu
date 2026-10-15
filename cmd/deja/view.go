@@ -213,7 +213,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 		v := viewSession{
 			ID: s.ID, Harness: s.Harness, Project: s.Project,
 			Title:   strings.TrimSpace(s.Title),
-			Updated: s.Updated.Format("2006-01-02 15:04"),
+			Updated: s.Updated.Local().Format("2006-01-02 15:04"),
 		}
 		if i < viewTranscripts {
 			if full, ok, err := index.FindByPrefix(dir, s.ID); err == nil && ok {
@@ -275,7 +275,7 @@ func writeViewHTML(dir, out string) (string, int, error) {
 	for _, n := range loaded {
 		notes = append(notes, viewNote{
 			Project: n.Project, State: n.State, Title: n.Title, Text: n.Text,
-			Tags: n.Tags, At: n.At.Format("2006-01-02"),
+			Tags: n.Tags, At: n.At.Local().Format("2006-01-02"),
 		})
 	}
 	// Redact here rather than trusting the index: the page is the artifact

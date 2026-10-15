@@ -95,7 +95,7 @@ func newStatsHTMLPage(report stats.Report, sessions []model.Session) (statsHTMLP
 		// whatever the transcript held, and a bidi override reverses a line in
 		// a browser too (#2090).
 		rows = append(rows, htmlSession{
-			Date: date.Format("2006-01-02"), Harness: s.Harness,
+			Date: date.Local().Format("2006-01-02"), Harness: s.Harness,
 			Project: search.SafePath(project),
 			Title:   search.SafeLine(stats.Title(s)), Messages: len(s.Messages),
 		})

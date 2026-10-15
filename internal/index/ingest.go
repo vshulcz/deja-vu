@@ -1211,8 +1211,10 @@ func deriveImportedNoteState(s *model.Session) {
 			continue
 		}
 		s.Lifecycle, s.LifecycleNote = st, note
+		// The UTC day, as import stores it: records come back in this
+		// machine's zone, and the rebuild must not move the date (#5053).
 		if !msg.Time.IsZero() {
-			s.LifecycleAt = msg.Time.Format("2006-01-02")
+			s.LifecycleAt = msg.Time.UTC().Format(lifecycleDay)
 		}
 		return
 	}

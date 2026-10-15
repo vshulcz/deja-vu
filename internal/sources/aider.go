@@ -344,7 +344,13 @@ func ParseAiderFile(path string) ([]model.Session, error) {
 		if !inFence && strings.HasPrefix(line, aiderSessionMark) {
 			endSession()
 			idx++
-			ts, _ := time.ParseInLocation("2006-01-02 15:04:05", strings.TrimSpace(strings.TrimPrefix(line, aiderSessionMark)), time.Local)
+			// aider writes its local wall clock with no zone. Read in this
+			// machine's zone, the same file gave other instants after a zone
+			// change, and an index kept from before it disagreed with a
+			// rebuild by up to a day (#5053). Read as UTC it is the same on
+			// every machine and every pass, the rule Cursor's stamps without
+			// an offset follow; the cost is an hour shown off by the offset.
+			ts, _ := time.Parse("2006-01-02 15:04:05", strings.TrimSpace(strings.TrimPrefix(line, aiderSessionMark)))
 			id := aiderSessionID(path, ts, idx, starts)
 			cur = &model.Session{Harness: "aider", ID: id, Project: project, Path: path, Started: ts, Updated: ts}
 			seenFiles = map[string]bool{}

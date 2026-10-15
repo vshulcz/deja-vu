@@ -2727,7 +2727,7 @@ func doctorIndex(w io.Writer, idx doctorIndexReport, dir string) {
 	if at := index.ManifestSourcesReadAt(dir); at.IsZero() {
 		read = ", stores never read"
 	} else if fi, err := os.Stat(filepath.Join(dir, "manifest.gob")); err == nil && fi.ModTime().Sub(at) > time.Hour {
-		read = ", stores read " + at.Format("2006-01-02 15:04")
+		read = ", stores read " + at.Local().Format("2006-01-02 15:04")
 	}
 	fmt.Fprintf(w, "  status   built (size=%s, updated=%s%s)\n", humanBytes(pathSize(dir)), updated, read)
 	// An index written by an older format is unreadable to this binary: the

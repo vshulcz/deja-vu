@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -35,7 +36,20 @@ type SyncRecord struct {
 	// receiving side then says only that the session came from elsewhere,
 	// which is what it said before.
 	Origin syncName `json:"origin,omitempty"`
+	// Lifecycle, LifecycleNote and LifecycleAt are a promoted note's current
+	// state, as the machine holding its notes.jsonl filed it, on every record
+	// of the note. The text carries a state too, but only its own line's, and
+	// the record time is the evidence's, in the sender's zone: the receiver
+	// dated a rejection by the session it rejected, and every peer showed a
+	// different day (#5053). LifecycleAt is the filing day in UTC. Additive:
+	// a batch without them falls back to the text.
+	Lifecycle     syncName `json:"lifecycle,omitempty"`
+	LifecycleNote syncName `json:"lifecycle_note,omitempty"`
+	LifecycleAt   syncName `json:"lifecycle_at,omitempty"`
 }
+
+// lifecycleDay is how a lifecycle date is stored: the UTC day of the filing.
+const lifecycleDay = "2006-01-02"
 
 // syncName is a metadata string that survives being sent the wrong shape. A
 // batch is another machine's file, and this machine may be older or newer than
@@ -200,6 +214,7 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 	// that work never syncs again, because the source resumes from a point
 	// beyond it. Held records are not sent, and they are not settled either.
 	heldFrom := map[string]int64{}
+	var noteStates map[string]sources.Lifecycle
 	err = eachRecord(filepath.Join(dir, "records.bin"), tablesFromManifest(m), func(r Record) {
 		// What arrived by sync travels on rather than stopping here. A machine
 		// that pulled from a container and is then pulled from itself used to
@@ -274,6 +289,22 @@ func exportRecordsWith(dir, outDir, peer string, full, relay bool) (int, func() 
 		}
 		text, _ := redact.Text(r.Text)
 		rec := SyncRecord{Harness: meta.Harness, SessionID: sessionID, Project: project, Role: r.Role, Text: text, Time: r.Time, Origin: origin}
+		if meta.Harness == "deja" && strings.HasPrefix(sessionID, "deja-note-") {
+			if relayed {
+				rec.Lifecycle, rec.LifecycleNote, rec.LifecycleAt = syncName(meta.Lifecycle), syncName(meta.LifecycleNote), syncName(meta.LifecycleAt)
+			} else {
+				if noteStates == nil {
+					noteStates = promotedStatesByNoteID()
+				}
+				if lc, ok := noteStates[sessionID]; ok {
+					note, _ := redact.Text(lc.Note)
+					rec.Lifecycle, rec.LifecycleNote = syncName(lc.State), syncName(note)
+					if !lc.At.IsZero() {
+						rec.LifecycleAt = syncName(lc.At.UTC().Format(lifecycleDay))
+					}
+				}
+			}
+		}
 		bySource[source] = append(bySource[source], rec)
 		touched[wk] = true
 		tn := r.Time.UnixNano()
@@ -392,6 +423,39 @@ var lastImportSkippedIncomplete int
 // ImportSkippedIncomplete reports that count.
 func ImportSkippedIncomplete() int { return lastImportSkippedIncomplete }
 
+// promotedStatesByNoteID is this machine's promoted-note states keyed by the
+// note's session id, the name a record carries.
+func promotedStatesByNoteID() map[string]sources.Lifecycle {
+	out := map[string]sources.Lifecycle{}
+	for src, lc := range sources.PromotedLifecycles() {
+		out[sources.PromotedNoteID(src)] = lc
+	}
+	return out
+}
+
+// carriedNoteState is the state a record brought in its own fields. Another
+// machine's file, so a state deja does not know is no state and a date that
+// is not a day is dropped rather than shown.
+func carriedNoteState(sr SyncRecord) (state, note, at string, ok bool) {
+	state = string(sr.Lifecycle)
+	if !sources.NoteStates[state] {
+		return "", "", "", false
+	}
+	note, _ = redact.Text(strings.TrimSpace(string(sr.LifecycleNote)))
+	// A full stamp is taken too, as its UTC day: a hand-made batch writes one.
+	raw := strings.TrimSpace(string(sr.LifecycleAt))
+	if d, err := time.Parse(lifecycleDay, raw); err == nil {
+		at = d.Format(lifecycleDay)
+	} else if d, err := time.Parse(time.RFC3339Nano, raw); err == nil {
+		at = d.UTC().Format(lifecycleDay)
+	}
+	return state, note, at, true
+}
+
+// noteBodyTail is what the loader appends to a promoted note's line: where it
+// came from, the evidence day, and the tags. It is not part of the note.
+var noteBodyTail = regexp.MustCompile(` \(from [^\s()]+, \d{4}-\d{2}-\d{2}\)( #\S+)*$`)
+
 // noteStateFromText reads the state a promoted note's line carries. deja writes
 // them as "[accepted] …" or "[rejected] did not hold", and that prefix is the
 // only copy of the state that crosses a machine boundary (#975).
@@ -409,7 +473,10 @@ func noteStateFromText(text string) (state, note string, ok bool) {
 	default:
 		return "", "", false
 	}
-	return state, strings.TrimSpace(text[end+1:]), true
+	// Without the tail the note reads as it does on the machine that filed
+	// it, where it comes from notes.jsonl (#5053).
+	note = noteBodyTail.ReplaceAllString(strings.TrimSpace(text[end+1:]), "")
+	return state, note, true
 }
 
 // dayBucketKey identifies a note in a day bucket without the bucket id. Empty
@@ -734,11 +801,19 @@ func Import(dir, inDir string) (int, error) {
 			// The states themselves live in the other machine's notes.jsonl,
 			// which never travels, so without reading them here a decision
 			// retracted there reads as accepted on this machine (#975).
+			//
+			// The state the sender filed wins over the line's own. The date is
+			// the filing day in UTC; a batch from before the fields has only
+			// the evidence time, taken as its UTC day so every peer and every
+			// rebuild store the same string (#5053). Read from the redacted
+			// text: the note lands in the manifest.
 			if strings.HasPrefix(origID, "deja-note-") {
-				if st, note, ok := noteStateFromText(sr.Text); ok {
+				if st, note, at, ok := carriedNoteState(sr); ok {
+					meta.Lifecycle, meta.LifecycleNote, meta.LifecycleAt = st, note, at
+				} else if st, note, ok := noteStateFromText(text); ok {
 					meta.Lifecycle, meta.LifecycleNote = st, note
 					if !sr.Time.IsZero() {
-						meta.LifecycleAt = sr.Time.Format("2006-01-02")
+						meta.LifecycleAt = sr.Time.UTC().Format(lifecycleDay)
 					}
 				}
 			}

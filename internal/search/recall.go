@@ -1205,7 +1205,7 @@ func EarlierAttempts(ss []model.Session) map[string]string {
 			if snippetOverlap(words[i], words[j]) < 0.6 {
 				continue
 			}
-			out[a.ID] = b.Updated.Format("2006-01-02")
+			out[a.ID] = b.Updated.Local().Format("2006-01-02")
 		}
 	}
 	return out

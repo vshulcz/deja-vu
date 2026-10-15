@@ -621,7 +621,7 @@ func markEarlierAttempts(hits []Hit) {
 			if snippetOverlap(sets[i], sets[j]) < 0.6 {
 				continue
 			}
-			hits[i].Superseded = b.Session.Updated.Format("2006-01-02")
+			hits[i].Superseded = b.Session.Updated.Local().Format("2006-01-02")
 		}
 	}
 }
@@ -1619,8 +1619,8 @@ func Print(w io.Writer, hits []Hit, o Options) {
 }
 
 // supersededDay prints the newer session's day the way the header above it
-// prints days. The marker is minted as a UTC date because lifecycle compares
-// against it, so it is read back in UTC; anything else is printed as it came.
+// prints days. The marker is the reader's day, as the header's is (#5053), and
+// is printed as that day; anything else is printed as it came.
 func supersededDay(day string) string {
 	t, err := time.Parse("2006-01-02", day)
 	if err != nil {

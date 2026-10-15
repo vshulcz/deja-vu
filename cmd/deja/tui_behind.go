@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"io"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/policy"
@@ -36,7 +36,7 @@ type behindRow struct {
 func changedFiles(cwd string) []string {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "diff", "--name-only", "--relative", "HEAD").Output()
+	out, err := gitread.Command(ctx, "-C", cwd, "diff", "--name-only", "--relative", "HEAD").Output()
 	if err != nil {
 		return nil
 	}

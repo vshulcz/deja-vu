@@ -8,13 +8,13 @@ import (
 	"hash"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -83,7 +83,7 @@ func compactionFreshness(root string) model.RepositoryFreshness {
 	defer cancel()
 	f := model.RepositoryFreshness{CheckedAt: time.Now().UTC()}
 	gitValue := func(args ...string) (string, error) {
-		out, err := exec.CommandContext(ctx, "git", append([]string{"-C", root}, args...)...).Output()
+		out, err := gitread.Command(ctx, append([]string{"-C", root}, args...)...).Output()
 		return strings.TrimSpace(string(out)), err
 	}
 	inside, err := gitValue("rev-parse", "--is-inside-work-tree")
@@ -104,7 +104,7 @@ func compactionFreshness(root string) model.RepositoryFreshness {
 }
 
 func hashGitStream(ctx context.Context, h io.Writer, root string, args ...string) bool {
-	cmd := gitReadOnly(ctx, append([]string{"-C", root}, args...)...)
+	cmd := gitread.Command(ctx, append([]string{"-C", root}, args...)...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return false
@@ -119,7 +119,7 @@ func hashGitStream(ctx context.Context, h io.Writer, root string, args ...string
 
 // hashUntrackedStream returns true when the resulting fingerprint is partial.
 func hashUntrackedStream(ctx context.Context, h hash.Hash, root string) bool {
-	cmd := exec.CommandContext(ctx, "git", "-C", root, "ls-files", "--others", "--exclude-standard", "-z")
+	cmd := gitread.Command(ctx, "-C", root, "ls-files", "--others", "--exclude-standard", "-z")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return true

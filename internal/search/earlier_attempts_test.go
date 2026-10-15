@@ -20,7 +20,7 @@ func TestEarlierAttempts(t *testing.T) {
 		Messages: []model.Message{msg("switch the pool back — transaction mode broke prepared statements pgbouncer")},
 	}
 	got := EarlierAttempts([]model.Session{older, newer})
-	if got["old"] != newer.Updated.Format("2006-01-02") {
+	if got["old"] != newer.Updated.Local().Format("2006-01-02") {
 		t.Errorf("older session not marked with the newer date: %v", got)
 	}
 	if got["new"] != "" {

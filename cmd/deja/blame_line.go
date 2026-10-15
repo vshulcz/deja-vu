@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/harnesscolor"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
@@ -165,7 +166,7 @@ func blameSpanKey(s string) string { return sources.WrittenLineKey(s) }
 func gitRun(dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), blameGitTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd := gitread.Command(ctx, append([]string{"-C", dir}, args...)...)
 	out, err := cmd.Output()
 	return string(out), err
 }

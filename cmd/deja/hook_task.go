@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/model"
 )
 
@@ -68,7 +67,7 @@ func changedTaskFiles(cwd string) []string {
 			out = append(out, base)
 		}
 	}
-	if b, err := gitReadOnly(ctx, "-C", cwd, "status", "--porcelain").Output(); err == nil {
+	if b, err := gitread.Command(ctx, "-C", cwd, "status", "--porcelain").Output(); err == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			if len(line) < 4 {
 				continue
@@ -80,21 +79,12 @@ func changedTaskFiles(cwd string) []string {
 			add(path)
 		}
 	}
-	if b, err := exec.CommandContext(ctx, "git", "-C", cwd, "log", "--name-only", "-3", "--pretty=format:").Output(); err == nil {
+	if b, err := gitread.Command(ctx, "-C", cwd, "log", "--no-renames", "--name-only", "-3", "--pretty=format:").Output(); err == nil {
 		for _, line := range strings.Split(string(b), "\n") {
 			add(line)
 		}
 	}
 	return out
-}
-
-// gitReadOnly is a git command that leaves the repository alone. status and
-// diff refresh the index and take its lock when they can; a hook doing that in
-// the background holds index.lock under the user's own git commands.
-func gitReadOnly(ctx context.Context, args ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0")
-	return cmd
 }
 
 // taskScores counts, per session, how many of the changed files it mentions.

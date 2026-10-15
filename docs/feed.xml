@@ -53,6 +53,13 @@
     <summary>Cascade writes each conversation to an encrypted file under ~/.codeium/windsurf and starts new ones without them. deja reads the files and gives Cascade recall.</summary>
   </entry>
   <entry>
+    <title>Privacy — deja-vu docs</title>
+    <id>https://vshulcz.github.io/deja-vu/guide/privacy.html</id>
+    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/privacy.html"></link>
+    <updated>2026-10-15T00:00:00Z</updated>
+    <summary>deja is local by design: no network path in indexing or search unless semantic search is on, credentials redacted at index time, and forget/exclude controls.</summary>
+  </entry>
+  <entry>
     <title>How to delete Claude Code sessions — deja-vu</title>
     <id>https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html</id>
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/session-files-on-disk.html"></link>
@@ -282,12 +289,5 @@
     <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gemini.html"></link>
     <updated>2026-10-14T00:00:00Z</updated>
     <summary>How to give Gemini CLI recall over every coding agent&#39;s sessions on this machine — one extension install, and what the CLI install adds on top.</summary>
-  </entry>
-  <entry>
-    <title>Add memory to gjc: recall past sessions — deja-vu</title>
-    <id>https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html</id>
-    <link rel="alternate" type="text/html" href="https://vshulcz.github.io/deja-vu/guide/memory-for-gjc.html"></link>
-    <updated>2026-10-14T00:00:00Z</updated>
-    <summary>gajae-code keeps a session log and can reopen one; nothing reads the others back. deja wires its extension, server, skill and command, and indexes every agent.</summary>
   </entry>
 </feed>

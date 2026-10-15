@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -27,6 +28,18 @@ const releaseNoticeInterval = 24 * time.Hour
 // `-v` is not here: it is a search for "-v", not a version flag.
 var releaseNoticeSkips = map[string]bool{
 	"update": true, "doctor": true, "version": true, "--version": true, "-version": true,
+}
+
+// harnessRunCommand is a command an agent or its harness starts, never a
+// person. The tty check alone does not keep the look out of them: a harness
+// can run `deja mcp` or a hook under a pty, and then both streams are a
+// terminal and a GET to GitHub went out from the MCP server (#5053).
+func harnessRunCommand(name string) bool {
+	switch name {
+	case "mcp", "reasonix-ext", "statusline", "warmup", "warmup-status":
+		return true
+	}
+	return strings.HasPrefix(name, "hook-")
 }
 
 // releaseStamp sits next to the index as `<index dir>.release`. Looked is the
@@ -71,7 +84,8 @@ type releaseNotice struct {
 
 // startReleaseNotice decides whether this run may show the line and, once a
 // day, starts a look in the background. Only an interactive run qualifies:
-// both stdout and stderr a terminal, which a hook or the MCP server never has.
+// both stdout and stderr a terminal, and a command a person types: never a
+// hook, the MCP server or another command a harness starts.
 // DEJA_NO_UPDATE_NOTICE=1 turns the whole thing off. DEJA_OFFLINE=1 turns off
 // the look, so no request is made; what a new version brings comes from the
 // binary and still shows. The look time is written before the look, so a
@@ -80,7 +94,7 @@ func startReleaseNotice(args []string, interactive bool, dir string, now time.Ti
 	if !interactive || os.Getenv(releaseNoticeOff) != "" {
 		return nil
 	}
-	if len(args) > 0 && releaseNoticeSkips[args[0]] {
+	if len(args) > 0 && (releaseNoticeSkips[args[0]] || harnessRunCommand(args[0])) {
 		return nil
 	}
 	// Without a home the index dir is relative, and the stamp would land in

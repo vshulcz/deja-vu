@@ -192,7 +192,7 @@ func demoteRejected(hits []search.Hit) int {
 		// The label carries a date, not an identity, so the rival is the
 		// rejected hit in the same project stamped that day.
 		for _, r := range rejected {
-			if r.Session.Project == h.Session.Project && r.Session.Updated.Format("2006-01-02") == h.Superseded {
+			if r.Session.Project == h.Session.Project && r.Session.Updated.Local().Format("2006-01-02") == h.Superseded {
 				h.Superseded = ""
 				break
 			}

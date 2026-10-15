@@ -5,7 +5,6 @@ package digest
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -15,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/vshulcz/deja-vu/internal/cjkfold"
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/redact"
 	"github.com/vshulcz/deja-vu/internal/sources"
@@ -566,7 +566,7 @@ var worktreeListBudget = func() time.Duration {
 func gitWorktreeRoots(cwd string) []string {
 	ctx, cancel := context.WithTimeout(context.Background(), worktreeListBudget)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "git", "-C", cwd, "worktree", "list", "--porcelain").Output()
+	out, err := gitread.Command(ctx, "-C", cwd, "worktree", "list", "--porcelain").Output()
 	if err != nil {
 		return nil
 	}

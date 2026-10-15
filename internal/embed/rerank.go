@@ -11,12 +11,9 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 	if len(hits) == 0 || len(sidecar.Vectors) == 0 {
 		return hits, nil
 	}
-	q, err := client.Embed(ctx, []string{query})
+	q, err := client.EmbedQuery(ctx, query)
 	if err != nil {
 		return nil, err
-	}
-	if len(q) != 1 {
-		return nil, errBadQueryVector
 	}
 	limit := len(hits)
 	if limit > 64 {
@@ -44,7 +41,7 @@ func Rerank(ctx context.Context, hits []search.Hit, query string, sidecar Sideca
 		if !wanted[v.Key] {
 			continue
 		}
-		c := Cosine(q[0], v.Values)
+		c := Cosine(q, v.Values)
 		if !seen[v.Key] || c > cosines[v.Key] {
 			cosines[v.Key], seen[v.Key] = c, true
 		}

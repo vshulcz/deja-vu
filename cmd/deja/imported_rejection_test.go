@@ -57,7 +57,8 @@ func TestASyncedRejectionMarksTheTranscriptItRejects(t *testing.T) {
 	if line := lifecycleLine(hits[transcript]); !strings.Contains(line, "tried and rejected") {
 		t.Errorf("the transcript's line does not say what happened: %q", line)
 	}
-	if got := hits[transcript].LifecycleNote; got != "reverted: pgbouncer instead (from claude:src1, 2026-08-06)" {
+	// Without the loader's "(from …, day)" tail, as on the sender (#5053).
+	if got := hits[transcript].LifecycleNote; got != "reverted: pgbouncer instead" {
 		t.Errorf("correction lost on the way: %q", got)
 	}
 }

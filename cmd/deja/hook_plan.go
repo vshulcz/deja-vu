@@ -370,7 +370,7 @@ func formatPlanFinding(match index.PlanCooccurrence) string {
 
 	since := ""
 	if oldest := oldestPlanSession(match.Wall.Sessions); !oldest.IsZero() {
-		since = " since " + oldest.Format("2006-01-02")
+		since = " since " + oldest.Local().Format("2006-01-02")
 	}
 	wall := strconv.Quote(neutralPlanEvidence(match.Wall.Text))
 	line := fmt.Sprintf("wall hit in %d sessions%s: %s", len(match.Wall.Sessions), since, wall)

@@ -26,12 +26,9 @@ type match struct {
 // match per session. The caller is responsible for checking generation and
 // endpoint availability before calling it.
 func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar Sidecar, client *Client) ([]search.Hit, error) {
-	query, err := client.Embed(ctx, []string{o.Query})
+	query, err := client.EmbedQuery(ctx, o.Query)
 	if err != nil {
 		return nil, err
-	}
-	if len(query) != 1 {
-		return nil, errBadQueryVector
 	}
 	if Stale(dir, sidecar) {
 		return nil, nil
@@ -64,7 +61,7 @@ func SemanticSearch(ctx context.Context, dir string, o search.Options, sidecar S
 		if !ok || (o.Role != "" && record.Role != o.Role) {
 			continue
 		}
-		score := Cosine(query[0], vector.Values)
+		score := Cosine(query, vector.Values)
 		if score < semanticFloor {
 			// A promoted note is held rather than dropped. It is one distilled
 			// line where its transcript is a whole session, so it is often

@@ -104,7 +104,10 @@ and only inside that agent's store directory.
 
 The index and sidecar never leave the machine through indexing, search, MCP,
 stats, or hook operation. The MCP server uses JSON-RPC over standard input and
-output and does not listen on a network socket.
+output and does not listen on a network socket. The git commands deja runs to
+read a repository (changed files, blame, worktree names) set
+`GIT_NO_LAZY_FETCH=1`, so in a partial clone they answer from what is on disk
+instead of fetching missing objects from the remote.
 
 ### Explicit exports and network paths
 
@@ -128,8 +131,9 @@ once-a-day release check described last:
   process that makes the same HTTPS GET as `deja doctor` and writes the answer
   to `<index dir>.release`; the next interactive command prints one line on
   stderr if a newer release is out. No session data is sent. Hooks, the MCP
-  server, pipes, dev builds and `deja update`, `doctor` and `version` never
-  start it. `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1` turns it off, and
+  server and the other commands a harness starts never start it, even when the
+  harness gives them a terminal; nor do pipes, dev builds and `deja update`,
+  `doctor` and `version`. `DEJA_OFFLINE=1` or `DEJA_NO_UPDATE_NOTICE=1` turns it off, and
   then no request is made.
 - `deja embed` and hybrid search talk to the embedding endpoint you configured
   (an Ollama or LM Studio address, normally on localhost). Without that
@@ -137,7 +141,8 @@ once-a-day release check described last:
   the only command that puts session text in front of a third party, so the
   trust policy gates it on every activation at once rather than on `search`:
   content withheld from any read path is not embedded, and the command says how
-  many records stayed behind.
+  many records stayed behind. A search or recall sends its query, redacted by
+  the same rules as the index, once per call.
 
 `deja sync export <dir>` and `deja share <id>` write data to a path or output
 chosen by the user. They do not transmit it themselves. Exported batches and

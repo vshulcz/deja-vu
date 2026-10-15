@@ -710,7 +710,9 @@ import (
 // 70: recoffsets.bin and frictext.bin sit beside the log. Both are caches
 // checked against it, so an index without them reads as before and needs no
 // rebuild for them.
-const version = 70
+// 71: aider headers are read as UTC, not in the machine's zone; an index
+// that read them in another zone holds other instants until a rebuild.
+const version = 71
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

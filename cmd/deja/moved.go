@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/vshulcz/deja-vu/internal/gitread"
 	"github.com/vshulcz/deja-vu/internal/search"
 )
 
@@ -110,7 +110,7 @@ func filesMovedSince(paths []string, since time.Time, budget time.Duration) move
 	for root, files := range byRepo {
 		args := append([]string{"-C", root, "log", "--format=", "--name-only",
 			"--since=" + since.UTC().Format(time.RFC3339), "--"}, files...)
-		out, err := exec.CommandContext(ctx, "git", args...).Output()
+		out, err := gitread.Command(ctx, args...).Output()
 		if err != nil {
 			continue
 		}
