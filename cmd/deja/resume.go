@@ -343,6 +343,11 @@ func resumeCommand(s model.Session) (string, string, error) {
 	}
 	switch s.Harness {
 	case "claude":
+		// Claude Code deleted the transcript and only the prompts were left in
+		// its history.jsonl: --resume would find nothing (#5046).
+		if sources.IsPromptLog(s.Path) {
+			return "", "", fmt.Errorf("session %s is only its prompts from history.jsonl, its transcript is gone, nothing to resume", digest.Short(s.ID))
+		}
 		return claudeProjectDirFor(s), "claude --resume " + s.ID, nil
 	case "codex":
 		if s.Project == "history" {

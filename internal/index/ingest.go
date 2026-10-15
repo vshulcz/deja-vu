@@ -635,6 +635,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 			len(vanished), pluralS(len(vanished)), map[bool]string{true: "its", false: "their"}[len(vanished) == 1])
 	}
 	ss = filterTombstonedSet(ss, dead)
+	ss = dropShadowedPrompts(ss, nil)
 	for p, st := range orphans.files {
 		if !st.Kept && orphans.dated {
 			st.KeptAt = time.Now().Unix()
@@ -1659,6 +1660,7 @@ func writeSessions(tmp, dir string, ss []model.Session, files map[string]FileSta
 }
 
 func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string]FileState, scope string, imp importedState) error {
+	ss = dropShadowedPrompts(ss, nil)
 	// The counters belong to this build. Draining them only on read made
 	// "since the last build" true only when the last read was the last build:
 	// a second build in one process reported its own empty transcripts plus
@@ -2900,8 +2902,9 @@ func attributeSession(held SessionMeta, s model.Session) (owns, collided bool) {
 	// the directory it ran in; the history line holds the prompt and the
 	// project "history". Sort order gave the row to history.jsonl, so a TUI
 	// session was filed outside its project and resume refused it as an exec
-	// entry (#4180).
-	if s.Harness == "codex" {
+	// entry (#4180). TRAE writes the same pair, and Claude Code's prompt log
+	// sorts ahead of its projects folder the same way (#5046).
+	if s.Harness == "codex" || s.Harness == "trae" || s.Harness == "claude" {
 		if newIsHist, heldIsHist := isCodexHistory(s.Path), isCodexHistory(held.Path); newIsHist != heldIsHist {
 			return !newIsHist, false
 		}
@@ -2967,10 +2970,48 @@ func holdsText(s model.Session) bool {
 	return false
 }
 
-// isCodexHistory reports whether a path is Codex's prompt log rather than a
-// rollout. Named, for the reason isGooseStore gives.
+// isCodexHistory reports whether a path is a prompt log rather than a
+// transcript: Codex's, TRAE's or Claude Code's history.jsonl. Named, for the
+// reason isGooseStore gives.
 func isCodexHistory(path string) bool {
-	return strings.EqualFold(filepath.Base(path), "history.jsonl")
+	return sources.IsPromptLog(path)
+}
+
+// dropShadowedPrompts drops a session read from a prompt log when a transcript
+// holds the same id, in this batch or in the rows the index already has. A
+// prompt log is read for sessions whose transcript is not on disk, and one deja
+// kept after the client deleted it is exactly that: its prompts merged into
+// the kept conversation a second time, at the log's own instant, and on the
+// append path the log took the row because the kept path was gone (#5046). A
+// rebuild sees the kept transcript in its batch, an incremental pass in held,
+// so both drop the same lines.
+func dropShadowedPrompts(ss []model.Session, held map[string]SessionMeta) []model.Session {
+	transcript := map[string]bool{}
+	logs := false
+	for _, s := range ss {
+		if isCodexHistory(s.Path) {
+			logs = true
+		} else {
+			transcript[s.Harness+":"+s.ID] = true
+		}
+	}
+	if !logs {
+		return ss
+	}
+	out := make([]model.Session, 0, len(ss))
+	for _, s := range ss {
+		if isCodexHistory(s.Path) {
+			key := s.Harness + ":" + s.ID
+			if transcript[key] {
+				continue
+			}
+			if meta, ok := held[key]; ok && meta.Path != "" && !isCodexHistory(meta.Path) {
+				continue
+			}
+		}
+		out = append(out, s)
+	}
+	return out
 }
 
 // isZCodeSnapshot reports whether a ZCode session's path is a snapshot an
@@ -4140,7 +4181,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		}
 	}
 	take := func(p string, ss []model.Session) {
-		ss = sources.FilterSessions(filterTombstoned(ss))
+		ss = dropShadowedPrompts(sources.FilterSessions(filterTombstoned(ss)), old.Sessions)
 		for _, s := range ss {
 			keysFrom[p] = append(keysFrom[p], s.Harness+":"+s.ID)
 		}
@@ -4776,7 +4817,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			}
 			continue
 		}
-		ss = sources.FilterSessions(filterTombstoned(ss))
+		ss = dropShadowedPrompts(sources.FilterSessions(filterTombstoned(ss)), m.Sessions)
 		// Scrub before anything is derived from the text, as the other two paths
 		// do. Redacting per message inside the write loop below left the derived
 		// fields — the friction signatures especially — hashed from the raw

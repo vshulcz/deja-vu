@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Claude Code sessions whose transcript is gone come back as their prompts. `~/.claude/history.jsonl` keeps every typed prompt and paste with its session id after the cleanup deletes the transcript, so those sessions are searchable again, filed under the directory they ran in. Only the prompts: `deja show` says so, and `deja resume` refuses one. A session with its transcript on disk, or one deja kept after it was deleted, is left to the transcript. `DEJA_CLAUDE_HISTORY_FILE` moves the file (#5046).
 - The guide on deleting old Claude Code sessions in Chinese, with the same commands and numbers: 368 of 1,320 files are older than 30 days and hold 4% of the bytes, while the ten largest hold 86%. From @beiryu (#4970).
 - Shell completion for `deja recall`: `--project`, `--harness` with the harness names, and `--limit` in bash, zsh, fish and PowerShell, where it used to offer search flags recall refuses. zsh's command list now offers recall too. From @orshih6 (#5015).
 
 ### Fixed
 
+- A Codex rollout deja kept after it was deleted no longer gets its prompt a second time from `history.jsonl` on a rebuild (#5046).
 - "what did we do in may" finds the same sessions after an incremental pass as after a rebuild. The month a record was indexed under came from the local zone on one path and UTC on the other, so near a month boundary the two disagreed; it is UTC on both now. The suite also passes outside UTC: seven command tests and three notes tests assumed it, found at UTC-3 by a LinuxPro review (#5044).
 - An install into a config with a long array of entries written on one line no longer copies the whole file once per entry it puts back: 3000 entries took 47ms and allocated 9 GB, now 13ms (#5025).
 - `deja share --to out.md <id>` refuses the flag before building the index, as `deja share <id> --to out.md` already did, instead of reporting that no session matches "--to". From @mvanhorn (#5014).

@@ -519,7 +519,7 @@ func doctorStoreChecks() []doctorStoreCheck {
 	aiderPaths = append(aiderPaths, filepath.SplitList(os.Getenv("DEJA_AIDER_ROOTS"))...)
 	cursorFiles := append(sources.CursorTranscripts(), sources.CursorDBs()...)
 	checks := []doctorStoreCheck{
-		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles(), sources.ParseClaudeFile},
+		{"claude", sources.ClaudeRoots(), sources.ClaudeFiles(), parseDoctorClaude},
 		{"codex", sources.CodexRoots(), sources.CodexFiles(), parseDoctorCodex},
 		{"trae", []string{sources.TraeRoot()}, sources.TraeFiles(), parseDoctorTrae},
 		{"opencode", []string{sources.OpencodeDB()}, presentDoctorFile(sources.OpencodeDB()), doctorProbeOpencode},
@@ -684,6 +684,13 @@ func presentDoctorFile(path string) []string {
 		return []string{path}
 	}
 	return nil
+}
+
+func parseDoctorClaude(path string) ([]model.Session, error) {
+	if sources.IsClaudeHistory(path) {
+		return sources.ParseClaudeHistory(path)
+	}
+	return sources.ParseClaudeFile(path)
 }
 
 func parseDoctorCodex(path string) ([]model.Session, error) {

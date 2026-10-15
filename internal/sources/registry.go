@@ -155,13 +155,23 @@ func allHarnesses() []Harness {
 	return []Harness{
 		{
 			Name: "claude", Load: LoadClaude, Files: ClaudeFiles,
-			Kinds: []FileKind{{
-				Name:      "claude",
-				Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
-				Parse:     fullParse(ParseClaudeFile),
-				ParseFrom: offsetParse(ParseClaudeFileFromOffset),
-				Resumes:   claudeExitResumes,
-			}},
+			Kinds: []FileKind{
+				{
+					// First: a prompt log moved under the transcript root is
+					// still the prompt log.
+					Name:      "claude-history",
+					Match:     IsClaudeHistory,
+					Parse:     fullParse(ParseClaudeHistory),
+					ParseFrom: offsetParse(ParseClaudeHistoryFromOffset),
+				},
+				{
+					Name:      "claude",
+					Match:     func(p string) bool { return strings.HasSuffix(p, ".jsonl") && UnderClaudeRoot(p) },
+					Parse:     fullParse(ParseClaudeFile),
+					ParseFrom: offsetParse(ParseClaudeFileFromOffset),
+					Resumes:   claudeExitResumes,
+				},
+			},
 		},
 		{
 			Name: "codex", Load: LoadCodex, Files: CodexFiles,

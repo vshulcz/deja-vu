@@ -211,6 +211,9 @@ func renderClaude(s model.Session, turns []model.Message) (string, []byte, error
 	if s.Kind == "sidechain" {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is a sub-agent run; Claude Code keeps those inside the parent's transcript and does not reopen one on its own"}
 	}
+	if IsPromptLog(s.Path) {
+		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "session is only its prompts from history.jsonl; Claude Code deleted the transcript with the replies, and a session of questions alone is not one to reopen"}
+	}
 	if !strings.HasSuffix(s.Path, ".jsonl") || strings.TrimSuffix(filepath.Base(s.Path), ".jsonl") != s.ID {
 		return "", nil, &WriteBackRefusal{Harness: s.Harness, Reason: "the index has no <id>.jsonl path for this session, which is where `claude --resume` looks"}
 	}

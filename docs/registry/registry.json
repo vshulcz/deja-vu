@@ -288,7 +288,9 @@
         "${HOME}/Library/Developer/Xcode/CodingAssistant/ClaudeAgentConfig/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
         "${DEJA_XCODE_CLAUDE_ROOT}/**/*.jsonl",
         "${DEJA_CC_MIRROR_ROOT:-~/.cc-mirror}/*/.claude/${CLAUDE_CODE_PROJECT_DIR_NAME:-projects}/**/*.jsonl",
-        "${DEJA_CLAUDE_ROOT}/**/*.jsonl"
+        "${DEJA_CLAUDE_ROOT}/**/*.jsonl",
+        "${CLAUDE_CONFIG_DIR:-~/.claude}/history.jsonl",
+        "${DEJA_CLAUDE_HISTORY_FILE}"
       ],
       "format_kind": "jsonl",
       "fixture_paths": [

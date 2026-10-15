@@ -218,6 +218,7 @@ func (r *historyRun) step() {
 			first = historyThin[r.rng.Intn(len(historyThin))]
 		}
 		h.put(s.project, s.sid, hPrompt(s.project, s.sid, s.day, 0, first)+r.turns(s))
+		r.promptLogged(s, first)
 		r.live = append(r.live, s)
 		r.log = append(r.log, "new "+s.sid+" in "+s.project)
 	case 2, 3, 4:

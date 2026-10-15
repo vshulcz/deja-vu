@@ -12,7 +12,7 @@ against the loader list.
 
 | Source | Code | Input |
 | --- | --- | --- |
-| Claude Code | `claude.go` | JSONL files under `~/.claude/projects` |
+| Claude Code | `claude.go`, `claude_history.go` | JSONL files under `~/.claude/projects`, plus the prompts in `~/.claude/history.jsonl` of sessions whose transcript is gone |
 | Codex CLI | `codex.go` | rollout JSONL files (`.jsonl.zst` once Codex compresses them) plus `history.jsonl` under `~/.codex` |
 | opencode | `opencode.go`, `opencode_v2.go`, `opencode_diff.go` | SQLite database at `~/.local/share/opencode/opencode.db` (the 1.x tables and the 2.0 `session_v2`/`session_message` ones), plus `storage/session_diff/*.json` beside it |
 | aider | `aider.go` | `.aider.chat.history.md` files under configured project roots |

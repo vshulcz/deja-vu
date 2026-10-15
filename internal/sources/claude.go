@@ -115,12 +115,33 @@ func ccMirrorRoots() []string {
 }
 
 func LoadClaude() []model.Session {
-	return parseFiles(ClaudeFiles(), ParseClaudeFile)
+	ss := parseFiles(claudeTranscriptFiles(), ParseClaudeFile)
+	if hist := ClaudeHistoryFile(); hist != "" && fileExists(hist) {
+		seen := make(map[string]bool, len(ss))
+		for _, s := range ss {
+			seen[s.ID] = true
+		}
+		h, _ := ParseClaudeHistory(hist)
+		for _, s := range h {
+			if !seen[s.ID] {
+				ss = append(ss, s)
+			}
+		}
+	}
+	return ss
 }
 
-// ClaudeFiles lists the transcript files under the Claude root without parsing
-// them — a cheap count for diagnostics.
+// ClaudeFiles lists the transcript files under the Claude root, and the prompt
+// log when there is one, without parsing them — a cheap count for diagnostics.
 func ClaudeFiles() []string {
+	out := claudeTranscriptFiles()
+	if hist := ClaudeHistoryFile(); hist != "" && fileExists(hist) {
+		out = append(out, hist)
+	}
+	return out
+}
+
+func claudeTranscriptFiles() []string {
 	var out []string
 	for _, root := range ClaudeRoots() {
 		out = append(out, walkFiles(root, ClaudeFileWanted)...)

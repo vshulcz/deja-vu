@@ -856,6 +856,9 @@ func cmdShow(dir string, rest []string, sourceInstance string) error {
 		fmt.Fprintln(os.Stderr, note)
 	}
 	printSpawnEdges(os.Stderr, dir, s)
+	if s.Harness == "claude" && sources.IsPromptLog(s.Path) {
+		fmt.Fprintln(os.Stderr, "deja: only the prompts are left — Claude Code deleted the transcript, and history.jsonl kept what was typed")
+	}
 	// A pasted log is one message, and the index keeps the head of it. The
 	// window note above says when messages were left out; nothing said when a
 	// message was, so a reader searching a log for the line that explains a

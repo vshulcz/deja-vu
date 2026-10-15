@@ -42,6 +42,8 @@ func TestResumeCommandPerHarness(t *testing.T) {
 		{"claude with resolvable dir", model.Session{Harness: "claude", ID: "abc-123", Project: "projects/my-app", Path: claudePath}, real, "claude --resume abc-123", ""},
 		{"codex rollout", model.Session{Harness: "codex", ID: "uuid-1", Project: "my-app"}, "", "codex resume uuid-1", ""},
 		{"codex history entry", model.Session{Harness: "codex", ID: "uuid-2", Project: "history"}, "", "", "nothing to resume"},
+		// Claude Code deleted the transcript; its prompt log is all that is left (#5046).
+		{"claude prompts only", model.Session{Harness: "claude", ID: "abc-124", Project: "proj/app", Path: filepath.Join(tmp, ".claude", "history.jsonl")}, "", "", "nothing to resume"},
 		{"opencode with dir", model.Session{Harness: "opencode", ID: "ses_1", Project: "my-app", Path: real}, real, "opencode -s ses_1", ""},
 		// opencode reopens a session from any directory; a cd into a deleted one
 		// stopped the command before it started (#4201).

@@ -31,6 +31,8 @@ type historyStores struct {
 	db       string
 	opencode []*opencodeSession
 	clock    int64
+	// claudeHistory is Claude Code's prompt log.
+	claudeHistory string
 	// forgotten holds session ids forget took out, for unforget to bring back.
 	forgotten []string
 	peer      *historyPeer
@@ -56,6 +58,27 @@ create table message(id text primary key, session_id text, time_created integer,
 create table part(id text primary key, message_id text, session_id text, time_created integer, time_updated integer, data text);`)
 	}
 	m.clock = time.Now().UnixMilli()
+	// Claude Code's prompt log beside the transcripts: a deleted one leaves
+	// its first prompt there, where the log is the only thing left (#5046).
+	m.claudeHistory = filepath.Join(r.h.tmp, "claude-history.jsonl")
+	t.Setenv("DEJA_CLAUDE_HISTORY_FILE", m.claudeHistory)
+}
+
+// promptLogged writes a Claude session's opening prompt to the prompt log, a
+// moment after the transcript stamps it, as Claude Code does.
+func (r *historyRun) promptLogged(s *historySession, text string) {
+	at := time.Date(2026, 6, s.day, 10, 0, 0, 300_000_000, time.UTC)
+	line := hjson(map[string]any{"display": text, "pastedContents": map[string]any{}, "timestamp": at.UnixMilli(), "project": "/Users/me/" + s.project, "sessionId": s.sid})
+	f, err := os.OpenFile(r.more.claudeHistory, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if _, err := f.WriteString(line); err != nil {
+		r.t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		r.t.Fatal(err)
+	}
 }
 
 // anyStep is one change to one of the stores, Claude transcripts most often.
