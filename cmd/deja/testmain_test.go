@@ -71,6 +71,9 @@ func TestMain(m *testing.M) {
 		"DEJA_ANTIGRAVITY_ROOT": filepath.Join(root, "antigravity"),
 		"DEJA_GROK_ROOT":        filepath.Join(root, "grok"),
 		"DEJA_QWEN_ROOT":        filepath.Join(root, "qwen"),
+		// Claude Code's managed settings win over the user's, and a machine
+		// with a real file there would set cleanupPeriodDays for every test.
+		"DEJA_CLAUDE_MANAGED_SETTINGS": filepath.Join(root, "no-managed-settings.json"),
 		// An opencode on PATH is asked its version, which writes its log under
 		// the test's home and decides which plugin shape doctor calls current:
 		// three tests went red only where opencode was installed (#4155). "0"

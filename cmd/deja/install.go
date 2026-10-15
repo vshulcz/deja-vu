@@ -202,7 +202,7 @@ func runInstall(dir string, args []string, uninstall bool) error {
 	defer recordWiring(targets, uninstall)
 	saidNotes := map[string]bool{}
 	banner := !uninstall && (targetArgs[0] == "--auto" || targetArgs[0] == "--all") && logoWanted(os.Stdout)
-	type lineItem struct{ target, action, path, note string }
+	type lineItem struct{ target, action, path, note, aside string }
 	// The real paths, not the display ones: an uninstall reports the snapshots
 	// it left beside the configs it handled, and ~ does not stat (#2676).
 	var touchedPaths []string
@@ -316,13 +316,21 @@ func runInstall(dir string, args []string, uninstall bool) error {
 				r.Note += off
 			}
 		}
+		// On a line of its own: it is about the agent's files, not this write.
+		aside := ""
+		if !uninstall {
+			if n := claudeCleanupNote(t); n != "" && !saidNotes[n] {
+				saidNotes[n] = true
+				aside = n
+			}
+		}
 		written++
 		if r.Action != "unchanged" || guidanceMoved {
 			changed++
 		}
 		touchedPaths = append(touchedPaths, r.touched()...)
 		if banner {
-			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note})
+			done = append(done, lineItem{t, r.Action, shortHome(r.Path), r.Note, aside})
 		} else {
 			if uninstall && r.Action == "unchanged" && r.Note == "" && !guidanceMoved {
 				// Nothing of deja's was in this agent's files.
@@ -334,8 +342,10 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			}
 			// Under the action rather than in place of it, the way guidance
 			// prints its own note: the action is still what happened (#2218).
-			if r.Note != "" {
-				fmt.Printf("%s%s\n", strings.Repeat(" ", len(t)+2), r.Note)
+			for _, n := range []string{r.Note, aside} {
+				if n != "" {
+					fmt.Printf("%s%s\n", strings.Repeat(" ", len(t)+2), n)
+				}
 			}
 		}
 		if !uninstall && t != "statusline" {
@@ -446,8 +456,10 @@ func runInstall(dir string, args []string, uninstall bool) error {
 			// tells people to run `deja install --auto` — so a note that only
 			// the line-by-line output carried was a note almost nobody read
 			// (#2712).
-			if d.note != "" {
-				info = append(info, fmt.Sprintf("%-*s  %s", nameW, "", d.note))
+			for _, n := range []string{d.note, d.aside} {
+				if n != "" {
+					info = append(info, fmt.Sprintf("%-*s  %s", nameW, "", n))
+				}
 			}
 		}
 		// --all writes the MCP entries and nothing else, which is the flag's
@@ -3718,6 +3730,21 @@ func installClientOffNotes(target string) []string {
 		}
 	}
 	return notes
+}
+
+// claudeCleanupNote is what install says over Claude Code wiring when its
+// cleanupPeriodDays sweep runs at the default 30 days or sooner: it deletes
+// transcripts without a word, and nobody learns deja kept them until one is
+// missing. The setting is the person's, so it is named and left alone.
+func claudeCleanupNote(target string) string {
+	if base := strings.TrimSuffix(target, "-auto"); base != "claude" && base != "claude-code" {
+		return ""
+	}
+	days, ok := claudeCleanupDays(filepath.Join(sources.ClaudeConfigDir(), "settings.json"))
+	if !ok || days > 30 {
+		return ""
+	}
+	return fmt.Sprintf("Claude Code deletes transcripts after %d day%s; deja keeps a copy of each one it indexes from now on", days, pluralS(days))
 }
 
 // switchedOffNote is what install says over an entry the reader turned off.
