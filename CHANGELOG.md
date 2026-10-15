@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An install into a config with a long array of entries written on one line no longer copies the whole file once per entry it puts back: 3000 entries took 47ms and allocated 9 GB, now 13ms (#5025).
 - `deja share --to out.md <id>` refuses the flag before building the index, as `deja share <id> --to out.md` already did, instead of reporting that no session matches "--to". From @mvanhorn (#5014).
 - PowerShell completion offers every role after `--role`, not the old three, and `--year` on `deja stats`. From @notsubash (#5017).
 
