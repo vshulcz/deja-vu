@@ -200,3 +200,30 @@ func setKeptAt(t *testing.T, dir, path string, at int64) {
 		t.Fatal(err)
 	}
 }
+
+// An upgraded store with nothing new on disk reads as up to date, and the
+// marker that starts dating was never written: the first deletion after the
+// upgrade went undated. The pass that finds the marker missing writes it.
+func TestKeptSinceDatesTheFirstDeletionAfterAnUpgradeWithNothingNew(t *testing.T) {
+	dir, _, s1, _ := seedTwoTranscripts(t)
+	m, err := readManifest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.KeptDated = false
+	if err := writeManifestOnly(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(s1); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(dir, "claude", false, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := KeptSince(dir, time.Unix(0, 0), farFuture); len(got) != 1 || got[0].ID != "s1" {
+		t.Fatalf("the first deletion after the upgrade, KeptSince = %+v; want s1", got)
+	}
+}

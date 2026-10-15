@@ -19,7 +19,7 @@ func TestManifestFreshWithAKeptTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := FileState{Size: 3}
-	m := Manifest{Version: version, ToolFingerprint: toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable()),
+	m := Manifest{Version: version, KeptDated: true, ToolFingerprint: toolFingerprint(sources.SQLite3Available(), sources.ZstdAvailable()),
 		Files: map[string]FileState{live: st, gone: st, syncImportPath: {}}}
 	listed := map[string]FileState{live: st}
 	if manifestFresh(m, listed, "") {
@@ -53,7 +53,7 @@ func TestInstallingTheMissingToolMakesTheIndexStale(t *testing.T) {
 		t.Fatalf("the fingerprint does not separate the three states: %q %q %q", without, sqliteOnly, both)
 	}
 
-	m := Manifest{Version: version, Files: map[string]FileState{}, ToolFingerprint: without}
+	m := Manifest{Version: version, KeptDated: true, Files: map[string]FileState{}, ToolFingerprint: without}
 	if manifestFresh(m, map[string]FileState{}, "") {
 		t.Error("an index built without the tools is current on a machine that now has them")
 	}

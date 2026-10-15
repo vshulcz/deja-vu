@@ -416,6 +416,11 @@ func manifestFresh(m Manifest, files map[string]FileState, scope string) bool {
 	if m.Version != version || len(m.Files) < len(files) {
 		return false
 	}
+	// A store from before deletions were dated is read once more, so the pass
+	// writes the mark and the first deletion after the upgrade is dated.
+	if !m.KeptDated {
+		return false
+	}
 	if len(m.Files) > len(files) {
 		for p, f := range m.Files {
 			// The records a sync brought in have no transcript to list.
