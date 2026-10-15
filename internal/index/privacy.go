@@ -14,6 +14,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 type ForgetOptions struct {
@@ -145,14 +146,7 @@ func PushedTo(dir, harness, id string) ([]string, bool) {
 	return pushedTo(m, map[string]bool{key: true})
 }
 
-func privacyDir() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		h, _ := os.UserHomeDir()
-		base = filepath.Join(h, ".config")
-	}
-	return filepath.Join(base, "deja")
-}
+func privacyDir() string { return sources.ConfigDir() }
 
 func tombstonePath() string { return filepath.Join(privacyDir(), "tombstones") }
 

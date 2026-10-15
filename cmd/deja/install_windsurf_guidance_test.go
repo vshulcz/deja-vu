@@ -183,7 +183,7 @@ func TestInstallWindsurfRulesRefusesAnUnboundedBlock(t *testing.T) {
 // word, and ends deja's flags before it.
 func TestWindsurfWorkflowRunsASearch(t *testing.T) {
 	body := commandFileText("windsurf", "/bin/deja")
-	if !strings.Contains(body, `/bin/deja search -- "<the text after /deja>"`) {
+	if !strings.Contains(body, `/bin/deja --framed search -- "<the text after /deja>"`) {
 		t.Fatalf("workflow does not run a search:\n%s", body)
 	}
 	if strings.Contains(body, "$ARGUMENTS") || strings.Contains(body, `/bin/deja "`) {

@@ -49,17 +49,19 @@ If the input is not empty, treat it as the search terms and skip step 2.
 
    ```sh
    deja recall -- "<query>"
-   deja files -- "<query>"
+   deja --framed files -- "<query>"
    ```
 
    Always keep the `--` before the query, so a query that starts with `-` is
-   not read as a flag. `deja recall` prints a short page of matching sessions,
+   not read as a flag, and `--framed` before the command on everything but
+   `deja recall`, which frames its own page: the output then comes marked as
+   untrusted transcript text. `deja recall` prints a short page of matching sessions,
    this project first, each with a session id. `deja files` lists the files
    that were opened or edited while that topic was worked on in this project.
 
    When a hit looks relevant but the excerpt is too short to tell what
-   happened, read it: `deja show <session-id> --limit 40`. If the plan names a
-   specific error, `deja fix -- "<error text>"` shows what was run after that
+   happened, read it: `deja --framed show <session-id> --limit 40`. If the plan names a
+   specific error, `deja --framed fix -- "<error text>"` shows what was run after that
    error before. The first deja call on a machine may take a while to build the
    index; later ones answer in well under a second.
 

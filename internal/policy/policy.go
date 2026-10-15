@@ -44,12 +44,9 @@ func Path() string {
 	if p := os.Getenv("DEJA_POLICY_FILE"); p != "" {
 		return p
 	}
-	// A relative XDG_CONFIG_HOME is ignored rather than followed — the spec
-	// says so, and it is what this repository's own xdgConfigHome does.
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if !filepath.IsAbs(base) {
-		base = filepath.Join(sources.Home(), ".config")
-	}
+	// A relative XDG_CONFIG_HOME is ignored rather than followed, as the spec
+	// says; ConfigHome is the one place that decides it.
+	base := sources.ConfigHome()
 	// And nowhere, rather than somewhere relative: Home() answers "" when
 	// there is no home directory, so this was `.config/deja/policy.json` —
 	// deja read whatever a checkout happened to have there as the reader's own

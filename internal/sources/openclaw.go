@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -151,16 +152,19 @@ func ParseOpenClawFileFromOffset(path string, offset int64) ([]model.Session, er
 // keeps the id it had before the rename — that is the id the store, the key
 // mapping and anyone looking for it still use.
 func parseOpenClawArchive(path string) ([]model.Session, error) {
-	read := path
+	var ss []model.Session
+	var err error
 	if strings.HasSuffix(path, ".zst") {
-		plain, err := zstdToTemp(path)
-		if err != nil {
-			return nil, err
+		plain, derr := zstdDecoded(path, "openclaw")
+		if derr != nil {
+			return nil, derr
 		}
-		defer func() { _ = os.Remove(plain) }()
-		read = plain
+		ss, err = parsePiShapedScan(path, "openclaw", openclawProject(path), true, func(fn func(map[string]any)) error {
+			return scanJSONLReader(path, bytes.NewReader(plain), fn)
+		})
+	} else {
+		ss, err = parsePiShaped(path, 0, "openclaw", openclawProject(path), true)
 	}
-	ss, err := parsePiShaped(read, 0, "openclaw", openclawProject(path), true)
 	for i := range ss {
 		ss[i].Path = path
 		ss[i].ID = strings.TrimSuffix(filepath.Base(openclawArchiveLive(path)), ".jsonl")
@@ -168,40 +172,20 @@ func parseOpenClawArchive(path string) ([]model.Session, error) {
 	return ss, err
 }
 
-// zstdToTemp decompresses a .zst archive into a temporary file and returns its
-// path. deja carries no Go dependencies, so the frames go through the same
-// `zstd` CLI the Zed and DeepSeek stores already need; the caller removes the
-// file. A scanner that reads from a path is what every transcript parser here
-// takes, and an archive is small enough that a temporary copy is cheaper than
-// teaching all of them to read a stream.
-func zstdToTemp(path string) (string, error) { return zstdToTempNamed(path, "openclaw") }
-
-// zstdToTempNamed is zstdToTemp for any store whose transcripts arrive as zstd
-// frames; harness names the store in the error and in the temporary file, so a
+// zstdDecoded decompresses a .zst transcript into memory. deja carries no Go
+// dependencies, so the frames go through the same `zstd` CLI the Zed and
+// DeepSeek stores already need; harness names the store in the error, so a
 // failure says which reader hit it. Codex compresses its own rollouts (#3640).
-func zstdToTempNamed(path, harness string) (string, error) {
+//
+// In memory rather than in a temporary file: the plaintext is the transcript
+// before redaction, and a copy in $TMPDIR outlived any pass that was killed
+// while parsing it (#5052). The archive is read whole either way.
+func zstdDecoded(path, harness string) ([]byte, error) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	out, err := zstdDecodeFile(path, harness, raw)
-	if err != nil {
-		return "", err
-	}
-	f, err := os.CreateTemp("", "deja-"+harness+"-*.jsonl")
-	if err != nil {
-		return "", err
-	}
-	if _, err := f.Write(out); err != nil {
-		_ = f.Close()
-		_ = os.Remove(f.Name())
-		return "", err
-	}
-	if err := f.Close(); err != nil {
-		_ = os.Remove(f.Name())
-		return "", err
-	}
-	return f.Name(), nil
+	return zstdDecodeFile(path, harness, raw)
 }
 
 // openclawProject attributes a session to its agent id; the header cwd, when

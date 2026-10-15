@@ -150,6 +150,9 @@ export default {
     }
     const answer = (out) => text(out || (installed ? NOTHING : MISSING))
 
+    // --framed: search, fix and blame print for a person, and what a tool
+    // returns goes to the model, which has to get it inside deja's
+    // untrusted-data frame. /deja below answers the person and stays plain.
     if (adds.tools) {
       api.registerTool({
         name: "deja_recall",
@@ -158,7 +161,7 @@ export default {
         parameters: RECALL_SCHEMA,
         async execute(_id, params) {
           const limit = String(Math.min(Math.max(Number(params.limit) || 5, 1), 20))
-          return answer(await ask(argv("search", ["--limit", limit], params.query), undefined, 120000))
+          return answer(await ask(["--framed", ...argv("search", ["--limit", limit], params.query)], undefined, 120000))
         },
       })
       api.registerTool({
@@ -167,7 +170,7 @@ export default {
           "What this machine ran after that same error before, in the sessions where the error did not come back. Paste the failing output verbatim rather than a paraphrase.",
         parameters: FIX_SCHEMA,
         async execute(_id, params) {
-          return answer(await ask(argv("fix", [], params.error), undefined, 120000))
+          return answer(await ask(["--framed", ...argv("fix", [], params.error)], undefined, 120000))
         },
       })
       api.registerTool({
@@ -176,7 +179,7 @@ export default {
           "The past sessions that discussed a file, so you know why it is shaped the way it is before editing, refactoring or deleting it. Session history, not git authorship.",
         parameters: BLAME_SCHEMA,
         async execute(_id, params) {
-          return answer(await ask(argv("blame", [], params.path), undefined, 120000))
+          return answer(await ask(["--framed", ...argv("blame", [], params.path)], undefined, 120000))
         },
       })
     }

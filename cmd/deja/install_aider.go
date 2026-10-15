@@ -24,12 +24,7 @@ import (
 // costing a keystroke per session. `deja aider` does the refresh instead and
 // hands the arguments straight to aider.
 func aiderContextPath() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		h, _ := os.UserHomeDir()
-		base = filepath.Join(h, ".config")
-	}
-	return filepath.Join(base, "deja", "aider-context.md")
+	return filepath.Join(sources.ConfigDir(), "aider-context.md")
 }
 
 func aiderConfPath() string {

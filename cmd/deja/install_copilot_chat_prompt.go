@@ -45,7 +45,7 @@ follow up with mode recall_context using a term from it.
 If the deja tools are not available in this window, run the CLI in the
 terminal:
 
-`+"```bash\n"+`%s search -- "$ARGUMENTS"
+`+"```bash\n"+`%s --framed search -- "$ARGUMENTS"
 `+"```"+`
 
 Answer with what the sessions say, and name the session you took it from so the

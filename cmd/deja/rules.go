@@ -144,8 +144,12 @@ func rulesFileFor(harness string) rulesFile {
 	case "aider":
 		// The read-only file install lists under read:, re-read on every
 		// message (stand on 0.86.2); `deja aider` keeps the block when it
-		// refreshes the rest.
-		return sharedRules(aiderContextPath())
+		// refreshes the rest. The file sits in deja's own config directory,
+		// which exists as soon as deja keeps a tombstone or a lock, so the
+		// directory says nothing about aider: the file does, since install
+		// writes it and uninstall removes it (#5052).
+		p := aiderContextPath()
+		return rulesFile{path: p, root: filepath.Dir(p), existing: true}
 	case "continue":
 		// Every .md under <global dir>/rules without globs or invokable is
 		// in the system prompt's userRules (cn 1.5.47, stub endpoint).
@@ -527,6 +531,11 @@ func runRulesTo(w io.Writer, args []string) error {
 // are no rules. Every file is attempted: one the reader has to fix by hand is
 // named at the end rather than stopping the rest.
 func syncRules(w io.Writer, body string, known []string) error {
+	// No agent to write for is no reason to create deja's config directory
+	// for the lock (#5052).
+	if len(known) == 0 {
+		return nil
+	}
 	release, _, _ := holdInstallLock(true)
 	defer release()
 	var refused []string

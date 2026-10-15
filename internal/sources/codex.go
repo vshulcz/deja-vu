@@ -322,21 +322,23 @@ func ParseCodexRolloutFromOffset(path string, offset int64) ([]model.Session, er
 // parseRolloutFile reads one codex-rs rollout, plain or compressed, as the
 // sessions of the harness that wrote it.
 func parseRolloutFile(path string, offset int64, harness string) ([]model.Session, error) {
-	// A compressed rollout is read through the same scanner as a plain one, by
-	// decompressing it to a temporary file first — the pattern openclaw's
-	// archives already use, because every transcript parser here takes a path.
-	// The frame is immutable: Codex materializes a rollout back to `.jsonl`
-	// before appending, so the offset the incremental pass carries for a
-	// compressed file is a whole-file read (#3640).
+	// A compressed rollout is read through the same scanner as a plain one,
+	// from the decompressed bytes in memory. The frame is immutable: Codex
+	// materializes a rollout back to `.jsonl` before appending, so the offset
+	// the incremental pass carries for a compressed file is a whole-file read
+	// (#3640).
 	if codexCompressed(path) {
-		plain, err := zstdToTempNamed(path, harness)
+		plain, err := zstdDecoded(path, harness)
 		if err != nil {
 			return nil, err
 		}
-		defer func() { _ = os.Remove(plain) }()
-		ss, err := parseCodexRolloutPath(plain, 0, codexSessionID(path), filepath.Base(filepath.Dir(path)), harness)
-		for i := range ss {
-			ss[i].Path = path
+		s := model.Session{Harness: harness, ID: codexSessionID(path), Project: filepath.Base(filepath.Dir(path)), Path: path}
+		ss, err := parseCodexRolloutWithScanner(s, false, "", func(fn func(map[string]any)) error {
+			return scanJSONLReader(path, bytes.NewReader(plain), fn)
+		}, nil)
+		// As parseCodexRolloutPath: a rollout with no message is no session.
+		if len(ss) == 1 && len(ss[0].Messages) == 0 {
+			return nil, err
 		}
 		return ss, err
 	}

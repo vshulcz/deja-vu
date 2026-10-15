@@ -17,7 +17,7 @@ func TestWrittenCommandFilesNameTheSubcommand(t *testing.T) {
 		{"markdown", markdownCommand("/bin/deja"), "$ARGUMENTS"},
 		{"body", commandBody("/bin/deja", "{{args}}"), "{{args}}"},
 	} {
-		call := "/bin/deja search -- \"" + tc.token + "\""
+		call := "/bin/deja --framed search -- \"" + tc.token + "\""
 		if !strings.Contains(tc.body, call) {
 			t.Errorf("%s does not run a search:\n%s", tc.name, tc.body)
 		}

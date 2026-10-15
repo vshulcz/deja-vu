@@ -206,7 +206,9 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
   // copy `deja install` keeps current; this package fills the gaps.
   const adds = contributions(installerWiring(), config)
 
-  // The six tools, described once. opencode 1.x takes them through its zod
+  // The six tools, described once. The ones that read history ask for
+  // --framed output: what those commands print is written for a person, and
+  // the model has to get it inside deja's untrusted-data frame. opencode 1.x takes them through its zod
   // helper and 2.x as JSON Schema (server.js), so the arguments are plain
   // data and each side builds its own.
   const specs = {
@@ -219,7 +221,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
       },
       async execute(args) {
         const limit = String(clampLimit(args.limit))
-        return answer(await ask(argv("search", ["--json", "--limit", limit], args.query)))
+        return answer(await ask(["--framed", ...argv("search", ["--json", "--limit", limit], args.query)]))
       },
     },
     deja_session: {
@@ -229,7 +231,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         query: { type: "string", description: "A query, or a session id prefix returned by deja_recall." },
       },
       async execute(args) {
-        return answer(await ask(argv("ctx", [], args.query)))
+        return answer(await ask(["--framed", ...argv("ctx", [], args.query)]))
       },
     },
     deja_blame: {
@@ -239,7 +241,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         path: { type: "string", description: "Path to the file, absolute or relative to the project." },
       },
       async execute(args) {
-        return answer(await ask(argv("blame", ["--json"], args.path)))
+        return answer(await ask(["--framed", ...argv("blame", ["--json"], args.path)]))
       },
     },
     deja_fix: {
@@ -249,7 +251,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         error: { type: "string", description: "The failing output, copied as it was printed." },
       },
       async execute(args) {
-        return answer(await ask(argv("fix", [], args.error)))
+        return answer(await ask(["--framed", ...argv("fix", [], args.error)]))
       },
     },
     deja_how: {
@@ -259,7 +261,7 @@ export const DejaPlugin = async ({ client, directory }, options = {}) => {
         what: { type: "string", description: "The thing to run: a tool, a task, a script name." },
       },
       async execute(args) {
-        return answer(await ask(argv("how", [], args.what)))
+        return answer(await ask(["--framed", ...argv("how", [], args.what)]))
       },
     },
     deja_remember: {

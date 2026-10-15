@@ -46,6 +46,14 @@ func parsePiFileFromOffset(path string, offset int64) ([]model.Session, error) {
 // whose agent runtime is the same lineage). useHeaderCwd promotes the session
 // header's cwd to the project key when present.
 func parsePiShaped(path string, offset int64, harness, project string, useHeaderCwd bool) ([]model.Session, error) {
+	return parsePiShapedScan(path, harness, project, useHeaderCwd, func(fn func(map[string]any)) error {
+		return scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isPiHeader, fn)
+	})
+}
+
+// parsePiShapedScan is parsePiShaped with the lines supplied by scan, for a
+// transcript that is not read from its path as it is.
+func parsePiShapedScan(path, harness, project string, useHeaderCwd bool, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	s := model.Session{
 		Harness: harness,
 		ID:      strings.TrimSuffix(filepath.Base(path), ".jsonl"),
@@ -53,7 +61,7 @@ func parsePiShaped(path string, offset int64, harness, project string, useHeader
 		Path:    path,
 	}
 	r := newPiReader(&s, useHeaderCwd)
-	err := scanJSONLWithHeaderFromOffsetFunc(path, offset, headerLookahead, isPiHeader, r.line)
+	err := scan(r.line)
 	r.finish()
 	if len(s.Messages) == 0 {
 		return nil, err
