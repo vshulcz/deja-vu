@@ -91,11 +91,7 @@ func AiderFiles() []string {
 // AiderProjectsPath is the list of directories `deja aider` has started aider
 // in, one per line.
 func AiderProjectsPath() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		base = filepath.Join(Home(), ".config")
-	}
-	return filepath.Join(base, "deja", "aider-projects")
+	return filepath.Join(ConfigDir(), "aider-projects")
 }
 
 func aiderProjects() []string {

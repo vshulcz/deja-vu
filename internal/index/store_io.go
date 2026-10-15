@@ -656,6 +656,7 @@ func swapIndexDir(dir, tmp string) error {
 	if _, statErr := os.Stat(old); statErr == nil {
 		return fmt.Errorf("an earlier index swap left %s behind and deja cannot replace it — remove that directory and run `deja index` again", old)
 	}
+	carryTombstoneMirror(dir, tmp)
 	// The parking step can afford to wait: the index is still where readers
 	// look until it succeeds, so nobody is waiting on it, and this is the
 	// rename a pass that spent seconds building tmp would otherwise give up on
@@ -667,7 +668,11 @@ func swapIndexDir(dir, tmp string) error {
 	// restore that may follow it share one deadline: the window a reader waits
 	// out, spent once between them rather than twice.
 	deadline := swapNow().Add(swapRenameWait)
+	carried := carryIndexState(old, tmp)
 	if err := renameWaitingUntil(tmp, dir, deadline); err != nil {
+		for _, name := range carried {
+			_ = os.Rename(filepath.Join(tmp, name), filepath.Join(old, name))
+		}
 		// Put the previous index back rather than leaving nothing, with
 		// whatever is left of that window — this runs exactly when renames on
 		// this directory are being refused.
@@ -683,6 +688,50 @@ func swapIndexDir(dir, tmp string) error {
 	}
 	_ = os.RemoveAll(old)
 	return nil
+}
+
+// indexState is what lives inside the index directory without being built
+// from the transcripts: the hook text still waiting for its session
+// (cmd/deja's deferred/). No pass writes it into a new index, so every swap
+// deleted it along with the old one (#5052).
+var indexState = []string{"deferred"}
+
+// carryIndexState moves indexState from the parked index into the new one and
+// returns the names it moved, so a failed swap can put them back. A rename,
+// not a copy: the parked directory goes a moment later either way.
+func carryIndexState(old, tmp string) []string {
+	var moved []string
+	for _, name := range indexState {
+		if _, err := os.Lstat(filepath.Join(tmp, name)); err == nil {
+			continue
+		}
+		if os.Rename(filepath.Join(old, name), filepath.Join(tmp, name)) == nil {
+			moved = append(moved, name)
+		}
+	}
+	return moved
+}
+
+// carryTombstoneMirror writes the tombstone mirror into the index about to
+// replace dir. Only forget and unforget wrote it, so the first rebuild after a
+// forget deleted it, and with the config directory gone too the next rebuild
+// brought the session back (#5052). Both copies go in, so a mirror lost
+// earlier comes back from the config copy. Best effort, as in writeTombstones:
+// an index that cannot hold it still gets swapped.
+func carryTombstoneMirror(dir, tmp string) {
+	set := readTombstoneFile(tombstonePath())
+	for key := range readTombstoneFile(tombstoneMirrorPath(dir)) {
+		set[key] = true
+	}
+	if len(set) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(set))
+	for key := range set {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	_ = writeTombstoneMirrorAt(tmp, keys)
 }
 
 // renameWaiting is os.Rename with a short wait for a rename another pass is

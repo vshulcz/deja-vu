@@ -18,6 +18,11 @@ func TestAnUnknownTargetWritesNothing(t *testing.T) {
 	if _, statErr := os.Stat(cliSkillPath()); statErr == nil {
 		t.Fatalf("the skill was written for a target that does not exist: %s", cliSkillPath())
 	}
+	// Nor the install lock: it made ~/.config/deja for a run that wires
+	// nothing (#5052).
+	if _, statErr := os.Stat(installLockPath()); statErr == nil {
+		t.Fatalf("an unknown target created the install lock: %s", installLockPath())
+	}
 }
 
 // A target that exists still gets it, which is what the file is for.

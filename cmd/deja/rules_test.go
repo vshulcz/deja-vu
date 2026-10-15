@@ -365,3 +365,43 @@ func TestDoctorNamesAgentsBehindTheRules(t *testing.T) {
 		t.Fatalf("an agent in sync was named:\n%s", buf.String())
 	}
 }
+
+// aider's rules file is in deja's own config directory, which exists as soon
+// as the rules file itself does, so sync wrote aider-context.md, and the
+// install lock beside it, on a machine where aider was never installed
+// (#5052).
+func TestRulesSyncSkipsAiderWhenItWasNeverInstalled(t *testing.T) {
+	hermeticEnv(t)
+	cfg := filepath.Join(os.Getenv("HOME"), ".config", "deja")
+	if err := os.MkdirAll(cfg, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rulesSourcePath(), []byte("Use tabs.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := rulesOut(t, "sync"); err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	for _, p := range []string{aiderContextPath(), installLockPath()} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("rules sync wrote %s with no agent installed", p)
+		}
+	}
+}
+
+// Once install has written the context file, sync puts the block in it.
+func TestRulesSyncWritesAiderOnceInstalled(t *testing.T) {
+	hermeticEnv(t)
+	if _, err := captureRun(t, "install", "aider", "--no-index"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rulesSourcePath(), []byte("Use tabs.\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := rulesOut(t, "sync"); err != nil {
+		t.Fatalf("sync: %v\n%s", err, out)
+	}
+	if b, err := os.ReadFile(aiderContextPath()); err != nil || !strings.Contains(string(b), "Use tabs.") {
+		t.Fatalf("aider context after sync: %q, %v", b, err)
+	}
+}

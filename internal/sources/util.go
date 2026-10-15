@@ -46,6 +46,25 @@ func capParsedMessage(s string) string {
 type Source struct{ Name, Root string }
 
 func Home() string { h, _ := os.UserHomeDir(); return h }
+
+// ConfigHome is the XDG config base for deja's own files: the tombstones, the
+// exclude list, the aider context, peers, policy, the wiring record and the
+// install lock. Not for paths that mirror a harness's own lookup.
+//
+// The XDG spec says a relative value is invalid and must be ignored. Followed,
+// it put the tombstone list and aider's context file in whatever directory the
+// command ran from, where no later run looks (#1693, #5052). With no home
+// directory the answer is relative too; main refuses to run in that case.
+func ConfigHome() string {
+	if base := os.Getenv("XDG_CONFIG_HOME"); filepath.IsAbs(base) {
+		return base
+	}
+	return filepath.Join(Home(), ".config")
+}
+
+// ConfigDir is deja's own directory under ConfigHome.
+func ConfigDir() string { return filepath.Join(ConfigHome(), "deja") }
+
 func EnvPath(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
@@ -382,7 +401,14 @@ func scanJSONLFromOffset(path string, offset int64, fn func(map[string]any)) err
 			return err
 		}
 	}
-	r := bufio.NewReaderSize(boundedFrom(path, f, offset), 1024*1024)
+	return scanJSONLReader(path, boundedFrom(path, f, offset), fn)
+}
+
+// scanJSONLReader is the line loop of scanJSONLFromOffset over any reader;
+// path only names the file in diagnostics. A decompressed archive is read
+// through it from memory, so its plaintext never lands in a temporary file.
+func scanJSONLReader(path string, src io.Reader, fn func(map[string]any)) error {
+	r := bufio.NewReaderSize(src, 1024*1024)
 	for {
 		line, err := r.ReadBytes('\n')
 		// A UTF-8 BOM on the first line would fail the JSON decode below, so the

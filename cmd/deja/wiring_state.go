@@ -7,6 +7,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/vshulcz/deja-vu/internal/sources"
 )
 
 // A hook or plugin deja wrote is a copy of what this binary generates, frozen
@@ -130,12 +132,7 @@ func wiringStatePath() string {
 // a relative value instead, so `XDG_CONFIG_HOME=relcfg deja install` wrote
 // wiring.json into whatever directory the command ran from, where no later run
 // would look for it (#1693).
-func xdgConfigHome() string {
-	if base := os.Getenv("XDG_CONFIG_HOME"); filepath.IsAbs(base) {
-		return base
-	}
-	return filepath.Join(homeDir(), ".config")
-}
+func xdgConfigHome() string { return sources.ConfigHome() }
 
 func readWiringState() wiringState {
 	var st wiringState

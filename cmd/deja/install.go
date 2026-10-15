@@ -64,22 +64,6 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		readBytes = nil
 		readBytesMu.Unlock()
 	}()
-	// One install at a time. Every writer here reads a config, edits it and
-	// writes it back, which is three steps a second process can land in the
-	// middle of: with `deja install claude-auto` and `deja install statusline`
-	// started together, eight runs in twelve lost one of the two wirings —
-	// both edit ~/.claude/settings.json, and the later write was built on the
-	// file as it was before the earlier one. The pairing is not contrived: the
-	// repair after an upgrade runs an install from the hook path, so a session
-	// starting while someone types `deja install` is exactly this (#3691).
-	// An uninstall on a machine that never had deja must leave nothing at all
-	// behind, the lock included (#676), so it only takes one where deja's own
-	// directory is already there.
-	if !uninstall || isRealDir(filepath.Dir(installLockPath())) {
-		if release, ok, _ := holdInstallLock(true); ok {
-			defer release()
-		}
-	}
 	removingWiring = uninstall
 	defer func() { removingWiring = false }()
 	guidance := true
@@ -183,6 +167,24 @@ func runInstall(dir string, args []string, uninstall bool) error {
 		// worked, with the wiring still in place.
 		if len(targets) == 0 {
 			return unknownTargetError(targetArgs[0])
+		}
+	}
+	// One install at a time. Every writer here reads a config, edits it and
+	// writes it back, which is three steps a second process can land in the
+	// middle of: with `deja install claude-auto` and `deja install statusline`
+	// started together, eight runs in twelve lost one of the two wirings —
+	// both edit ~/.claude/settings.json, and the later write was built on the
+	// file as it was before the earlier one. The pairing is not contrived: the
+	// repair after an upgrade runs an install from the hook path, so a session
+	// starting while someone types `deja install` is exactly this (#3691).
+	// An uninstall on a machine that never had deja must leave nothing at all
+	// behind, the lock included (#676), so it only takes one where deja's own
+	// directory is already there. Taken once the targets are known, and only
+	// when one of them is real: `deja install frobnicate` created
+	// ~/.config/deja/install.lock for a run that wires nothing (#5052).
+	if slices.ContainsFunc(targets, knownInstallTarget) && (!uninstall || isRealDir(filepath.Dir(installLockPath()))) {
+		if release, ok, _ := holdInstallLock(true); ok {
+			defer release()
 		}
 	}
 	exe, err := os.Executable()
@@ -833,6 +835,14 @@ var installTargetAliases = map[string]string{
 	"claude":   "claude-code",
 	"dsh":      "deepseek",
 	"dsh-auto": "deepseek-auto",
+}
+
+// knownInstallTarget reports whether installTarget has a case for target.
+func knownInstallTarget(target string) bool {
+	if _, ok := installTargetAliases[target]; ok {
+		return true
+	}
+	return target == "sync-timer" || slices.Contains(installTargetNames(), target)
 }
 
 func installTarget(target, exe string, uninstall bool) (installResult, error) {

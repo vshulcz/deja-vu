@@ -16,11 +16,7 @@ import (
 
 // ExcludePath is the primary privacy configuration, kept outside the cache.
 func ExcludePath() string {
-	base := os.Getenv("XDG_CONFIG_HOME")
-	if base == "" {
-		base = filepath.Join(Home(), ".config")
-	}
-	return filepath.Join(base, "deja", "exclude")
+	return filepath.Join(ConfigDir(), "exclude")
 }
 
 func ExclusionPatterns() []string {

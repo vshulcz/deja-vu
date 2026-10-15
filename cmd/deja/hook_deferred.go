@@ -382,40 +382,49 @@ func hasFlag(args []string, flag string) bool {
 }
 
 // withStdin runs fn with os.Stdin reading raw.
+//
+// A pipe, not a file: the payload is the user's prompt, and a temporary file
+// in $TMPDIR outlived a hook killed by its harness's timeout (#5052). A pipe
+// is also what the harness hands a hook in the first place. The writer stops
+// when fn returns without reading it all, since the read end closes.
 func withStdin(raw []byte, fn func() error) error {
-	f, err := os.CreateTemp("", "deja-hook-in-*")
+	r, w, err := os.Pipe()
 	if err != nil {
 		return fn()
 	}
-	defer func() { _ = os.Remove(f.Name()) }()
-	defer f.Close()
-	if _, err := f.Write(raw); err != nil {
-		return fn()
-	}
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return fn()
-	}
+	go func() {
+		_, _ = w.Write(raw)
+		_ = w.Close()
+	}()
 	old := os.Stdin
-	os.Stdin = f
-	defer func() { os.Stdin = old }()
+	os.Stdin = r
+	defer func() {
+		os.Stdin = old
+		_ = r.Close()
+	}()
 	return fn()
 }
 
-// captureDeferredStdout runs fn with os.Stdout going to a file and returns what it
-// wrote.
+// captureDeferredStdout runs fn with os.Stdout going to a pipe and returns
+// what it wrote. A pipe for the reason withStdin has one; the hook's children
+// write to the null device, so nothing else holds the write end open.
 func captureDeferredStdout(fn func() error) ([]byte, error) {
-	f, err := os.CreateTemp("", "deja-hook-out-*")
+	r, w, err := os.Pipe()
 	if err != nil {
 		return nil, fn()
 	}
-	defer func() { _ = os.Remove(f.Name()) }()
-	defer f.Close()
+	got := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		_ = r.Close()
+		got <- b
+	}()
 	old := os.Stdout
-	os.Stdout = f
+	os.Stdout = w
 	ferr := fn()
 	os.Stdout = old
-	b, _ := os.ReadFile(f.Name())
-	return b, ferr
+	_ = w.Close()
+	return <-got, ferr
 }
 
 // runHookStop hands what waits for this session to the model through a Stop
