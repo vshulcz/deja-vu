@@ -809,6 +809,11 @@ type FileState struct {
 	// index never read as fresh, and every search served stale while a
 	// background pass found nothing to do.
 	Kept bool `json:"kept,omitempty"`
+	// KeptAt is when an index pass first found the kept transcript gone, in
+	// Unix seconds. No agent records when it deleted a transcript, and the pass
+	// after it is the nearest deja can say; a row kept before this field
+	// existed has zero, and no window claims it.
+	KeptAt int64 `json:"kept_at,omitempty"`
 	// SafeSize is the offset just past the last complete line at index time.
 	// A session file caught mid-write ends in a torn line; parsing skips it,
 	// and the next append must resume from here or that message is lost.

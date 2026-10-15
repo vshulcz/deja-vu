@@ -636,6 +636,9 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = filterTombstonedSet(ss, dead)
 	for p, st := range orphans.files {
+		if !st.Kept {
+			st.KeptAt = time.Now().Unix()
+		}
 		st.Kept = true
 		files[p] = st
 	}
@@ -4003,6 +4006,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		if of, ok := old.Files[p]; ok {
 			if !of.Kept {
 				newlyKept[p] = true
+				of.KeptAt = time.Now().Unix()
 			}
 			of.Kept = true
 			files[p] = of
