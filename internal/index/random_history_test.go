@@ -86,6 +86,14 @@ type historyRun struct {
 	index string
 	more  historyStores
 	walls bool
+	// awaiting holds sessions whose prompt is in the log and whose transcript
+	// the next step writes.
+	awaiting []awaitingTranscript
+}
+
+type awaitingTranscript struct {
+	s    *historySession
+	body string
 }
 
 func runRandomHistory(t *testing.T, seed int64, walls bool) {
@@ -196,6 +204,16 @@ func (r *historyRun) pick() *historySession {
 
 func (r *historyRun) step() {
 	h := r.h
+	// A session whose prompt was logged a pass before its transcript: the
+	// transcript lands now, as Claude Code writes it after the prompt hook.
+	if len(r.awaiting) > 0 {
+		a := r.awaiting[0]
+		r.awaiting = r.awaiting[1:]
+		h.put(a.s.project, a.s.sid, a.body)
+		r.live = append(r.live, a.s)
+		r.log = append(r.log, "the transcript of "+a.s.sid+" lands")
+		return
+	}
 	s := r.pick()
 	op := r.rng.Intn(10)
 	if s == nil {
@@ -217,8 +235,14 @@ func (r *historyRun) step() {
 		if r.rng.Intn(3) == 0 {
 			first = historyThin[r.rng.Intn(len(historyThin))]
 		}
-		h.put(s.project, s.sid, hPrompt(s.project, s.sid, s.day, 0, first)+r.turns(s))
+		body := hPrompt(s.project, s.sid, s.day, 0, first) + r.turns(s)
 		r.promptLogged(s, first)
+		if r.next%3 == 0 {
+			r.awaiting = append(r.awaiting, awaitingTranscript{s, body})
+			r.log = append(r.log, "the prompt of "+s.sid+" in "+s.project+" logged before its transcript")
+			return
+		}
+		h.put(s.project, s.sid, body)
 		r.live = append(r.live, s)
 		r.log = append(r.log, "new "+s.sid+" in "+s.project)
 	case 2, 3, 4:

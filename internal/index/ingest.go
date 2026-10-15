@@ -496,7 +496,7 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 			removedAny = true
 		}
 	}
-	if !removedAny && canAppendIncremental(changed, m.Files) {
+	if !removedAny && canAppendIncremental(changed, m.Files) && !promptLogTakeover(changed, m.Files, m.Sessions) {
 		mark("decide append")
 		// An append is cheap until it isn't. A live session that has been
 		// writing all day — a Grok `updates.jsonl` in the tens of megabytes —
@@ -2977,6 +2977,72 @@ func isCodexHistory(path string) bool {
 	return sources.IsPromptLog(path)
 }
 
+// promptLogTakeover reports whether a file new to this pass is the transcript
+// of a session the index holds from a prompt log alone. Claude Code writes the
+// prompt to history.jsonl before the transcript line, and deja's own prompt
+// hook runs a pass in between, so a new session's first prompt is indexed from
+// the log and its transcript lands a pass later. The append path can only add
+// to what is stored; the replacement path drops the log's copy, which is what a
+// rebuild, reading the transcript and skipping the line, gives. A Codex rollout
+// after its history line is the same pair. The id is in the file name: the
+// whole stem for Claude, the trailing UUID of a rollout.
+func promptLogTakeover(changed, oldFiles map[string]FileState, sessions map[string]SessionMeta) bool {
+	logged := map[string]bool{}
+	for _, meta := range sessions {
+		if isCodexHistory(meta.Path) {
+			logged[meta.ID] = true
+		}
+	}
+	if len(logged) == 0 {
+		return false
+	}
+	for p := range changed {
+		if _, known := oldFiles[p]; known || isCodexHistory(p) {
+			continue
+		}
+		stem := filepath.Base(fileStem(p))
+		if logged[stem] || (len(stem) > 36 && logged[stem[len(stem)-36:]]) {
+			return true
+		}
+	}
+	return false
+}
+
+// promptLogTakeovers names the sessions of this batch whose row came from a
+// prompt log and that a transcript now holds.
+func promptLogTakeovers(ss []model.Session, held map[string]SessionMeta) map[string]bool {
+	out := map[string]bool{}
+	for _, s := range ss {
+		key := s.Harness + ":" + s.ID
+		if meta, ok := held[key]; ok && isCodexHistory(meta.Path) && !isCodexHistory(s.Path) {
+			out[key] = true
+		}
+	}
+	return out
+}
+
+// freshPromptWait is how long a prompt-log line with no transcript beside it
+// waits before it is taken for a session whose transcript is gone. Claude Code
+// writes the transcript line a moment after the prompt; a pass in between
+// would index the prompt twice and leave the takeover to a full rewrite.
+const freshPromptWait = 5 * time.Minute
+
+// waitsForTranscript reports whether a prompt log's tail holds a session the
+// index does not know whose last prompt is younger than freshPromptWait. The
+// file is then left for the next pass to read from the same offset, by which
+// time the transcript is on disk and the parser skips the line.
+func waitsForTranscript(ss []model.Session, held map[string]SessionMeta, now time.Time) bool {
+	for _, s := range ss {
+		if _, ok := held[s.Harness+":"+s.ID]; ok {
+			continue
+		}
+		if !s.Updated.IsZero() && now.Sub(s.Updated) < freshPromptWait {
+			return true
+		}
+	}
+	return false
+}
+
 // dropShadowedPrompts drops a session read from a prompt log when a transcript
 // holds the same id, in this batch or in the rows the index already has. A
 // prompt log is read for sessions whose transcript is not on disk, and one deja
@@ -4128,7 +4194,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		}
 		return nil
 	}
-	if len(removed) == 0 && !rewritten && canAppendIncremental(changed, old.Files) {
+	if len(removed) == 0 && !rewritten && canAppendIncremental(changed, old.Files) && !promptLogTakeover(changed, old.Files, old.Sessions) {
 		filesTouched, messages, unreadable, err := appendIncremental(dir, harness, scope, old, files, changed)
 		if IsCorrupt(err) {
 			if progress != nil {
@@ -4262,6 +4328,9 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	for _, s := range replacements {
 		replaceKeys[s.Harness+":"+s.ID] = true
 	}
+	// A transcript arriving for a session held from a prompt log alone: the
+	// log's records for it go, and the row starts over from the transcript.
+	takeovers := promptLogTakeovers(replacements, old.Sessions)
 	aiderHeld := aiderStarts(replacements)
 	// A kept file whose session arrived again from another path is a rename,
 	// not a cleanup: the client moved the transcript, and keeping the old copy
@@ -4430,7 +4499,8 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		// And only when the pass read that store whole: a store read from its
 		// watermark hands back the new turns alone, so dropping the rest by key
 		// would take the earlier turns of every continued session (#2033).
-		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) {
+		if removed[r.SourcePath] || (changed[r.SourcePath].Path != "" && !fromStore && !leftItsFile(r, replaceKeys, old.Sessions[r.Key], aiderHeld) && !keptThroughCompaction(r, compacted)) || (fromStore && readWholeThisPass(r) && storeKeys[r.Key]) ||
+			(takeovers[r.Key] && isCodexHistory(r.SourcePath)) {
 			dropped[r.Key] = true
 			return
 		}
@@ -4479,6 +4549,9 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		if !ok {
 			// The row may exist only in the manifest being replaced.
 			held = old.Sessions[key]
+			if takeovers[key] {
+				held = SessionMeta{}
+			}
 		}
 		// A renamed transcript arrives as one removed path and one added path
 		// in the same pass, so the path deja holds is the one that went away.
@@ -4818,6 +4891,17 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 			continue
 		}
 		ss = dropShadowedPrompts(sources.FilterSessions(filterTombstoned(ss)), m.Sessions)
+		// A prompt whose transcript has not landed yet is read again next pass,
+		// from the same offset, rather than indexed from the log now and taken
+		// over by a full rewrite when the transcript arrives.
+		if isCodexHistory(p) && waitsForTranscript(ss, m.Sessions, time.Now()) {
+			if known {
+				m.Files[p] = of
+			} else {
+				delete(m.Files, p)
+			}
+			continue
+		}
 		// Scrub before anything is derived from the text, as the other two paths
 		// do. Redacting per message inside the write loop below left the derived
 		// fields — the friction signatures especially — hashed from the raw
