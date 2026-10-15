@@ -18,8 +18,11 @@ func runShare(dir string, args []string, w io.Writer) error {
 	// Everything after the id used to be ignored, so `deja share <id> --to
 	// out.md` printed the share to the terminal and wrote no file — and said
 	// nothing about either (#1002). promote refuses unknown flags; this is the
-	// same command shape one letter away.
-	for _, a := range args[1:] {
+	// same command shape one letter away. The loop started at args[1:], so a
+	// flag standing where the id belongs was taken as the prefix and surfaced
+	// as `no session matches "--to"` only after the index build (#5014);
+	// checking the id position too refuses it before any lookup.
+	for _, a := range args {
 		if strings.HasPrefix(a, "-") {
 			return fmt.Errorf("share: unknown flag %q — share writes to stdout (redirect it), and `deja promote <id> --to <path>` is the one that writes a file", a)
 		}

@@ -39,6 +39,22 @@ func TestShareRefusesFlagsItCannotHonour(t *testing.T) {
 		t.Errorf("share wrote a file after refusing")
 	}
 
+	// A flag standing where the id belongs was taken as the prefix, so it cost
+	// an index build and came back as `no session matches "--to"` (#5014).
+	// Both orders must refuse it the same way, naming the flag.
+	_, err = captureRun(t, "share", "--to", out, "loc")
+	if err == nil {
+		t.Fatalf("share accepted a flag in the id's place and looked it up as a prefix")
+	}
+	if !strings.Contains(err.Error(), "unknown flag") ||
+		!strings.Contains(err.Error(), `"--to"`) ||
+		!strings.Contains(err.Error(), "promote") {
+		t.Errorf("the refusal does not name the flag and what to use instead: %v", err)
+	}
+	if _, statErr := os.Stat(out); statErr == nil {
+		t.Errorf("share wrote a file after refusing a leading flag")
+	}
+
 	// The ordinary share is untouched.
 	got, err := captureRun(t, "share", "loc")
 	if err != nil {
