@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An install into a config with a long array of entries written on one line no longer copies the whole file once per entry it puts back: 3000 entries took 47ms and allocated 9 GB, now 13ms (#5025).
 - `deja share --to out.md <id>` refuses the flag before building the index, as `deja share <id> --to out.md` already did, instead of reporting that no session matches "--to". From @mvanhorn (#5014).
 - PowerShell completion offers every role after `--role`, not the old three, and `--year` on `deja stats`. From @notsubash (#5017).
 - The weekly note says when an agent deleted sessions deja kept: `Claude Code deleted 37 sessions this week; deja kept them — deja resume 5a1c0de0-111 --write-back`. Agents are named in one line, the id is the newest deletion, and an agent deja cannot write back to gets `deja show <id>`. A quiet week still says it. The window starts at the index pass that found each transcript gone; sessions kept before this release carry no date and are not counted.

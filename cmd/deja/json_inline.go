@@ -75,14 +75,20 @@ func keepInlineBlocks(old, next []byte) []byte {
 		edits = append(edits, rewrite{c.start, c.end, flat})
 		covered = c.end
 	}
-	// Back to front, so every offset ahead of an edit is still the one the scan
-	// reported.
-	for i := len(edits) - 1; i >= 0; i-- {
-		e := edits[i]
-		tail := append(append([]byte{}, e.text...), next[e.end:]...)
-		next = append(next[:e.start:e.start], tail...)
+	if len(edits) == 0 {
+		return next
 	}
-	return next
+	// One copy, front to back. Splicing each edit into next copied the rest of
+	// the document every time, and an array of 3000 moved entries allocated
+	// gigabytes (#5025).
+	out := make([]byte, 0, len(next))
+	at := 0
+	for _, e := range edits {
+		out = append(out, next[at:e.start]...)
+		out = append(out, e.text...)
+		at = e.end
+	}
+	return append(out, next[at:]...)
 }
 
 // relined puts one block of next back on one line in the reader's shape: their

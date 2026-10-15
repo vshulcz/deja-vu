@@ -139,26 +139,45 @@ func TestEqualEntriesWrittenDifferentlyStayApart(t *testing.T) {
 }
 
 // A long array with deja's entry added ahead of the reader's stays linear: the
-// lookup by value decoded every entry again for every entry it moved.
+// lookup by value decoded every entry again for every entry it moved. A fixed
+// 2s ceiling tripped on a loaded runner under -race (#5025), so the time is
+// compared against an array a quarter the size: linear is about 4x, the
+// quadratic lookup was 16x.
 func TestALongArrayWithAMovedEntryStaysFast(t *testing.T) {
-	var o, n strings.Builder
-	o.WriteString("{\n  \"list\": [\n")
-	n.WriteString("{\n  \"list\": [\n    {\n      \"deja\": true\n    },\n")
-	const count = 3000
-	for i := 0; i < count; i++ {
-		sep := ","
-		if i == count-1 {
-			sep = ""
+	build := func(count int) (string, string) {
+		var o, n strings.Builder
+		o.WriteString("{\n  \"list\": [\n")
+		n.WriteString("{\n  \"list\": [\n    {\n      \"deja\": true\n    },\n")
+		for i := 0; i < count; i++ {
+			sep := ","
+			if i == count-1 {
+				sep = ""
+			}
+			fmt.Fprintf(&o, "    {\"name\": \"e%d\", \"id\": %d}%s\n", i, i, sep)
+			fmt.Fprintf(&n, "    {\n      \"id\": %d,\n      \"name\": \"e%d\"\n    }%s\n", i, i, sep)
 		}
-		fmt.Fprintf(&o, "    {\"name\": \"e%d\", \"id\": %d}%s\n", i, i, sep)
-		fmt.Fprintf(&n, "    {\n      \"id\": %d,\n      \"name\": \"e%d\"\n    }%s\n", i, i, sep)
+		o.WriteString("  ]\n}\n")
+		n.WriteString("  ]\n}\n")
+		return o.String(), n.String()
 	}
-	o.WriteString("  ]\n}\n")
-	n.WriteString("  ]\n}\n")
-	start := time.Now()
-	got := string(keepInlineBlocks([]byte(o.String()), []byte(n.String())))
-	if took := time.Since(start); took > 2*time.Second {
-		t.Errorf("%d entries took %v", count, took)
+	// The fastest of three runs, so one stall on a busy runner does not count.
+	fastest := func(o, n string) (time.Duration, string) {
+		var best time.Duration
+		var got string
+		for range 3 {
+			start := time.Now()
+			got = string(keepInlineBlocks([]byte(o), []byte(n)))
+			if took := time.Since(start); best == 0 || took < best {
+				best = took
+			}
+		}
+		return best, got
+	}
+	const count = 3000
+	small, _ := fastest(build(count / 4))
+	large, got := fastest(build(count))
+	if large > 10*small && large > 50*time.Millisecond {
+		t.Errorf("%d entries took %v against %v for %d: grows faster than linear", count, large, small, count/4)
 	}
 	if !strings.Contains(got, `{"name": "e2999", "id": 2999}`) {
 		t.Errorf("the moved entries lost their text")
