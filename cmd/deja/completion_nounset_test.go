@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os/exec"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ COMP_CWORD=1
 _deja_completion
 printf '%s\n' "${#COMPREPLY[@]}"
 `
-	out, err := exec.Command(bash, "-c", script+drive).CombinedOutput()
+	out, err := shellScriptCommand(context.Background(), t, bash, nil, script+drive).CombinedOutput()
 	got := string(out)
 	if err != nil {
 		t.Fatalf("completion failed under set -u: %v\n%s", err, got)

@@ -59,7 +59,7 @@ func TestBashCompletionLimitScope(t *testing.T) {
 			defer cancel()
 			// words contains only the fixed test cases above, never user input.
 			drive := "\nCOMP_WORDS=(" + tc.words + ")\nCOMP_CWORD=$((${#COMP_WORDS[@]}-1))\n_deja_completion\nprintf '%s\\n' \"${COMPREPLY[@]}\"\n"
-			out, err := exec.CommandContext(ctx, bash, "--noprofile", "--norc", "-c", emittedCompletion(t, "bash")+drive).CombinedOutput()
+			out, err := shellScriptCommand(ctx, t, bash, []string{"--noprofile", "--norc"}, emittedCompletion(t, "bash")+drive).CombinedOutput()
 			if err != nil {
 				t.Fatalf("bash completion failed: %v\n%s", err, out)
 			}
