@@ -45,12 +45,18 @@ func TestAForgottenNoteStaysGoneWhenAPeerSendsTheirOwnBucket(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The peer's copy: same text, same instant, their rendering of the day.
+	// The peer's copy: same text, same instant, their rendering of the day,
+	// which is the other side of midnight from ours. A fixed 08-03 was this
+	// machine's own bucket west of UTC-10, and the test then sent no peer id.
+	peer := "deja-2026-08-03-x29"
+	if local == peer {
+		peer = "deja-2026-08-04-x29"
+	}
 	exp := filepath.Join(tmp, "transfer")
 	if err := os.MkdirAll(exp, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	b, err := json.Marshal(SyncRecord{Harness: "deja", SessionID: "deja-2026-08-03-x29",
+	b, err := json.Marshal(SyncRecord{Harness: "deja", SessionID: peer,
 		Project: "x29", Role: "user", Text: "the ticker window stays at 30s", Time: when})
 	if err != nil {
 		t.Fatal(err)

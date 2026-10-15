@@ -22,11 +22,13 @@ func TestNotesPathAndAppendParse(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "private", "notes.jsonl")
 	t.Setenv("DEJA_NOTES_FILE", path)
+	// decision two is the same instant, so the two share a local day in every
+	// zone. An hour apart they straddled midnight at UTC-3 (#5044).
 	when := time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("x", 3600))
 	if err := AppendNote("app", "decision one", when); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, appendMustRead(t, path, `{"ts":"2026-01-02T03:04:05Z","project":"app","text":"decision two"}`+"\n"+`{"ts":"bad","project":"app","text":"ignored"}`+"\n"+`{"ts":"2026-01-03T00:00:00Z","project":"other","text":"other"}`+"\n"+`{"ts":"2026-01-03T00:00:00Z","project":"app","text":"torn`), 0o600); err != nil {
+	if err := os.WriteFile(path, appendMustRead(t, path, `{"ts":"2026-01-02T02:04:05Z","project":"app","text":"decision two"}`+"\n"+`{"ts":"bad","project":"app","text":"ignored"}`+"\n"+`{"ts":"2026-01-03T00:00:00Z","project":"other","text":"other"}`+"\n"+`{"ts":"2026-01-03T00:00:00Z","project":"app","text":"torn`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ss, err := ParseNotesFile(path)

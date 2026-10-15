@@ -18,7 +18,9 @@ import (
 func TestPromotedNoteServesTheLatestCorrectionFirst(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "notes.jsonl")
-	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.UTC)
+	// Local, so the two plain notes an hour apart share a bucket day in every
+	// zone: at 10:00 UTC they straddled midnight west of UTC-10.
+	base := time.Date(2026, 7, 1, 10, 0, 0, 0, time.Local)
 	var lines []string
 	for i := 1; i <= 5; i++ {
 		row := map[string]any{

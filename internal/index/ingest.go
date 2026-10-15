@@ -1876,10 +1876,16 @@ func indexTextParallel(feed func(push func(tokenJob)) error) (bucketPostings, er
 // dateTokens makes a message findable by when it happened: the month name,
 // the year, and year-month land in the postings like ordinary words, so
 // "deja \"what did we do in may\"" matches May sessions structurally.
+//
+// The month is UTC's. A record read back from the store carries the local zone
+// and a parsed one mostly UTC, so near a month boundary the incremental pass
+// and a rebuild gave the same record different months, and west of UTC-10 the
+// two indexes disagreed.
 func dateTokens(when time.Time) []string {
 	if when.IsZero() {
 		return nil
 	}
+	when = when.UTC()
 	return []string{
 		"t" + strings.ToLower(when.Month().String()),
 		"t" + when.Format("2006"),
