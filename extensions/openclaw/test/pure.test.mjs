@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { accessNote, argv, configPath, contributions, installerPluginPath, mcpWired, promptText, toolCall, where } from "../lib.mjs"
@@ -94,4 +95,21 @@ test("a finished tool maps to the call the installer's plugin makes", () => {
   assert.equal(failed.payload.tool_response, "boom")
   assert.equal(toolCall({ toolName: "exec", args: { command: "make" }, result: { content: [] } }, at), null)
   assert.equal(toolCall({ toolName: "web_search", args: {} }, at), null)
+})
+
+// What a tool returns goes to the model, and search, ctx, blame, fix and how
+// print for a person: no frame, and a tag planted in a transcript went through
+// as though deja had closed its own block (#5051). Every call inside a tool
+// asks for --framed output; the /deja command answers the person and stays
+// plain.
+test("every agent tool asks deja for framed output", () => {
+  const SRC = readFileSync(new URL("../index.mjs", import.meta.url), "utf8")
+  let tools = 0
+  for (const m of SRC.matchAll(/argv\("(search|ctx|blame|fix|how|show)"/g)) {
+    const before = SRC.slice(0, m.index)
+    if (before.lastIndexOf("execute(") < before.lastIndexOf("handler(")) continue
+    tools++
+    assert.ok(before.endsWith('"--framed", ...'), `${SRC.slice(m.index, m.index + 40)} in a tool is not framed`)
+  }
+  assert.ok(tools >= 3, `found ${tools} tool calls, so this proves nothing`)
 })

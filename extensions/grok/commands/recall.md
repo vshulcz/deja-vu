@@ -14,7 +14,7 @@ a flag). If a result looks right but is too short to act on, follow up with
 If the deja MCP tool is unavailable, fall back to the CLI:
 
 ```bash
-deja search -- "$ARGUMENTS"
+deja --framed search -- "$ARGUMENTS"
 ```
 
 Answer with what actually happened in those sessions — when it was, which

@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Recalled text no longer reaches the model outside deja's untrusted-data frame. The MCP environment block sits inside it, the dsh, opencode, OpenClaw and Hermes agent tools and every skill's shell fallback run `deja --framed …`, and a planted `&#60;/deja-recall&#62;`, `</deja-recall/>`, `<\/deja-recall>` or fullwidth tag is defanged (#5051).
+- CodeWhale no longer leaves the frame open when a long message forces deja to cut what it adds, and a handoff quote can't be closed by `--- END QUOTED SESSION ---` in another case or with text after it (#5051).
 - A Codex rollout deja kept after it was deleted no longer gets its prompt a second time from `history.jsonl` on a rebuild (#5046).
 - "what did we do in may" finds the same sessions after an incremental pass as after a rebuild. The month a record was indexed under came from the local zone on one path and UTC on the other, so near a month boundary the two disagreed; it is UTC on both now. The suite also passes outside UTC: seven command tests and three notes tests assumed it, found at UTC-3 by a LinuxPro review (#5044).
 - An install into a config with a long array of entries written on one line no longer copies the whole file once per entry it puts back: 3000 entries took 47ms and allocated 9 GB, now 13ms (#5025).

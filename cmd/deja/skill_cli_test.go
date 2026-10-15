@@ -19,7 +19,7 @@ func TestWarmupWritesTheCLISkill(t *testing.T) {
 	if err != nil {
 		t.Fatalf("warmup left no CLI skill: %v", err)
 	}
-	for _, want := range []string{"name: deja-search", "deja search --json", "deja blame"} {
+	for _, want := range []string{"name: deja-search", "deja --framed search --json", "deja --framed blame"} {
 		if !strings.Contains(string(body), want) {
 			t.Errorf("the skill does not teach %q", want)
 		}
@@ -40,7 +40,7 @@ func TestTheTwoSkillsPointAtEachOther(t *testing.T) {
 	if !strings.Contains(cliSkillBody, "MCP tool") {
 		t.Error("the CLI skill never mentions the MCP tool it defers to")
 	}
-	if !strings.Contains(skillBody, "deja search --json") {
+	if !strings.Contains(skillBody, "deja --framed search --json") {
 		t.Error("the MCP skill never names the shell path for a session without the tools")
 	}
 }

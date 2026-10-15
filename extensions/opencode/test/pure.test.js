@@ -457,3 +457,20 @@ test("userTurns keys a message by its id, and by its place where it has none", (
   assert.deepEqual(turns.map((u) => u.key), ["m1", "s#1#"])
   assert.equal(turns[1].parts.length, 0)
 })
+
+// What a tool returns goes to the model, and search, ctx, blame, fix and how
+// print for a person: no frame, and a tag planted in a transcript went through
+// as though deja had closed its own block (#5051). Every call inside a tool
+// asks for --framed output; the /deja command answers the person and stays
+// plain.
+test("every agent tool asks deja for framed output", () => {
+  const SRC = readFileSync(new URL("../index.js", import.meta.url), "utf8")
+  let tools = 0
+  for (const m of SRC.matchAll(/argv\("(search|ctx|blame|fix|how|show)"/g)) {
+    const before = SRC.slice(0, m.index)
+    if (before.lastIndexOf("execute(") < before.lastIndexOf("handler(")) continue
+    tools++
+    assert.ok(before.endsWith('"--framed", ...'), `${SRC.slice(m.index, m.index + 40)} in a tool is not framed`)
+  }
+  assert.ok(tools >= 3, `found ${tools} tool calls, so this proves nothing`)
+})

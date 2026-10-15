@@ -146,3 +146,52 @@ func TestHermesGeneratedPythonCompiles(t *testing.T) {
 		}
 	}
 }
+
+// The model-facing tools hand back what the command printed, and search, fix
+// and blame print for a person: no frame, planted tags intact (#5051). Each one
+// asks for the framed form.
+func TestHermesToolsAskForFramedOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("stub deja is a shebang script")
+	}
+	py, err := exec.LookPath("python3")
+	if err != nil {
+		t.Skip("python3 not on PATH")
+	}
+	dir := t.TempDir()
+	argvFile := filepath.Join(dir, "argv.json")
+	stub := filepath.Join(dir, "deja")
+	stubSrc := "#!" + py + "\nimport json, sys\nopen(" + strconv.Quote(argvFile) + ", 'a').write(json.dumps(sys.argv[1:]) + '\\n')\n"
+	if err := os.WriteFile(stub, []byte(stubSrc), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "agent"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent", "__init__.py"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "agent", "memory_provider.py"), []byte("class MemoryProvider:\n    pass\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "provider.py"), []byte(hermesMemoryPy(stub)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	run := "import provider\np = provider.DejaMemoryProvider()\n" +
+		"p.handle_tool_call('deja_recall', {'query': 'q'})\n" +
+		"p.handle_tool_call('deja_fix', {'error': 'e'})\n" +
+		"p.handle_tool_call('deja_blame', {'path': 'a.go'})\n"
+	cmd := exec.Command(py, "-c", run)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("provider: %v\n%s", err, out)
+	}
+	got, err := os.ReadFile(argvFile)
+	if err != nil {
+		t.Fatalf("stub deja was not called: %v", err)
+	}
+	want := `["--framed", "search", "q"]` + "\n" + `["--framed", "fix", "e"]` + "\n" + `["--framed", "blame", "a.go"]` + "\n"
+	if string(got) != want {
+		t.Fatalf("argv =\n%s\nwant\n%s", got, want)
+	}
+}

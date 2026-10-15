@@ -95,7 +95,9 @@ function tools(ctx) {
   if (!defineTool) return;
 
   // Every tool here answers with the text deja printed, so one output
-  // declaration serves them all. The schema is plain JSON Schema — a
+  // declaration serves them all. Printed with --framed: search, ctx, blame,
+  // fix and how write for a person, and without the frame a tag planted in a
+  // transcript reached the model as though deja had closed its own block. The schema is plain JSON Schema — a
   // schemastery instance is rejected as "schema must be a value schema object",
   // because the host validates that this is an ordinary JSON record.
   const TEXT_OUTPUT = {
@@ -124,7 +126,7 @@ function tools(ctx) {
       // spend the model's context on a tail nobody reads.
       const asked = Number.isFinite(args.limit) ? Math.trunc(args.limit) : 5;
       const limit = String(Math.min(20, Math.max(1, asked)));
-      return Promise.resolve(answer(run(argv("search", ["--json", "--limit", limit], args.query))));
+      return Promise.resolve(answer(run(["--framed", ...argv("search", ["--json", "--limit", limit], args.query)])));
     },
   })));
 
@@ -141,7 +143,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(argv("ctx", [], args.query))));
+      return Promise.resolve(answer(run(["--framed", ...argv("ctx", [], args.query)])));
     },
   })));
 
@@ -158,7 +160,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(argv("blame", ["--json"], args.path))));
+      return Promise.resolve(answer(run(["--framed", ...argv("blame", ["--json"], args.path)])));
     },
   })));
 
@@ -175,7 +177,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(argv("fix", [], args.error))));
+      return Promise.resolve(answer(run(["--framed", ...argv("fix", [], args.error)])));
     },
   })));
 
@@ -192,7 +194,7 @@ function tools(ctx) {
     },
     output: TEXT_OUTPUT,
     execute(args) {
-      return Promise.resolve(answer(run(argv("how", [], args.what))));
+      return Promise.resolve(answer(run(["--framed", ...argv("how", [], args.what)])));
     },
   })));
 

@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"regexp"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/vshulcz/deja-vu/internal/digest"
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
 	"github.com/vshulcz/deja-vu/internal/query"
@@ -26,19 +29,116 @@ const (
 // an injection over its cap.
 var recallFrameOverhead = len(recallFrameHeader) + len(recallFrameFooter)
 
-// frameMarkerRe matches a frame tag in raw or HTML-escaped form, in any case,
-// with whitespace tolerated inside the brackets. The slash class also swallows
-// repeated slashes (`<//deja-recall>`) and entity-encoded slashes (`&#x2f;`,
-// `&#47;`), both of which an LLM would still read as a close. The tail accepts
-// only whitespace before the bracket, not arbitrary attributes: an `[^>]*`
-// there would greedily reach a distant `>` and eat ordinary text between them.
-var frameMarkerRe = regexp.MustCompile(`(?i)(?:<|&lt;)(?:\s|/|&#x2f;|&#47;)*deja-recall\s*(?:>|&gt;)`)
+// frameMarkerRe matches a frame tag in any spelling a model would still read as
+// one, in any case, with whitespace tolerated inside the brackets. The brackets
+// may be raw, fullwidth or small-form, named or numeric HTML entities (decimal
+// or hex, with or without the semicolon), entities escaped again (`&amp;lt;`),
+// or JSON escapes (`\u003c`) — `search --json` and the stores themselves carry
+// text in each of these. The slash class swallows repeated slashes, a
+// backslash-escaped slash (`<\/deja-recall>`, how JSON may write it) and the
+// entity forms, before the name and after it (`</deja-recall/>`). The tail
+// accepts only those, not arbitrary attributes: an `[^>]*` there would greedily
+// reach a distant `>` and eat ordinary text between them.
+var frameMarkerRe = regexp.MustCompile(`(?i)` + frameLT + frameSlash + `*deja-recall` + frameSlash + `*` + frameGT)
+
+const (
+	frameEntity = `&(?:amp;)*`
+	frameLT     = `(?:<|＜|﹤|` + frameEntity + `(?:lt|#0*60|#x0*3c);?|\\u003c)`
+	frameGT     = `(?:>|＞|﹥|` + frameEntity + `(?:gt|#0*62|#x0*3e);?|\\u003e)`
+	frameSlash  = `(?:\s|/|\\|／|` + frameEntity + `(?:sol|#0*47|#x0*2f);?|\\u002f)`
+)
 
 func frameRecall(text string) string {
 	if strings.TrimSpace(text) == "" {
 		return text
 	}
 	return recallFrameHeader + neutralizeFrameMarkers(text) + recallFrameFooter
+}
+
+// fitFramed joins blocks with sep and keeps the result within max bytes
+// without cutting through a frame. Cut after framing, a long reply ended inside
+// the block with `<deja-recall>` open and no close (#5051), and everything the
+// host put after it read as still inside. A block that does not fit whole is
+// cut inside its frame and closed again; one with no room left for its own
+// frame is dropped. A part already framed by its builder is unframed and
+// framed again around the shorter body, which needs no second pass of the
+// neutraliser: a prefix of neutralised text holds no marker.
+func fitFramed(parts []string, sep string, max int) string {
+	var b strings.Builder
+	for _, p := range parts {
+		room := max - b.Len()
+		if b.Len() > 0 {
+			room -= len(sep)
+		}
+		if room <= 0 {
+			break
+		}
+		if len(p) > room {
+			body, framed := strings.CutPrefix(p, recallFrameHeader)
+			if framed {
+				body = strings.TrimSuffix(body, recallFrameFooter)
+				if room <= recallFrameOverhead {
+					break
+				}
+				p = recallFrameHeader + truncateToolLine(body, room-recallFrameOverhead) + recallFrameFooter
+			} else {
+				p = truncateToolLine(p, room)
+			}
+		}
+		if b.Len() > 0 {
+			b.WriteString(sep)
+		}
+		b.WriteString(p)
+		if len(p) >= room {
+			break
+		}
+	}
+	return b.String()
+}
+
+// framedFlag, ahead of any command, frames what that command prints. The
+// agent tools in the dsh, opencode, OpenClaw and Hermes plugins, and the skills
+// that send an agent to the shell, run search, ctx, show, fix, how and blame,
+// whose output is written for a person and was handed to the model raw: a
+// planted `</deja-recall>` in a transcript came back as if deja had said it
+// (#5051). One flag that any command takes, rather than a framed twin of each,
+// keeps the output a person sees and the output a model reads the same text.
+const framedFlag = "--framed"
+
+func runFramed(args []string) error {
+	// A pipe rather than a temporary file: with nowhere to capture, the
+	// command would have printed straight to the model, unframed, which is the
+	// one outcome this flag exists to rule out.
+	r, w, err := os.Pipe()
+	if err != nil {
+		return err
+	}
+	read := make(chan []byte)
+	go func() {
+		b, _ := io.ReadAll(r)
+		read <- b
+	}()
+	stdout := os.Stdout
+	os.Stdout = w
+	runErr := run(args)
+	os.Stdout = stdout
+	_ = w.Close()
+	out := <-read
+	_ = r.Close()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		fmt.Fprintln(os.Stdout, frameRecall(s))
+	}
+	return runErr
+}
+
+// safeNote is a line meant for the person that may quote transcript text: the
+// error this machine keeps hitting, a session's title. It stays unframed,
+// because it is deja speaking on the host's UI channel, but that channel is not
+// sealed off from the model — dsh and OpenClaw add `--notes` to the /deja
+// reply, and a person pastes what they are shown — so a quoted marker of
+// either kind is made inert before it goes out (#5051).
+func safeNote(s string) string {
+	return neutralizeFrameMarkers(digest.NeutralizeHandoffMarkers(s))
 }
 
 // neutralizeFrameMarkers stops recalled text from closing the frame around it.
@@ -68,11 +168,20 @@ func neutralizeFrameMarkers(text string) string {
 }
 
 // neutralizeTag keeps the text readable while making it inert: a marker with
-// no brackets cannot delimit anything.
+// no brackets cannot delimit anything. What is left is the name as it was
+// written, after a slash when the tag was a close.
 func neutralizeTag(tag string) string {
-	tag = strings.NewReplacer("&lt;", "", "&gt;", "", "<", "", ">", "", " ", "").Replace(tag)
-	return "(" + tag + ")"
+	at := strings.Index(strings.ToLower(tag), "deja-recall")
+	name := tag[at : at+len("deja-recall")]
+	// What sits between the bracket and the name matched only the slash class,
+	// so anything there but whitespace is a slash.
+	if strings.TrimSpace(frameOpenRe.ReplaceAllString(tag[:at], "")) != "" {
+		return "(/" + name + ")"
+	}
+	return "(" + name + ")"
 }
+
+var frameOpenRe = regexp.MustCompile(`(?i)^` + frameLT)
 
 const (
 	// recallConclusionsReserve keeps room after the best hit's conclusions for
