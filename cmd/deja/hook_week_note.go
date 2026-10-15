@@ -50,7 +50,7 @@ func weekNoteFor(dir string, now time.Time, private bool) string {
 	n := usage.StatusCounters(dir)
 	recalls := n.WeekRecalls + n.WeekInjections
 	// Counted from the last note, so each deletion is said once.
-	deleted := weekDeletedLine(dir, weekDeletedSince(dir, since), since, now)
+	deleted := weekDeletedLine(dir, weekDeletedSince(dir, since, now), since, now)
 	if recalls == 0 {
 		// A quiet week is not news; the clock restarts so the next week that
 		// has something to say is the one reported. Sessions deleted under

@@ -60,7 +60,9 @@ func TestWeekNoteSaysWhichSessionsTheirAgentDeleted(t *testing.T) {
 	if err := os.WriteFile(dir+".weeknote", []byte(strconv.FormatInt(last.Unix(), 10)), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	got := weekNoteAt(dir, time.Now())
+	// A second on: the window ends before the second the note is written in,
+	// and the next one starts there.
+	got := weekNoteAt(dir, time.Now().Add(time.Second))
 	want := "Claude Code deleted 1 session this week; deja kept it — deja resume " + shortID(gone) + " --write-back"
 	if got != want {
 		t.Fatalf("week note = %q\nwant        %q", got, want)

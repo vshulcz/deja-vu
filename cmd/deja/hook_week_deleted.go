@@ -21,8 +21,8 @@ const weekDeletedNamed = 2
 
 // weekDeletedSince is the sessions whose transcript a pass found gone since
 // the last week note, as the person may see them. It reads the manifest only.
-func weekDeletedSince(dir string, since time.Time) []index.KeptSession {
-	kept, err := index.KeptSince(dir, since)
+func weekDeletedSince(dir string, since, now time.Time) []index.KeptSession {
+	kept, err := index.KeptSince(dir, since, now)
 	if err != nil || len(kept) == 0 {
 		return nil
 	}

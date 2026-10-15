@@ -1069,6 +1069,11 @@ type Manifest struct {
 	// it with the existing local index, while keeping it out of searchable
 	// transcript records.
 	Compactions map[string]CompactionState `json:"compactions,omitempty"`
+	// KeptDated says the transcripts this store lost were dated as they went:
+	// a pass of a build that stamps KeptAt wrote it. A store from before that
+	// holds rows for transcripts already gone, unmarked (0.21 had no Kept), and
+	// the first pass to find them must not date months of deletions to today.
+	KeptDated bool `json:"kept_dated,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -1130,6 +1135,7 @@ type manifestCore struct {
 	ExcludeFingerprint string
 	ToolFingerprint    string
 	Compactions        map[string]CompactionState
+	KeptDated          bool
 }
 
 type RedactionStats struct {

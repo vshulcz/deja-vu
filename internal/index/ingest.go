@@ -636,7 +636,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	}
 	ss = filterTombstonedSet(ss, dead)
 	for p, st := range orphans.files {
-		if !st.Kept {
+		if !st.Kept && orphans.dated {
 			st.KeptAt = time.Now().Unix()
 		}
 		st.Kept = true
@@ -660,7 +660,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// incremental build carries the old stamp forward: it keeps records it
 	// wrote under the previous patterns, which is why `deja index` has to ask
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
-	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -996,6 +996,9 @@ type orphanState struct {
 	// with its deleted-transcript sessions unrecoverable, and saying so is the
 	// difference between a loss and a silent one.
 	unreadable int
+	// dated is the old manifest's KeptDated: a row first found gone here is
+	// dated only when the store before this build dated its own.
+	dated bool
 }
 
 // orphanedSessions preserves sessions the client's own housekeeping deleted.
@@ -1014,6 +1017,7 @@ func orphanedSessions(dir, harness string, files map[string]FileState) orphanSta
 	if err != nil {
 		return out
 	}
+	out.dated = m.KeptDated
 	want := map[string]bool{}
 	var present map[string]bool
 	moved := map[string]bool{}
@@ -1668,7 +1672,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	parsedThisPass(files)
-	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -3958,6 +3962,9 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	newlyKept := map[string]bool{}
 	var view *listedView
 	var held map[string]bool
+	// Read before the loop and set after it: what a store written before
+	// deja dated deletions lost is undated, and from here on it is dated.
+	dated := old.KeptDated
 	for p := range removed {
 		if superseded[p] {
 			continue
@@ -4006,7 +4013,9 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		if of, ok := old.Files[p]; ok {
 			if !of.Kept {
 				newlyKept[p] = true
-				of.KeptAt = time.Now().Unix()
+				if dated {
+					of.KeptAt = time.Now().Unix()
+				}
 			}
 			of.Kept = true
 			files[p] = of
@@ -4014,6 +4023,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 			kept[p] = true
 		}
 	}
+	old.KeptDated = true
 	// Said once per pass, and only once the rename filter below has had its
 	// say — except when nothing else changed, in which case there is no
 	// rename to filter and the pass returns early.
@@ -4063,7 +4073,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 		lastIngestFiles = 0
 		// Nothing to read, but the kept mark has to land, or the next run
 		// takes the same file for a fresh deletion.
-		if len(newlyKept) > 0 {
+		if len(newlyKept) > 0 || !dated {
 			for p := range newlyKept {
 				old.Files[p] = files[p]
 			}
@@ -4282,7 +4292,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	// keyed on it — the embedding sidecar — that the file it measured was still
 	// there (#1357). Only appendIncremental, which appends in place, may keep a
 	// generation.
-	m := Manifest{Version: version, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(),
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
 		Compactions: cloneCompactions(old.Compactions),

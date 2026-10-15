@@ -12,10 +12,12 @@ type KeptSession struct {
 	At time.Time
 }
 
-// KeptSince lists the sessions whose transcript a pass first found gone after
-// since, newest first. It reads the manifest alone, never the disk: the
-// week note asks from a session-start hook.
-func KeptSince(dir string, since time.Time) ([]KeptSession, error) {
+// KeptSince lists the sessions whose transcript a pass first found gone in
+// [from, to), newest first. Stamps are whole seconds, so two windows that meet
+// at one second each hold a stamp in it once: the week note's last window ends
+// where the next begins. It reads the manifest alone, never the disk: the week
+// note asks from a session-start hook.
+func KeptSince(dir string, from, to time.Time) ([]KeptSession, error) {
 	if dir == "" {
 		dir = DefaultDir()
 	}
@@ -26,7 +28,7 @@ func KeptSince(dir string, since time.Time) ([]KeptSession, error) {
 	var out []KeptSession
 	for _, meta := range m.Sessions {
 		f, ok := m.Files[meta.Path]
-		if !ok || !f.Kept || f.KeptAt == 0 || f.KeptAt <= since.Unix() {
+		if !ok || !f.Kept || f.KeptAt == 0 || f.KeptAt < from.Unix() || f.KeptAt >= to.Unix() {
 			continue
 		}
 		out = append(out, KeptSession{SessionMeta: meta, At: time.Unix(f.KeptAt, 0)})
