@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<script>document.documentElement.className=document.documentElement.className.replace("no-js","js")</script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex resume session: list, find and fix errors — deja-vu</title>
+<meta name="description" content="codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.">
+<link rel="canonical" href="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Codex resume session: list, find and fix errors">
+<meta property="og:description" content="codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.">
+<meta property="og:url" content="https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html">
+<meta property="og:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" sizes="16x16" href="../assets/favicon.svg">
+<link rel="icon" type="image/svg+xml" sizes="any" href="../assets/icon.svg">
+<link rel="stylesheet" href="../assets/site.css">
+<meta name="author" content="vshulcz">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="theme-color" content="#0d0b16">
+<meta name="color-scheme" content="dark light">
+<meta property="og:site_name" content="deja-vu">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="deja-vu — searchable local memory for coding agents">
+<meta name="twitter:title" content="Codex resume session: list, find and fix errors">
+<meta name="twitter:description" content="codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.">
+<meta name="twitter:image" content="https://vshulcz.github.io/deja-vu/assets/og.png">
+<meta name="twitter:image:alt" content="deja-vu — searchable local memory for coding agents">
+<link rel="apple-touch-icon" href="../assets/icon.svg">
+<link rel="sitemap" type="application/xml" href="https://vshulcz.github.io/deja-vu/sitemap.xml">
+<link rel="describedby" type="text/markdown" href="https://vshulcz.github.io/deja-vu/llms.txt">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "TechArticle", "headline": "Codex resume: finding the session, and the errors when it is not there", "description": "codex resume, --all, --last and exec resume: why a session is missing from the picker, and the no rollout found and is archived errors.", "url": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html", "inLanguage": "en", "author": {"@type": "Person", "name": "vshulcz"}, "publisher": {"@type": "Person", "name": "vshulcz"}, "mainEntityOfPage": {"@type": "WebPage", "@id": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"}, "isPartOf": {"@type": "WebSite", "name": "deja-vu", "url": "https://vshulcz.github.io/deja-vu/"}, "datePublished": "2026-10-14", "dateModified": "2026-10-14"}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "deja-vu", "item": "https://vshulcz.github.io/deja-vu/"}, {"@type": "ListItem", "position": 2, "name": "Codex resume", "item": "https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html"}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "How do I resume a previous Codex CLI session?", "acceptedAnswer": {"@type": "Answer", "text": "codex resume opens a picker of the sessions started in the current directory; codex resume --all shows every directory, codex resume --last skips the picker, and codex resume <id-or-name> reopens one session. In scripts, use codex exec resume <id> \"prompt\"."}}, {"@type": "Question", "name": "Why is my Codex session missing from codex resume?", "acceptedAnswer": {"@type": "Answer", "text": "The picker shows only sessions started in the current directory (use --all), leaves out codex exec runs (use --include-non-interactive), hides archived sessions (codex unarchive <id>), and lists only sessions on this machine."}}, {"@type": "Question", "name": "What does \"no rollout found for thread id\" mean in Codex?", "acceptedAnswer": {"@type": "Answer", "text": "Codex found no session file for that id under ${CODEX_HOME:-~/.codex}/sessions. The id is wrong, the session was deleted, or CODEX_HOME points at a different tree. Rollouts older than seven days are compressed to .jsonl.zst, so search for rollout-*<id>* rather than *.jsonl."}}, {"@type": "Question", "name": "Can I resume a Codex session on another computer?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, by copying its rollout file to the same sessions/YYYY/MM/DD path under the other machine's CODEX_HOME and resuming by id. Codex does not sync sessions itself."}}]}</script>
+</head>
+<body>
+<div class="glow"></div>
+<nav><a class="brand" href="../"><img src="../assets/icon.svg" alt="" width="22" height="22">deja-vu</a><span class="spacer"></span><a class="lnk" href="../">Home</a><a class="lnk" href="getting-started.html">Docs</a><a class="lnk" href="https://github.com/vshulcz/deja-vu">GitHub</a></nav>
+<div class="wrap"><div class="doc">
+<aside><a href="../">← deja-vu</a>
+<div class="grp">Guide</div>
+<a href="getting-started.html">Getting started</a>
+<a href="agents.html">Agents &amp; MCP</a>
+<a href="search.html">Search</a>
+<a href="commands.html">CLI reference</a>
+<a href="harnesses.html">Harnesses</a>
+<a href="privacy.html">Privacy</a>
+<details class="grpfold"><summary>Why agents forget <span class="n">11</span></summary>
+<a href="forgetting.html">Why agents forget</a>
+<a href="does-my-agent-remember.html">Does my agent remember?</a>
+<a href="lost-context.html">Lost context</a>
+<a href="context-window-full.html">Context window full</a>
+<a href="after-compaction.html">After compaction</a>
+<a href="repeated-mistakes.html">Repeated mistakes</a>
+<a href="switching-agents.html">Switching agents</a>
+<a href="parallel-sessions.html">Parallel sessions</a>
+<a href="rules-files.html">When CLAUDE.md grows</a>
+<a href="one-rules-file.html">One rules file</a>
+<a href="token-cost.html">What memory costs</a>
+</details>
+<details class="grpfold" open><summary>Session history <span class="n">11</span></summary>
+<a href="where-sessions-are-stored.html">Where history lives</a>
+<a href="find-a-session.html">Finding a session</a>
+<a href="codex-history.html">Codex history</a>
+<a href="resume-a-session.html">Resuming a session</a>
+<a href="codex-resume-session.html" aria-current="page">Codex resume</a>
+<a href="export-conversations.html">Exporting sessions</a>
+<a href="sync-across-machines.html">Across machines</a>
+<a href="auditing-agents.html">Auditing an agent</a>
+<a href="credentials-in-transcripts.html">Credentials in transcripts</a>
+<a href="recover-a-deleted-session.html">Recover a deleted session</a>
+<a href="no-conversation-found-claude-code.html">No conversation found</a>
+</details>
+<details class="grpfold"><summary>Deleting sessions <span class="n">15</span></summary>
+<a href="session-files-on-disk.html">Claude Code</a>
+<a href="delete-old-claude-sessions.html">Old sessions</a>
+<a href="delete-codex-sessions.html">Codex</a>
+<a href="delete-cursor-chat-history.html">Cursor</a>
+<a href="cursor-state-vscdb-too-large.html">Cursor state.vscdb too large</a>
+<a href="delete-copilot-chat-history.html">Copilot Chat</a>
+<a href="delete-gemini-cli-history.html">Gemini CLI</a>
+<a href="delete-opencode-session-history.html">opencode</a>
+<a href="delete-cline-task-history.html">Cline</a>
+<a href="delete-roo-task-history.html">Roo Code</a>
+<a href="delete-zed-thread-history.html">Zed</a>
+<a href="delete-kilo-code-task-history.html">Kilo Code</a>
+<a href="delete-amp-thread-history.html">Amp</a>
+<a href="delete-continue-session-history.html">Continue</a>
+<a href="delete-kiro-session-history.html">Kiro</a>
+</details>
+<details class="grpfold"><summary>Per-agent guides <span class="n">35</span></summary>
+<a href="memory-for-aider.html">aider</a>
+<a href="memory-for-amp.html">Amp</a>
+<a href="memory-for-antigravity.html">Antigravity</a>
+<a href="memory-for-cherrystudio.html">Cherry Studio</a>
+<a href="memory-for-claude-code.html">Claude Code</a>
+<a href="memory-for-cline.html">Cline</a>
+<a href="memory-for-codewhale.html">CodeWhale</a>
+<a href="memory-for-codex.html">Codex</a>
+<a href="memory-for-commandcode.html">Command Code</a>
+<a href="memory-for-continue.html">Continue</a>
+<a href="memory-for-copilot.html">Copilot CLI</a>
+<a href="memory-for-crush.html">Crush</a>
+<a href="memory-for-cursor.html">Cursor</a>
+<a href="memory-for-dsh.html">dsh</a>
+<a href="memory-for-gjc.html">gajae-code</a>
+<a href="memory-for-gemini.html">Gemini CLI</a>
+<a href="memory-for-goose.html">Goose</a>
+<a href="memory-for-grok.html">Grok Build</a>
+<a href="memory-for-hermes.html">Hermes</a>
+<a href="memory-for-kilocode.html">Kilo Code</a>
+<a href="memory-for-kimchi.html">Kimchi Coding</a>
+<a href="memory-for-kimi.html">Kimi Code</a>
+<a href="memory-for-kiro.html">Kiro</a>
+<a href="memory-for-omp.html">omp</a>
+<a href="memory-for-openclaw.html">OpenClaw</a>
+<a href="memory-for-opencode.html">opencode</a>
+<a href="memory-for-pi.html">pi</a>
+<a href="memory-for-prime.html">prime-agent</a>
+<a href="memory-for-qwen.html">Qwen Code</a>
+<a href="memory-for-reasonix.html">Reasonix</a>
+<a href="memory-for-roo.html">Roo Code</a>
+<a href="memory-for-senpi.html">Senpi</a>
+<a href="memory-for-copilot-chat.html">VS Code Copilot Chat</a>
+<a href="memory-for-zcode.html">ZCode</a>
+<a href="memory-for-zed.html">Zed</a>
+</details>
+<div class="grp">Evidence</div>
+<a href="benchmarks.html">Benchmarks</a>
+<a href="compare.html">Compare</a>
+<a href="claude-mem-alternative.html">claude-mem alternative</a>
+<a href="day-zero.html">Day zero</a>
+<div class="grp">Reference</div>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/ARCHITECTURE.md">Architecture</a>
+<a href="https://github.com/vshulcz/deja-vu/blob/main/docs/SECURITY-MODEL.md">Security model</a>
+<a href="../registry/README.html">Format registry</a><a class="sidecat" href="../"><img src="../assets/icon-live.svg" width="46" height="46" alt=""><span>it remembers, so you do not have to</span></a></aside>
+<article>
+
+<h1>Codex resume: finding the session, and the errors when it is not there</h1>
+<p class="pagelede">the picker filters by directory, hides <code>codex exec</code> runs and archived sessions, and resumes only what is on this disk<span class="mins" data-mins></span></p>
+
+<p><code>codex resume</code> reopens a past Codex CLI session with its whole conversation. Most of the time the session you want is in the picker. When it is not, the reason is one of a short list, and each has its own fix. Commands and messages below are from codex-cli 0.149.0, run against a throwaway <code>CODEX_HOME</code>.</p>
+
+<h2>The commands</h2>
+<pre>codex resume                            # picker: sessions started in this directory
+codex resume --all                      # every directory, with a CWD column
+codex resume --last                     # the most recent one, no picker
+codex resume &lt;id-or-name&gt;               # one session by UUID or by its name
+codex resume --include-non-interactive  # codex exec runs too
+codex fork                              # continue from a copy of an old session
+codex exec resume &lt;id&gt; "next step"      # resume without the TUI, for scripts</pre>
+<p>A UUID takes precedence over a name when the argument parses as one.</p>
+
+<h2>The session is not in the picker</h2>
+<ul>
+<li><b>It ran in another directory.</b> The picker shows sessions started where you are. <code>codex resume --all</code> lists all of them. Resuming by id works from any directory: a session started in one project resumed by id from another in the test.</li>
+<li><b>It was a <code>codex exec</code> run.</b> Non-interactive sessions are left out of the picker and of <code>--last</code>. Add <code>--include-non-interactive</code>.</li>
+<li><b>It is archived.</b> <code>codex archive</code> hides a session from the picker. <code>codex unarchive &lt;id&gt;</code> brings it back.</li>
+<li><b>It is on another machine.</b> Sessions are local files, nothing is synced. See below.</li>
+</ul>
+
+<h2>The errors</h2>
+<p>An archived session tells you what to do:</p>
+<pre>$ codex exec resume 01a0775d-a98d-7500-b4b5-943a1f3a35e3 "go on"
+Error: thread/resume: thread/resume failed: session 01a0775d-a98d-7500-b4b5-943a1f3a35e3 is archived. Run `codex unarchive 01a0775d-a98d-7500-b4b5-943a1f3a35e3` to unarchive it first. (code -32600)</pre>
+<p>A session with no file at all does not:</p>
+<pre>$ codex exec resume 3f2a9c1e-0000-4000-8000-000000000000 "go on"
+Error: thread/resume: thread/resume failed: no rollout found for thread id 3f2a9c1e-0000-4000-8000-000000000000 (code -32600)</pre>
+<p>A rollout is the session file, <code>sessions/YYYY/MM/DD/rollout-&lt;time&gt;-&lt;id&gt;.jsonl</code> under <code>${CODEX_HOME:-~/.codex}</code>. No rollout means one of three things: the id is wrong, the session was removed with <code>codex delete</code> or <code>rm</code>, or this shell's <code>CODEX_HOME</code> points at a different tree than the one that wrote it. Check:</p>
+<pre>echo "${CODEX_HOME:-$HOME/.codex}"
+find "${CODEX_HOME:-$HOME/.codex}" -name "rollout-*&lt;id&gt;*"</pre>
+<p>The <code>find</code> pattern matters: after seven days Codex compresses a rollout to <code>rollout-….jsonl.zst</code>, so a search for <code>*.jsonl</code> misses every session older than a week. Codex resumes either form.</p>
+<p>And one that is not about the session: <code>codex resume</code> is a full-screen picker, so from a pipe, a CI job or an agent's own shell it stops with <code>Error: stdin is not a terminal</code>. Use <code>codex exec resume &lt;id&gt; "prompt"</code> there.</p>
+
+<h2>Resuming on another machine</h2>
+<p>There is no sync. A rollout copied to the same path under the other machine's <code>CODEX_HOME</code> is enough to resume it by id; in the test, a fresh <code>CODEX_HOME</code> holding nothing but the copied file resumed it:</p>
+<pre>scp laptop:.codex/sessions/2026/09/06/rollout-*01a0775d-a98d-7500-b4b5-943a1f3a35e3.jsonl \
+    ~/.codex/sessions/2026/09/06/
+codex resume 01a0775d-a98d-7500-b4b5-943a1f3a35e3</pre>
+<p>The rollout records the directory the session ran in, and the picker filters on it, so where the project lives at another path, use <code>--all</code> or the id.</p>
+
+<h2>Finding the id when you only remember what it was about</h2>
+<p>The picker shows titles and first messages; it does not search the conversations, and it knows only Codex. <a href="https://github.com/vshulcz/deja-vu">deja</a> indexes the rollouts, compressed and archived ones included, with every other agent's history on the machine, and prints the command that reopens a session:</p>
+<pre>deja --harness codex "the flaky retry in the uploader"   # ranked hits, each with its session id
+deja resume &lt;id&gt;                                        # the codex resume command that reopens it
+deja resume &lt;id&gt; --write-back                           # a deleted session: write the rollout back first</pre>
+<p><code>--write-back</code> is for a session deja indexed before Codex lost the file. It writes a rollout from what deja kept, the conversation turns, and needs to know the directory the session ran in; when it cannot find that, it says so rather than writing a rollout Codex would list in the wrong place. Tool calls and their output stay in deja. To install:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/vshulcz/deja-vu/main/install.sh | sh
+deja install --auto</pre>
+<p>The first index reads the history already on disk. Indexing and search run locally.</p>
+
+<p><a href="codex-history.html">Codex CLI history</a> · <a href="delete-codex-sessions.html">Deleting Codex sessions</a> · <a href="resume-a-session.html">Resuming a session in any agent</a> · <a href="sync-across-machines.html">Across machines</a></p>
+<p class="star-cta">Found this useful? <a href="https://github.com/vshulcz/deja-vu">Star deja-vu on GitHub</a>.</p>
+</article>
+</div>
+<footer>deja-vu is MIT-licensed and runs on your machine. <a href="https://github.com/vshulcz/deja-vu">Source on GitHub</a> · <a href="../">Home</a></footer>
+</div>
+<script>
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+<script src="../assets/guide.js" defer></script>
+</body>
+</html>

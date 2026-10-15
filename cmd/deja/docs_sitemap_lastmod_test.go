@@ -5,10 +5,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/vshulcz/deja-vu/internal/docsdate"
 )
 
 // lastmod is what a crawler schedules the next fetch from, so a date that stops
@@ -38,6 +39,12 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 		t.Fatalf("only %d URLs matched in docs/sitemap.xml; the pattern is wrong", len(found))
 	}
 
+	dater, err := docsdate.New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = dater.Close() }()
+
 	const slack = 7 * 24 * time.Hour
 	for _, m := range found {
 		loc, lastmod := m[1], m[2]
@@ -64,28 +71,88 @@ func TestSitemapLastmodFollowsThePages(t *testing.T) {
 			t.Errorf("%s has lastmod %q, which is not a date", named, lastmod)
 			continue
 		}
-		// The UTC day of the commit, the way genregistry dates it (#4922): %as
-		// is the day in the author's zone and can be a day off.
-		out, err := exec.Command("git", "-C", root, "log", "-1", "--format=%at", "--", rel).Output()
+		// The day the page's content last changed, the way genregistry dates
+		// it: a commit that only rewrote the sidebar does not count.
+		day, err := dater.Day(rel)
 		if err != nil {
-			t.Fatalf("git log %s: %v", loc, err)
+			t.Fatalf("dating %s: %v", loc, err)
 		}
-		stamp := strings.TrimSpace(string(out))
-		if stamp == "" {
-			continue // not committed yet
+		if day == "" {
+			continue
 		}
-		secs, err := strconv.ParseInt(stamp, 10, 64)
+		changed, err := time.Parse("2006-01-02", day)
 		if err != nil {
-			t.Fatalf("git returned %q for %s", stamp, loc)
+			t.Fatalf("docsdate returned %q for %s", day, loc)
 		}
-		changed := time.Unix(secs, 0).UTC().Truncate(24 * time.Hour)
-		day := changed.Format("2006-01-02")
 		// Both directions: a date behind the file is the drift this catches, and
 		// a date ahead of it is the same lie told the other way round — a page
 		// that says it changed tomorrow is one a crawler is told to come back
 		// for and finds nothing new.
 		if drift := changed.Sub(said); drift > slack || drift < -slack {
 			t.Errorf("%s says lastmod %s but last changed %s — run `go run ./scripts/genregistry`", named, lastmod, day)
+		}
+	}
+}
+
+// A URL listed twice is two entries that can disagree about the page, and
+// merges that both added the same pages left nineteen of them that way.
+func TestSitemapListsEachPageOnce(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "docs", "sitemap.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]int{}
+	for _, m := range regexp.MustCompile(`<loc>([^<]+)</loc>`).FindAllStringSubmatch(string(b), -1) {
+		seen[m[1]]++
+	}
+	for loc, n := range seen {
+		if n > 1 {
+			t.Errorf("%s is in docs/sitemap.xml %d times — run `go run ./scripts/genregistry`", loc, n)
+		}
+	}
+}
+
+// The page's structured data and the sitemap answer the same question, so
+// they give the same day; dateModified used to be typed once and left there.
+func TestGuideDateModifiedIsTheSitemapDay(t *testing.T) {
+	root := filepath.Join("..", "..")
+	b, err := os.ReadFile(filepath.Join(root, "docs", "sitemap.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lastmod := map[string]string{}
+	entry := regexp.MustCompile(`<loc>https://vshulcz\.github\.io/deja-vu/([^<]*)</loc><lastmod>([^<]*)</lastmod>`)
+	for _, m := range entry.FindAllStringSubmatch(string(b), -1) {
+		lastmod[m[1]] = m[2]
+	}
+	modified := regexp.MustCompile(`"dateModified": ?"([^"]*)"`)
+	published := regexp.MustCompile(`"datePublished": ?"([^"]*)"`)
+	for _, glob := range []string{"guide/*.html", "zh/guide/*.html"} {
+		pages, err := filepath.Glob(filepath.Join(root, "docs", filepath.FromSlash(glob)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range pages {
+			page, err := os.ReadFile(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := modified.FindSubmatch(page)
+			if m == nil {
+				continue
+			}
+			rel, _ := filepath.Rel(filepath.Join(root, "docs"), p)
+			rel = filepath.ToSlash(rel)
+			want, ok := lastmod[rel]
+			if !ok {
+				continue
+			}
+			if pub := published.FindSubmatch(page); pub != nil && string(pub[1]) > want {
+				want = string(pub[1])
+			}
+			if got := string(m[1]); got != want {
+				t.Errorf("%s: dateModified %s, sitemap lastmod %s — run `go run ./scripts/genregistry`", rel, got, want)
+			}
 		}
 	}
 }

@@ -59,11 +59,13 @@ var groups = []group{
 		{"find-a-session.html", "Finding a session"},
 		{"codex-history.html", "Codex history"},
 		{"resume-a-session.html", "Resuming a session"},
+		{"codex-resume-session.html", "Codex resume"},
 		{"export-conversations.html", "Exporting sessions"},
 		{"sync-across-machines.html", "Across machines"},
 		{"auditing-agents.html", "Auditing an agent"},
 		{"credentials-in-transcripts.html", "Credentials in transcripts"},
 		{"recover-a-deleted-session.html", "Recover a deleted session"},
+		{"no-conversation-found-claude-code.html", "No conversation found"},
 	}},
 	{title: "Deleting sessions", fold: true, links: []link{
 		{"session-files-on-disk.html", "Claude Code"},

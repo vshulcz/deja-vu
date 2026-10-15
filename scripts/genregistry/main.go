@@ -13,7 +13,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html"
 	"html/template"
@@ -22,9 +24,9 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
-	"time"
+
+	"github.com/vshulcz/deja-vu/internal/docsdate"
 )
 
 const site = "https://vshulcz.github.io/deja-vu"
@@ -333,24 +335,61 @@ func writeSitemap(registryPages []string) error {
 	if err := requireFullHistory(); err != nil {
 		return err
 	}
+	text = dedupe(text)
+	if err := refreshDateModified(); err != nil {
+		return err
+	}
 	text, err = refreshLastmod(text)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(text), 0o644)
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		return err
+	}
+	// sitemap.txt is the same list, one URL a line: the second way in when
+	// Search Console reports the XML as unprocessed. Written from the XML so
+	// the two cannot drift.
+	var txt strings.Builder
+	for _, m := range regexp.MustCompile(`<loc>([^<]+)</loc>`).FindAllStringSubmatch(text, -1) {
+		txt.WriteString(m[1] + "\n")
+	}
+	return os.WriteFile(filepath.Join("docs", "sitemap.txt"), []byte(txt.String()), 0o644)
 }
 
 var locRe = regexp.MustCompile(`<loc>` + regexp.QuoteMeta(site) + `/([^<]*)</loc>(?:<lastmod>[^<]*</lastmod>)?`)
 
-// refreshLastmod rewrites each entry's lastmod from the day its file last
-// changed. An entry whose file is not there is left alone: the page may be
-// served from somewhere this generator cannot see, and dropping the date is
+// urlRe is one sitemap entry on its own line, the way this file writes them.
+var urlRe = regexp.MustCompile(`(?m)^[ \t]*<url><loc>([^<]*)</loc>.*</url>\n`)
+
+// dedupe keeps the first entry for each URL. Merges that both added the same
+// page left nineteen URLs listed two and three times; a sitemap that lists a
+// page twice is one that disagrees with itself about its priority.
+func dedupe(text string) string {
+	seen := map[string]bool{}
+	return urlRe.ReplaceAllStringFunc(text, func(m string) string {
+		loc := urlRe.FindStringSubmatch(m)[1]
+		if seen[loc] {
+			return ""
+		}
+		seen[loc] = true
+		return m
+	})
+}
+
+// refreshLastmod rewrites each entry's lastmod from the day its page's content
+// last changed. An entry whose file is not there is left alone: the page may
+// be served from somewhere this generator cannot see, and dropping the date is
 // worse than leaving the one a person put in.
 func refreshLastmod(text string) (string, error) {
+	d, err := docsdate.New(".")
+	if err != nil {
+		return text, err
+	}
+	defer func() { _ = d.Close() }()
 	var first error
 	out := locRe.ReplaceAllStringFunc(text, func(m string) string {
 		loc := locRe.FindStringSubmatch(m)[1]
-		day, err := lastChanged(sitemapFile(loc))
+		day, err := lastChanged(d, sitemapFile(loc))
 		if err != nil {
 			if first == nil {
 				first = err
@@ -365,6 +404,52 @@ func refreshLastmod(text string) (string, error) {
 	return out, first
 }
 
+var (
+	publishedRe = regexp.MustCompile(`"datePublished": ?"(\d{4}-\d{2}-\d{2})"`)
+	modifiedRe  = regexp.MustCompile(`"dateModified": ?"\d{4}-\d{2}-\d{2}"`)
+)
+
+// refreshDateModified gives each guide page's structured data the same day
+// the sitemap gives it. The two used to disagree by up to four weeks, because
+// dateModified was typed once and never touched again; it lives in <head>, so
+// writing it does not move the content date it is read from.
+func refreshDateModified() error {
+	d, err := docsdate.New(".")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = d.Close() }()
+	for _, glob := range []string{"docs/guide/*.html", "docs/zh/guide/*.html"} {
+		pages, err := filepath.Glob(filepath.FromSlash(glob))
+		if err != nil {
+			return err
+		}
+		for _, page := range pages {
+			b, err := os.ReadFile(page)
+			if err != nil {
+				return err
+			}
+			if !modifiedRe.Match(b) {
+				continue
+			}
+			day, err := lastChanged(d, filepath.ToSlash(page))
+			if err != nil {
+				return err
+			}
+			if m := publishedRe.FindSubmatch(b); m != nil && string(m[1]) > day {
+				day = string(m[1])
+			}
+			out := modifiedRe.ReplaceAll(b, []byte(`"dateModified": "`+day+`"`))
+			if !bytes.Equal(out, b) {
+				if err := os.WriteFile(page, out, 0o644); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // sitemapFile maps a sitemap path to the file docs/ serves for it, with the
 // slashes git wants in a pathspec on every platform. The site root and a
 // directory URL both come from an index.html.
@@ -375,47 +460,26 @@ func sitemapFile(loc string) string {
 	return "docs/" + loc
 }
 
-// lastChanged is the author date of the last commit that touched the file, or
-// today when the file has edits that are not committed yet: the commit that
-// will carry them does not exist, and the alternative is to publish the date of
-// the change before this one.
-func lastChanged(file string) (string, error) {
-	if _, err := os.Stat(filepath.FromSlash(file)); err != nil {
-		return "", nil
+// lastChanged is the UTC day the file's content last changed (see docsdate):
+// a commit that only rewrote the sidebar does not count, and a file with
+// edits not committed yet is today.
+//
+// UTC, not the author's zone: %as printed the day in the author's own zone,
+// so a commit made at 00:30 in +03:00 dated every page it touched a day ahead
+// of UTC, and the next commit from another zone moved them back (#4906, #4908).
+//
+// A clean, tracked file with no commit behind it means the history is not
+// here. `git log` says so by printing nothing and exiting 0, so this used to
+// leave every date untouched and report success (#3984).
+func lastChanged(d *docsdate.Dater, file string) (string, error) {
+	day, err := d.Day(file)
+	if errors.Is(err, docsdate.ErrNoHistory) {
+		return "", fmt.Errorf("%w: %s", err, shallowHint())
 	}
-	dirty, err := exec.Command("git", "status", "--porcelain", "--", file).Output()
 	if err != nil {
-		return "", fmt.Errorf("git status %s: %w", file, err)
+		return "", err
 	}
-	// Both a modified file and one git has never seen come back here, and both
-	// want today: neither has a commit carrying its current contents.
-	if len(strings.TrimSpace(string(dirty))) > 0 {
-		return time.Now().UTC().Format("2006-01-02"), nil
-	}
-	// %at, not %as: %as prints the day in the author's own zone, so a commit
-	// made at 00:30 in +03:00 dated every page it touched a day ahead of UTC,
-	// and the next commit from another zone moved them back (#4906, #4908). A
-	// Unix time carries no zone, and cutting the day in UTC here means neither
-	// the author's zone nor the machine running the generator can move it.
-	out, err := exec.Command("git", "log", "-1", "--format=%at", "--", file).Output()
-	if err != nil {
-		return "", fmt.Errorf("git log %s: %w", file, err)
-	}
-	stamp := strings.TrimSpace(string(out))
-	if stamp == "" {
-		// A clean, tracked file with no commit behind it means the history is
-		// not here. `git log` says so by printing nothing and exiting 0, so
-		// this used to leave every date untouched and report success — a run
-		// that changes nothing looks exactly like a tree that is already
-		// current, and a drift gate built on it passes without reading
-		// anything (#3984).
-		return "", fmt.Errorf("no commit in this clone touched %s: %s", file, shallowHint())
-	}
-	secs, err := strconv.ParseInt(stamp, 10, 64)
-	if err != nil {
-		return "", fmt.Errorf("git log %s: %q is not a Unix time", file, stamp)
-	}
-	return time.Unix(secs, 0).UTC().Format("2006-01-02"), nil
+	return day, nil
 }
 
 // shallowHint says which of the two ways to have no history this is, because

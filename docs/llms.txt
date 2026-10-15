@@ -42,6 +42,8 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [The agent repeats a mistake you already fixed](https://vshulcz.github.io/deja-vu/guide/repeated-mistakes.html): the same error again, in a repository that solved it before
 - [Finding a session](https://vshulcz.github.io/deja-vu/guide/find-a-session.html): search chat history across every agent at once
 - [Codex CLI history](https://vshulcz.github.io/deja-vu/guide/codex-history.html): where Codex keeps sessions, the .jsonl.zst rollouts grep misses after a week, jq and sqlite3 recipes, search and sync
+- [Codex resume](https://vshulcz.github.io/deja-vu/guide/codex-resume-session.html): codex resume, --all, --last and exec resume, why a session is missing from the picker, "no rollout found for thread id" and archived sessions
+- [No conversation found with session ID](https://vshulcz.github.io/deja-vu/guide/no-conversation-found-claude-code.html): what the claude --resume error means, five causes reproduced on 2.1.295, finding the file and getting the session back
 - [Switching agents](https://vshulcz.github.io/deja-vu/guide/switching-agents.html): move between Claude Code, Codex and Cursor without re-explaining
 - [One set of rules for every agent](https://vshulcz.github.io/deja-vu/guide/one-rules-file.html): which rules file each agent reads, sharing AGENTS.md in a repository, and keeping your global rules in step with deja rules sync
 - [After compaction](https://vshulcz.github.io/deja-vu/guide/after-compaction.html): recovering the commands a summary dropped, and the packet deja hands back automatically
@@ -61,6 +63,8 @@ Run `deja` with no arguments in a terminal and it opens a full-screen search ove
 - [会话文件怎么删](https://vshulcz.github.io/deja-vu/zh/guide/session-files-on-disk.html)：Claude Code 的会话文件怎么删、能占多大、删掉之后失去什么
 - [找回被删掉的会话](https://vshulcz.github.io/deja-vu/zh/guide/recover-a-deleted-session.html)：claude --resume 里找不到那次会话时，四种原因里有三种不是删除，真正还能找回的是什么
 - [找回解决问题的那次会话](https://vshulcz.github.io/deja-vu/zh/guide/find-a-session.html)：按记得的词在所有智能体里同时搜历史，然后继续那次对话
+- [给 Codex CLI 加记忆](https://vshulcz.github.io/deja-vu/zh/guide/memory-for-codex.html)：MCP 服务器、需要你批准的钩子，以及插件市场
+- [接着昨天的会话继续](https://vshulcz.github.io/deja-vu/zh/guide/resume-a-session.html)：先在所有智能体里找到会话，再在它所属的那个里重新打开，或者只取摘要
 - [隐私](https://vshulcz.github.io/deja-vu/zh/guide/privacy.html)：索引什么、脱敏什么、什么永远不出这台机器，以及怎么控制留下什么
 
 ## Per-harness setup

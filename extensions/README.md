@@ -15,6 +15,7 @@ same local index.
 | [`kimi/`](kimi) | Kimi Code plugin `deja` | `/plugins install https://github.com/vshulcz/deja-vu` |
 | [`grok/`](grok) | Grok Build plugin `deja` from this repository's marketplace, then `grok plugin install deja` (official entry in review: xai-org/plugin-marketplace#332) | `grok plugin marketplace add vshulcz/deja-vu` |
 | [`hermes/`](hermes) | Hermes memory provider `deja-memory` | `hermes plugins install vshulcz/deja-vu/extensions/hermes` |
+| [`spec-kit/`](spec-kit) | Spec Kit extension `deja-vu`, release asset `deja-spec-kit.zip` | `specify extension add deja-vu --from https://github.com/vshulcz/deja-vu/releases/latest/download/deja-spec-kit.zip` |
 
 Four more integrations live outside this directory because their registries or
 install commands read a fixed path in this repository: `claude-plugin/` (Claude
@@ -70,6 +71,14 @@ marketplace entry. `TestKimiManifestsAgree` keeps the two manifests one plugin.
 Kimi notifies about updates only for plugins installed from its own
 marketplace, so `deja doctor` reports the installed plugin version against the
 one this deja ships.
+
+The Spec Kit extension is not a harness: it is a `/speckit.deja-vu.recall`
+command that any agent Spec Kit drives can run before `/speckit.implement`. Each
+release packs `extensions/spec-kit` into `deja-spec-kit.zip` after
+`scripts/pinmanifests` has set its version to the release's, and attaches it.
+The entry in github/spec-kit's community catalog pins one release's zip URL and
+its sha256 (the release job prints it in the run summary), so a new version
+there means a new submission through their Extension Submission issue form.
 
 Gemini installs this repository itself: `gemini extensions install
 https://github.com/vshulcz/deja-vu` reads `gemini-extension.json` at the

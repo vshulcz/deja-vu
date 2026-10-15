@@ -77,9 +77,13 @@ const (
 	kimiPacked = "extensions/kimi/kimi.plugin.json"
 	// doctor compares the installed copy against this constant to tell a
 	// user their zip install is behind, so it has to move with the manifest.
-	kimiConst  = "cmd/deja/kimi_plugin.go"
-	releaseAPI = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
-	assetBase  = "https://github.com/vshulcz/deja-vu/releases/download"
+	kimiConst = "cmd/deja/kimi_plugin.go"
+	// The Spec Kit extension is packed into deja-spec-kit.zip after this pin
+	// runs, and its catalog entry names the version inside the zip, so the
+	// two have to be the release's.
+	specKitExtension = "extensions/spec-kit/extension.yml"
+	releaseAPI       = "https://api.github.com/repos/vshulcz/deja-vu/releases/latest"
+	assetBase        = "https://github.com/vshulcz/deja-vu/releases/download"
 )
 
 // npmHarnessPackages are the plugins published to npm that install the deja
@@ -176,6 +180,7 @@ func targets() map[string]func(pins) ([]byte, error) {
 		kimiConst:         renderGoVersionConst(kimiConst, "kimiPluginVersion"),
 		agentPlugin:       renderPluginVersion(agentPlugin),
 		serverJSON:        renderPluginVersion(serverJSON),
+		specKitExtension:  renderYAMLExtensionVersion(specKitExtension),
 	}
 	// The harness packages depend on the deja binary package. The pin is a
 	// caret on a 0.x version, which npm reads as "this minor and no further",
@@ -319,6 +324,22 @@ func renderNpmDejaDep(path string) func(pins) ([]byte, error) {
 	}
 }
 
+// renderYAMLExtensionVersion pins the `version:` under `extension:` in a Spec
+// Kit manifest and nothing else: `requires.tools` carries a version range for
+// deja itself that only moves when the command needs a newer deja.
+func renderYAMLExtensionVersion(path string) func(pins) ([]byte, error) {
+	return func(p pins) ([]byte, error) {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		if n := len(yamlExtensionVersion.FindAllIndex(b, -1)); n != 1 {
+			return nil, fmt.Errorf("%s has %d extension version lines, want 1", path, n)
+		}
+		return yamlExtensionVersion.ReplaceAll(b, []byte(`${1}"`+p.version+`"`)), nil
+	}
+}
+
 func renderPluginVersion(path string) func(pins) ([]byte, error) {
 	return func(p pins) ([]byte, error) {
 		b, err := os.ReadFile(path)
@@ -340,7 +361,10 @@ var (
 	tagRefs     = regexp.MustCompile(`(?m)/v\d+\.\d+\.\d+(/|$)`)
 	fileRefs    = regexp.MustCompile(`deja-vu_\d+\.\d+\.\d+_windows`)
 	jsonVersion = regexp.MustCompile(`(?m)^(\s*"version":\s*)"[^"]*"`)
-	amdSha      = regexp.MustCompile(`(?m)^(\s*InstallerSha256: )[0-9A-Fa-f]{64}(\s*)$`)
+	// Two-space indent: the extension block's own field, not a tool's
+	// `version:` under requires, which sits deeper.
+	yamlExtensionVersion = regexp.MustCompile(`(?m)^(  version:[ \t]*)"[^"\n]*"`)
+	amdSha               = regexp.MustCompile(`(?m)^(\s*InstallerSha256: )[0-9A-Fa-f]{64}(\s*)$`)
 )
 
 func edit(path string, p pins) ([]byte, error) {
