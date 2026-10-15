@@ -296,7 +296,7 @@ func Ensure(dir string, harness string, force bool, progress io.Writer) error {
 		scope = harness
 	}
 	m, err := prior, priorErr
-	if !force && err == nil && notesZoneDrifted(m) {
+	if !force && err == nil && zoneDrifted(m) {
 		force = true
 	}
 	// A store skipped for a missing CLI has unchanged files, so the
@@ -386,7 +386,7 @@ func ensureLocked(dir string, o query.Options, force bool, progress io.Writer) e
 	want := currentFilesReusing("", priorFiles(prior, priorErr))
 	scope := ""
 	m, err := prior, priorErr
-	if !force && err == nil && notesZoneDrifted(m) {
+	if !force && err == nil && zoneDrifted(m) {
 		force = true
 	}
 	if !force && err == nil && manifestFresh(m, want, scope) && recordsIntact(dir, m) {
@@ -473,9 +473,9 @@ func EnsureForSearchStale(dir string, o query.Options, progress io.Writer) (bool
 		// tool (#3552).
 		return true, nil
 	}
-	if notesZoneDrifted(m) {
-		// Regrouping the day buckets is a full rebuild; hand it to the
-		// detached warmup and say the current answer is stale.
+	if zoneDrifted(m) {
+		// Regrouping the day buckets or rereading aider headers in this zone
+		// is a full rebuild; hand it to the detached warmup and say the current answer is stale.
 		return true, nil
 	}
 	if manifestFresh(m, want, "") {
@@ -661,7 +661,7 @@ func rebuildWithTombstones(dir string, harness string, scope string, files map[s
 	// incremental build carries the old stamp forward: it keeps records it
 	// wrote under the previous patterns, which is why `deja index` has to ask
 	// for a rebuild rather than quietly declaring the new list in force (#1307).
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imported.watermarks, ExportBoundary: imported.boundary, ImportedRecords: imported.dedupe,
 		Compactions:        compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -1676,7 +1676,7 @@ func writeSessionsWithSync(tmp, dir string, ss []model.Session, files map[string
 	writtenMessages := 0
 	lastIngestFiles = len(files)
 	parsedThisPass(files)
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(), Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: imp.watermarks, ExportBoundary: imp.boundary, ImportedRecords: imp.dedupe,
 		Compactions:        imp.compactions,
 		ExcludeFingerprint: sources.ExclusionFingerprint(),
@@ -4410,7 +4410,7 @@ func updateIndexOnce(dir, harness, scope string, files map[string]FileState, for
 	// keyed on it — the embedding sidecar — that the file it measured was still
 	// there (#1357). Only appendIncremental, which appends in place, may keep a
 	// generation.
-	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(),
+	m := Manifest{Version: version, KeptDated: true, Format: onDiskFormat, Files: files, Sessions: map[string]SessionMeta{}, BuiltAt: time.Now(), SourcesReadAt: time.Now(), ReadZone: zoneFingerprint(),
 		Generation: time.Now().UTC().Format(time.RFC3339Nano), Scope: scope,
 		ExportWatermarks: old.ExportWatermarks, ExportBoundary: old.ExportBoundary, ImportedRecords: old.ImportedRecords,
 		Compactions: cloneCompactions(old.Compactions),
@@ -4862,6 +4862,7 @@ func appendIncremental(dir, harness, scope string, old Manifest, files map[strin
 	m.Scope = scope
 	m.BuiltAt = time.Now()
 	m.SourcesReadAt = m.BuiltAt
+	m.ReadZone = zoneFingerprint()
 	m.Files = files
 	m.Redacted = 0
 	carryRedactions(&m, old, map[string]bool{})

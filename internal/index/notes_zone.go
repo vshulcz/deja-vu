@@ -1,6 +1,9 @@
 package index
 
 import (
+	"fmt"
+	"hash/fnv"
+	"strconv"
 	"strings"
 	"time"
 
@@ -67,4 +70,63 @@ func noteBucketDay(harness, id string) (string, bool) {
 
 func sameLocalDay(t time.Time, day string) bool {
 	return t.IsZero() || t.Local().Format("2006-01-02") == day
+}
+
+// zoneDrifted reports rows that a rebuild in this process's zone would read
+// differently: note buckets grouped by another zone's day (#1058) and aider
+// headers read in another zone (#5053). Either one makes the pass a rebuild.
+func zoneDrifted(m Manifest) bool {
+	return notesZoneDrifted(m) || aiderZoneDrifted(m)
+}
+
+// AiderZoneDrift reports whether the store holds aider sessions read in a time
+// zone other than the one this process runs in. aider writes its local wall
+// clock with no zone, and deja reads it in the machine's zone, so after a zone
+// change an incremental pass kept the old instants and a rebuild gave new ones
+// (#5053).
+func AiderZoneDrift(dir string) bool {
+	if dir == "" {
+		dir = DefaultDir()
+	}
+	m, err := readManifest(dir)
+	if err != nil {
+		return false
+	}
+	return aiderZoneDrifted(m)
+}
+
+// aiderZoneDrifted is AiderZoneDrift over a manifest the caller holds. The
+// zone is recorded per pass rather than derived from the rows: a kept row of a
+// deleted history stays as it was read, by a rebuild too, and a check over the
+// rows would rebuild the index on every pass. A store from before ReadZone
+// says nothing, and a store with no aider rows has nothing to reread.
+func aiderZoneDrifted(m Manifest) bool {
+	if m.ReadZone == "" || m.ReadZone == zoneFingerprint() {
+		return false
+	}
+	for _, s := range m.Sessions {
+		if s.Harness == "aider" && s.Path != syncImportPath {
+			return true
+		}
+	}
+	return false
+}
+
+// zoneFingerprint names this process's zone by its offsets and transitions
+// from 2023, before aider's first release, to 2040. Two zones that read every
+// aider header the same get the same name, whatever they are called.
+func zoneFingerprint() string {
+	h := fnv.New64a()
+	end := time.Date(2040, 1, 1, 0, 0, 0, 0, time.UTC)
+	for t := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC); t.Before(end); {
+		lt := t.In(time.Local)
+		_, off := lt.Zone()
+		fmt.Fprintf(h, "%d@%d;", off, t.Unix())
+		_, next := lt.ZoneBounds()
+		if !next.After(t) {
+			break
+		}
+		t = next
+	}
+	return strconv.FormatUint(h.Sum64(), 36)
 }

@@ -584,6 +584,12 @@ func cmdIndex(dir string, rest []string) error {
 		fmt.Fprintln(os.Stderr, "deja: some notes were grouped in another time zone — regrouping them")
 		fresh, force = false, true
 	}
+	// aider headers carry no zone and are read in this one; after a zone
+	// change the warmup this command runs must reread them (#5053).
+	if fresh && !force && index.AiderZoneDrift(dir) {
+		fmt.Fprintln(os.Stderr, "deja: aider sessions were read in another time zone — reading them again")
+		fresh, force = false, true
+	}
 	if fresh && !force {
 		stopProgress()
 		// The warmup child runs this command, so returning before the sentinel

@@ -710,9 +710,7 @@ import (
 // 70: recoffsets.bin and frictext.bin sit beside the log. Both are caches
 // checked against it, so an index without them reads as before and needs no
 // rebuild for them.
-// 71: aider headers are read as UTC, not in the machine's zone; an index
-// that read them in another zone holds other instants until a rebuild.
-const version = 71
+const version = 70
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an
@@ -1076,6 +1074,11 @@ type Manifest struct {
 	// holds rows for transcripts already gone, unmarked (0.21 had no Kept), and
 	// the first pass to find them must not date months of deletions to today.
 	KeptDated bool `json:"kept_dated,omitempty"`
+	// ReadZone names the time zone this machine's stores were last read in
+	// (zoneFingerprint). aider headers carry no zone and are read in the
+	// local one, so a pass in another zone rereads them (#5053). Empty on a
+	// store from before the field, which says nothing.
+	ReadZone string `json:"read_zone,omitempty"`
 }
 
 // HarnessIngest is one harness's ingestion health from its last indexing pass.
@@ -1138,6 +1141,7 @@ type manifestCore struct {
 	ToolFingerprint    string
 	Compactions        map[string]CompactionState
 	KeptDated          bool
+	ReadZone           string
 }
 
 type RedactionStats struct {
