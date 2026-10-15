@@ -30,9 +30,13 @@ func weekNoteAt(dir string, now time.Time) string { return weekNoteFor(dir, now,
 // which is the person's own question.
 func weekNoteFor(dir string, now time.Time, private bool) string {
 	p := dir + ".weeknote"
+	since := now.Add(-weekNoteEvery)
 	if b, err := os.ReadFile(p); err == nil {
-		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && now.Sub(time.Unix(ts, 0)) < weekNoteEvery {
-			return ""
+		if ts, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil {
+			if now.Sub(time.Unix(ts, 0)) < weekNoteEvery {
+				return ""
+			}
+			since = time.Unix(ts, 0)
 		}
 	} else {
 		_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
@@ -45,11 +49,14 @@ func weekNoteFor(dir string, now time.Time, private bool) string {
 	// were never true together (#1576).
 	n := usage.StatusCounters(dir)
 	recalls := n.WeekRecalls + n.WeekInjections
+	// Counted from the last note, so each deletion is said once.
+	deleted := weekDeletedLine(dir, weekDeletedSince(dir, since), since, now)
 	if recalls == 0 {
 		// A quiet week is not news; the clock restarts so the next week that
-		// has something to say is the one reported.
+		// has something to say is the one reported. Sessions deleted under
+		// the person are, quiet week or not.
 		_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
-		return ""
+		return deleted
 	}
 	_ = os.WriteFile(p, []byte(strconv.FormatInt(now.Unix(), 10)), 0o600)
 	line := fmt.Sprintf("deja this week: %d recall%s", recalls, pluralS(recalls))
@@ -57,7 +64,7 @@ func weekNoteFor(dir string, now time.Time, private bool) string {
 		line += fmt.Sprintf(", %d déjà vu", n.DejaVuWeek)
 	}
 	line += " — deja stats --card"
-	return joinNotes(line, weekUsedLine(dir, now, private))
+	return joinNotes(joinNotes(line, weekUsedLine(dir, now, private)), deleted)
 }
 
 // humanNotes is what deja has to tell the person rather than the model: the

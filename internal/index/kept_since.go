@@ -12,8 +12,8 @@ type KeptSession struct {
 	At time.Time
 }
 
-// KeptSince lists the sessions whose transcript a pass first found gone at or
-// after since, newest first. It reads the manifest alone, never the disk: the
+// KeptSince lists the sessions whose transcript a pass first found gone after
+// since, newest first. It reads the manifest alone, never the disk: the
 // week note asks from a session-start hook.
 func KeptSince(dir string, since time.Time) ([]KeptSession, error) {
 	if dir == "" {
@@ -26,7 +26,7 @@ func KeptSince(dir string, since time.Time) ([]KeptSession, error) {
 	var out []KeptSession
 	for _, meta := range m.Sessions {
 		f, ok := m.Files[meta.Path]
-		if !ok || !f.Kept || f.KeptAt == 0 || f.KeptAt < since.Unix() {
+		if !ok || !f.Kept || f.KeptAt == 0 || f.KeptAt <= since.Unix() {
 			continue
 		}
 		out = append(out, KeptSession{SessionMeta: meta, At: time.Unix(f.KeptAt, 0)})
