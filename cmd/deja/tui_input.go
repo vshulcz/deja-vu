@@ -33,8 +33,6 @@ func (a *tuiApp) handle(ev tui.Event) {
 		a.handleReader(ev)
 	case a.view == viewWelcome:
 		a.handleWelcome(ev)
-	case a.view == viewMemory:
-		a.handleMemory(ev)
 	default:
 		a.handleList(ev)
 	}
@@ -79,17 +77,9 @@ func (a *tuiApp) handleList(ev tui.Event) {
 	case tui.KeyEnd:
 		a.move(len(a.rows))
 	case tui.KeyTab:
-		if a.scope == scopeKept {
-			a.openMemory()
-			return
-		}
-		a.setScope(a.scope + 1)
+		a.setScope((a.scope + 1) % 3)
 	case tui.KeyBackTab:
-		if a.scope == scopeHere {
-			a.openMemory()
-			return
-		}
-		a.setScope(a.scope - 1)
+		a.setScope((a.scope + 2) % 3)
 	case tui.KeyEnter:
 		if len(a.rows) == 0 && a.takeWayOut() {
 			return

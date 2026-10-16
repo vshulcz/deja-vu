@@ -756,17 +756,10 @@ func runHookContextMode(dir string, plain, once bool) error {
 	if input.Shell {
 		lead = shellRecallLead(lead)
 	}
-	starting := sync.OnceValue(func() string { return startingHarness(dir, input.SessionID, input.TranscriptPath) })
-	// What Claude wrote in its own memory here, for every agent but Claude,
-	// which already loads it. A session nothing identifies gets it: a line it
-	// has seen costs a few hundred bytes, one it never got costs a rule.
-	if h := starting(); h != "claude" && (h != "" || input.TranscriptPath == "" || !sources.UnderClaudeRoot(input.TranscriptPath)) {
-		if mb := claudeMemoryBlock(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), 8, 1000); mb != "" {
-			digest = mb + "\n" + digest
-		}
-	}
 	digest = lead + digest
-	if tip := limitHandoffTip(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), append(self, input.SessionID), starting); tip != "" {
+	if tip := limitHandoffTip(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), append(self, input.SessionID), func() string {
+		return startingHarness(dir, input.SessionID, input.TranscriptPath)
+	}); tip != "" {
 		digest += "\n" + tip
 	}
 	digest = frameRecall(digest)

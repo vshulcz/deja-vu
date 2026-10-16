@@ -30,7 +30,6 @@ const (
 	viewList = iota
 	viewReader
 	viewWelcome
-	viewMemory
 )
 
 const (
@@ -83,13 +82,10 @@ type tuiApp struct {
 	updates chan func()
 	bg      sync.WaitGroup // one-shot work off the event loop, see spawn
 
-	view int
-	mem  memoryState
-	// readerBack is the view esc in the reader returns to.
-	readerBack int
-	reader     readerState
-	modal      int
-	m          modalState
+	view   int
+	reader readerState
+	modal  int
+	m      modalState
 
 	toast      string
 	toastGood  bool
