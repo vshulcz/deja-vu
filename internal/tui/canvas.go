@@ -137,7 +137,8 @@ func (c *Canvas) PutClip(x, y int, s string, st Style, max int) int {
 	if max-x < 1 {
 		return x
 	}
-	return c.Put(x, y, termwidth.Cut(s, max-x-1)+"…", st, max)
+	// No space before the ellipsis: "Fixed by …" reads as a gap, not a cut.
+	return c.Put(x, y, strings.TrimRight(termwidth.Cut(s, max-x-1), " ")+"…", st, max)
 }
 
 func (c *Canvas) style(p *cell, st Style) {

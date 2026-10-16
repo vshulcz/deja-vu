@@ -133,7 +133,7 @@ func (p painter) putHL(x, y int, text string, terms []string, base tui.Style, ma
 			}
 		}
 		if termwidth.Columns(text) > max-x {
-			text = termwidth.Cut(text, max-x-1) + "…"
+			text = strings.TrimRight(termwidth.Cut(text, max-x-1), " ") + "…"
 		}
 	}
 	rs := []rune(text)
@@ -228,7 +228,7 @@ func wrapLines(text string, width, n int) []string {
 		if termwidth.Columns(last) >= width {
 			last = termwidth.Cut(last, width-1)
 		}
-		lines[n-1] = last + "…"
+		lines[n-1] = strings.TrimRight(last, " ") + "…"
 	}
 	return lines
 }

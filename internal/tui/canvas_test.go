@@ -80,6 +80,12 @@ func TestPutClip(t *testing.T) {
 	if got := c.Text(0); got != "abc     " {
 		t.Errorf("fits = %q", got)
 	}
+	// A cut that lands after a space does not leave it before the ellipsis.
+	c = NewCanvas(8, 1)
+	c.PutClip(0, 0, "ab cdefgh", Style{}, 4)
+	if got := c.Text(0); got != "ab…     " {
+		t.Errorf("cut at a space = %q", got)
+	}
 	if x := c.PutClip(6, 0, "abc", Style{}, 6); x != 6 {
 		t.Errorf("no room writes nothing, got %d", x)
 	}
