@@ -240,11 +240,7 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 	row := func(k int) (int, bool) { yy := y + k; return yy, yy >= minY && yy < maxY }
 	head := a.headline(r.s)
 	if yy, ok := row(0); ok {
-		x := x0 + 2
-		if a.keptIDs[sessionKey(r.s)] {
-			x = p.Put(x, yy, "◆ ", fgs(cPeach), x1)
-		}
-		p.PutClip(x, yy, head, boldOn(cText, surf), x1-1)
+		p.PutClip(x0+2, yy, head, boldOn(cText, surf), x1-1)
 	}
 	if yy, ok := row(1); ok {
 		x := p.Put(x0+2, yy, "●", fgs(agentColor(r.s.Harness)), x1)
@@ -253,7 +249,18 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 			meta += " · " + tuiProject(r.s)
 		}
 		meta += " · " + tuiAgo(r.s.Updated, a.now)
-		x = p.PutClip(x+1, yy, meta, fgs(cMuted), x1-1)
+		// The selected card's line comes up a step with its surface.
+		mc := cMuted
+		if sel {
+			mc = cSub
+		}
+		x = p.PutClip(x+1, yy, meta, fgs(mc), x1-1)
+		// Deleted is said on this line rather than as a mark before the
+		// headline, which pushed that one headline off the column the others
+		// start on. The Deleted tab is all of them, and its heading says so.
+		if a.keptIDs[sessionKey(r.s)] && a.scope != scopeKept {
+			x = p.PutClip(x, yy, " · deleted", fgs(cPeach), x1-1)
+		}
 		if r.file != "" {
 			x = p.Put(x, yy, " · touched ", fgs(cMuted), x1-1)
 			p.PutClip(x, yy, filepath.ToSlash(r.file), fgs(cPeach), x1-1)

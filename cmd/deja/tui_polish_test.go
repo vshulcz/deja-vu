@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/vshulcz/deja-vu/internal/model"
 )
 
 // At 80 columns the hints ran out before the way out; it keeps the right edge
@@ -38,5 +40,21 @@ func TestTUIHelpLabelsWhole(t *testing.T) {
 		if strings.Contains(ln, "FIND") && !strings.Contains(ln, "ACT") {
 			t.Errorf("sections not side by side: %q", ln)
 		}
+	}
+}
+
+// A deleted session among live ones says so beside its agent; its headline
+// starts on the column every other headline does.
+func TestTUIDeletedCardKeepsTheHeadlineColumn(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	a.keptIDs = map[string]bool{sessionKey(a.rows[0].s): true}
+	s := screen(a.frame(120, 36))
+	wantOnScreen(t, s, "▌ webhook signature fails", "· deleted")
+	a.setScope(scopeKept)
+	a.kept, a.keptLoaded = []model.Session{a.allMeta[0]}, true
+	a.loadHome()
+	if s := screen(a.frame(120, 36)); strings.Contains(s, "· deleted") {
+		t.Errorf("the Deleted tab says deleted on every card:\n%s", s)
 	}
 }
