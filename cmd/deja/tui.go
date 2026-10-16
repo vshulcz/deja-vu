@@ -104,6 +104,12 @@ type tuiApp struct {
 	histAt     int      // where ↑ is in history, -1 when not browsing
 	firstShown int      // the first card on screen, for 1-9
 	beyond     beyond   // where an empty answer can go next
+	boxMemo    struct {
+		key string
+		at  time.Time
+		f   boxFilters
+		ok  bool
+	}
 
 	after func() error
 	quit  bool

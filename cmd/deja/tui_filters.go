@@ -149,7 +149,17 @@ func parseBox(q []rune, now time.Time) boxFilters {
 }
 
 // box is the filters in the box as it reads now.
-func (a *tuiApp) box() boxFilters { return parseBox(a.query, a.wall()) }
+// box parses the query once per text and second: a frame asks for it from
+// every card, and a pasted log in the box made each ask a full parse.
+func (a *tuiApp) box() boxFilters {
+	now, key := a.wall().Truncate(time.Second), string(a.query)
+	m := &a.boxMemo
+	if !m.ok || m.key != key || !m.at.Equal(now) {
+		m.key, m.at, m.ok = key, now, true
+		m.f = parseBox(a.query, now)
+	}
+	return m.f
+}
 
 func (a *tuiApp) wall() time.Time {
 	if a.clock != nil {
