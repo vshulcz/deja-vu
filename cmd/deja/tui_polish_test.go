@@ -58,3 +58,15 @@ func TestTUIDeletedCardKeepsTheHeadlineColumn(t *testing.T) {
 		t.Errorf("the Deleted tab says deleted on every card:\n%s", s)
 	}
 }
+
+// The agent strip over this project's list counts this project, not the
+// machine.
+func TestTUIStripCountsTheScope(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	wantOnScreen(t, screen(a.frame(120, 36)), "Claude Code 3")
+	a.projects = []string{"payments"}
+	a.setScope(scopeHere)
+	s := screen(a.frame(120, 36))
+	wantOnScreen(t, s, "Claude Code 2")
+}

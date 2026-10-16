@@ -166,13 +166,18 @@ func (a *tuiApp) drawSearch(l layout, y int) {
 
 func (a *tuiApp) drawStrip(l layout, y int) {
 	p := a.p
+	// The strip counts what the list under it holds: the machine's totals
+	// over this project's list read as 137 Claude sessions above a list of 53.
 	counts := a.agentsAll
-	if len(a.query) > 0 || a.scope == scopeKept {
+	switch {
+	case len(a.query) > 0 || a.scope == scopeKept:
 		ss := make([]model.Session, len(a.rows))
 		for i, r := range a.rows {
 			ss[i] = r.s
 		}
 		counts = tuiAgentCounts(ss)
+	case a.scope == scopeHere && a.agentsHere != nil:
+		counts = a.agentsHere
 	}
 	x := 2
 	tail := "a  filter agents"

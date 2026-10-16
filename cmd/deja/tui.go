@@ -10,6 +10,7 @@ import (
 
 	"github.com/vshulcz/deja-vu/internal/index"
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/query"
 	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/tui"
 )
@@ -57,6 +58,7 @@ type tuiApp struct {
 	allMeta     []model.Session
 	allStamp    string // the index write allMeta was read from
 	agentsAll   []agentCount
+	agentsHere  []agentCount // agentsAll in this project, for the strip over its list
 	filter      map[string]bool
 	query       []rune
 	listFocus   bool
@@ -321,6 +323,15 @@ func (a *tuiApp) loadHome() {
 			a.allMeta, a.allStamp = all, st
 			a.agentsAll = tuiAgentCounts(all)
 		}
+	}
+	if a.scope == scopeHere {
+		var here []model.Session
+		for _, s := range a.allMeta {
+			if query.ProjectAnyMatches(s.Project, s.From, a.projects) {
+				here = append(here, s)
+			}
+		}
+		a.agentsHere = tuiAgentCounts(here)
 	}
 	var ss []model.Session
 	total := 0
