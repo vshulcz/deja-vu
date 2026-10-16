@@ -320,7 +320,10 @@ func TestReasonixExtSurvivesMalformedFrames(t *testing.T) {
 		t.Errorf("shutdown answer = %+v", f)
 	}
 	select {
-	case <-h.done:
+	case err := <-h.done:
+		if err != nil {
+			t.Fatalf("serve after shutdown = %v", err)
+		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the sidecar did not stop after shutdown")
 	}
