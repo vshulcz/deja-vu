@@ -137,9 +137,13 @@ func formatMS(ms float64) string {
 
 func (a *tuiApp) drawSearch(l layout, y int) {
 	p := a.p
-	x1 := l.w - 2
+	// The box ends on the column the preview's border and the header's
+	// counts end on.
+	x1 := l.w - 1
 	p.Fill(2, y, x1-2, 1, cSurf)
-	p.Put(3, y, "⌕", fgs(cAcc), x1)
+	// The palette's prompt: ⌕ is missing from most terminal fonts, which
+	// draw a fallback glyph half the size of the text around it.
+	p.Put(3, y, "›", bold(cAcc), x1)
 	count := ""
 	switch {
 	case len(a.query) == 0:
