@@ -3,9 +3,11 @@ package index
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -52,6 +54,10 @@ type ForgetResult struct {
 	// still in them. Named rather than taken, since the fork's own work would
 	// go with it.
 	Copies []string
+	// Unindexed is set when no index was built yet: the sessions were matched
+	// in their stores, nothing was dropped, and the tombstones keep them out
+	// of the first build.
+	Unindexed bool
 }
 
 // copiesOf is the sessions outside matched that open on a matched session's
@@ -430,12 +436,20 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	defer unlock()
 	m, err := readManifest(dir)
 	compactionOnly := false
+	// Messages per session when there is no index to count records in.
+	var unindexed map[string]int
 	if err != nil {
 		var ok bool
-		if m, ok = compactionOnlyManifest(dir); !ok {
+		if m, ok = compactionOnlyManifest(dir); ok {
+			compactionOnly = true
+		} else if errors.Is(err, fs.ErrNotExist) && !HasManifest(dir) {
+			// Never built: the sessions are still only in their stores, and a
+			// forget here failed as an unmounted disk and wrote nothing, so the
+			// first `deja index` took the session in (#5057).
+			m, unindexed = storeManifest()
+		} else {
 			return ForgetResult{}, err
 		}
-		compactionOnly = true
 	}
 	dead := readTombstones()
 	var added []string
@@ -509,10 +523,23 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 			dead[key] = true
 		}
 	}
+	result.Unindexed = unindexed != nil
 	if result.Sessions == 0 {
 		return result, nil
 	}
 	sort.Strings(result.Keys)
+	if unindexed != nil {
+		// Nothing to drop and nothing to rebuild: the tombstones alone keep
+		// these sessions out of the first build. No mirror either, since there
+		// is no index for it to sit beside yet.
+		for _, key := range result.Keys {
+			result.Messages += unindexed[key]
+		}
+		if o.DryRun {
+			return result, nil
+		}
+		return result, appendTombstones(added)
+	}
 	result.Peers, result.Exported = pushedTo(m, matched)
 	result.Copies = copiesOf(m, matched)
 	// Count the messages on the dry run too. It is the same single pass over
@@ -596,6 +623,20 @@ func Forget(dir string, o ForgetOptions) (ForgetResult, error) {
 	sort.Strings(keys)
 	_ = writeTombstoneMirrorAt(dir, keys)
 	return result, nil
+}
+
+// storeManifest stands in for the manifest of an index never built: the
+// sessions the stores hold now, filtered the way a build filters them, with
+// the message count of each.
+func storeManifest() (Manifest, map[string]int) {
+	m := Manifest{Sessions: map[string]SessionMeta{}}
+	counts := map[string]int{}
+	for _, s := range sources.FilterSessions(loadProgress("", nil)) {
+		key := s.Harness + ":" + s.ID
+		m.Sessions[key] = SessionMeta{ID: s.ID, Harness: s.Harness, Project: s.Project, Path: s.Path, Started: s.Started, Updated: s.Updated}
+		counts[key] += len(s.Messages)
+	}
+	return m, counts
 }
 
 func readRecordsForForget(dir string) []OffsetRecord {

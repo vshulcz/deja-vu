@@ -2944,13 +2944,21 @@ func reportPath(p string) string {
 	return strings.Join(parts, ", ")
 }
 
-// freshHomePath says whether a missing path lies inside the home directory
-// below a directory deja can write, so a build would simply create it. A
-// mount point that went away leaves its path outside the home, or under a
-// directory nothing here can write.
+// freshHomePath says whether a missing path lies below a directory deja can
+// write, so a build would simply create it. A mount point that went away
+// leaves its path under a directory nothing here can write, or under an empty
+// one outside the home: the mount point itself. A DEJA_INDEX_DIR under /tmp
+// or a project directory was read as an unmounted disk before (#5057).
 func freshHomePath(p string) bool {
 	a := nearestExistingDir(p)
-	return a != "" && underHome(a) != a && dirWritable(a)
+	if a == "" || !dirWritable(a) {
+		return false
+	}
+	if underHome(a) != a {
+		return true
+	}
+	entries, err := os.ReadDir(a)
+	return err == nil && len(entries) > 0
 }
 
 // underHome contracts a home-prefixed path to ~, and leaves everything else

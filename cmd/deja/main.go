@@ -4210,6 +4210,13 @@ func runForget(dir string, args []string) error {
 	// The same pass answers what is about to go: after the real Forget the rows
 	// are out of the manifest, so a row that covered two conversations can no
 	// longer be recognised (#970).
+	// With no index, Forget matches in the stores and writes only the
+	// tombstones. An index on a disk that went away also reads as no index,
+	// and saying "nothing indexed yet" there would leave the session in the
+	// index that comes back with the disk.
+	if parent, gone := indexLooksUnmounted(dir); gone && !index.HasManifest(dir) {
+		return fmt.Errorf("the index directory is not there (%s) — the disk it lives on may have been unmounted; reconnect it, or point DEJA_INDEX_DIR somewhere local", parent)
+	}
 	shared := 0
 	if !o.DryRun {
 		probe := o
@@ -4261,6 +4268,11 @@ func runForget(dir string, args []string) error {
 		} else {
 			fmt.Fprintf(os.Stdout, "dry run — nothing was changed\nwould drop: %s\nwould add: %s\n",
 				forgetCounts(result.Sessions, result.Messages), countNoun(result.Tombstones, "tombstone"))
+		}
+		if result.Unindexed && result.Sessions > 0 {
+			fmt.Fprintln(os.Stdout, "nothing is indexed yet — the tombstones would keep these sessions out of the first `deja index`")
+		} else if result.Unindexed {
+			fmt.Fprintln(os.Stdout, "nothing is indexed yet, and no session store on this machine holds a match")
 		}
 		// The ids, so the scope can be checked by name and not by a count
 		// alone: the refusal sends the reader here to see what would go.
@@ -4382,6 +4394,15 @@ func runForget(dir string, args []string) error {
 		// is the shape #3567 closed for a mistyped command. A window is not a
 		// name — `--before 30d` on a young store covering nothing is the right
 		// outcome, and a cleanup loop under `set -e` must not abort on it.
+		if result.Unindexed {
+			// No index to drop from, and no store holds a match: there is no
+			// harness:id to write a tombstone under.
+			if o.Session != "" || o.Project != "" {
+				return fmt.Errorf("nothing matched %s — nothing is indexed yet and no session store on this machine holds one, so no tombstone was written", forgetSelector(o))
+			}
+			fmt.Fprintf(os.Stdout, "nothing matched %s — nothing is indexed yet and no session store on this machine holds one\n", forgetSelector(o))
+			return nil
+		}
 		if o.Session != "" || o.Project != "" {
 			return fmt.Errorf("nothing matched %s — no session was dropped%s",
 				forgetSelector(o), movedBucketHint(dir, o.Session))
@@ -4389,7 +4410,14 @@ func runForget(dir string, args []string) error {
 		fmt.Fprintf(os.Stdout, "nothing matched %s — no session was dropped%s\n", forgetSelector(o), movedBucketHint(dir, o.Session))
 		return nil
 	}
-	fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	if result.Unindexed {
+		// Nothing was in an index to drop; "sessions dropped: 1" would claim a
+		// removal that never happened.
+		fmt.Fprintf(os.Stdout, "nothing is indexed yet, so nothing was dropped\ntombstones added: %d — the first `deja index` leaves %s out\n",
+			result.Tombstones, safeForStatusline(joinCapped(result.Keys, 5), 400))
+	} else {
+		fmt.Fprintf(os.Stdout, "sessions dropped: %d\nmessages dropped: %d\ntombstones added: %d\n", result.Sessions, result.Messages, result.Tombstones)
+	}
 	// "1 session" can be two conversations: transcripts that share an id are
 	// filed under one row, and the message count is the only tell (#970).
 	if shared > 0 {
@@ -5010,6 +5038,13 @@ func ensureError(dir string, err error) error {
 		return fmt.Errorf("the index path runs through %s, which is a file — point DEJA_INDEX_DIR at a directory", p)
 	}
 	if errors.Is(err, fs.ErrNotExist) && !dirExists(dir) {
+		// Only a write inside the build directory is a build the disk went
+		// away from. A read of an index never built fails the same way, and
+		// sent a fresh machine to reconnect a disk that was fine (#5057).
+		var pe *fs.PathError
+		if errors.As(err, &pe) && !pathUnder(pe.Path, dir+".tmp") {
+			return fmt.Errorf("nothing is indexed yet (%s) — `deja index` builds it", dir)
+		}
 		return fmt.Errorf("the index directory went away mid-build (%s) — the disk it lives on may have been unmounted; the index already there is unharmed, so reconnect it and run `deja index` again, or point DEJA_INDEX_DIR somewhere local", dir)
 	}
 	// Already worded where it was raised — the leftover-swap case names the
@@ -5022,6 +5057,27 @@ func ensureError(dir string, err error) error {
 		}
 	}
 	return fmt.Errorf("ensure: %w", err)
+}
+
+// pathUnder reports whether p is dir or lies inside it.
+func pathUnder(p, dir string) bool {
+	rel, err := filepath.Rel(filepath.Clean(dir), filepath.Clean(p))
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
+}
+
+// indexLooksUnmounted reports an index whose directory and parent are both
+// missing where a build could not simply create them: a volume that went
+// away, not a machine that never built an index. It returns the parent to
+// name.
+func indexLooksUnmounted(dir string) (string, bool) {
+	if dir == "" {
+		dir = index.DefaultDir()
+	}
+	parent := filepath.Dir(dir)
+	if dirExists(dir) || dirExists(parent) {
+		return parent, false
+	}
+	return parent, !freshHomePath(parent)
 }
 
 // searchValueFlags take a value, so "--flag=value" has to become two arguments
