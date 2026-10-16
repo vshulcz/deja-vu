@@ -240,7 +240,14 @@ func (a *tuiApp) drawCard(l layout, i int, r tuiRow, y, minY, maxY int) {
 	row := func(k int) (int, bool) { yy := y + k; return yy, yy >= minY && yy < maxY }
 	head := a.headline(r.s)
 	if yy, ok := row(0); ok {
-		p.PutClip(x0+2, yy, head, boldOn(cText, surf), x1-1)
+		// The query's words are lit here as on the line under it, but the
+		// headline is cut rather than slid to its first match: a card is
+		// known by how its question starts.
+		shown := head
+		if room := x1 - 1 - (x0 + 2); termwidth.Columns(shown) > room {
+			shown = strings.TrimRight(termwidth.Cut(shown, room-1), " ") + "…"
+		}
+		p.putHL(x0+2, yy, shown, queryTerms(a.box().text), boldOn(cText, surf), x1-1)
 	}
 	if yy, ok := row(1); ok {
 		x := p.Put(x0+2, yy, "●", fgs(agentColor(r.s.Harness)), x1)
@@ -337,9 +344,11 @@ func (a *tuiApp) drawPreview(l layout) {
 	plain := func(c tui.Color) func(int, string) {
 		return func(_ int, ln string) { p.Put(ix, cy, ln, fgs(c), right) }
 	}
-	section("ASKED", wrapLines(s.Title, iw, 3), plain(cText))
+	terms := queryTerms(a.box().text)
+	section("ASKED", wrapLines(s.Title, iw, 3), func(_ int, ln string) {
+		p.putHL(ix, cy, ln, terms, fgs(cText), right)
+	})
 	if len(r.snips) > 0 {
-		terms := queryTerms(a.box().text)
 		section("MATCHED", wrapLines(r.snips[0], iw-2, 3), func(_ int, ln string) {
 			p.putHL(ix, cy, ln, terms, fgs(cSub), right)
 		})

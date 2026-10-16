@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/search"
 	"github.com/vshulcz/deja-vu/internal/termwidth"
+	"github.com/vshulcz/deja-vu/internal/tui"
 )
 
 // At 80 columns the hints ran out before the way out; it keeps the right edge
@@ -87,5 +89,30 @@ func TestTUIReaderMeasure(t *testing.T) {
 	}
 	if widest == 0 || widest > readerMeasure+4 {
 		t.Errorf("widest prose line = %d columns", widest)
+	}
+}
+
+// The query's words are lit in a card's headline and in ASKED, not only in the
+// matched line under them.
+func TestTUIHeadlineLightsTheQuery(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	a.query = []rune("webhook")
+	hits, err := tuiSearch(dir, search.Options{Query: "webhook", Limit: 80})
+	if err != nil || len(hits) != 1 {
+		t.Fatalf("hits = %d, %v", len(hits), err)
+	}
+	a.setRows(nil, hits, len(hits))
+	a.p.mono = true // a match is drawn reversed, which the plain text shows
+	c := a.frame(120, 36)
+	lit := 0
+	for y, ln := range c.Lines(tui.ModeMono) {
+		if strings.Contains(c.Text(y), "webhook signature fails") && strings.Contains(ln, ";7m") {
+			lit++
+		}
+	}
+	// The headline, ASKED and MATCHED; only MATCHED was before.
+	if lit != 3 {
+		t.Errorf("rows lit = %d, want 3", lit)
 	}
 }
