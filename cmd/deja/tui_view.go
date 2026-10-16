@@ -216,14 +216,20 @@ func (a *tuiApp) drawFooter() {
 	default:
 		keys = [][2]string{{"type", "search"}, {"↑↓", "pick"}, {"↵", "read"}, {"tab", "scope"}, {"^k", "commands"}, {"?", "help"}, {"esc", "quit"}}
 	}
+	// The last key is the way out, and it keeps the right edge: at 80 columns
+	// the hints ran out before it, so the one key nobody should have to guess
+	// was the first to go.
+	last := keys[len(keys)-1]
+	end := p.W - 1 - termwidth.Columns(last[0]) - termwidth.Columns(last[1]) - 3
 	x := 2
-	for _, k := range keys {
+	for _, k := range keys[:len(keys)-1] {
 		need := termwidth.Columns(k[0]) + termwidth.Columns(k[1]) + 6
-		if x+need > p.W {
+		if x+need > end {
 			break
 		}
 		x = p.keycap(x, y, k[0], k[1], p.W)
 	}
+	p.keycap(max(end, x), y, last[0], last[1], p.W)
 }
 
 func (a *tuiApp) drawToast() {
