@@ -371,7 +371,7 @@ func (a *tuiApp) drawPreview(l layout) {
 	// The edited list below says it better once the session is read.
 	if len(s.Touched) > 0 && (d == nil || len(d.story.edited) == 0) && room(1) {
 		lx := p.Put(ix, cy, "TOUCHED", fgs(cMuted), right)
-		p.Put(lx+3, cy, termwidth.CutRight(s.Touched[0], right-lx-3), fgs(cText), right)
+		p.Put(lx+2, cy, termwidth.CutRight(s.Touched[0], right-lx-2), fgs(cText), right)
 		cy++
 	}
 	if room(1) {
@@ -387,7 +387,7 @@ func (a *tuiApp) drawPreview(l layout) {
 		}
 		if size != "" {
 			lx := p.Put(ix, cy, "SIZE", fgs(cMuted), right)
-			p.Put(lx+6, cy, size, fgs(cSub), right)
+			p.Put(lx+2, cy, size, fgs(cSub), right)
 			cy++
 		}
 	}
