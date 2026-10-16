@@ -760,7 +760,7 @@ func runHookContextMode(dir string, plain, once bool) error {
 	// What Claude wrote in its own memory here, for every agent but Claude,
 	// which already loads it. A session nothing identifies gets it: a line it
 	// has seen costs a few hundred bytes, one it never got costs a rule.
-	if h := starting(); h != "claude" && !(h == "" && input.TranscriptPath != "" && sources.UnderClaudeRoot(input.TranscriptPath)) {
+	if h := starting(); h != "claude" && (h != "" || input.TranscriptPath == "" || !sources.UnderClaudeRoot(input.TranscriptPath)) {
 		if mb := claudeMemoryBlock(dir, hookCWD(hookProjectPath(input.CWD, input.WorkspaceRoots)), 8, 1000); mb != "" {
 			digest = mb + "\n" + digest
 		}

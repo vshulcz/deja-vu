@@ -28,8 +28,8 @@ func TestClaudeMemoriesReadsFrontmatter(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"a.md": "---\nname: a\ndescription: \"never add a \\\"Co-Authored-By\\\" trailer\"\nmetadata:\n  type: feedback\n  originSessionId: s-1\n  modified: 2026-10-01T10:00:00Z\n---\n\nThe **why** line.\n",
-		"b.md": "---\r\nname: b\r\ndescription: 'it''s pg-two'\r\ntype: project\r\nmodified: 2026-10-05T10:00:00Z\r\n---\r\nbody b\r\n",
+		"a.md":      "---\nname: a\ndescription: \"never add a \\\"Co-Authored-By\\\" trailer\"\nmetadata:\n  type: feedback\n  originSessionId: s-1\n  modified: 2026-10-01T10:00:00Z\n---\n\nThe **why** line.\n",
+		"b.md":      "---\r\nname: b\r\ndescription: 'it''s pg-two'\r\ntype: project\r\nmodified: 2026-10-05T10:00:00Z\r\n---\r\nbody b\r\n",
 		"MEMORY.md": "- [a](a.md)\n",
 		"notes.txt": "not a memory",
 	}
