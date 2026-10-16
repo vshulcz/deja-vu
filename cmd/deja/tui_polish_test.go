@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/vshulcz/deja-vu/internal/model"
+	"github.com/vshulcz/deja-vu/internal/termwidth"
 )
 
 // At 80 columns the hints ran out before the way out; it keeps the right edge
@@ -69,4 +70,22 @@ func TestTUIStripCountsTheScope(t *testing.T) {
 	a.setScope(scopeHere)
 	s := screen(a.frame(120, 36))
 	wantOnScreen(t, s, "Claude Code 2")
+}
+
+// Prose in the reader wraps at a reading measure, not at the terminal's edge.
+func TestTUIReaderMeasure(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	d := a.details[sessionKey(a.rows[0].s)]
+	d.full.Messages[len(d.full.Messages)-1].Text = strings.Repeat("rotate the signing key ", 30)
+	a.openReader()
+	widest := 0
+	for _, ln := range strings.Split(screen(a.frame(200, 30)), "\n")[1:] {
+		if strings.Contains(ln, "rotate") {
+			widest = max(widest, termwidth.Columns(strings.TrimRight(ln, " ")))
+		}
+	}
+	if widest == 0 || widest > readerMeasure+4 {
+		t.Errorf("widest prose line = %d columns", widest)
+	}
 }

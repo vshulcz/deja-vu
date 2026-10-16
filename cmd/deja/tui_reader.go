@@ -47,6 +47,10 @@ type readerState struct {
 const (
 	readerFold     = 10
 	readerMaxLines = 400
+	// readerMeasure is the widest a line of prose wraps to. Across a wide
+	// terminal a sentence ran 130 columns, and the eye loses the next line
+	// on the way back; code keeps its own breaks.
+	readerMeasure = 100
 )
 
 func (a *tuiApp) openReader() {
@@ -97,7 +101,7 @@ func (r *readerState) layout(width int, now func(model.Message) string) {
 	r.layoutW = width
 	r.lines, r.hits, r.turns = nil, nil, nil
 	r.turnTop = -1
-	tw := width - 8
+	tw := min(width-8, readerMeasure)
 	if tw < 20 {
 		tw = 20
 	}
