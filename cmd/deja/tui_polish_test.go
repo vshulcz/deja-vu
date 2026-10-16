@@ -34,7 +34,7 @@ func TestTUIHelpLabelsWhole(t *testing.T) {
 	a.modal = modalHelp
 	for _, w := range []int{79, 80, 100, 140} {
 		s := screen(a.frame(w, 24))
-		wantOnScreen(t, s, "tab  this project / all / deleted", "n N  next / previous match",
+		wantOnScreen(t, s, "tab  here / all / deleted / memory", "n N  next / previous match",
 			"R  put a deleted one back", "in:api one project", "esc  back to the list", "scroll anywhere.")
 	}
 	// Wide enough, the three sections sit side by side.

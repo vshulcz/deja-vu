@@ -327,7 +327,7 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 	case tui.KeyEnd:
 		r.top = len(r.lines)
 	case tui.KeyEsc, tui.KeyBackspace:
-		a.view = viewList
+		a.view, a.readerBack = a.readerBack, viewList
 	case tui.KeyCtrl:
 		// The list's own keys (^u ^w ^n ^p) would change the hidden list
 		// under an open session; here they move through it the way less does.
@@ -371,7 +371,7 @@ func (a *tuiApp) handleReader(ev tui.Event) {
 			r.expand = !r.expand
 			r.layoutW = 0
 		case 'q':
-			a.view = viewList
+			a.view, a.readerBack = a.readerBack, viewList
 		case 'r':
 			a.resumeSelected()
 		case 'R':

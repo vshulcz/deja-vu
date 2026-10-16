@@ -60,6 +60,7 @@ the list narrows as you type.
 - The box takes filters: an agent with a colon (`codex:`), `today`, `yesterday`, `week`, `month`, and `in:<project>`.
 - `r` resumes the session in the agent that wrote it. `o` continues it in any other agent, which starts with what the session asked, decided and left open.
 - `tab` switches between this project, all projects and Deleted, the sessions their agent deleted that deja still holds; `R` puts one back.
+- Memory, the last tab, is what every agent starting in this project reads first: decisions promoted in deja and what Claude Code wrote in its own auto-memory, which deja hands to Codex, opencode and the other agents at session start. `x` stops a line being handed on.
 - `?` lists every key, `^k` has the rest (copy the session id or project path, forget a session), `q` quits from the list; `esc` steps back and quits from an empty search box.
 
 With `DEJA_TUI=0` it prints the text summary instead, which is also `deja brief`. Piped, it

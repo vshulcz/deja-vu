@@ -43,6 +43,9 @@ func (a *tuiApp) paletteItems() []paletteItem {
 			add("Show "+strings.ToLower(n[:1])+n[1:], "tab", func() { a.view = viewList; a.setScope(scope) })
 		}
 	}
+	if a.view != viewMemory {
+		add("Show what agents here remember", "tab", a.openMemory)
+	}
 	add("Filter by agent…", "a", func() { a.openModal(modalAgents) })
 	if len(a.filter) > 0 {
 		add("Show every agent", "", func() { a.filter = map[string]bool{}; a.reload() })
