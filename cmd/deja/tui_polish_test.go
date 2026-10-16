@@ -20,3 +20,23 @@ func TestTUIFooterKeepsTheWayOut(t *testing.T) {
 		t.Errorf("reader footer = %q", foot)
 	}
 }
+
+// The help columns are sized to what they hold. Thirds of the box cut most
+// labels short at 80 columns and one at any width.
+func TestTUIHelpLabelsWhole(t *testing.T) {
+	dir, _ := tuiStore(t)
+	a := newTestTUI(t, dir)
+	a.modal = modalHelp
+	for _, w := range []int{79, 80, 100, 140} {
+		s := screen(a.frame(w, 24))
+		wantOnScreen(t, s, "tab  this project / all / deleted", "n N  next / previous match",
+			"R  put a deleted one back", "in:api one project", "esc  back to the list", "scroll anywhere.")
+	}
+	// Wide enough, the three sections sit side by side.
+	s := screen(a.frame(140, 36))
+	for _, ln := range strings.Split(s, "\n") {
+		if strings.Contains(ln, "FIND") && !strings.Contains(ln, "ACT") {
+			t.Errorf("sections not side by side: %q", ln)
+		}
+	}
+}

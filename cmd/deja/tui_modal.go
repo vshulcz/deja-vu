@@ -285,36 +285,120 @@ func (a *tuiApp) drawAgents() {
 	p.button(bx+2, y, "esc", "Close", false, right)
 }
 
+// helpSection is one titled group of keys on the help screen.
+type helpSection struct {
+	title string
+	keys  [][2]string
+}
+
+// drawHelp lays the sections out as columns sized to what they hold, keys
+// right-aligned so every label in a column starts on one edge. Three equal
+// thirds cut "this project / all / deleted" short at any width and most labels
+// at 80 columns; where three do not fit, the sections stack into two.
 func (a *tuiApp) drawHelp() {
 	p := a.p
-	cols := []struct {
-		title string
-		keys  [][2]string
-	}{
+	secs := []helpSection{
 		{"FIND", [][2]string{{"type", "search as you type"}, {"tab", "this project / all / deleted"}, {"↑↓ 1-9", "pick a session"}, {"↑ on empty", "past searches"}, {"a", "filter by agent"}}},
 		{"READ", [][2]string{{"↵", "open at the match"}, {"/", "find in the session"}, {"n N", "next / previous match"}, {"] [", "next / previous turn"}, {"t", "unfold long messages"}, {"g G", "top / bottom"}, {"esc", "back to the list"}}},
 		{"ACT", [][2]string{{"r", "resume in its agent"}, {"o", "continue in any agent"}, {"c", "copy the context"}, {"R", "put a deleted one back"}, {"^k", "copy id, path, forget…"}}},
 	}
-	x, y, iw := a.modalBox(100, 16)
+	gap := 4
+	cols := helpColumns(secs, p.W-8-2*gap)
+	keyW, colW := make([]int, len(cols)), make([]int, len(cols))
+	inner, tall := 0, 0
+	for c, col := range cols {
+		labelW, h := 0, 0
+		for _, i := range col {
+			for _, k := range secs[i].keys {
+				keyW[c] = max(keyW[c], termwidth.Columns(k[0])+2)
+				labelW = max(labelW, termwidth.Columns(k[1]))
+			}
+			h += len(secs[i].keys) + 2
+		}
+		colW[c] = keyW[c] + 1 + labelW
+		inner += colW[c]
+		tall = max(tall, h-1)
+	}
+	// The gutter gives way before a label is cut.
+	if spare := p.W - 8 - inner; spare < gap*(len(cols)-1) {
+		gap = max(2, spare/max(1, len(cols)-1))
+	}
+	inner += gap * (len(cols) - 1)
+	filters := [][2]string{{"codex:", "one agent"}, {"today", "yesterday, week, month"}, {"in:api", "one project"}}
+	fw := len("FILTERS") + 2 - 3
+	for _, f := range filters {
+		fw += termwidth.Columns(f[0]) + 1 + termwidth.Columns(f[1]) + 3
+	}
+	boxW := max(inner, 76) + 4
+	h := tall + 8
+	if fw > min(boxW, p.W-4)-4 {
+		h++ // the filters take two lines
+	}
+	x, y, iw := a.modalBox(boxW, h)
 	right := x + iw
 	cx := p.Put(x, y, "Keys", bold(cText), right)
 	p.Put(cx+3, y, "the three you need: type, ↵, o", fgs(cMuted), right)
 	y += 2
-	colW := iw / 3
+	cx = x
 	for c, col := range cols {
-		cx := x + c*colW
-		p.Put(cx, y, col.title, fgs(cMuted), cx+colW)
-		for i, k := range col.keys {
-			kx := p.Put(cx, y+1+i, " "+k[0]+" ", boldOn(cText, cSurf2), cx+colW)
-			p.PutClip(kx+1, y+1+i, k[1], fgs(cSub), cx+colW-1)
+		cy := y
+		for _, i := range col {
+			p.Put(cx, cy, secs[i].title, fgs(cMuted), right)
+			for j, k := range secs[i].keys {
+				kx := cx + keyW[c] - termwidth.Columns(k[0]) - 2
+				p.Put(kx, cy+1+j, " "+k[0]+" ", boldOn(cText, cSurf2), right)
+				p.PutClip(cx+keyW[c]+1, cy+1+j, k[1], fgs(cSub), min(cx+colW[c], right))
+			}
+			cy += len(secs[i].keys) + 2
 		}
+		cx += colW[c] + gap
 	}
-	// The words the box takes as filters, each drawn as the chip it becomes.
-	fx := p.Put(x, y+9, "FILTERS", fgs(cMuted), right) + 2
+	// The words the box takes as filters, each drawn as the chip it becomes;
+	// one that does not fit goes to the next line rather than being cut.
+	fy := y + tall + 1
+	indent := p.Put(x, fy, "FILTERS", fgs(cMuted), right) + 2
+	fx := indent
 	chip := tui.Style{FG: cAcc, BG: cOver, Bold: true, Reverse: p.mono}
-	for _, f := range [][2]string{{"codex:", "one agent"}, {"today", "yesterday, week, month"}, {"in:api", "one project"}} {
-		fx = p.Put(fx, y+9, f[0], chip, right)
-		fx = p.Put(fx+1, y+9, f[1], fgs(cSub), right) + 3
+	for _, f := range filters {
+		if w := termwidth.Columns(f[0]) + 1 + termwidth.Columns(f[1]); fx > indent && fx+w > right {
+			fx, fy = indent, fy+1
+		}
+		fx = p.Put(fx, fy, f[0], chip, right)
+		fx = p.Put(fx+1, fy, f[1], fgs(cSub), right) + 3
 	}
-	p.PutClip(x, y+11, "The mouse works too: click a card, double-click to open, scroll anywhere.", fgs(cMuted), right)
+	p.PutClip(x, fy+2, "Mouse: click a card, double-click to open it, scroll anywhere.", fgs(cMuted), right)
+}
+
+// helpColumns puts the sections side by side when their natural widths fit
+// in room, and otherwise stacks them into two columns, each section going
+// under whichever column is shorter so far.
+func helpColumns(secs []helpSection, room int) [][]int {
+	width := func(s helpSection) int {
+		kw, lw := 0, 0
+		for _, k := range s.keys {
+			kw = max(kw, termwidth.Columns(k[0])+2)
+			lw = max(lw, termwidth.Columns(k[1]))
+		}
+		return kw + 1 + lw
+	}
+	total := 0
+	for _, s := range secs {
+		total += width(s)
+	}
+	n := len(secs)
+	if total > room {
+		n = 2
+	}
+	cols, h := make([][]int, n), make([]int, n)
+	for i, s := range secs {
+		c := 0
+		for k := range h {
+			if h[k] < h[c] {
+				c = k
+			}
+		}
+		cols[c] = append(cols[c], i)
+		h[c] += len(s.keys) + 2
+	}
+	return cols
 }
