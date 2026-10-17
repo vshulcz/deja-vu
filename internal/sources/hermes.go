@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -185,6 +186,16 @@ func applyHermesMeta(out []model.Session, meta map[string]hermesMeta) {
 		if m.Cwd != "" {
 			out[i].Project = projectName(m.Cwd)
 		}
+		// A branch is a copy of its source's turns under a new id, so recall
+		// asked from it leaves the source out (#5141). Its row has no cwd; it
+		// ran where its source did.
+		if b := m.Branched; b != "" && m.Source != "subagent" {
+			out[i].Kind, out[i].Parent = "fork", b
+			if m.Cwd == "" && meta[b].Cwd != "" {
+				out[i].Project = projectName(meta[b].Cwd)
+			}
+			continue
+		}
 		switch m.Source {
 		case "subagent":
 			if m.Parent != "" {
@@ -345,6 +356,10 @@ type hermesMeta struct {
 	Cwd    string `json:"cwd"`
 	Source string `json:"source"`
 	Parent string `json:"parent"`
+	// Branched is model_config._branched_from: /branch copies the
+	// conversation into a new session and marks it with the one it came from
+	// (hermes_cli/cli_commands_mixin.py, 0.17.0).
+	Branched string `json:"branched"`
 }
 
 // hermesSessionMeta reads hermesMeta for every session. Stamped with the
@@ -353,6 +368,12 @@ type hermesMeta struct {
 // the directory it was about (#3257). Best effort: a store from before the
 // table or a column keeps what it has.
 func hermesSessionMeta(db string) map[string]hermesMeta {
+	return hermesSessionMetaWhere(db, "")
+}
+
+// hermesSessionMetaWhere is hermesSessionMeta for the rows a where clause
+// keeps, "" for all of them.
+func hermesSessionMetaWhere(db, where string) map[string]hermesMeta {
 	cols := map[string]bool{}
 	if out, err := sqliteOutput(db, `select name from pragma_table_info('sessions')`); err == nil {
 		for _, c := range strings.Fields(string(out)) {
@@ -368,7 +389,12 @@ func hermesSessionMeta(db string) map[string]hermesMeta {
 			fields += fmt.Sprintf(`,'%s',cast(%s as text)`, key, col)
 		}
 	}
-	out, err := sqliteOutput(db, `select json_object(`+fields+`) from sessions`)
+	if cols["model_config"] {
+		// json_valid first: one row of something else would fail the query
+		// and lose every session's cwd with it.
+		fields += `,'branched',case when json_valid(model_config) then cast(json_extract(model_config,'$._branched_from') as text) end`
+	}
+	out, err := sqliteOutput(db, `select json_object(`+fields+`) from sessions`+where)
 	if err != nil {
 		return nil
 	}
@@ -384,9 +410,33 @@ func hermesSessionMeta(db string) map[string]hermesMeta {
 		if r.ID == "" {
 			continue
 		}
-		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent)}
+		meta[r.ID] = hermesMeta{Cwd: strings.TrimSpace(r.Cwd), Source: strings.TrimSpace(r.Source), Parent: strings.TrimSpace(r.Parent), Branched: strings.TrimSpace(r.Branched)}
 	}
 	return meta
+}
+
+// hermesSessionID is the id Hermes gives a CLI session and a /branch:
+// 20261018_013350_8f1cbe.
+var hermesSessionID = regexp.MustCompile(`^[0-9]{8}_[0-9]{6}_[0-9a-f]+$`)
+
+// HermesSessionHead is what the sessions table says about one session, read
+// off the store for a session the index has not seen yet: a branch's first
+// turns come before any build, and its recall answered with its source
+// (#5141). Who it is, not its messages; false when no store holds the id.
+func HermesSessionHead(id string) (model.Session, bool) {
+	if !hermesSessionID.MatchString(id) {
+		return model.Session{}, false
+	}
+	for _, db := range HermesDBs() {
+		m, ok := hermesSessionMetaWhere(db, ` where id = '`+id+`'`)[id]
+		if !ok {
+			continue
+		}
+		s := []model.Session{{ID: id, Harness: "hermes"}}
+		applyHermesMeta(s, map[string]hermesMeta{id: m})
+		return s[0], true
+	}
+	return model.Session{}, false
 }
 
 // hermesProfile names the session's project after the profile directory when

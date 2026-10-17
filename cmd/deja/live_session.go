@@ -326,8 +326,8 @@ func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool 
 }
 
 // askerHead is the session read off its own store: the first records of the
-// transcript the payload names, or opencode's database or Copilot CLI's
-// session folder, which their payloads do not name a file in (#5137).
+// transcript the payload names, or opencode's or Hermes' database or Copilot
+// CLI's session folder, which their payloads do not name a file in (#5137).
 func askerHead(id, transcript string) (model.Session, bool) {
 	if transcript != "" {
 		s, err := sources.TranscriptHead(transcript, id)
@@ -342,6 +342,11 @@ func askerHead(id, transcript string) (model.Session, bool) {
 				return s, true
 			}
 		}
+	}
+	// A Hermes branch names its source in the sessions table; that is all
+	// lineage needs of it (#5141).
+	if s, ok := sources.HermesSessionHead(id); ok && s.Parent != "" {
+		return s, true
 	}
 	return model.Session{}, false
 }

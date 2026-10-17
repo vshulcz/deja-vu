@@ -5323,7 +5323,26 @@ func wholeSession(p string, s model.Session) (model.Session, bool) {
 func sameFile(a, b FileState) bool {
 	return a.Path == b.Path && a.Size == b.Size && a.MTime == b.MTime &&
 		a.MetadataSize == b.MetadataSize && a.MetadataMTime == b.MetadataMTime &&
-		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime
+		a.CWDSize == b.CWDSize && a.CWDMTime == b.CWDMTime &&
+		a.WALSize == b.WALSize && a.WALMTime == b.WALMTime
+}
+
+// walStat is the size and mtime of a SQLite store's write-ahead log, zero for
+// a store without one and for anything that is not a database. Hermes
+// checkpoints every 50 writes of one process, so a few short sessions live in
+// state.db-wal alone, and a walk that statted state.db called them unchanged
+// (#5140).
+func walStat(p string) (size, stamp int64) {
+	switch strings.ToLower(filepath.Ext(p)) {
+	case ".db", ".sqlite", ".sqlite3", ".vscdb":
+	default:
+		return 0, 0
+	}
+	fi, err := os.Lstat(p + "-wal")
+	if err != nil || !fi.Mode().IsRegular() {
+		return 0, 0
+	}
+	return fi.Size(), fi.ModTime().UnixNano()
 }
 
 // kindForPath returns the registry FileKind whose Match accepts p.
@@ -5762,6 +5781,7 @@ func walkFileState(p string, fi os.FileInfo, old map[string]FileState) FileState
 	if k, ok := kindForPath(p); ok && k.Sidecar != nil {
 		fs.MetadataSize, fs.MetadataMTime = k.Sidecar(p)
 	}
+	fs.WALSize, fs.WALMTime = walStat(p)
 	if harnessForPath(p) == "grok" {
 		if cwd, err := os.Lstat(filepath.Join(filepath.Dir(filepath.Dir(p)), ".cwd")); err == nil && cwd.Mode()&os.ModeSymlink == 0 && !cwd.IsDir() {
 			fs.CWDSize = cwd.Size()
