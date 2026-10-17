@@ -227,6 +227,15 @@ func ParseDeepSeekFile(path string) ([]model.Session, error) {
 				cwd = dir
 				s.Project = projectName(dir)
 			}
+			// A subagent or subagent_fork run is its own log, beside its
+			// parent's, and the header names the parent. Read without it, the
+			// parent's recall answered with its own sub-agents.
+			if origin, _ := e["origin"].(string); origin == "subagent" {
+				s.Kind = "subagent"
+				if p, _ := e["parentSession"].(string); p != "" {
+					s.Parent = strings.TrimPrefix(p, "session-")
+				}
+			}
 			s.Touch(parseTimeAny(e["createdAt"]))
 		case "session/title":
 			// The last one wins. dsh names a session twice — a stand-in it cuts
