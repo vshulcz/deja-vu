@@ -499,7 +499,13 @@ func UTF8SafeCut(s string, n int) string {
 	return s[:n]
 }
 
+// ProjectNameCandidates is every name the sessions of the project at cwd may
+// carry. Under a path the alias file names, that name is the only one: every
+// session there was indexed under it.
 func ProjectNameCandidates(cwd string) []string {
+	if name, ok := sources.ProjectAliasFor(cwd); ok {
+		return []string{name}
+	}
 	cwd = projectRoot(cwd)
 	names := []string{sources.ClaudeProjectName(cwd)}
 	add := func(name string) {

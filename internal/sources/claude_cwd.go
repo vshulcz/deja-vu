@@ -138,10 +138,14 @@ var (
 // last two segments, as a decoded folder name would give them. A file:// URI
 // is read as the path it names, escapes decoded (#4461), and a drive is not a
 // parent: C:\proj is "proj". A WorkBuddy chat folder names the workspace root
-// it sits in (ChatWorkspaceRoot).
+// it sits in (ChatWorkspaceRoot). A directory the alias file covers is the
+// project it names there (ProjectAliasFor).
 func cwdProjectName(cwd string) string {
 	if p, ok := fileURIPath(cwd); ok {
 		cwd = p
+	}
+	if name, ok := ProjectAliasFor(cwd); ok {
+		return name
 	}
 	segs := dropChatFolder(strings.FieldsFunc(cwd, func(r rune) bool { return r == '/' || r == '\\' }))
 	switch {

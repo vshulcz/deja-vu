@@ -562,8 +562,14 @@ func splitEncodedWindowsDrive(base string) (root, rest string, ok bool) {
 }
 
 // ClaudeProjectName derives the display project name using the same rules as
-// the Claude source parser.
-func ClaudeProjectName(dir string) string { return claudeProjectName(dir) }
+// the Claude source parser. A directory the alias file covers is the project it
+// names there, so a note filed from it lands where the hooks look.
+func ClaudeProjectName(dir string) string {
+	if name, ok := ProjectAliasFor(dir); ok {
+		return name
+	}
+	return claudeProjectName(dir)
+}
 
 // ClaudeProjectDirBase returns the encoded project dir name for a transcript
 // path, e.g. "-Users-x-projects-app" for .../projects/-Users-x-projects-app/s.jsonl.
