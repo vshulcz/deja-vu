@@ -345,7 +345,7 @@ var searchFlagRows = [][2]string{
 	{"--project <name>", "only sessions from one project"},
 	{"--since <duration>", "only sessions newer than e.g. 30d, 12h"},
 	{"--role <name>", "only turns from one role: user, assistant, tool"},
-	{"", "(tool output), files, command, edit"},
+	{"", "(tool output), files, command, edit, summary"},
 	{"--session <id>", "only one session, by the id a hit prints"},
 	{"--limit <1-100>", "max sessions to return (default 15)"},
 	{"--all", "every match, no cap"},

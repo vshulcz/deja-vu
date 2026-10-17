@@ -101,7 +101,9 @@ func TestHelpNamesEveryRoleThatMatches(t *testing.T) {
 	if i := strings.Index(rolesBlock, "--limit"); i > 0 {
 		rolesBlock = rolesBlock[:i]
 	}
-	for _, role := range []string{sources.RoleFiles, sources.RoleCommand, sources.RoleEdit} {
+	// summary works too (`deja --role summary`) and `deja help last` already
+	// named it; the flag block left it out (#5078).
+	for _, role := range []string{sources.RoleFiles, sources.RoleCommand, sources.RoleEdit, sources.RoleSummary} {
 		if !strings.Contains(lastLine, role) {
 			t.Errorf("`deja last` usage line does not name the %q role: %q", role, lastLine)
 		}
