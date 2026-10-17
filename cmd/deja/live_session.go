@@ -6,6 +6,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vshulcz/deja-vu/internal/atomicfile"
@@ -229,21 +230,50 @@ func liveSessionIDs(dir string) map[string]bool {
 // liveLineage is the live sessions and every session that counts as one of
 // them: a sub-agent a live session spawned is being written too, under an id
 // no hook stamps, since its hooks fire under the parent's (#4547). A live
-// session the index does not hold yet is read off its own store, as
-// askerLineage does: a fork's first turn comes before any build has seen it,
-// and MCP answered it with its source (#5129).
+// session the index does not hold yet is read off its own store in full: a
+// fork's first turn comes before any build has seen it, and MCP answered it
+// with its source (#5129).
 func liveLineage(dir string) map[string]bool {
 	ids := liveSessionIDs(dir)
-	var heads []model.Session
+	var wholes []model.Session
 	for id := range ids {
 		if isSpawnedReader(id) || index.HasSession(dir, id) {
 			continue
 		}
-		if h, ok := askerHead(id, ""); ok {
-			heads = append(heads, h)
+		if w, ok := liveWhole(id); ok {
+			wholes = append(wholes, w)
 		}
 	}
-	return index.Lineage(dir, ids, heads...)
+	return index.LineageWhole(dir, ids, wholes...)
+}
+
+// liveWholes keeps each unindexed live session read for this process. What a
+// fork copied is fixed when it forks, and turns it adds later are newer than
+// anything indexed, so the first read answers for the rest; one recall asks
+// two or three times, and a fork of a long session takes a second to read.
+var liveWholes = struct {
+	sync.Mutex
+	m map[string]model.Session
+}{m: map[string]model.Session{}}
+
+func liveWhole(id string) (model.Session, bool) {
+	liveWholes.Lock()
+	w, ok := liveWholes.m[id]
+	liveWholes.Unlock()
+	if ok {
+		return w, true
+	}
+	w, ok = askerHead(id, "")
+	if !ok {
+		return w, false
+	}
+	liveWholes.Lock()
+	if len(liveWholes.m) >= liveSessionsMax {
+		clear(liveWholes.m)
+	}
+	liveWholes.m[id] = w
+	liveWholes.Unlock()
+	return w, true
 }
 
 // askerLineage is the session a hook speaks for and every session that counts

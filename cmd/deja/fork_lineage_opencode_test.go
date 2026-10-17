@@ -40,7 +40,9 @@ insert into part values('` + msg + `pa', '` + msg + `a', '{"type":"text","text":
 	sqlite(`create table session(id text, directory text, time_created any, time_updated any);
 create table message(id text, session_id text, time_created any, data text);
 create table part(id text, message_id text, data text);
-` + session("ses_source", "s"))
+` + session("ses_source", "s") + session("ses_sibling", "b") + `
+insert into message values('bu2', 'ses_sibling', 1792271300000, '{"role":"user"}');
+insert into part values('bpu2', 'bu2', '{"type":"text","text":"the sibling went on with token wombatzeal"}');`)
 	dir := index.DefaultDir()
 	if err := index.Ensure(dir, "", true, io.Discard); err != nil {
 		t.Fatal(err)
@@ -62,5 +64,13 @@ create table part(id text, message_id text, data text);
 	}
 	if strings.Contains(out, "ses_source") {
 		t.Errorf("the fork's first recall answered with the session it was forked from:\n%s", out)
+	}
+	// A sibling fork that went on holds work this fork never saw.
+	out, err = callMCPTool(dir, "recall", json.RawMessage(`{"query":"wombatzeal"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "ses_sibling") {
+		t.Errorf("a sibling fork that went on was left out of the fork's recall:\n%s", out)
 	}
 }

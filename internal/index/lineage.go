@@ -39,6 +39,20 @@ import (
 // Read off the manifest, which recall has already loaded: no record is read,
 // so the cost is one pass over the sessions in memory.
 func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string]bool {
+	return lineage(dir, ids, heads, nil)
+}
+
+// LineageWhole is Lineage with askers the index does not hold yet read off
+// their store in full rather than by their first records. A whole asker opening
+// like an indexed session leaves it out only when it holds that session's last
+// record, so a sibling fork or a source that went on stays on the page (#5129).
+// The record is matched on role and time: the text the index keeps is redacted
+// and the asker's is not.
+func LineageWhole(dir string, ids map[string]bool, wholes ...model.Session) map[string]bool {
+	return lineage(dir, ids, nil, wholes)
+}
+
+func lineage(dir string, ids map[string]bool, heads, wholes []model.Session) map[string]bool {
 	out := make(map[string]bool, len(ids))
 	for id := range ids {
 		if id != "" {
@@ -66,6 +80,16 @@ func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string
 			}
 		}
 	}
+	wholeOpenings := map[uint64][]map[string]bool{}
+	for _, w := range wholes {
+		if !ids[w.ID] {
+			continue
+		}
+		parentOf(w.Kind, w.Parent)
+		if o := SessionOpening(w); o != 0 {
+			wholeOpenings[o] = append(wholeOpenings[o], wholeTurns(w))
+		}
+	}
 	m, err := readManifestCached(dir)
 	if err != nil {
 		return out
@@ -87,6 +111,10 @@ func Lineage(dir string, ids map[string]bool, heads ...model.Session) map[string
 			continue
 		}
 		if headOpenings[meta.Opening] {
+			out[meta.ID] = true
+			continue
+		}
+		if ws := wholeOpenings[meta.Opening]; len(ws) > 0 && wholeHolds(dir, m, ws, meta) {
 			out[meta.ID] = true
 			continue
 		}
@@ -142,6 +170,41 @@ func heldRecords(dir string, m Manifest) func(asker, other SessionMeta) bool {
 		}
 		return false
 	}
+}
+
+// wholeTurns is the role and millisecond of every message a session holds.
+func wholeTurns(s model.Session) map[string]bool {
+	set := make(map[string]bool, len(s.Messages))
+	for _, msg := range s.Messages {
+		if !msg.Time.IsZero() {
+			set[turnKey(msg.Role, msg.Time.UnixMilli())] = true
+		}
+	}
+	return set
+}
+
+func turnKey(role string, ms int64) string { return role + "\x00" + strconv.FormatInt(ms, 10) }
+
+// wholeHolds reports whether any of the whole askers holds other's last record
+// that is a turn rather than harness noise. A read that fails answers no.
+func wholeHolds(dir string, m Manifest, wholes []map[string]bool, other SessionMeta) bool {
+	recs, err := recordsForKey(filepath.Join(dir, "records.bin"), tablesFromManifest(m), other.Harness+":"+other.ID)
+	if err != nil {
+		return false
+	}
+	for i := len(recs) - 1; i >= 0; i-- {
+		if afterForkNoise(recs[i]) {
+			continue
+		}
+		k := turnKey(recs[i].Role, recs[i].Time.UnixMilli())
+		for _, w := range wholes {
+			if w[k] {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 // afterForkNoise reports a record the harness wrote on its own rather than a
