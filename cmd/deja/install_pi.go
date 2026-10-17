@@ -325,7 +325,7 @@ export default function (pi: any) {
   pi.on("session_shutdown", async (_event: any) => {
     try {
       const id = sessionID();
-      if (id) run(["hook-session-end"], JSON.stringify({ session_id: id }), 2000);
+      if (id) run(["hook-session-end"], JSON.stringify({ session_id: id, cwd: process.cwd() }), 2000);
     } catch {}
   });
 }

@@ -321,7 +321,7 @@ class DejaMemoryProvider(MemoryProvider):
         # recall can answer with it now rather than twenty minutes from now.
         sid = getattr(self, "_session_id", "")
         if sid:
-            _deja(["hook-session-end"], json.dumps({"session_id": sid}), timeout=3)
+            _deja(["hook-session-end"], json.dumps({"session_id": sid, "cwd": os.getcwd()}), timeout=3)
 
     def on_pre_compress(self, messages) -> str:
         # Held until the compression commits: Hermes can still abandon it, and

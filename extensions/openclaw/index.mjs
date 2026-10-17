@@ -338,9 +338,10 @@ export default {
       api.on(
         "session_end",
         async (event, ctx) => {
-          const id = (event && event.sessionId) || where(seen, event, ctx, process.cwd()).id
+          const at = where(seen, event, ctx, process.cwd())
+          const id = (event && event.sessionId) || at.id
           if (!id) return
-          await ask(["hook-session-end"], JSON.stringify({ session_id: id }), 5000)
+          await ask(["hook-session-end"], JSON.stringify({ session_id: id, cwd: at.cwd }), 5000)
         },
         { timeoutMs: 10000 },
       )

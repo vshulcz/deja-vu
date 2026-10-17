@@ -373,7 +373,7 @@ export default function (amp: any) {
   // last one it served. agent.end's answer decides whether the agent goes on,
   // so this one gives Amp's own default back.
   const endThread = (id: string) => {
-    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id }), 2000)
+    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id, cwd: process.cwd() }), 2000)
   }
   // The thread goes to the store as it stands, whole, so deja indexes it like
   // any other session; written aside and renamed, a reader never sees half.

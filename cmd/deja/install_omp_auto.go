@@ -299,7 +299,7 @@ export default function extension(pi) {
   // On a switch the id remembered so far is the session left behind.
   const endSession = () => {
     const id = sessionID();
-    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id }), 2000);
+    if (id) run(["hook-session-end"], JSON.stringify({ session_id: id, cwd: process.cwd() }), 2000);
   };
   pi.on("session_switch", async (_event, ctx) => {
     try {

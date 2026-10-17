@@ -408,22 +408,25 @@ function apply(ctx) {
   // stamp a session live, which keeps it out of its own MCP recall; dropping
   // the stamp lets the next session be answered with it now rather than
   // twenty minutes from now.
-  const live = new Set();
+  // Each live session with the directory it opened in: the end refreshes that
+  // project's start digest, so the next session there sees this one.
+  const live = new Map();
   const end = (sid) => {
     if (!sid || !live.has(sid)) return;
+    const cwd = live.get(sid);
     live.delete(sid);
-    ask(["hook-session-end"], { session_id: sid });
+    ask(["hook-session-end"], { session_id: sid, cwd });
   };
   try {
     // The stamp is under the bare uuid, so the end has to name that too: the
     // "session-<uuid>" dsh hands over matched nothing and the stamp stayed.
     ctx.on("session/created", (session) => {
       const sid = bareSessionId(session && session.id);
-      if (sid) live.add(sid);
+      if (sid) live.set(sid, (session.header && session.header.cwd) || process.cwd());
     });
     ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id)));
     process.on("exit", () => {
-      for (const sid of [...live]) end(sid);
+      for (const sid of [...live.keys()]) end(sid);
     });
   } catch {}
   try {

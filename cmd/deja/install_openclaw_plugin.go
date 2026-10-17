@@ -820,7 +820,7 @@ export default {
       "session_end",
       async (event, ctx) => {
         const id = event?.sessionId || ctx?.sessionId || event?.sessionKey || ctx?.sessionKey || "";
-        if (id) ask(["hook-session-end"], { session_id: id });
+        if (id) ask(["hook-session-end"], { session_id: id, cwd: where(ctx).cwd });
       },
       { timeoutMs: 5000 },
     );

@@ -505,20 +505,23 @@ function toolNotes(ctx) {
 // be answered with it now rather than twenty minutes from now.
 function sessionEnds(ctx) {
   if (typeof ctx.on !== "function") return;
-  const live = new Set();
+  // Each live session with the directory it opened in: the end refreshes that
+  // project's start digest, so the next session there sees this one.
+  const live = new Map();
   const end = (sid) => {
     if (!sid || !live.has(sid)) return;
+    const cwd = live.get(sid);
     live.delete(sid);
-    run(["hook-session-end"], JSON.stringify({ session_id: sid }));
+    run(["hook-session-end"], JSON.stringify({ session_id: sid, cwd }));
   };
   try {
     ctx.on("session/created", (session) => {
       const sid = bareSessionId(session && session.id);
-      if (sid) live.add(sid);
+      if (sid) live.set(sid, (session.header && session.header.cwd) || process.cwd());
     });
     ctx.on("session/disposed", (session) => end(bareSessionId(session && session.id)));
     process.on("exit", () => {
-      for (const sid of [...live]) end(sid);
+      for (const sid of [...live.keys()]) end(sid);
     });
   } catch {}
 }

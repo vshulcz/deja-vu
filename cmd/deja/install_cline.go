@@ -251,7 +251,7 @@ export default {
     // prompt stamps it again before the model is called. Cline has no hook for
     // the session itself ending.
     afterRun: () => {
-      if (session) run(["hook-session-end"], JSON.stringify({ session_id: session }), 2000);
+      if (session) run(["hook-session-end"], JSON.stringify({ session_id: session, cwd: workspace || process.cwd() }), 2000);
     },
   },
   setup(api, ctx) {

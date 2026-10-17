@@ -335,7 +335,7 @@ export default {
     // ran here and a finished session stayed out of the next one's MCP recall
     // for twenty minutes (#4571).
     const live = new Set()
-    const endSession = (id) => runHook("hook-session-end", JSON.stringify({ session_id: id }), cwd)
+    const endSession = (id) => runHook("hook-session-end", JSON.stringify({ session_id: id, cwd }), cwd)
     // A sub-agent's session names its parent. Without it the sub-agent's
     // digest and recall led with the parent, which is live and is the very
     // session that spawned it (#4548, fixed for 1.x). 2.x hands the plugin
@@ -670,7 +670,7 @@ func legacyPluginJSFor(target, exe string) string {
   // ended, so without ending them here the stamp sat out its whole window and
   // the next session's MCP recall left a finished one out (#4546).
   const live = new Set()
-  const endSession = (id) => $%secho ${JSON.stringify({ session_id: id })} | %q hook-session-end%s.quiet()
+  const endSession = (id) => $%secho ${JSON.stringify({ session_id: id, cwd })} | %q hook-session-end%s.quiet()
   // The per-prompt recall each user message was given, by message.
   const recalled = new Map()
   const remember = (key, extra) => {
