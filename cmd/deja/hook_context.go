@@ -691,6 +691,11 @@ func runHookContextMode(dir string, plain, once bool) error {
 			return nil
 		}
 		rememberSessionDigest(dir, input.SessionID)
+		// A Kimi /fork is a copy of its source under a new id, the digest
+		// that opened the source among what it copied (#5146).
+		if src := sources.KimiForkSource(input.SessionID); src != "" && sessionHadDigest(dir, src) {
+			return nil
+		}
 	}
 	// Claude Code forks with source "fork", and the fork carries its source's
 	// turns, the digest that opened it among them. A second one led with the

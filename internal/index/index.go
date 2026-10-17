@@ -710,7 +710,12 @@ import (
 // 70: recoffsets.bin and frictext.bin sit beside the log. Both are caches
 // checked against it, so an index without them reads as before and needs no
 // rebuild for them.
-const version = 70
+// 71: Kimi Code 2.x sessions get their project and start time from
+// state.json, which names the directory cwd and stamps in milliseconds; the
+// rows already indexed have neither until a rebuild (#5143). Their first
+// prompt no longer opens with the empty <hook_result> wrappers of deja's own
+// hooks either, which is what titled them (#5144).
+const version = 71
 
 // onDiskFormat is how the store is laid out on disk — the record encoding, the
 // bucket encoding, the manifest's own shape. It moves only when a reader of an

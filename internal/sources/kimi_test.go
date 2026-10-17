@@ -350,3 +350,52 @@ func TestKimiTailResumesKeepsBothRules(t *testing.T) {
 		})
 	}
 }
+
+// Kimi Code 2.x names the directory cwd and stamps state.json in epoch
+// milliseconds; the string-typed struct failed on the number and every 2.x
+// session indexed with no project and resumed with no cd (#5143).
+func TestKimi2StateGivesProjectAndResumeDir(t *testing.T) {
+	root, wire := kimiFixture(t)
+	state := `{"id":"session_t01","version":2,"cwd":"/home/u/work/proj","createdAt":1782295200000,"updatedAt":1782295205000,"agents":{"main":{"type":"main"}},"custom":{},"archived":false,"isCustomTitle":false}`
+	if err := os.WriteFile(filepath.Join(root, "kimi", "sessions", "wd_demo_ab", "session_t01", "state.json"), []byte(state), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(wire, []byte(kimiWireHead), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseKimiFile(wire)
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("parse: %v %d", err, len(ss))
+	}
+	if ss[0].Project != "work/proj" {
+		t.Fatalf("project = %q, want work/proj", ss[0].Project)
+	}
+	if got := KimiSessionDir(wire); got != "/home/u/work/proj" {
+		t.Fatalf("resume dir = %q", got)
+	}
+	if ss[0].Started.UnixMilli() != 1782295200000 {
+		t.Fatalf("started = %v", ss[0].Started)
+	}
+}
+
+// Kimi Code 2.x hands the person's message to the model with each
+// UserPromptSubmit hook's output as a <hook_result> part ahead of the typed
+// words, all under origin user. The parts are the host's; the session was
+// titled by their empty wrappers (#5144).
+func TestKimi2HookResultPartsAreNotTheUsersWords(t *testing.T) {
+	_, wire := kimiFixture(t)
+	line := `{"type":"context.append_message","agentId":"main","message":{"role":"user","content":[` +
+		`{"type":"text","text":"<hook_result hook_event=\"UserPromptSubmit\">\n<deja-recall>\nrecalled\n</deja-recall>\n</hook_result>"},` +
+		`{"type":"text","text":"<hook_result hook_event=\"UserPromptSubmit\">\nplain hook stdout\n</hook_result>"},` +
+		`{"type":"text","text":"raise the retry cap to 6"}],"origin":{"kind":"user"}},"time":1782295201000}` + "\n"
+	if err := os.WriteFile(wire, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ParseKimiFile(wire)
+	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 1 {
+		t.Fatalf("parse: %v %+v", err, ss)
+	}
+	if got := ss[0].Messages[0].Text; got != "raise the retry cap to 6" {
+		t.Fatalf("user text = %q", got)
+	}
+}
