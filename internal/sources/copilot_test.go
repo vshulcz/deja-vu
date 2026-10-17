@@ -74,9 +74,34 @@ func TestParseCopilotFileFromOffset(t *testing.T) {
 	if err != nil || len(ss) != 1 || len(ss[0].Messages) != 2 {
 		t.Fatalf("offset parse = %#v, %v", ss, err)
 	}
-	// The ID falls back to the directory name when session.start is behind the offset.
-	if ss[0].ID != "abc" {
-		t.Fatalf("fallback id = %q", ss[0].ID)
+	// session.start is behind the offset; its id still names the session.
+	if ss[0].ID != "7cf44517-55ca-435c-893a-3fde1973a44e" {
+		t.Fatalf("id = %q", ss[0].ID)
+	}
+}
+
+// An index run between session.start and the first prompt stores the file's
+// offset with no session; the rest of the file then arrives as a tail. It has
+// to carry what a rebuild reads off session.start, or the session is filed
+// under no project and drops out of that project's start digest and prompt
+// recall (#5136).
+func TestCopilotTailReadKeepsSessionStart(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("DEJA_COPILOT_ROOT", root)
+	lines := copilotFixtureLines()
+	p := writeCopilotFixture(t, root, "7cf44517-55ca-435c-893a-3fde1973a44e", lines)
+	full, err := ParseCopilotFile(p)
+	if err != nil || len(full) != 1 {
+		t.Fatalf("full parse = %#v, %v", full, err)
+	}
+	ss, err := ParseCopilotFileFromOffset(p, int64(len(lines[0])+1))
+	if err != nil || len(ss) != 1 {
+		t.Fatalf("tail parse = %#v, %v", ss, err)
+	}
+	got, want := ss[0], full[0]
+	if got.Project != want.Project || got.ID != want.ID || !got.Started.Equal(want.Started) {
+		t.Fatalf("tail = id %q project %q started %v, rebuild = id %q project %q started %v",
+			got.ID, got.Project, got.Started, want.ID, want.Project, want.Started)
 	}
 }
 

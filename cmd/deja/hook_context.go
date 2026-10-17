@@ -1044,7 +1044,13 @@ func (e hookCacheEntry) servedWithout(exclude ...string) (hookDigestVariant, boo
 		return hookDigestVariant{Digest: e.Digest, Sessions: e.Sessions, Raw: e.Raw, TaskMatched: e.TaskMatched, IDs: e.IDs, Projects: e.Projects}, true
 	case 1:
 		v, ok := e.Without[in[0]]
-		return v, ok
+		// The variant backfills from the sessions behind the digest, and a
+		// fork leaves out its sources too, which the full digest may not hold
+		// (#5138).
+		if !ok || slices.ContainsFunc(exclude, func(id string) bool { return id != "" && slices.Contains(v.IDs, id) }) {
+			return hookDigestVariant{}, false
+		}
+		return v, true
 	}
 	return hookDigestVariant{}, false
 }

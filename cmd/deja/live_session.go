@@ -264,12 +264,15 @@ func askerLineage(dir, asker, transcript string, ids ...string) map[string]bool 
 }
 
 // askerHead is the session read off its own store: the first records of the
-// transcript the payload names, or opencode's database, which the plugin's
-// payload does not name a file in.
+// transcript the payload names, or opencode's database or Copilot CLI's
+// session folder, which their payloads do not name a file in (#5137).
 func askerHead(id, transcript string) (model.Session, bool) {
 	if transcript != "" {
 		s, err := sources.TranscriptHead(transcript, id)
 		return s, err == nil
+	}
+	if s, err := sources.CopilotSessionHead(id); err == nil {
+		return s, true
 	}
 	if strings.HasPrefix(id, "ses_") {
 		for _, s := range sources.LoadOpencodeSession(id) {

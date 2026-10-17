@@ -94,3 +94,22 @@ func TestTheHookCacheIsReplacedNotRewritten(t *testing.T) {
 		t.Fatalf("a reader that opened the old entry read:\n%s\nwant the old entry whole:\n%s", got, old)
 	}
 }
+
+// A fork asks without itself and its sources. The cache keeps a digest per
+// served session left out, and the one without the fork's previous copy
+// backfilled with a source the fork also leaves out: it was served, and the
+// fork was handed its own history as a prior session (#5138).
+func TestTheDigestWithoutOneSessionIsNotServedWhenItHoldsAnother(t *testing.T) {
+	e := hookCacheEntry{
+		Digest: "fork-b and other", IDs: []string{"fork-b", "other"},
+		Without: map[string]hookDigestVariant{
+			"fork-b": {Digest: "source and other", IDs: []string{"source", "other"}},
+		},
+	}
+	if v, ok := e.servedWithout("fork-c", "fork-b", "source"); ok {
+		t.Errorf("served %v to a session that leaves out %v", v.IDs, []string{"fork-c", "fork-b", "source"})
+	}
+	if v, ok := e.servedWithout("fork-b"); !ok || v.Digest != "source and other" {
+		t.Errorf("the variant without one session is not served to it: %v %v", v, ok)
+	}
+}

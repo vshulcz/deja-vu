@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/vshulcz/deja-vu/internal/model"
 )
@@ -32,6 +33,20 @@ func CopilotSessionFiles() []string {
 	return walkFiles(CopilotRoot(), func(p string) bool {
 		return filepath.Base(p) == "events.jsonl"
 	})
+}
+
+// CopilotSessionFile is the event log Copilot CLI keeps for session id, or ""
+// when there is none. Its hooks name the session and not the file.
+func CopilotSessionFile(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "." || id == ".." || strings.ContainsAny(id, `/\`) {
+		return ""
+	}
+	p := filepath.Join(CopilotRoot(), id, "events.jsonl")
+	if fi, err := os.Stat(p); err != nil || !fi.Mode().IsRegular() {
+		return ""
+	}
+	return p
 }
 
 // CopilotSidecarFiles lists the IDE's bookkeeping beside each session —
@@ -95,6 +110,13 @@ var copilotDialect = toolDialect{
 }
 
 func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseCopilotScan(path, offset, func(fn func(map[string]any)) error {
+		return scanJSONLFromOffset(path, offset, fn)
+	})
+}
+
+// parseCopilotScan reads the records scan yields as path's, from offset.
+func parseCopilotScan(path string, offset int64, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	s := model.Session{
 		Harness: "copilot",
 		ID:      filepath.Base(filepath.Dir(path)),
@@ -104,12 +126,23 @@ func parseCopilotFileFromOffset(path string, offset int64) ([]model.Session, err
 	// event repeats: Copilot files the command and its outcome as two records.
 	commandAt := map[string][]int{}
 	// Where the session runs, which a patch's relative paths are under. An
-	// incremental read starts past session.start, so it comes off the head.
+	// incremental read starts past session.start, so it comes off the head,
+	// with the id, start and project a rebuild takes from there: an index run
+	// between session.start and the first prompt (a hook's refresh does) left
+	// the session filed under no project for good (#5136).
 	cwd := ""
 	if offset > 0 {
-		cwd = copilotHeadCWD(path)
+		head := copilotReadHead(path)
+		cwd = head.cwd
+		if head.id != "" {
+			s.ID = head.id
+		}
+		s.Touch(head.started)
+		if cwd != "" {
+			s.Project = copilotProjectName(cwd)
+		}
 	}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	err := scan(func(m map[string]any) {
 		typ, _ := m["type"].(string)
 		data, _ := m["data"].(map[string]any)
 		t := parseTimeAny(m["timestamp"])
@@ -332,10 +365,19 @@ func copilotExitCode(data map[string]any, out string) int {
 
 // copilotHeadCWD is the cwd session.start records, read off the first lines
 // only.
-func copilotHeadCWD(path string) string {
+func copilotHeadCWD(path string) string { return copilotReadHead(path).cwd }
+
+type copilotHead struct {
+	id, cwd string
+	started time.Time
+}
+
+// copilotReadHead is what session.start records, read off the first lines
+// only.
+func copilotReadHead(path string) copilotHead {
 	f, err := os.Open(path)
 	if err != nil {
-		return ""
+		return copilotHead{}
 	}
 	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
@@ -344,16 +386,18 @@ func copilotHeadCWD(path string) string {
 		var rec struct {
 			Type string `json:"type"`
 			Data struct {
-				Context struct {
+				SessionID string `json:"sessionId"`
+				StartTime any    `json:"startTime"`
+				Context   struct {
 					CWD string `json:"cwd"`
 				} `json:"context"`
 			} `json:"data"`
 		}
 		if json.Unmarshal(sc.Bytes(), &rec) == nil && rec.Type == "session.start" {
-			return rec.Data.Context.CWD
+			return copilotHead{id: rec.Data.SessionID, cwd: rec.Data.Context.CWD, started: parseTimeAny(rec.Data.StartTime)}
 		}
 	}
-	return ""
+	return copilotHead{}
 }
 
 // copilotProjectName is the recorded working directory's project, the last two

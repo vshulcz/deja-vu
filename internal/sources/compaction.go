@@ -308,6 +308,8 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		}, false, "", compactionMapScanner(originalPath, data), nil)
 	case "codebuddy":
 		sessions, err = parseCodeBuddy(originalPath, compactionMapScanner(originalPath, data))
+	case "copilot":
+		sessions, err = parseCopilotScan(originalPath, 0, compactionMapScanner(originalPath, data))
 	default:
 		return model.Session{}, ErrUnsupportedCompactionTranscript
 	}
@@ -673,6 +675,23 @@ func IsCompactionEditTool(name string) bool {
 // it — learns from it which turn the session opens with and, from a Codex
 // rollout, which thread it was forked from (#4549).
 func TranscriptHead(path, nativeSessionID string) (model.Session, error) {
+	return transcriptHead(path, nativeSessionID, "")
+}
+
+// CopilotSessionHead is TranscriptHead for a Copilot CLI session, found by its
+// id: Copilot's hooks name the session and not its file, and its records do
+// not say which harness wrote them.
+func CopilotSessionHead(id string) (model.Session, error) {
+	p := CopilotSessionFile(id)
+	if p == "" {
+		return model.Session{}, os.ErrNotExist
+	}
+	return transcriptHead(p, id, "copilot")
+}
+
+// transcriptHead reads path's head as known's, or as whichever harness its
+// records name when known is "".
+func transcriptHead(path, nativeSessionID, known string) (model.Session, error) {
 	if strings.TrimSpace(nativeSessionID) == "" {
 		return model.Session{}, fmt.Errorf("%w: missing session id", ErrTranscriptIdentity)
 	}
@@ -707,7 +726,10 @@ func TranscriptHead(path, nativeSessionID string) (model.Session, error) {
 			head = nil
 		}
 		if head != nil {
-			harness, err := compactionHarness(head, nil)
+			harness, err := known, error(nil)
+			if harness == "" {
+				harness, err = compactionHarness(head, nil)
+			}
 			if err != nil {
 				return model.Session{}, err
 			}
