@@ -302,3 +302,41 @@ func TestGeminiSnapshotsFollowGeminisHistory(t *testing.T) {
 		t.Errorf("a rewritten turn was kept twice: %s", got)
 	}
 }
+
+// Gemini CLI 0.64 writes a sub-agent's run under chats/<parent id>/ and names
+// it in the header; read without its parent, recall from the live parent
+// answered with its own sub-agents (#5134).
+func TestGeminiSubagentNamesItsParent(t *testing.T) {
+	_, chats := geminiTree(t)
+	parent := "f7b7a064-d884-4582-a228-e95a8c1ac4f3"
+	dir := filepath.Join(chats, parent)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	child := filepath.Join(dir, "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6.jsonl")
+	lines := `{"sessionId":"24b39ab6-b48a-48e4-80f9-0ba7bb24acc6","projectHash":"abc","startTime":"2026-10-17T21:48:40.460Z","lastUpdated":"2026-10-17T21:48:40.460Z","kind":"subagent","directories":["/w/p"]}
+{"id":"u1","timestamp":"2026-10-17T21:48:41.000Z","type":"user","content":[{"text":"check the release train history"}]}
+{"id":"a1","timestamp":"2026-10-17T21:48:42.000Z","type":"gemini","content":"nothing found","model":"gemini-3"}
+`
+	if err := os.WriteFile(child, []byte(lines), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	main := filepath.Join(chats, "session-2026-10-17T21-47-f7b7a064.jsonl")
+	if err := os.WriteFile(main, []byte(strings.Replace(strings.Replace(lines, "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6", parent, 1), `"subagent"`, `"main"`, 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]model.Session{}
+	for _, p := range []string{child, main} {
+		ss, err := ParseGeminiFile(p)
+		if err != nil || len(ss) != 1 {
+			t.Fatalf("%s: %v %#v", p, err, ss)
+		}
+		got[ss[0].ID] = ss[0]
+	}
+	if c := got["24b39ab6-b48a-48e4-80f9-0ba7bb24acc6"]; c.Kind != "subagent" || c.Parent != parent {
+		t.Fatalf("sub-agent kind/parent = %q/%q, want subagent/%s", c.Kind, c.Parent, parent)
+	}
+	if m := got[parent]; m.Kind != "" || m.Parent != "" {
+		t.Fatalf("the main session got kind/parent %q/%q", m.Kind, m.Parent)
+	}
+}

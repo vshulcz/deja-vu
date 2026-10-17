@@ -328,7 +328,8 @@ func runHookDeferred(dir, name string, rest []string, cmd command) error {
 	if !deferIt && (name == "hook-context" || name == "hook-prompt") && grokDropsContext() {
 		deferIt = true
 	}
-	if !deferIt && !hasDeferred(dir) {
+	gemini := name == "hook-context" && os.Getenv("GEMINI_PROJECT_DIR") != ""
+	if !deferIt && !gemini && !hasDeferred(dir) {
 		return cmd(dir, rest)
 	}
 	if stdinIsTerminal() {
@@ -336,6 +337,15 @@ func runHookDeferred(dir, name string, rest []string, cmd command) error {
 	}
 	raw := readHookStdin()
 	key, event := readDeferredPayload(raw)
+	// Gemini CLI fires SessionStart on --resume before it has gone back to
+	// the resumed file, so an answer there was written to a new file with no
+	// session header, and Gemini's cleanup then deleted every file of that id,
+	// the real transcript too (#5133). The digest waits for the session's
+	// first prompt, and the note stays unsaid: it is written to that file too.
+	quiet := false
+	if !deferIt && gemini && geminiResumeStart(raw) {
+		deferIt, quiet = true, true
+	}
 	if !deferIt && !hasDeferredFor(dir, key) {
 		return withStdin(raw, func() error { return cmd(dir, rest) })
 	}
@@ -350,7 +360,7 @@ func runHookDeferred(dir, name string, rest []string, cmd command) error {
 		deferText(dir, key, name, hookOutputContext(out))
 		// What the host shows the person still goes out; the context does not,
 		// so it is not counted twice when it is handed over.
-		if notes := hookOutputNotes(out); notes != nil {
+		if notes := hookOutputNotes(out); notes != nil && !quiet {
 			_, _ = os.Stdout.Write(notes)
 		}
 		return err
@@ -535,4 +545,19 @@ func gooseStopFixPair(dir string, raw []byte, turn sources.GooseTurnState) strin
 	payload := frameRecall(truncateToolLine(line, toolAfterMaxBytes))
 	usage.RecordDigestInto(dir, usage.KindTool, payload, p.SessionID, 1, 0, nil)
 	return payload
+}
+
+// geminiResumeStart reports a Gemini CLI SessionStart for --resume: the event
+// and source in the payload, and a transcript under Gemini's own chats. Qwen
+// Code exports GEMINI_PROJECT_DIR as well, and its transcripts live elsewhere.
+func geminiResumeStart(raw []byte) bool {
+	var p struct {
+		Event      string `json:"hook_event_name"`
+		Source     string `json:"source"`
+		Transcript string `json:"transcript_path"`
+	}
+	if json.Unmarshal(raw, &p) != nil {
+		return false
+	}
+	return p.Event == "SessionStart" && p.Source == "resume" && sources.IsGeminiChatPath(p.Transcript)
 }

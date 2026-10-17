@@ -26,6 +26,8 @@ func TestResumeRefusesAKimiOrQwenSubagent(t *testing.T) {
 		{Harness: "qwen", ID: "agent-a1-q-1", Kind: "subagent", Parent: "q-1", Path: qwenChild},
 		{Harness: "kimi", ID: "agent-1-session_t01", Kind: "subagent", Parent: "session_t01",
 			Path: filepath.Join(tmp, "kimi", "sessions", "wd", "session_t01", "agents", "agent-1", "wire.jsonl")},
+		{Harness: "gemini", ID: "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6", Kind: "subagent", Parent: "f7b7a064-d884-4582-a228-e95a8c1ac4f3",
+			Path: filepath.Join(tmp, "gemini", "tmp", "proj", "chats", "f7b7a064-d884-4582-a228-e95a8c1ac4f3", "24b39ab6-b48a-48e4-80f9-0ba7bb24acc6.jsonl")},
 	} {
 		dir, cmd, err := resumeCommand(s)
 		if err == nil {

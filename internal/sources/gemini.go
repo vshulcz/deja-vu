@@ -58,6 +58,27 @@ func GeminiSidecarFiles() []string {
 	})
 }
 
+// IsGeminiChatPath reports a path inside a Gemini CLI project's chats, the way
+// a hook payload's transcript_path names one: under Gemini's home or deja's
+// read root, or any .gemini/tmp/<project>/chats when a home override hides
+// which one.
+func IsGeminiChatPath(p string) bool {
+	if p == "" {
+		return false
+	}
+	slash := filepath.ToSlash(filepath.Clean(p))
+	if !strings.Contains(slash, "/chats/") {
+		return false
+	}
+	for _, root := range []string{GeminiHome(), GeminiRoot()} {
+		tmp := filepath.ToSlash(filepath.Join(root, "tmp")) + "/"
+		if strings.HasPrefix(slash, tmp) {
+			return true
+		}
+	}
+	return strings.Contains(slash, "/.gemini/tmp/")
+}
+
 func GeminiChatFiles() []string {
 	root := filepath.Join(GeminiRoot(), "tmp")
 	var out []string
@@ -237,6 +258,15 @@ func parseGeminiJSONLWith(path string, scan func(func(map[string]any)) error) ([
 			st, _ := m["startTime"].(string)
 			lu, _ := m["lastUpdated"].(string)
 			s = geminiSessionShell(path, id, st, lu)
+			// Gemini 0.64 writes a sub-agent's run to chats/<parent>/<child>.jsonl
+			// and says so in the header. Without the parent, recall from the
+			// live session answered with its own sub-agents (#5134).
+			if kind, _ := m["kind"].(string); kind == "subagent" {
+				s.Kind = "subagent"
+				if parent := filepath.Base(filepath.Dir(path)); parent != "chats" {
+					s.Parent = parent
+				}
+			}
 			started = true
 			return
 		}

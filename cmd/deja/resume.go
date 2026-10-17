@@ -332,8 +332,9 @@ func resumeCommand(s model.Session) (string, string, error) {
 	// DEJA_INCLUDE_SUBAGENTS=1, but none of these clients opens one on its own; the
 	// id deja gives it is one they have never seen (#4483).
 	// Muse's child logs are the same: `muse resume <child>` answers "has no
-	// saved log" (#4710).
-	if s.Kind == "subagent" && (s.Harness == "kimi" || s.Harness == "qwen" || s.Harness == "muse" || s.Harness == "codebuddy" || s.Harness == "devin") && s.Parent != "" {
+	// saved log" (#4710). Gemini CLI's under chats/<parent>/ answer "Invalid
+	// session identifier" (0.64, #5134).
+	if s.Kind == "subagent" && (s.Harness == "kimi" || s.Harness == "qwen" || s.Harness == "muse" || s.Harness == "codebuddy" || s.Harness == "devin" || s.Harness == "gemini") && s.Parent != "" {
 		return "", "", fmt.Errorf("session %s is a sub-agent run, which %s does not reopen on its own — `deja resume %s` reopens the session that spawned it", digest.Short(s.ID), s.Harness, s.Parent)
 	}
 	// Nor a Kimi /btw side question, which runs in a fork of the session it
