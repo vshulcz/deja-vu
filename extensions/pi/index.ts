@@ -1,12 +1,12 @@
 // deja-vu for pi: recall from the coding sessions already on this machine at
 // session start and on every prompt, and /deja to search them by hand.
 import { execFileSync } from "node:child_process";
-import { accessSync, constants, existsSync } from "node:fs";
+import { accessSync, closeSync, constants, existsSync, openSync, readSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
-import { argv, contextText, installerExtensionPaths, sessionKey } from "./lib.mjs";
+import { argv, branchHoldsRecall, contextText, installerExtensionPaths, sessionKey } from "./lib.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -124,16 +124,58 @@ export default function (pi: any) {
     },
   });
 
+  // The session a fork was made from, named on its header by path, when the
+  // fork holds a copy of its turns: a fork at the first message copies
+  // nothing, and its source is no part of it. The id is on that file's own
+  // header; pi names the file <time>_<id>.jsonl.
+  const parents: Record<string, string> = {};
+  const parentID = (ctx: any): string => {
+    if (session in parents) return parents[session];
+    let id = "";
+    try {
+      const m = ctx.sessionManager;
+      const path = String((m.getHeader() || {}).parentSession || "");
+      const copied = (m.getBranch() || []).some((e: any) => e && e.type === "message");
+      if (path && copied) {
+        try {
+          const fd = openSync(path, "r");
+          const buf = Buffer.alloc(64 * 1024);
+          const n = readSync(fd, buf, 0, buf.length, 0);
+          closeSync(fd);
+          id = String(JSON.parse(buf.subarray(0, n).toString("utf8").split("\n", 1)[0]).id || "");
+        } catch {}
+        if (!id) {
+          const name = basename(path).replace(/\.jsonl$/, "");
+          id = name.slice(name.lastIndexOf("_") + 1);
+        }
+      }
+    } catch {}
+    if (session) parents[session] = id;
+    return id;
+  };
+
   pi.on("before_agent_start", async (event: any, ctx: any) => {
     try {
       const key = sessionKey(event, ctx);
       if (key) session = key;
+      // A resumed session holds the digest it opened with, and pi sends it to
+      // the model again with the rest of the session; a fork holds a copy of
+      // its source's. Asking for another put a second copy in front of the
+      // model, and in a fork one that led with the source itself.
+      const parent = parentID(ctx);
+      try {
+        if (!injected.has(session) && branchHoldsRecall(ctx.sessionManager.getBranch())) {
+          injected.add(session);
+          const stats = run(["statusline"], "");
+          if (stats) ctx.ui.setStatus("deja", stats);
+        }
+      } catch {}
       if (!injected.has(session)) {
         // The session goes with it: hook-context marks the one starting as
         // live, which keeps it out of its own MCP recall on this first turn
         // (#4394, as #4246 and #4273 did for Hermes and opencode).
         const { context: digest, receipt } = contextText(
-          run(["hook-context"], JSON.stringify({ session_id: session, cwd: process.cwd() })),
+          run(["hook-context"], JSON.stringify({ session_id: session, parent_session_id: parent, cwd: process.cwd() })),
         );
         if (digest) {
           injected.add(session);
@@ -155,7 +197,7 @@ export default function (pi: any) {
         }
         return;
       }
-      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: session }));
+      const raw = run(["hook-prompt"], JSON.stringify({ prompt: event.prompt || "", session_id: session, parent_session_id: parent }));
       if (!raw) return;
       const resp = JSON.parse(raw);
       if (resp && resp.systemMessage) ctx.ui.notify(resp.systemMessage, "info");

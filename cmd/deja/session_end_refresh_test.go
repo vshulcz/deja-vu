@@ -43,8 +43,26 @@ func TestSessionEndRefreshesTheProjectsStartDigest(t *testing.T) {
 	}
 }
 
-// No cached digest means the next start builds one itself, recall off means
-// nobody reads one, and a payload without a project names no cache.
+// The first session in a project leaves no cache behind: an empty digest is
+// never written. The next start built one itself, from an index nothing had
+// refreshed since that session wrote, and left it out however long the gap.
+func TestSessionEndRefreshesAProjectWithNoCacheYet(t *testing.T) {
+	requireNoSpawnHere(t)
+	t.Setenv("DEJA_RECALL", "")
+	t.Setenv("DEJA_HOOK_REFRESH", "")
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	t.Setenv("DEVIN_PROJECT_DIR", "")
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "index.db")
+	work := filepath.Join(tmp, "work")
+	runHookSessionEnd(dir, strings.NewReader(`{"session_id":"s-1","cwd":"`+jsonEscaped(t, work)+`"}`))
+	if _, err := os.Stat(hookCachePath(dir, work) + ".refreshing"); err != nil {
+		t.Errorf("the first session in a project ended and nothing refreshed the index the next start reads: %v", err)
+	}
+}
+
+// Recall off means nobody reads a digest, and a payload without a project
+// names no cache.
 func TestSessionEndLeavesNoCacheAlone(t *testing.T) {
 	requireNoSpawnHere(t)
 	t.Setenv("DEJA_RECALL", "")
@@ -56,11 +74,6 @@ func TestSessionEndLeavesNoCacheAlone(t *testing.T) {
 	work := filepath.Join(tmp, "work")
 	payload := `{"session_id":"s-1","cwd":"` + jsonEscaped(t, work) + `"}`
 	sentinel := hookCachePath(dir, work) + ".refreshing"
-
-	runHookSessionEnd(dir, strings.NewReader(payload))
-	if _, err := os.Stat(sentinel); err == nil {
-		t.Error("refreshed a project with no cached digest")
-	}
 
 	if err := os.WriteFile(hookCachePath(dir, work), []byte(`{"digest":"x"}`), 0o600); err != nil {
 		t.Fatal(err)

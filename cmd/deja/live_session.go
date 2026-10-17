@@ -120,12 +120,13 @@ func sessionEndProject(input precompactHookInput) string {
 // other refresh runs at a session start, before that session has written
 // anything, so the next session read a snapshot without the one that just
 // ended (#5119). Detached, like every refresh: the host is closing.
+//
+// A project with no cache yet too. The next start does build the digest
+// itself, but from an index nothing has refreshed since this session wrote, so
+// the first session in a new project reached neither the second session nor
+// any later one until a third start refreshed it.
 func refreshDigestAfterSession(dir, cwd string) {
 	if dir == "" || strings.TrimSpace(cwd) == "" || recallIsOff() {
-		return
-	}
-	// No cache means the next start builds the digest itself.
-	if _, err := os.Stat(hookCachePath(dir, cwd)); err != nil {
 		return
 	}
 	requestHookRefresh(dir, cwd)
