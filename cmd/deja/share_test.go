@@ -58,8 +58,17 @@ func TestShareRefusesFlagsItCannotHonour(t *testing.T) {
 		t.Errorf("share --json was searched as a session prefix: %v", err)
 	}
 
+	// A second id is refused and named, not dropped (#5076).
+	got, err := captureRun(t, "share", "loc", "extra")
+	if err == nil || err.Error() != `share accepts one session id, got an extra "extra"` {
+		t.Errorf("share with a second id: err=%v out=%q", err, got)
+	}
+	if got != "" {
+		t.Errorf("share printed a digest before refusing a second id:\n%s", got)
+	}
+
 	// The ordinary share is untouched.
-	got, err := captureRun(t, "share", "loc")
+	got, err = captureRun(t, "share", "loc")
 	if err != nil {
 		t.Fatal(err)
 	}

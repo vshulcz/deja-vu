@@ -78,9 +78,13 @@ func runRestore(dir string, args []string, stdout io.Writer) error {
 			if strings.HasPrefix(args[i], "-") {
 				return unknownFlag("restore", args[i], restoreFlags)
 			}
-			if path == "" {
-				path = args[i]
+			// A second path used to be skipped, so `deja restore main.go
+			// config.go` reported nothing for main.go and never looked at
+			// config.go (#5076). Refuse it before the index is opened.
+			if path != "" {
+				return fmt.Errorf("restore accepts one path, got an extra %q", args[i])
 			}
+			path = args[i]
 		}
 	}
 	if path == "" {

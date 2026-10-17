@@ -132,6 +132,11 @@ func TestRestoreUnknownPathAndBadArgs(t *testing.T) {
 	if err := runRestore(t.TempDir(), nil, os.Stdout); err == nil {
 		t.Fatal("no path should be a usage error")
 	}
+	// A second path is refused and named, not silently skipped (#5076).
+	if err := runRestore(t.TempDir(), []string{"main.go", "config.go"}, os.Stdout); err == nil ||
+		err.Error() != `restore accepts one path, got an extra "config.go"` {
+		t.Fatalf("restore with two paths: %v", err)
+	}
 	if err := runRestore(t.TempDir(), []string{"a.go", "--span", "x"}, os.Stdout); err == nil {
 		t.Fatal("--span wants a number")
 	}
