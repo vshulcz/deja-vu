@@ -356,6 +356,13 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 	// maps the Claude names onto its own — and then dropped here, so the hook
 	// fired on every action it took and had nothing to say about any of them.
 	if isCommandTool(input.ToolName) {
+		// Codex runs apply_patch through its shell tool when the model has no
+		// apply_patch tool of its own — a provider model without Codex metadata
+		// does every edit that way — and the hook then names the tool Bash with
+		// the patch in the heredoc. That is an edit, not a command.
+		if cmd := input.ToolInput.Command; strings.Contains(cmd, "apply_patch") && strings.Contains(cmd, "*** Begin Patch") {
+			return applyPatchLine(dir, cwd, cmd, input.SessionID)
+		}
 		if !commandHintsOn() {
 			return ""
 		}
@@ -407,10 +414,16 @@ func toolHookLineSkipping(dir, cwd string, input toolHookInput, used func(string
 		// is in its header, not in file_path. Pull the targets out so the
 		// file-history line fires here too — without this the hook is blind to
 		// every edit those agents make.
-		for _, path := range applyPatchFiles(input.ToolInput.Command) {
-			if line := fileHookLineOutside(dir, cwd, path, input.SessionID); line != "" {
-				return line
-			}
+		return applyPatchLine(dir, cwd, input.ToolInput.Command, input.SessionID)
+	}
+	return ""
+}
+
+// applyPatchLine is the file line for the first file in a patch that has one.
+func applyPatchLine(dir, cwd, patch, self string) string {
+	for _, path := range applyPatchFiles(patch) {
+		if line := fileHookLineOutside(dir, cwd, path, self); line != "" {
+			return line
 		}
 	}
 	return ""
