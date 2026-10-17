@@ -24,6 +24,7 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 	n := 20
 	jsonOut := false
 	last := false
+	seenN := false
 	for _, a := range args {
 		switch a {
 		case "--json":
@@ -45,7 +46,12 @@ func runLogTo(w io.Writer, dir string, args []string) error {
 			if x <= 0 {
 				return fmt.Errorf("log: how many entries to show must be positive, got %q", a)
 			}
-			n = x
+			// A second count used to win without a word (#5074); `last`
+			// refuses the same input with this shape of message.
+			if seenN {
+				return fmt.Errorf("log takes one count, got %d and %q", n, a)
+			}
+			n, seenN = x, true
 		}
 	}
 	if last {

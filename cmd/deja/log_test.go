@@ -74,3 +74,30 @@ func TestStatuslineShowsDistillRatio(t *testing.T) {
 		t.Fatalf("statusline missing ratio: %q", out.String())
 	}
 }
+
+// A second count used to replace the first without a word (#5074). `last`
+// refuses the same input, and log now says the same thing.
+func TestLogRefusesASecondCount(t *testing.T) {
+	withTempStores(t)
+	dir := t.TempDir()
+	var b bytes.Buffer
+	err := runLogTo(&b, dir, []string{"2", "1"})
+	if err == nil {
+		t.Fatalf("log 2 1: want an error, got output %q", b.String())
+	}
+	if want := `log takes one count, got 2 and "1"`; err.Error() != want {
+		t.Errorf("log 2 1: got %q, want %q", err.Error(), want)
+	}
+	if b.Len() != 0 {
+		t.Errorf("log 2 1 printed before refusing: %q", b.String())
+	}
+	// Flags around a single count are still fine.
+	b.Reset()
+	if err := runLogTo(&b, dir, []string{"--json", "2"}); err != nil {
+		t.Errorf("log --json 2: %v", err)
+	}
+	b.Reset()
+	if err := runLogTo(&b, dir, []string{"2"}); err != nil {
+		t.Errorf("log 2: %v", err)
+	}
+}
