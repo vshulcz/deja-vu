@@ -130,6 +130,12 @@ func ParseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 }
 
 func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error) {
+	return parseQwenScan(path, func(fn func(map[string]any)) error { return scanJSONLFromOffset(path, offset, fn) })
+}
+
+// parseQwenScan reads the records scan hands over as the Qwen transcript at
+// path: the whole file, a tail from an offset, or a hook's bounded head.
+func parseQwenScan(path string, scan func(func(map[string]any)) error) ([]model.Session, error) {
 	project := cwdProjectName(qwenTranscriptCWD(path))
 	if project == "" {
 		project = claudeProjectName(projectDir(filepath.Join(QwenRoot(), "projects"), path))
@@ -154,8 +160,16 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 	// A shell call and its result are separate records; the call id carries
 	// the command over to the result its exit status is read from (#4255).
 	shellAt := map[string]int{}
-	err := scanJSONLFromOffset(path, offset, func(m map[string]any) {
+	// A /branch copies its source's records and marks each with
+	// forkedFrom.sessionId, the session it was copied out of (0.20.0
+	// SessionService.forkSession). That is the fork's source, said by the
+	// harness, so the branch's own recall can leave it out.
+	forkedFrom := ""
+	err := scan(func(m map[string]any) {
 		typ, _ := m["type"].(string)
+		if ff, ok := m["forkedFrom"].(map[string]any); ok && forkedFrom == "" {
+			forkedFrom, _ = ff["sessionId"].(string)
+		}
 		if typ == "tool_result" {
 			// Every tool result is its own record, role user, parts holding
 			// the functionResponse. Skipped with the other types, a failing
@@ -216,6 +230,9 @@ func parseQwenFileFromOffset(path string, offset int64) ([]model.Session, error)
 			qwenNoteExits(&s, msg["parts"], shellAt)
 		}
 	})
+	if forkedFrom != "" && forkedFrom != s.ID && !child {
+		s.Kind, s.Parent = "fork", forkedFrom
+	}
 	if len(s.Messages) == 0 {
 		return nil, err
 	}

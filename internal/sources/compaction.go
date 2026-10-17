@@ -310,6 +310,8 @@ func parseCompactionSession(originalPath, harness, workspace string, data []byte
 		sessions, err = parseCodeBuddy(originalPath, compactionMapScanner(originalPath, data))
 	case "copilot":
 		sessions, err = parseCopilotScan(originalPath, 0, compactionMapScanner(originalPath, data))
+	case "qwen":
+		sessions, err = parseQwenScan(originalPath, compactionMapScanner(originalPath, data))
 	default:
 		return model.Session{}, ErrUnsupportedCompactionTranscript
 	}
@@ -730,6 +732,12 @@ func transcriptHead(path, nativeSessionID, known string) (model.Session, error) 
 			harness, err := known, error(nil)
 			if harness == "" {
 				harness, err = compactionHarness(head, nil)
+				// A hook asking about a Qwen session reads its head too: a
+				// /branch's first prompts come before any build has seen
+				// it, and its digest led with its source.
+				if errors.Is(err, ErrUnsupportedCompactionTranscript) && qwenShapedHead(head) {
+					harness, err = "qwen", nil
+				}
 			}
 			if err != nil {
 				return model.Session{}, err
@@ -750,6 +758,35 @@ func transcriptHead(path, nativeSessionID, known string) (model.Session, error) 
 		return model.Session{}, fmt.Errorf("%w: got %q, want %q", ErrTranscriptIdentity, s.ID, nativeSessionID)
 	}
 	return s, nil
+}
+
+// qwenShapedHead reports whether head reads as a Qwen Code transcript: a
+// Claude-style record, sessionId and type, whose turn is a list of Gemini
+// parts. compactionHarness turns it away for compaction, which Qwen's own
+// reader handles.
+func qwenShapedHead(head []byte) bool {
+	for len(head) > 0 {
+		line := head
+		if i := bytes.IndexByte(head, '\n'); i >= 0 {
+			line, head = head[:i], head[i+1:]
+		} else {
+			head = nil
+		}
+		var record struct {
+			Type      string `json:"type"`
+			SessionID string `json:"sessionId"`
+			Message   *struct {
+				Parts json.RawMessage `json:"parts"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(bytes.TrimSpace(line), &record) != nil {
+			continue
+		}
+		if record.SessionID != "" && (record.Type == "user" || record.Type == "assistant") && record.Message != nil && len(record.Message.Parts) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // transcriptHeadMaxBytes bounds TranscriptHead: it runs inside a hook, and a
